@@ -12,35 +12,10 @@
     <script src="https://cdn.jsdelivr.net/npm/pusher-js@8.4.0-rc2/dist/web/pusher.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/laravel-echo@1.16.1/dist/echo.iife.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link
-        href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap"
-        rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 
     <style>
         :root {
-
-            .stat-card.s-cancel::before {
-                background: var(--cancelado);
-            }
-
-            .stat-card.s-cancel .stat-num {
-                color: var(--cancelado);
-            }
-
-            .stripe-cancelado {
-                background: var(--cancelado);
-            }
-
-            .status-cancelado {
-                background: rgba(239, 68, 68, 0.12);
-                color: #f87171;
-            }
-
-            .status-cancelado .status-dot-sm {
-                background: var(--cancelado);
-                box-shadow: 0 0 6px var(--cancelado);
-            }
-
             --bg: #0a0c12;
             --surface: #12151f;
             --card: #181c28;
@@ -53,8 +28,9 @@
 
             --nuevo: #3b82f6;
             --proceso: #f59e0b;
-            --despachado:#a855f7;
+            --despachado: #a855f7;
             --entregado: #22c55e;
+            --cancelado: #ef4444;
 
             --text: #f0f2f8;
             --muted: #6b7280;
@@ -79,7 +55,6 @@
             overflow-x: hidden;
         }
 
-        /* Ambient background blobs */
         body::before {
             content: '';
             position: fixed;
@@ -111,7 +86,6 @@
             margin: 0 auto;
         }
 
-        /* ── HEADER ── */
         .header {
             display: flex;
             justify-content: space-between;
@@ -181,10 +155,9 @@
             animation: pulse-green 1.8s ease infinite;
         }
 
-        /* ── STATS STRIP ── */
         .stats-strip {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(5, 1fr);
             gap: 12px;
             margin-bottom: 28px;
             animation: fadeDown .5s .1s ease both;
@@ -210,21 +183,11 @@
             border-radius: 16px 16px 0 0;
         }
 
-        .stat-card.s-nuevo::before {
-            background: var(--nuevo);
-        }
-
-        .stat-card.s-proceso::before {
-            background: var(--proceso);
-        }
-
-        .stat-card.s-desp::before {
-            background: var(--despachado);
-        }
-
-        .stat-card.s-entr::before {
-            background: var(--entregado);
-        }
+        .stat-card.s-nuevo::before { background: var(--nuevo); }
+        .stat-card.s-proceso::before { background: var(--proceso); }
+        .stat-card.s-desp::before { background: var(--despachado); }
+        .stat-card.s-entr::before { background: var(--entregado); }
+        .stat-card.s-cancel::before { background: var(--cancelado); }
 
         .stat-label {
             font-size: 0.78rem;
@@ -241,21 +204,11 @@
             line-height: 1;
         }
 
-        .stat-card.s-nuevo .stat-num {
-            color: var(--nuevo);
-        }
-
-        .stat-card.s-proceso .stat-num {
-            color: var(--proceso);
-        }
-
-        .stat-card.s-desp .stat-num {
-            color: var(--despachado);
-        }
-
-        .stat-card.s-entr .stat-num {
-            color: var(--entregado);
-        }
+        .stat-card.s-nuevo .stat-num { color: var(--nuevo); }
+        .stat-card.s-proceso .stat-num { color: var(--proceso); }
+        .stat-card.s-desp .stat-num { color: var(--despachado); }
+        .stat-card.s-entr .stat-num { color: var(--entregado); }
+        .stat-card.s-cancel .stat-num { color: var(--cancelado); }
 
         .stat-icon {
             position: absolute;
@@ -265,7 +218,6 @@
             opacity: 0.18;
         }
 
-        /* ── TOOLBAR ── */
         .toolbar {
             display: flex;
             justify-content: space-between;
@@ -344,7 +296,6 @@
             color: var(--text);
         }
 
-        /* ── ORDERS LIST ── */
         .orders-list {
             display: flex;
             flex-direction: column;
@@ -375,27 +326,16 @@
             box-shadow: 0 0 0 1px rgba(255, 165, 50, 0.12), 0 8px 24px rgba(0, 0, 0, 0.35);
         }
 
-        /* Left accent stripe */
         .card-stripe {
             width: 5px;
             flex-shrink: 0;
         }
 
-        .stripe-nuevo {
-            background: var(--nuevo);
-        }
-
-        .stripe-proceso {
-            background: var(--proceso);
-        }
-
-        .stripe-despachado {
-            background: var(--despachado);
-        }
-
-        .stripe-entregado {
-            background: var(--entregado);
-        }
+        .stripe-nuevo { background: var(--nuevo); }
+        .stripe-proceso { background: var(--proceso); }
+        .stripe-despachado { background: var(--despachado); }
+        .stripe-entregado { background: var(--entregado); }
+        .stripe-cancelado { background: var(--cancelado); }
 
         .card-body {
             flex: 1;
@@ -487,6 +427,16 @@
             background: var(--entregado);
         }
 
+        .status-cancelado {
+            background: rgba(239, 68, 68, 0.12);
+            color: #f87171;
+        }
+
+        .status-cancelado .status-dot-sm {
+            background: var(--cancelado);
+            box-shadow: 0 0 6px var(--cancelado);
+        }
+
         .order-client {
             font-size: 1.1rem;
             color: var(--text);
@@ -511,7 +461,6 @@
             color: var(--muted);
         }
 
-        /* Right section */
         .order-right {
             display: flex;
             align-items: center;
@@ -559,7 +508,6 @@
             transform: scale(1.08);
         }
 
-        /* ── EMPTY STATE ── */
         .empty-state {
             text-align: center;
             padding: 80px 20px;
@@ -579,7 +527,6 @@
             font-size: 1rem;
         }
 
-        /* ── TOAST ── */
         .toast {
             position: fixed;
             right: 22px;
@@ -629,7 +576,6 @@
             line-height: 1.4;
         }
 
-        /* ── ANIMATIONS ── */
         @keyframes fadeDown {
             from {
                 opacity: 0;
@@ -655,9 +601,7 @@
         }
 
         @keyframes pulse-green {
-
-            0%,
-            100% {
+            0%, 100% {
                 box-shadow: 0 0 6px #22c55e;
             }
 
@@ -667,9 +611,7 @@
         }
 
         @keyframes pulse-blue {
-
-            0%,
-            100% {
+            0%, 100% {
                 box-shadow: 0 0 4px var(--nuevo);
             }
 
@@ -678,7 +620,6 @@
             }
         }
 
-        /* ── RESPONSIVE ── */
         @media (max-width: 900px) {
             .stats-strip {
                 grid-template-columns: repeat(2, 1fr);
@@ -732,7 +673,6 @@
 <body>
     <div class="container">
 
-        <!-- HEADER -->
         <div class="header">
             <div class="header-brand">
                 <div class="brand-icon">🛵</div>
@@ -768,7 +708,6 @@
             }
         @endphp
 
-        <!-- STATS STRIP -->
         <div class="stats-strip">
             <div class="stat-card s-nuevo">
                 <div class="stat-label">Nuevos</div>
@@ -790,9 +729,13 @@
                 <div class="stat-num">{{ $entregados }}</div>
                 <div class="stat-icon">✅</div>
             </div>
+            <div class="stat-card s-cancel">
+                <div class="stat-label">Cancelados</div>
+                <div class="stat-num">{{ $cancelados }}</div>
+                <div class="stat-icon">❌</div>
+            </div>
         </div>
 
-        <!-- TOOLBAR -->
         <div class="toolbar">
             <div class="tabs">
                 <a href="{{ request()->fullUrlWithQuery(['estado' => 'todos']) }}"
@@ -832,7 +775,6 @@
             </form>
         </div>
 
-        <!-- ORDERS LIST -->
         <div class="orders-list" id="orders-list">
             @forelse($pedidosFiltrados as $pedido)
                 @php
@@ -864,9 +806,9 @@
                     };
                 @endphp
 
-                <div class="order-card {{ $pedido->estado === 'nuevo' ? 'active' : '' }} {{ $pedido->estado === 'cancelado' ? 'opacity-60' : '' }}"
-                    data-id="{{ $pedido->id }}">
-                    data-id="{{ $pedido->id }}">
+                <div class="order-card {{ $pedido->estado === 'nuevo' ? 'active' : '' }}"
+                    data-id="{{ $pedido->id }}"
+                    style="{{ $pedido->estado === 'cancelado' ? 'opacity:.6;' : '' }}">
                     <div class="card-stripe {{ $stripeClass }}"></div>
                     <div class="card-body">
                         <div class="order-left">
@@ -895,8 +837,7 @@
                         <div class="order-right">
                             <div class="price-block">
                                 <div class="price">${{ number_format($pedido->total, 0, ',', '.') }}</div>
-                                <div class="time">{{ \Carbon\Carbon::parse($pedido->created_at)->diffForHumans() }}
-                                </div>
+                                <div class="time">{{ \Carbon\Carbon::parse($pedido->created_at)->diffForHumans() }}</div>
                             </div>
                             <div class="action-btn" title="Ver detalle">›</div>
                         </div>
@@ -912,7 +853,6 @@
 
     </div>
 
-    <!-- TOAST -->
     <div class="toast" id="toast">
         <div class="toast-icon">🛵</div>
         <div>
@@ -942,7 +882,7 @@
         const toastMessage = document.getElementById('toast-message');
 
         function formatMoney(value) {
-            return new Intl.NumberFormat('es-CO').format(value);
+            return new Intl.NumberFormat('es-CO').format(Number(value || 0));
         }
 
         function formatHour(dateString) {
@@ -960,7 +900,7 @@
                 despachado: 'Despachado',
                 entregado: 'Entregado',
                 cancelado: 'Cancelado'
-            } [estado] || estado;
+            }[estado] || estado;
         }
 
         function getBadgeClass(estado) {
@@ -970,7 +910,7 @@
                 despachado: 'status-despachado',
                 entregado: 'status-entregado',
                 cancelado: 'status-cancelado'
-            } [estado] || 'status-nuevo';
+            }[estado] || 'status-nuevo';
         }
 
         function getStripeClass(estado) {
@@ -980,17 +920,23 @@
                 despachado: 'stripe-despachado',
                 entregado: 'stripe-entregado',
                 cancelado: 'stripe-cancelado'
-            } [estado] || 'stripe-nuevo';
+            }[estado] || 'stripe-nuevo';
         }
 
         function addOrderCard(pedido) {
             const code = `PED-${String(pedido.id).padStart(3, '0')}`;
             const activeClass = pedido.estado === 'nuevo' ? 'active' : '';
 
+            const total = pedido.total_raw ?? pedido.total ?? 0;
+
             const card = document.createElement('div');
             card.className = `order-card ${activeClass}`;
             card.dataset.id = pedido.id;
             card.style.animationDelay = '0s';
+
+            if (pedido.estado === 'cancelado') {
+                card.style.opacity = '0.6';
+            }
 
             card.innerHTML = `
                 <div class="card-stripe ${getStripeClass(pedido.estado)}"></div>
@@ -1003,14 +949,14 @@
                                 ${getStatusLabel(pedido.estado)}
                             </span>
                         </div>
-                        <div class="order-client">${pedido.cliente_nombre}</div>
+                        <div class="order-client">${pedido.cliente_nombre ?? 'Cliente'}</div>
                         <div class="order-meta">
-                            <span class="meta-chip">🕒 ${formatHour(pedido.created_at)}</span>
+                            <span class="meta-chip">🕒 ${pedido.created_at ? formatHour(pedido.created_at) : 'Ahora mismo'}</span>
                         </div>
                     </div>
                     <div class="order-right">
                         <div class="price-block">
-                            <div class="price">$${formatMoney(pedido.total)}</div>
+                            <div class="price">$${formatMoney(total)}</div>
                             <div class="time">Ahora mismo</div>
                         </div>
                         <div class="action-btn" title="Ver detalle">›</div>
@@ -1019,7 +965,9 @@
             `;
 
             const emptyState = ordersList.querySelector('.empty-state');
-            if (emptyState) ordersList.innerHTML = '';
+            if (emptyState) {
+                ordersList.innerHTML = '';
+            }
 
             ordersList.prepend(card);
         }
@@ -1044,9 +992,9 @@
             if (badge) {
                 badge.className = `status-badge ${getBadgeClass(pedido.estado)}`;
                 badge.innerHTML = `
-            <span class="status-dot-sm"></span>
-            ${getStatusLabel(pedido.estado)}
-        `;
+                    <span class="status-dot-sm"></span>
+                    ${getStatusLabel(pedido.estado)}
+                `;
             }
 
             if (client) {

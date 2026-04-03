@@ -2,17 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\PedidoActualizado;
+use App\Events\PedidoConfirmado;
+use App\Models\AnsPedido;
+use App\Models\DetallePedido;
+use App\Models\Pedido;
+use App\Models\Sede;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-use App\Models\Pedido;
-use App\Models\DetallePedido;
-use App\Models\Sede;
-use App\Models\AnsPedido;
-use App\Events\PedidoConfirmado;
-use App\Events\PedidoActualizado;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class WhatsappWebhookController extends Controller
 {
@@ -45,7 +45,7 @@ class WhatsappWebhookController extends Controller
         }
 
         $from    = $data['chat']['phone'] ?? $data['from'] ?? $data['phoneNumber'] ?? null;
-        $name    = $data['chat']['name']  ?? $data['name'] ?? 'Cliente';
+        $name    = $data['chat']['name'] ?? $data['name'] ?? 'Cliente';
         $message = trim(
             $data['mensaje']['body'] ?? $data['body'] ?? $data['message'] ?? $data['text'] ?? ''
         );
@@ -214,7 +214,7 @@ class WhatsappWebhookController extends Controller
 
     /*
     |==========================================================================
-    | FLUJO PRINCIPAL DE PROCESAMIENTO
+    | FLUJO PRINCIPAL
     |==========================================================================
     */
 
@@ -277,10 +277,20 @@ class WhatsappWebhookController extends Controller
             $rawArgs   = $toolCalls[0]['function']['arguments'] ?? '{}';
             $orderData = json_decode($rawArgs, true);
 
-            if (json_last_error() !== JSON_ERROR_NONE || empty($orderData['products'])) {
+            $orderData['products'] = array_values(array_filter($orderData['products'] ?? [], function ($p) {
+                return !empty($p['name']);
+            }));
+
+            if (json_last_error() !== JSON_ERROR_NONE) {
                 Log::error('❌ JSON inválido en tool_call', ['raw' => $rawArgs]);
                 Cache::put($cacheKey, $conversationHistory, now()->addMinutes(45));
-                return '⚠️ Hubo un problema al registrar tu pedido. Por favor, confírmame los datos de nuevo.';
+                return '⚠️ Hubo un problema al procesar tu pedido. Por favor indícame nuevamente qué deseas pedir.';
+            }
+
+            if (empty($orderData['products'])) {
+                Log::error('❌ Tool call sin productos válidos', ['raw' => $rawArgs]);
+                Cache::put($cacheKey, $conversationHistory, now()->addMinutes(45));
+                return '⚠️ No pude identificar los productos del pedido. Por favor indícame qué deseas pedir.';
             }
 
             Log::info('🎯 CAPA 3: Function call confirmar_pedido', compact('from', 'orderData'));
@@ -311,7 +321,7 @@ class WhatsappWebhookController extends Controller
                         'model'       => 'gpt-4o-mini',
                         'messages'    => $messages,
                         'temperature' => 0.4,
-                        'max_tokens'  => 600,
+                        'max_tokens'  => 700,
                         'tools'       => $this->getToolsDefinicion(),
                         'tool_choice' => 'auto',
                     ]);
@@ -339,7 +349,7 @@ class WhatsappWebhookController extends Controller
 
     /*
     |==========================================================================
-    | CAPA 2 — REGLAS DETERMINISTAS
+    | REGLAS DETERMINISTAS
     |==========================================================================
     */
 
@@ -629,7 +639,7 @@ class WhatsappWebhookController extends Controller
 
         if ($accion === 'cancelar') {
             $this->guardarAccionPendiente($pedido->telefono_whatsapp ?? $pedido->telefono ?? '', [
-                'accion'   => 'cancelar',
+                'accion'    => 'cancelar',
                 'pedido_id' => $pedido->id,
             ]);
 
@@ -639,6 +649,7 @@ class WhatsappWebhookController extends Controller
             $lineas[] = "✅ Sí es posible adicionar o modificar este pedido.";
             $lineas[] = "Escríbeme qué producto deseas agregar o cambiar en el pedido #{$pedido->id}.";
         }
+
         return implode("\n", $lineas);
     }
 
@@ -683,7 +694,6 @@ class WhatsappWebhookController extends Controller
 
         $accion = $pendiente['accion'];
 
-        // Confirmación directa de cancelación
         if (
             $accion === 'cancelar' &&
             in_array(mb_strtolower(trim($message)), [
@@ -809,9 +819,7 @@ class WhatsappWebhookController extends Controller
             ]);
 
             $notas = implode(' | ', $partes) ?: 'Solicitud vía WhatsApp';
-
             $pickupTime = !empty($orderData['pickup_time']) ? $orderData['pickup_time'] : null;
-
             $telefonoWhatsapp = $this->normalizarTelefono($from);
             $telefonoContacto = $this->normalizarTelefono($orderData['phone'] ?? $from);
 
@@ -819,7 +827,7 @@ class WhatsappWebhookController extends Controller
                 'sede_id'               => $sede?->id,
                 'fecha_pedido'          => now(),
                 'hora_entrega'          => $pickupTime,
-                'estado'                => 'confirmado',
+                'estado'                => 'nuevo',
                 'total'                 => (float) ($orderData['total'] ?? 0),
                 'notas'                 => $notas,
                 'cliente_nombre'        => $orderData['customer_name'] ?? $name,
@@ -844,7 +852,8 @@ class WhatsappWebhookController extends Controller
 
             DB::commit();
 
-            broadcast(new PedidoConfirmado($pedido));
+            broadcast(new PedidoConfirmado($pedido->fresh(['sede', 'detalles'])));
+            broadcast(new PedidoActualizado($pedido->fresh(['sede', 'detalles']), 'confirmado'));
 
             Cache::forget($cacheKey);
 
@@ -1016,7 +1025,7 @@ class WhatsappWebhookController extends Controller
 
     /*
     |==========================================================================
-    | SYSTEM PROMPT E INFO EMPRESA
+    | PROMPT
     |==========================================================================
     */
 
@@ -1062,18 +1071,24 @@ HISTORIAL DEL CLIENTE:
 ━━━ FLUJO ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 1. Saluda siempre primero.
 2. Entender qué necesita.
-3. Preguntar barrio: ¿En qué barrio se encuentra?
+3. Preguntar barrio.
 4. Validar cobertura.
 5. Construir el pedido.
-6. Pedir datos SOLO cuando el cliente ya decidió.
+6. Pedir datos solo cuando el cliente ya decidió.
 7. Mostrar resumen y pedir confirmación.
-8. Confirmar SOLO cuando el cliente diga: sí, correcto, listo, ok, confirmado.
+8. Confirmar solo cuando el cliente diga: sí, correcto, listo, ok, confirmado.
+
+⚠️ REGLA CRÍTICA:
+NUNCA llames la función confirmar_pedido si no hay al menos 1 producto válido.
+NUNCA envíes products vacío.
+ANTES de confirmar debes tener producto, cantidad, barrio, dirección, teléfono y nombre.
 
 ━━━ DATOS NECESARIOS ━━━━━━━━━━━━━━━━━━━━━━━━
 ✅ Nombre
 ✅ Dirección completa
 ✅ Barrio
 ✅ Teléfono
+✅ Al menos 1 producto con cantidad
 
 ━━━ CONFIRMACIÓN ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Antes de confirmar SIEMPRE muestra el resumen así:
@@ -1100,9 +1115,19 @@ Termina SIEMPRE con: "¿Todo correcto para confirmar?"
 ━━━ FUNCIÓN confirmar_pedido ━━━━━━━━━━━━━━━━━
 Llama a la función confirmar_pedido ÚNICAMENTE cuando:
 - El cliente confirmó con sí / correcto / listo / ok / confirmado
-- Ya tienes: nombre, dirección, barrio, teléfono y al menos un producto
+- Ya tienes: nombre, dirección, barrio, teléfono y al menos un producto válido
 
-NO la llames si falta algún dato. NO inventes datos.
+Ejemplo válido de products:
+[
+  {
+    "name": "Producto",
+    "quantity": 2,
+    "unit": "libras"
+  }
+]
+
+NO la llames si falta algún dato.
+NO inventes datos.
 NO la llames más de una vez por conversación.
 
 ━━━ ANS ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1143,8 +1168,8 @@ PROMPT;
                             'neighborhood'   => ['type' => 'string', 'description' => 'Barrio'],
                             'location'       => ['type' => 'string', 'description' => 'Ciudad o zona'],
                             'payment_method' => ['type' => 'string', 'description' => 'Método de pago'],
-                            'pickup_time'    => ['type' => 'string', 'description' => 'Hora estimada de entrega, vacío si no se sabe'],
-                            'total'          => ['type' => 'number', 'description' => 'Total del pedido, 0 si no aplica'],
+                            'pickup_time'    => ['type' => 'string', 'description' => 'Hora estimada de entrega'],
+                            'total'          => ['type' => 'number', 'description' => 'Total del pedido'],
                             'notes'          => ['type' => 'string', 'description' => 'Notas adicionales del pedido'],
                         ],
                         'required' => ['products', 'customer_name', 'phone', 'address', 'neighborhood'],
@@ -1387,7 +1412,7 @@ PROMPT;
             $pedido->estado = 'cancelado';
             $pedido->save();
 
-            broadcast(new \App\Events\PedidoActualizado($pedido->fresh(['sede', 'detalles']), 'cancelado'));
+            broadcast(new PedidoActualizado($pedido->fresh(['sede', 'detalles']), 'cancelado'));
 
             Log::info('✅ PEDIDO CANCELADO AUTOMÁTICAMENTE', [
                 'pedido_id' => $pedido->id,
@@ -1418,7 +1443,7 @@ PROMPT;
 
     /*
     |==========================================================================
-    | HELPERS DE FORMATO
+    | HELPERS
     |==========================================================================
     */
 
@@ -1466,7 +1491,7 @@ PROMPT;
             'telefono_whatsapp'    => $pedido->telefono_whatsapp ?? $pedido->telefono,
             'telefono_contacto'    => $pedido->telefono_contacto ?? $pedido->telefono,
             'telefono'             => $pedido->telefono,
-            'total'                => $pedido->total,
+            'total'                => (float) $pedido->total,
             'total_formateado'     => number_format((float) $pedido->total, 0, ',', '.'),
             'notas'                => $pedido->notas,
             'resumen_conversacion' => $pedido->resumen_conversacion,
@@ -1510,8 +1535,11 @@ PROMPT;
     private function traducirEstadoPedido(?string $estado): string
     {
         return match ($estado) {
+            'nuevo'          => 'Nuevo 🔔',
             'confirmado'     => 'Confirmado ✅',
+            'en_proceso'     => 'En proceso 🍳',
             'en_preparacion' => 'En preparación 👨‍🍳',
+            'despachado'     => 'Despachado 🛵',
             'listo'          => 'Listo para entrega 🚚',
             'entregado'      => 'Entregado 📦',
             'cancelado'      => 'Cancelado ❌',
