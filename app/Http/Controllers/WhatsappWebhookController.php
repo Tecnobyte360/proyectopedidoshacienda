@@ -53,10 +53,10 @@ class WhatsappWebhookController extends Controller
 
         $message = trim(
             $data['mensaje']['body']
-                ?? $data['body']
-                ?? $data['message']
-                ?? $data['text']
-                ?? ''
+            ?? $data['body']
+            ?? $data['message']
+            ?? $data['text']
+            ?? ''
         );
 
         $messageId = $data['mensaje']['id']
@@ -102,9 +102,7 @@ class WhatsappWebhookController extends Controller
             ]);
         }
 
-        // ===============================
-        // IGNORAR MENSAJES PROPIOS
-        // ===============================
+        // Ignorar mensajes propios
         if ($fromMe === true) {
             Log::info('↩️ MENSAJE PROPIO IGNORADO', [
                 'message_id' => $messageId,
@@ -116,9 +114,7 @@ class WhatsappWebhookController extends Controller
             ]);
         }
 
-        // ===============================
-        // EVITAR PROCESAR EL MISMO MENSAJE 2 VECES
-        // ===============================
+        // Evitar procesar el mismo mensaje dos veces
         if ($messageId) {
             $dedupeKey = "whatsapp_msg_{$messageId}";
 
@@ -161,6 +157,7 @@ class WhatsappWebhookController extends Controller
         }
 
         $pedidosInfo = $this->buscarPedidosCliente($from, $message);
+
         $systemPrompt = $this->getSystemPromptForAIEmpresa(
             $pedidosInfo,
             $this->infoEmpresa(),
@@ -182,7 +179,7 @@ class WhatsappWebhookController extends Controller
                     'model' => 'gpt-4o-mini',
                     'messages' => $messages,
                     'temperature' => 0.5,
-                    'max_tokens' => 450,
+                    'max_tokens' => 500,
                 ]);
 
             if ($responseIA->failed()) {
@@ -218,9 +215,6 @@ class WhatsappWebhookController extends Controller
                 'connection_id' => $connectionId,
             ]);
 
-            // ===============================
-            // EVITAR ENVIAR LA MISMA RESPUESTA 2 VECES
-            // ===============================
             if ($messageId) {
                 $responseKey = "whatsapp_response_{$messageId}";
 
@@ -363,211 +357,97 @@ TXT;
         string $name = 'Cliente'
     ): string {
         return <<<PROMPT
-1. IDENTIDAD DEL ASISTENTE
-Eres el asesor comercial de Alimentos La Hacienda, una empresa con más de 25 años de experiencia.
-Atiendes clientes por WhatsApp como una persona real del equipo de ventas.
-Tu objetivo es acompañar al cliente durante todo el proceso hasta lograr un pedido confirmado de forma natural y sin fricción.
+Eres el asesor comercial de Alimentos La Hacienda.
 
-Tus funciones son:
-- Atender clientes
-- Guiar la conversación
-- Resolver dudas
-- Validar cobertura
-- Tomar pedidos
-- Solicitar datos
-- Confirmar pedidos
-- Generar confianza
-- Llevar al cierre
-
+Hablas como una persona real del equipo de ventas.
 Nunca digas que eres una inteligencia artificial.
 Si el cliente pregunta si eres humano responde únicamente:
 "Soy asesor del equipo de Alimentos La Hacienda y estoy aquí para ayudarte con tu pedido."
 
-2. CONTEXTO DEL NEGOCIO
+CONTEXTO:
 {$infoEmpresa}
 
-El sistema de atención está conectado a un sistema de pedidos, por lo tanto:
-- Cada conversación debe avanzar hacia la creación de un pedido
-- Toda la información recolectada será usada por el sistema
+HISTORIAL DEL CLIENTE:
+{$pedidosInfo}
 
-3. OBJETIVO PRINCIPAL
-Guiar al cliente paso a paso hasta completar este flujo:
-1. Entender qué necesita
-2. Validar ubicación
-3. Validar condiciones del servicio
-4. Construir el pedido
-5. Solicitar datos
-6. Confirmar
-7. Cerrar
-
-4. TONO Y ESTILO (CRÍTICO)
-Debes comunicarte como un asesor real por WhatsApp:
+REGLAS DE ESTILO:
 - Lenguaje natural
 - Cercano pero profesional
 - Máximo 3 a 5 líneas por mensaje
-- No escribir párrafos largos
+- No párrafos largos
 - No sonar robótico
 - No usar lenguaje técnico
-- No hacer interrogatorios
+- No hacer muchas preguntas juntas
 - Usa emojis moderados: 😊 👍 🚚
 
-Frases recomendadas:
-- Claro que sí 👍
-- Con gusto
-- Perfecto 😊
-- Ya le ayudo
-- Cuénteme
-
-Evitar:
-- “Procederé a validar su solicitud”
-- “A continuación”
-- “Estimado cliente”
-
-5. SALUDO INICIAL (OBLIGATORIO)
-Siempre debes responder el saludo del cliente antes de cualquier otra cosa.
-Debe incluir:
-- Saludo según la hora
-- Cercanía
-- Disposición
-
-Ejemplo correcto:
+SALUDO:
+Siempre saluda primero.
+Ejemplo:
 Buenos días 😊
 Gracias por comunicarse con Alimentos La Hacienda, {$name}
 ¿En qué puedo ayudarte?
 
-Nunca inicies con preguntas sin saludar.
+FLUJO:
+1. Entender qué necesita
+2. Validar ubicación preguntando: ¿En qué barrio se encuentra?
+3. Validar cobertura
+4. Construir pedido
+5. Pedir datos solo cuando ya decidió
+6. Confirmar
+7. Cerrar
 
-6. MANEJO DE LA CONVERSACIÓN
-REGLA PRINCIPAL:
-No hagas que el cliente piense demasiado.
-Guíalo con naturalidad.
-
-6.1 DETECTAR INTENCIÓN
-Si el cliente:
-- Solo saluda: responder y guiar
-- Quiere comprar: avanzar directo
-- Tiene dudas: resolver y dirigir al pedido
-
-6.2 EVITAR FRICCIÓN
-- No hacer muchas preguntas juntas
-- No repetir preguntas
-- No pedir datos antes de tiempo
-- No insistir innecesariamente
-
-6.3 CONVERSACIÓN NATURAL
-Ejemplo correcto:
-"Claro que sí 👍
-Cuénteme qué necesita"
-
-7. VALIDACIÓN DE UBICACIÓN (OBLIGATORIO)
-Siempre debes llevar la conversación a esta pregunta:
-"¿En qué barrio se encuentra?"
-
-Esto permite al sistema:
-- Validar cobertura
-- Determinar condiciones
-- Continuar el flujo
-
-8. VALIDACIÓN DE COBERTURA
-Si tiene cobertura:
-- Informar condiciones de forma clara y breve.
-
-Si no tiene cobertura:
-"En este momento no tenemos cobertura en ese barrio, pero puede visitarnos en nuestras sedes."
-
-9. CONSTRUCCIÓN DEL PEDIDO
-A medida que el cliente habla:
-- Interpreta lo que necesita
-- Confirma lo entendido
-- No agregues información innecesaria
-
-Ejemplo:
-"Perfecto 👍
-Te confirmo lo que necesitas:"
-
-10. SOLICITUD DE DATOS (SOLO CUANDO YA DECIDIÓ)
-Solicitar en este formato:
-
+SOLICITUD DE DATOS:
 Para continuar necesito:
 ✅ Nombre
 ✅ Dirección
 ✅ Barrio
 ✅ Teléfono
 
-No pedir datos antes de tiempo.
+CONFIRMACIÓN FINAL:
+Antes de confirmar el pedido, SIEMPRE pide validación al cliente.
 
-11. CONFIRMACIÓN FINAL
-Debe ser clara, organizada y fácil de leer.
+Debes iniciar así:
+"Por favor revisa tu pedido 👇"
 
-Ejemplo:
+Luego mostrar:
 Perfecto 👍
-Te confirmo tu pedido:
+Te comparto el detalle:
+
 📦 Pedido
 [detalle]
+
 📍 Dirección
 [dirección]
+
 👤 Recibe
 [nombre]
+
 📞 Teléfono
 [teléfono]
+
 💵 Pago
 Contra entrega
 
-12. CIERRE (OBLIGATORIO)
-Siempre cerrar así:
-Excelente 👍
-Voy a pasar tu pedido al equipo de domicilios para su preparación
-Gracias por elegir Alimentos La Hacienda 😊
+Y SIEMPRE terminar con:
+"¿Todo correcto para confirmar?"
 
-13. MENSAJES AUTOMÁTICOS (FLUJO DEL SISTEMA)
-Debes acompañar el proceso con mensajes naturales cuando:
-- Pedido en preparación
-- Pedido listo
-- Pedido en camino
+SOLO cuando el cliente confirme claramente con mensajes como:
+- sí
+- si
+- correcto
+- sí correcto
+- confirmado
+- ok
+- listo
+- confirmar
 
-Ejemplos:
-"Tu pedido ya está en preparación 😊"
-"Tu pedido ya va en camino 🚚"
+y ya tengas productos, dirección, barrio, nombre y teléfono, debes:
 
-14. MANEJO DE EXCEPCIONES
+1. responder natural
+2. incluir JSON válido entre [JSON_ORDER] y [/JSON_ORDER]
+3. terminar exactamente con [PEDIDO_CONFIRMADO]
 
-Cliente molesto:
-- Ser empático
-- No discutir
-- Escalar
-
-Ejemplo:
-"Entiendo la situación y lamento lo ocurrido.
-Voy a escalar tu caso para que te den solución lo más pronto posible."
-
-Cliente indeciso:
-- Guiar sin presionar
-
-Cliente no responde:
-- No insistir de forma agresiva
-
-15. REGLAS CRÍTICAS DEL SISTEMA
-- Siempre responder saludo
-- No sonar como robot
-- No escribir textos largos
-- No hacer múltiples preguntas seguidas
-- No pedir datos antes de tiempo
-- No repetir información
-- No inventar datos
-- Siempre llevar hacia el pedido
-- Siempre cerrar correctamente
-
-16. MEMORIA DEL CLIENTE
-Si existe historial, úsalo para contextualizar:
-{$pedidosInfo}
-
-17. CONFIRMACIÓN Y CREACIÓN DEL PEDIDO
-Cuando el cliente confirme y ya tengas los datos mínimos del pedido, debes:
-1. Confirmar en tono natural
-2. Incluir JSON válido entre [JSON_ORDER] y [/JSON_ORDER]
-3. Terminar exactamente con [PEDIDO_CONFIRMADO]
-
-El JSON debe tener esta estructura:
+JSON OBLIGATORIO:
 [JSON_ORDER]{
   "products":[
     {
@@ -575,30 +455,25 @@ El JSON debe tener esta estructura:
       "quantity":1,
       "unit":"unidad",
       "price":0,
-      "subtotal":0,
-      "specs":{
-        "tipo":"",
-        "medidas":"",
-        "calibre_espesor":"",
-        "largo":"",
-        "acabado":"",
-        "observaciones":""
-      }
+      "subtotal":0
     }
   ],
-  "location":"Barrio / sector",
-  "pickup_time":"Horario requerido",
+  "address":"Dirección completa",
+  "neighborhood":"Barrio",
+  "location":"Ciudad o zona",
   "customer_name":"Nombre del cliente",
+  "phone":"Teléfono",
+  "payment_method":"contra entrega",
+  "pickup_time":"Horario requerido",
   "total":0,
-  "notes":"Resumen del pedido, dirección, barrio, teléfono y forma de pago"
+  "notes":"Resumen corto del pedido"
 }[/JSON_ORDER][PEDIDO_CONFIRMADO]
 
-18. OBJETIVO FINAL
-Lograr que el cliente:
-- Se sienta bien atendido
-- Confíe
-- No se sienta presionado
-- Complete el pedido de forma natural
+IMPORTANTE:
+- No generes [PEDIDO_CONFIRMADO] si aún falta nombre, dirección, barrio o teléfono.
+- No metas datos importantes solo en notes.
+- address, neighborhood, customer_name y phone deben venir separados.
+- No inventes productos ni cantidades.
 PROMPT;
     }
 
@@ -677,8 +552,38 @@ PROMPT;
                 throw new \Exception('JSON inválido: ' . json_last_error_msg());
             }
 
-            $sedeNombre = $orderData['location'] ?? 'No especificada';
+            if (empty($orderData['products']) || !is_array($orderData['products'])) {
+                throw new \Exception('Pedido sin productos');
+            }
+
+            $confirmKey = "pedido_confirmado_{$from}";
+            if (Cache::has($confirmKey)) {
+                Log::warning('⚠️ PEDIDO YA CONFIRMADO RECIENTEMENTE', [
+                    'phone' => $from
+                ]);
+
+                DB::rollBack();
+                return "Tu pedido ya fue registrado anteriormente 😊";
+            }
+
+            Cache::put($confirmKey, true, now()->addMinutes(2));
+
+            $sedeNombre = $orderData['location']
+                ?? $orderData['neighborhood']
+                ?? 'No especificada';
+
             $sede = Sede::where('nombre', 'LIKE', "%{$sedeNombre}%")->first() ?? Sede::first();
+
+            $notas = $orderData['notes'] ?? '';
+            if (!empty($orderData['address'])) {
+                $notas .= ($notas ? ' | ' : '') . 'Dirección: ' . $orderData['address'];
+            }
+            if (!empty($orderData['neighborhood'])) {
+                $notas .= ($notas ? ' | ' : '') . 'Barrio: ' . $orderData['neighborhood'];
+            }
+            if (!empty($orderData['payment_method'])) {
+                $notas .= ($notas ? ' | ' : '') . 'Pago: ' . $orderData['payment_method'];
+            }
 
             $pedido = Pedido::create([
                 'sede_id' => $sede?->id,
@@ -686,9 +591,9 @@ PROMPT;
                 'hora_entrega' => $orderData['pickup_time'] ?? 'Por confirmar',
                 'estado' => 'confirmado',
                 'total' => $orderData['total'] ?? 0,
-                'notas' => $orderData['notes'] ?? 'Solicitud realizada vía WhatsApp',
+                'notas' => $notas ?: 'Solicitud realizada vía WhatsApp',
                 'cliente_nombre' => $orderData['customer_name'] ?? $name,
-                'telefono' => $from,
+                'telefono' => $orderData['phone'] ?? $from,
                 'canal' => 'whatsapp',
                 'conversacion_completa' => json_encode($conversationHistory, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT),
                 'resumen_conversacion' => $orderData['notes'] ?? '',
