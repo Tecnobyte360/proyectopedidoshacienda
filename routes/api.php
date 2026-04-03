@@ -1,9 +1,7 @@
 <?php
 
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
 
 use App\Models\Pedido;
@@ -20,6 +18,19 @@ Route::get('/whatsapp-webhook', function () {
 });
 
 Route::post('/whatsapp-webhook', [WhatsappWebhookController::class, 'receive']);
+
+/*
+|--------------------------------------------------------------------------
+| CONSULTA DE PEDIDOS
+|--------------------------------------------------------------------------
+| Buscar por:
+| - pedido_id
+| - telefono
+| - cliente
+|--------------------------------------------------------------------------
+*/
+Route::get('/whatsapp-webhook/orders/search', [WhatsappWebhookController::class, 'searchOrders']);
+Route::get('/whatsapp-webhook/orders/{id}', [WhatsappWebhookController::class, 'showOrder']);
 
 Route::delete('/whatsapp-webhook/reset/{phone}', function ($phone) {
     $cacheKey = "whatsapp_chat_{$phone}";
@@ -49,54 +60,6 @@ Route::get('/whatsapp-webhook/history/{phone}', function ($phone) {
         'phone'          => $phone,
         'messages_count' => count($history),
         'history'        => $history,
-    ]);
-});
-
-Route::get('/whatsapp-webhook/orders/{phone}', function ($phone) {
-
-    $formatearCantidad = function (float $cantidad): string {
-        if (fmod($cantidad, 1.0) == 0.0) {
-            return number_format($cantidad, 0, ',', '.');
-        }
-
-        return number_format($cantidad, 2, ',', '.');
-    };
-
-    $pedidos = Pedido::where('telefono', $phone)
-        ->with(['sede', 'detalles'])
-        ->orderBy('fecha_pedido', 'desc')
-        ->get();
-
-    if ($pedidos->isEmpty()) {
-        return response()->json([
-            'status'  => 'not_found',
-            'message' => 'No se encontraron solicitudes',
-            'phone'   => $phone,
-        ], 404);
-    }
-
-    return response()->json([
-        'status'       => 'success',
-        'phone'        => $phone,
-        'total_orders' => $pedidos->count(),
-        'orders'       => $pedidos->map(function ($pedido) use ($formatearCantidad) {
-            return [
-                'id'           => $pedido->id,
-                'fecha'        => $pedido->fecha_pedido->format('d/m/Y H:i'),
-                'estado'       => $pedido->estado,
-                'hora_entrega' => $pedido->hora_entrega,
-                'sede'         => $pedido->sede->nombre ?? 'No especificada',
-                'cliente'      => $pedido->cliente_nombre,
-                'total'        => $pedido->total,
-                'productos'    => $pedido->detalles->map(function ($detalle) use ($formatearCantidad) {
-                    return [
-                        'producto' => $detalle->producto,
-                        'cantidad' => $formatearCantidad($detalle->cantidad),
-                        'unidad'   => $detalle->unidad,
-                    ];
-                }),
-            ];
-        }),
     ]);
 });
 

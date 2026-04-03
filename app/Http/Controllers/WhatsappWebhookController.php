@@ -34,7 +34,7 @@ class WhatsappWebhookController extends Controller
         if (empty($data)) {
             Log::warning('⚠️ Webhook vacío');
             return response()->json([
-                'status' => 'error',
+                'status'  => 'error',
                 'message' => 'Payload vacío',
             ], 400);
         }
@@ -77,19 +77,19 @@ class WhatsappWebhookController extends Controller
             ?? null;
 
         Log::info('📥 DATOS NORMALIZADOS', [
-            'from' => $from,
-            'name' => $name,
-            'message' => $message,
-            'message_id' => $messageId,
-            'from_me' => $fromMe,
-            'connection_id' => $connectionId,
+            'from'            => $from,
+            'name'            => $name,
+            'message'         => $message,
+            'message_id'      => $messageId,
+            'from_me'         => $fromMe,
+            'connection_id'   => $connectionId,
             'connection_name' => $connectionName,
         ]);
 
         if (!$from || !$message) {
             Log::warning('⚠️ Mensaje ignorado por falta de datos', [
-                'from' => $from,
-                'name' => $name,
+                'from'    => $from,
+                'name'    => $name,
                 'message' => $message,
                 'payload' => $data,
             ]);
@@ -103,7 +103,7 @@ class WhatsappWebhookController extends Controller
         if ($fromMe === true) {
             Log::info('↩️ MENSAJE PROPIO IGNORADO', [
                 'message_id' => $messageId,
-                'from' => $from,
+                'from'       => $from,
             ]);
 
             return response()->json([
@@ -119,8 +119,8 @@ class WhatsappWebhookController extends Controller
             if (Cache::has($alreadyProcessedKey)) {
                 Log::warning('⚠️ MENSAJE DUPLICADO IGNORADO (YA PROCESADO)', [
                     'message_id' => $messageId,
-                    'from' => $from,
-                    'message' => $message,
+                    'from'       => $from,
+                    'message'    => $message,
                 ]);
 
                 return response()->json([
@@ -128,11 +128,10 @@ class WhatsappWebhookController extends Controller
                 ]);
             }
 
-            // lock corto para que dos requests paralelos no entren juntos
             if (!Cache::add($processingKey, true, now()->addSeconds(30))) {
                 Log::warning('⚠️ MENSAJE DUPLICADO IGNORADO (EN PROCESO)', [
                     'message_id' => $messageId,
-                    'from' => $from,
+                    'from'       => $from,
                 ]);
 
                 return response()->json([
@@ -143,10 +142,10 @@ class WhatsappWebhookController extends Controller
 
         try {
             Log::info('✅ MENSAJE CLIENTE', [
-                'from' => $from,
-                'name' => $name,
-                'message' => $message,
-                'message_id' => $messageId,
+                'from'          => $from,
+                'name'          => $name,
+                'message'       => $message,
+                'message_id'    => $messageId,
                 'connection_id' => $connectionId,
             ]);
 
@@ -154,7 +153,7 @@ class WhatsappWebhookController extends Controller
             $conversationHistory = Cache::get($cacheKey, []);
 
             $conversationHistory[] = [
-                'role' => 'user',
+                'role'    => 'user',
                 'content' => $message,
             ];
 
@@ -181,10 +180,10 @@ class WhatsappWebhookController extends Controller
             $responseIA = Http::withToken(env('OPENAI_API_KEY'))
                 ->timeout(35)
                 ->post('https://api.openai.com/v1/chat/completions', [
-                    'model' => 'gpt-4o-mini',
-                    'messages' => $messages,
+                    'model'       => 'gpt-4o-mini',
+                    'messages'    => $messages,
                     'temperature' => 0.4,
-                    'max_tokens' => 500,
+                    'max_tokens'  => 500,
                 ]);
 
             if ($responseIA->failed()) {
@@ -197,7 +196,7 @@ class WhatsappWebhookController extends Controller
                 ?? 'En este momento no logré procesar tu mensaje. ¿Me lo repites con un poquito más de detalle?';
 
             $conversationHistory[] = [
-                'role' => 'assistant',
+                'role'    => 'assistant',
                 'content' => $reply
             ];
 
@@ -214,9 +213,9 @@ class WhatsappWebhookController extends Controller
             }
 
             Log::info('💬 RESPUESTA GENERADA', [
-                'reply' => $reply,
-                'phone' => $from,
-                'message_id' => $messageId,
+                'reply'         => $reply,
+                'phone'         => $from,
+                'message_id'    => $messageId,
                 'connection_id' => $connectionId,
             ]);
 
@@ -227,7 +226,7 @@ class WhatsappWebhookController extends Controller
             }
 
             return response()->json([
-                'status' => 'ok',
+                'status'            => 'ok',
                 'message_processed' => true,
             ]);
         } catch (\Throwable $e) {
@@ -237,7 +236,7 @@ class WhatsappWebhookController extends Controller
             ]);
 
             return response()->json([
-                'status' => 'error',
+                'status'  => 'error',
                 'message' => 'No se pudo procesar',
             ], 500);
         } finally {
@@ -245,6 +244,154 @@ class WhatsappWebhookController extends Controller
                 Cache::forget("processing_whatsapp_msg_{$messageId}");
             }
         }
+    }
+
+    public function searchOrders(Request $request)
+    {
+        $request->validate([
+            'pedido_id' => 'nullable|integer',
+            'telefono'  => 'nullable|string|max:30',
+            'cliente'   => 'nullable|string|max:255',
+        ]);
+
+        if (
+            !$request->filled('pedido_id') &&
+            !$request->filled('telefono') &&
+            !$request->filled('cliente')
+        ) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Debes enviar al menos uno de estos filtros: pedido_id, telefono o cliente.',
+            ], 422);
+        }
+
+        $formatearCantidad = function (float $cantidad): string {
+            if (fmod($cantidad, 1.0) == 0.0) {
+                return number_format($cantidad, 0, ',', '.');
+            }
+
+            return number_format($cantidad, 2, ',', '.');
+        };
+
+        $query = Pedido::with(['sede', 'detalles']);
+
+        if ($request->filled('pedido_id')) {
+            $query->where('id', $request->pedido_id);
+        }
+
+        if ($request->filled('telefono')) {
+            $telefono = preg_replace('/\D+/', '', $request->telefono);
+
+            $query->where(function ($q) use ($telefono) {
+                $q->whereRaw("REGEXP_REPLACE(telefono, '[^0-9]', '') LIKE ?", ["%{$telefono}%"]);
+            });
+        }
+
+        if ($request->filled('cliente')) {
+            $cliente = trim($request->cliente);
+
+            $query->where(function ($q) use ($cliente) {
+                $q->where('cliente_nombre', 'LIKE', "%{$cliente}%");
+            });
+        }
+
+        $pedidos = $query
+            ->orderByDesc('fecha_pedido')
+            ->orderByDesc('id')
+            ->get();
+
+        if ($pedidos->isEmpty()) {
+            return response()->json([
+                'status'  => 'not_found',
+                'message' => 'No se encontraron pedidos con los filtros enviados.',
+                'filters' => [
+                    'pedido_id' => $request->pedido_id,
+                    'telefono'  => $request->telefono,
+                    'cliente'   => $request->cliente,
+                ],
+            ], 404);
+        }
+
+        return response()->json([
+            'status'       => 'success',
+            'total_orders' => $pedidos->count(),
+            'filters'      => [
+                'pedido_id' => $request->pedido_id,
+                'telefono'  => $request->telefono,
+                'cliente'   => $request->cliente,
+            ],
+            'orders'       => $pedidos->map(function ($pedido) use ($formatearCantidad) {
+                return [
+                    'id'                   => $pedido->id,
+                    'fecha'                => optional($pedido->fecha_pedido)?->format('d/m/Y H:i'),
+                    'estado'               => $pedido->estado,
+                    'hora_entrega'         => $pedido->hora_entrega ?? 'Por confirmar',
+                    'sede'                 => $pedido->sede->nombre ?? 'No especificada',
+                    'cliente'              => $pedido->cliente_nombre,
+                    'telefono'             => $pedido->telefono,
+                    'total'                => $pedido->total,
+                    'total_formateado'     => number_format($pedido->total, 0, ',', '.'),
+                    'notas'                => $pedido->notas,
+                    'resumen_conversacion' => $pedido->resumen_conversacion,
+                    'productos'            => $pedido->detalles->map(function ($detalle) use ($formatearCantidad) {
+                        return [
+                            'producto'        => $detalle->producto,
+                            'cantidad'        => $formatearCantidad((float) $detalle->cantidad),
+                            'unidad'          => $detalle->unidad,
+                            'precio_unitario' => $detalle->precio_unitario,
+                            'subtotal'        => $detalle->subtotal,
+                        ];
+                    })->values(),
+                ];
+            })->values(),
+        ]);
+    }
+
+    public function showOrder($id)
+    {
+        $formatearCantidad = function (float $cantidad): string {
+            if (fmod($cantidad, 1.0) == 0.0) {
+                return number_format($cantidad, 0, ',', '.');
+            }
+
+            return number_format($cantidad, 2, ',', '.');
+        };
+
+        $pedido = Pedido::with(['sede', 'detalles'])->find($id);
+
+        if (!$pedido) {
+            return response()->json([
+                'status'  => 'not_found',
+                'message' => 'Pedido no encontrado.',
+                'id'      => $id,
+            ], 404);
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'order'  => [
+                'id'                   => $pedido->id,
+                'fecha'                => optional($pedido->fecha_pedido)?->format('d/m/Y H:i'),
+                'estado'               => $pedido->estado,
+                'hora_entrega'         => $pedido->hora_entrega ?? 'Por confirmar',
+                'sede'                 => $pedido->sede->nombre ?? 'No especificada',
+                'cliente'              => $pedido->cliente_nombre,
+                'telefono'             => $pedido->telefono,
+                'total'                => $pedido->total,
+                'total_formateado'     => number_format($pedido->total, 0, ',', '.'),
+                'notas'                => $pedido->notas,
+                'resumen_conversacion' => $pedido->resumen_conversacion,
+                'productos'            => $pedido->detalles->map(function ($detalle) use ($formatearCantidad) {
+                    return [
+                        'producto'        => $detalle->producto,
+                        'cantidad'        => $formatearCantidad((float) $detalle->cantidad),
+                        'unidad'          => $detalle->unidad,
+                        'precio_unitario' => $detalle->precio_unitario,
+                        'subtotal'        => $detalle->subtotal,
+                    ];
+                })->values(),
+            ],
+        ]);
     }
 
     private function enviarRespuestaWhatsapp(string $from, string $reply, $connectionId = null): void
@@ -259,7 +406,7 @@ class WhatsappWebhookController extends Controller
 
             $payload = [
                 'number' => $from,
-                'body' => $reply,
+                'body'   => $reply,
             ];
 
             if ($connectionId) {
@@ -268,7 +415,7 @@ class WhatsappWebhookController extends Controller
             }
 
             Log::info('📤 ENVIANDO RESPUESTA A WHATSAPP', [
-                'url' => 'https://wa-api.tecnobyteapp.com:1422/api/messages/send',
+                'url'     => 'https://wa-api.tecnobyteapp.com:1422/api/messages/send',
                 'payload' => $payload,
             ]);
 
@@ -279,23 +426,23 @@ class WhatsappWebhookController extends Controller
 
             if ($response->successful()) {
                 Log::info('✅ RESPUESTA ENVIADA A WHATSAPP', [
-                    'status' => $response->status(),
-                    'body' => $response->json(),
-                    'phone' => $from,
+                    'status'        => $response->status(),
+                    'body'          => $response->json(),
+                    'phone'         => $from,
                     'connection_id' => $connectionId,
                 ]);
             } else {
                 Log::error('⚠️ WHATSAPP API RESPONDIÓ CON ERROR', [
-                    'status' => $response->status(),
-                    'body' => $response->body(),
-                    'phone' => $from,
+                    'status'        => $response->status(),
+                    'body'          => $response->body(),
+                    'phone'         => $from,
                     'connection_id' => $connectionId,
                 ]);
             }
         } catch (\Throwable $e) {
             Log::error('❌ ERROR ENVIANDO A WHATSAPP', [
-                'error' => $e->getMessage(),
-                'phone' => $from,
+                'error'         => $e->getMessage(),
+                'phone'         => $from,
                 'connection_id' => $connectionId,
             ]);
         }
@@ -307,14 +454,14 @@ class WhatsappWebhookController extends Controller
             $response = Http::withoutVerifying()
                 ->timeout(20)
                 ->post('https://wa-api.tecnobyteapp.com:1422/auth/login', [
-                    'email' => env('WHATSAPP_API_EMAIL'),
+                    'email'    => env('WHATSAPP_API_EMAIL'),
                     'password' => env('WHATSAPP_API_PASSWORD'),
                 ]);
 
             if ($response->failed()) {
                 Log::error('❌ ERROR LOGIN WHATSAPP', [
                     'status' => $response->status(),
-                    'body' => $response->body(),
+                    'body'   => $response->body(),
                 ]);
                 return null;
             }
@@ -585,27 +732,27 @@ PROMPT;
             }
 
             $pedido = Pedido::create([
-                'sede_id' => $sede?->id,
-                'fecha_pedido' => now(),
-                'hora_entrega' => $pickupTime,
-                'estado' => 'confirmado',
-                'total' => $orderData['total'] ?? 0,
-                'notas' => $notas ?: 'Solicitud realizada vía WhatsApp',
-                'cliente_nombre' => $orderData['customer_name'] ?? $name,
-                'telefono' => $orderData['phone'] ?? $from,
-                'canal' => 'whatsapp',
+                'sede_id'               => $sede?->id,
+                'fecha_pedido'          => now(),
+                'hora_entrega'          => $pickupTime,
+                'estado'                => 'confirmado',
+                'total'                 => $orderData['total'] ?? 0,
+                'notas'                 => $notas ?: 'Solicitud realizada vía WhatsApp',
+                'cliente_nombre'        => $orderData['customer_name'] ?? $name,
+                'telefono'              => $orderData['phone'] ?? $from,
+                'canal'                 => 'whatsapp',
                 'conversacion_completa' => json_encode($conversationHistory, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT),
-                'resumen_conversacion' => $orderData['notes'] ?? '',
+                'resumen_conversacion'  => $orderData['notes'] ?? '',
             ]);
 
             foreach (($orderData['products'] ?? []) as $product) {
                 DetallePedido::create([
-                    'pedido_id' => $pedido->id,
-                    'producto' => $product['name'] ?? 'Producto/Servicio',
-                    'cantidad' => (float)($product['quantity'] ?? 1),
-                    'unidad' => $product['unit'] ?? 'unidad',
-                    'precio_unitario' => (float)($product['price'] ?? 0),
-                    'subtotal' => (float)($product['subtotal'] ?? 0),
+                    'pedido_id'       => $pedido->id,
+                    'producto'        => $product['name'] ?? 'Producto/Servicio',
+                    'cantidad'        => (float) ($product['quantity'] ?? 1),
+                    'unidad'          => $product['unit'] ?? 'unidad',
+                    'precio_unitario' => (float) ($product['price'] ?? 0),
+                    'subtotal'        => (float) ($product['subtotal'] ?? 0),
                 ]);
             }
 
@@ -622,11 +769,10 @@ PROMPT;
             DB::rollBack();
 
             Log::error('❌ ERROR CRÍTICO AL GUARDAR SOLICITUD', [
-                'error' => $e->getMessage(),
+                'error'             => $e->getMessage(),
                 'reply_ia_completo' => $reply,
             ]);
 
-            // NO mandamos un error técnico largo al cliente
             return '⚠️ Tu pedido no se pudo registrar en este momento. Ya lo estamos revisando.';
         }
     }
