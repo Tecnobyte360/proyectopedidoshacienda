@@ -9,32 +9,18 @@ use Illuminate\Support\Facades\Cache;
 use App\Models\Pedido;
 use App\Http\Controllers\WhatsappWebhookController;
 
-// =========================================================
-// 🌐 RUTAS BÁSICAS DEL WEBHOOK Y API
-// =========================================================
-
 Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
 
-// Verificación del webhook
 Route::get('/whatsapp-webhook', function () {
     return response()->json([
         'status' => 'webhook active'
     ]);
 });
 
-// =========================================================
-// 📩 WEBHOOK PRINCIPAL
-// =========================================================
-
 Route::post('/whatsapp-webhook', [WhatsappWebhookController::class, 'receive']);
 
-// =========================================================
-// 🛠️ RUTAS DE ADMINISTRACIÓN Y DEBUGGING
-// =========================================================
-
-// Resetear conversación
 Route::delete('/whatsapp-webhook/reset/{phone}', function ($phone) {
     $cacheKey = "whatsapp_chat_{$phone}";
 
@@ -55,7 +41,6 @@ Route::delete('/whatsapp-webhook/reset/{phone}', function ($phone) {
     ], 404);
 });
 
-// Ver historial de conversación
 Route::get('/whatsapp-webhook/history/{phone}', function ($phone) {
     $cacheKey = "whatsapp_chat_{$phone}";
     $history  = Cache::get($cacheKey, []);
@@ -67,7 +52,6 @@ Route::get('/whatsapp-webhook/history/{phone}', function ($phone) {
     ]);
 });
 
-// Consultar pedidos de un cliente
 Route::get('/whatsapp-webhook/orders/{phone}', function ($phone) {
 
     $formatearCantidad = function (float $cantidad): string {
@@ -116,7 +100,6 @@ Route::get('/whatsapp-webhook/orders/{phone}', function ($phone) {
     ]);
 });
 
-// Actualizar estado de un pedido
 Route::patch('/whatsapp-webhook/orders/{id}/status', function (Request $request, $id) {
     $request->validate([
         'estado' => 'required|in:confirmado,en_preparacion,listo,entregado,cancelado',

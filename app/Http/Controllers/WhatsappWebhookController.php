@@ -35,10 +35,13 @@ class WhatsappWebhookController extends Controller
             Log::warning('⚠️ Webhook vacío');
             return response()->json([
                 'status' => 'error',
-                'message' => 'Payload vacío'
+                'message' => 'Payload vacío',
             ], 400);
         }
 
+        // ===============================
+        // NORMALIZAR DATOS DEL WEBHOOK
+        // ===============================
         $from = $data['chat']['phone']
             ?? $data['from']
             ?? $data['phoneNumber']
@@ -56,6 +59,17 @@ class WhatsappWebhookController extends Controller
             ?? ''
         );
 
+        $messageId = $data['mensaje']['id']
+            ?? $data['message']['id']
+            ?? $data['id']
+            ?? null;
+
+        $fromMe = (bool) (
+            $data['mensaje']['fromMe']
+            ?? $data['fromMe']
+            ?? false
+        );
+
         $connectionId = $data['conexion']['id']
             ?? $data['connectionId']
             ?? $data['whatsappId']
@@ -69,6 +83,8 @@ class WhatsappWebhookController extends Controller
             'from' => $from,
             'name' => $name,
             'message' => $message,
+            'message_id' => $messageId,
+            'from_me' => $fromMe,
             'connection_id' => $connectionId,
             'connection_name' => $connectionName,
         ]);
@@ -81,21 +97,63 @@ class WhatsappWebhookController extends Controller
                 'payload' => $data,
             ]);
 
-            return response()->json(['status' => 'ignored']);
+            return response()->json([
+                'status' => 'ignored'
+            ]);
+        }
+
+        // ===============================
+        // IGNORAR MENSAJES PROPIOS
+        // ===============================
+        if ($fromMe === true) {
+            Log::info('↩️ MENSAJE PROPIO IGNORADO', [
+                'message_id' => $messageId,
+                'from' => $from,
+            ]);
+
+            return response()->json([
+                'status' => 'self_message_ignored'
+            ]);
+        }
+
+        // ===============================
+        // EVITAR PROCESAR EL MISMO MENSAJE 2 VECES
+        // ===============================
+        if ($messageId) {
+            $dedupeKey = "whatsapp_msg_{$messageId}";
+
+            if (Cache::has($dedupeKey)) {
+                Log::warning('⚠️ MENSAJE DUPLICADO IGNORADO', [
+                    'message_id' => $messageId,
+                    'from' => $from,
+                    'message' => $message,
+                ]);
+
+                return response()->json([
+                    'status' => 'duplicate_ignored'
+                ]);
+            }
+
+            Cache::put($dedupeKey, true, now()->addMinutes(10));
         }
 
         Log::info('✅ MENSAJE CLIENTE', [
-            'from'    => $from,
-            'name'    => $name,
+            'from' => $from,
+            'name' => $name,
             'message' => $message,
+            'message_id' => $messageId,
             'connection_id' => $connectionId,
         ]);
 
+        // ===============================
+        // HISTORIAL DE CONVERSACIÓN
+        // ===============================
         $cacheKey = "whatsapp_chat_{$from}";
         $conversationHistory = Cache::get($cacheKey, []);
+
         $conversationHistory[] = [
             'role' => 'user',
-            'content' => $message
+            'content' => $message,
         ];
 
         if (count($conversationHistory) > 20) {
@@ -121,10 +179,10 @@ class WhatsappWebhookController extends Controller
             $responseIA = Http::withToken(env('OPENAI_API_KEY'))
                 ->timeout(35)
                 ->post('https://api.openai.com/v1/chat/completions', [
-                    'model'       => 'gpt-4o-mini',
-                    'messages'    => $messages,
+                    'model' => 'gpt-4o-mini',
+                    'messages' => $messages,
                     'temperature' => 0.5,
-                    'max_tokens'  => 450,
+                    'max_tokens' => 450,
                 ]);
 
             if ($responseIA->failed()) {
@@ -156,8 +214,29 @@ class WhatsappWebhookController extends Controller
             Log::info('💬 RESPUESTA GENERADA', [
                 'reply' => $reply,
                 'phone' => $from,
+                'message_id' => $messageId,
                 'connection_id' => $connectionId,
             ]);
+
+            // ===============================
+            // EVITAR ENVIAR LA MISMA RESPUESTA 2 VECES
+            // ===============================
+            if ($messageId) {
+                $responseKey = "whatsapp_response_{$messageId}";
+
+                if (Cache::has($responseKey)) {
+                    Log::warning('⚠️ RESPUESTA YA ENVIADA', [
+                        'message_id' => $messageId,
+                        'from' => $from,
+                    ]);
+
+                    return response()->json([
+                        'status' => 'response_already_sent'
+                    ]);
+                }
+
+                Cache::put($responseKey, true, now()->addMinutes(10));
+            }
 
             $this->enviarRespuestaWhatsapp($from, $reply, $connectionId);
 
@@ -190,7 +269,7 @@ class WhatsappWebhookController extends Controller
 
             $payload = [
                 'number' => $from,
-                'body'   => $reply,
+                'body' => $reply,
             ];
 
             if ($connectionId) {
@@ -253,7 +332,7 @@ class WhatsappWebhookController extends Controller
             $token = $response->json('token');
 
             Log::info('🔐 LOGIN WHATSAPP OK', [
-                'token_prefix' => $token ? substr($token, 0, 20) . '...' : null
+                'token_prefix' => $token ? substr($token, 0, 20) . '...' : null,
             ]);
 
             return $token;
@@ -261,6 +340,7 @@ class WhatsappWebhookController extends Controller
             Log::error('❌ EXCEPCIÓN LOGIN WHATSAPP', [
                 'error' => $e->getMessage(),
             ]);
+
             return null;
         }
     }
@@ -402,27 +482,27 @@ PROMPT;
             $sede = Sede::where('nombre', 'LIKE', "%{$sedeNombre}%")->first() ?? Sede::first();
 
             $pedido = Pedido::create([
-                'sede_id'               => $sede?->id,
-                'fecha_pedido'          => now(),
-                'hora_entrega'          => $orderData['pickup_time'] ?? 'Por confirmar',
-                'estado'                => 'confirmado',
-                'total'                 => $orderData['total'] ?? 0,
-                'notas'                 => $orderData['notes'] ?? 'Solicitud realizada vía WhatsApp',
-                'cliente_nombre'        => $orderData['customer_name'] ?? $name,
-                'telefono'              => $from,
-                'canal'                 => 'whatsapp',
+                'sede_id' => $sede?->id,
+                'fecha_pedido' => now(),
+                'hora_entrega' => $orderData['pickup_time'] ?? 'Por confirmar',
+                'estado' => 'confirmado',
+                'total' => $orderData['total'] ?? 0,
+                'notas' => $orderData['notes'] ?? 'Solicitud realizada vía WhatsApp',
+                'cliente_nombre' => $orderData['customer_name'] ?? $name,
+                'telefono' => $from,
+                'canal' => 'whatsapp',
                 'conversacion_completa' => json_encode($conversationHistory, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT),
-                'resumen_conversacion'  => $orderData['notes'] ?? '',
+                'resumen_conversacion' => $orderData['notes'] ?? '',
             ]);
 
             foreach (($orderData['products'] ?? []) as $product) {
                 DetallePedido::create([
-                    'pedido_id'       => $pedido->id,
-                    'producto'        => $product['name'] ?? 'Producto/Servicio',
-                    'cantidad'        => (float)($product['quantity'] ?? 1),
-                    'unidad'          => $product['unit'] ?? 'unidad',
+                    'pedido_id' => $pedido->id,
+                    'producto' => $product['name'] ?? 'Producto/Servicio',
+                    'cantidad' => (float)($product['quantity'] ?? 1),
+                    'unidad' => $product['unit'] ?? 'unidad',
                     'precio_unitario' => (float)($product['price'] ?? 0),
-                    'subtotal'        => (float)($product['subtotal'] ?? 0),
+                    'subtotal' => (float)($product['subtotal'] ?? 0),
                 ]);
             }
 
