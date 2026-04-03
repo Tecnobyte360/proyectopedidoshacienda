@@ -1,1071 +1,881 @@
 <!DOCTYPE html>
 <html lang="es">
-
 <head>
-    <meta charset="UTF-8" />
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Panel de Pedidos WhatsApp – Tiempo Real</title>
-
-    <meta name="csrf-token" content="{{ csrf_token() }}" />
+    <title>Pedidos · Delivery</title>
+    <meta name="csrf-token" content="{{ csrf_token() }}">
 
     @vite(['resources/css/app.css'])
 
-    <!-- ✅ ECHO / REVERB -->
     <script src="https://cdn.jsdelivr.net/npm/pusher-js@8.4.0-rc2/dist/web/pusher.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/laravel-echo@1.16.1/dist/echo.iife.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 
-    <script>
-    window.Pusher = Pusher;
-
-    const isLocal =
-        window.location.hostname === 'localhost' ||
-        window.location.hostname === '127.0.0.1';
-
-    window.Echo = new Echo({
-        broadcaster: 'reverb',
-        key: 'app-key',
-
-        wsHost: isLocal ? '127.0.0.1' : 'pedidosonline.tecnobyte360.com',
-
-        // 🔥 CORREGIDO
-        wsPort: isLocal ? 8080 : 443,
-        wssPort: isLocal ? 8080 : 443,
-
-        forceTLS: !isLocal,
-
-        // 🔥 IMPORTANTE: en local usa SOLO ws
-        enabledTransports: isLocal ? ['ws'] : ['ws', 'wss'],
-
-        disableStats: true,
-    });
-
-    console.log('✅ Echo configurado y listo', isLocal ? 'LOCAL' : 'PRODUCCIÓN');
-</script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+        :root {
+            --bg:        #0a0c12;
+            --surface:   #12151f;
+            --card:      #181c28;
+            --border:    rgba(255,255,255,0.07);
+            --border-hi: rgba(255,165,50,0.35);
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+            --accent:    #ff8c00;
+            --accent2:   #ffb347;
+            --glow:      rgba(255,140,0,0.18);
+
+            --nuevo:     #3b82f6;
+            --proceso:   #f59e0b;
+            --despachado:#a855f7;
+            --entregado: #22c55e;
+
+            --text:      #f0f2f8;
+            --muted:     #6b7280;
+            --sub:       #9ca3af;
         }
+
+        *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
 
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background: #f3f4f6;
+            font-family: 'DM Sans', sans-serif;
+            background: var(--bg);
+            color: var(--text);
             min-height: 100vh;
-            padding: 0.75rem 1rem;
-            color: #111827;
+            padding: 28px 20px 60px;
+            position: relative;
+            overflow-x: hidden;
         }
 
-        .app-shell {
-            width: 100%;
-            max-width: 100%;
+        /* Ambient background blobs */
+        body::before {
+            content: '';
+            position: fixed;
+            top: -160px;
+            left: -160px;
+            width: 520px;
+            height: 520px;
+            background: radial-gradient(circle, rgba(255,140,0,0.08) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+        body::after {
+            content: '';
+            position: fixed;
+            bottom: -120px;
+            right: -120px;
+            width: 440px;
+            height: 440px;
+            background: radial-gradient(circle, rgba(59,130,246,0.07) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 1100px;
             margin: 0 auto;
         }
 
-        /* ─── HEADER SUPERIOR ───────── */
-
-        .app-header {
+        /* ── HEADER ── */
+        .header {
             display: flex;
             justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1rem;
+            align-items: flex-start;
             gap: 1rem;
-        }
-
-        .app-header-left {
-            display: flex;
-            flex-direction: column;
-            gap: 0.25rem;
-        }
-
-        .app-header-title-row {
-            display: flex;
-            align-items: baseline;
-            gap: 0.5rem;
+            margin-bottom: 32px;
             flex-wrap: wrap;
+            animation: fadeDown .5s ease both;
         }
 
-        .app-title-label {
-            font-size: 1.3rem;
-            font-weight: 600;
-            color: #111827;
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 14px;
         }
 
-        .app-header-dropdown {
-            border: none;
-            background: transparent;
-            font-size: 1.3rem;
-            font-weight: 600;
-            color: #111827;
+        .brand-icon {
+            width: 52px;
+            height: 52px;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.6rem;
+            box-shadow: 0 0 24px var(--glow);
+            flex-shrink: 0;
+        }
+
+        .header h1 {
+            font-family: 'Syne', sans-serif;
+            font-size: 2.2rem;
+            font-weight: 800;
+            color: var(--text);
+            letter-spacing: -0.03em;
+            line-height: 1;
+        }
+
+        .header p {
+            font-size: 0.93rem;
+            color: var(--muted);
+            margin-top: 5px;
+        }
+
+        .live-pill {
             display: inline-flex;
             align-items: center;
-            gap: 0.25rem;
-            cursor: pointer;
+            gap: 8px;
+            background: rgba(34,197,94,0.1);
+            border: 1px solid rgba(34,197,94,0.25);
+            color: #4ade80;
+            font-size: 0.82rem;
+            font-weight: 600;
+            padding: 8px 14px;
+            border-radius: 999px;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            align-self: center;
         }
 
-        .app-header-dropdown span {
-            font-size: 0.9rem;
-            color: #9ca3af;
-        }
-
-        .app-header-meta {
-            font-size: 0.8rem;
-            color: #6b7280;
-            display: flex;
-            align-items: center;
-            gap: 0.4rem;
-        }
-
-        .app-header-dot {
+        .live-dot {
             width: 7px;
             height: 7px;
-            border-radius: 999px;
+            border-radius: 50%;
             background: #22c55e;
+            box-shadow: 0 0 8px #22c55e;
+            animation: pulse-green 1.8s ease infinite;
         }
 
-        .app-header-actions {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            flex-wrap: wrap;
-        }
-
-        .btn-ghost,
-        .btn-primary {
-            font-size: 0.8rem;
-            font-weight: 500;
-            border-radius: 999px;
-            padding: 0.45rem 0.9rem;
-            border: 1px solid transparent;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.25rem;
-        }
-
-        .btn-ghost {
-            background: #f3f4f6;
-            border-color: #d1d5db;
-            color: #374151;
-        }
-
-        .btn-ghost:hover {
-            background: #e5e7eb;
-        }
-
-        .btn-primary {
-            background: #111827;
-            color: white;
-            border-color: #111827;
-        }
-
-        .btn-primary:hover {
-            background: #030712;
-        }
-
-        /* ─── TARJETA DE RESUMEN ───────── */
-
-        .summary-card {
-            background: #f9fafb;
-            border-radius: 14px;
-            padding: 0.9rem 1.1rem 1.1rem;
-            border: 1px solid #e5e7eb;
-            margin-bottom: 1rem;
-            width: 100%;
-        }
-
-        .summary-top {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 0.8rem;
-        }
-
-        .range-button {
-            border-radius: 999px;
-            border: 1px solid #d1d5db;
-            background: white;
-            font-size: 0.8rem;
-            padding: 0.3rem 0.75rem;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.25rem;
-            color: #374151;
-        }
-
-        .summary-metrics {
+        /* ── STATS STRIP ── */
+        .stats-strip {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-            gap: 0.75rem;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            margin-bottom: 28px;
+            animation: fadeDown .5s .1s ease both;
         }
 
-        .summary-metric {
-            display: flex;
-            flex-direction: column;
-            gap: 0.15rem;
-        }
-
-        .metric-label {
-            font-size: 0.75rem;
-            color: #6b7280;
-        }
-
-        .metric-value-row {
-            display: flex;
-            align-items: baseline;
-            gap: 0.3rem;
-        }
-
-        .metric-value {
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: #111827;
-        }
-
-        .metric-trend {
-            font-size: 0.75rem;
-            color: #16a34a;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.18rem;
-        }
-
-        /* ─── CONTENEDOR TABLA ───────── */
-
-        .table-card {
-            background: white;
-            border-radius: 14px;
-            border: 1px solid #e5e7eb;
+        .stat-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 16px 18px;
+            position: relative;
             overflow: hidden;
-            width: 100%;
+            transition: border-color .2s;
         }
 
-        .filters-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0.4rem 0.75rem 0.35rem;
-            border-bottom: 1px solid #e5e7eb;
-            background: #f9fafb;
-            gap: 0.5rem;
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 3px;
+            border-radius: 16px 16px 0 0;
         }
 
-        .filters-tabs {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.25rem;
-        }
+        .stat-card.s-nuevo::before   { background: var(--nuevo); }
+        .stat-card.s-proceso::before { background: var(--proceso); }
+        .stat-card.s-desp::before    { background: var(--despachado); }
+        .stat-card.s-entr::before    { background: var(--entregado); }
 
-        .filter-pill {
-            border-radius: 999px;
-            border: 1px solid transparent;
-            background: transparent;
-            padding: 0.3rem 0.7rem;
+        .stat-label {
             font-size: 0.78rem;
-            color: #4b5563;
-            cursor: pointer;
-        }
-
-        .filter-pill:hover {
-            background: #e5e7eb;
-        }
-
-        .filter-pill.active {
-            background: #111827;
-            color: white;
-        }
-
-        .filters-actions {
-            display: flex;
-            align-items: center;
-            gap: 0.35rem;
-        }
-
-        .icon-button {
-            border-radius: 999px;
-            border: 1px solid #d1d5db;
-            background: white;
-            width: 30px;
-            height: 30px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            font-size: 0.85rem;
-            color: #6b7280;
-        }
-
-        .table-header {
-            padding: 0.7rem 1rem;
-            border-bottom: 1px solid #e5e7eb;
-            font-size: 0.8rem;
-            color: #6b7280;
-        }
-
-        .table-wrapper {
-            width: 100%;
-            overflow-x: auto;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            min-width: 900px;
-        }
-
-        thead {
-            background: #f9fafb;
-        }
-
-        th {
-            padding: 0.7rem 1rem;
-            text-align: left;
-            font-size: 0.72rem;
-            font-weight: 600;
-            color: #6b7280;
+            color: var(--muted);
             text-transform: uppercase;
             letter-spacing: 0.06em;
-            border-bottom: 1px solid #e5e7eb;
-            white-space: nowrap;
+            margin-bottom: 8px;
         }
 
-        tbody tr {
-            border-bottom: 1px solid #e5e7eb;
-            transition: background 0.15s ease;
+        .stat-num {
+            font-family: 'Syne', sans-serif;
+            font-size: 2rem;
+            font-weight: 800;
+            line-height: 1;
         }
 
-        tbody tr:hover {
-            background: #f9fafb;
+        .stat-card.s-nuevo   .stat-num { color: var(--nuevo); }
+        .stat-card.s-proceso .stat-num { color: var(--proceso); }
+        .stat-card.s-desp    .stat-num { color: var(--despachado); }
+        .stat-card.s-entr    .stat-num { color: var(--entregado); }
+
+        .stat-icon {
+            position: absolute;
+            right: 14px;
+            bottom: 12px;
+            font-size: 1.8rem;
+            opacity: 0.18;
         }
 
-        td {
-            padding: 0.85rem 1rem;
-            vertical-align: middle;
-            font-size: 0.86rem;
-            color: #111827;
-        }
-
-        .id-badge {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            min-width: 56px;
-            padding: 0.25rem 0.55rem;
-            border-radius: 999px;
-            border: 1px solid #e5e7eb;
-            background: #f9fafb;
-            font-size: 0.8rem;
-            font-weight: 500;
-            color: #4b5563;
-        }
-
-        .cliente-cell {
+        /* ── TOOLBAR ── */
+        .toolbar {
             display: flex;
+            justify-content: space-between;
             align-items: center;
-            gap: 0.7rem;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+            animation: fadeDown .5s .15s ease both;
         }
 
-        .cliente-avatar {
-            width: 32px;
-            height: 32px;
-            border-radius: 999px;
-            background: #e5e7eb;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.9rem;
-            font-weight: 600;
-            color: #374151;
-        }
-
-        .cliente-name {
-            font-weight: 500;
-            color: #111827;
-        }
-
-        .telefono-link {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.4rem;
-            padding: 0.35rem 0.75rem;
-            border-radius: 999px;
-            border: 1px solid #bbf7d0;
-            background: #f0fdf4;
-            color: #15803d;
-            font-size: 0.78rem;
-            font-weight: 500;
-            text-decoration: none;
-            white-space: nowrap;
-        }
-
-        .productos-container {
-            min-width: 260px;
-        }
-
-        .productos-grid {
+        .tabs {
             display: flex;
             flex-wrap: wrap;
-            gap: 0.25rem;
+            gap: 6px;
         }
 
-        .producto-item {
+        .tab-btn {
+            text-decoration: none;
+            border: 1px solid var(--border);
+            background: var(--card);
+            color: var(--muted);
+            padding: 9px 16px;
+            border-radius: 10px;
+            font-size: 0.88rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all .2s ease;
             display: inline-flex;
             align-items: center;
-            gap: 0.4rem;
-            padding: 0.3rem 0.55rem;
-            background: #f3f4f6;
-            border-radius: 999px;
-            font-size: 0.78rem;
+            gap: 6px;
         }
 
-        .producto-cantidad {
-            min-width: 20px;
-            height: 20px;
-            border-radius: 999px;
-            background: #fef3c7;
+        .tab-btn:hover {
+            border-color: rgba(255,140,0,0.3);
+            color: var(--text);
+        }
+
+        .tab-btn.active {
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            border-color: transparent;
+            color: #0a0c12;
+            font-weight: 700;
+            box-shadow: 0 0 16px var(--glow);
+        }
+
+        .count-badge {
+            background: rgba(0,0,0,0.18);
+            border-radius: 6px;
+            padding: 1px 6px;
+            font-size: 0.78rem;
+            font-weight: 700;
+        }
+
+        .tab-btn.active .count-badge {
+            background: rgba(0,0,0,0.22);
+            color: #0a0c12;
+        }
+
+        .filter-select {
+            appearance: none;
+            -webkit-appearance: none;
+            border: 1px solid var(--border);
+            background: var(--card) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' fill='none'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b7280' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 14px center;
+            color: var(--sub);
+            border-radius: 10px;
+            padding: 10px 36px 10px 14px;
+            font-size: 0.88rem;
+            outline: none;
+            font-family: 'DM Sans', sans-serif;
+            cursor: pointer;
+            transition: border-color .2s;
+        }
+
+        .filter-select:hover {
+            border-color: rgba(255,140,0,0.3);
+            color: var(--text);
+        }
+
+        /* ── ORDERS LIST ── */
+        .orders-list {
             display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .order-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 0;
+            display: flex;
+            align-items: stretch;
+            overflow: hidden;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.25);
+            transition: transform .2s ease, box-shadow .2s ease, border-color .2s;
+            animation: slideIn .35s ease both;
+        }
+
+        .order-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 28px rgba(0,0,0,0.4);
+            border-color: rgba(255,140,0,0.2);
+        }
+
+        .order-card.active {
+            border-color: var(--border-hi);
+            box-shadow: 0 0 0 1px rgba(255,165,50,0.12), 0 8px 24px rgba(0,0,0,0.35);
+        }
+
+        /* Left accent stripe */
+        .card-stripe {
+            width: 5px;
+            flex-shrink: 0;
+        }
+
+        .stripe-nuevo      { background: var(--nuevo); }
+        .stripe-proceso    { background: var(--proceso); }
+        .stripe-despachado { background: var(--despachado); }
+        .stripe-entregado  { background: var(--entregado); }
+
+        .card-body {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 18px 20px;
+            gap: 20px;
+        }
+
+        .order-left {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            min-width: 0;
+        }
+
+        .order-top {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .order-code {
+            font-family: 'Syne', sans-serif;
+            font-size: 0.88rem;
+            font-weight: 700;
+            color: var(--accent2);
+            letter-spacing: 0.05em;
+            background: rgba(255,140,0,0.08);
+            padding: 3px 10px;
+            border-radius: 6px;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 4px 11px;
+            border-radius: 999px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+        }
+
+        .status-dot-sm {
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .status-nuevo {
+            background: rgba(59,130,246,0.12);
+            color: #60a5fa;
+        }
+        .status-nuevo .status-dot-sm {
+            background: var(--nuevo);
+            box-shadow: 0 0 6px var(--nuevo);
+            animation: pulse-blue 1.6s ease infinite;
+        }
+
+        .status-proceso {
+            background: rgba(245,158,11,0.12);
+            color: #fbbf24;
+        }
+        .status-proceso .status-dot-sm { background: var(--proceso); }
+
+        .status-despachado {
+            background: rgba(168,85,247,0.12);
+            color: #c084fc;
+        }
+        .status-despachado .status-dot-sm { background: var(--despachado); }
+
+        .status-entregado {
+            background: rgba(34,197,94,0.12);
+            color: #4ade80;
+        }
+        .status-entregado .status-dot-sm { background: var(--entregado); }
+
+        .order-client {
+            font-size: 1.1rem;
+            color: var(--text);
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .order-meta {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .meta-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.8rem;
+            color: var(--muted);
+        }
+
+        /* Right section */
+        .order-right {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            flex-shrink: 0;
+        }
+
+        .price-block {
+            text-align: right;
+        }
+
+        .price {
+            font-family: 'Syne', sans-serif;
+            font-size: 1.75rem;
+            font-weight: 800;
+            color: var(--text);
+            line-height: 1;
+            letter-spacing: -0.02em;
+        }
+
+        .time {
+            margin-top: 5px;
+            font-size: 0.8rem;
+            color: var(--muted);
+            text-align: right;
+        }
+
+        .action-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            display: inline-flex;
             align-items: center;
             justify-content: center;
-            font-size: 0.75rem;
-            font-weight: 600;
-            color: #92400e;
+            background: rgba(255,140,0,0.08);
+            border: 1px solid rgba(255,140,0,0.15);
+            color: var(--accent2);
+            cursor: pointer;
+            transition: all .2s;
+            font-size: 1.1rem;
         }
 
-        .producto-unidad {
-            font-size: 0.7rem;
-            color: #6b7280;
-            text-transform: uppercase;
+        .action-btn:hover {
+            background: rgba(255,140,0,0.18);
+            transform: scale(1.08);
         }
 
-        .producto-nombre {
-            font-size: 0.78rem;
-            font-weight: 500;
-        }
-
-        .sede-badge,
-        .hora-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.35rem;
-            padding: 0.3rem 0.7rem;
-            border-radius: 999px;
-            font-size: 0.78rem;
-            border: 1px solid #e5e7eb;
-            background: #f9fafb;
-            color: #4b5563;
-            white-space: nowrap;
-        }
-
-        .hora-badge {
-            background: #fffbeb;
-            border-color: #fde68a;
-            color: #92400e;
-        }
-
-        .estado-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.35rem;
-            padding: 0.3rem 0.75rem;
-            border-radius: 999px;
-            font-size: 0.78rem;
-            font-weight: 500;
-            white-space: nowrap;
-        }
-
-        .estado-badge.confirmado {
-            background: #e0f2fe;
-            color: #0369a1;
-            border: 1px solid #bfdbfe;
-        }
-
-        .estado-badge.pendiente {
-            background: #fef3c7;
-            color: #92400e;
-            border: 1px solid #fde68a;
-        }
-
-        .estado-badge.completado {
-            background: #dcfce7;
-            color: #15803d;
-            border: 1px solid #bbf7d0;
-        }
-
-        .estado-badge.cancelado {
-            background: #fee2e2;
-            color: #b91c1c;
-            border: 1px solid #fecaca;
-        }
-
-        .total-cell {
-            font-weight: 600;
-            font-size: 0.9rem;
-            white-space: nowrap;
-        }
-
-        .fecha-cell {
-            font-size: 0.8rem;
-            color: #6b7280;
-        }
-
-        .fecha-hora {
-            font-size: 0.75rem;
-            color: #9ca3af;
-        }
-
+        /* ── EMPTY STATE ── */
         .empty-state {
             text-align: center;
-            padding: 3rem 1rem;
-            font-size: 0.9rem;
-            color: #6b7280;
+            padding: 80px 20px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 20px;
         }
 
+        .empty-icon {
+            font-size: 3.5rem;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        .empty-state p {
+            color: var(--muted);
+            font-size: 1rem;
+        }
+
+        /* ── TOAST ── */
         .toast {
             position: fixed;
-            bottom: 1.5rem;
-            right: 1.5rem;
-            background: white;
-            border-radius: 14px;
-            padding: 1rem 1.1rem;
-            box-shadow: 0 16px 40px rgba(15, 23, 42, 0.25);
+            right: 22px;
+            bottom: 22px;
+            background: var(--surface);
+            border: 1px solid rgba(255,140,0,0.3);
+            border-radius: 16px;
+            padding: 16px 18px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,140,0,0.08);
+            min-width: 300px;
+            z-index: 9999;
+            transform: translateY(130px);
+            opacity: 0;
+            transition: all .4s cubic-bezier(.34,1.56,.64,1);
             display: flex;
+            gap: 12px;
             align-items: flex-start;
-            gap: 0.8rem;
-            max-width: 380px;
-            transform: translateX(500px);
-            transition: transform 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-            z-index: 1000;
-            border-left: 4px solid #16a34a;
         }
 
         .toast.show {
-            transform: translateX(0);
+            transform: translateY(0);
+            opacity: 1;
         }
 
         .toast-icon {
-            width: 40px;
-            height: 40px;
-            border-radius: 999px;
-            background: #16a34a;
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
             display: flex;
             align-items: center;
             justify-content: center;
+            font-size: 1.1rem;
             flex-shrink: 0;
         }
 
         .toast-title {
-            font-size: 0.9rem;
-            font-weight: 600;
-            margin-bottom: 0.2rem;
+            font-weight: 700;
+            color: var(--text);
+            font-size: 0.95rem;
+            margin-bottom: 3px;
         }
 
         .toast-message {
-            font-size: 0.8rem;
-            color: #6b7280;
+            color: var(--muted);
+            font-size: 0.85rem;
+            line-height: 1.4;
         }
 
-        .toast-close {
-            background: none;
-            border: none;
-            color: #9ca3af;
-            cursor: pointer;
-            font-size: 0.9rem;
+        /* ── ANIMATIONS ── */
+        @keyframes fadeDown {
+            from { opacity: 0; transform: translateY(-14px); }
+            to   { opacity: 1; transform: translateY(0); }
         }
 
-        .resumen-cell {
-            max-width: 260px;
-            max-height: 90px;
-            /* altura visible */
-            overflow-y: auto;
-            /* ✅ scroll vertical */
-            font-size: 0.8rem;
-            color: #4b5563;
-            line-height: 1.35;
-            white-space: normal;
-            /* ✅ permite salto de línea */
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-16px); }
+            to   { opacity: 1; transform: translateX(0); }
         }
 
+        @keyframes pulse-green {
+            0%,100% { box-shadow: 0 0 6px #22c55e; }
+            50%      { box-shadow: 0 0 14px #22c55e; }
+        }
 
+        @keyframes pulse-blue {
+            0%,100% { box-shadow: 0 0 4px var(--nuevo); }
+            50%      { box-shadow: 0 0 12px var(--nuevo); }
+        }
 
-        /* ─── RESPONSIVE ───────── */
-
+        /* ── RESPONSIVE ── */
         @media (max-width: 900px) {
-            .summary-top {
-                flex-direction: row;
-            }
+            .stats-strip { grid-template-columns: repeat(2,1fr); }
         }
 
-        @media (max-width: 768px) {
-            body {
-                padding: 0.5rem;
-            }
+        @media (max-width: 640px) {
+            body { padding: 18px 12px 50px; }
 
-            .app-header {
+            .header h1 { font-size: 1.7rem; }
+
+            .stats-strip { grid-template-columns: repeat(2,1fr); gap: 8px; }
+
+            .toolbar { flex-direction: column; align-items: stretch; }
+
+            .tabs { width: 100%; }
+
+            .filter-select { width: 100%; }
+
+            .card-body {
                 flex-direction: column;
-                align-items: flex-start;
+                align-items: stretch;
+                gap: 14px;
             }
 
-            .app-header-actions {
-                width: 100%;
-                justify-content: flex-start;
+            .order-right {
+                justify-content: space-between;
             }
 
-            table {
-                min-width: 720px;
-            }
-
-            .toast {
-                right: 1rem;
-                left: 1rem;
-                bottom: 1rem;
-                max-width: none;
-            }
-        }
-
-        @media (max-width: 480px) {
-            .filters-row {
-                flex-direction: column;
-                align-items: flex-start;
-            }
-
-            .telefono-link {
-                max-width: 100%;
-            }
+            .price { font-size: 1.5rem; }
         }
     </style>
 </head>
-
 <body>
-    <div class="app-shell">
+    <div class="container">
 
-        <!-- HEADER SUPERIOR -->
-        <header class="app-header">
-            <div class="app-header-left">
-                <div class="app-header-title-row">
-                    <span class="app-title-label">Pedidos:</span>
-                    <button class="app-header-dropdown">
-                        Todas las sucursales
-                        <span>▾</span>
-                    </button>
-                </div>
-                <div class="app-header-meta">
-                    <span class="app-header-dot"></span>
-                    <span>Sistema activo · Actualizado en tiempo real</span>
+        <!-- HEADER -->
+        <div class="header">
+            <div class="header-brand">
+                <div class="brand-icon">🛵</div>
+                <div>
+                    <h1>Pedidos</h1>
+                    <p>Gestión y seguimiento en tiempo real</p>
                 </div>
             </div>
 
-            <div class="app-header-actions">
-                <button class="btn-ghost">Exportar</button>
-                <button class="btn-ghost">Más acciones ▾</button>
-                <button class="btn-primary">Crear pedido</button>
+            <div class="live-pill">
+                <span class="live-dot"></span>
+                En vivo
             </div>
-        </header>
+        </div>
 
-        <!-- TARJETA RESUMEN -->
-        <section class="summary-card">
-            <div class="summary-top">
-                <button class="range-button">
-                    30 días ▾
-                </button>
+        @php
+            $todos       = $pedidos->count();
+            $nuevos      = $pedidos->where('estado', 'nuevo')->count();
+            $enProceso   = $pedidos->where('estado', 'en_proceso')->count();
+            $despachados = $pedidos->where('estado', 'despachado')->count();
+            $entregados  = $pedidos->where('estado', 'entregado')->count();
+
+            $tab  = request('estado', 'todos');
+            $zona = request('zona', 'todas');
+
+            $pedidosFiltrados = $pedidos;
+            if ($tab !== 'todos')   { $pedidosFiltrados = $pedidosFiltrados->where('estado', $tab); }
+            if ($zona !== 'todas')  { $pedidosFiltrados = $pedidosFiltrados->where('zona', $zona); }
+        @endphp
+
+        <!-- STATS STRIP -->
+        <div class="stats-strip">
+            <div class="stat-card s-nuevo">
+                <div class="stat-label">Nuevos</div>
+                <div class="stat-num">{{ $nuevos }}</div>
+                <div class="stat-icon">🔔</div>
             </div>
-
-            <div class="summary-metrics">
-                <div class="summary-metric">
-                    <span class="metric-label">Pedidos</span>
-                    <div class="metric-value-row">
-                        <span class="metric-value" id="count-total-top">{{ $pedidos->count() }}</span>
-                    </div>
-                    <span class="metric-trend">▲ 0%</span>
-                </div>
-
-                <div class="summary-metric">
-                    <span class="metric-label">Pedidos hoy</span>
-                    <div class="metric-value-row">
-                        <span class="metric-value" id="count-today">
-                            {{ $pedidos->where('fecha_pedido', '>=', now()->startOfDay())->count() }}
-                        </span>
-                    </div>
-                    <span class="metric-trend">▲ 0%</span>
-                </div>
-
-                <div class="summary-metric">
-                    <span class="metric-label">Confirmados</span>
-                    <div class="metric-value-row">
-                        <span class="metric-value" id="count-confirmed">
-                            {{ $pedidos->where('estado', 'confirmado')->count() }}
-                        </span>
-                    </div>
-                    <span class="metric-trend">▲ 0%</span>
-                </div>
-
-                <div class="summary-metric">
-                    <span class="metric-label">En proceso</span>
-                    <div class="metric-value-row">
-                        <span class="metric-value" id="count-processing">
-                            {{ $pedidos->whereIn('estado', ['pendiente', 'en_preparacion'])->count() }}
-                        </span>
-                    </div>
-                    <span class="metric-trend">▲ 0%</span>
-                </div>
-
-                <div class="summary-metric">
-                    <span class="metric-label">Entregados</span>
-                    <div class="metric-value-row">
-                        <span class="metric-value">
-                            {{ $pedidos->where('estado', 'completado')->count() }}
-                        </span>
-                    </div>
-                    <span class="metric-trend">▲ 0%</span>
-                </div>
-
-                <div class="summary-metric">
-                    <span class="metric-label">Cancelados</span>
-                    <div class="metric-value-row">
-                        <span class="metric-value">
-                            {{ $pedidos->where('estado', 'cancelado')->count() }}
-                        </span>
-                    </div>
-                    <span class="metric-trend" style="color:#dc2626;">▼ 0%</span>
-                </div>
+            <div class="stat-card s-proceso">
+                <div class="stat-label">En proceso</div>
+                <div class="stat-num">{{ $enProceso }}</div>
+                <div class="stat-icon">🍳</div>
             </div>
-        </section>
+            <div class="stat-card s-desp">
+                <div class="stat-label">Despachados</div>
+                <div class="stat-num">{{ $despachados }}</div>
+                <div class="stat-icon">🛵</div>
+            </div>
+            <div class="stat-card s-entr">
+                <div class="stat-label">Entregados</div>
+                <div class="stat-num">{{ $entregados }}</div>
+                <div class="stat-icon">✅</div>
+            </div>
+        </div>
 
-        <!-- TABLA -->
-        <section class="table-card">
-            <!-- Filtros -->
-            <div class="filters-row">
-                <div class="filters-tabs">
-                    <button class="filter-pill active">Todo</button>
-                    <button class="filter-pill">No preparado</button>
-                    <button class="filter-pill">Sin pagar</button>
-                    <button class="filter-pill">Abierto</button>
-                    <button class="filter-pill">Cerrado</button>
-                    <button class="filter-pill">Automatizaciones</button>
-                    <button class="filter-pill">Entrega local</button>
-                </div>
-                <div class="filters-actions">
-                    <button class="icon-button">🔍</button>
-                    <button class="icon-button">⟳</button>
-                </div>
+        <!-- TOOLBAR -->
+        <div class="toolbar">
+            <div class="tabs">
+                <a href="{{ request()->fullUrlWithQuery(['estado' => 'todos']) }}"
+                   class="tab-btn {{ $tab === 'todos' ? 'active' : '' }}">
+                    Todos <span class="count-badge">{{ $todos }}</span>
+                </a>
+                <a href="{{ request()->fullUrlWithQuery(['estado' => 'nuevo']) }}"
+                   class="tab-btn {{ $tab === 'nuevo' ? 'active' : '' }}">
+                    🔔 Nuevos <span class="count-badge">{{ $nuevos }}</span>
+                </a>
+                <a href="{{ request()->fullUrlWithQuery(['estado' => 'en_proceso']) }}"
+                   class="tab-btn {{ $tab === 'en_proceso' ? 'active' : '' }}">
+                    🍳 En proceso <span class="count-badge">{{ $enProceso }}</span>
+                </a>
+                <a href="{{ request()->fullUrlWithQuery(['estado' => 'despachado']) }}"
+                   class="tab-btn {{ $tab === 'despachado' ? 'active' : '' }}">
+                    🛵 Despachados <span class="count-badge">{{ $despachados }}</span>
+                </a>
+                <a href="{{ request()->fullUrlWithQuery(['estado' => 'entregado']) }}"
+                   class="tab-btn {{ $tab === 'entregado' ? 'active' : '' }}">
+                    ✅ Entregados <span class="count-badge">{{ $entregados }}</span>
+                </a>
             </div>
 
-            <div class="table-header">
-                Pedidos en tiempo real desde WhatsApp
-            </div>
+            <form method="GET">
+                <input type="hidden" name="estado" value="{{ $tab }}">
+                <select name="zona" class="filter-select" onchange="this.form.submit()">
+                    <option value="todas" {{ $zona === 'todas' ? 'selected' : '' }}>📍 Todas las zonas</option>
+                    <option value="norte"  {{ $zona === 'norte'  ? 'selected' : '' }}>⬆️ Zona Norte</option>
+                    <option value="sur"    {{ $zona === 'sur'    ? 'selected' : '' }}>⬇️ Zona Sur</option>
+                    <option value="centro" {{ $zona === 'centro' ? 'selected' : '' }}>🎯 Zona Centro</option>
+                </select>
+            </form>
+        </div>
 
-            <div class="table-wrapper">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Pedido</th>
-                            <th>Fecha</th>
-                            <th>Cliente</th>
-                            <th>Teléfono</th>
-                            <th>Productos</th>
-                            <th>Resumen</th> <!-- 👈 NUEVO -->
-                            <th>Sede</th>
-                            <th>Hora entrega</th>
-                            <th>Estado</th>
-                            <th>Total</th>
-                        </tr>
-                    </thead>
-                    <tbody id="pedidos-tbody">
-                        @forelse($pedidos as $pedido)
-                            <tr data-pedido-id="{{ $pedido->id }}">
-                                <td>
-                                    <div class="id-badge">#{{ $pedido->id }}</div>
-                                </td>
-                                <td>
-                                    <div class="fecha-cell">
-                                        {{ $pedido->created_at->format('d/m/Y') }}
-                                        <div class="fecha-hora">{{ $pedido->created_at->format('H:i') }}</div>
-                                    </div>
-                                </td>
-                                <td>
-                                    <div class="cliente-cell">
-                                        <div class="cliente-avatar">
-                                            {{ strtoupper(substr($pedido->cliente_nombre, 0, 1)) }}
-                                        </div>
-                                        <span class="cliente-name">{{ $pedido->cliente_nombre }}</span>
-                                    </div>
-                                </td>
-                                <td>
-                                    <a href="https://wa.me/{{ $pedido->telefono }}" target="_blank"
-                                        class="telefono-link">
-                                        {{ $pedido->telefono }}
-                                    </a>
-                                </td>
-                                <td>
-                                    <div class="productos-container">
-                                        <div class="productos-grid">
-                                            @foreach ($pedido->detalles as $detalle)
-                                                <div class="producto-item">
-                                                    @php
-                                                        $cantidad = rtrim(
-                                                            rtrim(number_format($detalle->cantidad, 2, ',', '.'), '0'),
-                                                            ',',
-                                                        );
-                                                    @endphp
+        <!-- ORDERS LIST -->
+        <div class="orders-list" id="orders-list">
+            @forelse($pedidosFiltrados as $pedido)
+                @php
+                    $stripeClass = match($pedido->estado) {
+                        'nuevo'      => 'stripe-nuevo',
+                        'en_proceso' => 'stripe-proceso',
+                        'despachado' => 'stripe-despachado',
+                        'entregado'  => 'stripe-entregado',
+                        default      => 'stripe-nuevo',
+                    };
 
-                                                    <div class="producto-cantidad">{{ $cantidad }}</div>
-                                                    <div class="producto-info">
-                                                        <span class="producto-unidad">
-                                                            {{ strtoupper($detalle->unidad) }}
-                                                        </span>
-                                                        <span class="producto-nombre">{{ $detalle->producto }}</span>
-                                                    </div>
+                    $badgeClass = match($pedido->estado) {
+                        'nuevo'      => 'status-nuevo',
+                        'en_proceso' => 'status-proceso',
+                        'despachado' => 'status-despachado',
+                        'entregado'  => 'status-entregado',
+                        default      => 'status-nuevo',
+                    };
 
-                                                    <div class="producto-info">
-                                                        <span class="producto-unidad">{{ $detalle->unidad }}</span>
+                    $labelEstado = match($pedido->estado) {
+                        'nuevo'      => 'Nuevo',
+                        'en_proceso' => 'En Proceso',
+                        'despachado' => 'Despachado',
+                        'entregado'  => 'Entregado',
+                        default      => ucfirst(str_replace('_', ' ', $pedido->estado)),
+                    };
+                @endphp
 
-                                                    </div>
-                                                </div>
-                                            @endforeach
-                                        </div>
-                                    </div>
-                                </td>
-                                <td>
-                                    <div class="resumen-cell" title="{{ $pedido->resumen_conversacion }}">
-                                        {{ $pedido->resumen_conversacion }}
-                                    </div>
+                <div class="order-card {{ $pedido->estado === 'nuevo' ? 'active' : '' }}" data-id="{{ $pedido->id }}">
+                    <div class="card-stripe {{ $stripeClass }}"></div>
+                    <div class="card-body">
+                        <div class="order-left">
+                            <div class="order-top">
+                                <span class="order-code">PED-{{ str_pad($pedido->id, 3, '0', STR_PAD_LEFT) }}</span>
+                                <span class="status-badge {{ $badgeClass }}">
+                                    <span class="status-dot-sm"></span>
+                                    {{ $labelEstado }}
+                                </span>
+                            </div>
 
-                                </td>
+                            <div class="order-client">{{ $pedido->cliente_nombre }}</div>
 
-                                <td>
-                                    <span class="sede-badge">
-                                        {{ $pedido->sede?->nombre ?? 'N/A' }}
+                            <div class="order-meta">
+                                <span class="meta-chip">
+                                    🕒 {{ \Carbon\Carbon::parse($pedido->created_at)->format('h:i a') }}
+                                </span>
+                                @if(isset($pedido->zona))
+                                    <span class="meta-chip">
+                                        📍 {{ ucfirst($pedido->zona) }}
                                     </span>
-                                </td>
-                                <td>
-                                    <span class="hora-badge">
-                                        {{ $pedido->hora_entrega }}
-                                    </span>
-                                </td>
-                                <td>
-                                    @php
-                                        $estados = [
-                                            'confirmado' => ['class' => 'confirmado', 'icon' => '●'],
-                                            'pendiente' => ['class' => 'pendiente', 'icon' => '●'],
-                                            'completado' => ['class' => 'completado', 'icon' => '●'],
-                                            'cancelado' => ['class' => 'cancelado', 'icon' => '●'],
-                                        ];
-                                        $estado = $estados[$pedido->estado] ?? ['class' => 'pendiente', 'icon' => '●'];
-                                    @endphp
-                                    <span class="estado-badge {{ $estado['class'] }}">
-                                        <span style="font-size:0.6rem;">{{ $estado['icon'] }}</span>
-                                        <span>{{ ucfirst($pedido->estado) }}</span>
-                                    </span>
-                                </td>
-                                <td>
-                                    <div class="total-cell">
-                                        ${{ number_format($pedido->total, 0, ',', '.') }}
-                                    </div>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="10">
-                                    <div class="empty-state">
-                                        No hay pedidos todavía. Cuando entren por WhatsApp aparecerán aquí.
-                                    </div>
-                                </td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-        </section>
+                                @endif
+                            </div>
+                        </div>
+
+                        <div class="order-right">
+                            <div class="price-block">
+                                <div class="price">${{ number_format($pedido->total, 0, ',', '.') }}</div>
+                                <div class="time">{{ \Carbon\Carbon::parse($pedido->created_at)->diffForHumans() }}</div>
+                            </div>
+                            <div class="action-btn" title="Ver detalle">›</div>
+                        </div>
+                    </div>
+                </div>
+            @empty
+                <div class="empty-state">
+                    <div class="empty-icon">🛵</div>
+                    <p>Sin pedidos para mostrar en este momento.</p>
+                </div>
+            @endforelse
+        </div>
+
     </div>
 
     <!-- TOAST -->
-    <div id="notification-toast" class="toast">
-        <div class="toast-icon">
-            <svg width="20" height="20" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round"
-                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-            </svg>
-        </div>
+    <div class="toast" id="toast">
+        <div class="toast-icon">🛵</div>
         <div>
-            <div class="toast-title">¡Nuevo pedido confirmado!</div>
-            <div class="toast-message" id="toast-message"></div>
+            <div class="toast-title">¡Nuevo pedido!</div>
+            <div class="toast-message" id="toast-message">Se ha recibido un nuevo pedido.</div>
         </div>
-        <button class="toast-close" onclick="closeToast()">✕</button>
     </div>
 
     <script>
-        console.log('🔍 Iniciando sistema de pedidos...');
+        window.Pusher = Pusher;
 
-        if (!window.Echo) {
-            console.error('❌ Echo NO está disponible');
-        } else {
-            console.log('✅ Echo disponible');
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
+        window.Echo = new Echo({
+            broadcaster: 'reverb',
+            key: 'app-key',
+            wsHost: isLocal ? '127.0.0.1' : 'pedidosonline.tecnobyte360.com',
+            wsPort:  isLocal ? 8080 : 443,
+            wssPort: isLocal ? 8080 : 443,
+            forceTLS: !isLocal,
+            enabledTransports: isLocal ? ['ws'] : ['ws', 'wss'],
+            disableStats: true,
+        });
+
+        const ordersList   = document.getElementById('orders-list');
+        const toast        = document.getElementById('toast');
+        const toastMessage = document.getElementById('toast-message');
+
+        function formatMoney(value) {
+            return new Intl.NumberFormat('es-CO').format(value);
+        }
+
+        function formatHour(dateString) {
+            return new Date(dateString).toLocaleTimeString('es-CO', {
+                hour: '2-digit', minute: '2-digit', hour12: true
+            });
+        }
+
+        function getStatusLabel(estado) {
+            return { nuevo: 'Nuevo', en_proceso: 'En Proceso', despachado: 'Despachado', entregado: 'Entregado' }[estado] || estado;
+        }
+
+        function getBadgeClass(estado) {
+            return { nuevo: 'status-nuevo', en_proceso: 'status-proceso', despachado: 'status-despachado', entregado: 'status-entregado' }[estado] || 'status-nuevo';
+        }
+
+        function getStripeClass(estado) {
+            return { nuevo: 'stripe-nuevo', en_proceso: 'stripe-proceso', despachado: 'stripe-despachado', entregado: 'stripe-entregado' }[estado] || 'stripe-nuevo';
+        }
+
+        function addOrderCard(pedido) {
+            const code       = `PED-${String(pedido.id).padStart(3, '0')}`;
+            const activeClass = pedido.estado === 'nuevo' ? 'active' : '';
+
+            const card = document.createElement('div');
+            card.className = `order-card ${activeClass}`;
+            card.dataset.id = pedido.id;
+            card.style.animationDelay = '0s';
+
+            card.innerHTML = `
+                <div class="card-stripe ${getStripeClass(pedido.estado)}"></div>
+                <div class="card-body">
+                    <div class="order-left">
+                        <div class="order-top">
+                            <span class="order-code">${code}</span>
+                            <span class="status-badge ${getBadgeClass(pedido.estado)}">
+                                <span class="status-dot-sm"></span>
+                                ${getStatusLabel(pedido.estado)}
+                            </span>
+                        </div>
+                        <div class="order-client">${pedido.cliente_nombre}</div>
+                        <div class="order-meta">
+                            <span class="meta-chip">🕒 ${formatHour(pedido.created_at)}</span>
+                        </div>
+                    </div>
+                    <div class="order-right">
+                        <div class="price-block">
+                            <div class="price">$${formatMoney(pedido.total)}</div>
+                            <div class="time">Ahora mismo</div>
+                        </div>
+                        <div class="action-btn" title="Ver detalle">›</div>
+                    </div>
+                </div>
+            `;
+
+            const emptyState = ordersList.querySelector('.empty-state');
+            if (emptyState) ordersList.innerHTML = '';
+
+            ordersList.prepend(card);
+        }
+
+        function showToast(message) {
+            toastMessage.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 4500);
+        }
+
+        if (window.Echo) {
             window.Echo.channel('pedidos')
                 .listen('.pedido.confirmado', (event) => {
-                    console.log('🎉 Nuevo pedido recibido:', event);
-
-                    updateCounters();
-                    addPedidoRow(event);
-                    showNotification(event);
-                    playNotificationSound();
+                    addOrderCard(event);
+                    showToast(`Pedido de ${event.cliente_nombre} agregado.`);
                 });
-
-            console.log('✅ Escuchando canal: pedidos');
-        }
-
-        function addPedidoRow(pedido) {
-            const tbody = document.getElementById('pedidos-tbody');
-
-            if (tbody.querySelector('td[colspan]')) {
-                tbody.innerHTML = '';
-            }
-
-            const estadoConfig = {
-                'confirmado': {
-                    class: 'confirmado',
-                    icon: '●'
-                },
-                'pendiente': {
-                    class: 'pendiente',
-                    icon: '●'
-                },
-                'completado': {
-                    class: 'completado',
-                    icon: '●'
-                },
-                'cancelado': {
-                    class: 'cancelado',
-                    icon: '●'
-                }
-            };
-
-            const estado = estadoConfig[pedido.estado] || {
-                class: 'pendiente',
-                icon: '●'
-            };
-
-            const productosHTML = pedido.detalles.map(d =>
-                `<div class="producto-item">
-                <div class="producto-cantidad">${d.cantidad}</div>
-                <div class="producto-info">
-                    <span class="producto-unidad">${d.unidad}</span>
-                    <span class="producto-nombre">${d.producto}</span>
-                </div>
-            </div>`
-            ).join('');
-
-            const firstLetter = pedido.cliente_nombre.charAt(0).toUpperCase();
-            const resumen = pedido.resumen_conversacion || '';
-            const resumenCorto = resumen.length > 120 ? resumen.substring(0, 117) + '...' : resumen;
-            const resumenTitle = resumen.replace(/"/g, '&quot;');
-
-            const row = document.createElement('tr');
-            row.dataset.pedidoId = pedido.id;
-
-            row.innerHTML = `
-            <td><div class="id-badge">#${pedido.id}</div></td>
-            <td>
-                <div class="fecha-cell">
-                    ${pedido.created_at}
-                </div>
-            </td>
-            <td>
-                <div class="cliente-cell">
-                    <div class="cliente-avatar">${firstLetter}</div>
-                    <span class="cliente-name">${pedido.cliente_nombre}</span>
-                </div>
-            </td>
-            <td>
-                <a href="https://wa.me/${pedido.telefono}" target="_blank" class="telefono-link">
-                    ${pedido.telefono}
-                </a>
-            </td>
-            <td>
-                <div class="productos-container">
-                    <div class="productos-grid">${productosHTML}</div>
-                </div>
-            </td>
-            <td>
-                <div class="resumen-cell" title="${resumenTitle}">
-                    ${resumenCorto}
-                </div>
-            </td>
-            <td>
-                <span class="sede-badge">${pedido.sede}</span>
-            </td>
-            <td>
-                <span class="hora-badge">${pedido.hora_entrega}</span>
-            </td>
-            <td>
-                <span class="estado-badge ${estado.class}">
-                    <span style="font-size:0.6rem;">${estado.icon}</span>
-                    <span>${pedido.estado.charAt(0).toUpperCase() + pedido.estado.slice(1)}</span>
-                </span>
-            </td>
-            <td>
-                <div class="total-cell">$${pedido.total}</div>
-            </td>
-        `;
-
-            tbody.insertBefore(row, tbody.firstChild);
-        }
-
-        function showNotification(pedido) {
-            const toast = document.getElementById('notification-toast');
-            const message = document.getElementById('toast-message');
-
-            message.textContent = `Pedido #${pedido.id} - ${pedido.cliente_nombre}`;
-
-            toast.classList.add('show');
-
-            setTimeout(() => {
-                closeToast();
-            }, 5000);
-        }
-
-        function closeToast() {
-            const toast = document.getElementById('notification-toast');
-            toast.classList.remove('show');
-        }
-
-        function updateCounters() {
-            function bump(id) {
-                const el = document.getElementById(id);
-                if (!el) return;
-                const current = parseInt(el.textContent || '0');
-                el.textContent = current + 1;
-            }
-            bump('count-today');
-            bump('count-confirmed');
-            bump('count-total-top');
-        }
-
-        function playNotificationSound() {
-            try {
-                const audioContext = new(window.AudioContext || window.webkitAudioContext)();
-                const playTone = (frequency, startTime, duration) => {
-                    const oscillator = audioContext.createOscillator();
-                    const gainNode = audioContext.createGain();
-                    oscillator.connect(gainNode);
-                    gainNode.connect(audioContext.destination);
-                    oscillator.frequency.value = frequency;
-                    oscillator.type = 'sine';
-                    gainNode.gain.setValueAtTime(0.2, audioContext.currentTime + startTime);
-                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + startTime + duration);
-                    oscillator.start(audioContext.currentTime + startTime);
-                    oscillator.stop(audioContext.currentTime + startTime + duration);
-                };
-                playTone(523.25, 0, 0.15);
-                playTone(659.25, 0.1, 0.15);
-                playTone(783.99, 0.2, 0.25);
-            } catch (error) {
-                console.log('No se pudo reproducir el sonido:', error);
-            }
         }
     </script>
 </body>
-
 </html>
