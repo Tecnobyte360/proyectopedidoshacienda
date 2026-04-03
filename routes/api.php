@@ -111,28 +111,6 @@ Route::patch('/whatsapp-webhook/orders/{id}/status', function (Request $request,
     $pedido->estado = $request->estado;
     $pedido->save();
 
-    $mensajeEstado = match ($request->estado) {
-        'en_preparacion' => "🔵 Tu solicitud #{$id} está en gestión. Te vamos contando cualquier novedad.",
-        'listo'          => "🟢 Tu solicitud #{$id} quedó confirmada/lista. Gracias por escribir a Doblamos.",
-        'entregado'      => "✅ La solicitud #{$id} ya quedó finalizada. Gracias por contar con Doblamos.",
-        'cancelado'      => "🔴 La solicitud #{$id} fue cancelada. Si no fuiste tú, por favor escríbenos.",
-        default          => "Tu solicitud #{$id} actualizó su estado.",
-    };
-
-    try {
-        Http::withToken(env('WHATSAPP_BOT_TOKEN'))
-            ->timeout(10)
-            ->post('http://localhost:4002/api/send', [
-                'phoneNumber' => $pedido->telefono,
-                'message'     => $mensajeEstado,
-            ]);
-    } catch (\Throwable $e) {
-        Log::error('Error notificando cambio de estado', [
-            'pedido_id' => $id,
-            'error'     => $e->getMessage(),
-        ]);
-    }
-
     return response()->json([
         'status'  => 'success',
         'message' => 'Estado actualizado',

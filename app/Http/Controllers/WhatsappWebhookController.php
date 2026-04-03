@@ -39,9 +39,6 @@ class WhatsappWebhookController extends Controller
             ], 400);
         }
 
-        // ===============================
-        // NORMALIZAR DATOS DEL WEBHOOK
-        // ===============================
         $from = $data['chat']['phone']
             ?? $data['from']
             ?? $data['phoneNumber']
@@ -114,12 +111,13 @@ class WhatsappWebhookController extends Controller
             ]);
         }
 
-        // Evitar procesar el mismo mensaje dos veces
+        // Bloqueo fuerte por mensaje
         if ($messageId) {
-            $dedupeKey = "whatsapp_msg_{$messageId}";
+            $processingKey = "processing_whatsapp_msg_{$messageId}";
+            $alreadyProcessedKey = "processed_whatsapp_msg_{$messageId}";
 
-            if (Cache::has($dedupeKey)) {
-                Log::warning('⚠️ MENSAJE DUPLICADO IGNORADO', [
+            if (Cache::has($alreadyProcessedKey)) {
+                Log::warning('⚠️ MENSAJE DUPLICADO IGNORADO (YA PROCESADO)', [
                     'message_id' => $messageId,
                     'from' => $from,
                     'message' => $message,
@@ -130,41 +128,48 @@ class WhatsappWebhookController extends Controller
                 ]);
             }
 
-            Cache::put($dedupeKey, true, now()->addMinutes(10));
+            // lock corto para que dos requests paralelos no entren juntos
+            if (!Cache::add($processingKey, true, now()->addSeconds(30))) {
+                Log::warning('⚠️ MENSAJE DUPLICADO IGNORADO (EN PROCESO)', [
+                    'message_id' => $messageId,
+                    'from' => $from,
+                ]);
+
+                return response()->json([
+                    'status' => 'duplicate_in_progress'
+                ]);
+            }
         }
-
-        Log::info('✅ MENSAJE CLIENTE', [
-            'from' => $from,
-            'name' => $name,
-            'message' => $message,
-            'message_id' => $messageId,
-            'connection_id' => $connectionId,
-        ]);
-
-        // ===============================
-        // HISTORIAL DE CONVERSACIÓN
-        // ===============================
-        $cacheKey = "whatsapp_chat_{$from}";
-        $conversationHistory = Cache::get($cacheKey, []);
-
-        $conversationHistory[] = [
-            'role' => 'user',
-            'content' => $message,
-        ];
-
-        if (count($conversationHistory) > 20) {
-            $conversationHistory = array_slice($conversationHistory, -20);
-        }
-
-        $pedidosInfo = $this->buscarPedidosCliente($from, $message);
-
-        $systemPrompt = $this->getSystemPromptForAIEmpresa(
-            $pedidosInfo,
-            $this->infoEmpresa(),
-            $name
-        );
 
         try {
+            Log::info('✅ MENSAJE CLIENTE', [
+                'from' => $from,
+                'name' => $name,
+                'message' => $message,
+                'message_id' => $messageId,
+                'connection_id' => $connectionId,
+            ]);
+
+            $cacheKey = "whatsapp_chat_{$from}";
+            $conversationHistory = Cache::get($cacheKey, []);
+
+            $conversationHistory[] = [
+                'role' => 'user',
+                'content' => $message,
+            ];
+
+            if (count($conversationHistory) > 20) {
+                $conversationHistory = array_slice($conversationHistory, -20);
+            }
+
+            $pedidosInfo = $this->buscarPedidosCliente($from, $message);
+
+            $systemPrompt = $this->getSystemPromptForAIEmpresa(
+                $pedidosInfo,
+                $this->infoEmpresa(),
+                $name
+            );
+
             $messages = [
                 ['role' => 'system', 'content' => $systemPrompt]
             ];
@@ -178,7 +183,7 @@ class WhatsappWebhookController extends Controller
                 ->post('https://api.openai.com/v1/chat/completions', [
                     'model' => 'gpt-4o-mini',
                     'messages' => $messages,
-                    'temperature' => 0.5,
+                    'temperature' => 0.4,
                     'max_tokens' => 500,
                 ]);
 
@@ -215,24 +220,11 @@ class WhatsappWebhookController extends Controller
                 'connection_id' => $connectionId,
             ]);
 
-            if ($messageId) {
-                $responseKey = "whatsapp_response_{$messageId}";
-
-                if (Cache::has($responseKey)) {
-                    Log::warning('⚠️ RESPUESTA YA ENVIADA', [
-                        'message_id' => $messageId,
-                        'from' => $from,
-                    ]);
-
-                    return response()->json([
-                        'status' => 'response_already_sent'
-                    ]);
-                }
-
-                Cache::put($responseKey, true, now()->addMinutes(10));
-            }
-
             $this->enviarRespuestaWhatsapp($from, $reply, $connectionId);
+
+            if ($messageId) {
+                Cache::put("processed_whatsapp_msg_{$messageId}", true, now()->addMinutes(10));
+            }
 
             return response()->json([
                 'status' => 'ok',
@@ -248,6 +240,10 @@ class WhatsappWebhookController extends Controller
                 'status' => 'error',
                 'message' => 'No se pudo procesar',
             ], 500);
+        } finally {
+            if (!empty($messageId)) {
+                Cache::forget("processing_whatsapp_msg_{$messageId}");
+            }
         }
     }
 
@@ -382,10 +378,6 @@ REGLAS DE ESTILO:
 
 SALUDO:
 Siempre saluda primero.
-Ejemplo:
-Buenos días 😊
-Gracias por comunicarse con Alimentos La Hacienda, {$name}
-¿En qué puedo ayudarte?
 
 FLUJO:
 1. Entender qué necesita
@@ -437,6 +429,7 @@ SOLO cuando el cliente confirme claramente con mensajes como:
 - correcto
 - sí correcto
 - confirmado
+- si confirmado
 - ok
 - listo
 - confirmar
@@ -464,13 +457,14 @@ JSON OBLIGATORIO:
   "customer_name":"Nombre del cliente",
   "phone":"Teléfono",
   "payment_method":"contra entrega",
-  "pickup_time":"Horario requerido",
+  "pickup_time":"",
   "total":0,
   "notes":"Resumen corto del pedido"
 }[/JSON_ORDER][PEDIDO_CONFIRMADO]
 
 IMPORTANTE:
 - No generes [PEDIDO_CONFIRMADO] si aún falta nombre, dirección, barrio o teléfono.
+- Si no sabes pickup_time, envíalo vacío: ""
 - No metas datos importantes solo en notes.
 - address, neighborhood, customer_name y phone deben venir separados.
 - No inventes productos ni cantidades.
@@ -574,6 +568,11 @@ PROMPT;
 
             $sede = Sede::where('nombre', 'LIKE', "%{$sedeNombre}%")->first() ?? Sede::first();
 
+            $pickupTime = null;
+            if (!empty($orderData['pickup_time'])) {
+                $pickupTime = $orderData['pickup_time'];
+            }
+
             $notas = $orderData['notes'] ?? '';
             if (!empty($orderData['address'])) {
                 $notas .= ($notas ? ' | ' : '') . 'Dirección: ' . $orderData['address'];
@@ -588,7 +587,7 @@ PROMPT;
             $pedido = Pedido::create([
                 'sede_id' => $sede?->id,
                 'fecha_pedido' => now(),
-                'hora_entrega' => $orderData['pickup_time'] ?? 'Por confirmar',
+                'hora_entrega' => $pickupTime,
                 'estado' => 'confirmado',
                 'total' => $orderData['total'] ?? 0,
                 'notas' => $notas ?: 'Solicitud realizada vía WhatsApp',
@@ -627,7 +626,8 @@ PROMPT;
                 'reply_ia_completo' => $reply,
             ]);
 
-            return '⚠️ Hubo un problema registrando la solicitud. Por favor intenta de nuevo.';
+            // NO mandamos un error técnico largo al cliente
+            return '⚠️ Tu pedido no se pudo registrar en este momento. Ya lo estamos revisando.';
         }
     }
 }
