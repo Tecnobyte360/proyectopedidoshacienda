@@ -605,4 +605,3 @@ Route::patch('whatsapp-webhook/orders/{id}/status', function (Request $request, 
     ]);
 });
 Route::post('/whatsapp-webhook', [WhatsappWebhookController::class, 'receive']);
-
