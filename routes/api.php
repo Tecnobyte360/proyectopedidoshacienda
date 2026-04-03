@@ -11,6 +11,7 @@ use App\Models\Pedido;
 use App\Models\DetallePedido;
 use App\Models\Sede;
 use App\Events\PedidoConfirmado;
+use App\Http\Controllers\WhatsappWebhookController;
 
 // =========================================================
 // 🌐 RUTAS BÁSICAS DEL WEBHOOK Y API
@@ -603,3 +604,5 @@ Route::patch('whatsapp-webhook/orders/{id}/status', function (Request $request, 
         ],
     ]);
 });
+Route::post('/whatsapp-webhook', [WhatsappWebhookController::class, 'receive']);
+
