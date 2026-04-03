@@ -151,6 +151,36 @@ class WhatsappWebhookController extends Controller
 
             /*
             |--------------------------------------------------------------------------
+            | 0. CONTEXTO DE ACCIÓN PENDIENTE
+            |--------------------------------------------------------------------------
+            */
+            if ($this->tieneAccionPendiente($from)) {
+                $replyPendiente = $this->resolverAccionPendiente($from, $name, $message);
+
+                if ($replyPendiente) {
+                    Log::info('🧠 RESPUESTA POR ACCIÓN PENDIENTE', [
+                        'phone'         => $from,
+                        'message'       => $message,
+                        'reply'         => $replyPendiente,
+                        'connection_id' => $connectionId,
+                    ]);
+
+                    $this->enviarRespuestaWhatsapp($from, $replyPendiente, $connectionId);
+
+                    if ($messageId) {
+                        Cache::put("processed_whatsapp_msg_{$messageId}", true, now()->addMinutes(10));
+                    }
+
+                    return response()->json([
+                        'status'            => 'ok',
+                        'message_processed' => true,
+                        'type'              => 'pending_action_response',
+                    ]);
+                }
+            }
+
+            /*
+            |--------------------------------------------------------------------------
             | 1. VALIDACIÓN DE CANCELACIÓN / ADICIÓN / MODIFICACIÓN
             |--------------------------------------------------------------------------
             */
@@ -588,34 +618,43 @@ class WhatsappWebhookController extends Controller
     {
         $message = mb_strtolower(trim($message));
 
-        $frases = [
-            'cancelar pedido',
-            'cancelar mi pedido',
-            'quiero cancelar',
-            'quiero cancelar mi pedido',
-            'cancelar el pedido',
-            'anular pedido',
-            'anular mi pedido',
-            'anular el pedido',
-            'adicionar pedido',
-            'adicionar mi pedido',
-            'adicionar el pedido',
-            'quiero adicionar',
-            'agregar al pedido',
-            'agregar productos al pedido',
-            'modificar pedido',
-            'modificar mi pedido',
-            'modificar el pedido',
-            'editar pedido',
-            'editar mi pedido',
-            'editar el pedido',
-            'cambiar pedido',
-            'cambiar mi pedido',
-            'cambiar el pedido',
+        $palabrasCancelar = [
+            'cancelar',
+            'cancela',
+            'cancelame',
+            'cancelar el',
+            'cancelar mi',
+            'cancelen',
+            'anular',
+            'anula',
+            'ya no lo quiero',
+            'ya no quiero el pedido',
+            'quitar el pedido',
+            'eliminar pedido',
+            'borrar pedido',
         ];
 
-        foreach ($frases as $frase) {
-            if (str_contains($message, $frase)) {
+        $palabrasAdicionar = [
+            'adicionar',
+            'adiciona',
+            'agregar',
+            'agrega',
+            'sumar',
+            'añadir',
+            'anadir',
+            'ponerle',
+            'modificar',
+            'modifica',
+            'editar',
+            'edita',
+            'cambiar',
+            'cambiame',
+            'cámbiame',
+            'cambiarle',
+        ];
+
+        foreach (array_merge($palabrasCancelar, $palabrasAdicionar) as $palabra) {
+            if (str_contains($message, $palabra)) {
                 return true;
             }
         }
@@ -677,6 +716,11 @@ class WhatsappWebhookController extends Controller
             return $this->validarAnsYResponder($pedidos->first(), $accion, $name);
         }
 
+        $this->guardarAccionPendiente($from, [
+            'accion'     => $accion,
+            'pedido_ids' => $pedidos->pluck('id')->take(10)->values()->toArray(),
+        ]);
+
         $mensaje = [];
         $mensaje[] = "Hola {$name} 😊";
         $mensaje[] = "Encontré varios pedidos asociados a este número.";
@@ -687,6 +731,7 @@ class WhatsappWebhookController extends Controller
         }
 
         $mensaje[] = "Ejemplo: *{$accion} pedido #{$pedidos->first()->id}*";
+        $mensaje[] = "También puedes responder solo con el número. Ejemplo: *{$pedidos->first()->id}*";
 
         return implode("\n", $mensaje);
     }
@@ -695,21 +740,49 @@ class WhatsappWebhookController extends Controller
     {
         $message = mb_strtolower(trim($message));
 
-        if (
-            str_contains($message, 'cancelar')
-            || str_contains($message, 'anular')
-        ) {
-            return 'cancelar';
+        $palabrasCancelar = [
+            'cancelar',
+            'cancela',
+            'cancelame',
+            'cancelen',
+            'anular',
+            'anula',
+            'ya no lo quiero',
+            'ya no quiero el pedido',
+            'quitar el pedido',
+            'eliminar pedido',
+            'borrar pedido',
+        ];
+
+        foreach ($palabrasCancelar as $palabra) {
+            if (str_contains($message, $palabra)) {
+                return 'cancelar';
+            }
         }
 
-        if (
-            str_contains($message, 'adicionar')
-            || str_contains($message, 'agregar')
-            || str_contains($message, 'modificar')
-            || str_contains($message, 'editar')
-            || str_contains($message, 'cambiar')
-        ) {
-            return 'adicionar';
+        $palabrasAdicionar = [
+            'adicionar',
+            'adiciona',
+            'agregar',
+            'agrega',
+            'sumar',
+            'añadir',
+            'anadir',
+            'ponerle',
+            'modificar',
+            'modifica',
+            'editar',
+            'edita',
+            'cambiar',
+            'cambiame',
+            'cámbiame',
+            'cambiarle',
+        ];
+
+        foreach ($palabrasAdicionar as $palabra) {
+            if (str_contains($message, $palabra)) {
+                return 'adicionar';
+            }
         }
 
         return null;
@@ -736,6 +809,8 @@ class WhatsappWebhookController extends Controller
         $mensaje[] = "";
 
         if (!$puede) {
+            $this->limpiarAccionPendiente($pedido->telefono);
+
             $mensaje[] = "❌ Ya no es posible {$accion} este pedido porque el tiempo permitido expiró.";
             return implode("\n", $mensaje);
         }
@@ -812,7 +887,9 @@ TXT;
             '/orden\s+numero\s+(\d+)/i',
             '/orden\s+número\s+(\d+)/i',
             '/orden\s+(\d+)/i',
+            '/el\s+(\d+)/i',
             '/#\s*(\d+)/i',
+            '/^(\d+)$/i',
         ];
 
         foreach ($patrones as $patron) {
@@ -822,6 +899,83 @@ TXT;
         }
 
         return null;
+    }
+
+    private function claveAccionPendiente(string $from): string
+    {
+        return 'whatsapp_pending_action_' . $this->normalizarTelefono($from);
+    }
+
+    private function guardarAccionPendiente(string $from, array $data): void
+    {
+        Cache::put($this->claveAccionPendiente($from), $data, now()->addMinutes(10));
+    }
+
+    private function obtenerAccionPendiente(string $from): ?array
+    {
+        return Cache::get($this->claveAccionPendiente($from));
+    }
+
+    private function limpiarAccionPendiente(string $from): void
+    {
+        Cache::forget($this->claveAccionPendiente($from));
+    }
+
+    private function tieneAccionPendiente(string $from): bool
+    {
+        return Cache::has($this->claveAccionPendiente($from));
+    }
+
+    private function resolverAccionPendiente(string $from, string $name, string $message): ?string
+    {
+        $pendiente = $this->obtenerAccionPendiente($from);
+
+        if (!$pendiente || empty($pendiente['accion'])) {
+            return null;
+        }
+
+        $accion = $pendiente['accion'];
+        $pedidoIdsPermitidos = $pendiente['pedido_ids'] ?? [];
+
+        $pedidoId = $this->extraerNumeroPedidoDesdeMensaje($message);
+
+        if (!$pedidoId) {
+            $messageNormalizado = mb_strtolower(trim($message));
+
+            if (in_array($messageNormalizado, ['ese', 'ese mismo', 'el mismo', 'último', 'ultimo', 'el último', 'el ultimo'])) {
+                $pedidoId = $pedidoIdsPermitidos[0] ?? null;
+            }
+        }
+
+        if (!$pedidoId) {
+            return "Hola {$name} 😊\nNo logré identificar el número del pedido.\nPor favor respóndeme solo con el número. Ejemplo: *3*";
+        }
+
+        if (!in_array($pedidoId, $pedidoIdsPermitidos)) {
+            return "Hola {$name} 😊\nEse pedido no está entre las opciones que te mostré.\nPor favor elige uno de los pedidos listados.";
+        }
+
+        $telefonoNormalizado = $this->normalizarTelefono($from);
+
+        $pedido = Pedido::with(['sede', 'detalles'])
+            ->whereIn('id', $pedidoIdsPermitidos)
+            ->get()
+            ->first(function ($pedido) use ($telefonoNormalizado, $pedidoId) {
+                return (int) $pedido->id === (int) $pedidoId
+                    && (
+                        $this->normalizarTelefono($pedido->telefono) === $telefonoNormalizado
+                        || str_contains($this->normalizarTelefono($pedido->telefono), $telefonoNormalizado)
+                        || str_contains($telefonoNormalizado, $this->normalizarTelefono($pedido->telefono))
+                    );
+            });
+
+        if (!$pedido) {
+            return "Hola {$name} 😊\nNo encontré ese pedido asociado a este número.";
+        }
+
+        $this->limpiarAccionPendiente($from);
+
+        return $this->validarAnsYResponder($pedido, $accion, $name);
     }
 
     private function formatearCantidadPedido(float $cantidad): string
