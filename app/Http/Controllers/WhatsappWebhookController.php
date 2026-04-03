@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\DB;
 use App\Models\Pedido;
 use App\Models\DetallePedido;
 use App\Models\Sede;
+use App\Models\AnsPedido;
 use App\Events\PedidoConfirmado;
 
 class WhatsappWebhookController extends Controller
@@ -33,6 +34,7 @@ class WhatsappWebhookController extends Controller
 
         if (empty($data)) {
             Log::warning('⚠️ Webhook vacío');
+
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Payload vacío',
@@ -177,7 +179,35 @@ class WhatsappWebhookController extends Controller
 
             /*
             |--------------------------------------------------------------------------
-            | 2. FLUJO NORMAL CON IA
+            | 2. VALIDACIÓN DE CANCELACIÓN / ADICIÓN / MODIFICACIÓN
+            |--------------------------------------------------------------------------
+            */
+            if ($this->esSolicitudModificarPedido($message)) {
+                $replyModificacion = $this->resolverSolicitudModificacionPedido($from, $name, $message);
+
+                Log::info('🛠️ RESPUESTA AUTOMÁTICA MODIFICACIÓN PEDIDO', [
+                    'phone'         => $from,
+                    'message'       => $message,
+                    'reply'         => $replyModificacion,
+                    'connection_id' => $connectionId,
+                ]);
+
+                $this->enviarRespuestaWhatsapp($from, $replyModificacion, $connectionId);
+
+                if ($messageId) {
+                    Cache::put("processed_whatsapp_msg_{$messageId}", true, now()->addMinutes(10));
+                }
+
+                return response()->json([
+                    'status'            => 'ok',
+                    'message_processed' => true,
+                    'type'              => 'order_modification_validation',
+                ]);
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | 3. FLUJO NORMAL CON IA
             |--------------------------------------------------------------------------
             */
             $cacheKey = "whatsapp_chat_{$from}";
@@ -193,11 +223,13 @@ class WhatsappWebhookController extends Controller
             }
 
             $pedidosInfo = $this->buscarPedidosCliente($from, $message);
+            $ansInfo = $this->construirResumenAns();
 
             $systemPrompt = $this->getSystemPromptForAIEmpresa(
                 $pedidosInfo,
                 $this->infoEmpresa(),
-                $name
+                $name,
+                $ansInfo
             );
 
             $messages = [
@@ -279,74 +311,135 @@ class WhatsappWebhookController extends Controller
 
     public function searchOrders(Request $request)
     {
-        $request->validate([
-            'pedido_id' => 'nullable|integer',
-            'telefono'  => 'nullable|string|max:30',
-            'cliente'   => 'nullable|string|max:255',
-        ]);
+        try {
+            $request->validate([
+                'pedido_id' => 'nullable|integer',
+                'telefono'  => 'nullable|string|max:30',
+                'cliente'   => 'nullable|string|max:255',
+            ]);
 
-        if (
-            !$request->filled('pedido_id') &&
-            !$request->filled('telefono') &&
-            !$request->filled('cliente')
-        ) {
-            return response()->json([
-                'status'  => 'error',
-                'message' => 'Debes enviar al menos uno de estos filtros: pedido_id, telefono o cliente.',
-            ], 422);
-        }
-
-        $formatearCantidad = function (float $cantidad): string {
-            if (fmod($cantidad, 1.0) == 0.0) {
-                return number_format($cantidad, 0, ',', '.');
+            if (
+                !$request->filled('pedido_id') &&
+                !$request->filled('telefono') &&
+                !$request->filled('cliente')
+            ) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Debes enviar al menos uno de estos filtros: pedido_id, telefono o cliente.',
+                ], 422);
             }
 
-            return number_format($cantidad, 2, ',', '.');
-        };
+            $formatearCantidad = function (float $cantidad): string {
+                if (fmod($cantidad, 1.0) == 0.0) {
+                    return number_format($cantidad, 0, ',', '.');
+                }
 
-        $query = Pedido::with(['sede', 'detalles']);
+                return number_format($cantidad, 2, ',', '.');
+            };
 
-        if ($request->filled('pedido_id')) {
-            $query->where('id', $request->pedido_id);
-        }
+            $query = Pedido::with(['sede', 'detalles']);
 
-        if ($request->filled('telefono')) {
-            $telefono = trim($request->telefono);
-            $query->where('telefono', 'LIKE', "%{$telefono}%");
-        }
+            if ($request->filled('pedido_id')) {
+                $query->where('id', $request->pedido_id);
+            }
 
-        if ($request->filled('cliente')) {
-            $cliente = trim($request->cliente);
-            $query->where('cliente_nombre', 'LIKE', "%{$cliente}%");
-        }
+            if ($request->filled('telefono')) {
+                $telefono = trim($request->telefono);
+                $query->where('telefono', 'LIKE', "%{$telefono}%");
+            }
 
-        $pedidos = $query
-            ->orderByDesc('fecha_pedido')
-            ->orderByDesc('id')
-            ->get();
+            if ($request->filled('cliente')) {
+                $cliente = trim($request->cliente);
+                $query->where('cliente_nombre', 'LIKE', "%{$cliente}%");
+            }
 
-        if ($pedidos->isEmpty()) {
+            $pedidos = $query
+                ->orderByDesc('fecha_pedido')
+                ->orderByDesc('id')
+                ->get();
+
+            if ($pedidos->isEmpty()) {
+                return response()->json([
+                    'status'  => 'not_found',
+                    'message' => 'No se encontraron pedidos con los filtros enviados.',
+                    'filters' => [
+                        'pedido_id' => $request->pedido_id,
+                        'telefono'  => $request->telefono,
+                        'cliente'   => $request->cliente,
+                    ],
+                ], 404);
+            }
+
             return response()->json([
-                'status'  => 'not_found',
-                'message' => 'No se encontraron pedidos con los filtros enviados.',
-                'filters' => [
+                'status'       => 'success',
+                'total_orders' => $pedidos->count(),
+                'filters'      => [
                     'pedido_id' => $request->pedido_id,
                     'telefono'  => $request->telefono,
                     'cliente'   => $request->cliente,
                 ],
-            ], 404);
-        }
+                'orders'       => $pedidos->map(function ($pedido) use ($formatearCantidad) {
+                    return [
+                        'id'                   => $pedido->id,
+                        'fecha'                => optional($pedido->fecha_pedido)?->format('d/m/Y H:i'),
+                        'estado'               => $pedido->estado,
+                        'hora_entrega'         => $pedido->hora_entrega ?? 'Por confirmar',
+                        'sede'                 => $pedido->sede->nombre ?? 'No especificada',
+                        'cliente'              => $pedido->cliente_nombre,
+                        'telefono'             => $pedido->telefono,
+                        'total'                => $pedido->total,
+                        'total_formateado'     => number_format($pedido->total, 0, ',', '.'),
+                        'notas'                => $pedido->notas,
+                        'resumen_conversacion' => $pedido->resumen_conversacion,
+                        'productos'            => $pedido->detalles->map(function ($detalle) use ($formatearCantidad) {
+                            return [
+                                'producto'        => $detalle->producto,
+                                'cantidad'        => $formatearCantidad((float) $detalle->cantidad),
+                                'unidad'          => $detalle->unidad,
+                                'precio_unitario' => $detalle->precio_unitario,
+                                'subtotal'        => $detalle->subtotal,
+                            ];
+                        })->values(),
+                    ];
+                })->values(),
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('❌ ERROR SEARCH ORDERS', [
+                'error'   => $e->getMessage(),
+                'request' => $request->all(),
+            ]);
 
-        return response()->json([
-            'status'       => 'success',
-            'total_orders' => $pedidos->count(),
-            'filters'      => [
-                'pedido_id' => $request->pedido_id,
-                'telefono'  => $request->telefono,
-                'cliente'   => $request->cliente,
-            ],
-            'orders'       => $pedidos->map(function ($pedido) use ($formatearCantidad) {
-                return [
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Error al consultar pedidos.',
+            ], 500);
+        }
+    }
+
+    public function showOrder($id)
+    {
+        try {
+            $formatearCantidad = function (float $cantidad): string {
+                if (fmod($cantidad, 1.0) == 0.0) {
+                    return number_format($cantidad, 0, ',', '.');
+                }
+
+                return number_format($cantidad, 2, ',', '.');
+            };
+
+            $pedido = Pedido::with(['sede', 'detalles'])->find($id);
+
+            if (!$pedido) {
+                return response()->json([
+                    'status'  => 'not_found',
+                    'message' => 'Pedido no encontrado.',
+                    'id'      => $id,
+                ], 404);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'order'  => [
                     'id'                   => $pedido->id,
                     'fecha'                => optional($pedido->fecha_pedido)?->format('d/m/Y H:i'),
                     'estado'               => $pedido->estado,
@@ -367,56 +460,19 @@ class WhatsappWebhookController extends Controller
                             'subtotal'        => $detalle->subtotal,
                         ];
                     })->values(),
-                ];
-            })->values(),
-        ]);
-    }
+                ],
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('❌ ERROR SHOW ORDER', [
+                'error' => $e->getMessage(),
+                'id'    => $id,
+            ]);
 
-    public function showOrder($id)
-    {
-        $formatearCantidad = function (float $cantidad): string {
-            if (fmod($cantidad, 1.0) == 0.0) {
-                return number_format($cantidad, 0, ',', '.');
-            }
-
-            return number_format($cantidad, 2, ',', '.');
-        };
-
-        $pedido = Pedido::with(['sede', 'detalles'])->find($id);
-
-        if (!$pedido) {
             return response()->json([
-                'status'  => 'not_found',
-                'message' => 'Pedido no encontrado.',
-                'id'      => $id,
-            ], 404);
+                'status'  => 'error',
+                'message' => 'Error al consultar el pedido.',
+            ], 500);
         }
-
-        return response()->json([
-            'status' => 'success',
-            'order'  => [
-                'id'                   => $pedido->id,
-                'fecha'                => optional($pedido->fecha_pedido)?->format('d/m/Y H:i'),
-                'estado'               => $pedido->estado,
-                'hora_entrega'         => $pedido->hora_entrega ?? 'Por confirmar',
-                'sede'                 => $pedido->sede->nombre ?? 'No especificada',
-                'cliente'              => $pedido->cliente_nombre,
-                'telefono'             => $pedido->telefono,
-                'total'                => $pedido->total,
-                'total_formateado'     => number_format($pedido->total, 0, ',', '.'),
-                'notas'                => $pedido->notas,
-                'resumen_conversacion' => $pedido->resumen_conversacion,
-                'productos'            => $pedido->detalles->map(function ($detalle) use ($formatearCantidad) {
-                    return [
-                        'producto'        => $detalle->producto,
-                        'cantidad'        => $formatearCantidad((float) $detalle->cantidad),
-                        'unidad'          => $detalle->unidad,
-                        'precio_unitario' => $detalle->precio_unitario,
-                        'subtotal'        => $detalle->subtotal,
-                    ];
-                })->values(),
-            ],
-        ]);
     }
 
     private function esConsultaEstadoPedido(string $message): bool
@@ -489,7 +545,6 @@ class WhatsappWebhookController extends Controller
 
         $pedidoIdSolicitado = $this->extraerNumeroPedidoDesdeMensaje($message);
 
-        // Si el cliente pidió un pedido específico
         if ($pedidoIdSolicitado) {
             $pedido = $pedidos->firstWhere('id', $pedidoIdSolicitado);
 
@@ -511,12 +566,10 @@ class WhatsappWebhookController extends Controller
             return $this->formatearRespuestaPedidoEspecifico($pedido, $name);
         }
 
-        // Si solo tiene un pedido, mostrarlo directamente
         if ($pedidos->count() === 1) {
             return $this->formatearRespuestaPedidoEspecifico($pedidos->first(), $name);
         }
 
-        // Si tiene varios pedidos, mostrarlos todos resumidos
         $mensaje = [];
         $mensaje[] = "Hola {$name} 😊";
         $mensaje[] = "Encontré *{$pedidos->count()} pedidos* asociados a este número:";
@@ -534,6 +587,185 @@ class WhatsappWebhookController extends Controller
 
         return implode("\n", $mensaje);
     }
+
+    private function esSolicitudModificarPedido(string $message): bool
+    {
+        $message = mb_strtolower(trim($message));
+
+        $frases = [
+            'cancelar pedido',
+            'cancelar mi pedido',
+            'quiero cancelar',
+            'quiero cancelar mi pedido',
+            'anular pedido',
+            'adicionar pedido',
+            'adicionar mi pedido',
+            'quiero adicionar',
+            'agregar al pedido',
+            'agregar productos al pedido',
+            'modificar pedido',
+            'editar pedido',
+            'cambiar pedido',
+        ];
+
+        foreach ($frases as $frase) {
+            if (str_contains($message, $frase)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function resolverSolicitudModificacionPedido(string $from, string $name, string $message): string
+    {
+        $accion = $this->detectarAccionPedido($message);
+
+        if (!$accion) {
+            return "Hola {$name} 😊\nNo logré identificar si deseas cancelar o adicionar un pedido.\nPor favor indícame qué deseas hacer.";
+        }
+
+        $telefonoNormalizado = $this->normalizarTelefono($from);
+
+        $pedidos = Pedido::with(['sede', 'detalles'])
+            ->orderByDesc('fecha_pedido')
+            ->orderByDesc('id')
+            ->get()
+            ->filter(function ($pedido) use ($telefonoNormalizado) {
+                $pedidoTelefono = $this->normalizarTelefono($pedido->telefono);
+
+                return $pedidoTelefono === $telefonoNormalizado
+                    || str_contains($pedidoTelefono, $telefonoNormalizado)
+                    || str_contains($telefonoNormalizado, $pedidoTelefono);
+            })
+            ->values();
+
+        if ($pedidos->isEmpty()) {
+            return "Hola {$name} 😊\nNo encontré pedidos asociados a este número para {$accion}.";
+        }
+
+        $pedidoIdSolicitado = $this->extraerNumeroPedidoDesdeMensaje($message);
+
+        if ($pedidoIdSolicitado) {
+            $pedido = $pedidos->firstWhere('id', $pedidoIdSolicitado);
+
+            if (!$pedido) {
+                $mensaje = [];
+                $mensaje[] = "Hola {$name} 😊";
+                $mensaje[] = "No encontré el pedido #{$pedidoIdSolicitado} asociado a este número.";
+                $mensaje[] = "Estos son los pedidos disponibles:";
+
+                foreach ($pedidos->take(10) as $item) {
+                    $mensaje[] = "• Pedido #{$item->id} - " . $this->traducirEstadoPedido($item->estado);
+                }
+
+                $mensaje[] = "Escríbeme por ejemplo: *{$accion} pedido #{$pedidos->first()->id}*";
+
+                return implode("\n", $mensaje);
+            }
+
+            return $this->validarAnsYResponder($pedido, $accion, $name);
+        }
+
+        if ($pedidos->count() === 1) {
+            return $this->validarAnsYResponder($pedidos->first(), $accion, $name);
+        }
+
+        $mensaje = [];
+        $mensaje[] = "Hola {$name} 😊";
+        $mensaje[] = "Encontré varios pedidos asociados a este número.";
+        $mensaje[] = "Para {$accion}, indícame cuál deseas modificar:";
+
+        foreach ($pedidos->take(10) as $pedido) {
+            $mensaje[] = "• Pedido #{$pedido->id} - " . $this->traducirEstadoPedido($pedido->estado) . " - " . optional($pedido->fecha_pedido)?->format('d/m/Y H:i');
+        }
+
+        $mensaje[] = "Ejemplo: *{$accion} pedido #{$pedidos->first()->id}*";
+
+        return implode("\n", $mensaje);
+    }
+
+    private function detectarAccionPedido(string $message): ?string
+    {
+        $message = mb_strtolower(trim($message));
+
+        if (
+            str_contains($message, 'cancelar')
+            || str_contains($message, 'anular')
+        ) {
+            return 'cancelar';
+        }
+
+        if (
+            str_contains($message, 'adicionar')
+            || str_contains($message, 'agregar')
+            || str_contains($message, 'modificar')
+            || str_contains($message, 'editar')
+            || str_contains($message, 'cambiar')
+        ) {
+            return 'adicionar';
+        }
+
+        return null;
+    }
+
+    private function validarAnsYResponder(Pedido $pedido, string $accion, string $name): string
+    {
+        $ansMinutos = $this->obtenerAnsMinutos($accion);
+
+        if (!$ansMinutos) {
+            return "Hola {$name} 😊\nNo hay un ANS configurado para {$accion} el pedido #{$pedido->id}.";
+        }
+
+        $minutosTranscurridos = $pedido->fecha_pedido->diffInMinutes(now());
+        $puede = $minutosTranscurridos <= $ansMinutos;
+
+        $mensaje = [];
+        $mensaje[] = "Hola {$name} 😊";
+        $mensaje[] = "Pedido #{$pedido->id}";
+        $mensaje[] = "Estado actual: " . $this->traducirEstadoPedido($pedido->estado);
+        $mensaje[] = "Fecha del pedido: " . optional($pedido->fecha_pedido)?->format('d/m/Y H:i');
+        $mensaje[] = "Tiempo transcurrido: {$minutosTranscurridos} minuto(s)";
+        $mensaje[] = "ANS para {$accion}: {$ansMinutos} minuto(s)";
+        $mensaje[] = "";
+
+        if (!$puede) {
+            $mensaje[] = "❌ Ya no es posible {$accion} este pedido porque el tiempo permitido expiró.";
+            return implode("\n", $mensaje);
+        }
+
+        if ($accion === 'cancelar') {
+            $mensaje[] = "✅ Sí es posible cancelar este pedido.";
+            $mensaje[] = "Responde *CONFIRMAR CANCELACIÓN* para continuar.";
+        } else {
+            $mensaje[] = "✅ Sí es posible adicionar o modificar este pedido.";
+            $mensaje[] = "Escríbeme qué producto deseas agregar o cambiar en el pedido #{$pedido->id}.";
+        }
+
+        return implode("\n", $mensaje);
+    }
+
+    private function obtenerAnsMinutos(string $accion): ?int
+    {
+        return AnsPedido::where('accion', $accion)
+            ->where('activo', true)
+            ->value('tiempo_minutos');
+    }
+
+    private function construirResumenAns(): string
+    {
+        $crear = $this->obtenerAnsMinutos('crear') ?? 'No definido';
+        $adicionar = $this->obtenerAnsMinutos('adicionar') ?? 'No definido';
+        $cancelar = $this->obtenerAnsMinutos('cancelar') ?? 'No definido';
+
+        return <<<TXT
+ANS DEL SISTEMA:
+- Crear pedido: {$crear} minuto(s)
+- Adicionar pedido: {$adicionar} minuto(s)
+- Cancelar pedido: {$cancelar} minuto(s)
+TXT;
+    }
+
     private function formatearRespuestaPedidoEspecifico(Pedido $pedido, string $name = 'Cliente'): string
     {
         $mensaje = [];
@@ -560,6 +792,7 @@ class WhatsappWebhookController extends Controller
 
         return implode("\n", $mensaje);
     }
+
     private function extraerNumeroPedidoDesdeMensaje(string $message): ?int
     {
         $message = mb_strtolower(trim($message));
@@ -584,6 +817,7 @@ class WhatsappWebhookController extends Controller
 
         return null;
     }
+
     private function formatearCantidadPedido(float $cantidad): string
     {
         if (fmod($cantidad, 1.0) == 0.0) {
@@ -713,7 +947,8 @@ TXT;
     private function getSystemPromptForAIEmpresa(
         string $pedidosInfo = '',
         string $infoEmpresa = '',
-        string $name = 'Cliente'
+        string $name = 'Cliente',
+        string $ansInfo = ''
     ): string {
         return <<<PROMPT
 Eres el asesor comercial de Alimentos La Hacienda.
@@ -728,6 +963,8 @@ CONTEXTO:
 
 HISTORIAL DEL CLIENTE:
 {$pedidosInfo}
+
+{$ansInfo}
 
 REGLAS DE ESTILO:
 - Lenguaje natural
@@ -750,6 +987,11 @@ FLUJO:
 5. Pedir datos solo cuando ya decidió
 6. Confirmar
 7. Cerrar
+
+REGLAS DE ANS:
+- Si el cliente pregunta por cancelar o adicionar, primero debes respetar la validación que ya hizo el sistema.
+- No prometas cancelar o adicionar si el tiempo ANS ya expiró.
+- Si el sistema indica que sí es posible, guía al cliente al siguiente paso.
 
 SOLICITUD DE DATOS:
 Para continuar necesito:
@@ -827,10 +1069,10 @@ JSON OBLIGATORIO:
 
 IMPORTANTE:
 - No generes [PEDIDO_CONFIRMADO] si aún falta nombre, dirección, barrio o teléfono.
+- No inventes productos ni cantidades.
 - Si no sabes pickup_time, envíalo vacío: ""
 - No metas datos importantes solo en notes.
 - address, neighborhood, customer_name y phone deben venir separados.
-- No inventes productos ni cantidades.
 PROMPT;
     }
 
@@ -850,7 +1092,14 @@ PROMPT;
             'dirección',
             'barrio',
             'pago',
-            'contra entrega'
+            'contra entrega',
+            'cancelar',
+            'anular',
+            'adicionar',
+            'agregar',
+            'modificar',
+            'editar',
+            'cambiar',
         ];
 
         $esConsulta = false;
