@@ -50,10 +50,10 @@ class WhatsappWebhookController extends Controller
 
         $message = trim(
             $data['mensaje']['body']
-            ?? $data['body']
-            ?? $data['message']
-            ?? $data['text']
-            ?? ''
+                ?? $data['body']
+                ?? $data['message']
+                ?? $data['text']
+                ?? ''
         );
 
         $messageId = $data['mensaje']['id']
@@ -153,7 +153,7 @@ class WhatsappWebhookController extends Controller
             |--------------------------------------------------------------------------
             */
             if ($this->esConsultaEstadoPedido($message)) {
-                $replyEstado = $this->resolverConsultaEstadoPedido($from, $name);
+                $replyEstado = $this->resolverConsultaEstadoPedido($from, $name, $message);
 
                 Log::info('📦 RESPUESTA AUTOMÁTICA DE ESTADO', [
                     'phone'         => $from,
@@ -426,22 +426,35 @@ class WhatsappWebhookController extends Controller
         $frases = [
             'estado de mi pedido',
             'estado del pedido',
+            'estado de pedido',
             'como va mi pedido',
             'cómo va mi pedido',
+            'como van mis pedidos',
+            'cómo van mis pedidos',
+            'mis pedidos',
             'mi pedido',
             'mi orden',
+            'mis ordenes',
+            'mis órdenes',
             'estado pedido',
             'seguimiento pedido',
             'seguimiento de mi pedido',
+            'seguimiento de mis pedidos',
             'ya salió mi pedido',
             'ya salio mi pedido',
             'donde va mi pedido',
             'dónde va mi pedido',
             'consulta de pedido',
             'consultar pedido',
+            'consultar mis pedidos',
             'quiero saber mi pedido',
+            'quiero saber mis pedidos',
             'numero de pedido',
             'número de pedido',
+            'pedido #',
+            'pedido ',
+            'orden #',
+            'orden ',
         ];
 
         foreach ($frases as $frase) {
@@ -453,36 +466,79 @@ class WhatsappWebhookController extends Controller
         return false;
     }
 
-    private function resolverConsultaEstadoPedido(string $from, string $name = 'Cliente'): string
+    private function resolverConsultaEstadoPedido(string $from, string $name = 'Cliente', string $message = ''): string
     {
         $telefonoNormalizado = $this->normalizarTelefono($from);
 
-        $pedido = Pedido::with(['sede', 'detalles'])
+        $pedidos = Pedido::with(['sede', 'detalles'])
+            ->orderByDesc('fecha_pedido')
+            ->orderByDesc('id')
             ->get()
-            ->first(function ($pedido) use ($telefonoNormalizado) {
-                return $this->normalizarTelefono($pedido->telefono) === $telefonoNormalizado;
-            });
+            ->filter(function ($pedido) use ($telefonoNormalizado) {
+                $pedidoTelefono = $this->normalizarTelefono($pedido->telefono);
 
-        if (!$pedido) {
-            $pedido = Pedido::with(['sede', 'detalles'])
-                ->orderByDesc('fecha_pedido')
-                ->orderByDesc('id')
-                ->get()
-                ->first(function ($pedido) use ($telefonoNormalizado) {
-                    return str_contains($this->normalizarTelefono($pedido->telefono), $telefonoNormalizado)
-                        || str_contains($telefonoNormalizado, $this->normalizarTelefono($pedido->telefono));
-                });
-        }
+                return $pedidoTelefono === $telefonoNormalizado
+                    || str_contains($pedidoTelefono, $telefonoNormalizado)
+                    || str_contains($telefonoNormalizado, $pedidoTelefono);
+            })
+            ->values();
 
-        if (!$pedido) {
+        if ($pedidos->isEmpty()) {
             return "Hola {$name} 😊\nNo encontré pedidos registrados con este número.\nSi deseas, puedo ayudarte a realizar un nuevo pedido.";
         }
 
-        $estadoBonito = $this->traducirEstadoPedido($pedido->estado);
+        $pedidoIdSolicitado = $this->extraerNumeroPedidoDesdeMensaje($message);
 
+        // Si el cliente pidió un pedido específico
+        if ($pedidoIdSolicitado) {
+            $pedido = $pedidos->firstWhere('id', $pedidoIdSolicitado);
+
+            if (!$pedido) {
+                $mensaje = [];
+                $mensaje[] = "Hola {$name} 😊";
+                $mensaje[] = "No encontré el pedido #{$pedidoIdSolicitado} asociado a este número.";
+                $mensaje[] = "Estos son los pedidos que sí encontré:";
+
+                foreach ($pedidos->take(10) as $item) {
+                    $mensaje[] = "• #{$item->id} - " . $this->traducirEstadoPedido($item->estado);
+                }
+
+                $mensaje[] = "Escríbeme el número del pedido que deseas consultar. Ejemplo: pedido #{$pedidos->first()->id}";
+
+                return implode("\n", $mensaje);
+            }
+
+            return $this->formatearRespuestaPedidoEspecifico($pedido, $name);
+        }
+
+        // Si solo tiene un pedido, mostrarlo directamente
+        if ($pedidos->count() === 1) {
+            return $this->formatearRespuestaPedidoEspecifico($pedidos->first(), $name);
+        }
+
+        // Si tiene varios pedidos, mostrarlos todos resumidos
         $mensaje = [];
         $mensaje[] = "Hola {$name} 😊";
-        $mensaje[] = "Tu pedido #{$pedido->id} está actualmente en: *{$estadoBonito}*";
+        $mensaje[] = "Encontré *{$pedidos->count()} pedidos* asociados a este número:";
+        $mensaje[] = "";
+
+        foreach ($pedidos->take(10) as $pedido) {
+            $mensaje[] = "📦 Pedido #{$pedido->id}";
+            $mensaje[] = "Estado: " . $this->traducirEstadoPedido($pedido->estado);
+            $mensaje[] = "Fecha: " . optional($pedido->fecha_pedido)?->format('d/m/Y H:i');
+            $mensaje[] = "Sede: " . ($pedido->sede->nombre ?? 'No especificada');
+            $mensaje[] = "";
+        }
+
+        $mensaje[] = "Si deseas consultar uno en detalle, escríbeme por ejemplo: *pedido #{$pedidos->first()->id}*";
+
+        return implode("\n", $mensaje);
+    }
+    private function formatearRespuestaPedidoEspecifico(Pedido $pedido, string $name = 'Cliente'): string
+    {
+        $mensaje = [];
+        $mensaje[] = "Hola {$name} 😊";
+        $mensaje[] = "Tu pedido #{$pedido->id} está actualmente en: *" . $this->traducirEstadoPedido($pedido->estado) . "*";
         $mensaje[] = "📅 Fecha: " . optional($pedido->fecha_pedido)?->format('d/m/Y H:i');
         $mensaje[] = "📍 Sede: " . ($pedido->sede->nombre ?? 'No especificada');
 
@@ -490,20 +546,62 @@ class WhatsappWebhookController extends Controller
             $mensaje[] = "🕒 Hora estimada: {$pedido->hora_entrega}";
         }
 
-        $mensaje[] = "¿Deseas que también te comparta el detalle del pedido?";
+        if ($pedido->detalles && $pedido->detalles->count()) {
+            $mensaje[] = "";
+            $mensaje[] = "🛒 Detalle del pedido:";
+            foreach ($pedido->detalles as $detalle) {
+                $cantidad = $this->formatearCantidadPedido((float) $detalle->cantidad);
+                $mensaje[] = "• {$detalle->producto} - {$cantidad} {$detalle->unidad}";
+            }
+        }
+
+        $mensaje[] = "";
+        $mensaje[] = "💰 Total: $" . number_format((float) $pedido->total, 0, ',', '.');
 
         return implode("\n", $mensaje);
+    }
+    private function extraerNumeroPedidoDesdeMensaje(string $message): ?int
+    {
+        $message = mb_strtolower(trim($message));
+
+        $patrones = [
+            '/pedido\s*#\s*(\d+)/i',
+            '/pedido\s+numero\s+(\d+)/i',
+            '/pedido\s+número\s+(\d+)/i',
+            '/pedido\s+(\d+)/i',
+            '/orden\s*#\s*(\d+)/i',
+            '/orden\s+numero\s+(\d+)/i',
+            '/orden\s+número\s+(\d+)/i',
+            '/orden\s+(\d+)/i',
+            '/#\s*(\d+)/i',
+        ];
+
+        foreach ($patrones as $patron) {
+            if (preg_match($patron, $message, $matches)) {
+                return isset($matches[1]) ? (int) $matches[1] : null;
+            }
+        }
+
+        return null;
+    }
+    private function formatearCantidadPedido(float $cantidad): string
+    {
+        if (fmod($cantidad, 1.0) == 0.0) {
+            return number_format($cantidad, 0, ',', '.');
+        }
+
+        return number_format($cantidad, 2, ',', '.');
     }
 
     private function traducirEstadoPedido(?string $estado): string
     {
         return match ($estado) {
-            'confirmado'      => 'Confirmado ✅',
-            'en_preparacion'  => 'En preparación 👨‍🍳',
-            'listo'           => 'Listo para entrega 🚚',
-            'entregado'       => 'Entregado 📦',
-            'cancelado'       => 'Cancelado ❌',
-            default           => ucfirst((string) $estado),
+            'confirmado'     => 'Confirmado ✅',
+            'en_preparacion' => 'En preparación 👨‍🍳',
+            'listo'          => 'Listo para entrega 🚚',
+            'entregado'      => 'Entregado 📦',
+            'cancelado'      => 'Cancelado ❌',
+            default          => ucfirst((string) $estado),
         };
     }
 
