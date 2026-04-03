@@ -33,10 +33,12 @@ class WhatsappWebhookController extends Controller
 
         if (empty($data)) {
             Log::warning('⚠️ Webhook vacío');
-            return response()->json(['status' => 'error', 'message' => 'Payload vacío'], 400);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Payload vacío'
+            ], 400);
         }
 
-        // Normalizar estructura real del webhook
         $from = $data['chat']['phone']
             ?? $data['from']
             ?? $data['phoneNumber']
@@ -79,17 +81,26 @@ class WhatsappWebhookController extends Controller
 
         $cacheKey = "whatsapp_chat_{$from}";
         $conversationHistory = Cache::get($cacheKey, []);
-        $conversationHistory[] = ['role' => 'user', 'content' => $message];
+        $conversationHistory[] = [
+            'role' => 'user',
+            'content' => $message
+        ];
 
         if (count($conversationHistory) > 20) {
             $conversationHistory = array_slice($conversationHistory, -20);
         }
 
         $pedidosInfo = $this->buscarPedidosCliente($from, $message);
-        $systemPrompt = $this->getSystemPromptForAIDoblamos($pedidosInfo, $this->infoEmpresa(), $name);
+        $systemPrompt = $this->getSystemPromptForAIDoblamos(
+            $pedidosInfo,
+            $this->infoEmpresa(),
+            $name
+        );
 
         try {
-            $messages = [['role' => 'system', 'content' => $systemPrompt]];
+            $messages = [
+                ['role' => 'system', 'content' => $systemPrompt]
+            ];
 
             foreach ($conversationHistory as $msg) {
                 $messages[] = $msg;
@@ -105,26 +116,37 @@ class WhatsappWebhookController extends Controller
                 ]);
 
             if ($responseIA->failed()) {
-                throw new \Exception('OpenAI error: ' . $responseIA->status() . ' ' . $responseIA->body());
+                throw new \Exception(
+                    'OpenAI error: ' . $responseIA->status() . ' ' . $responseIA->body()
+                );
             }
 
             $reply = $responseIA->json('choices.0.message.content')
                 ?? 'En este momento no logré procesar tu mensaje. ¿Me lo repites con un poquito más de detalle?';
 
-            $conversationHistory[] = ['role' => 'assistant', 'content' => $reply];
+            $conversationHistory[] = [
+                'role' => 'assistant',
+                'content' => $reply
+            ];
 
             if (str_contains($reply, '[PEDIDO_CONFIRMADO]')) {
-                $reply = $this->guardarPedidoDesdeRespuestaIA($reply, $from, $name, $conversationHistory, $cacheKey);
+                $reply = $this->guardarPedidoDesdeRespuestaIA(
+                    $reply,
+                    $from,
+                    $name,
+                    $conversationHistory,
+                    $cacheKey
+                );
             } else {
                 Cache::put($cacheKey, $conversationHistory, now()->addMinutes(45));
             }
 
-            Log::info('💬 RESPUESTA', [
+            Log::info('💬 RESPUESTA GENERADA', [
                 'reply' => $reply,
                 'phone' => $from,
             ]);
 
-            $this->enviarRespuestaAlBot($from, $reply);
+            $this->enviarRespuestaWhatsapp($from, $reply);
 
             return response()->json([
                 'status' => 'ok',
@@ -143,32 +165,82 @@ class WhatsappWebhookController extends Controller
         }
     }
 
-    private function enviarRespuestaAlBot(string $from, string $reply): void
+    private function enviarRespuestaWhatsapp(string $from, string $reply): void
     {
         try {
-            $botResponse = Http::withToken(env('WHATSAPP_BOT_TOKEN'))
-                ->timeout(10)
-                ->post('http://localhost:4002/api/send', [
-                    'phoneNumber' => $from,
-                    'message'     => $reply,
-                ]);
+            $token = $this->loginWhatsapp();
 
-            if ($botResponse->successful()) {
-                Log::info('✅ RESPUESTA ENVIADA AL BOT NODE', [
-                    'status' => $botResponse->status(),
-                    'phone'  => $from,
+            if (!$token) {
+                Log::error('❌ No se pudo obtener token de WhatsApp');
+                return;
+            }
+
+            $payload = [
+                'number' => $from,
+                'body'   => $reply,
+            ];
+
+            Log::info('📤 ENVIANDO RESPUESTA A WHATSAPP', [
+                'url' => 'https://wa-api.tecnobyteapp.com:1422/api/messages/send',
+                'payload' => $payload,
+            ]);
+
+            $response = Http::withoutVerifying()
+                ->withToken($token)
+                ->timeout(20)
+                ->post('https://wa-api.tecnobyteapp.com:1422/api/messages/send', $payload);
+
+            if ($response->successful()) {
+                Log::info('✅ RESPUESTA ENVIADA A WHATSAPP', [
+                    'status' => $response->status(),
+                    'body' => $response->json(),
+                    'phone' => $from,
                 ]);
             } else {
-                Log::error('⚠️ BOT NODE RESPONDIÓ CON ERROR', [
-                    'status' => $botResponse->status(),
-                    'body'   => $botResponse->body(),
+                Log::error('⚠️ WHATSAPP API RESPONDIÓ CON ERROR', [
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                    'phone' => $from,
                 ]);
             }
         } catch (\Throwable $e) {
-            Log::error('❌ ERROR ENVIANDO A WHATSAPP BOT', [
+            Log::error('❌ ERROR ENVIANDO A WHATSAPP', [
                 'error' => $e->getMessage(),
                 'phone' => $from,
             ]);
+        }
+    }
+
+    private function loginWhatsapp(): ?string
+    {
+        try {
+            $response = Http::withoutVerifying()
+                ->timeout(20)
+                ->post('https://wa-api.tecnobyteapp.com:1422/auth/login', [
+                    'email' => env('WHATSAPP_API_EMAIL'),
+                    'password' => env('WHATSAPP_API_PASSWORD'),
+                ]);
+
+            if ($response->failed()) {
+                Log::error('❌ ERROR LOGIN WHATSAPP', [
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                ]);
+                return null;
+            }
+
+            $token = $response->json('token');
+
+            Log::info('🔐 LOGIN WHATSAPP OK', [
+                'token_prefix' => $token ? substr($token, 0, 20) . '...' : null
+            ]);
+
+            return $token;
+        } catch (\Throwable $e) {
+            Log::error('❌ EXCEPCIÓN LOGIN WHATSAPP', [
+                'error' => $e->getMessage(),
+            ]);
+            return null;
         }
     }
 
@@ -184,8 +256,11 @@ Reglas:
 TXT;
     }
 
-    private function getSystemPromptForAIDoblamos(string $pedidosInfo = '', string $infoEmpresa = '', string $name = 'Cliente'): string
-    {
+    private function getSystemPromptForAIDoblamos(
+        string $pedidosInfo = '',
+        string $infoEmpresa = '',
+        string $name = 'Cliente'
+    ): string {
         return <<<PROMPT
 Actúas como un asesor comercial por WhatsApp de DOBLAMOS S.A.S.
 
