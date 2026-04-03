@@ -19,10 +19,19 @@ class Pedido extends Model
         'total',
         'notas',
         'cliente_nombre',
+
+        // Nuevo: número desde el que llegó el WhatsApp
+        'telefono_whatsapp',
+
+        // Nuevo: número de contacto que entrega el cliente
+        'telefono_contacto',
+
+        // Campo viejo, lo dejamos por compatibilidad
         'telefono',
+
         'canal',
         'conversacion_completa',
-          'resumen_conversacion',
+        'resumen_conversacion',
     ];
 
     protected $casts = [

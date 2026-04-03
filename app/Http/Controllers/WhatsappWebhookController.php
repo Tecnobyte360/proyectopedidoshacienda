@@ -49,9 +49,9 @@ class WhatsappWebhookController extends Controller
         $message = trim(
             $data['mensaje']['body'] ?? $data['body'] ?? $data['message'] ?? $data['text'] ?? ''
         );
-        $messageId      = $data['mensaje']['id']    ?? $data['message']['id'] ?? $data['id'] ?? null;
-        $fromMe         = (bool) ($data['mensaje']['fromMe'] ?? $data['fromMe'] ?? false);
-        $connectionId   = $data['conexion']['id']   ?? $data['connectionId']   ?? $data['whatsappId']   ?? null;
+        $messageId    = $data['mensaje']['id'] ?? $data['message']['id'] ?? $data['id'] ?? null;
+        $fromMe       = (bool) ($data['mensaje']['fromMe'] ?? $data['fromMe'] ?? false);
+        $connectionId = $data['conexion']['id'] ?? $data['connectionId'] ?? $data['whatsappId'] ?? null;
 
         Log::info('📥 DATOS NORMALIZADOS', compact('from', 'name', 'message', 'messageId', 'fromMe', 'connectionId'));
 
@@ -121,7 +121,11 @@ class WhatsappWebhookController extends Controller
                 'cliente'   => 'nullable|string|max:255',
             ]);
 
-            if (!$request->filled('pedido_id') && !$request->filled('telefono') && !$request->filled('cliente')) {
+            if (
+                !$request->filled('pedido_id') &&
+                !$request->filled('telefono') &&
+                !$request->filled('cliente')
+            ) {
                 return response()->json([
                     'status'  => 'error',
                     'message' => 'Debes enviar al menos uno de: pedido_id, telefono o cliente.',
@@ -135,9 +139,14 @@ class WhatsappWebhookController extends Controller
             }
 
             if ($request->filled('telefono')) {
-                $tel = preg_replace('/\D+/', '', trim($request->telefono));
-                $telLocal = strlen($tel) > 10 ? substr($tel, -10) : $tel;
-                $query->where('telefono', 'LIKE', "%{$telLocal}%");
+                $tel      = $this->normalizarTelefono($request->telefono);
+                $telLocal = $this->obtenerTelefonoLocal($tel);
+
+                $query->where(function ($q) use ($telLocal) {
+                    $q->where('telefono_whatsapp', 'LIKE', "%{$telLocal}%")
+                        ->orWhere('telefono_contacto', 'LIKE', "%{$telLocal}%")
+                        ->orWhere('telefono', 'LIKE', "%{$telLocal}%");
+                });
             }
 
             if ($request->filled('cliente')) {
@@ -162,7 +171,11 @@ class WhatsappWebhookController extends Controller
             ]);
 
         } catch (\Throwable $e) {
-            Log::error('❌ ERROR SEARCH ORDERS', ['error' => $e->getMessage(), 'request' => $request->all()]);
+            Log::error('❌ ERROR SEARCH ORDERS', [
+                'error'   => $e->getMessage(),
+                'request' => $request->all(),
+            ]);
+
             return response()->json(['status' => 'error', 'message' => 'Error al consultar pedidos.'], 500);
         }
     }
@@ -173,10 +186,17 @@ class WhatsappWebhookController extends Controller
             $pedido = Pedido::with(['sede', 'detalles'])->find($id);
 
             if (!$pedido) {
-                return response()->json(['status' => 'not_found', 'message' => 'Pedido no encontrado.', 'id' => $id], 404);
+                return response()->json([
+                    'status'  => 'not_found',
+                    'message' => 'Pedido no encontrado.',
+                    'id'      => $id
+                ], 404);
             }
 
-            return response()->json(['status' => 'success', 'order' => $this->formatearPedidoParaApi($pedido)]);
+            return response()->json([
+                'status' => 'success',
+                'order'  => $this->formatearPedidoParaApi($pedido)
+            ]);
 
         } catch (\Throwable $e) {
             Log::error('❌ ERROR SHOW ORDER', ['error' => $e->getMessage(), 'id' => $id]);
@@ -190,13 +210,8 @@ class WhatsappWebhookController extends Controller
     |==========================================================================
     */
 
-    /**
-     * Orquesta las capas de procesamiento: reglas → IA.
-     * Retorna siempre un string listo para enviar al cliente.
-     */
     private function procesarMensaje(string $from, string $name, string $message, ?string $connectionId): string
     {
-        // ── Capa 1: Acción pendiente (respuesta multi-turno de reglas) ───────
         if ($this->tieneAccionPendiente($from)) {
             $reply = $this->resolverAccionPendiente($from, $name, $message);
             if ($reply) {
@@ -205,28 +220,21 @@ class WhatsappWebhookController extends Controller
             }
         }
 
-        // ── Capa 2a: Cancelar / Adicionar / Modificar pedido ────────────────
         if ($this->esSolicitudModificarPedido($message)) {
             $reply = $this->resolverSolicitudModificacionPedido($from, $name, $message);
             Log::info('🛠️ CAPA 2a: Modificación de pedido', compact('from', 'message', 'reply'));
             return $reply;
         }
 
-        // ── Capa 2b: Consulta de estado ──────────────────────────────────────
         if ($this->esConsultaEstadoPedido($message)) {
             $reply = $this->resolverConsultaEstadoPedido($from, $name, $message);
             Log::info('📦 CAPA 2b: Consulta de estado', compact('from', 'message', 'reply'));
             return $reply;
         }
 
-        // ── Capa 3: Motor IA ─────────────────────────────────────────────────
         return $this->procesarConIA($from, $name, $message);
     }
 
-    /**
-     * Flujo completo de IA con Function Calling.
-     * Maneja historial, system prompt enriquecido y confirmación de pedido.
-     */
     private function procesarConIA(string $from, string $name, string $message): string
     {
         $cacheKey = "whatsapp_chat_{$from}";
@@ -234,14 +242,12 @@ class WhatsappWebhookController extends Controller
 
         $conversationHistory[] = ['role' => 'user', 'content' => $message];
 
-        // Ventana deslizante de 20 mensajes
         if (count($conversationHistory) > 20) {
             $conversationHistory = array_slice($conversationHistory, -20);
         }
 
-        // Enriquecer system prompt con contexto real de la DB
-        $pedidosInfo = $this->buscarPedidosClienteSQL($from, $message);
-        $ansInfo     = $this->construirResumenAns();
+        $pedidosInfo  = $this->buscarPedidosClienteSQL($from, $message);
+        $ansInfo      = $this->construirResumenAns();
         $systemPrompt = $this->getSystemPrompt($pedidosInfo, $this->infoEmpresa(), $name, $ansInfo);
 
         $messages = array_merge(
@@ -249,7 +255,6 @@ class WhatsappWebhookController extends Controller
             $conversationHistory
         );
 
-        // ── Llamada a OpenAI con Function Calling ────────────────────────────
         $response = $this->llamarOpenAI($messages);
 
         if (!$response) {
@@ -258,11 +263,10 @@ class WhatsappWebhookController extends Controller
         }
 
         $toolCalls   = $response['choices'][0]['message']['tool_calls'] ?? null;
-        $textContent = $response['choices'][0]['message']['content']    ?? null;
+        $textContent = $response['choices'][0]['message']['content'] ?? null;
 
-        // ── Rama A: El modelo quiso confirmar el pedido ──────────────────────
         if ($toolCalls && ($toolCalls[0]['function']['name'] ?? '') === 'confirmar_pedido') {
-            $rawArgs  = $toolCalls[0]['function']['arguments'] ?? '{}';
+            $rawArgs   = $toolCalls[0]['function']['arguments'] ?? '{}';
             $orderData = json_decode($rawArgs, true);
 
             if (json_last_error() !== JSON_ERROR_NONE || empty($orderData['products'])) {
@@ -276,7 +280,6 @@ class WhatsappWebhookController extends Controller
             return $this->guardarPedidoDesdeToolCall($orderData, $from, $name, $conversationHistory, $cacheKey);
         }
 
-        // ── Rama B: Respuesta conversacional normal ──────────────────────────
         $reply = $textContent
             ?? 'En este momento no logré procesar tu mensaje. ¿Me lo repites con un poquito más de detalle?';
 
@@ -288,9 +291,6 @@ class WhatsappWebhookController extends Controller
         return $reply;
     }
 
-    /**
-     * Llama a OpenAI con reintentos. Centraliza headers, tools y manejo de errores.
-     */
     private function llamarOpenAI(array $messages): ?array
     {
         $intentos = 2;
@@ -332,7 +332,7 @@ class WhatsappWebhookController extends Controller
 
     /*
     |==========================================================================
-    | CAPA 2 — REGLAS DETERMINISTAS (sin consumo de tokens)
+    | CAPA 2 — REGLAS DETERMINISTAS
     |==========================================================================
     */
 
@@ -355,7 +355,9 @@ class WhatsappWebhookController extends Controller
         ];
 
         foreach ($frases as $frase) {
-            if (str_contains($msg, $frase)) return true;
+            if (str_contains($msg, $frase)) {
+                return true;
+            }
         }
 
         return false;
@@ -380,9 +382,11 @@ class WhatsappWebhookController extends Controller
                     "No encontré el pedido #{$pedidoIdSolicitado} asociado a este número.",
                     "Estos son los pedidos que sí encontré:",
                 ];
+
                 foreach ($pedidos->take(10) as $item) {
                     $lineas[] = "• #{$item->id} - " . $this->traducirEstadoPedido($item->estado);
                 }
+
                 $lineas[] = "Escríbeme el número del pedido. Ejemplo: pedido #{$pedidos->first()->id}";
                 return implode("\n", $lineas);
             }
@@ -428,7 +432,9 @@ class WhatsappWebhookController extends Controller
         ];
 
         foreach ($palabras as $p) {
-            if (str_contains($msg, $p)) return true;
+            if (str_contains($msg, $p)) {
+                return true;
+            }
         }
 
         return false;
@@ -459,9 +465,11 @@ class WhatsappWebhookController extends Controller
                     "No encontré el pedido #{$pedidoIdSolicitado} asociado a este número.",
                     "Estos son los pedidos disponibles:",
                 ];
+
                 foreach ($pedidos->take(10) as $item) {
                     $lineas[] = "• Pedido #{$item->id} - " . $this->traducirEstadoPedido($item->estado);
                 }
+
                 $lineas[] = "Escríbeme por ejemplo: *{$accion} pedido #{$pedidos->first()->id}*";
                 return implode("\n", $lineas);
             }
@@ -473,7 +481,6 @@ class WhatsappWebhookController extends Controller
             return $this->validarAnsYResponder($pedidos->first(), $accion, $name);
         }
 
-        // Múltiples pedidos → guardar acción pendiente y pedir aclaración
         $this->guardarAccionPendiente($from, [
             'accion'     => $accion,
             'pedido_ids' => $pedidos->pluck('id')->take(10)->values()->toArray(),
@@ -484,10 +491,12 @@ class WhatsappWebhookController extends Controller
             "Encontré varios pedidos. Para {$accion}, indícame cuál deseas modificar:",
             '',
         ];
+
         foreach ($pedidos->take(10) as $pedido) {
             $lineas[] = "• Pedido #{$pedido->id} - " . $this->traducirEstadoPedido($pedido->estado)
-                      . " - " . optional($pedido->fecha_pedido)?->format('d/m/Y H:i');
+                . " - " . optional($pedido->fecha_pedido)?->format('d/m/Y H:i');
         }
+
         $lineas[] = "Ejemplo: *{$accion} pedido #{$pedidos->first()->id}*";
         $lineas[] = "O responde solo con el número: *{$pedidos->first()->id}*";
 
@@ -498,20 +507,28 @@ class WhatsappWebhookController extends Controller
     {
         $msg = mb_strtolower(trim($message));
 
-        $cancelar = ['cancelar','cancela','cancelame','cancelen','anular','anula',
-                     'ya no lo quiero','ya no quiero el pedido','quitar el pedido',
-                     'eliminar pedido','borrar pedido'];
+        $cancelar = [
+            'cancelar', 'cancela', 'cancelame', 'cancelen', 'anular', 'anula',
+            'ya no lo quiero', 'ya no quiero el pedido', 'quitar el pedido',
+            'eliminar pedido', 'borrar pedido'
+        ];
 
         foreach ($cancelar as $p) {
-            if (str_contains($msg, $p)) return 'cancelar';
+            if (str_contains($msg, $p)) {
+                return 'cancelar';
+            }
         }
 
-        $adicionar = ['adicionar','adiciona','agregar','agrega','sumar','añadir','anadir',
-                      'ponerle','modificar','modifica','editar','edita',
-                      'cambiar','cambiame','cámbiame','cambiarle'];
+        $adicionar = [
+            'adicionar', 'adiciona', 'agregar', 'agrega', 'sumar', 'añadir', 'anadir',
+            'ponerle', 'modificar', 'modifica', 'editar', 'edita',
+            'cambiar', 'cambiame', 'cámbiame', 'cambiarle'
+        ];
 
         foreach ($adicionar as $p) {
-            if (str_contains($msg, $p)) return 'adicionar';
+            if (str_contains($msg, $p)) {
+                return 'adicionar';
+            }
         }
 
         return null;
@@ -539,7 +556,7 @@ class WhatsappWebhookController extends Controller
         ];
 
         if (!$puede) {
-            $this->limpiarAccionPendiente($pedido->telefono);
+            $this->limpiarAccionPendiente($pedido->telefono_whatsapp ?? $pedido->telefono ?? '');
             $lineas[] = "❌ Ya no es posible {$accion} este pedido porque el tiempo permitido expiró.";
             return implode("\n", $lineas);
         }
@@ -557,7 +574,7 @@ class WhatsappWebhookController extends Controller
 
     /*
     |==========================================================================
-    | ACCIÓN PENDIENTE (contexto multi-turno de reglas)
+    | ACCIÓN PENDIENTE
     |==========================================================================
     */
 
@@ -590,16 +607,18 @@ class WhatsappWebhookController extends Controller
     {
         $pendiente = $this->obtenerAccionPendiente($from);
 
-        if (!$pendiente || empty($pendiente['accion'])) return null;
+        if (!$pendiente || empty($pendiente['accion'])) {
+            return null;
+        }
 
-        $accion             = $pendiente['accion'];
+        $accion              = $pendiente['accion'];
         $pedidoIdsPermitidos = $pendiente['pedido_ids'] ?? [];
 
         $pedidoId = $this->extraerNumeroPedidoDesdeMensaje($message);
 
         if (!$pedidoId) {
             $msgNorm = mb_strtolower(trim($message));
-            if (in_array($msgNorm, ['ese','ese mismo','el mismo','último','ultimo','el último','el ultimo'])) {
+            if (in_array($msgNorm, ['ese', 'ese mismo', 'el mismo', 'último', 'ultimo', 'el último', 'el ultimo'])) {
                 $pedidoId = $pedidoIdsPermitidos[0] ?? null;
             }
         }
@@ -618,13 +637,27 @@ class WhatsappWebhookController extends Controller
             ->whereIn('id', $pedidoIdsPermitidos)
             ->get()
             ->first(function ($p) use ($telNorm, $pedidoId) {
-                $pTel = $this->normalizarTelefono($p->telefono);
-                return (int) $p->id === (int) $pedidoId
-                    && (
-                        $pTel === $telNorm
-                        || str_contains($pTel, $telNorm)
-                        || str_contains($telNorm, $pTel)
-                    );
+                $telefonos = array_filter([
+                    $this->normalizarTelefono($p->telefono_whatsapp ?? ''),
+                    $this->normalizarTelefono($p->telefono_contacto ?? ''),
+                    $this->normalizarTelefono($p->telefono ?? ''),
+                ]);
+
+                if ((int) $p->id !== (int) $pedidoId) {
+                    return false;
+                }
+
+                foreach ($telefonos as $pTel) {
+                    if (
+                        $pTel === $telNorm ||
+                        str_contains($pTel, $telNorm) ||
+                        str_contains($telNorm, $pTel)
+                    ) {
+                        return true;
+                    }
+                }
+
+                return false;
             });
 
         if (!$pedido) {
@@ -638,48 +671,48 @@ class WhatsappWebhookController extends Controller
 
     /*
     |==========================================================================
-    | GUARDAR PEDIDO — Function Calling (reemplaza parsing de [JSON_ORDER])
+    | GUARDAR PEDIDO
     |==========================================================================
     */
 
-    /**
-     * Recibe el array ya parseado que vino del tool_call de OpenAI.
-     * JSON garantizado válido — no hay parsing frágil de texto.
-     */
     private function guardarPedidoDesdeToolCall(
-        array  $orderData,
+        array $orderData,
         string $from,
         string $name,
-        array  $conversationHistory,
+        array $conversationHistory,
         string $cacheKey
     ): string {
         try {
-            // Guardia anti-duplicado de confirmación (ventana 2 min)
-            $confirmKey = "pedido_confirmado_{$from}";
+            $confirmKey = "pedido_confirmado_" . $this->normalizarTelefono($from);
+
             if (Cache::has($confirmKey)) {
                 Log::warning('⚠️ Pedido ya confirmado recientemente', compact('from'));
                 return "Tu pedido ya fue registrado 😊 Escríbeme el número de pedido para consultarlo.";
             }
+
             Cache::put($confirmKey, true, now()->addMinutes(2));
 
             DB::beginTransaction();
 
-            // Sede: buscar por localidad/barrio, fallback a primera disponible
             $sedeNombre = $orderData['location'] ?? $orderData['neighborhood'] ?? null;
+
             $sede = $sedeNombre
                 ? Sede::where('nombre', 'LIKE', "%{$sedeNombre}%")->first() ?? Sede::first()
                 : Sede::first();
 
-            // Notas enriquecidas con datos de entrega
             $partes = array_filter([
-                $orderData['notes']          ?? null,
-                isset($orderData['address'])       ? "Dirección: {$orderData['address']}"       : null,
-                isset($orderData['neighborhood'])   ? "Barrio: {$orderData['neighborhood']}"     : null,
-                isset($orderData['payment_method']) ? "Pago: {$orderData['payment_method']}"     : null,
+                $orderData['notes'] ?? null,
+                isset($orderData['address']) ? "Dirección: {$orderData['address']}" : null,
+                isset($orderData['neighborhood']) ? "Barrio: {$orderData['neighborhood']}" : null,
+                isset($orderData['payment_method']) ? "Pago: {$orderData['payment_method']}" : null,
             ]);
+
             $notas = implode(' | ', $partes) ?: 'Solicitud vía WhatsApp';
 
             $pickupTime = !empty($orderData['pickup_time']) ? $orderData['pickup_time'] : null;
+
+            $telefonoWhatsapp = $this->normalizarTelefono($from);
+            $telefonoContacto = $this->normalizarTelefono($orderData['phone'] ?? $from);
 
             $pedido = Pedido::create([
                 'sede_id'               => $sede?->id,
@@ -689,7 +722,14 @@ class WhatsappWebhookController extends Controller
                 'total'                 => (float) ($orderData['total'] ?? 0),
                 'notas'                 => $notas,
                 'cliente_nombre'        => $orderData['customer_name'] ?? $name,
-                'telefono'              => $orderData['phone'] ?? $from,
+
+                // Nuevo esquema recomendado
+                'telefono_whatsapp'     => $telefonoWhatsapp,
+                'telefono_contacto'     => $telefonoContacto,
+
+                // Compatibilidad con lógica vieja
+                'telefono'              => $telefonoWhatsapp,
+
                 'canal'                 => 'whatsapp',
                 'conversacion_completa' => json_encode($conversationHistory, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT),
                 'resumen_conversacion'  => $orderData['notes'] ?? '',
@@ -698,10 +738,10 @@ class WhatsappWebhookController extends Controller
             foreach (($orderData['products'] ?? []) as $product) {
                 DetallePedido::create([
                     'pedido_id'       => $pedido->id,
-                    'producto'        => $product['name']     ?? 'Producto',
+                    'producto'        => $product['name'] ?? 'Producto',
                     'cantidad'        => (float) ($product['quantity'] ?? 1),
-                    'unidad'          => $product['unit']     ?? 'unidad',
-                    'precio_unitario' => (float) ($product['price']    ?? 0),
+                    'unidad'          => $product['unit'] ?? 'unidad',
+                    'precio_unitario' => (float) ($product['price'] ?? 0),
                     'subtotal'        => (float) ($product['subtotal'] ?? 0),
                 ]);
             }
@@ -710,16 +750,20 @@ class WhatsappWebhookController extends Controller
 
             broadcast(new PedidoConfirmado($pedido));
 
-            // Limpiar historial de conversación — el pedido está cerrado
             Cache::forget($cacheKey);
 
-            Log::info('✅ PEDIDO GUARDADO', ['pedido_id' => $pedido->id, 'from' => $from]);
+            Log::info('✅ PEDIDO GUARDADO', [
+                'pedido_id'          => $pedido->id,
+                'from'               => $from,
+                'telefono_whatsapp'  => $telefonoWhatsapp,
+                'telefono_contacto'  => $telefonoContacto,
+            ]);
 
             return $this->construirMensajeConfirmacionPedido($pedido, $orderData, $name);
 
         } catch (\Throwable $e) {
             DB::rollBack();
-            Cache::forget("pedido_confirmado_{$from}");
+            Cache::forget("pedido_confirmado_" . $this->normalizarTelefono($from));
 
             Log::error('❌ ERROR CRÍTICO AL GUARDAR PEDIDO', [
                 'error'      => $e->getMessage(),
@@ -730,10 +774,6 @@ class WhatsappWebhookController extends Controller
         }
     }
 
-    /**
-     * Construye el mensaje de confirmación final para el cliente.
-     * Mensaje limpio, sin JSON, sin artefactos — solo información útil.
-     */
     private function construirMensajeConfirmacionPedido(Pedido $pedido, array $orderData, string $name): string
     {
         $lineas = [
@@ -752,11 +792,17 @@ class WhatsappWebhookController extends Controller
         if (!empty($orderData['address'])) {
             $lineas[] = "📍 *Dirección:* {$orderData['address']}";
         }
+
         if (!empty($orderData['neighborhood'])) {
             $lineas[] = "🏘️ *Barrio:* {$orderData['neighborhood']}";
         }
+
         if (!empty($pedido->hora_entrega)) {
             $lineas[] = "🕒 *Entrega estimada:* {$pedido->hora_entrega}";
+        }
+
+        if (!empty($pedido->telefono_contacto)) {
+            $lineas[] = "📞 *Contacto:* {$pedido->telefono_contacto}";
         }
 
         $total = (float) $pedido->total;
@@ -778,64 +824,67 @@ class WhatsappWebhookController extends Controller
 
     private function obtenerAnsMinutos(string $accion): ?int
     {
-        return AnsPedido::where('accion', $accion)->where('activo', true)->value('tiempo_minutos');
+        return AnsPedido::where('accion', $accion)
+            ->where('activo', true)
+            ->value('tiempo_minutos');
     }
 
     private function construirResumenAns(): string
     {
-        $crear     = $this->obtenerAnsMinutos('crear')     ?? 'No definido';
+        $crear     = $this->obtenerAnsMinutos('crear') ?? 'No definido';
         $adicionar = $this->obtenerAnsMinutos('adicionar') ?? 'No definido';
-        $cancelar  = $this->obtenerAnsMinutos('cancelar')  ?? 'No definido';
+        $cancelar  = $this->obtenerAnsMinutos('cancelar') ?? 'No definido';
 
         return "ANS DEL SISTEMA:\n"
-             . "- Crear pedido: {$crear} minuto(s)\n"
-             . "- Adicionar pedido: {$adicionar} minuto(s)\n"
-             . "- Cancelar pedido: {$cancelar} minuto(s)";
+            . "- Crear pedido: {$crear} minuto(s)\n"
+            . "- Adicionar pedido: {$adicionar} minuto(s)\n"
+            . "- Cancelar pedido: {$cancelar} minuto(s)";
     }
 
     /*
     |==========================================================================
-    | CONSULTAS DB — optimizadas a nivel SQL
+    | CONSULTAS DB
     |==========================================================================
     */
 
-    /**
-     * Trae pedidos del cliente filtrando en SQL (sin get()->filter() en PHP).
-     * Usa los últimos 10 dígitos del teléfono para tolerar prefijos de país.
-     */
     private function pedidosDelCliente(string $from, int $limite = 10): \Illuminate\Support\Collection
     {
         $tel      = $this->normalizarTelefono($from);
-        $telLocal = strlen($tel) > 10 ? substr($tel, -10) : $tel;
+        $telLocal = $this->obtenerTelefonoLocal($tel);
 
         return Pedido::with(['sede', 'detalles'])
-            ->where('telefono', 'LIKE', "%{$telLocal}%")
+            ->where(function ($q) use ($telLocal) {
+                $q->where('telefono_whatsapp', 'LIKE', "%{$telLocal}%")
+                    ->orWhere('telefono_contacto', 'LIKE', "%{$telLocal}%")
+                    ->orWhere('telefono', 'LIKE', "%{$telLocal}%");
+            })
             ->orderByDesc('fecha_pedido')
             ->orderByDesc('id')
             ->take($limite)
             ->get();
     }
 
-    /**
-     * Historial para el system prompt de la IA.
-     * Solo se consulta cuando el mensaje contiene keywords relevantes.
-     */
     private function buscarPedidosClienteSQL(string $from, string $message): string
     {
         $msg = mb_strtolower($message);
 
         $keywords = [
-            'pedido','domicilio','orden','estado','seguimiento','compra','comprar',
-            'dirección','direccion','barrio','pago','contra entrega',
-            'cancelar','anular','adicionar','agregar','modificar','editar','cambiar',
+            'pedido', 'domicilio', 'orden', 'estado', 'seguimiento', 'compra', 'comprar',
+            'dirección', 'direccion', 'barrio', 'pago', 'contra entrega',
+            'cancelar', 'anular', 'adicionar', 'agregar', 'modificar', 'editar', 'cambiar',
         ];
 
         $esConsulta = false;
         foreach ($keywords as $k) {
-            if (str_contains($msg, $k)) { $esConsulta = true; break; }
+            if (str_contains($msg, $k)) {
+                $esConsulta = true;
+                break;
+            }
         }
 
-        if (!$esConsulta) return '';
+        if (!$esConsulta) {
+            return '';
+        }
 
         $pedidos = $this->pedidosDelCliente($from, 3);
 
@@ -846,9 +895,9 @@ class WhatsappWebhookController extends Controller
         $texto = "📦 HISTORIAL DEL CLIENTE:\n\n";
         foreach ($pedidos as $p) {
             $texto .= "Pedido #{$p->id}\n"
-                    . "Estado: {$p->estado}\n"
-                    . "Fecha: {$p->fecha_pedido->format('d/m/Y H:i')}\n"
-                    . "Barrio/Sede: " . ($p->sede->nombre ?? 'No especificada') . "\n\n";
+                . "Estado: {$p->estado}\n"
+                . "Fecha: {$p->fecha_pedido->format('d/m/Y H:i')}\n"
+                . "Barrio/Sede: " . ($p->sede->nombre ?? 'No especificada') . "\n\n";
         }
 
         return $texto;
@@ -863,18 +912,18 @@ class WhatsappWebhookController extends Controller
     private function infoEmpresa(): string
     {
         return "Alimentos La Hacienda\n"
-             . "- Más de 25 años de experiencia.\n"
-             . "- Ubicada en Bello, Antioquia.\n"
-             . "- Calidad, frescura y servicio al cliente.\n"
-             . "- Opera con domicilios, sedes físicas y atención directa.\n"
-             . "- Sistema de pedidos integrado.";
+            . "- Más de 25 años de experiencia.\n"
+            . "- Ubicada en Bello, Antioquia.\n"
+            . "- Calidad, frescura y servicio al cliente.\n"
+            . "- Opera con domicilios, sedes físicas y atención directa.\n"
+            . "- Sistema de pedidos integrado.";
     }
 
     private function getSystemPrompt(
         string $pedidosInfo = '',
         string $infoEmpresa = '',
-        string $name        = 'Cliente',
-        string $ansInfo     = ''
+        string $name = 'Cliente',
+        string $ansInfo = ''
     ): string {
         return <<<PROMPT
 Eres el asesor comercial de Alimentos La Hacienda.
@@ -951,10 +1000,6 @@ NO la llames más de una vez por conversación.
 PROMPT;
     }
 
-    /**
-     * Definición del tool para OpenAI Function Calling.
-     * JSON siempre estructurado — elimina el parsing frágil de [JSON_ORDER].
-     */
     private function getToolsDefinicion(): array
     {
         return [
@@ -972,11 +1017,11 @@ PROMPT;
                                 'items'       => [
                                     'type'       => 'object',
                                     'properties' => [
-                                        'name'     => ['type' => 'string',  'description' => 'Nombre del producto'],
-                                        'quantity' => ['type' => 'number',  'description' => 'Cantidad'],
-                                        'unit'     => ['type' => 'string',  'description' => 'Unidad (kg, libra, unidad, etc.)'],
-                                        'price'    => ['type' => 'number',  'description' => 'Precio unitario, 0 si no se conoce'],
-                                        'subtotal' => ['type' => 'number',  'description' => 'Subtotal, 0 si no se conoce'],
+                                        'name'     => ['type' => 'string', 'description' => 'Nombre del producto'],
+                                        'quantity' => ['type' => 'number', 'description' => 'Cantidad'],
+                                        'unit'     => ['type' => 'string', 'description' => 'Unidad (kg, libra, unidad, etc.)'],
+                                        'price'    => ['type' => 'number', 'description' => 'Precio unitario, 0 si no se conoce'],
+                                        'subtotal' => ['type' => 'number', 'description' => 'Subtotal, 0 si no se conoce'],
                                     ],
                                     'required' => ['name', 'quantity', 'unit'],
                                 ],
@@ -1031,18 +1076,20 @@ PROMPT;
             if ($response->successful()) {
                 Log::info('✅ RESPUESTA ENVIADA', ['status' => $response->status(), 'phone' => $from]);
             } else {
-                Log::error('⚠️ WHATSAPP API ERROR', ['status' => $response->status(), 'body' => $response->body()]);
+                Log::error('⚠️ WHATSAPP API ERROR', [
+                    'status' => $response->status(),
+                    'body'   => $response->body()
+                ]);
             }
 
         } catch (\Throwable $e) {
-            Log::error('❌ ERROR ENVIANDO A WHATSAPP', ['error' => $e->getMessage(), 'phone' => $from]);
+            Log::error('❌ ERROR ENVIANDO A WHATSAPP', [
+                'error' => $e->getMessage(),
+                'phone' => $from
+            ]);
         }
     }
 
-    /**
-     * Login con cache de token.
-     * Evita un HTTP round-trip en cada mensaje (bug #3 corregido).
-     */
     private function loginWhatsapp(): ?string
     {
         $cacheKey = 'whatsapp_api_token';
@@ -1061,14 +1108,16 @@ PROMPT;
                 ]);
 
             if ($response->failed()) {
-                Log::error('❌ ERROR LOGIN WHATSAPP', ['status' => $response->status(), 'body' => $response->body()]);
+                Log::error('❌ ERROR LOGIN WHATSAPP', [
+                    'status' => $response->status(),
+                    'body'   => $response->body()
+                ]);
                 return null;
             }
 
             $token = $response->json('token');
 
             if ($token) {
-                // 50 min: antes de que expire la sesión típica de la API
                 Cache::put($cacheKey, $token, now()->addMinutes(50));
                 Log::info('🔐 Token WhatsApp obtenido y cacheado 50 min');
             }
@@ -1112,6 +1161,10 @@ PROMPT;
         $lineas[] = '';
         $lineas[] = "💰 Total: $" . number_format((float) $pedido->total, 0, ',', '.');
 
+        if (!empty($pedido->telefono_contacto)) {
+            $lineas[] = "📞 Contacto: {$pedido->telefono_contacto}";
+        }
+
         return implode("\n", $lineas);
     }
 
@@ -1124,6 +1177,8 @@ PROMPT;
             'hora_entrega'         => $pedido->hora_entrega ?? 'Por confirmar',
             'sede'                 => $pedido->sede->nombre ?? 'No especificada',
             'cliente'              => $pedido->cliente_nombre,
+            'telefono_whatsapp'    => $pedido->telefono_whatsapp ?? $pedido->telefono,
+            'telefono_contacto'    => $pedido->telefono_contacto ?? $pedido->telefono,
             'telefono'             => $pedido->telefono,
             'total'                => $pedido->total,
             'total_formateado'     => number_format((float) $pedido->total, 0, ',', '.'),
@@ -1181,6 +1236,12 @@ PROMPT;
     private function normalizarTelefono(?string $telefono): string
     {
         return preg_replace('/\D+/', '', (string) $telefono);
+    }
+
+    private function obtenerTelefonoLocal(?string $telefono): string
+    {
+        $tel = $this->normalizarTelefono($telefono);
+        return strlen($tel) > 10 ? substr($tel, -10) : $tel;
     }
 
     private function formatearCantidadPedido(float $cantidad): string
