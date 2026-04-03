@@ -43,7 +43,6 @@ class WhatsappWebhookController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Payload vacío'], 400);
         }
 
-        // ── Normalización de campos ──────────────────────────────────────────
         $from    = $data['chat']['phone'] ?? $data['from'] ?? $data['phoneNumber'] ?? null;
         $name    = $data['chat']['name']  ?? $data['name'] ?? 'Cliente';
         $message = trim(
@@ -55,7 +54,6 @@ class WhatsappWebhookController extends Controller
 
         Log::info('📥 DATOS NORMALIZADOS', compact('from', 'name', 'message', 'messageId', 'fromMe', 'connectionId'));
 
-        // ── Guardas tempranas ────────────────────────────────────────────────
         if (!$from || !$message) {
             Log::warning('⚠️ Mensaje ignorado: faltan datos', compact('from', 'message'));
             return response()->json(['status' => 'ignored']);
@@ -66,7 +64,6 @@ class WhatsappWebhookController extends Controller
             return response()->json(['status' => 'self_message_ignored']);
         }
 
-        // ── Deduplicación ────────────────────────────────────────────────────
         if ($messageId) {
             $alreadyProcessedKey = "processed_whatsapp_msg_{$messageId}";
             $processingKey       = "processing_whatsapp_msg_{$messageId}";
@@ -89,10 +86,24 @@ class WhatsappWebhookController extends Controller
 
             Log::info('💬 RESPUESTA GENERADA', compact('reply', 'from', 'messageId', 'connectionId'));
 
-            $this->enviarRespuestaWhatsapp($from, $reply, $connectionId);
+            $sent = $this->enviarRespuestaWhatsapp($from, $reply, $connectionId);
 
-            if ($messageId) {
+            if ($messageId && $sent) {
                 Cache::put("processed_whatsapp_msg_{$messageId}", true, now()->addMinutes(10));
+            }
+
+            if (!$sent) {
+                Log::warning('⚠️ La respuesta fue generada pero no se pudo enviar a WhatsApp', [
+                    'from'         => $from,
+                    'message_id'   => $messageId,
+                    'connectionId' => $connectionId,
+                ]);
+
+                return response()->json([
+                    'status'            => 'error',
+                    'message_processed' => false,
+                    'message'           => 'No se pudo enviar la respuesta a WhatsApp.'
+                ], 500);
             }
 
             return response()->json(['status' => 'ok', 'message_processed' => true]);
@@ -722,14 +733,9 @@ class WhatsappWebhookController extends Controller
                 'total'                 => (float) ($orderData['total'] ?? 0),
                 'notas'                 => $notas,
                 'cliente_nombre'        => $orderData['customer_name'] ?? $name,
-
-                // Nuevo esquema recomendado
                 'telefono_whatsapp'     => $telefonoWhatsapp,
                 'telefono_contacto'     => $telefonoContacto,
-
-                // Compatibilidad con lógica vieja
                 'telefono'              => $telefonoWhatsapp,
-
                 'canal'                 => 'whatsapp',
                 'conversacion_completa' => json_encode($conversationHistory, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT),
                 'resumen_conversacion'  => $orderData['notes'] ?? '',
@@ -1049,54 +1055,129 @@ PROMPT;
     |==========================================================================
     */
 
-    private function enviarRespuestaWhatsapp(string $from, string $reply, ?string $connectionId): void
+    private function enviarRespuestaWhatsapp(string $from, string $reply, $connectionId = null): bool
     {
         try {
-            $token = $this->loginWhatsapp();
+            $payload = [
+                'number' => $from,
+                'body'   => $reply,
+            ];
 
-            if (!$token) {
-                Log::error('❌ No se pudo obtener token de WhatsApp');
-                return;
-            }
-
-            $payload = ['number' => $from, 'body' => $reply];
-
-            if ($connectionId) {
-                $payload['whatsappId']   = $connectionId;
-                $payload['connectionId'] = $connectionId;
+            if (!empty($connectionId)) {
+                $payload['whatsappId']   = (int) $connectionId;
+                $payload['connectionId'] = (int) $connectionId;
             }
 
             Log::info('📤 ENVIANDO A WHATSAPP', ['payload' => $payload]);
 
-            $response = Http::withoutVerifying()
-                ->withToken($token)
-                ->timeout(20)
-                ->post('https://wa-api.tecnobyteapp.com:1422/api/messages/send', $payload);
+            $token = $this->obtenerTokenWhatsapp();
+
+            if (!$token) {
+                Log::error('❌ No se pudo obtener token de WhatsApp');
+                return false;
+            }
+
+            $response = $this->postWhatsappSend($token, $payload);
 
             if ($response->successful()) {
-                Log::info('✅ RESPUESTA ENVIADA', ['status' => $response->status(), 'phone' => $from]);
-            } else {
-                Log::error('⚠️ WHATSAPP API ERROR', [
+                Log::info('✅ RESPUESTA ENVIADA', [
                     'status' => $response->status(),
-                    'body'   => $response->body()
+                    'phone'  => $from,
                 ]);
+                return true;
             }
+
+            $body    = $response->json();
+            $rawBody = $response->body();
+
+            Log::warning('⚠️ Primer intento de envío falló', [
+                'status' => $response->status(),
+                'body'   => $rawBody,
+                'phone'  => $from,
+            ]);
+
+            if ($response->status() === 401 && $this->esSesionExpiradaWhatsapp($body, $rawBody)) {
+                Log::warning('🔄 Sesión expirada. Intentando refresh_token...', [
+                    'phone' => $from,
+                ]);
+
+                $newToken = $this->refrescarTokenWhatsapp();
+
+                if (!$newToken) {
+                    Log::warning('⚠️ Refresh falló. Intentando login completo...', [
+                        'phone' => $from,
+                    ]);
+
+                    $newToken = $this->loginWhatsapp(true);
+                }
+
+                if (!$newToken) {
+                    Log::error('❌ No se pudo renovar el token de WhatsApp');
+                    return false;
+                }
+
+                $retryResponse = $this->postWhatsappSend($newToken, $payload);
+
+                if ($retryResponse->successful()) {
+                    Log::info('✅ RESPUESTA ENVIADA EN REINTENTO', [
+                        'status' => $retryResponse->status(),
+                        'phone'  => $from,
+                    ]);
+                    return true;
+                }
+
+                Log::error('❌ Falló el reintento de envío a WhatsApp', [
+                    'status' => $retryResponse->status(),
+                    'body'   => $retryResponse->body(),
+                    'phone'  => $from,
+                ]);
+
+                return false;
+            }
+
+            Log::error('⚠️ WHATSAPP API ERROR', [
+                'status' => $response->status(),
+                'body'   => $rawBody,
+                'phone'  => $from,
+            ]);
+
+            return false;
 
         } catch (\Throwable $e) {
             Log::error('❌ ERROR ENVIANDO A WHATSAPP', [
                 'error' => $e->getMessage(),
-                'phone' => $from
+                'phone' => $from,
             ]);
+
+            return false;
         }
     }
 
-    private function loginWhatsapp(): ?string
+    private function postWhatsappSend(string $token, array $payload)
+    {
+        return Http::withoutVerifying()
+            ->withToken($token)
+            ->timeout(20)
+            ->post('https://wa-api.tecnobyteapp.com:1422/api/messages/send', $payload);
+    }
+
+    private function obtenerTokenWhatsapp(): ?string
+    {
+        $cacheKey = 'whatsapp_api_token';
+        return Cache::get($cacheKey) ?: $this->loginWhatsapp();
+    }
+
+    private function loginWhatsapp(bool $force = false): ?string
     {
         $cacheKey = 'whatsapp_api_token';
 
-        $cached = Cache::get($cacheKey);
-        if ($cached) {
-            return $cached;
+        if ($force) {
+            Cache::forget($cacheKey);
+        } else {
+            $cached = Cache::get($cacheKey);
+            if ($cached) {
+                return $cached;
+            }
         }
 
         try {
@@ -1110,24 +1191,99 @@ PROMPT;
             if ($response->failed()) {
                 Log::error('❌ ERROR LOGIN WHATSAPP', [
                     'status' => $response->status(),
-                    'body'   => $response->body()
+                    'body'   => $response->body(),
                 ]);
                 return null;
             }
 
             $token = $response->json('token');
 
-            if ($token) {
-                Cache::put($cacheKey, $token, now()->addMinutes(50));
-                Log::info('🔐 Token WhatsApp obtenido y cacheado 50 min');
+            if (!$token) {
+                Log::error('❌ LOGIN WHATSAPP SIN TOKEN', [
+                    'body' => $response->body(),
+                ]);
+                return null;
             }
+
+            Cache::put($cacheKey, $token, now()->addMinutes(20));
+
+            Log::info('🔐 Token WhatsApp obtenido y cacheado', [
+                'force' => $force,
+            ]);
 
             return $token;
 
         } catch (\Throwable $e) {
-            Log::error('❌ EXCEPCIÓN LOGIN WHATSAPP', ['error' => $e->getMessage()]);
+            Log::error('❌ EXCEPCIÓN LOGIN WHATSAPP', [
+                'error' => $e->getMessage(),
+            ]);
             return null;
         }
+    }
+
+    private function refrescarTokenWhatsapp(): ?string
+    {
+        $cacheKey = 'whatsapp_api_token';
+        $token    = Cache::get($cacheKey);
+
+        if (!$token) {
+            Log::warning('⚠️ No hay token en cache para refrescar');
+            return null;
+        }
+
+        try {
+            $response = Http::withoutVerifying()
+                ->withToken($token)
+                ->timeout(20)
+                ->post('https://wa-api.tecnobyteapp.com:1422/auth/refresh_token');
+
+            if ($response->failed()) {
+                Log::warning('⚠️ ERROR REFRESH TOKEN WHATSAPP', [
+                    'status' => $response->status(),
+                    'body'   => $response->body(),
+                ]);
+
+                Cache::forget($cacheKey);
+                return null;
+            }
+
+            $newToken = $response->json('token');
+
+            if (!$newToken) {
+                Log::warning('⚠️ REFRESH TOKEN SIN TOKEN NUEVO', [
+                    'body' => $response->body(),
+                ]);
+
+                Cache::forget($cacheKey);
+                return null;
+            }
+
+            Cache::put($cacheKey, $newToken, now()->addMinutes(20));
+
+            Log::info('🔄 Token WhatsApp refrescado correctamente');
+
+            return $newToken;
+
+        } catch (\Throwable $e) {
+            Cache::forget($cacheKey);
+
+            Log::error('❌ EXCEPCIÓN REFRESH TOKEN WHATSAPP', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
+    private function esSesionExpiradaWhatsapp(?array $body, string $rawBody = ''): bool
+    {
+        $error = strtoupper((string) data_get($body, 'error', ''));
+
+        if ($error === 'ERR_SESSION_EXPIRED') {
+            return true;
+        }
+
+        return str_contains(strtoupper($rawBody), 'ERR_SESSION_EXPIRED');
     }
 
     /*
