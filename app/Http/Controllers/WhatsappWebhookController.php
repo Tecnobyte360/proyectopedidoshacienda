@@ -151,35 +151,7 @@ class WhatsappWebhookController extends Controller
 
             /*
             |--------------------------------------------------------------------------
-            | 1. CONSULTA DIRECTA DE ESTADO DEL PEDIDO
-            |--------------------------------------------------------------------------
-            */
-            if ($this->esConsultaEstadoPedido($message)) {
-                $replyEstado = $this->resolverConsultaEstadoPedido($from, $name, $message);
-
-                Log::info('📦 RESPUESTA AUTOMÁTICA DE ESTADO', [
-                    'phone'         => $from,
-                    'message'       => $message,
-                    'reply'         => $replyEstado,
-                    'connection_id' => $connectionId,
-                ]);
-
-                $this->enviarRespuestaWhatsapp($from, $replyEstado, $connectionId);
-
-                if ($messageId) {
-                    Cache::put("processed_whatsapp_msg_{$messageId}", true, now()->addMinutes(10));
-                }
-
-                return response()->json([
-                    'status'            => 'ok',
-                    'message_processed' => true,
-                    'type'              => 'order_status_response',
-                ]);
-            }
-
-            /*
-            |--------------------------------------------------------------------------
-            | 2. VALIDACIÓN DE CANCELACIÓN / ADICIÓN / MODIFICACIÓN
+            | 1. VALIDACIÓN DE CANCELACIÓN / ADICIÓN / MODIFICACIÓN
             |--------------------------------------------------------------------------
             */
             if ($this->esSolicitudModificarPedido($message)) {
@@ -202,6 +174,34 @@ class WhatsappWebhookController extends Controller
                     'status'            => 'ok',
                     'message_processed' => true,
                     'type'              => 'order_modification_validation',
+                ]);
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | 2. CONSULTA DIRECTA DE ESTADO DEL PEDIDO
+            |--------------------------------------------------------------------------
+            */
+            if ($this->esConsultaEstadoPedido($message)) {
+                $replyEstado = $this->resolverConsultaEstadoPedido($from, $name, $message);
+
+                Log::info('📦 RESPUESTA AUTOMÁTICA DE ESTADO', [
+                    'phone'         => $from,
+                    'message'       => $message,
+                    'reply'         => $replyEstado,
+                    'connection_id' => $connectionId,
+                ]);
+
+                $this->enviarRespuestaWhatsapp($from, $replyEstado, $connectionId);
+
+                if ($messageId) {
+                    Cache::put("processed_whatsapp_msg_{$messageId}", true, now()->addMinutes(10));
+                }
+
+                return response()->json([
+                    'status'            => 'ok',
+                    'message_processed' => true,
+                    'type'              => 'order_status_response',
                 ]);
             }
 
@@ -507,10 +507,6 @@ class WhatsappWebhookController extends Controller
             'quiero saber mis pedidos',
             'numero de pedido',
             'número de pedido',
-            'pedido #',
-            'pedido ',
-            'orden #',
-            'orden ',
         ];
 
         foreach ($frases as $frase) {
@@ -597,15 +593,25 @@ class WhatsappWebhookController extends Controller
             'cancelar mi pedido',
             'quiero cancelar',
             'quiero cancelar mi pedido',
+            'cancelar el pedido',
             'anular pedido',
+            'anular mi pedido',
+            'anular el pedido',
             'adicionar pedido',
             'adicionar mi pedido',
+            'adicionar el pedido',
             'quiero adicionar',
             'agregar al pedido',
             'agregar productos al pedido',
             'modificar pedido',
+            'modificar mi pedido',
+            'modificar el pedido',
             'editar pedido',
+            'editar mi pedido',
+            'editar el pedido',
             'cambiar pedido',
+            'cambiar mi pedido',
+            'cambiar el pedido',
         ];
 
         foreach ($frases as $frase) {
@@ -1236,7 +1242,7 @@ PROMPT;
             Cache::forget($cacheKey);
 
             $mensajeCliente = trim(preg_replace('/\[JSON_ORDER\].*?\[\/JSON_ORDER\]/s', '', $reply));
-            $mensajeCliente = trim(str_replace('[PEDIDO_CONFIRMADO]', '', $mensajeCliente));
+            $mensajeCliente = trim(str_replace('[PEDIDO_CONFIRMADO]', '', $reply));
 
             return $mensajeCliente . "\n\n📋 Número de solicitud: #{$pedido->id}\nGuárdalo para consultar el estado.";
         } catch (\Throwable $e) {
