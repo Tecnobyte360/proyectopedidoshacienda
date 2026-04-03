@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,31 +12,62 @@
     <script src="https://cdn.jsdelivr.net/npm/pusher-js@8.4.0-rc2/dist/web/pusher.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/laravel-echo@1.16.1/dist/echo.iife.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap"
+        rel="stylesheet">
 
     <style>
         :root {
-            --bg:        #0a0c12;
-            --surface:   #12151f;
-            --card:      #181c28;
-            --border:    rgba(255,255,255,0.07);
-            --border-hi: rgba(255,165,50,0.35);
 
-            --accent:    #ff8c00;
-            --accent2:   #ffb347;
-            --glow:      rgba(255,140,0,0.18);
+            .stat-card.s-cancel::before {
+                background: var(--cancelado);
+            }
 
-            --nuevo:     #3b82f6;
-            --proceso:   #f59e0b;
+            .stat-card.s-cancel .stat-num {
+                color: var(--cancelado);
+            }
+
+            .stripe-cancelado {
+                background: var(--cancelado);
+            }
+
+            .status-cancelado {
+                background: rgba(239, 68, 68, 0.12);
+                color: #f87171;
+            }
+
+            .status-cancelado .status-dot-sm {
+                background: var(--cancelado);
+                box-shadow: 0 0 6px var(--cancelado);
+            }
+
+            --bg: #0a0c12;
+            --surface: #12151f;
+            --card: #181c28;
+            --border: rgba(255, 255, 255, 0.07);
+            --border-hi: rgba(255, 165, 50, 0.35);
+
+            --accent: #ff8c00;
+            --accent2: #ffb347;
+            --glow: rgba(255, 140, 0, 0.18);
+
+            --nuevo: #3b82f6;
+            --proceso: #f59e0b;
             --despachado:#a855f7;
             --entregado: #22c55e;
 
-            --text:      #f0f2f8;
-            --muted:     #6b7280;
-            --sub:       #9ca3af;
+            --text: #f0f2f8;
+            --muted: #6b7280;
+            --sub: #9ca3af;
         }
 
-        *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+        *,
+        *::before,
+        *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
         body {
             font-family: 'DM Sans', sans-serif;
@@ -55,10 +87,11 @@
             left: -160px;
             width: 520px;
             height: 520px;
-            background: radial-gradient(circle, rgba(255,140,0,0.08) 0%, transparent 70%);
+            background: radial-gradient(circle, rgba(255, 140, 0, 0.08) 0%, transparent 70%);
             pointer-events: none;
             z-index: 0;
         }
+
         body::after {
             content: '';
             position: fixed;
@@ -66,7 +99,7 @@
             right: -120px;
             width: 440px;
             height: 440px;
-            background: radial-gradient(circle, rgba(59,130,246,0.07) 0%, transparent 70%);
+            background: radial-gradient(circle, rgba(59, 130, 246, 0.07) 0%, transparent 70%);
             pointer-events: none;
             z-index: 0;
         }
@@ -127,8 +160,8 @@
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            background: rgba(34,197,94,0.1);
-            border: 1px solid rgba(34,197,94,0.25);
+            background: rgba(34, 197, 94, 0.1);
+            border: 1px solid rgba(34, 197, 94, 0.25);
             color: #4ade80;
             font-size: 0.82rem;
             font-weight: 600;
@@ -170,15 +203,28 @@
         .stat-card::before {
             content: '';
             position: absolute;
-            top: 0; left: 0; right: 0;
+            top: 0;
+            left: 0;
+            right: 0;
             height: 3px;
             border-radius: 16px 16px 0 0;
         }
 
-        .stat-card.s-nuevo::before   { background: var(--nuevo); }
-        .stat-card.s-proceso::before { background: var(--proceso); }
-        .stat-card.s-desp::before    { background: var(--despachado); }
-        .stat-card.s-entr::before    { background: var(--entregado); }
+        .stat-card.s-nuevo::before {
+            background: var(--nuevo);
+        }
+
+        .stat-card.s-proceso::before {
+            background: var(--proceso);
+        }
+
+        .stat-card.s-desp::before {
+            background: var(--despachado);
+        }
+
+        .stat-card.s-entr::before {
+            background: var(--entregado);
+        }
 
         .stat-label {
             font-size: 0.78rem;
@@ -195,10 +241,21 @@
             line-height: 1;
         }
 
-        .stat-card.s-nuevo   .stat-num { color: var(--nuevo); }
-        .stat-card.s-proceso .stat-num { color: var(--proceso); }
-        .stat-card.s-desp    .stat-num { color: var(--despachado); }
-        .stat-card.s-entr    .stat-num { color: var(--entregado); }
+        .stat-card.s-nuevo .stat-num {
+            color: var(--nuevo);
+        }
+
+        .stat-card.s-proceso .stat-num {
+            color: var(--proceso);
+        }
+
+        .stat-card.s-desp .stat-num {
+            color: var(--despachado);
+        }
+
+        .stat-card.s-entr .stat-num {
+            color: var(--entregado);
+        }
 
         .stat-icon {
             position: absolute;
@@ -242,7 +299,7 @@
         }
 
         .tab-btn:hover {
-            border-color: rgba(255,140,0,0.3);
+            border-color: rgba(255, 140, 0, 0.3);
             color: var(--text);
         }
 
@@ -255,7 +312,7 @@
         }
 
         .count-badge {
-            background: rgba(0,0,0,0.18);
+            background: rgba(0, 0, 0, 0.18);
             border-radius: 6px;
             padding: 1px 6px;
             font-size: 0.78rem;
@@ -263,7 +320,7 @@
         }
 
         .tab-btn.active .count-badge {
-            background: rgba(0,0,0,0.22);
+            background: rgba(0, 0, 0, 0.22);
             color: #0a0c12;
         }
 
@@ -283,7 +340,7 @@
         }
 
         .filter-select:hover {
-            border-color: rgba(255,140,0,0.3);
+            border-color: rgba(255, 140, 0, 0.3);
             color: var(--text);
         }
 
@@ -302,20 +359,20 @@
             display: flex;
             align-items: stretch;
             overflow: hidden;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.25);
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
             transition: transform .2s ease, box-shadow .2s ease, border-color .2s;
             animation: slideIn .35s ease both;
         }
 
         .order-card:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 28px rgba(0,0,0,0.4);
-            border-color: rgba(255,140,0,0.2);
+            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
+            border-color: rgba(255, 140, 0, 0.2);
         }
 
         .order-card.active {
             border-color: var(--border-hi);
-            box-shadow: 0 0 0 1px rgba(255,165,50,0.12), 0 8px 24px rgba(0,0,0,0.35);
+            box-shadow: 0 0 0 1px rgba(255, 165, 50, 0.12), 0 8px 24px rgba(0, 0, 0, 0.35);
         }
 
         /* Left accent stripe */
@@ -324,10 +381,21 @@
             flex-shrink: 0;
         }
 
-        .stripe-nuevo      { background: var(--nuevo); }
-        .stripe-proceso    { background: var(--proceso); }
-        .stripe-despachado { background: var(--despachado); }
-        .stripe-entregado  { background: var(--entregado); }
+        .stripe-nuevo {
+            background: var(--nuevo);
+        }
+
+        .stripe-proceso {
+            background: var(--proceso);
+        }
+
+        .stripe-despachado {
+            background: var(--despachado);
+        }
+
+        .stripe-entregado {
+            background: var(--entregado);
+        }
 
         .card-body {
             flex: 1;
@@ -358,7 +426,7 @@
             font-weight: 700;
             color: var(--accent2);
             letter-spacing: 0.05em;
-            background: rgba(255,140,0,0.08);
+            background: rgba(255, 140, 0, 0.08);
             padding: 3px 10px;
             border-radius: 6px;
         }
@@ -375,15 +443,17 @@
         }
 
         .status-dot-sm {
-            width: 6px; height: 6px;
+            width: 6px;
+            height: 6px;
             border-radius: 50%;
             flex-shrink: 0;
         }
 
         .status-nuevo {
-            background: rgba(59,130,246,0.12);
+            background: rgba(59, 130, 246, 0.12);
             color: #60a5fa;
         }
+
         .status-nuevo .status-dot-sm {
             background: var(--nuevo);
             box-shadow: 0 0 6px var(--nuevo);
@@ -391,22 +461,31 @@
         }
 
         .status-proceso {
-            background: rgba(245,158,11,0.12);
+            background: rgba(245, 158, 11, 0.12);
             color: #fbbf24;
         }
-        .status-proceso .status-dot-sm { background: var(--proceso); }
+
+        .status-proceso .status-dot-sm {
+            background: var(--proceso);
+        }
 
         .status-despachado {
-            background: rgba(168,85,247,0.12);
+            background: rgba(168, 85, 247, 0.12);
             color: #c084fc;
         }
-        .status-despachado .status-dot-sm { background: var(--despachado); }
+
+        .status-despachado .status-dot-sm {
+            background: var(--despachado);
+        }
 
         .status-entregado {
-            background: rgba(34,197,94,0.12);
+            background: rgba(34, 197, 94, 0.12);
             color: #4ade80;
         }
-        .status-entregado .status-dot-sm { background: var(--entregado); }
+
+        .status-entregado .status-dot-sm {
+            background: var(--entregado);
+        }
 
         .order-client {
             font-size: 1.1rem;
@@ -467,8 +546,8 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            background: rgba(255,140,0,0.08);
-            border: 1px solid rgba(255,140,0,0.15);
+            background: rgba(255, 140, 0, 0.08);
+            border: 1px solid rgba(255, 140, 0, 0.15);
             color: var(--accent2);
             cursor: pointer;
             transition: all .2s;
@@ -476,7 +555,7 @@
         }
 
         .action-btn:hover {
-            background: rgba(255,140,0,0.18);
+            background: rgba(255, 140, 0, 0.18);
             transform: scale(1.08);
         }
 
@@ -506,15 +585,15 @@
             right: 22px;
             bottom: 22px;
             background: var(--surface);
-            border: 1px solid rgba(255,140,0,0.3);
+            border: 1px solid rgba(255, 140, 0, 0.3);
             border-radius: 16px;
             padding: 16px 18px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,140,0,0.08);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 140, 0, 0.08);
             min-width: 300px;
             z-index: 9999;
             transform: translateY(130px);
             opacity: 0;
-            transition: all .4s cubic-bezier(.34,1.56,.64,1);
+            transition: all .4s cubic-bezier(.34, 1.56, .64, 1);
             display: flex;
             gap: 12px;
             align-items: flex-start;
@@ -552,42 +631,86 @@
 
         /* ── ANIMATIONS ── */
         @keyframes fadeDown {
-            from { opacity: 0; transform: translateY(-14px); }
-            to   { opacity: 1; transform: translateY(0); }
+            from {
+                opacity: 0;
+                transform: translateY(-14px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         @keyframes slideIn {
-            from { opacity: 0; transform: translateX(-16px); }
-            to   { opacity: 1; transform: translateX(0); }
+            from {
+                opacity: 0;
+                transform: translateX(-16px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
         }
 
         @keyframes pulse-green {
-            0%,100% { box-shadow: 0 0 6px #22c55e; }
-            50%      { box-shadow: 0 0 14px #22c55e; }
+
+            0%,
+            100% {
+                box-shadow: 0 0 6px #22c55e;
+            }
+
+            50% {
+                box-shadow: 0 0 14px #22c55e;
+            }
         }
 
         @keyframes pulse-blue {
-            0%,100% { box-shadow: 0 0 4px var(--nuevo); }
-            50%      { box-shadow: 0 0 12px var(--nuevo); }
+
+            0%,
+            100% {
+                box-shadow: 0 0 4px var(--nuevo);
+            }
+
+            50% {
+                box-shadow: 0 0 12px var(--nuevo);
+            }
         }
 
         /* ── RESPONSIVE ── */
         @media (max-width: 900px) {
-            .stats-strip { grid-template-columns: repeat(2,1fr); }
+            .stats-strip {
+                grid-template-columns: repeat(2, 1fr);
+            }
         }
 
         @media (max-width: 640px) {
-            body { padding: 18px 12px 50px; }
+            body {
+                padding: 18px 12px 50px;
+            }
 
-            .header h1 { font-size: 1.7rem; }
+            .header h1 {
+                font-size: 1.7rem;
+            }
 
-            .stats-strip { grid-template-columns: repeat(2,1fr); gap: 8px; }
+            .stats-strip {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 8px;
+            }
 
-            .toolbar { flex-direction: column; align-items: stretch; }
+            .toolbar {
+                flex-direction: column;
+                align-items: stretch;
+            }
 
-            .tabs { width: 100%; }
+            .tabs {
+                width: 100%;
+            }
 
-            .filter-select { width: 100%; }
+            .filter-select {
+                width: 100%;
+            }
 
             .card-body {
                 flex-direction: column;
@@ -599,10 +722,13 @@
                 justify-content: space-between;
             }
 
-            .price { font-size: 1.5rem; }
+            .price {
+                font-size: 1.5rem;
+            }
         }
     </style>
 </head>
+
 <body>
     <div class="container">
 
@@ -623,18 +749,23 @@
         </div>
 
         @php
-            $todos       = $pedidos->count();
-            $nuevos      = $pedidos->where('estado', 'nuevo')->count();
-            $enProceso   = $pedidos->where('estado', 'en_proceso')->count();
+            $todos = $pedidos->count();
+            $nuevos = $pedidos->where('estado', 'nuevo')->count();
+            $enProceso = $pedidos->where('estado', 'en_proceso')->count();
             $despachados = $pedidos->where('estado', 'despachado')->count();
-            $entregados  = $pedidos->where('estado', 'entregado')->count();
+            $entregados = $pedidos->where('estado', 'entregado')->count();
+            $cancelados = $pedidos->where('estado', 'cancelado')->count();
 
-            $tab  = request('estado', 'todos');
+            $tab = request('estado', 'todos');
             $zona = request('zona', 'todas');
 
             $pedidosFiltrados = $pedidos;
-            if ($tab !== 'todos')   { $pedidosFiltrados = $pedidosFiltrados->where('estado', $tab); }
-            if ($zona !== 'todas')  { $pedidosFiltrados = $pedidosFiltrados->where('zona', $zona); }
+            if ($tab !== 'todos') {
+                $pedidosFiltrados = $pedidosFiltrados->where('estado', $tab);
+            }
+            if ($zona !== 'todas') {
+                $pedidosFiltrados = $pedidosFiltrados->where('zona', $zona);
+            }
         @endphp
 
         <!-- STATS STRIP -->
@@ -665,24 +796,28 @@
         <div class="toolbar">
             <div class="tabs">
                 <a href="{{ request()->fullUrlWithQuery(['estado' => 'todos']) }}"
-                   class="tab-btn {{ $tab === 'todos' ? 'active' : '' }}">
+                    class="tab-btn {{ $tab === 'todos' ? 'active' : '' }}">
                     Todos <span class="count-badge">{{ $todos }}</span>
                 </a>
                 <a href="{{ request()->fullUrlWithQuery(['estado' => 'nuevo']) }}"
-                   class="tab-btn {{ $tab === 'nuevo' ? 'active' : '' }}">
+                    class="tab-btn {{ $tab === 'nuevo' ? 'active' : '' }}">
                     🔔 Nuevos <span class="count-badge">{{ $nuevos }}</span>
                 </a>
                 <a href="{{ request()->fullUrlWithQuery(['estado' => 'en_proceso']) }}"
-                   class="tab-btn {{ $tab === 'en_proceso' ? 'active' : '' }}">
+                    class="tab-btn {{ $tab === 'en_proceso' ? 'active' : '' }}">
                     🍳 En proceso <span class="count-badge">{{ $enProceso }}</span>
                 </a>
                 <a href="{{ request()->fullUrlWithQuery(['estado' => 'despachado']) }}"
-                   class="tab-btn {{ $tab === 'despachado' ? 'active' : '' }}">
+                    class="tab-btn {{ $tab === 'despachado' ? 'active' : '' }}">
                     🛵 Despachados <span class="count-badge">{{ $despachados }}</span>
                 </a>
                 <a href="{{ request()->fullUrlWithQuery(['estado' => 'entregado']) }}"
-                   class="tab-btn {{ $tab === 'entregado' ? 'active' : '' }}">
+                    class="tab-btn {{ $tab === 'entregado' ? 'active' : '' }}">
                     ✅ Entregados <span class="count-badge">{{ $entregados }}</span>
+                </a>
+                <a href="{{ request()->fullUrlWithQuery(['estado' => 'cancelado']) }}"
+                    class="tab-btn {{ $tab === 'cancelado' ? 'active' : '' }}">
+                    ❌ Cancelados <span class="count-badge">{{ $cancelados }}</span>
                 </a>
             </div>
 
@@ -690,8 +825,8 @@
                 <input type="hidden" name="estado" value="{{ $tab }}">
                 <select name="zona" class="filter-select" onchange="this.form.submit()">
                     <option value="todas" {{ $zona === 'todas' ? 'selected' : '' }}>📍 Todas las zonas</option>
-                    <option value="norte"  {{ $zona === 'norte'  ? 'selected' : '' }}>⬆️ Zona Norte</option>
-                    <option value="sur"    {{ $zona === 'sur'    ? 'selected' : '' }}>⬇️ Zona Sur</option>
+                    <option value="norte" {{ $zona === 'norte' ? 'selected' : '' }}>⬆️ Zona Norte</option>
+                    <option value="sur" {{ $zona === 'sur' ? 'selected' : '' }}>⬇️ Zona Sur</option>
                     <option value="centro" {{ $zona === 'centro' ? 'selected' : '' }}>🎯 Zona Centro</option>
                 </select>
             </form>
@@ -701,32 +836,37 @@
         <div class="orders-list" id="orders-list">
             @forelse($pedidosFiltrados as $pedido)
                 @php
-                    $stripeClass = match($pedido->estado) {
-                        'nuevo'      => 'stripe-nuevo',
+                    $stripeClass = match ($pedido->estado) {
+                        'nuevo' => 'stripe-nuevo',
                         'en_proceso' => 'stripe-proceso',
                         'despachado' => 'stripe-despachado',
-                        'entregado'  => 'stripe-entregado',
-                        default      => 'stripe-nuevo',
+                        'entregado' => 'stripe-entregado',
+                        'cancelado' => 'stripe-cancelado',
+                        default => 'stripe-nuevo',
                     };
 
-                    $badgeClass = match($pedido->estado) {
-                        'nuevo'      => 'status-nuevo',
+                    $badgeClass = match ($pedido->estado) {
+                        'nuevo' => 'status-nuevo',
                         'en_proceso' => 'status-proceso',
                         'despachado' => 'status-despachado',
-                        'entregado'  => 'status-entregado',
-                        default      => 'status-nuevo',
+                        'entregado' => 'status-entregado',
+                        'cancelado' => 'status-cancelado',
+                        default => 'status-nuevo',
                     };
 
-                    $labelEstado = match($pedido->estado) {
-                        'nuevo'      => 'Nuevo',
+                    $labelEstado = match ($pedido->estado) {
+                        'nuevo' => 'Nuevo',
                         'en_proceso' => 'En Proceso',
                         'despachado' => 'Despachado',
-                        'entregado'  => 'Entregado',
-                        default      => ucfirst(str_replace('_', ' ', $pedido->estado)),
+                        'entregado' => 'Entregado',
+                        'cancelado' => 'Cancelado',
+                        default => ucfirst(str_replace('_', ' ', $pedido->estado)),
                     };
                 @endphp
 
-                <div class="order-card {{ $pedido->estado === 'nuevo' ? 'active' : '' }}" data-id="{{ $pedido->id }}">
+                <div class="order-card {{ $pedido->estado === 'nuevo' ? 'active' : '' }} {{ $pedido->estado === 'cancelado' ? 'opacity-60' : '' }}"
+                    data-id="{{ $pedido->id }}">
+                    data-id="{{ $pedido->id }}">
                     <div class="card-stripe {{ $stripeClass }}"></div>
                     <div class="card-body">
                         <div class="order-left">
@@ -744,7 +884,7 @@
                                 <span class="meta-chip">
                                     🕒 {{ \Carbon\Carbon::parse($pedido->created_at)->format('h:i a') }}
                                 </span>
-                                @if(isset($pedido->zona))
+                                @if (isset($pedido->zona))
                                     <span class="meta-chip">
                                         📍 {{ ucfirst($pedido->zona) }}
                                     </span>
@@ -755,7 +895,8 @@
                         <div class="order-right">
                             <div class="price-block">
                                 <div class="price">${{ number_format($pedido->total, 0, ',', '.') }}</div>
-                                <div class="time">{{ \Carbon\Carbon::parse($pedido->created_at)->diffForHumans() }}</div>
+                                <div class="time">{{ \Carbon\Carbon::parse($pedido->created_at)->diffForHumans() }}
+                                </div>
                             </div>
                             <div class="action-btn" title="Ver detalle">›</div>
                         </div>
@@ -789,15 +930,15 @@
             broadcaster: 'reverb',
             key: 'app-key',
             wsHost: isLocal ? '127.0.0.1' : 'pedidosonline.tecnobyte360.com',
-            wsPort:  isLocal ? 8080 : 443,
+            wsPort: isLocal ? 8080 : 443,
             wssPort: isLocal ? 8080 : 443,
             forceTLS: !isLocal,
             enabledTransports: isLocal ? ['ws'] : ['ws', 'wss'],
             disableStats: true,
         });
 
-        const ordersList   = document.getElementById('orders-list');
-        const toast        = document.getElementById('toast');
+        const ordersList = document.getElementById('orders-list');
+        const toast = document.getElementById('toast');
         const toastMessage = document.getElementById('toast-message');
 
         function formatMoney(value) {
@@ -806,24 +947,44 @@
 
         function formatHour(dateString) {
             return new Date(dateString).toLocaleTimeString('es-CO', {
-                hour: '2-digit', minute: '2-digit', hour12: true
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true
             });
         }
 
         function getStatusLabel(estado) {
-            return { nuevo: 'Nuevo', en_proceso: 'En Proceso', despachado: 'Despachado', entregado: 'Entregado' }[estado] || estado;
+            return {
+                nuevo: 'Nuevo',
+                en_proceso: 'En Proceso',
+                despachado: 'Despachado',
+                entregado: 'Entregado',
+                cancelado: 'Cancelado'
+            } [estado] || estado;
         }
 
         function getBadgeClass(estado) {
-            return { nuevo: 'status-nuevo', en_proceso: 'status-proceso', despachado: 'status-despachado', entregado: 'status-entregado' }[estado] || 'status-nuevo';
+            return {
+                nuevo: 'status-nuevo',
+                en_proceso: 'status-proceso',
+                despachado: 'status-despachado',
+                entregado: 'status-entregado',
+                cancelado: 'status-cancelado'
+            } [estado] || 'status-nuevo';
         }
 
         function getStripeClass(estado) {
-            return { nuevo: 'stripe-nuevo', en_proceso: 'stripe-proceso', despachado: 'stripe-despachado', entregado: 'stripe-entregado' }[estado] || 'stripe-nuevo';
+            return {
+                nuevo: 'stripe-nuevo',
+                en_proceso: 'stripe-proceso',
+                despachado: 'stripe-despachado',
+                entregado: 'stripe-entregado',
+                cancelado: 'stripe-cancelado'
+            } [estado] || 'stripe-nuevo';
         }
 
         function addOrderCard(pedido) {
-            const code       = `PED-${String(pedido.id).padStart(3, '0')}`;
+            const code = `PED-${String(pedido.id).padStart(3, '0')}`;
             const activeClass = pedido.estado === 'nuevo' ? 'active' : '';
 
             const card = document.createElement('div');
@@ -863,6 +1024,48 @@
             ordersList.prepend(card);
         }
 
+        function updateOrderCard(pedido) {
+            const card = document.querySelector(`.order-card[data-id="${pedido.id}"]`);
+
+            if (!card) {
+                addOrderCard(pedido);
+                return;
+            }
+
+            const stripe = card.querySelector('.card-stripe');
+            const badge = card.querySelector('.status-badge');
+            const client = card.querySelector('.order-client');
+            const price = card.querySelector('.price');
+
+            if (stripe) {
+                stripe.className = `card-stripe ${getStripeClass(pedido.estado)}`;
+            }
+
+            if (badge) {
+                badge.className = `status-badge ${getBadgeClass(pedido.estado)}`;
+                badge.innerHTML = `
+            <span class="status-dot-sm"></span>
+            ${getStatusLabel(pedido.estado)}
+        `;
+            }
+
+            if (client) {
+                client.textContent = pedido.cliente_nombre ?? 'Cliente';
+            }
+
+            if (price) {
+                const total = pedido.total_raw ?? pedido.total ?? 0;
+                price.textContent = `$${formatMoney(total)}`;
+            }
+
+            if (pedido.estado === 'cancelado') {
+                card.classList.remove('active');
+                card.style.opacity = '0.6';
+            } else {
+                card.style.opacity = '1';
+            }
+        }
+
         function showToast(message) {
             toastMessage.textContent = message;
             toast.classList.add('show');
@@ -874,8 +1077,18 @@
                 .listen('.pedido.confirmado', (event) => {
                     addOrderCard(event);
                     showToast(`Pedido de ${event.cliente_nombre} agregado.`);
+                })
+                .listen('.pedido.actualizado', (event) => {
+                    updateOrderCard(event);
+
+                    if (event.accion === 'cancelado' || event.estado === 'cancelado') {
+                        showToast(`Pedido #${event.id} cancelado correctamente.`);
+                    } else {
+                        showToast(`Pedido #${event.id} actualizado.`);
+                    }
                 });
         }
     </script>
 </body>
+
 </html>

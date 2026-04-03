@@ -12,6 +12,7 @@ use App\Models\DetallePedido;
 use App\Models\Sede;
 use App\Models\AnsPedido;
 use App\Events\PedidoConfirmado;
+use App\Events\PedidoActualizado;
 
 class WhatsappWebhookController extends Controller
 {
@@ -107,7 +108,6 @@ class WhatsappWebhookController extends Controller
             }
 
             return response()->json(['status' => 'ok', 'message_processed' => true]);
-
         } catch (\Throwable $e) {
             Log::error('❌ ERROR PROCESANDO MENSAJE', [
                 'error' => $e->getMessage(),
@@ -115,7 +115,6 @@ class WhatsappWebhookController extends Controller
             ]);
 
             return response()->json(['status' => 'error', 'message' => 'No se pudo procesar'], 500);
-
         } finally {
             if (!empty($messageId)) {
                 Cache::forget("processing_whatsapp_msg_{$messageId}");
@@ -180,7 +179,6 @@ class WhatsappWebhookController extends Controller
                 'filters'      => $request->only(['pedido_id', 'telefono', 'cliente']),
                 'orders'       => $pedidos->map(fn($p) => $this->formatearPedidoParaApi($p))->values(),
             ]);
-
         } catch (\Throwable $e) {
             Log::error('❌ ERROR SEARCH ORDERS', [
                 'error'   => $e->getMessage(),
@@ -208,7 +206,6 @@ class WhatsappWebhookController extends Controller
                 'status' => 'success',
                 'order'  => $this->formatearPedidoParaApi($pedido)
             ]);
-
         } catch (\Throwable $e) {
             Log::error('❌ ERROR SHOW ORDER', ['error' => $e->getMessage(), 'id' => $id]);
             return response()->json(['status' => 'error', 'message' => 'Error al consultar el pedido.'], 500);
@@ -327,7 +324,6 @@ class WhatsappWebhookController extends Controller
                     'status' => $response->status(),
                     'body'   => $response->body(),
                 ]);
-
             } catch (\Throwable $e) {
                 Log::warning("⚠️ OpenAI excepción intento {$i}", ['error' => $e->getMessage()]);
             }
@@ -352,17 +348,33 @@ class WhatsappWebhookController extends Controller
         $msg = mb_strtolower(trim($message));
 
         $frases = [
-            'estado de mi pedido', 'estado del pedido', 'estado de pedido',
-            'como va mi pedido', 'cómo va mi pedido',
-            'como van mis pedidos', 'cómo van mis pedidos',
-            'mis pedidos', 'mi pedido', 'mi orden', 'mis ordenes', 'mis órdenes',
-            'estado pedido', 'seguimiento pedido',
-            'seguimiento de mi pedido', 'seguimiento de mis pedidos',
-            'ya salió mi pedido', 'ya salio mi pedido',
-            'donde va mi pedido', 'dónde va mi pedido',
-            'consulta de pedido', 'consultar pedido', 'consultar mis pedidos',
-            'quiero saber mi pedido', 'quiero saber mis pedidos',
-            'numero de pedido', 'número de pedido',
+            'estado de mi pedido',
+            'estado del pedido',
+            'estado de pedido',
+            'como va mi pedido',
+            'cómo va mi pedido',
+            'como van mis pedidos',
+            'cómo van mis pedidos',
+            'mis pedidos',
+            'mi pedido',
+            'mi orden',
+            'mis ordenes',
+            'mis órdenes',
+            'estado pedido',
+            'seguimiento pedido',
+            'seguimiento de mi pedido',
+            'seguimiento de mis pedidos',
+            'ya salió mi pedido',
+            'ya salio mi pedido',
+            'donde va mi pedido',
+            'dónde va mi pedido',
+            'consulta de pedido',
+            'consultar pedido',
+            'consultar mis pedidos',
+            'quiero saber mi pedido',
+            'quiero saber mis pedidos',
+            'numero de pedido',
+            'número de pedido',
         ];
 
         foreach ($frases as $frase) {
@@ -433,13 +445,35 @@ class WhatsappWebhookController extends Controller
         $msg = mb_strtolower(trim($message));
 
         $palabras = [
-            'cancelar', 'cancela', 'cancelame', 'cancelar el', 'cancelar mi',
-            'cancelen', 'anular', 'anula', 'ya no lo quiero', 'ya no quiero el pedido',
-            'quitar el pedido', 'eliminar pedido', 'borrar pedido',
-            'adicionar', 'adiciona', 'agregar', 'agrega', 'sumar',
-            'añadir', 'anadir', 'ponerle',
-            'modificar', 'modifica', 'editar', 'edita',
-            'cambiar', 'cambiame', 'cámbiame', 'cambiarle',
+            'cancelar',
+            'cancela',
+            'cancelame',
+            'cancelar el',
+            'cancelar mi',
+            'cancelen',
+            'anular',
+            'anula',
+            'ya no lo quiero',
+            'ya no quiero el pedido',
+            'quitar el pedido',
+            'eliminar pedido',
+            'borrar pedido',
+            'adicionar',
+            'adiciona',
+            'agregar',
+            'agrega',
+            'sumar',
+            'añadir',
+            'anadir',
+            'ponerle',
+            'modificar',
+            'modifica',
+            'editar',
+            'edita',
+            'cambiar',
+            'cambiame',
+            'cámbiame',
+            'cambiarle',
         ];
 
         foreach ($palabras as $p) {
@@ -519,9 +553,17 @@ class WhatsappWebhookController extends Controller
         $msg = mb_strtolower(trim($message));
 
         $cancelar = [
-            'cancelar', 'cancela', 'cancelame', 'cancelen', 'anular', 'anula',
-            'ya no lo quiero', 'ya no quiero el pedido', 'quitar el pedido',
-            'eliminar pedido', 'borrar pedido'
+            'cancelar',
+            'cancela',
+            'cancelame',
+            'cancelen',
+            'anular',
+            'anula',
+            'ya no lo quiero',
+            'ya no quiero el pedido',
+            'quitar el pedido',
+            'eliminar pedido',
+            'borrar pedido'
         ];
 
         foreach ($cancelar as $p) {
@@ -531,9 +573,22 @@ class WhatsappWebhookController extends Controller
         }
 
         $adicionar = [
-            'adicionar', 'adiciona', 'agregar', 'agrega', 'sumar', 'añadir', 'anadir',
-            'ponerle', 'modificar', 'modifica', 'editar', 'edita',
-            'cambiar', 'cambiame', 'cámbiame', 'cambiarle'
+            'adicionar',
+            'adiciona',
+            'agregar',
+            'agrega',
+            'sumar',
+            'añadir',
+            'anadir',
+            'ponerle',
+            'modificar',
+            'modifica',
+            'editar',
+            'edita',
+            'cambiar',
+            'cambiame',
+            'cámbiame',
+            'cambiarle'
         ];
 
         foreach ($adicionar as $p) {
@@ -573,13 +628,17 @@ class WhatsappWebhookController extends Controller
         }
 
         if ($accion === 'cancelar') {
+            $this->guardarAccionPendiente($pedido->telefono_whatsapp ?? $pedido->telefono ?? '', [
+                'accion'   => 'cancelar',
+                'pedido_id' => $pedido->id,
+            ]);
+
             $lineas[] = "✅ Sí es posible cancelar este pedido.";
             $lineas[] = "Responde *CONFIRMAR CANCELACIÓN* para continuar.";
         } else {
             $lineas[] = "✅ Sí es posible adicionar o modificar este pedido.";
             $lineas[] = "Escríbeme qué producto deseas agregar o cambiar en el pedido #{$pedido->id}.";
         }
-
         return implode("\n", $lineas);
     }
 
@@ -622,9 +681,40 @@ class WhatsappWebhookController extends Controller
             return null;
         }
 
-        $accion              = $pendiente['accion'];
-        $pedidoIdsPermitidos = $pendiente['pedido_ids'] ?? [];
+        $accion = $pendiente['accion'];
 
+        // Confirmación directa de cancelación
+        if (
+            $accion === 'cancelar' &&
+            in_array(mb_strtolower(trim($message)), [
+                'confirmar cancelación',
+                'confirmar cancelacion',
+                'si cancelar',
+                'sí cancelar',
+                'confirmo cancelación',
+                'confirmo cancelacion'
+            ])
+        ) {
+            $pedidoId = $pendiente['pedido_id'] ?? null;
+
+            if (!$pedidoId) {
+                $this->limpiarAccionPendiente($from);
+                return "Hola {$name} 😊\nNo encontré el pedido pendiente de cancelación.";
+            }
+
+            $pedido = Pedido::with(['sede', 'detalles'])->find($pedidoId);
+
+            if (!$pedido) {
+                $this->limpiarAccionPendiente($from);
+                return "Hola {$name} 😊\nNo encontré el pedido que ibas a cancelar.";
+            }
+
+            $this->limpiarAccionPendiente($from);
+
+            return $this->cancelarPedidoAutomaticamente($pedido, $name);
+        }
+
+        $pedidoIdsPermitidos = $pendiente['pedido_ids'] ?? [];
         $pedidoId = $this->extraerNumeroPedidoDesdeMensaje($message);
 
         if (!$pedidoId) {
@@ -766,7 +856,6 @@ class WhatsappWebhookController extends Controller
             ]);
 
             return $this->construirMensajeConfirmacionPedido($pedido, $orderData, $name);
-
         } catch (\Throwable $e) {
             DB::rollBack();
             Cache::forget("pedido_confirmado_" . $this->normalizarTelefono($from));
@@ -875,9 +964,25 @@ class WhatsappWebhookController extends Controller
         $msg = mb_strtolower($message);
 
         $keywords = [
-            'pedido', 'domicilio', 'orden', 'estado', 'seguimiento', 'compra', 'comprar',
-            'dirección', 'direccion', 'barrio', 'pago', 'contra entrega',
-            'cancelar', 'anular', 'adicionar', 'agregar', 'modificar', 'editar', 'cambiar',
+            'pedido',
+            'domicilio',
+            'orden',
+            'estado',
+            'seguimiento',
+            'compra',
+            'comprar',
+            'dirección',
+            'direccion',
+            'barrio',
+            'pago',
+            'contra entrega',
+            'cancelar',
+            'anular',
+            'adicionar',
+            'agregar',
+            'modificar',
+            'editar',
+            'cambiar',
         ];
 
         $esConsulta = false;
@@ -1142,7 +1247,6 @@ PROMPT;
             ]);
 
             return false;
-
         } catch (\Throwable $e) {
             Log::error('❌ ERROR ENVIANDO A WHATSAPP', [
                 'error' => $e->getMessage(),
@@ -1212,7 +1316,6 @@ PROMPT;
             ]);
 
             return $token;
-
         } catch (\Throwable $e) {
             Log::error('❌ EXCEPCIÓN LOGIN WHATSAPP', [
                 'error' => $e->getMessage(),
@@ -1263,7 +1366,6 @@ PROMPT;
             Log::info('🔄 Token WhatsApp refrescado correctamente');
 
             return $newToken;
-
         } catch (\Throwable $e) {
             Cache::forget($cacheKey);
 
@@ -1272,6 +1374,34 @@ PROMPT;
             ]);
 
             return null;
+        }
+    }
+
+    private function cancelarPedidoAutomaticamente(Pedido $pedido, string $name): string
+    {
+        try {
+            if ($pedido->estado === 'cancelado') {
+                return "Hola {$name} 😊\nEl pedido #{$pedido->id} ya se encuentra cancelado.";
+            }
+
+            $pedido->estado = 'cancelado';
+            $pedido->save();
+
+            broadcast(new \App\Events\PedidoActualizado($pedido->fresh(['sede', 'detalles']), 'cancelado'));
+
+            Log::info('✅ PEDIDO CANCELADO AUTOMÁTICAMENTE', [
+                'pedido_id' => $pedido->id,
+                'estado'    => $pedido->estado,
+            ]);
+
+            return "Hola {$name} 😊\nTu pedido #{$pedido->id} fue cancelado correctamente ❌";
+        } catch (\Throwable $e) {
+            Log::error('❌ ERROR CANCELANDO PEDIDO', [
+                'pedido_id' => $pedido->id,
+                'error'     => $e->getMessage(),
+            ]);
+
+            return "Hola {$name} 😊\nNo pude cancelar el pedido #{$pedido->id} en este momento.";
         }
     }
 
