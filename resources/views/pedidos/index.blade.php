@@ -9,7 +9,25 @@
 
     @vite(['resources/css/app.css'])
     
+    <!-- ✅ ECHO / REVERB -->
+    <script src="https://cdn.jsdelivr.net/npm/pusher-js@8.4.0-rc2/dist/web/pusher.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/laravel-echo@1.16.1/dist/echo.iife.js"></script>
     
+    <script>
+        window.Pusher = Pusher;
+        window.Echo = new Echo({
+            broadcaster: 'reverb',
+            key: 'app-key',
+            wsHost: '127.0.0.1',
+            wsPort: 8080,
+            wssPort: 8080,
+            forceTLS: false,
+            enabledTransports: ['ws', 'wss'],
+            disableStats: true,
+        });
+        
+        console.log('✅ Echo configurado y listo');
+    </script>
     
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
@@ -863,11 +881,11 @@ $cantidad = rtrim(rtrim(number_format($detalle->cantidad, 2, ',', '.'), '0'), ',
         console.error('❌ Echo NO está disponible');
     } else {
         console.log('✅ Echo disponible');
-
+        
         window.Echo.channel('pedidos')
             .listen('.pedido.confirmado', (event) => {
                 console.log('🎉 Nuevo pedido recibido:', event);
-
+                
                 updateCounters();
                 addPedidoRow(event);
                 showNotification(event);
@@ -879,38 +897,38 @@ $cantidad = rtrim(rtrim(number_format($detalle->cantidad, 2, ',', '.'), '0'), ',
 
     function addPedidoRow(pedido) {
         const tbody = document.getElementById('pedidos-tbody');
-
+        
         if (tbody.querySelector('td[colspan]')) {
             tbody.innerHTML = '';
         }
-
+        
         const estadoConfig = {
-            confirmado: { class: 'confirmado', icon: '●' },
-            pendiente: { class: 'pendiente', icon: '●' },
-            completado: { class: 'completado', icon: '●' },
-            cancelado: { class: 'cancelado', icon: '●' }
+            'confirmado': { class: 'confirmado', icon: '●' },
+            'pendiente':  { class: 'pendiente',  icon: '●' },
+            'completado': { class: 'completado', icon: '●' },
+            'cancelado':  { class: 'cancelado',  icon: '●' }
         };
-
+        
         const estado = estadoConfig[pedido.estado] || { class: 'pendiente', icon: '●' };
-
-        const productosHTML = pedido.detalles.map(d => `
-            <div class="producto-item">
+        
+        const productosHTML = pedido.detalles.map(d => 
+            `<div class="producto-item">
                 <div class="producto-cantidad">${d.cantidad}</div>
                 <div class="producto-info">
                     <span class="producto-unidad">${d.unidad}</span>
                     <span class="producto-nombre">${d.producto}</span>
                 </div>
-            </div>
-        `).join('');
+            </div>`
+        ).join('');
 
         const firstLetter = pedido.cliente_nombre.charAt(0).toUpperCase();
         const resumen = pedido.resumen_conversacion || '';
         const resumenCorto = resumen.length > 120 ? resumen.substring(0, 117) + '...' : resumen;
         const resumenTitle = resumen.replace(/"/g, '&quot;');
-
+        
         const row = document.createElement('tr');
         row.dataset.pedidoId = pedido.id;
-
+        
         row.innerHTML = `
             <td><div class="id-badge">#${pedido.id}</div></td>
             <td>
@@ -955,18 +973,18 @@ $cantidad = rtrim(rtrim(number_format($detalle->cantidad, 2, ',', '.'), '0'), ',
                 <div class="total-cell">$${pedido.total}</div>
             </td>
         `;
-
+        
         tbody.insertBefore(row, tbody.firstChild);
     }
 
     function showNotification(pedido) {
         const toast = document.getElementById('notification-toast');
         const message = document.getElementById('toast-message');
-
+        
         message.textContent = `Pedido #${pedido.id} - ${pedido.cliente_nombre}`;
-
+        
         toast.classList.add('show');
-
+        
         setTimeout(() => {
             closeToast();
         }, 5000);
