@@ -56,10 +56,21 @@ class WhatsappWebhookController extends Controller
             ?? ''
         );
 
+        $connectionId = $data['conexion']['id']
+            ?? $data['connectionId']
+            ?? $data['whatsappId']
+            ?? null;
+
+        $connectionName = $data['conexion']['name']
+            ?? $data['connectionName']
+            ?? null;
+
         Log::info('📥 DATOS NORMALIZADOS', [
             'from' => $from,
             'name' => $name,
             'message' => $message,
+            'connection_id' => $connectionId,
+            'connection_name' => $connectionName,
         ]);
 
         if (!$from || !$message) {
@@ -77,6 +88,7 @@ class WhatsappWebhookController extends Controller
             'from'    => $from,
             'name'    => $name,
             'message' => $message,
+            'connection_id' => $connectionId,
         ]);
 
         $cacheKey = "whatsapp_chat_{$from}";
@@ -144,9 +156,10 @@ class WhatsappWebhookController extends Controller
             Log::info('💬 RESPUESTA GENERADA', [
                 'reply' => $reply,
                 'phone' => $from,
+                'connection_id' => $connectionId,
             ]);
 
-            $this->enviarRespuestaWhatsapp($from, $reply);
+            $this->enviarRespuestaWhatsapp($from, $reply, $connectionId);
 
             return response()->json([
                 'status' => 'ok',
@@ -165,7 +178,7 @@ class WhatsappWebhookController extends Controller
         }
     }
 
-    private function enviarRespuestaWhatsapp(string $from, string $reply): void
+    private function enviarRespuestaWhatsapp(string $from, string $reply, $connectionId = null): void
     {
         try {
             $token = $this->loginWhatsapp();
@@ -179,6 +192,11 @@ class WhatsappWebhookController extends Controller
                 'number' => $from,
                 'body'   => $reply,
             ];
+
+            if ($connectionId) {
+                $payload['whatsappId'] = $connectionId;
+                $payload['connectionId'] = $connectionId;
+            }
 
             Log::info('📤 ENVIANDO RESPUESTA A WHATSAPP', [
                 'url' => 'https://wa-api.tecnobyteapp.com:1422/api/messages/send',
@@ -195,18 +213,21 @@ class WhatsappWebhookController extends Controller
                     'status' => $response->status(),
                     'body' => $response->json(),
                     'phone' => $from,
+                    'connection_id' => $connectionId,
                 ]);
             } else {
                 Log::error('⚠️ WHATSAPP API RESPONDIÓ CON ERROR', [
                     'status' => $response->status(),
                     'body' => $response->body(),
                     'phone' => $from,
+                    'connection_id' => $connectionId,
                 ]);
             }
         } catch (\Throwable $e) {
             Log::error('❌ ERROR ENVIANDO A WHATSAPP', [
                 'error' => $e->getMessage(),
                 'phone' => $from,
+                'connection_id' => $connectionId,
             ]);
         }
     }
