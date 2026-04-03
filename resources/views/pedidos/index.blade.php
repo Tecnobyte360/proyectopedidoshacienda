@@ -7,9 +7,27 @@
 
     <meta name="csrf-token" content="{{ csrf_token() }}" />
 
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @vite(['resources/css/app.css'])
     
-   
+    <!-- ✅ ECHO / REVERB -->
+    <script src="https://cdn.jsdelivr.net/npm/pusher-js@8.4.0-rc2/dist/web/pusher.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/laravel-echo@1.16.1/dist/echo.iife.js"></script>
+    
+    <script>
+        window.Pusher = Pusher;
+        window.Echo = new Echo({
+            broadcaster: 'reverb',
+            key: 'app-key',
+            wsHost: '127.0.0.1',
+            wsPort: 8080,
+            wssPort: 8080,
+            forceTLS: false,
+            enabledTransports: ['ws', 'wss'],
+            disableStats: true,
+        });
+        
+        console.log('✅ Echo configurado y listo');
+    </script>
     
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
