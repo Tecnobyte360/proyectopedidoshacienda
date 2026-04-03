@@ -18,17 +18,6 @@ Route::get('/whatsapp-webhook', function () {
 });
 
 Route::post('/whatsapp-webhook', [WhatsappWebhookController::class, 'receive']);
-
-/*
-|--------------------------------------------------------------------------
-| CONSULTA DE PEDIDOS
-|--------------------------------------------------------------------------
-| Buscar por:
-| - pedido_id
-| - telefono
-| - cliente
-|--------------------------------------------------------------------------
-*/
 Route::get('/whatsapp-webhook/orders/search', [WhatsappWebhookController::class, 'searchOrders']);
 Route::get('/whatsapp-webhook/orders/{id}', [WhatsappWebhookController::class, 'showOrder']);
 

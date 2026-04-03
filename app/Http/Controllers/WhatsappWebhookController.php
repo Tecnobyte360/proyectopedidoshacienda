@@ -99,7 +99,6 @@ class WhatsappWebhookController extends Controller
             ]);
         }
 
-        // Ignorar mensajes propios
         if ($fromMe === true) {
             Log::info('↩️ MENSAJE PROPIO IGNORADO', [
                 'message_id' => $messageId,
@@ -111,7 +110,6 @@ class WhatsappWebhookController extends Controller
             ]);
         }
 
-        // Bloqueo fuerte por mensaje
         if ($messageId) {
             $processingKey = "processing_whatsapp_msg_{$messageId}";
             $alreadyProcessedKey = "processed_whatsapp_msg_{$messageId}";
@@ -149,6 +147,39 @@ class WhatsappWebhookController extends Controller
                 'connection_id' => $connectionId,
             ]);
 
+            /*
+            |--------------------------------------------------------------------------
+            | 1. CONSULTA DIRECTA DE ESTADO DEL PEDIDO
+            |--------------------------------------------------------------------------
+            */
+            if ($this->esConsultaEstadoPedido($message)) {
+                $replyEstado = $this->resolverConsultaEstadoPedido($from, $name);
+
+                Log::info('📦 RESPUESTA AUTOMÁTICA DE ESTADO', [
+                    'phone'         => $from,
+                    'message'       => $message,
+                    'reply'         => $replyEstado,
+                    'connection_id' => $connectionId,
+                ]);
+
+                $this->enviarRespuestaWhatsapp($from, $replyEstado, $connectionId);
+
+                if ($messageId) {
+                    Cache::put("processed_whatsapp_msg_{$messageId}", true, now()->addMinutes(10));
+                }
+
+                return response()->json([
+                    'status'            => 'ok',
+                    'message_processed' => true,
+                    'type'              => 'order_status_response',
+                ]);
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | 2. FLUJO NORMAL CON IA
+            |--------------------------------------------------------------------------
+            */
             $cacheKey = "whatsapp_chat_{$from}";
             $conversationHistory = Cache::get($cacheKey, []);
 
@@ -280,19 +311,13 @@ class WhatsappWebhookController extends Controller
         }
 
         if ($request->filled('telefono')) {
-            $telefono = preg_replace('/\D+/', '', $request->telefono);
-
-            $query->where(function ($q) use ($telefono) {
-                $q->whereRaw("REGEXP_REPLACE(telefono, '[^0-9]', '') LIKE ?", ["%{$telefono}%"]);
-            });
+            $telefono = trim($request->telefono);
+            $query->where('telefono', 'LIKE', "%{$telefono}%");
         }
 
         if ($request->filled('cliente')) {
             $cliente = trim($request->cliente);
-
-            $query->where(function ($q) use ($cliente) {
-                $q->where('cliente_nombre', 'LIKE', "%{$cliente}%");
-            });
+            $query->where('cliente_nombre', 'LIKE', "%{$cliente}%");
         }
 
         $pedidos = $query
@@ -392,6 +417,99 @@ class WhatsappWebhookController extends Controller
                 })->values(),
             ],
         ]);
+    }
+
+    private function esConsultaEstadoPedido(string $message): bool
+    {
+        $message = mb_strtolower(trim($message));
+
+        $frases = [
+            'estado de mi pedido',
+            'estado del pedido',
+            'como va mi pedido',
+            'cómo va mi pedido',
+            'mi pedido',
+            'mi orden',
+            'estado pedido',
+            'seguimiento pedido',
+            'seguimiento de mi pedido',
+            'ya salió mi pedido',
+            'ya salio mi pedido',
+            'donde va mi pedido',
+            'dónde va mi pedido',
+            'consulta de pedido',
+            'consultar pedido',
+            'quiero saber mi pedido',
+            'numero de pedido',
+            'número de pedido',
+        ];
+
+        foreach ($frases as $frase) {
+            if (str_contains($message, $frase)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function resolverConsultaEstadoPedido(string $from, string $name = 'Cliente'): string
+    {
+        $telefonoNormalizado = $this->normalizarTelefono($from);
+
+        $pedido = Pedido::with(['sede', 'detalles'])
+            ->get()
+            ->first(function ($pedido) use ($telefonoNormalizado) {
+                return $this->normalizarTelefono($pedido->telefono) === $telefonoNormalizado;
+            });
+
+        if (!$pedido) {
+            $pedido = Pedido::with(['sede', 'detalles'])
+                ->orderByDesc('fecha_pedido')
+                ->orderByDesc('id')
+                ->get()
+                ->first(function ($pedido) use ($telefonoNormalizado) {
+                    return str_contains($this->normalizarTelefono($pedido->telefono), $telefonoNormalizado)
+                        || str_contains($telefonoNormalizado, $this->normalizarTelefono($pedido->telefono));
+                });
+        }
+
+        if (!$pedido) {
+            return "Hola {$name} 😊\nNo encontré pedidos registrados con este número.\nSi deseas, puedo ayudarte a realizar un nuevo pedido.";
+        }
+
+        $estadoBonito = $this->traducirEstadoPedido($pedido->estado);
+
+        $mensaje = [];
+        $mensaje[] = "Hola {$name} 😊";
+        $mensaje[] = "Tu pedido #{$pedido->id} está actualmente en: *{$estadoBonito}*";
+        $mensaje[] = "📅 Fecha: " . optional($pedido->fecha_pedido)?->format('d/m/Y H:i');
+        $mensaje[] = "📍 Sede: " . ($pedido->sede->nombre ?? 'No especificada');
+
+        if (!empty($pedido->hora_entrega)) {
+            $mensaje[] = "🕒 Hora estimada: {$pedido->hora_entrega}";
+        }
+
+        $mensaje[] = "¿Deseas que también te comparta el detalle del pedido?";
+
+        return implode("\n", $mensaje);
+    }
+
+    private function traducirEstadoPedido(?string $estado): string
+    {
+        return match ($estado) {
+            'confirmado'      => 'Confirmado ✅',
+            'en_preparacion'  => 'En preparación 👨‍🍳',
+            'listo'           => 'Listo para entrega 🚚',
+            'entregado'       => 'Entregado 📦',
+            'cancelado'       => 'Cancelado ❌',
+            default           => ucfirst((string) $estado),
+        };
+    }
+
+    private function normalizarTelefono(?string $telefono): string
+    {
+        return preg_replace('/\D+/', '', (string) $telefono);
     }
 
     private function enviarRespuestaWhatsapp(string $from, string $reply, $connectionId = null): void
@@ -650,11 +768,20 @@ PROMPT;
             return '';
         }
 
-        $pedidos = Pedido::where('telefono', $from)
-            ->with(['sede', 'detalles'])
-            ->orderBy('fecha_pedido', 'desc')
-            ->limit(3)
-            ->get();
+        $telefonoNormalizado = $this->normalizarTelefono($from);
+
+        $pedidos = Pedido::with(['sede', 'detalles'])
+            ->orderByDesc('fecha_pedido')
+            ->orderByDesc('id')
+            ->get()
+            ->filter(function ($pedido) use ($telefonoNormalizado) {
+                $pedidoTelefono = $this->normalizarTelefono($pedido->telefono);
+
+                return $pedidoTelefono === $telefonoNormalizado
+                    || str_contains($pedidoTelefono, $telefonoNormalizado)
+                    || str_contains($telefonoNormalizado, $pedidoTelefono);
+            })
+            ->take(3);
 
         if ($pedidos->isEmpty()) {
             return "ℹ️ No se encontraron pedidos recientes para este número.\n";
