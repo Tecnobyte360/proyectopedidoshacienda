@@ -15,6 +15,12 @@ use App\Events\PedidoConfirmado;
 
 class WhatsappWebhookController extends Controller
 {
+    /*
+    |==========================================================================
+    | ENDPOINTS PÚBLICOS
+    |==========================================================================
+    */
+
     public function receive(Request $request)
     {
         $rawBody = $request->getContent();
@@ -34,283 +40,54 @@ class WhatsappWebhookController extends Controller
 
         if (empty($data)) {
             Log::warning('⚠️ Webhook vacío');
-
-            return response()->json([
-                'status'  => 'error',
-                'message' => 'Payload vacío',
-            ], 400);
+            return response()->json(['status' => 'error', 'message' => 'Payload vacío'], 400);
         }
 
-        $from = $data['chat']['phone']
-            ?? $data['from']
-            ?? $data['phoneNumber']
-            ?? null;
-
-        $name = $data['chat']['name']
-            ?? $data['name']
-            ?? 'Cliente';
-
+        // ── Normalización de campos ──────────────────────────────────────────
+        $from    = $data['chat']['phone'] ?? $data['from'] ?? $data['phoneNumber'] ?? null;
+        $name    = $data['chat']['name']  ?? $data['name'] ?? 'Cliente';
         $message = trim(
-            $data['mensaje']['body']
-                ?? $data['body']
-                ?? $data['message']
-                ?? $data['text']
-                ?? ''
+            $data['mensaje']['body'] ?? $data['body'] ?? $data['message'] ?? $data['text'] ?? ''
         );
+        $messageId      = $data['mensaje']['id']    ?? $data['message']['id'] ?? $data['id'] ?? null;
+        $fromMe         = (bool) ($data['mensaje']['fromMe'] ?? $data['fromMe'] ?? false);
+        $connectionId   = $data['conexion']['id']   ?? $data['connectionId']   ?? $data['whatsappId']   ?? null;
 
-        $messageId = $data['mensaje']['id']
-            ?? $data['message']['id']
-            ?? $data['id']
-            ?? null;
+        Log::info('📥 DATOS NORMALIZADOS', compact('from', 'name', 'message', 'messageId', 'fromMe', 'connectionId'));
 
-        $fromMe = (bool) (
-            $data['mensaje']['fromMe']
-            ?? $data['fromMe']
-            ?? false
-        );
-
-        $connectionId = $data['conexion']['id']
-            ?? $data['connectionId']
-            ?? $data['whatsappId']
-            ?? null;
-
-        $connectionName = $data['conexion']['name']
-            ?? $data['connectionName']
-            ?? null;
-
-        Log::info('📥 DATOS NORMALIZADOS', [
-            'from'            => $from,
-            'name'            => $name,
-            'message'         => $message,
-            'message_id'      => $messageId,
-            'from_me'         => $fromMe,
-            'connection_id'   => $connectionId,
-            'connection_name' => $connectionName,
-        ]);
-
+        // ── Guardas tempranas ────────────────────────────────────────────────
         if (!$from || !$message) {
-            Log::warning('⚠️ Mensaje ignorado por falta de datos', [
-                'from'    => $from,
-                'name'    => $name,
-                'message' => $message,
-                'payload' => $data,
-            ]);
-
-            return response()->json([
-                'status' => 'ignored'
-            ]);
+            Log::warning('⚠️ Mensaje ignorado: faltan datos', compact('from', 'message'));
+            return response()->json(['status' => 'ignored']);
         }
 
-        if ($fromMe === true) {
-            Log::info('↩️ MENSAJE PROPIO IGNORADO', [
-                'message_id' => $messageId,
-                'from'       => $from,
-            ]);
-
-            return response()->json([
-                'status' => 'self_message_ignored'
-            ]);
+        if ($fromMe) {
+            Log::info('↩️ Mensaje propio ignorado', ['message_id' => $messageId, 'from' => $from]);
+            return response()->json(['status' => 'self_message_ignored']);
         }
 
+        // ── Deduplicación ────────────────────────────────────────────────────
         if ($messageId) {
-            $processingKey = "processing_whatsapp_msg_{$messageId}";
             $alreadyProcessedKey = "processed_whatsapp_msg_{$messageId}";
+            $processingKey       = "processing_whatsapp_msg_{$messageId}";
 
             if (Cache::has($alreadyProcessedKey)) {
-                Log::warning('⚠️ MENSAJE DUPLICADO IGNORADO (YA PROCESADO)', [
-                    'message_id' => $messageId,
-                    'from'       => $from,
-                    'message'    => $message,
-                ]);
-
-                return response()->json([
-                    'status' => 'duplicate_ignored'
-                ]);
+                Log::warning('⚠️ Mensaje duplicado ignorado (ya procesado)', compact('messageId', 'from'));
+                return response()->json(['status' => 'duplicate_ignored']);
             }
 
             if (!Cache::add($processingKey, true, now()->addSeconds(30))) {
-                Log::warning('⚠️ MENSAJE DUPLICADO IGNORADO (EN PROCESO)', [
-                    'message_id' => $messageId,
-                    'from'       => $from,
-                ]);
-
-                return response()->json([
-                    'status' => 'duplicate_in_progress'
-                ]);
+                Log::warning('⚠️ Mensaje duplicado ignorado (en proceso)', compact('messageId', 'from'));
+                return response()->json(['status' => 'duplicate_in_progress']);
             }
         }
 
         try {
-            Log::info('✅ MENSAJE CLIENTE', [
-                'from'          => $from,
-                'name'          => $name,
-                'message'       => $message,
-                'message_id'    => $messageId,
-                'connection_id' => $connectionId,
-            ]);
+            Log::info('✅ MENSAJE CLIENTE', compact('from', 'name', 'message', 'messageId', 'connectionId'));
 
-            /*
-            |--------------------------------------------------------------------------
-            | 0. CONTEXTO DE ACCIÓN PENDIENTE
-            |--------------------------------------------------------------------------
-            */
-            if ($this->tieneAccionPendiente($from)) {
-                $replyPendiente = $this->resolverAccionPendiente($from, $name, $message);
+            $reply = $this->procesarMensaje($from, $name, $message, $connectionId);
 
-                if ($replyPendiente) {
-                    Log::info('🧠 RESPUESTA POR ACCIÓN PENDIENTE', [
-                        'phone'         => $from,
-                        'message'       => $message,
-                        'reply'         => $replyPendiente,
-                        'connection_id' => $connectionId,
-                    ]);
-
-                    $this->enviarRespuestaWhatsapp($from, $replyPendiente, $connectionId);
-
-                    if ($messageId) {
-                        Cache::put("processed_whatsapp_msg_{$messageId}", true, now()->addMinutes(10));
-                    }
-
-                    return response()->json([
-                        'status'            => 'ok',
-                        'message_processed' => true,
-                        'type'              => 'pending_action_response',
-                    ]);
-                }
-            }
-
-            /*
-            |--------------------------------------------------------------------------
-            | 1. VALIDACIÓN DE CANCELACIÓN / ADICIÓN / MODIFICACIÓN
-            |--------------------------------------------------------------------------
-            */
-            if ($this->esSolicitudModificarPedido($message)) {
-                $replyModificacion = $this->resolverSolicitudModificacionPedido($from, $name, $message);
-
-                Log::info('🛠️ RESPUESTA AUTOMÁTICA MODIFICACIÓN PEDIDO', [
-                    'phone'         => $from,
-                    'message'       => $message,
-                    'reply'         => $replyModificacion,
-                    'connection_id' => $connectionId,
-                ]);
-
-                $this->enviarRespuestaWhatsapp($from, $replyModificacion, $connectionId);
-
-                if ($messageId) {
-                    Cache::put("processed_whatsapp_msg_{$messageId}", true, now()->addMinutes(10));
-                }
-
-                return response()->json([
-                    'status'            => 'ok',
-                    'message_processed' => true,
-                    'type'              => 'order_modification_validation',
-                ]);
-            }
-
-            /*
-            |--------------------------------------------------------------------------
-            | 2. CONSULTA DIRECTA DE ESTADO DEL PEDIDO
-            |--------------------------------------------------------------------------
-            */
-            if ($this->esConsultaEstadoPedido($message)) {
-                $replyEstado = $this->resolverConsultaEstadoPedido($from, $name, $message);
-
-                Log::info('📦 RESPUESTA AUTOMÁTICA DE ESTADO', [
-                    'phone'         => $from,
-                    'message'       => $message,
-                    'reply'         => $replyEstado,
-                    'connection_id' => $connectionId,
-                ]);
-
-                $this->enviarRespuestaWhatsapp($from, $replyEstado, $connectionId);
-
-                if ($messageId) {
-                    Cache::put("processed_whatsapp_msg_{$messageId}", true, now()->addMinutes(10));
-                }
-
-                return response()->json([
-                    'status'            => 'ok',
-                    'message_processed' => true,
-                    'type'              => 'order_status_response',
-                ]);
-            }
-
-            /*
-            |--------------------------------------------------------------------------
-            | 3. FLUJO NORMAL CON IA
-            |--------------------------------------------------------------------------
-            */
-            $cacheKey = "whatsapp_chat_{$from}";
-            $conversationHistory = Cache::get($cacheKey, []);
-
-            $conversationHistory[] = [
-                'role'    => 'user',
-                'content' => $message,
-            ];
-
-            if (count($conversationHistory) > 20) {
-                $conversationHistory = array_slice($conversationHistory, -20);
-            }
-
-            $pedidosInfo = $this->buscarPedidosCliente($from, $message);
-            $ansInfo = $this->construirResumenAns();
-
-            $systemPrompt = $this->getSystemPromptForAIEmpresa(
-                $pedidosInfo,
-                $this->infoEmpresa(),
-                $name,
-                $ansInfo
-            );
-
-            $messages = [
-                ['role' => 'system', 'content' => $systemPrompt]
-            ];
-
-            foreach ($conversationHistory as $msg) {
-                $messages[] = $msg;
-            }
-
-            $responseIA = Http::withToken(env('OPENAI_API_KEY'))
-                ->timeout(35)
-                ->post('https://api.openai.com/v1/chat/completions', [
-                    'model'       => 'gpt-4o-mini',
-                    'messages'    => $messages,
-                    'temperature' => 0.4,
-                    'max_tokens'  => 500,
-                ]);
-
-            if ($responseIA->failed()) {
-                throw new \Exception(
-                    'OpenAI error: ' . $responseIA->status() . ' ' . $responseIA->body()
-                );
-            }
-
-            $reply = $responseIA->json('choices.0.message.content')
-                ?? 'En este momento no logré procesar tu mensaje. ¿Me lo repites con un poquito más de detalle?';
-
-            $conversationHistory[] = [
-                'role'    => 'assistant',
-                'content' => $reply
-            ];
-
-            if (str_contains($reply, '[PEDIDO_CONFIRMADO]')) {
-                $reply = $this->guardarPedidoDesdeRespuestaIA(
-                    $reply,
-                    $from,
-                    $name,
-                    $conversationHistory,
-                    $cacheKey
-                );
-            } else {
-                Cache::put($cacheKey, $conversationHistory, now()->addMinutes(45));
-            }
-
-            Log::info('💬 RESPUESTA GENERADA', [
-                'reply'         => $reply,
-                'phone'         => $from,
-                'message_id'    => $messageId,
-                'connection_id' => $connectionId,
-            ]);
+            Log::info('💬 RESPUESTA GENERADA', compact('reply', 'from', 'messageId', 'connectionId'));
 
             $this->enviarRespuestaWhatsapp($from, $reply, $connectionId);
 
@@ -318,20 +95,16 @@ class WhatsappWebhookController extends Controller
                 Cache::put("processed_whatsapp_msg_{$messageId}", true, now()->addMinutes(10));
             }
 
-            return response()->json([
-                'status'            => 'ok',
-                'message_processed' => true,
-            ]);
+            return response()->json(['status' => 'ok', 'message_processed' => true]);
+
         } catch (\Throwable $e) {
-            Log::error('❌ ERROR IA o HTTP', [
+            Log::error('❌ ERROR PROCESANDO MENSAJE', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
 
-            return response()->json([
-                'status'  => 'error',
-                'message' => 'No se pudo procesar',
-            ], 500);
+            return response()->json(['status' => 'error', 'message' => 'No se pudo procesar'], 500);
+
         } finally {
             if (!empty($messageId)) {
                 Cache::forget("processing_whatsapp_msg_{$messageId}");
@@ -348,24 +121,12 @@ class WhatsappWebhookController extends Controller
                 'cliente'   => 'nullable|string|max:255',
             ]);
 
-            if (
-                !$request->filled('pedido_id') &&
-                !$request->filled('telefono') &&
-                !$request->filled('cliente')
-            ) {
+            if (!$request->filled('pedido_id') && !$request->filled('telefono') && !$request->filled('cliente')) {
                 return response()->json([
                     'status'  => 'error',
-                    'message' => 'Debes enviar al menos uno de estos filtros: pedido_id, telefono o cliente.',
+                    'message' => 'Debes enviar al menos uno de: pedido_id, telefono o cliente.',
                 ], 422);
             }
-
-            $formatearCantidad = function (float $cantidad): string {
-                if (fmod($cantidad, 1.0) == 0.0) {
-                    return number_format($cantidad, 0, ',', '.');
-                }
-
-                return number_format($cantidad, 2, ',', '.');
-            };
 
             $query = Pedido::with(['sede', 'detalles']);
 
@@ -374,175 +135,227 @@ class WhatsappWebhookController extends Controller
             }
 
             if ($request->filled('telefono')) {
-                $telefono = trim($request->telefono);
-                $query->where('telefono', 'LIKE', "%{$telefono}%");
+                $tel = preg_replace('/\D+/', '', trim($request->telefono));
+                $telLocal = strlen($tel) > 10 ? substr($tel, -10) : $tel;
+                $query->where('telefono', 'LIKE', "%{$telLocal}%");
             }
 
             if ($request->filled('cliente')) {
-                $cliente = trim($request->cliente);
-                $query->where('cliente_nombre', 'LIKE', "%{$cliente}%");
+                $query->where('cliente_nombre', 'LIKE', '%' . trim($request->cliente) . '%');
             }
 
-            $pedidos = $query
-                ->orderByDesc('fecha_pedido')
-                ->orderByDesc('id')
-                ->get();
+            $pedidos = $query->orderByDesc('fecha_pedido')->orderByDesc('id')->get();
 
             if ($pedidos->isEmpty()) {
                 return response()->json([
                     'status'  => 'not_found',
                     'message' => 'No se encontraron pedidos con los filtros enviados.',
-                    'filters' => [
-                        'pedido_id' => $request->pedido_id,
-                        'telefono'  => $request->telefono,
-                        'cliente'   => $request->cliente,
-                    ],
+                    'filters' => $request->only(['pedido_id', 'telefono', 'cliente']),
                 ], 404);
             }
 
             return response()->json([
                 'status'       => 'success',
                 'total_orders' => $pedidos->count(),
-                'filters'      => [
-                    'pedido_id' => $request->pedido_id,
-                    'telefono'  => $request->telefono,
-                    'cliente'   => $request->cliente,
-                ],
-                'orders'       => $pedidos->map(function ($pedido) use ($formatearCantidad) {
-                    return [
-                        'id'                   => $pedido->id,
-                        'fecha'                => optional($pedido->fecha_pedido)?->format('d/m/Y H:i'),
-                        'estado'               => $pedido->estado,
-                        'hora_entrega'         => $pedido->hora_entrega ?? 'Por confirmar',
-                        'sede'                 => $pedido->sede->nombre ?? 'No especificada',
-                        'cliente'              => $pedido->cliente_nombre,
-                        'telefono'             => $pedido->telefono,
-                        'total'                => $pedido->total,
-                        'total_formateado'     => number_format($pedido->total, 0, ',', '.'),
-                        'notas'                => $pedido->notas,
-                        'resumen_conversacion' => $pedido->resumen_conversacion,
-                        'productos'            => $pedido->detalles->map(function ($detalle) use ($formatearCantidad) {
-                            return [
-                                'producto'        => $detalle->producto,
-                                'cantidad'        => $formatearCantidad((float) $detalle->cantidad),
-                                'unidad'          => $detalle->unidad,
-                                'precio_unitario' => $detalle->precio_unitario,
-                                'subtotal'        => $detalle->subtotal,
-                            ];
-                        })->values(),
-                    ];
-                })->values(),
-            ]);
-        } catch (\Throwable $e) {
-            Log::error('❌ ERROR SEARCH ORDERS', [
-                'error'   => $e->getMessage(),
-                'request' => $request->all(),
+                'filters'      => $request->only(['pedido_id', 'telefono', 'cliente']),
+                'orders'       => $pedidos->map(fn($p) => $this->formatearPedidoParaApi($p))->values(),
             ]);
 
-            return response()->json([
-                'status'  => 'error',
-                'message' => 'Error al consultar pedidos.',
-            ], 500);
+        } catch (\Throwable $e) {
+            Log::error('❌ ERROR SEARCH ORDERS', ['error' => $e->getMessage(), 'request' => $request->all()]);
+            return response()->json(['status' => 'error', 'message' => 'Error al consultar pedidos.'], 500);
         }
     }
 
     public function showOrder($id)
     {
         try {
-            $formatearCantidad = function (float $cantidad): string {
-                if (fmod($cantidad, 1.0) == 0.0) {
-                    return number_format($cantidad, 0, ',', '.');
-                }
-
-                return number_format($cantidad, 2, ',', '.');
-            };
-
             $pedido = Pedido::with(['sede', 'detalles'])->find($id);
 
             if (!$pedido) {
-                return response()->json([
-                    'status'  => 'not_found',
-                    'message' => 'Pedido no encontrado.',
-                    'id'      => $id,
-                ], 404);
+                return response()->json(['status' => 'not_found', 'message' => 'Pedido no encontrado.', 'id' => $id], 404);
             }
 
-            return response()->json([
-                'status' => 'success',
-                'order'  => [
-                    'id'                   => $pedido->id,
-                    'fecha'                => optional($pedido->fecha_pedido)?->format('d/m/Y H:i'),
-                    'estado'               => $pedido->estado,
-                    'hora_entrega'         => $pedido->hora_entrega ?? 'Por confirmar',
-                    'sede'                 => $pedido->sede->nombre ?? 'No especificada',
-                    'cliente'              => $pedido->cliente_nombre,
-                    'telefono'             => $pedido->telefono,
-                    'total'                => $pedido->total,
-                    'total_formateado'     => number_format($pedido->total, 0, ',', '.'),
-                    'notas'                => $pedido->notas,
-                    'resumen_conversacion' => $pedido->resumen_conversacion,
-                    'productos'            => $pedido->detalles->map(function ($detalle) use ($formatearCantidad) {
-                        return [
-                            'producto'        => $detalle->producto,
-                            'cantidad'        => $formatearCantidad((float) $detalle->cantidad),
-                            'unidad'          => $detalle->unidad,
-                            'precio_unitario' => $detalle->precio_unitario,
-                            'subtotal'        => $detalle->subtotal,
-                        ];
-                    })->values(),
-                ],
-            ]);
-        } catch (\Throwable $e) {
-            Log::error('❌ ERROR SHOW ORDER', [
-                'error' => $e->getMessage(),
-                'id'    => $id,
-            ]);
+            return response()->json(['status' => 'success', 'order' => $this->formatearPedidoParaApi($pedido)]);
 
-            return response()->json([
-                'status'  => 'error',
-                'message' => 'Error al consultar el pedido.',
-            ], 500);
+        } catch (\Throwable $e) {
+            Log::error('❌ ERROR SHOW ORDER', ['error' => $e->getMessage(), 'id' => $id]);
+            return response()->json(['status' => 'error', 'message' => 'Error al consultar el pedido.'], 500);
         }
     }
 
+    /*
+    |==========================================================================
+    | FLUJO PRINCIPAL DE PROCESAMIENTO
+    |==========================================================================
+    */
+
+    /**
+     * Orquesta las capas de procesamiento: reglas → IA.
+     * Retorna siempre un string listo para enviar al cliente.
+     */
+    private function procesarMensaje(string $from, string $name, string $message, ?string $connectionId): string
+    {
+        // ── Capa 1: Acción pendiente (respuesta multi-turno de reglas) ───────
+        if ($this->tieneAccionPendiente($from)) {
+            $reply = $this->resolverAccionPendiente($from, $name, $message);
+            if ($reply) {
+                Log::info('🧠 CAPA 1: Respuesta por acción pendiente', compact('from', 'message', 'reply'));
+                return $reply;
+            }
+        }
+
+        // ── Capa 2a: Cancelar / Adicionar / Modificar pedido ────────────────
+        if ($this->esSolicitudModificarPedido($message)) {
+            $reply = $this->resolverSolicitudModificacionPedido($from, $name, $message);
+            Log::info('🛠️ CAPA 2a: Modificación de pedido', compact('from', 'message', 'reply'));
+            return $reply;
+        }
+
+        // ── Capa 2b: Consulta de estado ──────────────────────────────────────
+        if ($this->esConsultaEstadoPedido($message)) {
+            $reply = $this->resolverConsultaEstadoPedido($from, $name, $message);
+            Log::info('📦 CAPA 2b: Consulta de estado', compact('from', 'message', 'reply'));
+            return $reply;
+        }
+
+        // ── Capa 3: Motor IA ─────────────────────────────────────────────────
+        return $this->procesarConIA($from, $name, $message);
+    }
+
+    /**
+     * Flujo completo de IA con Function Calling.
+     * Maneja historial, system prompt enriquecido y confirmación de pedido.
+     */
+    private function procesarConIA(string $from, string $name, string $message): string
+    {
+        $cacheKey = "whatsapp_chat_{$from}";
+        $conversationHistory = Cache::get($cacheKey, []);
+
+        $conversationHistory[] = ['role' => 'user', 'content' => $message];
+
+        // Ventana deslizante de 20 mensajes
+        if (count($conversationHistory) > 20) {
+            $conversationHistory = array_slice($conversationHistory, -20);
+        }
+
+        // Enriquecer system prompt con contexto real de la DB
+        $pedidosInfo = $this->buscarPedidosClienteSQL($from, $message);
+        $ansInfo     = $this->construirResumenAns();
+        $systemPrompt = $this->getSystemPrompt($pedidosInfo, $this->infoEmpresa(), $name, $ansInfo);
+
+        $messages = array_merge(
+            [['role' => 'system', 'content' => $systemPrompt]],
+            $conversationHistory
+        );
+
+        // ── Llamada a OpenAI con Function Calling ────────────────────────────
+        $response = $this->llamarOpenAI($messages);
+
+        if (!$response) {
+            Cache::put($cacheKey, $conversationHistory, now()->addMinutes(45));
+            return 'En este momento no logré procesar tu mensaje. ¿Me lo repites con un poquito más de detalle?';
+        }
+
+        $toolCalls   = $response['choices'][0]['message']['tool_calls'] ?? null;
+        $textContent = $response['choices'][0]['message']['content']    ?? null;
+
+        // ── Rama A: El modelo quiso confirmar el pedido ──────────────────────
+        if ($toolCalls && ($toolCalls[0]['function']['name'] ?? '') === 'confirmar_pedido') {
+            $rawArgs  = $toolCalls[0]['function']['arguments'] ?? '{}';
+            $orderData = json_decode($rawArgs, true);
+
+            if (json_last_error() !== JSON_ERROR_NONE || empty($orderData['products'])) {
+                Log::error('❌ JSON inválido en tool_call', ['raw' => $rawArgs]);
+                Cache::put($cacheKey, $conversationHistory, now()->addMinutes(45));
+                return '⚠️ Hubo un problema al registrar tu pedido. Por favor, confírmame los datos de nuevo.';
+            }
+
+            Log::info('🎯 CAPA 3: Function call confirmar_pedido', compact('from', 'orderData'));
+
+            return $this->guardarPedidoDesdeToolCall($orderData, $from, $name, $conversationHistory, $cacheKey);
+        }
+
+        // ── Rama B: Respuesta conversacional normal ──────────────────────────
+        $reply = $textContent
+            ?? 'En este momento no logré procesar tu mensaje. ¿Me lo repites con un poquito más de detalle?';
+
+        $conversationHistory[] = ['role' => 'assistant', 'content' => $reply];
+        Cache::put($cacheKey, $conversationHistory, now()->addMinutes(45));
+
+        Log::info('💬 CAPA 3: Respuesta conversacional IA', compact('from', 'reply'));
+
+        return $reply;
+    }
+
+    /**
+     * Llama a OpenAI con reintentos. Centraliza headers, tools y manejo de errores.
+     */
+    private function llamarOpenAI(array $messages): ?array
+    {
+        $intentos = 2;
+
+        for ($i = 1; $i <= $intentos; $i++) {
+            try {
+                $response = Http::withToken(env('OPENAI_API_KEY'))
+                    ->timeout(35)
+                    ->post('https://api.openai.com/v1/chat/completions', [
+                        'model'       => 'gpt-4o-mini',
+                        'messages'    => $messages,
+                        'temperature' => 0.4,
+                        'max_tokens'  => 600,
+                        'tools'       => $this->getToolsDefinicion(),
+                        'tool_choice' => 'auto',
+                    ]);
+
+                if ($response->successful()) {
+                    return $response->json();
+                }
+
+                Log::warning("⚠️ OpenAI intento {$i} falló", [
+                    'status' => $response->status(),
+                    'body'   => $response->body(),
+                ]);
+
+            } catch (\Throwable $e) {
+                Log::warning("⚠️ OpenAI excepción intento {$i}", ['error' => $e->getMessage()]);
+            }
+
+            if ($i < $intentos) {
+                sleep(1);
+            }
+        }
+
+        Log::error('❌ OpenAI falló todos los intentos');
+        return null;
+    }
+
+    /*
+    |==========================================================================
+    | CAPA 2 — REGLAS DETERMINISTAS (sin consumo de tokens)
+    |==========================================================================
+    */
+
     private function esConsultaEstadoPedido(string $message): bool
     {
-        $message = mb_strtolower(trim($message));
+        $msg = mb_strtolower(trim($message));
 
         $frases = [
-            'estado de mi pedido',
-            'estado del pedido',
-            'estado de pedido',
-            'como va mi pedido',
-            'cómo va mi pedido',
-            'como van mis pedidos',
-            'cómo van mis pedidos',
-            'mis pedidos',
-            'mi pedido',
-            'mi orden',
-            'mis ordenes',
-            'mis órdenes',
-            'estado pedido',
-            'seguimiento pedido',
-            'seguimiento de mi pedido',
-            'seguimiento de mis pedidos',
-            'ya salió mi pedido',
-            'ya salio mi pedido',
-            'donde va mi pedido',
-            'dónde va mi pedido',
-            'consulta de pedido',
-            'consultar pedido',
-            'consultar mis pedidos',
-            'quiero saber mi pedido',
-            'quiero saber mis pedidos',
-            'numero de pedido',
-            'número de pedido',
+            'estado de mi pedido', 'estado del pedido', 'estado de pedido',
+            'como va mi pedido', 'cómo va mi pedido',
+            'como van mis pedidos', 'cómo van mis pedidos',
+            'mis pedidos', 'mi pedido', 'mi orden', 'mis ordenes', 'mis órdenes',
+            'estado pedido', 'seguimiento pedido',
+            'seguimiento de mi pedido', 'seguimiento de mis pedidos',
+            'ya salió mi pedido', 'ya salio mi pedido',
+            'donde va mi pedido', 'dónde va mi pedido',
+            'consulta de pedido', 'consultar pedido', 'consultar mis pedidos',
+            'quiero saber mi pedido', 'quiero saber mis pedidos',
+            'numero de pedido', 'número de pedido',
         ];
 
         foreach ($frases as $frase) {
-            if (str_contains($message, $frase)) {
-                return true;
-            }
+            if (str_contains($msg, $frase)) return true;
         }
 
         return false;
@@ -550,20 +363,7 @@ class WhatsappWebhookController extends Controller
 
     private function resolverConsultaEstadoPedido(string $from, string $name = 'Cliente', string $message = ''): string
     {
-        $telefonoNormalizado = $this->normalizarTelefono($from);
-
-        $pedidos = Pedido::with(['sede', 'detalles'])
-            ->orderByDesc('fecha_pedido')
-            ->orderByDesc('id')
-            ->get()
-            ->filter(function ($pedido) use ($telefonoNormalizado) {
-                $pedidoTelefono = $this->normalizarTelefono($pedido->telefono);
-
-                return $pedidoTelefono === $telefonoNormalizado
-                    || str_contains($pedidoTelefono, $telefonoNormalizado)
-                    || str_contains($telefonoNormalizado, $pedidoTelefono);
-            })
-            ->values();
+        $pedidos = $this->pedidosDelCliente($from);
 
         if ($pedidos->isEmpty()) {
             return "Hola {$name} 😊\nNo encontré pedidos registrados con este número.\nSi deseas, puedo ayudarte a realizar un nuevo pedido.";
@@ -575,18 +375,16 @@ class WhatsappWebhookController extends Controller
             $pedido = $pedidos->firstWhere('id', $pedidoIdSolicitado);
 
             if (!$pedido) {
-                $mensaje = [];
-                $mensaje[] = "Hola {$name} 😊";
-                $mensaje[] = "No encontré el pedido #{$pedidoIdSolicitado} asociado a este número.";
-                $mensaje[] = "Estos son los pedidos que sí encontré:";
-
+                $lineas = [
+                    "Hola {$name} 😊",
+                    "No encontré el pedido #{$pedidoIdSolicitado} asociado a este número.",
+                    "Estos son los pedidos que sí encontré:",
+                ];
                 foreach ($pedidos->take(10) as $item) {
-                    $mensaje[] = "• #{$item->id} - " . $this->traducirEstadoPedido($item->estado);
+                    $lineas[] = "• #{$item->id} - " . $this->traducirEstadoPedido($item->estado);
                 }
-
-                $mensaje[] = "Escríbeme el número del pedido que deseas consultar. Ejemplo: pedido #{$pedidos->first()->id}";
-
-                return implode("\n", $mensaje);
+                $lineas[] = "Escríbeme el número del pedido. Ejemplo: pedido #{$pedidos->first()->id}";
+                return implode("\n", $lineas);
             }
 
             return $this->formatearRespuestaPedidoEspecifico($pedido, $name);
@@ -596,67 +394,41 @@ class WhatsappWebhookController extends Controller
             return $this->formatearRespuestaPedidoEspecifico($pedidos->first(), $name);
         }
 
-        $mensaje = [];
-        $mensaje[] = "Hola {$name} 😊";
-        $mensaje[] = "Encontré *{$pedidos->count()} pedidos* asociados a este número:";
-        $mensaje[] = "";
+        $lineas = [
+            "Hola {$name} 😊",
+            "Encontré *{$pedidos->count()} pedidos* asociados a este número:",
+            '',
+        ];
 
         foreach ($pedidos->take(10) as $pedido) {
-            $mensaje[] = "📦 Pedido #{$pedido->id}";
-            $mensaje[] = "Estado: " . $this->traducirEstadoPedido($pedido->estado);
-            $mensaje[] = "Fecha: " . optional($pedido->fecha_pedido)?->format('d/m/Y H:i');
-            $mensaje[] = "Sede: " . ($pedido->sede->nombre ?? 'No especificada');
-            $mensaje[] = "";
+            $lineas[] = "📦 Pedido #{$pedido->id}";
+            $lineas[] = "Estado: " . $this->traducirEstadoPedido($pedido->estado);
+            $lineas[] = "Fecha: " . optional($pedido->fecha_pedido)?->format('d/m/Y H:i');
+            $lineas[] = "Sede: " . ($pedido->sede->nombre ?? 'No especificada');
+            $lineas[] = '';
         }
 
-        $mensaje[] = "Si deseas consultar uno en detalle, escríbeme por ejemplo: *pedido #{$pedidos->first()->id}*";
+        $lineas[] = "Para consultar uno en detalle, escríbeme: *pedido #{$pedidos->first()->id}*";
 
-        return implode("\n", $mensaje);
+        return implode("\n", $lineas);
     }
 
     private function esSolicitudModificarPedido(string $message): bool
     {
-        $message = mb_strtolower(trim($message));
+        $msg = mb_strtolower(trim($message));
 
-        $palabrasCancelar = [
-            'cancelar',
-            'cancela',
-            'cancelame',
-            'cancelar el',
-            'cancelar mi',
-            'cancelen',
-            'anular',
-            'anula',
-            'ya no lo quiero',
-            'ya no quiero el pedido',
-            'quitar el pedido',
-            'eliminar pedido',
-            'borrar pedido',
+        $palabras = [
+            'cancelar', 'cancela', 'cancelame', 'cancelar el', 'cancelar mi',
+            'cancelen', 'anular', 'anula', 'ya no lo quiero', 'ya no quiero el pedido',
+            'quitar el pedido', 'eliminar pedido', 'borrar pedido',
+            'adicionar', 'adiciona', 'agregar', 'agrega', 'sumar',
+            'añadir', 'anadir', 'ponerle',
+            'modificar', 'modifica', 'editar', 'edita',
+            'cambiar', 'cambiame', 'cámbiame', 'cambiarle',
         ];
 
-        $palabrasAdicionar = [
-            'adicionar',
-            'adiciona',
-            'agregar',
-            'agrega',
-            'sumar',
-            'añadir',
-            'anadir',
-            'ponerle',
-            'modificar',
-            'modifica',
-            'editar',
-            'edita',
-            'cambiar',
-            'cambiame',
-            'cámbiame',
-            'cambiarle',
-        ];
-
-        foreach (array_merge($palabrasCancelar, $palabrasAdicionar) as $palabra) {
-            if (str_contains($message, $palabra)) {
-                return true;
-            }
+        foreach ($palabras as $p) {
+            if (str_contains($msg, $p)) return true;
         }
 
         return false;
@@ -670,20 +442,7 @@ class WhatsappWebhookController extends Controller
             return "Hola {$name} 😊\nNo logré identificar si deseas cancelar o adicionar un pedido.\nPor favor indícame qué deseas hacer.";
         }
 
-        $telefonoNormalizado = $this->normalizarTelefono($from);
-
-        $pedidos = Pedido::with(['sede', 'detalles'])
-            ->orderByDesc('fecha_pedido')
-            ->orderByDesc('id')
-            ->get()
-            ->filter(function ($pedido) use ($telefonoNormalizado) {
-                $pedidoTelefono = $this->normalizarTelefono($pedido->telefono);
-
-                return $pedidoTelefono === $telefonoNormalizado
-                    || str_contains($pedidoTelefono, $telefonoNormalizado)
-                    || str_contains($telefonoNormalizado, $pedidoTelefono);
-            })
-            ->values();
+        $pedidos = $this->pedidosDelCliente($from);
 
         if ($pedidos->isEmpty()) {
             return "Hola {$name} 😊\nNo encontré pedidos asociados a este número para {$accion}.";
@@ -695,18 +454,16 @@ class WhatsappWebhookController extends Controller
             $pedido = $pedidos->firstWhere('id', $pedidoIdSolicitado);
 
             if (!$pedido) {
-                $mensaje = [];
-                $mensaje[] = "Hola {$name} 😊";
-                $mensaje[] = "No encontré el pedido #{$pedidoIdSolicitado} asociado a este número.";
-                $mensaje[] = "Estos son los pedidos disponibles:";
-
+                $lineas = [
+                    "Hola {$name} 😊",
+                    "No encontré el pedido #{$pedidoIdSolicitado} asociado a este número.",
+                    "Estos son los pedidos disponibles:",
+                ];
                 foreach ($pedidos->take(10) as $item) {
-                    $mensaje[] = "• Pedido #{$item->id} - " . $this->traducirEstadoPedido($item->estado);
+                    $lineas[] = "• Pedido #{$item->id} - " . $this->traducirEstadoPedido($item->estado);
                 }
-
-                $mensaje[] = "Escríbeme por ejemplo: *{$accion} pedido #{$pedidos->first()->id}*";
-
-                return implode("\n", $mensaje);
+                $lineas[] = "Escríbeme por ejemplo: *{$accion} pedido #{$pedidos->first()->id}*";
+                return implode("\n", $lineas);
             }
 
             return $this->validarAnsYResponder($pedido, $accion, $name);
@@ -716,73 +473,45 @@ class WhatsappWebhookController extends Controller
             return $this->validarAnsYResponder($pedidos->first(), $accion, $name);
         }
 
+        // Múltiples pedidos → guardar acción pendiente y pedir aclaración
         $this->guardarAccionPendiente($from, [
             'accion'     => $accion,
             'pedido_ids' => $pedidos->pluck('id')->take(10)->values()->toArray(),
         ]);
 
-        $mensaje = [];
-        $mensaje[] = "Hola {$name} 😊";
-        $mensaje[] = "Encontré varios pedidos asociados a este número.";
-        $mensaje[] = "Para {$accion}, indícame cuál deseas modificar:";
-
+        $lineas = [
+            "Hola {$name} 😊",
+            "Encontré varios pedidos. Para {$accion}, indícame cuál deseas modificar:",
+            '',
+        ];
         foreach ($pedidos->take(10) as $pedido) {
-            $mensaje[] = "• Pedido #{$pedido->id} - " . $this->traducirEstadoPedido($pedido->estado) . " - " . optional($pedido->fecha_pedido)?->format('d/m/Y H:i');
+            $lineas[] = "• Pedido #{$pedido->id} - " . $this->traducirEstadoPedido($pedido->estado)
+                      . " - " . optional($pedido->fecha_pedido)?->format('d/m/Y H:i');
         }
+        $lineas[] = "Ejemplo: *{$accion} pedido #{$pedidos->first()->id}*";
+        $lineas[] = "O responde solo con el número: *{$pedidos->first()->id}*";
 
-        $mensaje[] = "Ejemplo: *{$accion} pedido #{$pedidos->first()->id}*";
-        $mensaje[] = "También puedes responder solo con el número. Ejemplo: *{$pedidos->first()->id}*";
-
-        return implode("\n", $mensaje);
+        return implode("\n", $lineas);
     }
 
     private function detectarAccionPedido(string $message): ?string
     {
-        $message = mb_strtolower(trim($message));
+        $msg = mb_strtolower(trim($message));
 
-        $palabrasCancelar = [
-            'cancelar',
-            'cancela',
-            'cancelame',
-            'cancelen',
-            'anular',
-            'anula',
-            'ya no lo quiero',
-            'ya no quiero el pedido',
-            'quitar el pedido',
-            'eliminar pedido',
-            'borrar pedido',
-        ];
+        $cancelar = ['cancelar','cancela','cancelame','cancelen','anular','anula',
+                     'ya no lo quiero','ya no quiero el pedido','quitar el pedido',
+                     'eliminar pedido','borrar pedido'];
 
-        foreach ($palabrasCancelar as $palabra) {
-            if (str_contains($message, $palabra)) {
-                return 'cancelar';
-            }
+        foreach ($cancelar as $p) {
+            if (str_contains($msg, $p)) return 'cancelar';
         }
 
-        $palabrasAdicionar = [
-            'adicionar',
-            'adiciona',
-            'agregar',
-            'agrega',
-            'sumar',
-            'añadir',
-            'anadir',
-            'ponerle',
-            'modificar',
-            'modifica',
-            'editar',
-            'edita',
-            'cambiar',
-            'cambiame',
-            'cámbiame',
-            'cambiarle',
-        ];
+        $adicionar = ['adicionar','adiciona','agregar','agrega','sumar','añadir','anadir',
+                      'ponerle','modificar','modifica','editar','edita',
+                      'cambiar','cambiame','cámbiame','cambiarle'];
 
-        foreach ($palabrasAdicionar as $palabra) {
-            if (str_contains($message, $palabra)) {
-                return 'adicionar';
-            }
+        foreach ($adicionar as $p) {
+            if (str_contains($msg, $p)) return 'adicionar';
         }
 
         return null;
@@ -796,114 +525,45 @@ class WhatsappWebhookController extends Controller
             return "Hola {$name} 😊\nNo hay un ANS configurado para {$accion} el pedido #{$pedido->id}.";
         }
 
-        $minutosTranscurridos = $pedido->fecha_pedido->diffInMinutes(now());
+        $minutosTranscurridos = (int) round($pedido->fecha_pedido->diffInSeconds(now()) / 60);
         $puede = $minutosTranscurridos <= $ansMinutos;
 
-        $mensaje = [];
-        $mensaje[] = "Hola {$name} 😊";
-        $mensaje[] = "Pedido #{$pedido->id}";
-        $mensaje[] = "Estado actual: " . $this->traducirEstadoPedido($pedido->estado);
-        $mensaje[] = "Fecha del pedido: " . optional($pedido->fecha_pedido)?->format('d/m/Y H:i');
-        $mensaje[] = "Tiempo transcurrido: {$minutosTranscurridos} minuto(s)";
-        $mensaje[] = "ANS para {$accion}: {$ansMinutos} minuto(s)";
-        $mensaje[] = "";
+        $lineas = [
+            "Hola {$name} 😊",
+            "Pedido #{$pedido->id}",
+            "Estado actual: " . $this->traducirEstadoPedido($pedido->estado),
+            "Fecha del pedido: " . optional($pedido->fecha_pedido)?->format('d/m/Y H:i'),
+            "Tiempo transcurrido: {$minutosTranscurridos} minuto(s)",
+            "ANS para {$accion}: {$ansMinutos} minuto(s)",
+            '',
+        ];
 
         if (!$puede) {
             $this->limpiarAccionPendiente($pedido->telefono);
-
-            $mensaje[] = "❌ Ya no es posible {$accion} este pedido porque el tiempo permitido expiró.";
-            return implode("\n", $mensaje);
+            $lineas[] = "❌ Ya no es posible {$accion} este pedido porque el tiempo permitido expiró.";
+            return implode("\n", $lineas);
         }
 
         if ($accion === 'cancelar') {
-            $mensaje[] = "✅ Sí es posible cancelar este pedido.";
-            $mensaje[] = "Responde *CONFIRMAR CANCELACIÓN* para continuar.";
+            $lineas[] = "✅ Sí es posible cancelar este pedido.";
+            $lineas[] = "Responde *CONFIRMAR CANCELACIÓN* para continuar.";
         } else {
-            $mensaje[] = "✅ Sí es posible adicionar o modificar este pedido.";
-            $mensaje[] = "Escríbeme qué producto deseas agregar o cambiar en el pedido #{$pedido->id}.";
+            $lineas[] = "✅ Sí es posible adicionar o modificar este pedido.";
+            $lineas[] = "Escríbeme qué producto deseas agregar o cambiar en el pedido #{$pedido->id}.";
         }
 
-        return implode("\n", $mensaje);
+        return implode("\n", $lineas);
     }
 
-    private function obtenerAnsMinutos(string $accion): ?int
+    /*
+    |==========================================================================
+    | ACCIÓN PENDIENTE (contexto multi-turno de reglas)
+    |==========================================================================
+    */
+
+    private function tieneAccionPendiente(string $from): bool
     {
-        return AnsPedido::where('accion', $accion)
-            ->where('activo', true)
-            ->value('tiempo_minutos');
-    }
-
-    private function construirResumenAns(): string
-    {
-        $crear = $this->obtenerAnsMinutos('crear') ?? 'No definido';
-        $adicionar = $this->obtenerAnsMinutos('adicionar') ?? 'No definido';
-        $cancelar = $this->obtenerAnsMinutos('cancelar') ?? 'No definido';
-
-        return <<<TXT
-ANS DEL SISTEMA:
-- Crear pedido: {$crear} minuto(s)
-- Adicionar pedido: {$adicionar} minuto(s)
-- Cancelar pedido: {$cancelar} minuto(s)
-TXT;
-    }
-
-    private function formatearRespuestaPedidoEspecifico(Pedido $pedido, string $name = 'Cliente'): string
-    {
-        $mensaje = [];
-        $mensaje[] = "Hola {$name} 😊";
-        $mensaje[] = "Tu pedido #{$pedido->id} está actualmente en: *" . $this->traducirEstadoPedido($pedido->estado) . "*";
-        $mensaje[] = "📅 Fecha: " . optional($pedido->fecha_pedido)?->format('d/m/Y H:i');
-        $mensaje[] = "📍 Sede: " . ($pedido->sede->nombre ?? 'No especificada');
-
-        if (!empty($pedido->hora_entrega)) {
-            $mensaje[] = "🕒 Hora estimada: {$pedido->hora_entrega}";
-        }
-
-        if ($pedido->detalles && $pedido->detalles->count()) {
-            $mensaje[] = "";
-            $mensaje[] = "🛒 Detalle del pedido:";
-            foreach ($pedido->detalles as $detalle) {
-                $cantidad = $this->formatearCantidadPedido((float) $detalle->cantidad);
-                $mensaje[] = "• {$detalle->producto} - {$cantidad} {$detalle->unidad}";
-            }
-        }
-
-        $mensaje[] = "";
-        $mensaje[] = "💰 Total: $" . number_format((float) $pedido->total, 0, ',', '.');
-
-        return implode("\n", $mensaje);
-    }
-
-    private function extraerNumeroPedidoDesdeMensaje(string $message): ?int
-    {
-        $message = mb_strtolower(trim($message));
-
-        $patrones = [
-            '/pedido\s*#\s*(\d+)/i',
-            '/pedido\s+numero\s+(\d+)/i',
-            '/pedido\s+número\s+(\d+)/i',
-            '/pedido\s+(\d+)/i',
-            '/orden\s*#\s*(\d+)/i',
-            '/orden\s+numero\s+(\d+)/i',
-            '/orden\s+número\s+(\d+)/i',
-            '/orden\s+(\d+)/i',
-            '/el\s+(\d+)/i',
-            '/#\s*(\d+)/i',
-            '/^(\d+)$/i',
-        ];
-
-        foreach ($patrones as $patron) {
-            if (preg_match($patron, $message, $matches)) {
-                return isset($matches[1]) ? (int) $matches[1] : null;
-            }
-        }
-
-        return null;
-    }
-
-    private function claveAccionPendiente(string $from): string
-    {
-        return 'whatsapp_pending_action_' . $this->normalizarTelefono($from);
+        return Cache::has($this->claveAccionPendiente($from));
     }
 
     private function guardarAccionPendiente(string $from, array $data): void
@@ -921,51 +581,49 @@ TXT;
         Cache::forget($this->claveAccionPendiente($from));
     }
 
-    private function tieneAccionPendiente(string $from): bool
+    private function claveAccionPendiente(string $from): string
     {
-        return Cache::has($this->claveAccionPendiente($from));
+        return 'whatsapp_pending_action_' . $this->normalizarTelefono($from);
     }
 
     private function resolverAccionPendiente(string $from, string $name, string $message): ?string
     {
         $pendiente = $this->obtenerAccionPendiente($from);
 
-        if (!$pendiente || empty($pendiente['accion'])) {
-            return null;
-        }
+        if (!$pendiente || empty($pendiente['accion'])) return null;
 
-        $accion = $pendiente['accion'];
+        $accion             = $pendiente['accion'];
         $pedidoIdsPermitidos = $pendiente['pedido_ids'] ?? [];
 
         $pedidoId = $this->extraerNumeroPedidoDesdeMensaje($message);
 
         if (!$pedidoId) {
-            $messageNormalizado = mb_strtolower(trim($message));
-
-            if (in_array($messageNormalizado, ['ese', 'ese mismo', 'el mismo', 'último', 'ultimo', 'el último', 'el ultimo'])) {
+            $msgNorm = mb_strtolower(trim($message));
+            if (in_array($msgNorm, ['ese','ese mismo','el mismo','último','ultimo','el último','el ultimo'])) {
                 $pedidoId = $pedidoIdsPermitidos[0] ?? null;
             }
         }
 
         if (!$pedidoId) {
-            return "Hola {$name} 😊\nNo logré identificar el número del pedido.\nPor favor respóndeme solo con el número. Ejemplo: *3*";
+            return "Hola {$name} 😊\nNo logré identificar el número del pedido.\nResponde solo con el número. Ejemplo: *3*";
         }
 
         if (!in_array($pedidoId, $pedidoIdsPermitidos)) {
             return "Hola {$name} 😊\nEse pedido no está entre las opciones que te mostré.\nPor favor elige uno de los pedidos listados.";
         }
 
-        $telefonoNormalizado = $this->normalizarTelefono($from);
+        $telNorm = $this->normalizarTelefono($from);
 
         $pedido = Pedido::with(['sede', 'detalles'])
             ->whereIn('id', $pedidoIdsPermitidos)
             ->get()
-            ->first(function ($pedido) use ($telefonoNormalizado, $pedidoId) {
-                return (int) $pedido->id === (int) $pedidoId
+            ->first(function ($p) use ($telNorm, $pedidoId) {
+                $pTel = $this->normalizarTelefono($p->telefono);
+                return (int) $p->id === (int) $pedidoId
                     && (
-                        $this->normalizarTelefono($pedido->telefono) === $telefonoNormalizado
-                        || str_contains($this->normalizarTelefono($pedido->telefono), $telefonoNormalizado)
-                        || str_contains($telefonoNormalizado, $this->normalizarTelefono($pedido->telefono))
+                        $pTel === $telNorm
+                        || str_contains($pTel, $telNorm)
+                        || str_contains($telNorm, $pTel)
                     );
             });
 
@@ -978,13 +636,534 @@ TXT;
         return $this->validarAnsYResponder($pedido, $accion, $name);
     }
 
-    private function formatearCantidadPedido(float $cantidad): string
+    /*
+    |==========================================================================
+    | GUARDAR PEDIDO — Function Calling (reemplaza parsing de [JSON_ORDER])
+    |==========================================================================
+    */
+
+    /**
+     * Recibe el array ya parseado que vino del tool_call de OpenAI.
+     * JSON garantizado válido — no hay parsing frágil de texto.
+     */
+    private function guardarPedidoDesdeToolCall(
+        array  $orderData,
+        string $from,
+        string $name,
+        array  $conversationHistory,
+        string $cacheKey
+    ): string {
+        try {
+            // Guardia anti-duplicado de confirmación (ventana 2 min)
+            $confirmKey = "pedido_confirmado_{$from}";
+            if (Cache::has($confirmKey)) {
+                Log::warning('⚠️ Pedido ya confirmado recientemente', compact('from'));
+                return "Tu pedido ya fue registrado 😊 Escríbeme el número de pedido para consultarlo.";
+            }
+            Cache::put($confirmKey, true, now()->addMinutes(2));
+
+            DB::beginTransaction();
+
+            // Sede: buscar por localidad/barrio, fallback a primera disponible
+            $sedeNombre = $orderData['location'] ?? $orderData['neighborhood'] ?? null;
+            $sede = $sedeNombre
+                ? Sede::where('nombre', 'LIKE', "%{$sedeNombre}%")->first() ?? Sede::first()
+                : Sede::first();
+
+            // Notas enriquecidas con datos de entrega
+            $partes = array_filter([
+                $orderData['notes']          ?? null,
+                isset($orderData['address'])       ? "Dirección: {$orderData['address']}"       : null,
+                isset($orderData['neighborhood'])   ? "Barrio: {$orderData['neighborhood']}"     : null,
+                isset($orderData['payment_method']) ? "Pago: {$orderData['payment_method']}"     : null,
+            ]);
+            $notas = implode(' | ', $partes) ?: 'Solicitud vía WhatsApp';
+
+            $pickupTime = !empty($orderData['pickup_time']) ? $orderData['pickup_time'] : null;
+
+            $pedido = Pedido::create([
+                'sede_id'               => $sede?->id,
+                'fecha_pedido'          => now(),
+                'hora_entrega'          => $pickupTime,
+                'estado'                => 'confirmado',
+                'total'                 => (float) ($orderData['total'] ?? 0),
+                'notas'                 => $notas,
+                'cliente_nombre'        => $orderData['customer_name'] ?? $name,
+                'telefono'              => $orderData['phone'] ?? $from,
+                'canal'                 => 'whatsapp',
+                'conversacion_completa' => json_encode($conversationHistory, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT),
+                'resumen_conversacion'  => $orderData['notes'] ?? '',
+            ]);
+
+            foreach (($orderData['products'] ?? []) as $product) {
+                DetallePedido::create([
+                    'pedido_id'       => $pedido->id,
+                    'producto'        => $product['name']     ?? 'Producto',
+                    'cantidad'        => (float) ($product['quantity'] ?? 1),
+                    'unidad'          => $product['unit']     ?? 'unidad',
+                    'precio_unitario' => (float) ($product['price']    ?? 0),
+                    'subtotal'        => (float) ($product['subtotal'] ?? 0),
+                ]);
+            }
+
+            DB::commit();
+
+            broadcast(new PedidoConfirmado($pedido));
+
+            // Limpiar historial de conversación — el pedido está cerrado
+            Cache::forget($cacheKey);
+
+            Log::info('✅ PEDIDO GUARDADO', ['pedido_id' => $pedido->id, 'from' => $from]);
+
+            return $this->construirMensajeConfirmacionPedido($pedido, $orderData, $name);
+
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            Cache::forget("pedido_confirmado_{$from}");
+
+            Log::error('❌ ERROR CRÍTICO AL GUARDAR PEDIDO', [
+                'error'      => $e->getMessage(),
+                'order_data' => $orderData,
+            ]);
+
+            return '⚠️ Tu pedido no se pudo registrar en este momento. Ya lo estamos revisando, te contactamos en breve.';
+        }
+    }
+
+    /**
+     * Construye el mensaje de confirmación final para el cliente.
+     * Mensaje limpio, sin JSON, sin artefactos — solo información útil.
+     */
+    private function construirMensajeConfirmacionPedido(Pedido $pedido, array $orderData, string $name): string
     {
-        if (fmod($cantidad, 1.0) == 0.0) {
-            return number_format($cantidad, 0, ',', '.');
+        $lineas = [
+            "¡Listo {$name}! Tu pedido quedó confirmado ✅",
+            '',
+            "📋 *Pedido #{$pedido->id}*",
+        ];
+
+        foreach (($orderData['products'] ?? []) as $prod) {
+            $cant = $this->formatearCantidadPedido((float) ($prod['quantity'] ?? 1));
+            $lineas[] = "• {$prod['name']} — {$cant} {$prod['unit']}";
         }
 
-        return number_format($cantidad, 2, ',', '.');
+        $lineas[] = '';
+
+        if (!empty($orderData['address'])) {
+            $lineas[] = "📍 *Dirección:* {$orderData['address']}";
+        }
+        if (!empty($orderData['neighborhood'])) {
+            $lineas[] = "🏘️ *Barrio:* {$orderData['neighborhood']}";
+        }
+        if (!empty($pedido->hora_entrega)) {
+            $lineas[] = "🕒 *Entrega estimada:* {$pedido->hora_entrega}";
+        }
+
+        $total = (float) $pedido->total;
+        if ($total > 0) {
+            $lineas[] = "💵 *Total:* $" . number_format($total, 0, ',', '.');
+        }
+
+        $lineas[] = '';
+        $lineas[] = "Guarda el número *#{$pedido->id}* para consultar el estado de tu pedido. 😊";
+
+        return implode("\n", $lineas);
+    }
+
+    /*
+    |==========================================================================
+    | ANS
+    |==========================================================================
+    */
+
+    private function obtenerAnsMinutos(string $accion): ?int
+    {
+        return AnsPedido::where('accion', $accion)->where('activo', true)->value('tiempo_minutos');
+    }
+
+    private function construirResumenAns(): string
+    {
+        $crear     = $this->obtenerAnsMinutos('crear')     ?? 'No definido';
+        $adicionar = $this->obtenerAnsMinutos('adicionar') ?? 'No definido';
+        $cancelar  = $this->obtenerAnsMinutos('cancelar')  ?? 'No definido';
+
+        return "ANS DEL SISTEMA:\n"
+             . "- Crear pedido: {$crear} minuto(s)\n"
+             . "- Adicionar pedido: {$adicionar} minuto(s)\n"
+             . "- Cancelar pedido: {$cancelar} minuto(s)";
+    }
+
+    /*
+    |==========================================================================
+    | CONSULTAS DB — optimizadas a nivel SQL
+    |==========================================================================
+    */
+
+    /**
+     * Trae pedidos del cliente filtrando en SQL (sin get()->filter() en PHP).
+     * Usa los últimos 10 dígitos del teléfono para tolerar prefijos de país.
+     */
+    private function pedidosDelCliente(string $from, int $limite = 10): \Illuminate\Support\Collection
+    {
+        $tel      = $this->normalizarTelefono($from);
+        $telLocal = strlen($tel) > 10 ? substr($tel, -10) : $tel;
+
+        return Pedido::with(['sede', 'detalles'])
+            ->where('telefono', 'LIKE', "%{$telLocal}%")
+            ->orderByDesc('fecha_pedido')
+            ->orderByDesc('id')
+            ->take($limite)
+            ->get();
+    }
+
+    /**
+     * Historial para el system prompt de la IA.
+     * Solo se consulta cuando el mensaje contiene keywords relevantes.
+     */
+    private function buscarPedidosClienteSQL(string $from, string $message): string
+    {
+        $msg = mb_strtolower($message);
+
+        $keywords = [
+            'pedido','domicilio','orden','estado','seguimiento','compra','comprar',
+            'dirección','direccion','barrio','pago','contra entrega',
+            'cancelar','anular','adicionar','agregar','modificar','editar','cambiar',
+        ];
+
+        $esConsulta = false;
+        foreach ($keywords as $k) {
+            if (str_contains($msg, $k)) { $esConsulta = true; break; }
+        }
+
+        if (!$esConsulta) return '';
+
+        $pedidos = $this->pedidosDelCliente($from, 3);
+
+        if ($pedidos->isEmpty()) {
+            return "ℹ️ No se encontraron pedidos recientes para este número.\n";
+        }
+
+        $texto = "📦 HISTORIAL DEL CLIENTE:\n\n";
+        foreach ($pedidos as $p) {
+            $texto .= "Pedido #{$p->id}\n"
+                    . "Estado: {$p->estado}\n"
+                    . "Fecha: {$p->fecha_pedido->format('d/m/Y H:i')}\n"
+                    . "Barrio/Sede: " . ($p->sede->nombre ?? 'No especificada') . "\n\n";
+        }
+
+        return $texto;
+    }
+
+    /*
+    |==========================================================================
+    | SYSTEM PROMPT E INFO EMPRESA
+    |==========================================================================
+    */
+
+    private function infoEmpresa(): string
+    {
+        return "Alimentos La Hacienda\n"
+             . "- Más de 25 años de experiencia.\n"
+             . "- Ubicada en Bello, Antioquia.\n"
+             . "- Calidad, frescura y servicio al cliente.\n"
+             . "- Opera con domicilios, sedes físicas y atención directa.\n"
+             . "- Sistema de pedidos integrado.";
+    }
+
+    private function getSystemPrompt(
+        string $pedidosInfo = '',
+        string $infoEmpresa = '',
+        string $name        = 'Cliente',
+        string $ansInfo     = ''
+    ): string {
+        return <<<PROMPT
+Eres el asesor comercial de Alimentos La Hacienda.
+
+Hablas como una persona real del equipo de ventas.
+Nunca digas que eres una inteligencia artificial.
+Si el cliente pregunta si eres humano responde solo:
+"Soy asesor del equipo de Alimentos La Hacienda y estoy aquí para ayudarte con tu pedido."
+
+━━━ CONTEXTO ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{$infoEmpresa}
+
+HISTORIAL DEL CLIENTE:
+{$pedidosInfo}
+
+{$ansInfo}
+
+━━━ ESTILO ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- Lenguaje natural, cercano pero profesional.
+- Máximo 3 a 5 líneas por mensaje.
+- Sin párrafos largos. Sin sonar robótico.
+- Sin lenguaje técnico. Sin muchas preguntas juntas.
+- Emojis moderados: 😊 👍 🚚
+
+━━━ FLUJO ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. Saluda siempre primero.
+2. Entender qué necesita.
+3. Preguntar barrio: ¿En qué barrio se encuentra?
+4. Validar cobertura.
+5. Construir el pedido.
+6. Pedir datos SOLO cuando el cliente ya decidió.
+7. Mostrar resumen y pedir confirmación.
+8. Confirmar SOLO cuando el cliente diga: sí, correcto, listo, ok, confirmado.
+
+━━━ DATOS NECESARIOS ━━━━━━━━━━━━━━━━━━━━━━━━
+✅ Nombre
+✅ Dirección completa
+✅ Barrio
+✅ Teléfono
+
+━━━ CONFIRMACIÓN ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Antes de confirmar SIEMPRE muestra el resumen así:
+
+"Por favor revisa tu pedido 👇"
+
+📦 Pedido
+[productos]
+
+📍 Dirección
+[dirección]
+
+👤 Recibe
+[nombre]
+
+📞 Teléfono
+[teléfono]
+
+💵 Pago
+Contra entrega
+
+Termina SIEMPRE con: "¿Todo correcto para confirmar?"
+
+━━━ FUNCIÓN confirmar_pedido ━━━━━━━━━━━━━━━━━
+Llama a la función confirmar_pedido ÚNICAMENTE cuando:
+- El cliente confirmó con sí / correcto / listo / ok / confirmado
+- Ya tienes: nombre, dirección, barrio, teléfono y al menos un producto
+
+NO la llames si falta algún dato. NO inventes datos.
+NO la llames más de una vez por conversación.
+
+━━━ ANS ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- Si el cliente pregunta por cancelar o adicionar, respeta la validación que ya hizo el sistema.
+- No prometas cancelar o adicionar si el tiempo ANS ya expiró.
+PROMPT;
+    }
+
+    /**
+     * Definición del tool para OpenAI Function Calling.
+     * JSON siempre estructurado — elimina el parsing frágil de [JSON_ORDER].
+     */
+    private function getToolsDefinicion(): array
+    {
+        return [
+            [
+                'type'     => 'function',
+                'function' => [
+                    'name'        => 'confirmar_pedido',
+                    'description' => 'Confirma y registra el pedido. Llama SOLO cuando el cliente aceptó explícitamente y tienes todos los datos requeridos.',
+                    'parameters'  => [
+                        'type'       => 'object',
+                        'properties' => [
+                            'products' => [
+                                'type'        => 'array',
+                                'description' => 'Productos del pedido',
+                                'items'       => [
+                                    'type'       => 'object',
+                                    'properties' => [
+                                        'name'     => ['type' => 'string',  'description' => 'Nombre del producto'],
+                                        'quantity' => ['type' => 'number',  'description' => 'Cantidad'],
+                                        'unit'     => ['type' => 'string',  'description' => 'Unidad (kg, libra, unidad, etc.)'],
+                                        'price'    => ['type' => 'number',  'description' => 'Precio unitario, 0 si no se conoce'],
+                                        'subtotal' => ['type' => 'number',  'description' => 'Subtotal, 0 si no se conoce'],
+                                    ],
+                                    'required' => ['name', 'quantity', 'unit'],
+                                ],
+                            ],
+                            'customer_name'  => ['type' => 'string', 'description' => 'Nombre completo del cliente'],
+                            'phone'          => ['type' => 'string', 'description' => 'Teléfono del cliente'],
+                            'address'        => ['type' => 'string', 'description' => 'Dirección de entrega'],
+                            'neighborhood'   => ['type' => 'string', 'description' => 'Barrio'],
+                            'location'       => ['type' => 'string', 'description' => 'Ciudad o zona'],
+                            'payment_method' => ['type' => 'string', 'description' => 'Método de pago'],
+                            'pickup_time'    => ['type' => 'string', 'description' => 'Hora estimada de entrega, vacío si no se sabe'],
+                            'total'          => ['type' => 'number', 'description' => 'Total del pedido, 0 si no aplica'],
+                            'notes'          => ['type' => 'string', 'description' => 'Notas adicionales del pedido'],
+                        ],
+                        'required' => ['products', 'customer_name', 'phone', 'address', 'neighborhood'],
+                    ],
+                ],
+            ],
+        ];
+    }
+
+    /*
+    |==========================================================================
+    | WHATSAPP API
+    |==========================================================================
+    */
+
+    private function enviarRespuestaWhatsapp(string $from, string $reply, ?string $connectionId): void
+    {
+        try {
+            $token = $this->loginWhatsapp();
+
+            if (!$token) {
+                Log::error('❌ No se pudo obtener token de WhatsApp');
+                return;
+            }
+
+            $payload = ['number' => $from, 'body' => $reply];
+
+            if ($connectionId) {
+                $payload['whatsappId']   = $connectionId;
+                $payload['connectionId'] = $connectionId;
+            }
+
+            Log::info('📤 ENVIANDO A WHATSAPP', ['payload' => $payload]);
+
+            $response = Http::withoutVerifying()
+                ->withToken($token)
+                ->timeout(20)
+                ->post('https://wa-api.tecnobyteapp.com:1422/api/messages/send', $payload);
+
+            if ($response->successful()) {
+                Log::info('✅ RESPUESTA ENVIADA', ['status' => $response->status(), 'phone' => $from]);
+            } else {
+                Log::error('⚠️ WHATSAPP API ERROR', ['status' => $response->status(), 'body' => $response->body()]);
+            }
+
+        } catch (\Throwable $e) {
+            Log::error('❌ ERROR ENVIANDO A WHATSAPP', ['error' => $e->getMessage(), 'phone' => $from]);
+        }
+    }
+
+    /**
+     * Login con cache de token.
+     * Evita un HTTP round-trip en cada mensaje (bug #3 corregido).
+     */
+    private function loginWhatsapp(): ?string
+    {
+        $cacheKey = 'whatsapp_api_token';
+
+        $cached = Cache::get($cacheKey);
+        if ($cached) {
+            return $cached;
+        }
+
+        try {
+            $response = Http::withoutVerifying()
+                ->timeout(20)
+                ->post('https://wa-api.tecnobyteapp.com:1422/auth/login', [
+                    'email'    => env('WHATSAPP_API_EMAIL'),
+                    'password' => env('WHATSAPP_API_PASSWORD'),
+                ]);
+
+            if ($response->failed()) {
+                Log::error('❌ ERROR LOGIN WHATSAPP', ['status' => $response->status(), 'body' => $response->body()]);
+                return null;
+            }
+
+            $token = $response->json('token');
+
+            if ($token) {
+                // 50 min: antes de que expire la sesión típica de la API
+                Cache::put($cacheKey, $token, now()->addMinutes(50));
+                Log::info('🔐 Token WhatsApp obtenido y cacheado 50 min');
+            }
+
+            return $token;
+
+        } catch (\Throwable $e) {
+            Log::error('❌ EXCEPCIÓN LOGIN WHATSAPP', ['error' => $e->getMessage()]);
+            return null;
+        }
+    }
+
+    /*
+    |==========================================================================
+    | HELPERS DE FORMATO
+    |==========================================================================
+    */
+
+    private function formatearRespuestaPedidoEspecifico(Pedido $pedido, string $name = 'Cliente'): string
+    {
+        $lineas = [
+            "Hola {$name} 😊",
+            "Tu pedido #{$pedido->id} está: *" . $this->traducirEstadoPedido($pedido->estado) . "*",
+            "📅 Fecha: " . optional($pedido->fecha_pedido)?->format('d/m/Y H:i'),
+            "📍 Sede: " . ($pedido->sede->nombre ?? 'No especificada'),
+        ];
+
+        if (!empty($pedido->hora_entrega)) {
+            $lineas[] = "🕒 Hora estimada: {$pedido->hora_entrega}";
+        }
+
+        if ($pedido->detalles && $pedido->detalles->count()) {
+            $lineas[] = '';
+            $lineas[] = "🛒 Detalle:";
+            foreach ($pedido->detalles as $det) {
+                $cant = $this->formatearCantidadPedido((float) $det->cantidad);
+                $lineas[] = "• {$det->producto} — {$cant} {$det->unidad}";
+            }
+        }
+
+        $lineas[] = '';
+        $lineas[] = "💰 Total: $" . number_format((float) $pedido->total, 0, ',', '.');
+
+        return implode("\n", $lineas);
+    }
+
+    private function formatearPedidoParaApi(Pedido $pedido): array
+    {
+        return [
+            'id'                   => $pedido->id,
+            'fecha'                => optional($pedido->fecha_pedido)?->format('d/m/Y H:i'),
+            'estado'               => $pedido->estado,
+            'hora_entrega'         => $pedido->hora_entrega ?? 'Por confirmar',
+            'sede'                 => $pedido->sede->nombre ?? 'No especificada',
+            'cliente'              => $pedido->cliente_nombre,
+            'telefono'             => $pedido->telefono,
+            'total'                => $pedido->total,
+            'total_formateado'     => number_format((float) $pedido->total, 0, ',', '.'),
+            'notas'                => $pedido->notas,
+            'resumen_conversacion' => $pedido->resumen_conversacion,
+            'productos'            => $pedido->detalles->map(fn($d) => [
+                'producto'        => $d->producto,
+                'cantidad'        => $this->formatearCantidadPedido((float) $d->cantidad),
+                'unidad'          => $d->unidad,
+                'precio_unitario' => $d->precio_unitario,
+                'subtotal'        => $d->subtotal,
+            ])->values(),
+        ];
+    }
+
+    private function extraerNumeroPedidoDesdeMensaje(string $message): ?int
+    {
+        $msg = mb_strtolower(trim($message));
+
+        $patrones = [
+            '/pedido\s*#\s*(\d+)/i',
+            '/pedido\s+numero\s+(\d+)/i',
+            '/pedido\s+número\s+(\d+)/i',
+            '/pedido\s+(\d+)/i',
+            '/orden\s*#\s*(\d+)/i',
+            '/orden\s+numero\s+(\d+)/i',
+            '/orden\s+número\s+(\d+)/i',
+            '/orden\s+(\d+)/i',
+            '/el\s+(\d+)/i',
+            '/#\s*(\d+)/i',
+            '/^(\d+)$/i',
+        ];
+
+        foreach ($patrones as $patron) {
+            if (preg_match($patron, $msg, $matches)) {
+                return isset($matches[1]) ? (int) $matches[1] : null;
+            }
+        }
+
+        return null;
     }
 
     private function traducirEstadoPedido(?string $estado): string
@@ -1004,410 +1183,10 @@ TXT;
         return preg_replace('/\D+/', '', (string) $telefono);
     }
 
-    private function enviarRespuestaWhatsapp(string $from, string $reply, $connectionId = null): void
+    private function formatearCantidadPedido(float $cantidad): string
     {
-        try {
-            $token = $this->loginWhatsapp();
-
-            if (!$token) {
-                Log::error('❌ No se pudo obtener token de WhatsApp');
-                return;
-            }
-
-            $payload = [
-                'number' => $from,
-                'body'   => $reply,
-            ];
-
-            if ($connectionId) {
-                $payload['whatsappId'] = $connectionId;
-                $payload['connectionId'] = $connectionId;
-            }
-
-            Log::info('📤 ENVIANDO RESPUESTA A WHATSAPP', [
-                'url'     => 'https://wa-api.tecnobyteapp.com:1422/api/messages/send',
-                'payload' => $payload,
-            ]);
-
-            $response = Http::withoutVerifying()
-                ->withToken($token)
-                ->timeout(20)
-                ->post('https://wa-api.tecnobyteapp.com:1422/api/messages/send', $payload);
-
-            if ($response->successful()) {
-                Log::info('✅ RESPUESTA ENVIADA A WHATSAPP', [
-                    'status'        => $response->status(),
-                    'body'          => $response->json(),
-                    'phone'         => $from,
-                    'connection_id' => $connectionId,
-                ]);
-            } else {
-                Log::error('⚠️ WHATSAPP API RESPONDIÓ CON ERROR', [
-                    'status'        => $response->status(),
-                    'body'          => $response->body(),
-                    'phone'         => $from,
-                    'connection_id' => $connectionId,
-                ]);
-            }
-        } catch (\Throwable $e) {
-            Log::error('❌ ERROR ENVIANDO A WHATSAPP', [
-                'error'         => $e->getMessage(),
-                'phone'         => $from,
-                'connection_id' => $connectionId,
-            ]);
-        }
-    }
-
-    private function loginWhatsapp(): ?string
-    {
-        try {
-            $response = Http::withoutVerifying()
-                ->timeout(20)
-                ->post('https://wa-api.tecnobyteapp.com:1422/auth/login', [
-                    'email'    => env('WHATSAPP_API_EMAIL'),
-                    'password' => env('WHATSAPP_API_PASSWORD'),
-                ]);
-
-            if ($response->failed()) {
-                Log::error('❌ ERROR LOGIN WHATSAPP', [
-                    'status' => $response->status(),
-                    'body'   => $response->body(),
-                ]);
-                return null;
-            }
-
-            $token = $response->json('token');
-
-            Log::info('🔐 LOGIN WHATSAPP OK', [
-                'token_prefix' => $token ? substr($token, 0, 20) . '...' : null,
-            ]);
-
-            return $token;
-        } catch (\Throwable $e) {
-            Log::error('❌ EXCEPCIÓN LOGIN WHATSAPP', [
-                'error' => $e->getMessage(),
-            ]);
-
-            return null;
-        }
-    }
-
-    private function infoEmpresa(): string
-    {
-        return <<<TXT
-Alimentos La Hacienda
-- Empresa con más de 25 años de experiencia.
-- Ubicada en Bello, Antioquia.
-- Se enfoca en calidad, frescura y servicio al cliente.
-- Opera con domicilios, sedes físicas y atención directa.
-- El sistema de atención está conectado a un sistema de pedidos.
-TXT;
-    }
-
-    private function getSystemPromptForAIEmpresa(
-        string $pedidosInfo = '',
-        string $infoEmpresa = '',
-        string $name = 'Cliente',
-        string $ansInfo = ''
-    ): string {
-        return <<<PROMPT
-Eres el asesor comercial de Alimentos La Hacienda.
-
-Hablas como una persona real del equipo de ventas.
-Nunca digas que eres una inteligencia artificial.
-Si el cliente pregunta si eres humano responde únicamente:
-"Soy asesor del equipo de Alimentos La Hacienda y estoy aquí para ayudarte con tu pedido."
-
-CONTEXTO:
-{$infoEmpresa}
-
-HISTORIAL DEL CLIENTE:
-{$pedidosInfo}
-
-{$ansInfo}
-
-REGLAS DE ESTILO:
-- Lenguaje natural
-- Cercano pero profesional
-- Máximo 3 a 5 líneas por mensaje
-- No párrafos largos
-- No sonar robótico
-- No usar lenguaje técnico
-- No hacer muchas preguntas juntas
-- Usa emojis moderados: 😊 👍 🚚
-
-SALUDO:
-Siempre saluda primero.
-
-FLUJO:
-1. Entender qué necesita
-2. Validar ubicación preguntando: ¿En qué barrio se encuentra?
-3. Validar cobertura
-4. Construir pedido
-5. Pedir datos solo cuando ya decidió
-6. Confirmar
-7. Cerrar
-
-REGLAS DE ANS:
-- Si el cliente pregunta por cancelar o adicionar, primero debes respetar la validación que ya hizo el sistema.
-- No prometas cancelar o adicionar si el tiempo ANS ya expiró.
-- Si el sistema indica que sí es posible, guía al cliente al siguiente paso.
-
-SOLICITUD DE DATOS:
-Para continuar necesito:
-✅ Nombre
-✅ Dirección
-✅ Barrio
-✅ Teléfono
-
-CONFIRMACIÓN FINAL:
-Antes de confirmar el pedido, SIEMPRE pide validación al cliente.
-
-Debes iniciar así:
-"Por favor revisa tu pedido 👇"
-
-Luego mostrar:
-Perfecto 👍
-Te comparto el detalle:
-
-📦 Pedido
-[detalle]
-
-📍 Dirección
-[dirección]
-
-👤 Recibe
-[nombre]
-
-📞 Teléfono
-[teléfono]
-
-💵 Pago
-Contra entrega
-
-Y SIEMPRE terminar con:
-"¿Todo correcto para confirmar?"
-
-SOLO cuando el cliente confirme claramente con mensajes como:
-- sí
-- si
-- correcto
-- sí correcto
-- confirmado
-- si confirmado
-- ok
-- listo
-- confirmar
-
-y ya tengas productos, dirección, barrio, nombre y teléfono, debes:
-
-1. responder natural
-2. incluir JSON válido entre [JSON_ORDER] y [/JSON_ORDER]
-3. terminar exactamente con [PEDIDO_CONFIRMADO]
-
-JSON OBLIGATORIO:
-[JSON_ORDER]{
-  "products":[
-    {
-      "name":"Producto",
-      "quantity":1,
-      "unit":"unidad",
-      "price":0,
-      "subtotal":0
-    }
-  ],
-  "address":"Dirección completa",
-  "neighborhood":"Barrio",
-  "location":"Ciudad o zona",
-  "customer_name":"Nombre del cliente",
-  "phone":"Teléfono",
-  "payment_method":"contra entrega",
-  "pickup_time":"",
-  "total":0,
-  "notes":"Resumen corto del pedido"
-}[/JSON_ORDER][PEDIDO_CONFIRMADO]
-
-IMPORTANTE:
-- No generes [PEDIDO_CONFIRMADO] si aún falta nombre, dirección, barrio o teléfono.
-- No inventes productos ni cantidades.
-- Si no sabes pickup_time, envíalo vacío: ""
-- No metas datos importantes solo en notes.
-- address, neighborhood, customer_name y phone deben venir separados.
-PROMPT;
-    }
-
-    private function buscarPedidosCliente(string $from, string $message): string
-    {
-        $message = strtolower($message);
-
-        $palabras = [
-            'pedido',
-            'domicilio',
-            'orden',
-            'estado',
-            'seguimiento',
-            'compra',
-            'comprar',
-            'direccion',
-            'dirección',
-            'barrio',
-            'pago',
-            'contra entrega',
-            'cancelar',
-            'anular',
-            'adicionar',
-            'agregar',
-            'modificar',
-            'editar',
-            'cambiar',
-        ];
-
-        $esConsulta = false;
-
-        foreach ($palabras as $p) {
-            if (str_contains($message, $p)) {
-                $esConsulta = true;
-                break;
-            }
-        }
-
-        if (!$esConsulta) {
-            return '';
-        }
-
-        $telefonoNormalizado = $this->normalizarTelefono($from);
-
-        $pedidos = Pedido::with(['sede', 'detalles'])
-            ->orderByDesc('fecha_pedido')
-            ->orderByDesc('id')
-            ->get()
-            ->filter(function ($pedido) use ($telefonoNormalizado) {
-                $pedidoTelefono = $this->normalizarTelefono($pedido->telefono);
-
-                return $pedidoTelefono === $telefonoNormalizado
-                    || str_contains($pedidoTelefono, $telefonoNormalizado)
-                    || str_contains($telefonoNormalizado, $pedidoTelefono);
-            })
-            ->take(3);
-
-        if ($pedidos->isEmpty()) {
-            return "ℹ️ No se encontraron pedidos recientes para este número.\n";
-        }
-
-        $texto = "📦 HISTORIAL DEL CLIENTE:\n\n";
-
-        foreach ($pedidos as $pedido) {
-            $texto .= "Pedido #{$pedido->id}\n";
-            $texto .= "Estado: {$pedido->estado}\n";
-            $texto .= "Fecha: {$pedido->fecha_pedido->format('d/m/Y H:i')}\n";
-            $texto .= "Barrio/Sede: " . ($pedido->sede->nombre ?? 'No especificada') . "\n\n";
-        }
-
-        return $texto;
-    }
-
-    private function guardarPedidoDesdeRespuestaIA(
-        string $reply,
-        string $from,
-        string $name,
-        array $conversationHistory,
-        string $cacheKey
-    ): string {
-        try {
-            DB::beginTransaction();
-
-            if (!preg_match('/\[JSON_ORDER\](.*?)\[\/JSON_ORDER\]/s', $reply, $jsonMatches)) {
-                throw new \Exception('No se encontró [JSON_ORDER]');
-            }
-
-            $jsonString = trim($jsonMatches[1]);
-            $orderData = json_decode($jsonString, true);
-
-            if (json_last_error() !== JSON_ERROR_NONE) {
-                throw new \Exception('JSON inválido: ' . json_last_error_msg());
-            }
-
-            if (empty($orderData['products']) || !is_array($orderData['products'])) {
-                throw new \Exception('Pedido sin productos');
-            }
-
-            $confirmKey = "pedido_confirmado_{$from}";
-            if (Cache::has($confirmKey)) {
-                Log::warning('⚠️ PEDIDO YA CONFIRMADO RECIENTEMENTE', [
-                    'phone' => $from
-                ]);
-
-                DB::rollBack();
-                return "Tu pedido ya fue registrado anteriormente 😊";
-            }
-
-            Cache::put($confirmKey, true, now()->addMinutes(2));
-
-            $sedeNombre = $orderData['location']
-                ?? $orderData['neighborhood']
-                ?? 'No especificada';
-
-            $sede = Sede::where('nombre', 'LIKE', "%{$sedeNombre}%")->first() ?? Sede::first();
-
-            $pickupTime = null;
-            if (!empty($orderData['pickup_time'])) {
-                $pickupTime = $orderData['pickup_time'];
-            }
-
-            $notas = $orderData['notes'] ?? '';
-            if (!empty($orderData['address'])) {
-                $notas .= ($notas ? ' | ' : '') . 'Dirección: ' . $orderData['address'];
-            }
-            if (!empty($orderData['neighborhood'])) {
-                $notas .= ($notas ? ' | ' : '') . 'Barrio: ' . $orderData['neighborhood'];
-            }
-            if (!empty($orderData['payment_method'])) {
-                $notas .= ($notas ? ' | ' : '') . 'Pago: ' . $orderData['payment_method'];
-            }
-
-            $pedido = Pedido::create([
-                'sede_id'               => $sede?->id,
-                'fecha_pedido'          => now(),
-                'hora_entrega'          => $pickupTime,
-                'estado'                => 'confirmado',
-                'total'                 => $orderData['total'] ?? 0,
-                'notas'                 => $notas ?: 'Solicitud realizada vía WhatsApp',
-                'cliente_nombre'        => $orderData['customer_name'] ?? $name,
-                'telefono'              => $orderData['phone'] ?? $from,
-                'canal'                 => 'whatsapp',
-                'conversacion_completa' => json_encode($conversationHistory, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT),
-                'resumen_conversacion'  => $orderData['notes'] ?? '',
-            ]);
-
-            foreach (($orderData['products'] ?? []) as $product) {
-                DetallePedido::create([
-                    'pedido_id'       => $pedido->id,
-                    'producto'        => $product['name'] ?? 'Producto/Servicio',
-                    'cantidad'        => (float) ($product['quantity'] ?? 1),
-                    'unidad'          => $product['unit'] ?? 'unidad',
-                    'precio_unitario' => (float) ($product['price'] ?? 0),
-                    'subtotal'        => (float) ($product['subtotal'] ?? 0),
-                ]);
-            }
-
-            DB::commit();
-
-            broadcast(new PedidoConfirmado($pedido));
-            Cache::forget($cacheKey);
-
-            $mensajeCliente = trim(preg_replace('/\[JSON_ORDER\].*?\[\/JSON_ORDER\]/s', '', $reply));
-            $mensajeCliente = trim(str_replace('[PEDIDO_CONFIRMADO]', '', $reply));
-
-            return $mensajeCliente . "\n\n📋 Número de solicitud: #{$pedido->id}\nGuárdalo para consultar el estado.";
-        } catch (\Throwable $e) {
-            DB::rollBack();
-
-            Log::error('❌ ERROR CRÍTICO AL GUARDAR SOLICITUD', [
-                'error'             => $e->getMessage(),
-                'reply_ia_completo' => $reply,
-            ]);
-
-            return '⚠️ Tu pedido no se pudo registrar en este momento. Ya lo estamos revisando.';
-        }
+        return fmod($cantidad, 1.0) == 0.0
+            ? number_format($cantidad, 0, ',', '.')
+            : number_format($cantidad, 2, ',', '.');
     }
 }
