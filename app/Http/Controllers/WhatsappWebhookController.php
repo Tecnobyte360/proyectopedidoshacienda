@@ -32,19 +32,48 @@ class WhatsappWebhookController extends Controller
         }
 
         if (empty($data)) {
-            return response()->json(['status' => 'error']);
+            Log::warning('⚠️ Webhook vacío');
+            return response()->json(['status' => 'error', 'message' => 'Payload vacío'], 400);
         }
 
-        $from    = $data['from'] ?? $data['phoneNumber'] ?? null;
-        $message = trim($data['body'] ?? $data['message'] ?? $data['text'] ?? '');
+        // Normalizar estructura real del webhook
+        $from = $data['chat']['phone']
+            ?? $data['from']
+            ?? $data['phoneNumber']
+            ?? null;
+
+        $name = $data['chat']['name']
+            ?? $data['name']
+            ?? 'Cliente';
+
+        $message = trim(
+            $data['mensaje']['body']
+            ?? $data['body']
+            ?? $data['message']
+            ?? $data['text']
+            ?? ''
+        );
+
+        Log::info('📥 DATOS NORMALIZADOS', [
+            'from' => $from,
+            'name' => $name,
+            'message' => $message,
+        ]);
 
         if (!$from || !$message) {
-            Log::warning('⚠️ Mensaje ignorado por falta de datos', compact('from', 'message'));
+            Log::warning('⚠️ Mensaje ignorado por falta de datos', [
+                'from' => $from,
+                'name' => $name,
+                'message' => $message,
+                'payload' => $data,
+            ]);
+
             return response()->json(['status' => 'ignored']);
         }
 
         Log::info('✅ MENSAJE CLIENTE', [
             'from'    => $from,
+            'name'    => $name,
             'message' => $message,
         ]);
 
@@ -57,10 +86,11 @@ class WhatsappWebhookController extends Controller
         }
 
         $pedidosInfo = $this->buscarPedidosCliente($from, $message);
-        $systemPrompt = $this->getSystemPromptForAIDoblamos($pedidosInfo, $this->infoEmpresa());
+        $systemPrompt = $this->getSystemPromptForAIDoblamos($pedidosInfo, $this->infoEmpresa(), $name);
 
         try {
             $messages = [['role' => 'system', 'content' => $systemPrompt]];
+
             foreach ($conversationHistory as $msg) {
                 $messages[] = $msg;
             }
@@ -75,7 +105,7 @@ class WhatsappWebhookController extends Controller
                 ]);
 
             if ($responseIA->failed()) {
-                throw new \Exception('OpenAI error: '.$responseIA->status().' '.$responseIA->body());
+                throw new \Exception('OpenAI error: ' . $responseIA->status() . ' ' . $responseIA->body());
             }
 
             $reply = $responseIA->json('choices.0.message.content')
@@ -84,7 +114,7 @@ class WhatsappWebhookController extends Controller
             $conversationHistory[] = ['role' => 'assistant', 'content' => $reply];
 
             if (str_contains($reply, '[PEDIDO_CONFIRMADO]')) {
-                $reply = $this->guardarPedidoDesdeRespuestaIA($reply, $from, $conversationHistory, $cacheKey);
+                $reply = $this->guardarPedidoDesdeRespuestaIA($reply, $from, $name, $conversationHistory, $cacheKey);
             } else {
                 Cache::put($cacheKey, $conversationHistory, now()->addMinutes(45));
             }
@@ -154,11 +184,19 @@ Reglas:
 TXT;
     }
 
-    private function getSystemPromptForAIDoblamos(string $pedidosInfo = '', string $infoEmpresa = ''): string
+    private function getSystemPromptForAIDoblamos(string $pedidosInfo = '', string $infoEmpresa = '', string $name = 'Cliente'): string
     {
         return <<<PROMPT
 Actúas como un asesor comercial por WhatsApp de DOBLAMOS S.A.S.
-No inventes inventario, precios ni tiempos.
+
+Tu tono debe ser humano, breve, claro y útil.
+No digas que eres un bot.
+No inventes inventario, precios, tiempos ni sedes exactas.
+Si faltan datos, pregunta lo mínimo necesario para avanzar.
+
+Nombre del cliente:
+{$name}
+
 CONTEXTO OFICIAL:
 {$infoEmpresa}
 
@@ -166,18 +204,50 @@ MEMORIA DEL CLIENTE:
 {$pedidosInfo}
 
 Si el cliente confirma y ya tienes lo mínimo:
-1. confirmar
+1. confirmar en texto natural
 2. incluir JSON entre [JSON_ORDER] y [/JSON_ORDER]
 3. terminar con [PEDIDO_CONFIRMADO]
+
+JSON esperado:
+[JSON_ORDER]{
+  "products":[
+    {
+      "name":"Producto/Servicio",
+      "quantity":1,
+      "unit":"unidad",
+      "price":0,
+      "subtotal":0,
+      "specs":{
+        "tipo":"",
+        "medidas":"",
+        "calibre_espesor":"",
+        "largo":"",
+        "acabado":"",
+        "observaciones":""
+      }
+    }
+  ],
+  "location":"Ciudad / destino",
+  "pickup_time":"Fecha u horario requerido",
+  "customer_name":"Nombre del contacto",
+  "total":0,
+  "notes":"Resumen"
+}[/JSON_ORDER][PEDIDO_CONFIRMADO]
 PROMPT;
     }
 
     private function buscarPedidosCliente(string $from, string $message): string
     {
         $message = strtolower($message);
-        $palabras = ['pedido','solicitud','cotizacion','cotización','orden','estado','seguimiento','acero','barra','lamina','lámina','tubo','perfil','viga'];
+
+        $palabras = [
+            'pedido', 'solicitud', 'cotizacion', 'cotización', 'orden',
+            'estado', 'seguimiento', 'acero', 'barra', 'lamina', 'lámina',
+            'tubo', 'perfil', 'viga'
+        ];
 
         $esConsulta = false;
+
         foreach ($palabras as $p) {
             if (str_contains($message, $p)) {
                 $esConsulta = true;
@@ -200,6 +270,7 @@ PROMPT;
         }
 
         $texto = "📦 HISTORIAL DEL CLIENTE:\n\n";
+
         foreach ($pedidos as $pedido) {
             $texto .= "Solicitud #{$pedido->id}\n";
             $texto .= "Estado: {$pedido->estado}\n";
@@ -210,8 +281,13 @@ PROMPT;
         return $texto;
     }
 
-    private function guardarPedidoDesdeRespuestaIA(string $reply, string $from, array $conversationHistory, string $cacheKey): string
-    {
+    private function guardarPedidoDesdeRespuestaIA(
+        string $reply,
+        string $from,
+        string $name,
+        array $conversationHistory,
+        string $cacheKey
+    ): string {
         try {
             DB::beginTransaction();
 
@@ -236,7 +312,7 @@ PROMPT;
                 'estado'                => 'confirmado',
                 'total'                 => $orderData['total'] ?? 0,
                 'notas'                 => $orderData['notes'] ?? 'Solicitud realizada vía WhatsApp',
-                'cliente_nombre'        => $orderData['customer_name'] ?? 'Cliente WhatsApp',
+                'cliente_nombre'        => $orderData['customer_name'] ?? $name,
                 'telefono'              => $from,
                 'canal'                 => 'whatsapp',
                 'conversacion_completa' => json_encode($conversationHistory, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT),
