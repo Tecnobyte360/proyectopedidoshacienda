@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,26 +9,37 @@
     <meta name="csrf-token" content="{{ csrf_token() }}" />
 
     @vite(['resources/css/app.css'])
-    
+
     <!-- ✅ ECHO / REVERB -->
     <script src="https://cdn.jsdelivr.net/npm/pusher-js@8.4.0-rc2/dist/web/pusher.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/laravel-echo@1.16.1/dist/echo.iife.js"></script>
-    
-<script>
+
+    <script>
     window.Pusher = Pusher;
+
+    const isLocal =
+        window.location.hostname === 'localhost' ||
+        window.location.hostname === '127.0.0.1';
 
     window.Echo = new Echo({
         broadcaster: 'reverb',
         key: 'app-key',
-        wsHost: 'pedidosonline.tecnobyte360.com',
-        wsPort: 443,
-        wssPort: 443,
-        forceTLS: true,
-       enabledTransports: ['ws', 'wss'],
+
+        wsHost: isLocal ? '127.0.0.1' : 'pedidosonline.tecnobyte360.com',
+
+        // 🔥 CORREGIDO
+        wsPort: isLocal ? 8080 : 443,
+        wssPort: isLocal ? 8080 : 443,
+
+        forceTLS: !isLocal,
+
+        // 🔥 IMPORTANTE: en local usa SOLO ws
+        enabledTransports: isLocal ? ['ws'] : ['ws', 'wss'],
+
         disableStats: true,
     });
 
-    console.log('✅ Echo configurado y listo');
+    console.log('✅ Echo configurado y listo', isLocal ? 'LOCAL' : 'PRODUCCIÓN');
 </script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
@@ -524,7 +536,7 @@
             gap: 0.8rem;
             max-width: 380px;
             transform: translateX(500px);
-            transition: transform 0.4s cubic-bezier(0.68,-0.55,0.265,1.55);
+            transition: transform 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
             z-index: 1000;
             border-left: 4px solid #16a34a;
         }
@@ -563,15 +575,18 @@
             font-size: 0.9rem;
         }
 
-      .resumen-cell {
-    max-width: 260px;
-    max-height: 90px;          /* altura visible */
-    overflow-y: auto;          /* ✅ scroll vertical */
-    font-size: 0.8rem;
-    color: #4b5563;
-    line-height: 1.35;
-    white-space: normal;       /* ✅ permite salto de línea */
-}
+        .resumen-cell {
+            max-width: 260px;
+            max-height: 90px;
+            /* altura visible */
+            overflow-y: auto;
+            /* ✅ scroll vertical */
+            font-size: 0.8rem;
+            color: #4b5563;
+            line-height: 1.35;
+            white-space: normal;
+            /* ✅ permite salto de línea */
+        }
 
 
 
@@ -622,314 +637,335 @@
         }
     </style>
 </head>
-<body>
-<div class="app-shell">
 
-    <!-- HEADER SUPERIOR -->
-    <header class="app-header">
-        <div class="app-header-left">
-            <div class="app-header-title-row">
-                <span class="app-title-label">Pedidos:</span>
-                <button class="app-header-dropdown">
-                    Todas las sucursales
-                    <span>▾</span>
+<body>
+    <div class="app-shell">
+
+        <!-- HEADER SUPERIOR -->
+        <header class="app-header">
+            <div class="app-header-left">
+                <div class="app-header-title-row">
+                    <span class="app-title-label">Pedidos:</span>
+                    <button class="app-header-dropdown">
+                        Todas las sucursales
+                        <span>▾</span>
+                    </button>
+                </div>
+                <div class="app-header-meta">
+                    <span class="app-header-dot"></span>
+                    <span>Sistema activo · Actualizado en tiempo real</span>
+                </div>
+            </div>
+
+            <div class="app-header-actions">
+                <button class="btn-ghost">Exportar</button>
+                <button class="btn-ghost">Más acciones ▾</button>
+                <button class="btn-primary">Crear pedido</button>
+            </div>
+        </header>
+
+        <!-- TARJETA RESUMEN -->
+        <section class="summary-card">
+            <div class="summary-top">
+                <button class="range-button">
+                    30 días ▾
                 </button>
             </div>
-            <div class="app-header-meta">
-                <span class="app-header-dot"></span>
-                <span>Sistema activo · Actualizado en tiempo real</span>
-            </div>
-        </div>
 
-        <div class="app-header-actions">
-            <button class="btn-ghost">Exportar</button>
-            <button class="btn-ghost">Más acciones ▾</button>
-            <button class="btn-primary">Crear pedido</button>
-        </div>
-    </header>
-
-    <!-- TARJETA RESUMEN -->
-    <section class="summary-card">
-        <div class="summary-top">
-            <button class="range-button">
-                30 días ▾
-            </button>
-        </div>
-
-        <div class="summary-metrics">
-            <div class="summary-metric">
-                <span class="metric-label">Pedidos</span>
-                <div class="metric-value-row">
-                    <span class="metric-value" id="count-total-top">{{ $pedidos->count() }}</span>
+            <div class="summary-metrics">
+                <div class="summary-metric">
+                    <span class="metric-label">Pedidos</span>
+                    <div class="metric-value-row">
+                        <span class="metric-value" id="count-total-top">{{ $pedidos->count() }}</span>
+                    </div>
+                    <span class="metric-trend">▲ 0%</span>
                 </div>
-                <span class="metric-trend">▲ 0%</span>
-            </div>
 
-            <div class="summary-metric">
-                <span class="metric-label">Pedidos hoy</span>
-                <div class="metric-value-row">
-                    <span class="metric-value" id="count-today">
-                        {{ $pedidos->where('fecha_pedido', '>=', now()->startOfDay())->count() }}
-                    </span>
+                <div class="summary-metric">
+                    <span class="metric-label">Pedidos hoy</span>
+                    <div class="metric-value-row">
+                        <span class="metric-value" id="count-today">
+                            {{ $pedidos->where('fecha_pedido', '>=', now()->startOfDay())->count() }}
+                        </span>
+                    </div>
+                    <span class="metric-trend">▲ 0%</span>
                 </div>
-                <span class="metric-trend">▲ 0%</span>
-            </div>
 
-            <div class="summary-metric">
-                <span class="metric-label">Confirmados</span>
-                <div class="metric-value-row">
-                    <span class="metric-value" id="count-confirmed">
-                        {{ $pedidos->where('estado', 'confirmado')->count() }}
-                    </span>
+                <div class="summary-metric">
+                    <span class="metric-label">Confirmados</span>
+                    <div class="metric-value-row">
+                        <span class="metric-value" id="count-confirmed">
+                            {{ $pedidos->where('estado', 'confirmado')->count() }}
+                        </span>
+                    </div>
+                    <span class="metric-trend">▲ 0%</span>
                 </div>
-                <span class="metric-trend">▲ 0%</span>
-            </div>
 
-            <div class="summary-metric">
-                <span class="metric-label">En proceso</span>
-                <div class="metric-value-row">
-                    <span class="metric-value" id="count-processing">
-                        {{ $pedidos->whereIn('estado', ['pendiente', 'en_preparacion'])->count() }}
-                    </span>
+                <div class="summary-metric">
+                    <span class="metric-label">En proceso</span>
+                    <div class="metric-value-row">
+                        <span class="metric-value" id="count-processing">
+                            {{ $pedidos->whereIn('estado', ['pendiente', 'en_preparacion'])->count() }}
+                        </span>
+                    </div>
+                    <span class="metric-trend">▲ 0%</span>
                 </div>
-                <span class="metric-trend">▲ 0%</span>
-            </div>
 
-            <div class="summary-metric">
-                <span class="metric-label">Entregados</span>
-                <div class="metric-value-row">
-                    <span class="metric-value">
-                        {{ $pedidos->where('estado', 'completado')->count() }}
-                    </span>
+                <div class="summary-metric">
+                    <span class="metric-label">Entregados</span>
+                    <div class="metric-value-row">
+                        <span class="metric-value">
+                            {{ $pedidos->where('estado', 'completado')->count() }}
+                        </span>
+                    </div>
+                    <span class="metric-trend">▲ 0%</span>
                 </div>
-                <span class="metric-trend">▲ 0%</span>
-            </div>
 
-            <div class="summary-metric">
-                <span class="metric-label">Cancelados</span>
-                <div class="metric-value-row">
-                    <span class="metric-value">
-                        {{ $pedidos->where('estado', 'cancelado')->count() }}
-                    </span>
+                <div class="summary-metric">
+                    <span class="metric-label">Cancelados</span>
+                    <div class="metric-value-row">
+                        <span class="metric-value">
+                            {{ $pedidos->where('estado', 'cancelado')->count() }}
+                        </span>
+                    </div>
+                    <span class="metric-trend" style="color:#dc2626;">▼ 0%</span>
                 </div>
-                <span class="metric-trend" style="color:#dc2626;">▼ 0%</span>
             </div>
-        </div>
-    </section>
+        </section>
 
-    <!-- TABLA -->
-    <section class="table-card">
-        <!-- Filtros -->
-        <div class="filters-row">
-            <div class="filters-tabs">
-                <button class="filter-pill active">Todo</button>
-                <button class="filter-pill">No preparado</button>
-                <button class="filter-pill">Sin pagar</button>
-                <button class="filter-pill">Abierto</button>
-                <button class="filter-pill">Cerrado</button>
-                <button class="filter-pill">Automatizaciones</button>
-                <button class="filter-pill">Entrega local</button>
+        <!-- TABLA -->
+        <section class="table-card">
+            <!-- Filtros -->
+            <div class="filters-row">
+                <div class="filters-tabs">
+                    <button class="filter-pill active">Todo</button>
+                    <button class="filter-pill">No preparado</button>
+                    <button class="filter-pill">Sin pagar</button>
+                    <button class="filter-pill">Abierto</button>
+                    <button class="filter-pill">Cerrado</button>
+                    <button class="filter-pill">Automatizaciones</button>
+                    <button class="filter-pill">Entrega local</button>
+                </div>
+                <div class="filters-actions">
+                    <button class="icon-button">🔍</button>
+                    <button class="icon-button">⟳</button>
+                </div>
             </div>
-            <div class="filters-actions">
-                <button class="icon-button">🔍</button>
-                <button class="icon-button">⟳</button>
+
+            <div class="table-header">
+                Pedidos en tiempo real desde WhatsApp
             </div>
-        </div>
 
-        <div class="table-header">
-            Pedidos en tiempo real desde WhatsApp
-        </div>
-
-        <div class="table-wrapper">
-            <table>
-                <thead>
-                <tr>
-                    <th>Pedido</th>
-                    <th>Fecha</th>
-                    <th>Cliente</th>
-                    <th>Teléfono</th>
-                    <th>Productos</th>
-                    <th>Resumen</th> <!-- 👈 NUEVO -->
-                    <th>Sede</th>
-                    <th>Hora entrega</th>
-                    <th>Estado</th>
-                    <th>Total</th>
-                </tr>
-                </thead>
-                <tbody id="pedidos-tbody">
-                @forelse($pedidos as $pedido)
-                    <tr data-pedido-id="{{ $pedido->id }}">
-                        <td>
-                            <div class="id-badge">#{{ $pedido->id }}</div>
-                        </td>
-                        <td>
-                            <div class="fecha-cell">
-                                {{ $pedido->created_at->format('d/m/Y') }}
-                                <div class="fecha-hora">{{ $pedido->created_at->format('H:i') }}</div>
-                            </div>
-                        </td>
-                        <td>
-                            <div class="cliente-cell">
-                                <div class="cliente-avatar">
-                                    {{ strtoupper(substr($pedido->cliente_nombre, 0, 1)) }}
-                                </div>
-                                <span class="cliente-name">{{ $pedido->cliente_nombre }}</span>
-                            </div>
-                        </td>
-                        <td>
-                            <a href="https://wa.me/{{ $pedido->telefono }}" target="_blank" class="telefono-link">
-                                {{ $pedido->telefono }}
-                            </a>
-                        </td>
-                        <td>
-                            <div class="productos-container">
-                                <div class="productos-grid">
-                                    @foreach($pedido->detalles as $detalle)
-                                        <div class="producto-item">
-                                    @php
-$cantidad = rtrim(rtrim(number_format($detalle->cantidad, 2, ',', '.'), '0'), ',');
-@endphp
-
-<div class="producto-cantidad">{{ $cantidad }}</div>
-<div class="producto-info">
-    <span class="producto-unidad">
-        {{ strtoupper($detalle->unidad) }}
-    </span>
-    <span class="producto-nombre">{{ $detalle->producto }}</span>
-</div>
-
-                                            <div class="producto-info">
-                                                <span class="producto-unidad">{{ $detalle->unidad }}</span>
-                                              
-                                            </div>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Pedido</th>
+                            <th>Fecha</th>
+                            <th>Cliente</th>
+                            <th>Teléfono</th>
+                            <th>Productos</th>
+                            <th>Resumen</th> <!-- 👈 NUEVO -->
+                            <th>Sede</th>
+                            <th>Hora entrega</th>
+                            <th>Estado</th>
+                            <th>Total</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pedidos-tbody">
+                        @forelse($pedidos as $pedido)
+                            <tr data-pedido-id="{{ $pedido->id }}">
+                                <td>
+                                    <div class="id-badge">#{{ $pedido->id }}</div>
+                                </td>
+                                <td>
+                                    <div class="fecha-cell">
+                                        {{ $pedido->created_at->format('d/m/Y') }}
+                                        <div class="fecha-hora">{{ $pedido->created_at->format('H:i') }}</div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="cliente-cell">
+                                        <div class="cliente-avatar">
+                                            {{ strtoupper(substr($pedido->cliente_nombre, 0, 1)) }}
                                         </div>
-                                    @endforeach
-                                </div>
-                            </div>
-                        </td>
-                       <td>
-   <div class="resumen-cell" title="{{ $pedido->resumen_conversacion }}">
-    {{ $pedido->resumen_conversacion }}
-</div>
+                                        <span class="cliente-name">{{ $pedido->cliente_nombre }}</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <a href="https://wa.me/{{ $pedido->telefono }}" target="_blank"
+                                        class="telefono-link">
+                                        {{ $pedido->telefono }}
+                                    </a>
+                                </td>
+                                <td>
+                                    <div class="productos-container">
+                                        <div class="productos-grid">
+                                            @foreach ($pedido->detalles as $detalle)
+                                                <div class="producto-item">
+                                                    @php
+                                                        $cantidad = rtrim(
+                                                            rtrim(number_format($detalle->cantidad, 2, ',', '.'), '0'),
+                                                            ',',
+                                                        );
+                                                    @endphp
 
-</td>
+                                                    <div class="producto-cantidad">{{ $cantidad }}</div>
+                                                    <div class="producto-info">
+                                                        <span class="producto-unidad">
+                                                            {{ strtoupper($detalle->unidad) }}
+                                                        </span>
+                                                        <span class="producto-nombre">{{ $detalle->producto }}</span>
+                                                    </div>
 
-                        <td>
-                            <span class="sede-badge">
-                                {{ $pedido->sede?->nombre ?? 'N/A' }}
-                            </span>
-                        </td>
-                        <td>
-                            <span class="hora-badge">
-                                {{ $pedido->hora_entrega }}
-                            </span>
-                        </td>
-                        <td>
-                            @php
-                                $estados = [
-                                    'confirmado' => ['class' => 'confirmado', 'icon' => '●'],
-                                    'pendiente' => ['class' => 'pendiente', 'icon' => '●'],
-                                    'completado' => ['class' => 'completado', 'icon' => '●'],
-                                    'cancelado' => ['class' => 'cancelado', 'icon' => '●'],
-                                ];
-                                $estado = $estados[$pedido->estado] ?? ['class' => 'pendiente', 'icon' => '●'];
-                            @endphp
-                            <span class="estado-badge {{ $estado['class'] }}">
-                                <span style="font-size:0.6rem;">{{ $estado['icon'] }}</span>
-                                <span>{{ ucfirst($pedido->estado) }}</span>
-                            </span>
-                        </td>
-                        <td>
-                            <div class="total-cell">
-                                ${{ number_format($pedido->total, 0, ',', '.') }}
-                            </div>
-                        </td>
-                    </tr>
-                @empty
-                    <tr>
-                        <td colspan="10">
-                            <div class="empty-state">
-                                No hay pedidos todavía. Cuando entren por WhatsApp aparecerán aquí.
-                            </div>
-                        </td>
-                    </tr>
-                @endforelse
-                </tbody>
-            </table>
+                                                    <div class="producto-info">
+                                                        <span class="producto-unidad">{{ $detalle->unidad }}</span>
+
+                                                    </div>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="resumen-cell" title="{{ $pedido->resumen_conversacion }}">
+                                        {{ $pedido->resumen_conversacion }}
+                                    </div>
+
+                                </td>
+
+                                <td>
+                                    <span class="sede-badge">
+                                        {{ $pedido->sede?->nombre ?? 'N/A' }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="hora-badge">
+                                        {{ $pedido->hora_entrega }}
+                                    </span>
+                                </td>
+                                <td>
+                                    @php
+                                        $estados = [
+                                            'confirmado' => ['class' => 'confirmado', 'icon' => '●'],
+                                            'pendiente' => ['class' => 'pendiente', 'icon' => '●'],
+                                            'completado' => ['class' => 'completado', 'icon' => '●'],
+                                            'cancelado' => ['class' => 'cancelado', 'icon' => '●'],
+                                        ];
+                                        $estado = $estados[$pedido->estado] ?? ['class' => 'pendiente', 'icon' => '●'];
+                                    @endphp
+                                    <span class="estado-badge {{ $estado['class'] }}">
+                                        <span style="font-size:0.6rem;">{{ $estado['icon'] }}</span>
+                                        <span>{{ ucfirst($pedido->estado) }}</span>
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="total-cell">
+                                        ${{ number_format($pedido->total, 0, ',', '.') }}
+                                    </div>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="10">
+                                    <div class="empty-state">
+                                        No hay pedidos todavía. Cuando entren por WhatsApp aparecerán aquí.
+                                    </div>
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+
+    <!-- TOAST -->
+    <div id="notification-toast" class="toast">
+        <div class="toast-icon">
+            <svg width="20" height="20" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
         </div>
-    </section>
-</div>
-
-<!-- TOAST -->
-<div id="notification-toast" class="toast">
-    <div class="toast-icon">
-        <svg width="20" height="20" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-        </svg>
+        <div>
+            <div class="toast-title">¡Nuevo pedido confirmado!</div>
+            <div class="toast-message" id="toast-message"></div>
+        </div>
+        <button class="toast-close" onclick="closeToast()">✕</button>
     </div>
-    <div>
-        <div class="toast-title">¡Nuevo pedido confirmado!</div>
-        <div class="toast-message" id="toast-message"></div>
-    </div>
-    <button class="toast-close" onclick="closeToast()">✕</button>
-</div>
 
-<script>
-    console.log('🔍 Iniciando sistema de pedidos...');
+    <script>
+        console.log('🔍 Iniciando sistema de pedidos...');
 
-    if (!window.Echo) {
-        console.error('❌ Echo NO está disponible');
-    } else {
-        console.log('✅ Echo disponible');
-        
-        window.Echo.channel('pedidos')
-            .listen('.pedido.confirmado', (event) => {
-                console.log('🎉 Nuevo pedido recibido:', event);
-                
-                updateCounters();
-                addPedidoRow(event);
-                showNotification(event);
-                playNotificationSound();
-            });
+        if (!window.Echo) {
+            console.error('❌ Echo NO está disponible');
+        } else {
+            console.log('✅ Echo disponible');
 
-        console.log('✅ Escuchando canal: pedidos');
-    }
+            window.Echo.channel('pedidos')
+                .listen('.pedido.confirmado', (event) => {
+                    console.log('🎉 Nuevo pedido recibido:', event);
 
-    function addPedidoRow(pedido) {
-        const tbody = document.getElementById('pedidos-tbody');
-        
-        if (tbody.querySelector('td[colspan]')) {
-            tbody.innerHTML = '';
+                    updateCounters();
+                    addPedidoRow(event);
+                    showNotification(event);
+                    playNotificationSound();
+                });
+
+            console.log('✅ Escuchando canal: pedidos');
         }
-        
-        const estadoConfig = {
-            'confirmado': { class: 'confirmado', icon: '●' },
-            'pendiente':  { class: 'pendiente',  icon: '●' },
-            'completado': { class: 'completado', icon: '●' },
-            'cancelado':  { class: 'cancelado',  icon: '●' }
-        };
-        
-        const estado = estadoConfig[pedido.estado] || { class: 'pendiente', icon: '●' };
-        
-        const productosHTML = pedido.detalles.map(d => 
-            `<div class="producto-item">
+
+        function addPedidoRow(pedido) {
+            const tbody = document.getElementById('pedidos-tbody');
+
+            if (tbody.querySelector('td[colspan]')) {
+                tbody.innerHTML = '';
+            }
+
+            const estadoConfig = {
+                'confirmado': {
+                    class: 'confirmado',
+                    icon: '●'
+                },
+                'pendiente': {
+                    class: 'pendiente',
+                    icon: '●'
+                },
+                'completado': {
+                    class: 'completado',
+                    icon: '●'
+                },
+                'cancelado': {
+                    class: 'cancelado',
+                    icon: '●'
+                }
+            };
+
+            const estado = estadoConfig[pedido.estado] || {
+                class: 'pendiente',
+                icon: '●'
+            };
+
+            const productosHTML = pedido.detalles.map(d =>
+                `<div class="producto-item">
                 <div class="producto-cantidad">${d.cantidad}</div>
                 <div class="producto-info">
                     <span class="producto-unidad">${d.unidad}</span>
                     <span class="producto-nombre">${d.producto}</span>
                 </div>
             </div>`
-        ).join('');
+            ).join('');
 
-        const firstLetter = pedido.cliente_nombre.charAt(0).toUpperCase();
-        const resumen = pedido.resumen_conversacion || '';
-        const resumenCorto = resumen.length > 120 ? resumen.substring(0, 117) + '...' : resumen;
-        const resumenTitle = resumen.replace(/"/g, '&quot;');
-        
-        const row = document.createElement('tr');
-        row.dataset.pedidoId = pedido.id;
-        
-        row.innerHTML = `
+            const firstLetter = pedido.cliente_nombre.charAt(0).toUpperCase();
+            const resumen = pedido.resumen_conversacion || '';
+            const resumenCorto = resumen.length > 120 ? resumen.substring(0, 117) + '...' : resumen;
+            const resumenTitle = resumen.replace(/"/g, '&quot;');
+
+            const row = document.createElement('tr');
+            row.dataset.pedidoId = pedido.id;
+
+            row.innerHTML = `
             <td><div class="id-badge">#${pedido.id}</div></td>
             <td>
                 <div class="fecha-cell">
@@ -973,62 +1009,63 @@ $cantidad = rtrim(rtrim(number_format($detalle->cantidad, 2, ',', '.'), '0'), ',
                 <div class="total-cell">$${pedido.total}</div>
             </td>
         `;
-        
-        tbody.insertBefore(row, tbody.firstChild);
-    }
 
-    function showNotification(pedido) {
-        const toast = document.getElementById('notification-toast');
-        const message = document.getElementById('toast-message');
-        
-        message.textContent = `Pedido #${pedido.id} - ${pedido.cliente_nombre}`;
-        
-        toast.classList.add('show');
-        
-        setTimeout(() => {
-            closeToast();
-        }, 5000);
-    }
-
-    function closeToast() {
-        const toast = document.getElementById('notification-toast');
-        toast.classList.remove('show');
-    }
-
-    function updateCounters() {
-        function bump(id) {
-            const el = document.getElementById(id);
-            if (!el) return;
-            const current = parseInt(el.textContent || '0');
-            el.textContent = current + 1;
+            tbody.insertBefore(row, tbody.firstChild);
         }
-        bump('count-today');
-        bump('count-confirmed');
-        bump('count-total-top');
-    }
 
-    function playNotificationSound() {
-        try {
-            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            const playTone = (frequency, startTime, duration) => {
-                const oscillator = audioContext.createOscillator();
-                const gainNode = audioContext.createGain();
-                oscillator.connect(gainNode);
-                gainNode.connect(audioContext.destination);
-                oscillator.frequency.value = frequency;
-                oscillator.type = 'sine';
-                gainNode.gain.setValueAtTime(0.2, audioContext.currentTime + startTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + startTime + duration);
-                oscillator.start(audioContext.currentTime + startTime);
-                oscillator.stop(audioContext.currentTime + startTime + duration);
-            };
-            playTone(523.25, 0, 0.15);
-            playTone(659.25, 0.1, 0.15);
-            playTone(783.99, 0.2, 0.25);
-        } catch (error) {
-            console.log('No se pudo reproducir el sonido:', error);
+        function showNotification(pedido) {
+            const toast = document.getElementById('notification-toast');
+            const message = document.getElementById('toast-message');
+
+            message.textContent = `Pedido #${pedido.id} - ${pedido.cliente_nombre}`;
+
+            toast.classList.add('show');
+
+            setTimeout(() => {
+                closeToast();
+            }, 5000);
         }
-    }
-</script>
+
+        function closeToast() {
+            const toast = document.getElementById('notification-toast');
+            toast.classList.remove('show');
+        }
+
+        function updateCounters() {
+            function bump(id) {
+                const el = document.getElementById(id);
+                if (!el) return;
+                const current = parseInt(el.textContent || '0');
+                el.textContent = current + 1;
+            }
+            bump('count-today');
+            bump('count-confirmed');
+            bump('count-total-top');
+        }
+
+        function playNotificationSound() {
+            try {
+                const audioContext = new(window.AudioContext || window.webkitAudioContext)();
+                const playTone = (frequency, startTime, duration) => {
+                    const oscillator = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+                    oscillator.frequency.value = frequency;
+                    oscillator.type = 'sine';
+                    gainNode.gain.setValueAtTime(0.2, audioContext.currentTime + startTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + startTime + duration);
+                    oscillator.start(audioContext.currentTime + startTime);
+                    oscillator.stop(audioContext.currentTime + startTime + duration);
+                };
+                playTone(523.25, 0, 0.15);
+                playTone(659.25, 0.1, 0.15);
+                playTone(783.99, 0.2, 0.25);
+            } catch (error) {
+                console.log('No se pudo reproducir el sonido:', error);
+            }
+        }
+    </script>
 </body>
+
 </html>
