@@ -4,7 +4,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use App\Events\PedidoConfirmado;
 use App\Livewire\Pedidos\Index as PedidosIndex;
-use App\Livewire\pedidos\SeguimientoPedido;
+use App\Livewire\Pedidos\SeguimientoPedido;
 use App\Models\Sede;
 use App\Models\Pedido;
 use App\Models\DetallePedido;

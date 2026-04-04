@@ -352,10 +352,25 @@
                                 </td>
 
                                 <td class="px-4 py-3.5 text-center align-middle">
-                                    <button type="button" wire:click="abrirModalEstado({{ $pedido->id }})"
-                                        class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900">
-                                        <i class="fa-solid fa-pen-to-square text-sm"></i>
-                                    </button>
+                                    @if ($pedido->estado === \App\Models\Pedido::ESTADO_NUEVO)
+                                        <button type="button" wire:click="marcarEnPreparacion({{ $pedido->id }})"
+                                            class="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-3 py-2 text-xs font-bold text-white transition hover:bg-amber-600">
+                                            <i class="fa-solid fa-utensils"></i>
+                                            En proceso
+                                        </button>
+                                    @elseif($pedido->estado === \App\Models\Pedido::ESTADO_EN_PREPARACION)
+                                        <span
+                                            class="inline-flex items-center gap-2 rounded-xl bg-amber-50 px-3 py-2 text-xs font-bold text-amber-700 border border-amber-200">
+                                            <i class="fa-solid fa-utensils"></i>
+                                            En preparación
+                                        </span>
+                                    @else
+                                        <span
+                                            class="inline-flex items-center gap-2 rounded-xl bg-slate-100 px-3 py-2 text-xs font-bold text-slate-600 border border-slate-200">
+                                            <i class="fa-solid fa-circle-info"></i>
+                                            {{ ucfirst(str_replace('_', ' ', $pedido->estado)) }}
+                                        </span>
+                                    @endif
                                 </td>
                             </tr>
                         @empty
@@ -376,7 +391,7 @@
                 </table>
             </div>
         </div>
-       
+
         {{-- TOAST --}}
         <div id="toast"
             class="pointer-events-none fixed bottom-5 right-5 z-50 hidden min-w-[320px] max-w-sm rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-emerald-100 p-4 shadow-[0_20px_50px_rgba(16,185,129,0.22)]">

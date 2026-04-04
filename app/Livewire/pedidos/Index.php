@@ -9,12 +9,6 @@ class Index extends Component
 {
     public $pedidos = [];
 
-    public $mostrarModalEstado = false;
-    public $pedidoSeleccionadoId = null;
-    public $nuevoEstado = '';
-    public $tituloEstado = '';
-    public $descripcionEstado = '';
-
     protected $listeners = [
         'pedidoActualizado' => 'cargarPedidos',
     ];
@@ -31,58 +25,26 @@ class Index extends Component
             ->get();
     }
 
-    public function abrirModalEstado($pedidoId)
+    public function marcarEnPreparacion($pedidoId)
     {
         $pedido = Pedido::findOrFail($pedidoId);
 
-        $this->pedidoSeleccionadoId = $pedido->id;
-        $this->nuevoEstado = $pedido->estado ?? Pedido::ESTADO_NUEVO;
-        $this->tituloEstado = '';
-        $this->descripcionEstado = '';
-        $this->mostrarModalEstado = true;
-    }
-
-    public function cerrarModalEstado()
-    {
-        $this->mostrarModalEstado = false;
-        $this->pedidoSeleccionadoId = null;
-        $this->nuevoEstado = '';
-        $this->tituloEstado = '';
-        $this->descripcionEstado = '';
-    }
-
-    public function actualizarEstadoPedido()
-    {
-        $this->validate([
-            'pedidoSeleccionadoId' => 'required|exists:pedidos,id',
-            'nuevoEstado' => 'required|string|in:' . implode(',', array_keys(Pedido::estadosDisponibles())),
-            'tituloEstado' => 'nullable|string|max:150',
-            'descripcionEstado' => 'nullable|string|max:1000',
-        ]);
-
-        $pedido = Pedido::findOrFail($this->pedidoSeleccionadoId);
-
         $pedido->cambiarEstado(
-            $this->nuevoEstado,
-            $this->descripcionEstado ?: null,
-            $this->tituloEstado ?: null,
+            Pedido::ESTADO_EN_PREPARACION,
+            'Tu pedido ya está en preparación.',
+            'Pedido en preparación',
             auth()->user()?->name,
             auth()->id()
         );
 
         $this->cargarPedidos();
-        $this->cerrarModalEstado();
-
         $this->dispatch('pedidoActualizado');
     }
 
     public function render()
     {
         return view('livewire.pedidos.index', [
-            'pedidos' => collect($this->pedidos),
-            'estadosDisponibles' => Pedido::estadosDisponibles(),
-            'mostrarModalEstado' => $this->mostrarModalEstado,
-            'pedidoSeleccionadoId' => $this->pedidoSeleccionadoId,
+            'pedidos' => $this->pedidos,
         ])->layout('layouts.app');
     }
 }
