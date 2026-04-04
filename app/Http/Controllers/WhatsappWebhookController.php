@@ -840,6 +840,8 @@ class WhatsappWebhookController extends Controller
                 'fecha_pedido'          => now(),
                 'hora_entrega'          => $pickupTime,
                 'estado'                => 'nuevo',
+                'fecha_estado'          => now(),
+                'observacion_estado'    => 'Pedido creado automáticamente desde WhatsApp',
                 'total'                 => (float) ($orderData['total'] ?? 0),
                 'notas'                 => $notas,
                 'cliente_nombre'        => $orderData['customer_name'] ?? $name,
@@ -864,16 +866,20 @@ class WhatsappWebhookController extends Controller
 
             DB::commit();
 
-            broadcast(new PedidoConfirmado($pedido->fresh(['sede', 'detalles'])));
-            broadcast(new PedidoActualizado($pedido->fresh(['sede', 'detalles']), 'confirmado'));
+            $pedido->load(['sede', 'detalles', 'historialEstados']);
+
+            broadcast(new PedidoConfirmado($pedido));
+            broadcast(new PedidoActualizado($pedido, 'nuevo'));
 
             Cache::forget($cacheKey);
 
             Log::info('✅ PEDIDO GUARDADO', [
-                'pedido_id'          => $pedido->id,
-                'from'               => $from,
-                'telefono_whatsapp'  => $telefonoWhatsapp,
-                'telefono_contacto'  => $telefonoContacto,
+                'pedido_id' => $pedido->id,
+                'codigo_seguimiento' => $pedido->codigo_seguimiento,
+                'url_seguimiento' => $pedido->url_seguimiento,
+                'from' => $from,
+                'telefono_whatsapp' => $telefonoWhatsapp,
+                'telefono_contacto' => $telefonoContacto,
             ]);
 
             return $this->construirMensajeConfirmacionPedido($pedido, $orderData, $name);
@@ -882,7 +888,7 @@ class WhatsappWebhookController extends Controller
             Cache::forget("pedido_confirmado_" . $this->normalizarTelefono($from));
 
             Log::error('❌ ERROR CRÍTICO AL GUARDAR PEDIDO', [
-                'error'      => $e->getMessage(),
+                'error' => $e->getMessage(),
                 'order_data' => $orderData,
             ]);
 
@@ -901,47 +907,51 @@ class WhatsappWebhookController extends Controller
         }
     }
 
-    private function construirMensajeConfirmacionPedido(Pedido $pedido, array $orderData, string $name): string
-    {
-        $lineas = [
-            "¡Listo {$name}! Tu pedido quedó confirmado ✅",
-            '',
-            "📋 *Pedido #{$pedido->id}*",
-        ];
+  private function construirMensajeConfirmacionPedido(Pedido $pedido, array $orderData, string $name): string
+{
+    $lineas = [
+        "¡Listo {$name}! Tu pedido quedó confirmado ✅",
+        '',
+        "📋 *Pedido #{$pedido->id}*",
+    ];
 
-        foreach (($orderData['products'] ?? []) as $prod) {
-            $cant = $this->formatearCantidadPedido((float) ($prod['quantity'] ?? 1));
-            $lineas[] = "• {$prod['name']} — {$cant} {$prod['unit']}";
-        }
-
-        $lineas[] = '';
-
-        if (!empty($orderData['address'])) {
-            $lineas[] = "📍 *Dirección:* {$orderData['address']}";
-        }
-
-        if (!empty($orderData['neighborhood'])) {
-            $lineas[] = "🏘️ *Barrio:* {$orderData['neighborhood']}";
-        }
-
-        if (!empty($pedido->hora_entrega)) {
-            $lineas[] = "🕒 *Entrega estimada:* {$pedido->hora_entrega}";
-        }
-
-        if (!empty($pedido->telefono_contacto)) {
-            $lineas[] = "📞 *Contacto:* {$pedido->telefono_contacto}";
-        }
-
-        $total = (float) $pedido->total;
-        if ($total > 0) {
-            $lineas[] = "💵 *Total:* $" . number_format($total, 0, ',', '.');
-        }
-
-        $lineas[] = '';
-        $lineas[] = "Guarda el número *#{$pedido->id}* para consultar el estado de tu pedido. 😊";
-
-        return implode("\n", $lineas);
+    foreach (($orderData['products'] ?? []) as $prod) {
+        $cant = $this->formatearCantidadPedido((float) ($prod['quantity'] ?? 1));
+        $unidad = $prod['unit'] ?? 'unidad';
+        $lineas[] = "• {$prod['name']} — {$cant} {$unidad}";
     }
+
+    $lineas[] = '';
+
+    if (!empty($orderData['address'])) {
+        $lineas[] = "📍 *Dirección:* {$orderData['address']}";
+    }
+
+    if (!empty($orderData['neighborhood'])) {
+        $lineas[] = "🏘️ *Barrio:* {$orderData['neighborhood']}";
+    }
+
+    if (!empty($pedido->hora_entrega)) {
+        $lineas[] = "🕒 *Entrega estimada:* {$pedido->hora_entrega}";
+    }
+
+    if (!empty($pedido->telefono_contacto)) {
+        $lineas[] = "📞 *Contacto:* {$pedido->telefono_contacto}";
+    }
+
+    $total = (float) $pedido->total;
+    if ($total > 0) {
+        $lineas[] = "💵 *Total:* $" . number_format($total, 0, ',', '.');
+    }
+
+    $lineas[] = '';
+    $lineas[] = "🔎 Puedes seguir tu pedido aquí:";
+    $lineas[] = $pedido->url_seguimiento;
+    $lineas[] = '';
+    $lineas[] = "Guarda también tu número de pedido *#{$pedido->id}* para futuras consultas 😊";
+
+    return implode("\n", $lineas);
+}
 
     /*
     |==========================================================================
@@ -1564,42 +1574,48 @@ PROMPT;
         }
     }
 
-    private function cancelarPedidoAutomaticamente(Pedido $pedido, string $name): string
-    {
-        try {
-            if ($pedido->estado === 'cancelado') {
-                return "Hola {$name} 😊\nEl pedido #{$pedido->id} ya se encuentra cancelado.";
-            }
-
-            $pedido->estado = 'cancelado';
-            $pedido->save();
-
-            broadcast(new PedidoActualizado($pedido->fresh(['sede', 'detalles']), 'cancelado'));
-
-            Log::info('✅ PEDIDO CANCELADO AUTOMÁTICAMENTE', [
-                'pedido_id' => $pedido->id,
-                'estado'    => $pedido->estado,
-            ]);
-
-            return "Hola {$name} 😊\nTu pedido #{$pedido->id} fue cancelado correctamente ❌";
-        } catch (\Throwable $e) {
-            Log::error('❌ ERROR CANCELANDO PEDIDO', [
-                'pedido_id' => $pedido->id,
-                'error'     => $e->getMessage(),
-            ]);
-
-            $this->notificarFallaWhatsapp(
-                'ERROR CANCELANDO PEDIDO',
-                'Ocurrió un error al cancelar automáticamente un pedido.',
-                [
-                    'pedido_id' => $pedido->id,
-                    'error' => $e->getMessage(),
-                ]
-            );
-
-            return "Hola {$name} 😊\nNo pude cancelar el pedido #{$pedido->id} en este momento.";
+   private function cancelarPedidoAutomaticamente(Pedido $pedido, string $name): string
+{
+    try {
+        if ($pedido->estado === 'cancelado') {
+            return "Hola {$name} 😊\nEl pedido #{$pedido->id} ya se encuentra cancelado.";
         }
+
+        $pedido->cambiarEstado(
+            'cancelado',
+            'Cancelación confirmada por el cliente desde WhatsApp.',
+            'Pedido cancelado'
+        );
+
+        $pedido->load(['sede', 'detalles', 'historialEstados']);
+
+        broadcast(new PedidoActualizado($pedido, 'cancelado'));
+
+        Log::info('✅ PEDIDO CANCELADO AUTOMÁTICAMENTE', [
+            'pedido_id' => $pedido->id,
+            'estado' => $pedido->estado,
+            'url_seguimiento' => $pedido->url_seguimiento,
+        ]);
+
+        return "Hola {$name} 😊\nTu pedido #{$pedido->id} fue cancelado correctamente ❌\n\nPuedes ver el detalle aquí:\n{$pedido->url_seguimiento}";
+    } catch (\Throwable $e) {
+        Log::error('❌ ERROR CANCELANDO PEDIDO', [
+            'pedido_id' => $pedido->id,
+            'error' => $e->getMessage(),
+        ]);
+
+        $this->notificarFallaWhatsapp(
+            'ERROR CANCELANDO PEDIDO',
+            'Ocurrió un error al cancelar automáticamente un pedido.',
+            [
+                'pedido_id' => $pedido->id,
+                'error' => $e->getMessage(),
+            ]
+        );
+
+        return "Hola {$name} 😊\nNo pude cancelar el pedido #{$pedido->id} en este momento.";
     }
+}
 
     private function esSesionExpiradaWhatsapp(?array $body, string $rawBody = ''): bool
     {
@@ -1650,32 +1666,42 @@ PROMPT;
         return implode("\n", $lineas);
     }
 
-    private function formatearPedidoParaApi(Pedido $pedido): array
-    {
-        return [
-            'id'                   => $pedido->id,
-            'fecha'                => optional($pedido->fecha_pedido)?->format('d/m/Y H:i'),
-            'estado'               => $pedido->estado,
-            'hora_entrega'         => $pedido->hora_entrega ?? 'Por confirmar',
-            'sede'                 => $pedido->sede->nombre ?? 'No especificada',
-            'cliente'              => $pedido->cliente_nombre,
-            'telefono_whatsapp'    => $pedido->telefono_whatsapp ?? $pedido->telefono,
-            'telefono_contacto'    => $pedido->telefono_contacto ?? $pedido->telefono,
-            'telefono'             => $pedido->telefono,
-            'total'                => (float) $pedido->total,
-            'total_formateado'     => number_format((float) $pedido->total, 0, ',', '.'),
-            'notas'                => $pedido->notas,
-            'resumen_conversacion' => $pedido->resumen_conversacion,
-            'productos'            => $pedido->detalles->map(fn($d) => [
-                'producto'        => $d->producto,
-                'cantidad'        => $this->formatearCantidadPedido((float) $d->cantidad),
-                'unidad'          => $d->unidad,
-                'precio_unitario' => $d->precio_unitario,
-                'subtotal'        => $d->subtotal,
-            ])->values(),
-        ];
-    }
+  private function formatearPedidoParaApi(Pedido $pedido): array
+{
+    $pedido->loadMissing(['sede', 'detalles', 'historialEstados']);
 
+    return [
+        'id'                   => $pedido->id,
+        'codigo_seguimiento'   => $pedido->codigo_seguimiento,
+        'url_seguimiento'      => $pedido->url_seguimiento,
+        'fecha'                => optional($pedido->fecha_pedido)?->format('d/m/Y H:i'),
+        'estado'               => $pedido->estado,
+        'hora_entrega'         => $pedido->hora_entrega ?? 'Por confirmar',
+        'sede'                 => $pedido->sede->nombre ?? 'No especificada',
+        'cliente'              => $pedido->cliente_nombre,
+        'telefono_whatsapp'    => $pedido->telefono_whatsapp ?? $pedido->telefono,
+        'telefono_contacto'    => $pedido->telefono_contacto ?? $pedido->telefono,
+        'telefono'             => $pedido->telefono,
+        'total'                => (float) $pedido->total,
+        'total_formateado'     => number_format((float) $pedido->total, 0, ',', '.'),
+        'notas'                => $pedido->notas,
+        'resumen_conversacion' => $pedido->resumen_conversacion,
+        'productos'            => $pedido->detalles->map(fn($d) => [
+            'producto'        => $d->producto,
+            'cantidad'        => $this->formatearCantidadPedido((float) $d->cantidad),
+            'unidad'          => $d->unidad,
+            'precio_unitario' => $d->precio_unitario,
+            'subtotal'        => $d->subtotal,
+        ])->values(),
+        'historial' => $pedido->historialEstados->map(fn($h) => [
+            'estado_anterior' => $h->estado_anterior,
+            'estado_nuevo' => $h->estado_nuevo,
+            'titulo' => $h->titulo,
+            'descripcion' => $h->descripcion,
+            'fecha_evento' => optional($h->fecha_evento)->format('d/m/Y H:i'),
+        ])->values(),
+    ];
+}
     private function extraerNumeroPedidoDesdeMensaje(string $message): ?int
     {
         $msg = mb_strtolower(trim($message));
