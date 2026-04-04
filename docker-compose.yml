@@ -1,0 +1,70 @@
+version: "3.9"
+
+services:
+
+  pedidos_hacienda_app:
+    build: .
+    container_name: pedidos_hacienda_app
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8088:80"
+    volumes:
+      - ./:/var/www/html
+    depends_on:
+      - pedidos_hacienda_db
+      - pedidos_hacienda_reverb
+    networks:
+      - pedidos_hacienda_net
+    environment:
+      BROADCAST_CONNECTION: reverb
+      REVERB_APP_ID: pedidos_hacienda
+      REVERB_APP_KEY: app-key
+      REVERB_APP_SECRET: app-secret
+      REVERB_HOST: pedidos_hacienda_reverb
+      REVERB_PORT: 8080
+      REVERB_SCHEME: http
+
+  pedidos_hacienda_reverb:
+    build: .
+    container_name: pedidos_hacienda_reverb
+    restart: unless-stopped
+    command: php artisan reverb:start --host=0.0.0.0 --port=8080
+    volumes:
+      - ./:/var/www/html
+    ports:
+      - "127.0.0.1:8092:8080"
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      REVERB_APP_ID: pedidos_hacienda
+      REVERB_APP_KEY: app-key
+      REVERB_APP_SECRET: app-secret
+      REVERB_HOST: 0.0.0.0
+      REVERB_PORT: 8080
+      REVERB_SCHEME: http
+    depends_on:
+      - pedidos_hacienda_db
+    networks:
+      - pedidos_hacienda_net
+
+  pedidos_hacienda_db:
+    image: mysql:8.0
+    container_name: pedidos_hacienda_db
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: pedidoshacienda
+      MYSQL_ROOT_PASSWORD: TuRoot123*
+      MYSQL_USER: pedidosuser
+      MYSQL_PASSWORD: TuPassword123*
+    ports:
+      - "127.0.0.1:3311:3306"
+    volumes:
+      - pedidos_hacienda_db_data:/var/lib/mysql
+    networks:
+      - pedidos_hacienda_net
+
+networks:
+  pedidos_hacienda_net:
+
+volumes:
+  pedidos_hacienda_db_data:
