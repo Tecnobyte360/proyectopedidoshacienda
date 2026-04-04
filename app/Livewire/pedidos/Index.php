@@ -44,13 +44,11 @@ class Index extends Component
 
     public function cerrarModalEstado()
     {
-        $this->reset([
-            'mostrarModalEstado',
-            'pedidoSeleccionadoId',
-            'nuevoEstado',
-            'tituloEstado',
-            'descripcionEstado',
-        ]);
+        $this->mostrarModalEstado = false;
+        $this->pedidoSeleccionadoId = null;
+        $this->nuevoEstado = '';
+        $this->tituloEstado = '';
+        $this->descripcionEstado = '';
     }
 
     public function actualizarEstadoPedido()
@@ -78,16 +76,13 @@ class Index extends Component
         $this->dispatch('pedidoActualizado');
     }
 
-    public function getEstadosDisponiblesProperty()
-    {
-        return Pedido::estadosDisponibles();
-    }
-
     public function render()
     {
         return view('livewire.pedidos.index', [
             'pedidos' => collect($this->pedidos),
-            'estadosDisponibles' => $this->estadosDisponibles,
+            'estadosDisponibles' => Pedido::estadosDisponibles(),
+            'mostrarModalEstado' => $this->mostrarModalEstado,
+            'pedidoSeleccionadoId' => $this->pedidoSeleccionadoId,
         ])->layout('layouts.app');
     }
 }
