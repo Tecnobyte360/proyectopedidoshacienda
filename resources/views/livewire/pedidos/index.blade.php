@@ -376,13 +376,13 @@
                 </table>
             </div>
         </div>
-        @if ($mostrarModalEstado)
+        @if ($this->mostrarModalEstado)
             <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
                 <div class="w-full max-w-lg rounded-3xl bg-white shadow-2xl">
                     <div class="border-b border-slate-200 px-6 py-4">
                         <h3 class="text-xl font-bold text-slate-900">Actualizar estado del pedido</h3>
                         <p class="mt-1 text-sm text-slate-500">
-                            Pedido #{{ $pedidoSeleccionadoId }}
+                            Pedido #{{ $this->pedidoSeleccionadoId }}
                         </p>
                     </div>
 
@@ -391,7 +391,7 @@
                             <label class="mb-2 block text-sm font-semibold text-slate-700">Nuevo estado</label>
                             <select wire:model="nuevoEstado"
                                 class="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm">
-                                @foreach ($estadosDisponibles as $valor => $texto)
+                                @foreach ($this->estadosDisponibles as $valor => $texto)
                                     <option value="{{ $valor }}">{{ $texto }}</option>
                                 @endforeach
                             </select>
