@@ -1,13 +1,13 @@
 <?php
 
-namespace App\Livewire\Pedidos;
+namespace App\Livewire\pedidos;
 
 use App\Models\Pedido;
 use Livewire\Component;
 
 class SeguimientoPedido extends Component
 {
-    public Pedido $pedido;
+    public pedido $pedido;
 
     public function mount(string $codigo)
     {
