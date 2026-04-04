@@ -30,11 +30,9 @@
     <livewire:layouts.topbar />
 
     {{-- CONTENIDO --}}
-    <main class="pt-24">
-        <div class="p-6 md:p-8">
-            {{ $slot }}
-        </div>
-    </main>
+  <main class="w-full pt-24">
+    {{ $slot }}
+</main>
 
     @livewireScripts
     @stack('scripts')
