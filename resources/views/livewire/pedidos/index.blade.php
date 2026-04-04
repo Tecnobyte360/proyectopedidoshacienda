@@ -1,5 +1,5 @@
 <div class="min-h-screen bg-white text-slate-800">
-    <div class="mx-auto w-full max-w-[1500px] px-4 py-4 sm:px-5 lg:px-6">
+  <div class="w-full px-4 py-4 sm:px-6 lg:px-8">
 
         @php
             $todos = $pedidos->count();
