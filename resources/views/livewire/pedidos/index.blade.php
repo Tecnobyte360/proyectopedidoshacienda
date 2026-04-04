@@ -1,5 +1,5 @@
 <div class="min-h-screen bg-white text-slate-800">
-  <div class="w-full px-4 py-4 sm:px-6 lg:px-8">
+    <div class="w-full px-4 py-4 sm:px-6 lg:px-8">
 
         @php
             $todos = $pedidos->count();
@@ -352,9 +352,9 @@
                                 </td>
 
                                 <td class="px-4 py-3.5 text-center align-middle">
-                                    <button type="button"
+                                    <button type="button" wire:click="abrirModalEstado({{ $pedido->id }})"
                                         class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900">
-                                        <i class="fa-solid fa-arrow-right text-sm"></i>
+                                        <i class="fa-solid fa-pen-to-square text-sm"></i>
                                     </button>
                                 </td>
                             </tr>
@@ -376,7 +376,66 @@
                 </table>
             </div>
         </div>
+        @if ($mostrarModalEstado)
+            <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
+                <div class="w-full max-w-lg rounded-3xl bg-white shadow-2xl">
+                    <div class="border-b border-slate-200 px-6 py-4">
+                        <h3 class="text-xl font-bold text-slate-900">Actualizar estado del pedido</h3>
+                        <p class="mt-1 text-sm text-slate-500">
+                            Pedido #{{ $pedidoSeleccionadoId }}
+                        </p>
+                    </div>
 
+                    <div class="space-y-4 px-6 py-5">
+                        <div>
+                            <label class="mb-2 block text-sm font-semibold text-slate-700">Nuevo estado</label>
+                            <select wire:model="nuevoEstado"
+                                class="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-100">
+                                <option value="nuevo">Nuevo / Recibido</option>
+                                <option value="en_preparacion">En preparación</option>
+                                <option value="repartidor_en_camino">Repartidor en camino</option>
+                                <option value="recogido">Recogido</option>
+                                <option value="entregado">Entregado</option>
+                                <option value="cancelado">Cancelado</option>
+                            </select>
+                            @error('nuevoEstado')
+                                <span class="mt-1 block text-xs text-rose-600">{{ $message }}</span>
+                            @enderror
+                        </div>
+
+                        {{-- <div>
+                            <label class="mb-2 block text-sm font-semibold text-slate-700">Título</label>
+                            <input type="text" wire:model="tituloEstado" placeholder="Ej: Pedido en preparación"
+                                class="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-100">
+                            @error('tituloEstado')
+                                <span class="mt-1 block text-xs text-rose-600">{{ $message }}</span>
+                            @enderror
+                        </div> --}}
+
+                        <div>
+                            <label class="mb-2 block text-sm font-semibold text-slate-700">Descripción</label>
+                            <textarea wire:model="descripcionEstado" rows="4" placeholder="Escribe una actualización para el cliente"
+                                class="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-100"></textarea>
+                            @error('descripcionEstado')
+                                <span class="mt-1 block text-xs text-rose-600">{{ $message }}</span>
+                            @enderror
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-end gap-3 border-t border-slate-200 px-6 py-4">
+                        <button type="button" wire:click="cerrarModalEstado"
+                            class="rounded-2xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
+                            Cancelar
+                        </button>
+
+                        <button type="button" wire:click="actualizarEstadoPedido"
+                            class="rounded-2xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">
+                            Guardar estado
+                        </button>
+                    </div>
+                </div>
+            </div>
+        @endif
         {{-- TOAST --}}
         <div id="toast"
             class="pointer-events-none fixed bottom-5 right-5 z-50 hidden min-w-[320px] max-w-sm rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-emerald-100 p-4 shadow-[0_20px_50px_rgba(16,185,129,0.22)]">
