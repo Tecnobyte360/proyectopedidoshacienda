@@ -390,46 +390,34 @@
                         <div>
                             <label class="mb-2 block text-sm font-semibold text-slate-700">Nuevo estado</label>
                             <select wire:model="nuevoEstado"
-                                class="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-100">
-                                <option value="nuevo">Nuevo / Recibido</option>
-                                <option value="en_preparacion">En preparación</option>
-                                <option value="repartidor_en_camino">Repartidor en camino</option>
-                                <option value="recogido">Recogido</option>
-                                <option value="entregado">Entregado</option>
-                                <option value="cancelado">Cancelado</option>
+                                class="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm">
+                                @foreach ($estadosDisponibles as $valor => $texto)
+                                    <option value="{{ $valor }}">{{ $texto }}</option>
+                                @endforeach
                             </select>
-                            @error('nuevoEstado')
-                                <span class="mt-1 block text-xs text-rose-600">{{ $message }}</span>
-                            @enderror
                         </div>
 
-                        {{-- <div>
+                        <div>
                             <label class="mb-2 block text-sm font-semibold text-slate-700">Título</label>
-                            <input type="text" wire:model="tituloEstado" placeholder="Ej: Pedido en preparación"
-                                class="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-100">
-                            @error('tituloEstado')
-                                <span class="mt-1 block text-xs text-rose-600">{{ $message }}</span>
-                            @enderror
-                        </div> --}}
+                            <input type="text" wire:model="tituloEstado"
+                                class="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm">
+                        </div>
 
                         <div>
                             <label class="mb-2 block text-sm font-semibold text-slate-700">Descripción</label>
-                            <textarea wire:model="descripcionEstado" rows="4" placeholder="Escribe una actualización para el cliente"
-                                class="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-100"></textarea>
-                            @error('descripcionEstado')
-                                <span class="mt-1 block text-xs text-rose-600">{{ $message }}</span>
-                            @enderror
+                            <textarea wire:model="descripcionEstado" rows="4"
+                                class="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm"></textarea>
                         </div>
                     </div>
 
                     <div class="flex items-center justify-end gap-3 border-t border-slate-200 px-6 py-4">
                         <button type="button" wire:click="cerrarModalEstado"
-                            class="rounded-2xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
+                            class="rounded-2xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700">
                             Cancelar
                         </button>
 
                         <button type="button" wire:click="actualizarEstadoPedido"
-                            class="rounded-2xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">
+                            class="rounded-2xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white">
                             Guardar estado
                         </button>
                     </div>
