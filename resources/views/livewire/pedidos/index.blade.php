@@ -376,54 +376,7 @@
                 </table>
             </div>
         </div>
-        @if ($this->mostrarModalEstado)
-            <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
-                <div class="w-full max-w-lg rounded-3xl bg-white shadow-2xl">
-                    <div class="border-b border-slate-200 px-6 py-4">
-                        <h3 class="text-xl font-bold text-slate-900">Actualizar estado del pedido</h3>
-                        <p class="mt-1 text-sm text-slate-500">
-                            Pedido #{{ $this->pedidoSeleccionadoId }}
-                        </p>
-                    </div>
-
-                    <div class="space-y-4 px-6 py-5">
-                        <div>
-                            <label class="mb-2 block text-sm font-semibold text-slate-700">Nuevo estado</label>
-                            <select wire:model="nuevoEstado"
-                                class="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm">
-                                @foreach ($this->estadosDisponibles as $valor => $texto)
-                                    <option value="{{ $valor }}">{{ $texto }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        <div>
-                            <label class="mb-2 block text-sm font-semibold text-slate-700">Título</label>
-                            <input type="text" wire:model="tituloEstado"
-                                class="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm">
-                        </div>
-
-                        <div>
-                            <label class="mb-2 block text-sm font-semibold text-slate-700">Descripción</label>
-                            <textarea wire:model="descripcionEstado" rows="4"
-                                class="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm"></textarea>
-                        </div>
-                    </div>
-
-                    <div class="flex items-center justify-end gap-3 border-t border-slate-200 px-6 py-4">
-                        <button type="button" wire:click="cerrarModalEstado"
-                            class="rounded-2xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700">
-                            Cancelar
-                        </button>
-
-                        <button type="button" wire:click="actualizarEstadoPedido"
-                            class="rounded-2xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white">
-                            Guardar estado
-                        </button>
-                    </div>
-                </div>
-            </div>
-        @endif
+       
         {{-- TOAST --}}
         <div id="toast"
             class="pointer-events-none fixed bottom-5 right-5 z-50 hidden min-w-[320px] max-w-sm rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-emerald-100 p-4 shadow-[0_20px_50px_rgba(16,185,129,0.22)]">
