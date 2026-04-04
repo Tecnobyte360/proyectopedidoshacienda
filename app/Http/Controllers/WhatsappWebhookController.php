@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 class WhatsappWebhookController extends Controller
 {
@@ -113,6 +114,17 @@ class WhatsappWebhookController extends Controller
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
+
+            $this->notificarFallaWhatsapp(
+                'ERROR EN WEBHOOK DE PEDIDOS',
+                'Ocurrió un error procesando un mensaje entrante de WhatsApp.',
+                [
+                    'error' => $e->getMessage(),
+                    'from' => $from ?? null,
+                    'messageId' => $messageId ?? null,
+                    'connectionId' => $connectionId ?? null,
+                ]
+            );
 
             return response()->json(['status' => 'error', 'message' => 'No se pudo procesar'], 500);
         } finally {
@@ -874,6 +886,17 @@ class WhatsappWebhookController extends Controller
                 'order_data' => $orderData,
             ]);
 
+            $this->notificarFallaWhatsapp(
+                'ERROR GUARDANDO PEDIDO',
+                'Ocurrió un error guardando un pedido generado desde WhatsApp.',
+                [
+                    'from' => $from,
+                    'name' => $name,
+                    'error' => $e->getMessage(),
+                    'orderData' => $orderData,
+                ]
+            );
+
             return '⚠️ Tu pedido no se pudo registrar en este momento. Ya lo estamos revisando, te contactamos en breve.';
         }
     }
@@ -1204,6 +1227,17 @@ PROMPT;
 
             if (!$token) {
                 Log::error('❌ No se pudo obtener token de WhatsApp');
+
+                $this->notificarFallaWhatsapp(
+                    'TOKEN WHATSAPP NO DISPONIBLE',
+                    'No se pudo obtener token para enviar mensajes de WhatsApp.',
+                    [
+                        'from' => $from,
+                        'connectionId' => $connectionId,
+                        'payload' => $payload,
+                    ]
+                );
+
                 return false;
             }
 
@@ -1243,6 +1277,18 @@ PROMPT;
 
                 if (!$newToken) {
                     Log::error('❌ No se pudo renovar el token de WhatsApp');
+
+                    $this->notificarFallaWhatsapp(
+                        'SESIÓN WHATSAPP EXPIRADA',
+                        'La sesión de WhatsApp expiró y no fue posible renovarla automáticamente.',
+                        [
+                            'from' => $from,
+                            'connectionId' => $connectionId,
+                            'status' => $response->status(),
+                            'body' => $rawBody,
+                        ]
+                    );
+
                     return false;
                 }
 
@@ -1256,11 +1302,48 @@ PROMPT;
                     return true;
                 }
 
+                $retryBody = $retryResponse->body();
+
                 Log::error('❌ Falló el reintento de envío a WhatsApp', [
                     'status' => $retryResponse->status(),
-                    'body'   => $retryResponse->body(),
+                    'body'   => $retryBody,
                     'phone'  => $from,
                 ]);
+
+                $this->notificarFallaWhatsapp(
+                    'FALLO REINTENTO WHATSAPP',
+                    'Se intentó reenviar un mensaje después de refrescar la sesión, pero falló.',
+                    [
+                        'from' => $from,
+                        'connectionId' => $connectionId,
+                        'status' => $retryResponse->status(),
+                        'body' => $retryBody,
+                        'payload' => $payload,
+                    ]
+                );
+
+                return false;
+            }
+
+            if ($this->esWhatsappNoConectado($body, $rawBody)) {
+                Log::error('⚠️ WHATSAPP NO CONECTADO', [
+                    'status' => $response->status(),
+                    'body'   => $rawBody,
+                    'phone'  => $from,
+                    'connectionId' => $connectionId,
+                ]);
+
+                $this->notificarFallaWhatsapp(
+                    'WHATSAPP DESCONECTADO',
+                    'La conexión de WhatsApp no está conectada o está en proceso de emparejamiento.',
+                    [
+                        'from' => $from,
+                        'connectionId' => $connectionId,
+                        'status' => $response->status(),
+                        'body' => $rawBody,
+                        'payload' => $payload,
+                    ]
+                );
 
                 return false;
             }
@@ -1271,12 +1354,35 @@ PROMPT;
                 'phone'  => $from,
             ]);
 
+            $this->notificarFallaWhatsapp(
+                'ERROR ENVÍO WHATSAPP',
+                'Ocurrió un error al enviar un mensaje de WhatsApp.',
+                [
+                    'from' => $from,
+                    'connectionId' => $connectionId,
+                    'status' => $response->status(),
+                    'body' => $rawBody,
+                    'payload' => $payload,
+                ]
+            );
+
             return false;
         } catch (\Throwable $e) {
             Log::error('❌ ERROR ENVIANDO A WHATSAPP', [
                 'error' => $e->getMessage(),
                 'phone' => $from,
             ]);
+
+            $this->notificarFallaWhatsapp(
+                'EXCEPCIÓN ENVÍO WHATSAPP',
+                'Se produjo una excepción enviando un mensaje de WhatsApp.',
+                [
+                    'from' => $from,
+                    'connectionId' => $connectionId,
+                    'error' => $e->getMessage(),
+                    'payload' => $payload ?? [],
+                ]
+            );
 
             return false;
         }
@@ -1322,6 +1428,17 @@ PROMPT;
                     'status' => $response->status(),
                     'body'   => $response->body(),
                 ]);
+
+                $this->notificarFallaWhatsapp(
+                    'ERROR LOGIN WHATSAPP',
+                    'Falló el login contra la plataforma de WhatsApp.',
+                    [
+                        'status' => $response->status(),
+                        'body' => $response->body(),
+                        'force' => $force,
+                    ]
+                );
+
                 return null;
             }
 
@@ -1331,6 +1448,16 @@ PROMPT;
                 Log::error('❌ LOGIN WHATSAPP SIN TOKEN', [
                     'body' => $response->body(),
                 ]);
+
+                $this->notificarFallaWhatsapp(
+                    'LOGIN WHATSAPP SIN TOKEN',
+                    'El login de WhatsApp respondió sin token.',
+                    [
+                        'body' => $response->body(),
+                        'force' => $force,
+                    ]
+                );
+
                 return null;
             }
 
@@ -1345,6 +1472,16 @@ PROMPT;
             Log::error('❌ EXCEPCIÓN LOGIN WHATSAPP', [
                 'error' => $e->getMessage(),
             ]);
+
+            $this->notificarFallaWhatsapp(
+                'EXCEPCIÓN LOGIN WHATSAPP',
+                'Se produjo una excepción al iniciar sesión en la plataforma de WhatsApp.',
+                [
+                    'error' => $e->getMessage(),
+                    'force' => $force,
+                ]
+            );
+
             return null;
         }
     }
@@ -1371,6 +1508,15 @@ PROMPT;
                     'body'   => $response->body(),
                 ]);
 
+                $this->notificarFallaWhatsapp(
+                    'ERROR REFRESH TOKEN WHATSAPP',
+                    'Falló el refresh token de la plataforma de WhatsApp.',
+                    [
+                        'status' => $response->status(),
+                        'body' => $response->body(),
+                    ]
+                );
+
                 Cache::forget($cacheKey);
                 return null;
             }
@@ -1381,6 +1527,14 @@ PROMPT;
                 Log::warning('⚠️ REFRESH TOKEN SIN TOKEN NUEVO', [
                     'body' => $response->body(),
                 ]);
+
+                $this->notificarFallaWhatsapp(
+                    'REFRESH TOKEN SIN TOKEN NUEVO',
+                    'El refresh token respondió sin token nuevo.',
+                    [
+                        'body' => $response->body(),
+                    ]
+                );
 
                 Cache::forget($cacheKey);
                 return null;
@@ -1397,6 +1551,14 @@ PROMPT;
             Log::error('❌ EXCEPCIÓN REFRESH TOKEN WHATSAPP', [
                 'error' => $e->getMessage(),
             ]);
+
+            $this->notificarFallaWhatsapp(
+                'EXCEPCIÓN REFRESH TOKEN WHATSAPP',
+                'Se produjo una excepción refrescando el token de WhatsApp.',
+                [
+                    'error' => $e->getMessage(),
+                ]
+            );
 
             return null;
         }
@@ -1425,6 +1587,15 @@ PROMPT;
                 'pedido_id' => $pedido->id,
                 'error'     => $e->getMessage(),
             ]);
+
+            $this->notificarFallaWhatsapp(
+                'ERROR CANCELANDO PEDIDO',
+                'Ocurrió un error al cancelar automáticamente un pedido.',
+                [
+                    'pedido_id' => $pedido->id,
+                    'error' => $e->getMessage(),
+                ]
+            );
 
             return "Hola {$name} 😊\nNo pude cancelar el pedido #{$pedido->id} en este momento.";
         }
@@ -1563,5 +1734,91 @@ PROMPT;
         return fmod($cantidad, 1.0) == 0.0
             ? number_format($cantidad, 0, ',', '.')
             : number_format($cantidad, 2, ',', '.');
+    }
+
+    private function notificarFallaWhatsapp(
+        string $tipo,
+        string $mensaje,
+        array $contexto = [],
+        int $cooldownMinutes = 10
+    ): void {
+        try {
+            $destinatarios = collect(explode(',', (string) env('ALERTAS_TECNICAS_EMAILS', '')))
+                ->map(fn($email) => trim($email))
+                ->filter()
+                ->values()
+                ->all();
+
+            if (empty($destinatarios)) {
+                Log::warning('⚠️ No hay correos configurados para alertas técnicas.');
+                return;
+            }
+
+            $cacheKey = 'alerta_tecnica_' . md5($tipo . '|' . ($contexto['connectionId'] ?? 'sin_conexion'));
+
+            if (Cache::has($cacheKey)) {
+                Log::info('📭 Alerta técnica omitida por cooldown', [
+                    'tipo' => $tipo,
+                    'cache_key' => $cacheKey,
+                ]);
+                return;
+            }
+
+            Cache::put($cacheKey, true, now()->addMinutes($cooldownMinutes));
+
+            $appNombre = env('APP_NOMBRE_ALERTAS', config('app.name', 'Plataforma'));
+            $asunto = "[ALERTA] {$appNombre} - {$tipo}";
+
+            $contenido = [];
+            $contenido[] = "Se ha detectado una novedad en la plataforma de pedidos.";
+            $contenido[] = "";
+            $contenido[] = "Tipo de alerta: {$tipo}";
+            $contenido[] = "Mensaje: {$mensaje}";
+            $contenido[] = "Fecha: " . now()->format('d/m/Y H:i:s');
+            $contenido[] = "Aplicación: {$appNombre}";
+            $contenido[] = "";
+
+            if (!empty($contexto)) {
+                $contenido[] = "Contexto:";
+                foreach ($contexto as $clave => $valor) {
+                    if (is_array($valor) || is_object($valor)) {
+                        $valor = json_encode($valor, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+                    }
+                    $contenido[] = "- {$clave}: {$valor}";
+                }
+                $contenido[] = "";
+            }
+
+            $contenido[] = "Por favor revisar la plataforma.";
+
+            $body = implode("\n", $contenido);
+
+            Mail::raw($body, function ($message) use ($destinatarios, $asunto) {
+                $message->to($destinatarios)->subject($asunto);
+            });
+
+            Log::info('📧 Alerta técnica enviada por correo', [
+                'tipo' => $tipo,
+                'destinatarios' => $destinatarios,
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('❌ No se pudo enviar la alerta técnica por correo', [
+                'tipo' => $tipo,
+                'error' => $e->getMessage(),
+                'contexto' => $contexto,
+            ]);
+        }
+    }
+
+    private function esWhatsappNoConectado(?array $body, string $rawBody = ''): bool
+    {
+        $error = strtoupper((string) data_get($body, 'error', ''));
+
+        if ($error === 'ERR_WAPP_NOT_CONNECTED') {
+            return true;
+        }
+
+        return str_contains(strtoupper($rawBody), 'ERR_WAPP_NOT_CONNECTED')
+            || str_contains(strtoupper($rawBody), 'NOT_CONNECTED');
     }
 }
