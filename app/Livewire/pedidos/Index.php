@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Livewire\Pedidos;
+namespace App\Livewire\pedidos;
 
 use Livewire\Component;
 use App\Models\Pedido;
