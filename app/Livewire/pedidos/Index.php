@@ -9,6 +9,16 @@ class Index extends Component
 {
     public $pedidos = [];
 
+    public $mostrarModalEstado = false;
+    public $pedidoSeleccionadoId = null;
+    public $nuevoEstado = '';
+    public $tituloEstado = '';
+    public $descripcionEstado = '';
+
+    protected $listeners = [
+        'pedidoActualizado' => 'cargarPedidos',
+    ];
+
     public function mount()
     {
         $this->cargarPedidos();
@@ -16,17 +26,68 @@ class Index extends Component
 
     public function cargarPedidos()
     {
-        $this->pedidos = Pedido::latest()->get();
+        $this->pedidos = Pedido::with(['detalles', 'sede'])
+            ->latest()
+            ->get();
     }
 
-    protected $listeners = [
-        'pedidoActualizado' => 'cargarPedidos',
-    ];
+    public function abrirModalEstado($pedidoId)
+    {
+        $pedido = Pedido::findOrFail($pedidoId);
+
+        $this->pedidoSeleccionadoId = $pedido->id;
+        $this->nuevoEstado = $pedido->estado ?? Pedido::ESTADO_NUEVO;
+        $this->tituloEstado = '';
+        $this->descripcionEstado = '';
+        $this->mostrarModalEstado = true;
+    }
+
+    public function cerrarModalEstado()
+    {
+        $this->reset([
+            'mostrarModalEstado',
+            'pedidoSeleccionadoId',
+            'nuevoEstado',
+            'tituloEstado',
+            'descripcionEstado',
+        ]);
+    }
+
+    public function actualizarEstadoPedido()
+    {
+        $this->validate([
+            'pedidoSeleccionadoId' => 'required|exists:pedidos,id',
+            'nuevoEstado' => 'required|string|in:' . implode(',', array_keys(Pedido::estadosDisponibles())),
+            'tituloEstado' => 'nullable|string|max:150',
+            'descripcionEstado' => 'nullable|string|max:1000',
+        ]);
+
+        $pedido = Pedido::findOrFail($this->pedidoSeleccionadoId);
+
+        $pedido->cambiarEstado(
+            $this->nuevoEstado,
+            $this->descripcionEstado ?: null,
+            $this->tituloEstado ?: null,
+            auth()->user()?->name,
+            auth()->id()
+        );
+
+        $this->cargarPedidos();
+        $this->cerrarModalEstado();
+
+        $this->dispatch('pedidoActualizado');
+    }
+
+    public function getEstadosDisponiblesProperty()
+    {
+        return Pedido::estadosDisponibles();
+    }
 
     public function render()
     {
         return view('livewire.pedidos.index', [
-            'pedidos' => $this->pedidos,
+            'pedidos' => collect($this->pedidos),
+            'estadosDisponibles' => $this->estadosDisponibles,
         ])->layout('layouts.app');
     }
 }

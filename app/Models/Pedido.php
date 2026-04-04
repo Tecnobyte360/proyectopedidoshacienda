@@ -12,6 +12,7 @@ class Pedido extends Model
 
     protected $table = 'pedidos';
 
+    // ✅ ESTADOS CENTRALIZADOS
     const ESTADO_NUEVO = 'nuevo';
     const ESTADO_EN_PREPARACION = 'en_preparacion';
     const ESTADO_REPARTIDOR_EN_CAMINO = 'repartidor_en_camino';
@@ -48,9 +49,16 @@ class Pedido extends Model
         'total'            => 'decimal:2',
     ];
 
+    /*
+    |--------------------------------------------------------------------------
+    | BOOT
+    |--------------------------------------------------------------------------
+    */
+
     protected static function booted()
     {
         static::creating(function ($pedido) {
+
             if (empty($pedido->codigo_seguimiento)) {
                 $pedido->codigo_seguimiento = (string) Str::uuid();
             }
@@ -65,6 +73,7 @@ class Pedido extends Model
         });
 
         static::created(function ($pedido) {
+
             $pedido->registrarHistorial(
                 estadoNuevo: $pedido->estado,
                 estadoAnterior: null,
@@ -73,6 +82,12 @@ class Pedido extends Model
             );
         });
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | RELACIONES
+    |--------------------------------------------------------------------------
+    */
 
     public function sede()
     {
@@ -86,12 +101,28 @@ class Pedido extends Model
 
     public function historialEstados()
     {
-        return $this->hasMany(HistorialEstadoPedido::class)->orderBy('fecha_evento', 'asc');
+        return $this->hasMany(HistorialEstadoPedido::class)
+            ->orderBy('fecha_evento', 'asc');
     }
 
-    public function cambiarEstado(string $nuevoEstado, ?string $descripcion = null, ?string $titulo = null, ?string $usuario = null, ?int $usuarioId = null): void
-    {
+    /*
+    |--------------------------------------------------------------------------
+    | LÓGICA DE ESTADOS
+    |--------------------------------------------------------------------------
+    */
+
+    public function cambiarEstado(
+        string $nuevoEstado,
+        ?string $descripcion = null,
+        ?string $titulo = null,
+        ?string $usuario = null,
+        ?int $usuarioId = null
+    ): void {
         $estadoAnterior = $this->estado;
+
+        if ($estadoAnterior === $nuevoEstado) {
+            return;
+        }
 
         $this->estado = $nuevoEstado;
         $this->fecha_estado = now();
@@ -107,6 +138,7 @@ class Pedido extends Model
 
         $this->save();
 
+        // 🔥 HISTORIAL
         $this->registrarHistorial(
             estadoNuevo: $nuevoEstado,
             estadoAnterior: $estadoAnterior,
@@ -115,6 +147,9 @@ class Pedido extends Model
             usuario: $usuario,
             usuarioId: $usuarioId
         );
+
+        // 🚀 NOTIFICAR CLIENTE
+        $this->notificarClienteCambioEstado();
     }
 
     public function registrarHistorial(
@@ -125,16 +160,59 @@ class Pedido extends Model
         ?string $usuario = null,
         ?int $usuarioId = null
     ): void {
+
         $this->historialEstados()->create([
             'estado_anterior' => $estadoAnterior,
             'estado_nuevo'    => $estadoNuevo,
-            'titulo'          => $titulo,
+            'titulo'          => $titulo ?? $this->tituloPorEstado($estadoNuevo),
             'descripcion'     => $descripcion,
             'usuario'         => $usuario,
             'usuario_id'      => $usuarioId,
             'fecha_evento'    => now(),
         ]);
     }
+    public function notificarClienteCambioEstado(): void
+{
+    if (!$this->telefono_whatsapp) {
+        return;
+    }
+
+    $mensaje = match ($this->estado) {
+        self::ESTADO_EN_PREPARACION =>
+            "👨‍🍳 ¡Hola {$this->cliente_nombre}!\n\nTu pedido ya está en preparación 🥩🔥",
+
+        self::ESTADO_REPARTIDOR_EN_CAMINO =>
+            "🛵 ¡Tu pedido va en camino!\n\nPrepárate que ya casi llega 🚀",
+
+        self::ESTADO_ENTREGADO =>
+            "✅ Pedido entregado\n\nGracias por tu compra 🙌",
+
+        self::ESTADO_CANCELADO =>
+            "❌ Tu pedido fue cancelado\n\nSi tienes dudas escríbenos",
+
+        default =>
+            "📦 Tu pedido ha sido actualizado",
+    };
+
+    // 🔥 URL de seguimiento
+    $mensaje .= "\n\n🔎 Puedes seguirlo aquí:\n{$this->url_seguimiento}";
+
+    // 🚀 ENVÍO A TU API WHATSAPP
+    try {
+        \Illuminate\Support\Facades\Http::post(env('WHATSAPP_API_URL') . '/send-message', [
+            'phone' => $this->telefono_whatsapp,
+            'message' => $mensaje,
+        ]);
+    } catch (\Exception $e) {
+        \Log::error('Error enviando WhatsApp pedido: ' . $e->getMessage());
+    }
+}
+
+    /*
+    |--------------------------------------------------------------------------
+    | HELPERS
+    |--------------------------------------------------------------------------
+    */
 
     public function getUrlSeguimientoAttribute(): string
     {
@@ -145,11 +223,24 @@ class Pedido extends Model
     {
         return [
             self::ESTADO_NUEVO => 'Nuevo / Recibido',
-            self::ESTADO_EN_PREPARACION => 'En progreso / Preparación',
+            self::ESTADO_EN_PREPARACION => 'En preparación',
             self::ESTADO_REPARTIDOR_EN_CAMINO => 'Repartidor en camino',
-            self::ESTADO_RECOGIDO => 'Recogido / Código de verificación',
-            self::ESTADO_ENTREGADO => 'Finalizado / Entregado',
+            self::ESTADO_RECOGIDO => 'Recogido',
+            self::ESTADO_ENTREGADO => 'Entregado',
             self::ESTADO_CANCELADO => 'Cancelado',
         ];
+    }
+
+    public static function tituloPorEstado(string $estado): string
+    {
+        return match ($estado) {
+            self::ESTADO_NUEVO => 'Pedido recibido',
+            self::ESTADO_EN_PREPARACION => 'En preparación',
+            self::ESTADO_REPARTIDOR_EN_CAMINO => 'En camino',
+            self::ESTADO_RECOGIDO => 'Pedido recogido',
+            self::ESTADO_ENTREGADO => 'Pedido entregado',
+            self::ESTADO_CANCELADO => 'Pedido cancelado',
+            default => 'Actualización de pedido',
+        };
     }
 }
