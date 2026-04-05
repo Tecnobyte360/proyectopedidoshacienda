@@ -2,26 +2,13 @@
     <div class="w-full px-4 py-4 sm:px-6 lg:px-8">
 
         @php
-            $todos       = $pedidos->count();
-            $nuevos      = $pedidos->where('estado', \App\Models\Pedido::ESTADO_NUEVO)->count();
-            $enProceso   = $pedidos->where('estado', \App\Models\Pedido::ESTADO_EN_PREPARACION)->count();
+            $todos = $pedidos->count();
+            $nuevos = $pedidos->where('estado', \App\Models\Pedido::ESTADO_NUEVO)->count();
+            $enProceso = $pedidos->where('estado', \App\Models\Pedido::ESTADO_EN_PREPARACION)->count();
             $despachados = $pedidos->where('estado', \App\Models\Pedido::ESTADO_REPARTIDOR_EN_CAMINO)->count();
-            $entregados  = $pedidos->where('estado', \App\Models\Pedido::ESTADO_ENTREGADO)->count();
-            $cancelados  = $pedidos->where('estado', \App\Models\Pedido::ESTADO_CANCELADO)->count();
+            $entregados = $pedidos->where('estado', \App\Models\Pedido::ESTADO_ENTREGADO)->count();
+            $cancelados = $pedidos->where('estado', \App\Models\Pedido::ESTADO_CANCELADO)->count();
 
-            // ✅ Usamos las constantes del modelo como valores de filtro en la URL
-            $tab  = request('estado', 'todos');
-            $zona = request('zona', 'todas');
-
-            $pedidosFiltrados = $pedidos;
-
-            if ($tab !== 'todos') {
-                $pedidosFiltrados = $pedidosFiltrados->where('estado', $tab);
-            }
-
-            if ($zona !== 'todas') {
-                $pedidosFiltrados = $pedidosFiltrados->where('zona', $zona);
-            }
         @endphp
 
         {{-- HEADER PRINCIPAL --}}
@@ -120,65 +107,84 @@
         <div class="mt-4 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
             <div class="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
                 <div class="flex flex-wrap gap-2">
-                    {{-- ✅ Todos los href ahora usan las constantes reales del modelo --}}
-                    <a href="{{ request()->fullUrlWithQuery(['estado' => 'todos']) }}"
-                        class="inline-flex h-10 items-center gap-2 rounded-xl px-4 text-sm font-semibold transition {{ $tab === 'todos' ? 'bg-slate-900 text-white shadow-sm' : 'border border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50' }}">
+                    <button type="button" wire:click="cambiarTab('todos')"
+                        class="inline-flex h-10 items-center gap-2 rounded-xl px-4 text-sm font-semibold transition {{ $estado === 'todos' ? 'bg-slate-900 text-white shadow-sm' : 'border border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50' }}">
                         <i class="fa-solid fa-table-cells-large text-xs"></i>
                         Todos
-                        <span class="rounded-full bg-black/10 px-2 py-0.5 text-[11px] {{ $tab === 'todos' ? 'bg-white/15 text-white' : '' }}">{{ $todos }}</span>
-                    </a>
+                        <span
+                            class="rounded-full bg-black/10 px-2 py-0.5 text-[11px] {{ $estado === 'todos' ? 'bg-white/15 text-white' : '' }}">
+                            {{ $todos }}
+                        </span>
+                    </button>
 
-                    <a href="{{ request()->fullUrlWithQuery(['estado' => \App\Models\Pedido::ESTADO_NUEVO]) }}"
-                        class="inline-flex h-10 items-center gap-2 rounded-xl px-4 text-sm font-semibold transition {{ $tab === \App\Models\Pedido::ESTADO_NUEVO ? 'bg-blue-600 text-white shadow-sm' : 'border border-slate-200 bg-white text-slate-600 hover:bg-blue-50 hover:text-blue-600' }}">
+                    <button type="button" wire:click="cambiarTab('{{ \App\Models\Pedido::ESTADO_NUEVO }}')"
+                        class="inline-flex h-10 items-center gap-2 rounded-xl px-4 text-sm font-semibold transition {{ $estado === \App\Models\Pedido::ESTADO_NUEVO ? 'bg-blue-600 text-white shadow-sm' : 'border border-slate-200 bg-white text-slate-600 hover:bg-blue-50 hover:text-blue-600' }}">
                         <i class="fa-solid fa-bell text-xs"></i>
                         Nuevos
-                        <span class="rounded-full bg-black/10 px-2 py-0.5 text-[11px] {{ $tab === \App\Models\Pedido::ESTADO_NUEVO ? 'bg-white/15 text-white' : '' }}">{{ $nuevos }}</span>
-                    </a>
+                        <span
+                            class="rounded-full bg-black/10 px-2 py-0.5 text-[11px] {{ $estado === \App\Models\Pedido::ESTADO_NUEVO ? 'bg-white/15 text-white' : '' }}">
+                            {{ $nuevos }}
+                        </span>
+                    </button>
 
-                    {{-- ✅ Antes era 'en_proceso' — ahora es ESTADO_EN_PREPARACION = 'en_preparacion' --}}
-                    <a href="{{ request()->fullUrlWithQuery(['estado' => \App\Models\Pedido::ESTADO_EN_PREPARACION]) }}"
-                        class="inline-flex h-10 items-center gap-2 rounded-xl px-4 text-sm font-semibold transition {{ $tab === \App\Models\Pedido::ESTADO_EN_PREPARACION ? 'bg-amber-500 text-white shadow-sm' : 'border border-slate-200 bg-white text-slate-600 hover:bg-amber-50 hover:text-amber-600' }}">
+                    <button type="button" wire:click="cambiarTab('{{ \App\Models\Pedido::ESTADO_EN_PREPARACION }}')"
+                        class="inline-flex h-10 items-center gap-2 rounded-xl px-4 text-sm font-semibold transition {{ $estado === \App\Models\Pedido::ESTADO_EN_PREPARACION ? 'bg-amber-500 text-white shadow-sm' : 'border border-slate-200 bg-white text-slate-600 hover:bg-amber-50 hover:text-amber-600' }}">
                         <i class="fa-solid fa-gears text-xs"></i>
                         En proceso
-                        <span class="rounded-full bg-black/10 px-2 py-0.5 text-[11px] {{ $tab === \App\Models\Pedido::ESTADO_EN_PREPARACION ? 'bg-white/15 text-white' : '' }}">{{ $enProceso }}</span>
-                    </a>
+                        <span
+                            class="rounded-full bg-black/10 px-2 py-0.5 text-[11px] {{ $estado === \App\Models\Pedido::ESTADO_EN_PREPARACION ? 'bg-white/15 text-white' : '' }}">
+                            {{ $enProceso }}
+                        </span>
+                    </button>
 
-                    {{-- ✅ Antes era 'despachado' — ahora es ESTADO_REPARTIDOR_EN_CAMINO = 'repartidor_en_camino' --}}
-                    <a href="{{ request()->fullUrlWithQuery(['estado' => \App\Models\Pedido::ESTADO_REPARTIDOR_EN_CAMINO]) }}"
-                        class="inline-flex h-10 items-center gap-2 rounded-xl px-4 text-sm font-semibold transition {{ $tab === \App\Models\Pedido::ESTADO_REPARTIDOR_EN_CAMINO ? 'bg-violet-600 text-white shadow-sm' : 'border border-slate-200 bg-white text-slate-600 hover:bg-violet-50 hover:text-violet-600' }}">
+                    <button type="button"
+                        wire:click="cambiarTab('{{ \App\Models\Pedido::ESTADO_REPARTIDOR_EN_CAMINO }}')"
+                        class="inline-flex h-10 items-center gap-2 rounded-xl px-4 text-sm font-semibold transition {{ $estado === \App\Models\Pedido::ESTADO_REPARTIDOR_EN_CAMINO ? 'bg-violet-600 text-white shadow-sm' : 'border border-slate-200 bg-white text-slate-600 hover:bg-violet-50 hover:text-violet-600' }}">
                         <i class="fa-solid fa-motorcycle text-xs"></i>
                         Despachados
-                        <span class="rounded-full bg-black/10 px-2 py-0.5 text-[11px] {{ $tab === \App\Models\Pedido::ESTADO_REPARTIDOR_EN_CAMINO ? 'bg-white/15 text-white' : '' }}">{{ $despachados }}</span>
-                    </a>
+                        <span
+                            class="rounded-full bg-black/10 px-2 py-0.5 text-[11px] {{ $estado === \App\Models\Pedido::ESTADO_REPARTIDOR_EN_CAMINO ? 'bg-white/15 text-white' : '' }}">
+                            {{ $despachados }}
+                        </span>
+                    </button>
 
-                    <a href="{{ request()->fullUrlWithQuery(['estado' => \App\Models\Pedido::ESTADO_ENTREGADO]) }}"
-                        class="inline-flex h-10 items-center gap-2 rounded-xl px-4 text-sm font-semibold transition {{ $tab === \App\Models\Pedido::ESTADO_ENTREGADO ? 'bg-emerald-600 text-white shadow-sm' : 'border border-slate-200 bg-white text-slate-600 hover:bg-emerald-50 hover:text-emerald-600' }}">
+                    <button type="button" wire:click="cambiarTab('{{ \App\Models\Pedido::ESTADO_ENTREGADO }}')"
+                        class="inline-flex h-10 items-center gap-2 rounded-xl px-4 text-sm font-semibold transition {{ $estado === \App\Models\Pedido::ESTADO_ENTREGADO ? 'bg-emerald-600 text-white shadow-sm' : 'border border-slate-200 bg-white text-slate-600 hover:bg-emerald-50 hover:text-emerald-600' }}">
                         <i class="fa-solid fa-circle-check text-xs"></i>
                         Entregados
-                        <span class="rounded-full bg-black/10 px-2 py-0.5 text-[11px] {{ $tab === \App\Models\Pedido::ESTADO_ENTREGADO ? 'bg-white/15 text-white' : '' }}">{{ $entregados }}</span>
-                    </a>
+                        <span
+                            class="rounded-full bg-black/10 px-2 py-0.5 text-[11px] {{ $estado === \App\Models\Pedido::ESTADO_ENTREGADO ? 'bg-white/15 text-white' : '' }}">
+                            {{ $entregados }}
+                        </span>
+                    </button>
 
-                    <a href="{{ request()->fullUrlWithQuery(['estado' => \App\Models\Pedido::ESTADO_CANCELADO]) }}"
-                        class="inline-flex h-10 items-center gap-2 rounded-xl px-4 text-sm font-semibold transition {{ $tab === \App\Models\Pedido::ESTADO_CANCELADO ? 'bg-rose-600 text-white shadow-sm' : 'border border-slate-200 bg-white text-slate-600 hover:bg-rose-50 hover:text-rose-600' }}">
+                    <button type="button" wire:click="cambiarTab('{{ \App\Models\Pedido::ESTADO_CANCELADO }}')"
+                        class="inline-flex h-10 items-center gap-2 rounded-xl px-4 text-sm font-semibold transition {{ $estado === \App\Models\Pedido::ESTADO_CANCELADO ? 'bg-rose-600 text-white shadow-sm' : 'border border-slate-200 bg-white text-slate-600 hover:bg-rose-50 hover:text-rose-600' }}">
                         <i class="fa-solid fa-ban text-xs"></i>
                         Cancelados
-                        <span class="rounded-full bg-black/10 px-2 py-0.5 text-[11px] {{ $tab === \App\Models\Pedido::ESTADO_CANCELADO ? 'bg-white/15 text-white' : '' }}">{{ $cancelados }}</span>
-                    </a>
+                        <span
+                            class="rounded-full bg-black/10 px-2 py-0.5 text-[11px] {{ $estado === \App\Models\Pedido::ESTADO_CANCELADO ? 'bg-white/15 text-white' : '' }}">
+                            {{ $cancelados }}
+                        </span>
+                    </button>
                 </div>
-
                 <div class="flex flex-col gap-2 sm:flex-row">
                     <form method="GET" class="w-full sm:w-auto">
-                        <input type="hidden" name="estado" value="{{ $tab }}">
+                       <input type="hidden" name="estado" value="{{ $estado }}">
                         <div class="relative min-w-[220px]">
-                            <i class="fa-solid fa-location-dot pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
-                            <select name="zona" onchange="this.form.submit()"
+                            <i
+                                class="fa-solid fa-location-dot pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+
+                            <select wire:model.live="zona"
                                 class="h-10 w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-10 text-sm font-medium text-slate-700 outline-none transition focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-100">
-                                <option value="todas" {{ $zona === 'todas' ? 'selected' : '' }}>Todas las zonas</option>
-                                <option value="norte"  {{ $zona === 'norte'  ? 'selected' : '' }}>Zona Norte</option>
-                                <option value="sur"    {{ $zona === 'sur'    ? 'selected' : '' }}>Zona Sur</option>
-                                <option value="centro" {{ $zona === 'centro' ? 'selected' : '' }}>Zona Centro</option>
+                                <option value="todas">Todas las zonas</option>
+                                <option value="norte">Zona Norte</option>
+                                <option value="sur">Zona Sur</option>
+                                <option value="centro">Zona Centro</option>
                             </select>
-                            <i class="fa-solid fa-chevron-down pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+
+                            <i
+                                class="fa-solid fa-chevron-down pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
                         </div>
                     </form>
                 </div>
@@ -189,7 +195,8 @@
         <div class="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
             <div class="border-b border-slate-200 px-5 py-4">
                 <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <div class="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-600">
+                    <div
+                        class="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-600">
                         <i class="fa-solid fa-database text-[10px]"></i>
                         {{ $pedidosFiltrados->count() }} registros
                     </div>
@@ -200,14 +207,30 @@
                 <table class="min-w-full">
                     <thead class="bg-slate-50">
                         <tr>
-                            <th class="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-[0.22em] text-slate-500">Pedido</th>
-                            <th class="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-[0.22em] text-slate-500">Cliente</th>
-                            <th class="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-[0.22em] text-slate-500">Zona</th>
-                            <th class="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-[0.22em] text-slate-500">Teléfono</th>
-                            <th class="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-[0.22em] text-slate-500">Estado</th>
-                            <th class="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-[0.22em] text-slate-500">Hora</th>
-                            <th class="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-[0.22em] text-slate-500">Total</th>
-                            <th class="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-[0.22em] text-slate-500">Acción</th>
+                            <th
+                                class="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-[0.22em] text-slate-500">
+                                Pedido</th>
+                            <th
+                                class="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-[0.22em] text-slate-500">
+                                Cliente</th>
+                            <th
+                                class="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-[0.22em] text-slate-500">
+                                Zona</th>
+                            <th
+                                class="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-[0.22em] text-slate-500">
+                                Teléfono</th>
+                            <th
+                                class="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-[0.22em] text-slate-500">
+                                Estado</th>
+                            <th
+                                class="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-[0.22em] text-slate-500">
+                                Hora</th>
+                            <th
+                                class="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-[0.22em] text-slate-500">
+                                Total</th>
+                            <th
+                                class="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-[0.22em] text-slate-500">
+                                Acción</th>
                         </tr>
                     </thead>
 
@@ -218,38 +241,41 @@
 
                                 // ✅ match usa las constantes reales del modelo
                                 $badgeClass = match ($estado) {
-                                    \App\Models\Pedido::ESTADO_NUEVO                  => 'bg-blue-50 text-blue-700 border-blue-200',
-                                    \App\Models\Pedido::ESTADO_EN_PREPARACION         => 'bg-amber-50 text-amber-700 border-amber-200',
-                                    \App\Models\Pedido::ESTADO_REPARTIDOR_EN_CAMINO   => 'bg-violet-50 text-violet-700 border-violet-200',
-                                    \App\Models\Pedido::ESTADO_ENTREGADO              => 'bg-emerald-50 text-emerald-700 border-emerald-200',
-                                    \App\Models\Pedido::ESTADO_CANCELADO              => 'bg-rose-50 text-rose-700 border-rose-200',
-                                    default                                           => 'bg-slate-100 text-slate-700 border-slate-200',
+                                    \App\Models\Pedido::ESTADO_NUEVO => 'bg-blue-50 text-blue-700 border-blue-200',
+                                    \App\Models\Pedido::ESTADO_EN_PREPARACION
+                                        => 'bg-amber-50 text-amber-700 border-amber-200',
+                                    \App\Models\Pedido::ESTADO_REPARTIDOR_EN_CAMINO
+                                        => 'bg-violet-50 text-violet-700 border-violet-200',
+                                    \App\Models\Pedido::ESTADO_ENTREGADO
+                                        => 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                                    \App\Models\Pedido::ESTADO_CANCELADO => 'bg-rose-50 text-rose-700 border-rose-200',
+                                    default => 'bg-slate-100 text-slate-700 border-slate-200',
                                 };
 
                                 $dotClass = match ($estado) {
-                                    \App\Models\Pedido::ESTADO_NUEVO                => 'bg-blue-500',
-                                    \App\Models\Pedido::ESTADO_EN_PREPARACION       => 'bg-amber-500',
+                                    \App\Models\Pedido::ESTADO_NUEVO => 'bg-blue-500',
+                                    \App\Models\Pedido::ESTADO_EN_PREPARACION => 'bg-amber-500',
                                     \App\Models\Pedido::ESTADO_REPARTIDOR_EN_CAMINO => 'bg-violet-500',
-                                    \App\Models\Pedido::ESTADO_ENTREGADO            => 'bg-emerald-500',
-                                    \App\Models\Pedido::ESTADO_CANCELADO            => 'bg-rose-500',
-                                    default                                         => 'bg-slate-400',
+                                    \App\Models\Pedido::ESTADO_ENTREGADO => 'bg-emerald-500',
+                                    \App\Models\Pedido::ESTADO_CANCELADO => 'bg-rose-500',
+                                    default => 'bg-slate-400',
                                 };
 
                                 $iconEstado = match ($estado) {
-                                    \App\Models\Pedido::ESTADO_NUEVO                => 'fa-bell',
-                                    \App\Models\Pedido::ESTADO_EN_PREPARACION       => 'fa-gears',
+                                    \App\Models\Pedido::ESTADO_NUEVO => 'fa-bell',
+                                    \App\Models\Pedido::ESTADO_EN_PREPARACION => 'fa-gears',
                                     \App\Models\Pedido::ESTADO_REPARTIDOR_EN_CAMINO => 'fa-motorcycle',
-                                    \App\Models\Pedido::ESTADO_ENTREGADO            => 'fa-circle-check',
-                                    \App\Models\Pedido::ESTADO_CANCELADO            => 'fa-ban',
-                                    default                                         => 'fa-circle',
+                                    \App\Models\Pedido::ESTADO_ENTREGADO => 'fa-circle-check',
+                                    \App\Models\Pedido::ESTADO_CANCELADO => 'fa-ban',
+                                    default => 'fa-circle',
                                 };
 
                                 $labelEstado = match ($estado) {
-                                    \App\Models\Pedido::ESTADO_NUEVO                => 'Nuevo',
-                                    \App\Models\Pedido::ESTADO_EN_PREPARACION       => 'En proceso',
+                                    \App\Models\Pedido::ESTADO_NUEVO => 'Nuevo',
+                                    \App\Models\Pedido::ESTADO_EN_PREPARACION => 'En proceso',
                                     \App\Models\Pedido::ESTADO_REPARTIDOR_EN_CAMINO => 'Despachado',
-                                    \App\Models\Pedido::ESTADO_ENTREGADO            => 'Entregado',
-                                    \App\Models\Pedido::ESTADO_CANCELADO            => 'Cancelado',
+                                    \App\Models\Pedido::ESTADO_ENTREGADO => 'Entregado',
+                                    \App\Models\Pedido::ESTADO_CANCELADO => 'Cancelado',
                                     default => ucfirst(str_replace('_', ' ', $estado)),
                                 };
 
@@ -263,7 +289,8 @@
                             <tr data-id="{{ $pedido->id }}"
                                 class="transition hover:bg-slate-50 {{ $estado === \App\Models\Pedido::ESTADO_CANCELADO ? 'opacity-75' : '' }}">
                                 <td class="px-4 py-3.5 align-middle">
-                                    <div class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-700">
+                                    <div
+                                        class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-700">
                                         <i class="fa-solid fa-hashtag text-[9px] text-slate-400"></i>
                                         PED-{{ str_pad($pedido->id, 3, '0', STR_PAD_LEFT) }}
                                     </div>
@@ -271,18 +298,22 @@
 
                                 <td class="px-4 py-3.5 align-middle">
                                     <div class="flex items-center gap-3">
-                                        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-xs font-bold text-white">
+                                        <div
+                                            class="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-xs font-bold text-white">
                                             {{ $iniciales ?: 'CL' }}
                                         </div>
                                         <div class="min-w-0">
-                                            <div class="truncate font-semibold text-slate-900">{{ $pedido->cliente_nombre }}</div>
-                                            <div class="text-xs text-slate-500">{{ \Carbon\Carbon::parse($pedido->created_at)->diffForHumans() }}</div>
+                                            <div class="truncate font-semibold text-slate-900">
+                                                {{ $pedido->cliente_nombre }}</div>
+                                            <div class="text-xs text-slate-500">
+                                                {{ \Carbon\Carbon::parse($pedido->created_at)->diffForHumans() }}</div>
                                         </div>
                                     </div>
                                 </td>
 
                                 <td class="px-4 py-3.5 align-middle">
-                                    <span class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-700">
+                                    <span
+                                        class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-700">
                                         <i class="fa-solid fa-location-dot text-indigo-500 text-[11px]"></i>
                                         {{ $pedido->zona ? ucfirst($pedido->zona) : 'Sin zona' }}
                                     </span>
@@ -296,7 +327,8 @@
                                 </td>
 
                                 <td class="px-4 py-3.5 align-middle">
-                                    <span class="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] {{ $badgeClass }}">
+                                    <span
+                                        class="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] {{ $badgeClass }}">
                                         <span class="h-2 w-2 rounded-full {{ $dotClass }}"></span>
                                         <i class="fa-solid {{ $iconEstado }} text-[10px]"></i>
                                         {{ $labelEstado }}
@@ -311,7 +343,8 @@
                                 </td>
 
                                 <td class="px-4 py-3.5 align-middle">
-                                    <span class="inline-flex rounded-xl bg-slate-900 px-3 py-1.5 text-xs font-bold text-white shadow-sm">
+                                    <span
+                                        class="inline-flex rounded-xl bg-slate-900 px-3 py-1.5 text-xs font-bold text-white shadow-sm">
                                         ${{ number_format($pedido->total, 0, ',', '.') }}
                                     </span>
                                 </td>
@@ -319,64 +352,56 @@
                                 <td class="px-4 py-3.5 text-center align-middle">
                                     {{-- ✅ Botón TEST eliminado — era solo para debug --}}
                                     @if ($pedido->estado === \App\Models\Pedido::ESTADO_NUEVO)
-                                        <button type="button"
-                                            wire:click="marcarEnPreparacion({{ $pedido->id }})"
+                                        <button type="button" wire:click="marcarEnPreparacion({{ $pedido->id }})"
                                             wire:loading.attr="disabled"
                                             wire:target="marcarEnPreparacion({{ $pedido->id }})"
                                             class="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-3 py-2 text-xs font-bold text-white transition hover:bg-amber-600 disabled:opacity-60 disabled:cursor-not-allowed">
-                                            <i class="fa-solid fa-utensils"
-                                                wire:loading.class="hidden"
+                                            <i class="fa-solid fa-utensils" wire:loading.class="hidden"
                                                 wire:target="marcarEnPreparacion({{ $pedido->id }})"></i>
                                             <i class="fa-solid fa-spinner fa-spin hidden"
                                                 wire:loading.class.remove="hidden"
                                                 wire:target="marcarEnPreparacion({{ $pedido->id }})"></i>
                                             Iniciar preparación
                                         </button>
-
                                     @elseif ($pedido->estado === \App\Models\Pedido::ESTADO_EN_PREPARACION)
-                                        <button type="button"
-                                            wire:click="marcarEnCamino({{ $pedido->id }})"
+                                        <button type="button" wire:click="marcarEnCamino({{ $pedido->id }})"
                                             wire:loading.attr="disabled"
                                             wire:target="marcarEnCamino({{ $pedido->id }})"
                                             class="inline-flex items-center gap-2 rounded-xl bg-violet-500 px-3 py-2 text-xs font-bold text-white transition hover:bg-violet-600 disabled:opacity-60 disabled:cursor-not-allowed">
-                                            <i class="fa-solid fa-motorcycle"
-                                                wire:loading.class="hidden"
+                                            <i class="fa-solid fa-motorcycle" wire:loading.class="hidden"
                                                 wire:target="marcarEnCamino({{ $pedido->id }})"></i>
                                             <i class="fa-solid fa-spinner fa-spin hidden"
                                                 wire:loading.class.remove="hidden"
                                                 wire:target="marcarEnCamino({{ $pedido->id }})"></i>
                                             Despachar
                                         </button>
-
                                     @elseif ($pedido->estado === \App\Models\Pedido::ESTADO_REPARTIDOR_EN_CAMINO)
-                                        <button type="button"
-                                            wire:click="marcarEntregado({{ $pedido->id }})"
+                                        <button type="button" wire:click="marcarEntregado({{ $pedido->id }})"
                                             wire:loading.attr="disabled"
                                             wire:target="marcarEntregado({{ $pedido->id }})"
                                             class="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-3 py-2 text-xs font-bold text-white transition hover:bg-emerald-600 disabled:opacity-60 disabled:cursor-not-allowed">
-                                            <i class="fa-solid fa-circle-check"
-                                                wire:loading.class="hidden"
+                                            <i class="fa-solid fa-circle-check" wire:loading.class="hidden"
                                                 wire:target="marcarEntregado({{ $pedido->id }})"></i>
                                             <i class="fa-solid fa-spinner fa-spin hidden"
                                                 wire:loading.class.remove="hidden"
                                                 wire:target="marcarEntregado({{ $pedido->id }})"></i>
                                             Confirmar entrega
                                         </button>
-
                                     @elseif ($pedido->estado === \App\Models\Pedido::ESTADO_ENTREGADO)
-                                        <span class="inline-flex items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 border border-emerald-200">
+                                        <span
+                                            class="inline-flex items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 border border-emerald-200">
                                             <i class="fa-solid fa-circle-check"></i>
                                             Entregado
                                         </span>
-
                                     @elseif ($pedido->estado === \App\Models\Pedido::ESTADO_CANCELADO)
-                                        <span class="inline-flex items-center gap-2 rounded-xl bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 border border-rose-200">
+                                        <span
+                                            class="inline-flex items-center gap-2 rounded-xl bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 border border-rose-200">
                                             <i class="fa-solid fa-ban"></i>
                                             Cancelado
                                         </span>
-
                                     @else
-                                        <span class="inline-flex items-center gap-2 rounded-xl bg-slate-100 px-3 py-2 text-xs font-bold text-slate-600 border border-slate-200">
+                                        <span
+                                            class="inline-flex items-center gap-2 rounded-xl bg-slate-100 px-3 py-2 text-xs font-bold text-slate-600 border border-slate-200">
                                             <i class="fa-solid fa-circle-info"></i>
                                             {{ ucfirst(str_replace('_', ' ', $pedido->estado)) }}
                                         </span>
@@ -386,11 +411,13 @@
                         @empty
                             <tr class="empty-state">
                                 <td colspan="8" class="px-6 py-16 text-center">
-                                    <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-slate-400">
+                                    <div
+                                        class="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-slate-400">
                                         <i class="fa-solid fa-inbox text-2xl"></i>
                                     </div>
                                     <h3 class="mt-4 text-xl font-semibold text-slate-800">Sin pedidos para mostrar</h3>
-                                    <p class="mt-1 text-sm text-slate-500">No hay pedidos disponibles con los filtros actuales.</p>
+                                    <p class="mt-1 text-sm text-slate-500">No hay pedidos disponibles con los filtros
+                                        actuales.</p>
                                 </td>
                             </tr>
                         @endforelse
@@ -408,7 +435,8 @@
                 </div>
                 <div class="flex-1">
                     <h4 class="text-sm font-bold uppercase tracking-[0.16em] text-emerald-700">¡Nuevo pedido!</h4>
-                    <p id="toast-message" class="mt-1 text-sm leading-relaxed text-emerald-800">Se ha recibido un nuevo pedido.</p>
+                    <p id="toast-message" class="mt-1 text-sm leading-relaxed text-emerald-800">Se ha recibido un
+                        nuevo pedido.</p>
                 </div>
                 <audio id="new-order-sound" preload="auto">
                     <source src="{{ asset('sounds/new-order.mp3') }}" type="audio/mpeg">

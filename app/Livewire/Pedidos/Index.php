@@ -4,16 +4,21 @@ namespace App\Livewire\Pedidos;
 
 use App\Models\Pedido;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
 use Livewire\Component;
 
 class Index extends Component
 {
-    // ✅ Sin tipado array — Livewire maneja la Collection correctamente
     public $pedidos;
+    public string $estado = 'todos';
+    public string $zona = 'todas';
 
     protected $listeners = [
         'pedidoActualizado' => 'cargarPedidos',
+    ];
+
+    protected $queryString = [
+        'estado' => ['except' => 'todos'],
+        'zona'   => ['except' => 'todas'],
     ];
 
     public function mount(): void
@@ -26,28 +31,38 @@ class Index extends Component
         $this->pedidos = Pedido::with([
             'detalles',
             'sede',
-        ])
-            ->latest()
-            ->get();
+        ])->latest()->get();
+    }
+
+    public function cambiarTab(string $estado): void
+    {
+        $this->estado = $estado;
+    }
+
+    public function updatedZona(): void
+    {
+        // Solo para refrescar visualmente si deseas mantener el filtro por zona
+    }
+
+    public function getPedidosFiltradosProperty()
+    {
+        $pedidos = $this->pedidos ?? collect();
+
+        if ($this->estado !== 'todos') {
+            $pedidos = $pedidos->where('estado', $this->estado);
+        }
+
+        if ($this->zona !== 'todas') {
+            $pedidos = $pedidos->where('zona', $this->zona);
+        }
+
+        return $pedidos;
     }
 
     public function marcarEnPreparacion(int $pedidoId): void
     {
-        // ✅ dd() eliminado — era el culpable de romper la respuesta AJAX de Livewire
-
-        Log::info('CLICK iniciar preparación', [
-            'pedido_id' => $pedidoId,
-        ]);
-
         $pedido = Pedido::findOrFail($pedidoId);
-
         $estadoActual = trim((string) $pedido->estado);
-
-        Log::info('Pedido cargado para iniciar preparación', [
-            'id'                   => $pedido->id,
-            'estado_actual'        => $estadoActual,
-            'estado_nuevo_constante' => Pedido::ESTADO_NUEVO,
-        ]);
 
         if (in_array($estadoActual, [
             Pedido::ESTADO_CANCELADO,
@@ -55,29 +70,18 @@ class Index extends Component
             Pedido::ESTADO_REPARTIDOR_EN_CAMINO,
             Pedido::ESTADO_RECOGIDO,
         ], true)) {
-            Log::warning('No se puede pasar a preparación por estado no permitido', [
-                'pedido_id'     => $pedido->id,
-                'estado_actual' => $estadoActual,
-            ]);
-
             $this->dispatch('notify', [
                 'type'    => 'warning',
                 'message' => "El pedido #{$pedido->id} no se puede pasar a preparación porque está en estado: {$estadoActual}.",
             ]);
-
             return;
         }
 
         if ($estadoActual === Pedido::ESTADO_EN_PREPARACION) {
-            Log::info('El pedido ya estaba en preparación', [
-                'pedido_id' => $pedido->id,
-            ]);
-
             $this->dispatch('notify', [
                 'type'    => 'info',
                 'message' => "El pedido #{$pedido->id} ya está en preparación.",
             ]);
-
             return;
         }
 
@@ -91,13 +95,7 @@ class Index extends Component
             $usuario?->id
         );
 
-        Log::info('Estado cambiado correctamente a preparación', [
-            'pedido_id'    => $pedido->id,
-            'nuevo_estado' => $pedido->fresh()->estado,
-        ]);
-
         $this->cargarPedidos();
-        $this->dispatch('pedidoActualizado');
 
         $this->dispatch('notify', [
             'type'    => 'success',
@@ -107,7 +105,7 @@ class Index extends Component
 
     public function marcarEnCamino(int $pedidoId): void
     {
-        $pedido       = Pedido::findOrFail($pedidoId);
+        $pedido = Pedido::findOrFail($pedidoId);
         $estadoActual = trim((string) $pedido->estado);
 
         if ($estadoActual !== Pedido::ESTADO_EN_PREPARACION) {
@@ -129,7 +127,6 @@ class Index extends Component
         );
 
         $this->cargarPedidos();
-        $this->dispatch('pedidoActualizado');
 
         $this->dispatch('notify', [
             'type'    => 'success',
@@ -139,7 +136,7 @@ class Index extends Component
 
     public function marcarEntregado(int $pedidoId): void
     {
-        $pedido       = Pedido::findOrFail($pedidoId);
+        $pedido = Pedido::findOrFail($pedidoId);
         $estadoActual = trim((string) $pedido->estado);
 
         if ($estadoActual !== Pedido::ESTADO_REPARTIDOR_EN_CAMINO) {
@@ -161,7 +158,6 @@ class Index extends Component
         );
 
         $this->cargarPedidos();
-        $this->dispatch('pedidoActualizado');
 
         $this->dispatch('notify', [
             'type'    => 'success',
@@ -171,7 +167,7 @@ class Index extends Component
 
     public function cancelarPedido(int $pedidoId): void
     {
-        $pedido       = Pedido::findOrFail($pedidoId);
+        $pedido = Pedido::findOrFail($pedidoId);
         $estadoActual = trim((string) $pedido->estado);
 
         if (in_array($estadoActual, [
@@ -196,7 +192,6 @@ class Index extends Component
         );
 
         $this->cargarPedidos();
-        $this->dispatch('pedidoActualizado');
 
         $this->dispatch('notify', [
             'type'    => 'success',
@@ -207,7 +202,8 @@ class Index extends Component
     public function render()
     {
         return view('livewire.pedidos.index', [
-            'pedidos' => $this->pedidos,
+            'pedidos'           => $this->pedidos,
+            'pedidosFiltrados'  => $this->pedidosFiltrados,
         ])->layout('layouts.app');
     }
 }
