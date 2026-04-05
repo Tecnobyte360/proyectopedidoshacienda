@@ -4,6 +4,7 @@ namespace App\Livewire\Pedidos;
 
 use App\Models\Pedido;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Livewire\Component;
 
 class Index extends Component
@@ -28,29 +29,56 @@ class Index extends Component
             ->latest()
             ->get();
     }
+
     public function marcarEnPreparacion(int $pedidoId): void
     {
-        \Log::info('CLICK iniciar preparación', [
+        Log::info('CLICK iniciar preparación', [
             'pedido_id' => $pedidoId,
         ]);
 
         $pedido = Pedido::findOrFail($pedidoId);
 
-        \Log::info('Pedido cargado', [
+        $estadoActual = trim((string) $pedido->estado);
+
+        Log::info('Pedido cargado para iniciar preparación', [
             'id' => $pedido->id,
-            'estado_actual' => $pedido->estado,
+            'estado_actual' => $estadoActual,
             'estado_nuevo_constante' => Pedido::ESTADO_NUEVO,
         ]);
 
-        if ($pedido->estado !== Pedido::ESTADO_NUEVO) {
-            \Log::warning('No cambió porque el estado no es nuevo', [
+        if (in_array($estadoActual, [
+            Pedido::ESTADO_CANCELADO,
+            Pedido::ESTADO_ENTREGADO,
+            Pedido::ESTADO_REPARTIDOR_EN_CAMINO,
+            Pedido::ESTADO_RECOGIDO,
+        ], true)) {
+            Log::warning('No se puede pasar a preparación por estado no permitido', [
                 'pedido_id' => $pedido->id,
-                'estado_actual' => $pedido->estado,
+                'estado_actual' => $estadoActual,
             ]);
+
+            $this->dispatch('notify', [
+                'type' => 'warning',
+                'message' => "El pedido #{$pedido->id} no se puede pasar a preparación porque está en estado: {$estadoActual}.",
+            ]);
+
             return;
         }
 
-        $usuario = \Illuminate\Support\Facades\Auth::user();
+        if ($estadoActual === Pedido::ESTADO_EN_PREPARACION) {
+            Log::info('El pedido ya estaba en preparación', [
+                'pedido_id' => $pedido->id,
+            ]);
+
+            $this->dispatch('notify', [
+                'type' => 'info',
+                'message' => "El pedido #{$pedido->id} ya está en preparación.",
+            ]);
+
+            return;
+        }
+
+        $usuario = Auth::user();
 
         $pedido->cambiarEstado(
             Pedido::ESTADO_EN_PREPARACION,
@@ -60,20 +88,30 @@ class Index extends Component
             $usuario?->id
         );
 
-        \Log::info('Estado cambiado correctamente', [
+        Log::info('Estado cambiado correctamente a preparación', [
             'pedido_id' => $pedido->id,
             'nuevo_estado' => $pedido->fresh()->estado,
         ]);
 
         $this->cargarPedidos();
         $this->dispatch('pedidoActualizado');
+
+        $this->dispatch('notify', [
+            'type' => 'success',
+            'message' => "Pedido #{$pedido->id} enviado a preparación correctamente.",
+        ]);
     }
 
     public function marcarEnCamino(int $pedidoId): void
     {
         $pedido = Pedido::findOrFail($pedidoId);
+        $estadoActual = trim((string) $pedido->estado);
 
-        if ($pedido->estado !== Pedido::ESTADO_EN_PREPARACION) {
+        if ($estadoActual !== Pedido::ESTADO_EN_PREPARACION) {
+            $this->dispatch('notify', [
+                'type' => 'warning',
+                'message' => "El pedido #{$pedido->id} debe estar en preparación antes de pasarlo a en camino.",
+            ]);
             return;
         }
 
@@ -89,13 +127,23 @@ class Index extends Component
 
         $this->cargarPedidos();
         $this->dispatch('pedidoActualizado');
+
+        $this->dispatch('notify', [
+            'type' => 'success',
+            'message' => "Pedido #{$pedido->id} marcado como en camino.",
+        ]);
     }
 
     public function marcarEntregado(int $pedidoId): void
     {
         $pedido = Pedido::findOrFail($pedidoId);
+        $estadoActual = trim((string) $pedido->estado);
 
-        if ($pedido->estado !== Pedido::ESTADO_REPARTIDOR_EN_CAMINO) {
+        if ($estadoActual !== Pedido::ESTADO_REPARTIDOR_EN_CAMINO) {
+            $this->dispatch('notify', [
+                'type' => 'warning',
+                'message' => "El pedido #{$pedido->id} debe estar en camino antes de marcarlo como entregado.",
+            ]);
             return;
         }
 
@@ -111,16 +159,26 @@ class Index extends Component
 
         $this->cargarPedidos();
         $this->dispatch('pedidoActualizado');
+
+        $this->dispatch('notify', [
+            'type' => 'success',
+            'message' => "Pedido #{$pedido->id} marcado como entregado.",
+        ]);
     }
 
     public function cancelarPedido(int $pedidoId): void
     {
         $pedido = Pedido::findOrFail($pedidoId);
+        $estadoActual = trim((string) $pedido->estado);
 
-        if (in_array($pedido->estado, [
+        if (in_array($estadoActual, [
             Pedido::ESTADO_ENTREGADO,
             Pedido::ESTADO_CANCELADO,
         ], true)) {
+            $this->dispatch('notify', [
+                'type' => 'warning',
+                'message' => "El pedido #{$pedido->id} no se puede cancelar porque está en estado: {$estadoActual}.",
+            ]);
             return;
         }
 
@@ -136,6 +194,11 @@ class Index extends Component
 
         $this->cargarPedidos();
         $this->dispatch('pedidoActualizado');
+
+        $this->dispatch('notify', [
+            'type' => 'success',
+            'message' => "Pedido #{$pedido->id} cancelado correctamente.",
+        ]);
     }
 
     public function render()
