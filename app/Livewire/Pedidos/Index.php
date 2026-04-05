@@ -22,22 +22,35 @@ class Index extends Component
     public function cargarPedidos(): void
     {
         $this->pedidos = Pedido::with([
-                'detalles',
-                'sede',
-            ])
+            'detalles',
+            'sede',
+        ])
             ->latest()
             ->get();
     }
-
     public function marcarEnPreparacion(int $pedidoId): void
     {
+        \Log::info('CLICK iniciar preparación', [
+            'pedido_id' => $pedidoId,
+        ]);
+
         $pedido = Pedido::findOrFail($pedidoId);
 
+        \Log::info('Pedido cargado', [
+            'id' => $pedido->id,
+            'estado_actual' => $pedido->estado,
+            'estado_nuevo_constante' => Pedido::ESTADO_NUEVO,
+        ]);
+
         if ($pedido->estado !== Pedido::ESTADO_NUEVO) {
+            \Log::warning('No cambió porque el estado no es nuevo', [
+                'pedido_id' => $pedido->id,
+                'estado_actual' => $pedido->estado,
+            ]);
             return;
         }
 
-        $usuario = Auth::user();
+        $usuario = \Illuminate\Support\Facades\Auth::user();
 
         $pedido->cambiarEstado(
             Pedido::ESTADO_EN_PREPARACION,
@@ -46,6 +59,11 @@ class Index extends Component
             $usuario?->name,
             $usuario?->id
         );
+
+        \Log::info('Estado cambiado correctamente', [
+            'pedido_id' => $pedido->id,
+            'nuevo_estado' => $pedido->fresh()->estado,
+        ]);
 
         $this->cargarPedidos();
         $this->dispatch('pedidoActualizado');
