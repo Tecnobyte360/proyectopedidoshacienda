@@ -30,11 +30,42 @@
     <livewire:layouts.topbar />
 
     {{-- CONTENIDO --}}
-  <main class="w-full pt-24">
-    {{ $slot }}
-</main>
+    <main class="w-full pt-24">
+        {{ $slot }}
+    </main>
 
     @livewireScripts
+
+    <script>
+        // ✅ Desbloquear audio tras el primer click del usuario en la página
+        // Chrome bloquea el autoplay hasta que el usuario interactúa
+        let audioUnlocked = false;
+
+        document.addEventListener('click', function () {
+            if (!audioUnlocked) {
+                const audio = document.getElementById('new-order-sound');
+                if (audio) {
+                    audio.play().then(() => {
+                        audio.pause();
+                        audio.currentTime = 0;
+                        audioUnlocked = true;
+                    }).catch(() => {});
+                }
+            }
+        });
+
+        // ✅ Reproducir sonido cuando llega un pedido nuevo vía Livewire
+        document.addEventListener('livewire:initialized', () => {
+            Livewire.on('pedidoActualizado', () => {
+                const audio = document.getElementById('new-order-sound');
+                if (audio && audioUnlocked) {
+                    audio.currentTime = 0;
+                    audio.play().catch(() => {});
+                }
+            });
+        });
+    </script>
+
     @stack('scripts')
 </body>
 </html>
