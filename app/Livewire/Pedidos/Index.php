@@ -32,6 +32,8 @@ class Index extends Component
 
     public function marcarEnPreparacion(int $pedidoId): void
     {
+
+      dd('ENTRÓ AL MÉTODO', $pedidoId);
         Log::info('CLICK iniciar preparación', [
             'pedido_id' => $pedidoId,
         ]);
