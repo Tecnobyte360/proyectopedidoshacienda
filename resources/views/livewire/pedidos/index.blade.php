@@ -352,11 +352,14 @@
                                 </td>
 
                                 <td class="px-4 py-3.5 text-center align-middle">
+                                    <button wire:click="$refresh" class="bg-red-500 text-white p-2">
+                                        TEST
+                                    </button>
                                     @if ($pedido->estado === \App\Models\Pedido::ESTADO_NUEVO)
                                         <button type="button" wire:click="marcarEnPreparacion({{ $pedido->id }})"
                                             class="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-3 py-2 text-xs font-bold text-white transition hover:bg-amber-600">
                                             <i class="fa-solid fa-utensils"></i>
-                                          Iniciar preparación
+                                            Iniciar preparación
                                         </button>
                                     @elseif($pedido->estado === \App\Models\Pedido::ESTADO_EN_PREPARACION)
                                         <span
