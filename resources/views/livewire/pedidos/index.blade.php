@@ -350,7 +350,6 @@
                                 </td>
 
                                 <td class="px-4 py-3.5 text-center align-middle">
-                                    {{-- ✅ Botón TEST eliminado — era solo para debug --}}
                                     @if ($pedido->estado === \App\Models\Pedido::ESTADO_NUEVO)
                                         <button type="button" wire:click="marcarEnPreparacion({{ $pedido->id }})"
                                             wire:loading.attr="disabled"
@@ -373,25 +372,26 @@
                                             <i class="fa-solid fa-spinner fa-spin hidden"
                                                 wire:loading.class.remove="hidden"
                                                 wire:target="marcarEnCamino({{ $pedido->id }})"></i>
-                                            Terminar preparación
+                                            Despachar
                                         </button>
                                     @elseif ($pedido->estado === \App\Models\Pedido::ESTADO_REPARTIDOR_EN_CAMINO)
-
-                                    @elseif ($pedido->estado === \App\Models\Pedido::ESTADO_REPARTIDOR_EN_CAMINO)
-                                        {{-- Token visible para el domiciliario --}}
-                                        @if ($pedido->token_entrega)
-                                            <div
-                                                class="mb-1.5 inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-bold text-violet-700">
-                                                <i class="fa-solid fa-key text-[10px]"></i>
-                                                Token: <span
-                                                    class="tracking-widest">{{ $pedido->token_entrega }}</span>
-                                            </div>
-                                        @endif
-                                        <button type="button" wire:click="abrirModalEntrega({{ $pedido->id }})"
-                                            class="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-3 py-2 text-xs font-bold text-white transition hover:bg-emerald-600">
-                                            <i class="fa-solid fa-circle-check"></i>
-                                            Confirmar entrega
-                                        </button>
+                                        <div class="flex flex-col items-center gap-2">
+                                            {{-- Token visible para el domiciliario --}}
+                                            @if ($pedido->token_entrega)
+                                                <div
+                                                    class="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-bold text-violet-700">
+                                                    <i class="fa-solid fa-key text-[10px]"></i>
+                                                    Token: <span
+                                                        class="tracking-widest">{{ $pedido->token_entrega }}</span>
+                                                </div>
+                                            @endif
+                                            <button type="button"
+                                                wire:click="abrirModalEntrega({{ $pedido->id }})"
+                                                class="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-3 py-2 text-xs font-bold text-white transition hover:bg-emerald-600">
+                                                <i class="fa-solid fa-circle-check"></i>
+                                                Confirmar entrega
+                                            </button>
+                                        </div>
                                     @elseif ($pedido->estado === \App\Models\Pedido::ESTADO_ENTREGADO)
                                         <span
                                             class="inline-flex items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 border border-emerald-200">
