@@ -252,10 +252,10 @@ class WhatsappWebhookController extends Controller
             return $reply;
         }
 
-        return $this->procesarConIA($from, $name, $message);
+        return $this->procesarConIA($from, $name, $message, $connectionId);
     }
 
-    private function procesarConIA(string $from, string $name, string $message): string
+    private function procesarConIA(string $from, string $name, string $message, ?string $connectionId = null): string
     {
         $cacheKey = "whatsapp_chat_{$from}";
         $conversationHistory = Cache::get($cacheKey, []);
@@ -307,7 +307,14 @@ class WhatsappWebhookController extends Controller
 
             Log::info('🎯 CAPA 3: Function call confirmar_pedido', compact('from', 'orderData'));
 
-            return $this->guardarPedidoDesdeToolCall($orderData, $from, $name, $conversationHistory, $cacheKey);
+            return $this->guardarPedidoDesdeToolCall(
+                $orderData,
+                $from,
+                $name,
+                $conversationHistory,
+                $cacheKey,
+                $connectionId
+            );
         }
 
         $reply = $textContent
@@ -320,6 +327,152 @@ class WhatsappWebhookController extends Controller
 
         return $reply;
     }
+    private function obtenerEmpresaIdDesdeConexion(?string $connectionId): ?int
+    {
+        if (!$connectionId) {
+            return null;
+        }
+
+        try {
+            $token = $this->obtenerTokenWhatsapp();
+
+            if (!$token) {
+                Log::warning('⚠️ No se pudo obtener token para consultar conexión WhatsApp', [
+                    'connectionId' => $connectionId,
+                ]);
+                return null;
+            }
+
+            $response = Http::withoutVerifying()
+                ->withToken($token)
+                ->timeout(20)
+                ->get('https://wa-api.tecnobyteapp.com:1422/whatsapp/', [
+                    'id' => (int) $connectionId,
+                ]);
+
+            if ($response->failed()) {
+                Log::warning('⚠️ No se pudo consultar la conexión WhatsApp', [
+                    'connectionId' => $connectionId,
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                ]);
+                return null;
+            }
+
+            $whatsapps = $response->json('whatsapps', []);
+
+            $conexion = collect($whatsapps)->firstWhere('id', (int) $connectionId);
+
+            return $conexion['ownerId'] ?? null;
+        } catch (\Throwable $e) {
+            Log::error('❌ Error consultando empresa por conexión WhatsApp', [
+                'connectionId' => $connectionId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
+  private function resolverConexionWhatsapp(?string $connectionId = null): array
+{
+    // ✅ Si el webhook ya trajo connectionId, se usa ese mismo SIN consultar API
+    if (!empty($connectionId)) {
+        return [
+            'connection_id' => (int) $connectionId,
+            'whatsapp_id'   => (int) $connectionId,
+            'empresa_id'    => null, // si quieres luego puedes resolver empresa aparte
+        ];
+    }
+
+    // ✅ Solo si NO viene connectionId, consultar API para sacar una conexión válida
+    try {
+        $token = $this->obtenerTokenWhatsapp();
+
+        if (!$token) {
+            Log::warning('⚠️ No se pudo obtener token para resolver conexión WhatsApp');
+            return [
+                'connection_id' => null,
+                'whatsapp_id'   => null,
+                'empresa_id'    => null,
+            ];
+        }
+
+        $response = Http::withoutVerifying()
+            ->withToken($token)
+            ->timeout(20)
+            ->get('https://wa-api.tecnobyteapp.com:1422/whatsapp/');
+
+        if ($response->failed()) {
+            Log::warning('⚠️ No se pudo consultar listado de conexiones WhatsApp', [
+                'status' => $response->status(),
+                'body'   => $response->body(),
+            ]);
+
+            return [
+                'connection_id' => null,
+                'whatsapp_id'   => null,
+                'empresa_id'    => null,
+            ];
+        }
+
+        $whatsapps = collect($response->json('whatsapps', []));
+
+        if ($whatsapps->isEmpty()) {
+            Log::warning('⚠️ La API de WhatsApp no devolvió conexiones');
+            return [
+                'connection_id' => null,
+                'whatsapp_id'   => null,
+                'empresa_id'    => null,
+            ];
+        }
+
+        // 1. Buscar una conexión CONNECTED y default
+        $conexion = $whatsapps->first(function ($item) {
+            return ($item['status'] ?? null) === 'CONNECTED'
+                && (bool) ($item['isDefault'] ?? false) === true;
+        });
+
+        // 2. Si no hay default conectada, tomar la primera CONNECTED
+        if (!$conexion) {
+            $conexion = $whatsapps->first(function ($item) {
+                return ($item['status'] ?? null) === 'CONNECTED';
+            });
+        }
+
+        // 3. Si no hay ninguna conectada, tomar la primera
+        if (!$conexion) {
+            $conexion = $whatsapps->first();
+        }
+
+        if (!$conexion) {
+            return [
+                'connection_id' => null,
+                'whatsapp_id'   => null,
+                'empresa_id'    => null,
+            ];
+        }
+
+        return [
+            'connection_id' => $conexion['id'] ?? null,
+            'whatsapp_id'   => $conexion['id'] ?? null,
+            'empresa_id'    => $conexion['ownerId'] ?? null,
+        ];
+    } catch (\Throwable $e) {
+        Log::error('❌ Error resolviendo conexión WhatsApp', [
+            'connectionId_entrada' => $connectionId,
+            'error' => $e->getMessage(),
+        ]);
+
+        return [
+            'connection_id' => null,
+            'whatsapp_id'   => null,
+            'empresa_id'    => null,
+        ];
+    }
+}
+
+
 
     private function llamarOpenAI(array $messages): ?array
     {
@@ -798,160 +951,170 @@ class WhatsappWebhookController extends Controller
     |==========================================================================
     */
 
-    private function guardarPedidoDesdeToolCall(
-        array $orderData,
-        string $from,
-        string $name,
-        array $conversationHistory,
-        string $cacheKey
-    ): string {
-        try {
-            $confirmKey = "pedido_confirmado_" . $this->normalizarTelefono($from);
+  private function guardarPedidoDesdeToolCall(
+    array $orderData,
+    string $from,
+    string $name,
+    array $conversationHistory,
+    string $cacheKey,
+    ?string $connectionId = null
+): string {
+    try {
+        $confirmKey = "pedido_confirmado_" . $this->normalizarTelefono($from);
 
-            if (Cache::has($confirmKey)) {
-                Log::warning('⚠️ Pedido ya confirmado recientemente', compact('from'));
-                return "Tu pedido ya fue registrado 😊 Escríbeme el número de pedido para consultarlo.";
-            }
-
-            Cache::put($confirmKey, true, now()->addMinutes(2));
-
-            DB::beginTransaction();
-
-            $sedeNombre = $orderData['location'] ?? $orderData['neighborhood'] ?? null;
-
-            $sede = $sedeNombre
-                ? Sede::where('nombre', 'LIKE', "%{$sedeNombre}%")->first() ?? Sede::first()
-                : Sede::first();
-
-            $partes = array_filter([
-                $orderData['notes'] ?? null,
-                isset($orderData['address']) ? "Dirección: {$orderData['address']}" : null,
-                isset($orderData['neighborhood']) ? "Barrio: {$orderData['neighborhood']}" : null,
-                isset($orderData['payment_method']) ? "Pago: {$orderData['payment_method']}" : null,
-            ]);
-
-            $notas = implode(' | ', $partes) ?: 'Solicitud vía WhatsApp';
-            $pickupTime = !empty($orderData['pickup_time']) ? $orderData['pickup_time'] : null;
-            $telefonoWhatsapp = $this->normalizarTelefono($from);
-            $telefonoContacto = $this->normalizarTelefono($orderData['phone'] ?? $from);
-
-            $pedido = Pedido::create([
-                'sede_id'               => $sede?->id,
-                'fecha_pedido'          => now(),
-                'hora_entrega'          => $pickupTime,
-                'estado'                => 'nuevo',
-                'fecha_estado'          => now(),
-                'observacion_estado'    => 'Pedido creado automáticamente desde WhatsApp',
-                'total'                 => (float) ($orderData['total'] ?? 0),
-                'notas'                 => $notas,
-                'cliente_nombre'        => $orderData['customer_name'] ?? $name,
-                'telefono_whatsapp'     => $telefonoWhatsapp,
-                'telefono_contacto'     => $telefonoContacto,
-                'telefono'              => $telefonoWhatsapp,
-                'canal'                 => 'whatsapp',
-                'conversacion_completa' => json_encode($conversationHistory, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT),
-                'resumen_conversacion'  => $orderData['notes'] ?? '',
-            ]);
-
-            foreach (($orderData['products'] ?? []) as $product) {
-                DetallePedido::create([
-                    'pedido_id'       => $pedido->id,
-                    'producto'        => $product['name'] ?? 'Producto',
-                    'cantidad'        => (float) ($product['quantity'] ?? 1),
-                    'unidad'          => $product['unit'] ?? 'unidad',
-                    'precio_unitario' => (float) ($product['price'] ?? 0),
-                    'subtotal'        => (float) ($product['subtotal'] ?? 0),
-                ]);
-            }
-
-            DB::commit();
-
-            $pedido->load(['sede', 'detalles', 'historialEstados']);
-
-            broadcast(new PedidoConfirmado($pedido));
-            broadcast(new PedidoActualizado($pedido, 'nuevo'));
-
-            Cache::forget($cacheKey);
-
-            Log::info('✅ PEDIDO GUARDADO', [
-                'pedido_id' => $pedido->id,
-                'codigo_seguimiento' => $pedido->codigo_seguimiento,
-                'url_seguimiento' => $pedido->url_seguimiento,
-                'from' => $from,
-                'telefono_whatsapp' => $telefonoWhatsapp,
-                'telefono_contacto' => $telefonoContacto,
-            ]);
-
-            return $this->construirMensajeConfirmacionPedido($pedido, $orderData, $name);
-        } catch (\Throwable $e) {
-            DB::rollBack();
-            Cache::forget("pedido_confirmado_" . $this->normalizarTelefono($from));
-
-            Log::error('❌ ERROR CRÍTICO AL GUARDAR PEDIDO', [
-                'error' => $e->getMessage(),
-                'order_data' => $orderData,
-            ]);
-
-            $this->notificarFallaWhatsapp(
-                'ERROR GUARDANDO PEDIDO',
-                'Ocurrió un error guardando un pedido generado desde WhatsApp.',
-                [
-                    'from' => $from,
-                    'name' => $name,
-                    'error' => $e->getMessage(),
-                    'orderData' => $orderData,
-                ]
-            );
-
-            return '⚠️ Tu pedido no se pudo registrar en este momento. Ya lo estamos revisando, te contactamos en breve.';
+        if (Cache::has($confirmKey)) {
+            Log::warning('⚠️ Pedido ya confirmado recientemente', compact('from'));
+            return "Tu pedido ya fue registrado 😊 Escríbeme el número de pedido para consultarlo.";
         }
+
+        Cache::put($confirmKey, true, now()->addMinutes(2));
+
+        DB::beginTransaction();
+
+        $conexionData = $this->resolverConexionWhatsapp($connectionId);
+
+        $empresaId = $conexionData['empresa_id'];
+        $connectionId = $conexionData['connection_id'];
+        $whatsappId = $conexionData['whatsapp_id'];
+
+        $sedeNombre = $orderData['location'] ?? $orderData['neighborhood'] ?? null;
+
+        $sede = $sedeNombre
+            ? Sede::where('nombre', 'LIKE', "%{$sedeNombre}%")->first() ?? Sede::first()
+            : Sede::first();
+
+        $partes = array_filter([
+            $orderData['notes'] ?? null,
+            isset($orderData['address']) ? "Dirección: {$orderData['address']}" : null,
+            isset($orderData['neighborhood']) ? "Barrio: {$orderData['neighborhood']}" : null,
+            isset($orderData['payment_method']) ? "Pago: {$orderData['payment_method']}" : null,
+        ]);
+
+        $notas = implode(' | ', $partes) ?: 'Solicitud vía WhatsApp';
+        $pickupTime = !empty($orderData['pickup_time']) ? $orderData['pickup_time'] : null;
+        $telefonoWhatsapp = $this->normalizarTelefono($from);
+        $telefonoContacto = $this->normalizarTelefono($orderData['phone'] ?? $from);
+
+        $pedido = Pedido::create([
+            'sede_id'               => $sede?->id,
+            'empresa_id'            => $empresaId,
+            'fecha_pedido'          => now(),
+            'hora_entrega'          => $pickupTime,
+            'estado'                => 'nuevo',
+            'fecha_estado'          => now(),
+            'observacion_estado'    => 'Pedido creado automáticamente desde WhatsApp',
+            'total'                 => (float) ($orderData['total'] ?? 0),
+            'notas'                 => $notas,
+            'cliente_nombre'        => $orderData['customer_name'] ?? $name,
+            'telefono_whatsapp'     => $telefonoWhatsapp,
+            'telefono_contacto'     => $telefonoContacto,
+            'telefono'              => $telefonoWhatsapp,
+            'canal'                 => 'whatsapp',
+            'connection_id'         => $connectionId,
+            'whatsapp_id'           => $whatsappId,
+            'conversacion_completa' => json_encode($conversationHistory, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT),
+            'resumen_conversacion'  => $orderData['notes'] ?? '',
+        ]);
+
+        foreach (($orderData['products'] ?? []) as $product) {
+            DetallePedido::create([
+                'pedido_id'       => $pedido->id,
+                'producto'        => $product['name'] ?? 'Producto',
+                'cantidad'        => (float) ($product['quantity'] ?? 1),
+                'unidad'          => $product['unit'] ?? 'unidad',
+                'precio_unitario' => (float) ($product['price'] ?? 0),
+                'subtotal'        => (float) ($product['subtotal'] ?? 0),
+            ]);
+        }
+
+        DB::commit();
+
+        $pedido->load(['sede', 'detalles', 'historialEstados']);
+
+        broadcast(new PedidoConfirmado($pedido));
+        broadcast(new PedidoActualizado($pedido, 'nuevo'));
+
+        Cache::forget($cacheKey);
+
+        Log::info('✅ PEDIDO GUARDADO', [
+            'pedido_id' => $pedido->id,
+            'empresa_id' => $empresaId,
+            'connection_id' => $connectionId,
+            'whatsapp_id' => $whatsappId,
+            'from' => $from,
+        ]);
+
+        return $this->construirMensajeConfirmacionPedido($pedido, $orderData, $name);
+    } catch (\Throwable $e) {
+        DB::rollBack();
+        Cache::forget("pedido_confirmado_" . $this->normalizarTelefono($from));
+
+        Log::error('❌ ERROR CRÍTICO AL GUARDAR PEDIDO', [
+            'error' => $e->getMessage(),
+            'order_data' => $orderData,
+            'connectionId' => $connectionId,
+        ]);
+
+        $this->notificarFallaWhatsapp(
+            'ERROR GUARDANDO PEDIDO',
+            'Ocurrió un error guardando un pedido generado desde WhatsApp.',
+            [
+                'from' => $from,
+                'name' => $name,
+                'error' => $e->getMessage(),
+                'orderData' => $orderData,
+                'connectionId' => $connectionId,
+            ]
+        );
+
+        return '⚠️ Tu pedido no se pudo registrar en este momento. Ya lo estamos revisando, te contactamos en breve.';
     }
-
-  private function construirMensajeConfirmacionPedido(Pedido $pedido, array $orderData, string $name): string
-{
-    $lineas = [
-        "¡Listo {$name}! Tu pedido quedó confirmado ✅",
-        '',
-        "📋 *Pedido #{$pedido->id}*",
-    ];
-
-    foreach (($orderData['products'] ?? []) as $prod) {
-        $cant = $this->formatearCantidadPedido((float) ($prod['quantity'] ?? 1));
-        $unidad = $prod['unit'] ?? 'unidad';
-        $lineas[] = "• {$prod['name']} — {$cant} {$unidad}";
-    }
-
-    $lineas[] = '';
-
-    if (!empty($orderData['address'])) {
-        $lineas[] = "📍 *Dirección:* {$orderData['address']}";
-    }
-
-    if (!empty($orderData['neighborhood'])) {
-        $lineas[] = "🏘️ *Barrio:* {$orderData['neighborhood']}";
-    }
-
-    if (!empty($pedido->hora_entrega)) {
-        $lineas[] = "🕒 *Entrega estimada:* {$pedido->hora_entrega}";
-    }
-
-    if (!empty($pedido->telefono_contacto)) {
-        $lineas[] = "📞 *Contacto:* {$pedido->telefono_contacto}";
-    }
-
-    $total = (float) $pedido->total;
-    if ($total > 0) {
-        $lineas[] = "💵 *Total:* $" . number_format($total, 0, ',', '.');
-    }
-
-    $lineas[] = '';
-    $lineas[] = "🔎 Puedes seguir tu pedido aquí:";
-    $lineas[] = $pedido->url_seguimiento;
-    $lineas[] = '';
-    $lineas[] = "Guarda también tu número de pedido *#{$pedido->id}* para futuras consultas 😊";
-
-    return implode("\n", $lineas);
 }
+    private function construirMensajeConfirmacionPedido(Pedido $pedido, array $orderData, string $name): string
+    {
+        $lineas = [
+            "¡Listo {$name}! Tu pedido quedó confirmado ✅",
+            '',
+            "📋 *Pedido #{$pedido->id}*",
+        ];
+
+        foreach (($orderData['products'] ?? []) as $prod) {
+            $cant = $this->formatearCantidadPedido((float) ($prod['quantity'] ?? 1));
+            $unidad = $prod['unit'] ?? 'unidad';
+            $lineas[] = "• {$prod['name']} — {$cant} {$unidad}";
+        }
+
+        $lineas[] = '';
+
+        if (!empty($orderData['address'])) {
+            $lineas[] = "📍 *Dirección:* {$orderData['address']}";
+        }
+
+        if (!empty($orderData['neighborhood'])) {
+            $lineas[] = "🏘️ *Barrio:* {$orderData['neighborhood']}";
+        }
+
+        if (!empty($pedido->hora_entrega)) {
+            $lineas[] = "🕒 *Entrega estimada:* {$pedido->hora_entrega}";
+        }
+
+        if (!empty($pedido->telefono_contacto)) {
+            $lineas[] = "📞 *Contacto:* {$pedido->telefono_contacto}";
+        }
+
+        $total = (float) $pedido->total;
+        if ($total > 0) {
+            $lineas[] = "💵 *Total:* $" . number_format($total, 0, ',', '.');
+        }
+
+        $lineas[] = '';
+        $lineas[] = "🔎 Puedes seguir tu pedido aquí:";
+        $lineas[] = $pedido->url_seguimiento;
+        $lineas[] = '';
+        $lineas[] = "Guarda también tu número de pedido *#{$pedido->id}* para futuras consultas 😊";
+
+        return implode("\n", $lineas);
+    }
 
     /*
     |==========================================================================
@@ -1574,48 +1737,48 @@ PROMPT;
         }
     }
 
-   private function cancelarPedidoAutomaticamente(Pedido $pedido, string $name): string
-{
-    try {
-        if ($pedido->estado === 'cancelado') {
-            return "Hola {$name} 😊\nEl pedido #{$pedido->id} ya se encuentra cancelado.";
-        }
+    private function cancelarPedidoAutomaticamente(Pedido $pedido, string $name): string
+    {
+        try {
+            if ($pedido->estado === 'cancelado') {
+                return "Hola {$name} 😊\nEl pedido #{$pedido->id} ya se encuentra cancelado.";
+            }
 
-        $pedido->cambiarEstado(
-            'cancelado',
-            'Cancelación confirmada por el cliente desde WhatsApp.',
-            'Pedido cancelado'
-        );
+            $pedido->cambiarEstado(
+                'cancelado',
+                'Cancelación confirmada por el cliente desde WhatsApp.',
+                'Pedido cancelado'
+            );
 
-        $pedido->load(['sede', 'detalles', 'historialEstados']);
+            $pedido->load(['sede', 'detalles', 'historialEstados']);
 
-        broadcast(new PedidoActualizado($pedido, 'cancelado'));
+            broadcast(new PedidoActualizado($pedido, 'cancelado'));
 
-        Log::info('✅ PEDIDO CANCELADO AUTOMÁTICAMENTE', [
-            'pedido_id' => $pedido->id,
-            'estado' => $pedido->estado,
-            'url_seguimiento' => $pedido->url_seguimiento,
-        ]);
+            Log::info('✅ PEDIDO CANCELADO AUTOMÁTICAMENTE', [
+                'pedido_id' => $pedido->id,
+                'estado' => $pedido->estado,
+                'url_seguimiento' => $pedido->url_seguimiento,
+            ]);
 
-        return "Hola {$name} 😊\nTu pedido #{$pedido->id} fue cancelado correctamente ❌\n\nPuedes ver el detalle aquí:\n{$pedido->url_seguimiento}";
-    } catch (\Throwable $e) {
-        Log::error('❌ ERROR CANCELANDO PEDIDO', [
-            'pedido_id' => $pedido->id,
-            'error' => $e->getMessage(),
-        ]);
-
-        $this->notificarFallaWhatsapp(
-            'ERROR CANCELANDO PEDIDO',
-            'Ocurrió un error al cancelar automáticamente un pedido.',
-            [
+            return "Hola {$name} 😊\nTu pedido #{$pedido->id} fue cancelado correctamente ❌\n\nPuedes ver el detalle aquí:\n{$pedido->url_seguimiento}";
+        } catch (\Throwable $e) {
+            Log::error('❌ ERROR CANCELANDO PEDIDO', [
                 'pedido_id' => $pedido->id,
                 'error' => $e->getMessage(),
-            ]
-        );
+            ]);
 
-        return "Hola {$name} 😊\nNo pude cancelar el pedido #{$pedido->id} en este momento.";
+            $this->notificarFallaWhatsapp(
+                'ERROR CANCELANDO PEDIDO',
+                'Ocurrió un error al cancelar automáticamente un pedido.',
+                [
+                    'pedido_id' => $pedido->id,
+                    'error' => $e->getMessage(),
+                ]
+            );
+
+            return "Hola {$name} 😊\nNo pude cancelar el pedido #{$pedido->id} en este momento.";
+        }
     }
-}
 
     private function esSesionExpiradaWhatsapp(?array $body, string $rawBody = ''): bool
     {
@@ -1666,42 +1829,42 @@ PROMPT;
         return implode("\n", $lineas);
     }
 
-  private function formatearPedidoParaApi(Pedido $pedido): array
-{
-    $pedido->loadMissing(['sede', 'detalles', 'historialEstados']);
+    private function formatearPedidoParaApi(Pedido $pedido): array
+    {
+        $pedido->loadMissing(['sede', 'detalles', 'historialEstados']);
 
-    return [
-        'id'                   => $pedido->id,
-        'codigo_seguimiento'   => $pedido->codigo_seguimiento,
-        'url_seguimiento'      => $pedido->url_seguimiento,
-        'fecha'                => optional($pedido->fecha_pedido)?->format('d/m/Y H:i'),
-        'estado'               => $pedido->estado,
-        'hora_entrega'         => $pedido->hora_entrega ?? 'Por confirmar',
-        'sede'                 => $pedido->sede->nombre ?? 'No especificada',
-        'cliente'              => $pedido->cliente_nombre,
-        'telefono_whatsapp'    => $pedido->telefono_whatsapp ?? $pedido->telefono,
-        'telefono_contacto'    => $pedido->telefono_contacto ?? $pedido->telefono,
-        'telefono'             => $pedido->telefono,
-        'total'                => (float) $pedido->total,
-        'total_formateado'     => number_format((float) $pedido->total, 0, ',', '.'),
-        'notas'                => $pedido->notas,
-        'resumen_conversacion' => $pedido->resumen_conversacion,
-        'productos'            => $pedido->detalles->map(fn($d) => [
-            'producto'        => $d->producto,
-            'cantidad'        => $this->formatearCantidadPedido((float) $d->cantidad),
-            'unidad'          => $d->unidad,
-            'precio_unitario' => $d->precio_unitario,
-            'subtotal'        => $d->subtotal,
-        ])->values(),
-        'historial' => $pedido->historialEstados->map(fn($h) => [
-            'estado_anterior' => $h->estado_anterior,
-            'estado_nuevo' => $h->estado_nuevo,
-            'titulo' => $h->titulo,
-            'descripcion' => $h->descripcion,
-            'fecha_evento' => optional($h->fecha_evento)->format('d/m/Y H:i'),
-        ])->values(),
-    ];
-}
+        return [
+            'id'                   => $pedido->id,
+            'codigo_seguimiento'   => $pedido->codigo_seguimiento,
+            'url_seguimiento'      => $pedido->url_seguimiento,
+            'fecha'                => optional($pedido->fecha_pedido)?->format('d/m/Y H:i'),
+            'estado'               => $pedido->estado,
+            'hora_entrega'         => $pedido->hora_entrega ?? 'Por confirmar',
+            'sede'                 => $pedido->sede->nombre ?? 'No especificada',
+            'cliente'              => $pedido->cliente_nombre,
+            'telefono_whatsapp'    => $pedido->telefono_whatsapp ?? $pedido->telefono,
+            'telefono_contacto'    => $pedido->telefono_contacto ?? $pedido->telefono,
+            'telefono'             => $pedido->telefono,
+            'total'                => (float) $pedido->total,
+            'total_formateado'     => number_format((float) $pedido->total, 0, ',', '.'),
+            'notas'                => $pedido->notas,
+            'resumen_conversacion' => $pedido->resumen_conversacion,
+            'productos'            => $pedido->detalles->map(fn($d) => [
+                'producto'        => $d->producto,
+                'cantidad'        => $this->formatearCantidadPedido((float) $d->cantidad),
+                'unidad'          => $d->unidad,
+                'precio_unitario' => $d->precio_unitario,
+                'subtotal'        => $d->subtotal,
+            ])->values(),
+            'historial' => $pedido->historialEstados->map(fn($h) => [
+                'estado_anterior' => $h->estado_anterior,
+                'estado_nuevo' => $h->estado_nuevo,
+                'titulo' => $h->titulo,
+                'descripcion' => $h->descripcion,
+                'fecha_evento' => optional($h->fecha_evento)->format('d/m/Y H:i'),
+            ])->values(),
+        ];
+    }
     private function extraerNumeroPedidoDesdeMensaje(string $message): ?int
     {
         $msg = mb_strtolower(trim($message));

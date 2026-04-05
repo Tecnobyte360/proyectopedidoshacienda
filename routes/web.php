@@ -29,7 +29,7 @@ Route::get('/test-broadcast', function () {
 
         'total'          => 50000,
         'cliente_nombre' => 'TEST - Juan Pérez',
-        'telefono'       => '573001234567',
+        'telefono'       => '573216499744',
         'canal'          => 'whatsapp',
         'notas'          => 'Pedido de prueba para testing',
 

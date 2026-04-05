@@ -4,6 +4,9 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class Pedido extends Model
@@ -12,7 +15,6 @@ class Pedido extends Model
 
     protected $table = 'pedidos';
 
-    // ✅ ESTADOS CENTRALIZADOS
     const ESTADO_NUEVO = 'nuevo';
     const ESTADO_EN_PREPARACION = 'en_preparacion';
     const ESTADO_REPARTIDOR_EN_CAMINO = 'repartidor_en_camino';
@@ -22,6 +24,7 @@ class Pedido extends Model
 
     protected $fillable = [
         'sede_id',
+        'empresa_id',
         'fecha_pedido',
         'hora_entrega',
         'estado',
@@ -32,6 +35,8 @@ class Pedido extends Model
         'telefono_contacto',
         'telefono',
         'canal',
+        'connection_id',
+        'whatsapp_id',
         'conversacion_completa',
         'resumen_conversacion',
         'codigo_seguimiento',
@@ -47,18 +52,14 @@ class Pedido extends Model
         'fecha_entregado'  => 'datetime',
         'fecha_cancelado'  => 'datetime',
         'total'            => 'decimal:2',
+        'empresa_id'       => 'integer',
+        'connection_id'    => 'integer',
+        'whatsapp_id'      => 'integer',
     ];
-
-    /*
-    |--------------------------------------------------------------------------
-    | BOOT
-    |--------------------------------------------------------------------------
-    */
 
     protected static function booted()
     {
         static::creating(function ($pedido) {
-
             if (empty($pedido->codigo_seguimiento)) {
                 $pedido->codigo_seguimiento = (string) Str::uuid();
             }
@@ -73,7 +74,6 @@ class Pedido extends Model
         });
 
         static::created(function ($pedido) {
-
             $pedido->registrarHistorial(
                 estadoNuevo: $pedido->estado,
                 estadoAnterior: null,
@@ -82,12 +82,6 @@ class Pedido extends Model
             );
         });
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | RELACIONES
-    |--------------------------------------------------------------------------
-    */
 
     public function sede()
     {
@@ -104,12 +98,6 @@ class Pedido extends Model
         return $this->hasMany(HistorialEstadoPedido::class)
             ->orderBy('fecha_evento', 'asc');
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | LÓGICA DE ESTADOS
-    |--------------------------------------------------------------------------
-    */
 
     public function cambiarEstado(
         string $nuevoEstado,
@@ -138,7 +126,6 @@ class Pedido extends Model
 
         $this->save();
 
-        // 🔥 HISTORIAL
         $this->registrarHistorial(
             estadoNuevo: $nuevoEstado,
             estadoAnterior: $estadoAnterior,
@@ -148,7 +135,6 @@ class Pedido extends Model
             usuarioId: $usuarioId
         );
 
-        // 🚀 NOTIFICAR CLIENTE
         $this->notificarClienteCambioEstado();
     }
 
@@ -160,7 +146,6 @@ class Pedido extends Model
         ?string $usuario = null,
         ?int $usuarioId = null
     ): void {
-
         $this->historialEstados()->create([
             'estado_anterior' => $estadoAnterior,
             'estado_nuevo'    => $estadoNuevo,
@@ -171,48 +156,160 @@ class Pedido extends Model
             'fecha_evento'    => now(),
         ]);
     }
+
     public function notificarClienteCambioEstado(): void
-{
-    if (!$this->telefono_whatsapp) {
-        return;
+    {
+        $telefono = $this->telefono_whatsapp ?: $this->telefono_contacto ?: $this->telefono;
+
+        if (!$telefono) {
+            Log::warning('⚠️ Pedido sin teléfono para notificar', [
+                'pedido_id' => $this->id,
+                'estado' => $this->estado,
+            ]);
+            return;
+        }
+
+        $connectionId = $this->connection_id;
+        $whatsappId   = $this->whatsapp_id ?: $this->connection_id;
+
+        if (!$connectionId) {
+            Log::warning('⚠️ Pedido sin connection_id para notificar', [
+                'pedido_id' => $this->id,
+                'empresa_id' => $this->empresa_id,
+                'estado' => $this->estado,
+            ]);
+            return;
+        }
+
+        $mensaje = match ($this->estado) {
+            self::ESTADO_EN_PREPARACION =>
+                "👨‍🍳 ¡Hola {$this->cliente_nombre}!\n\nTu pedido #{$this->id} ya está en preparación 🥩🔥",
+
+            self::ESTADO_REPARTIDOR_EN_CAMINO =>
+                "🛵 ¡Hola {$this->cliente_nombre}!\n\nTu pedido #{$this->id} ya va en camino 🚀",
+
+            self::ESTADO_ENTREGADO =>
+                "✅ ¡Hola {$this->cliente_nombre}!\n\nTu pedido #{$this->id} fue entregado.\nGracias por tu compra 🙌",
+
+            self::ESTADO_CANCELADO =>
+                "❌ Hola {$this->cliente_nombre}\n\nTu pedido #{$this->id} fue cancelado.\nSi tienes dudas escríbenos.",
+
+            default =>
+                "📦 Hola {$this->cliente_nombre}\n\nTu pedido #{$this->id} ha sido actualizado.",
+        };
+
+        $mensaje .= "\n\n🔎 Puedes seguirlo aquí:\n{$this->url_seguimiento}";
+
+        try {
+            $payload = [
+                'number'       => $this->normalizarTelefono($telefono),
+                'body'         => $mensaje,
+                'connectionId' => (int) $connectionId,
+                'whatsappId'   => (int) $whatsappId,
+            ];
+
+            Log::info('📤 Enviando notificación de pedido a WhatsApp', [
+                'pedido_id' => $this->id,
+                'empresa_id' => $this->empresa_id,
+                'connection_id' => $connectionId,
+                'whatsapp_id' => $whatsappId,
+                'payload' => $payload,
+            ]);
+
+            $token = $this->obtenerTokenWhatsapp();
+
+            if (!$token) {
+                Log::error('❌ No se pudo obtener token de WhatsApp', [
+                    'pedido_id' => $this->id,
+                ]);
+                return;
+            }
+
+            $response = Http::withoutVerifying()
+                ->withToken($token)
+                ->timeout(20)
+                ->post('https://wa-api.tecnobyteapp.com:1422/api/messages/send', $payload);
+
+            if ($response->successful()) {
+                Log::info('✅ Notificación enviada correctamente', [
+                    'pedido_id' => $this->id,
+                    'status' => $response->status(),
+                ]);
+                return;
+            }
+
+            Log::error('❌ Error enviando notificación WhatsApp', [
+                'pedido_id' => $this->id,
+                'status' => $response->status(),
+                'body' => $response->body(),
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('❌ Excepción enviando WhatsApp pedido', [
+                'pedido_id' => $this->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
-    $mensaje = match ($this->estado) {
-        self::ESTADO_EN_PREPARACION =>
-            "👨‍🍳 ¡Hola {$this->cliente_nombre}!\n\nTu pedido ya está en preparación 🥩🔥",
-
-        self::ESTADO_REPARTIDOR_EN_CAMINO =>
-            "🛵 ¡Tu pedido va en camino!\n\nPrepárate que ya casi llega 🚀",
-
-        self::ESTADO_ENTREGADO =>
-            "✅ Pedido entregado\n\nGracias por tu compra 🙌",
-
-        self::ESTADO_CANCELADO =>
-            "❌ Tu pedido fue cancelado\n\nSi tienes dudas escríbenos",
-
-        default =>
-            "📦 Tu pedido ha sido actualizado",
-    };
-
-    // 🔥 URL de seguimiento
-    $mensaje .= "\n\n🔎 Puedes seguirlo aquí:\n{$this->url_seguimiento}";
-
-    // 🚀 ENVÍO A TU API WHATSAPP
-    try {
-        \Illuminate\Support\Facades\Http::post(env('WHATSAPP_API_URL') . '/send-message', [
-            'phone' => $this->telefono_whatsapp,
-            'message' => $mensaje,
-        ]);
-    } catch (\Exception $e) {
-        \Log::error('Error enviando WhatsApp pedido: ' . $e->getMessage());
+    private function obtenerTokenWhatsapp(): ?string
+    {
+        $cacheKey = 'whatsapp_api_token';
+        return Cache::get($cacheKey) ?: $this->loginWhatsapp();
     }
-}
 
-    /*
-    |--------------------------------------------------------------------------
-    | HELPERS
-    |--------------------------------------------------------------------------
-    */
+    private function loginWhatsapp(bool $force = false): ?string
+    {
+        $cacheKey = 'whatsapp_api_token';
+
+        if ($force) {
+            Cache::forget($cacheKey);
+        } else {
+            $cached = Cache::get($cacheKey);
+            if ($cached) {
+                return $cached;
+            }
+        }
+
+        try {
+            $response = Http::withoutVerifying()
+                ->timeout(20)
+                ->post('https://wa-api.tecnobyteapp.com:1422/auth/login', [
+                    'email'    => env('WHATSAPP_API_EMAIL'),
+                    'password' => env('WHATSAPP_API_PASSWORD'),
+                ]);
+
+            if ($response->failed()) {
+                Log::error('❌ ERROR LOGIN WHATSAPP', [
+                    'status' => $response->status(),
+                    'body'   => $response->body(),
+                ]);
+                return null;
+            }
+
+            $token = $response->json('token');
+
+            if (!$token) {
+                Log::error('❌ LOGIN WHATSAPP SIN TOKEN', [
+                    'body' => $response->body(),
+                ]);
+                return null;
+            }
+
+            Cache::put($cacheKey, $token, now()->addMinutes(20));
+
+            return $token;
+        } catch (\Throwable $e) {
+            Log::error('❌ EXCEPCIÓN LOGIN WHATSAPP', [
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
+    }
+
+    private function normalizarTelefono(?string $telefono): string
+    {
+        return preg_replace('/\D+/', '', (string) $telefono);
+    }
 
     public function getUrlSeguimientoAttribute(): string
     {

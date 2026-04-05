@@ -3,11 +3,11 @@
 
         @php
             $todos = $pedidos->count();
-            $nuevos = $pedidos->where('estado', 'nuevo')->count();
-            $enProceso = $pedidos->where('estado', 'en_proceso')->count();
-            $despachados = $pedidos->where('estado', 'despachado')->count();
-            $entregados = $pedidos->where('estado', 'entregado')->count();
-            $cancelados = $pedidos->where('estado', 'cancelado')->count();
+            $nuevos = $pedidos->where('estado', \App\Models\Pedido::ESTADO_NUEVO)->count();
+            $enProceso = $pedidos->where('estado', \App\Models\Pedido::ESTADO_EN_PREPARACION)->count();
+            $despachados = $pedidos->where('estado', \App\Models\Pedido::ESTADO_REPARTIDOR_EN_CAMINO)->count();
+            $entregados = $pedidos->where('estado', \App\Models\Pedido::ESTADO_ENTREGADO)->count();
+            $cancelados = $pedidos->where('estado', \App\Models\Pedido::ESTADO_CANCELADO)->count();
 
             $tab = request('estado', 'todos');
             $zona = request('zona', 'todas');
@@ -356,7 +356,7 @@
                                         <button type="button" wire:click="marcarEnPreparacion({{ $pedido->id }})"
                                             class="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-3 py-2 text-xs font-bold text-white transition hover:bg-amber-600">
                                             <i class="fa-solid fa-utensils"></i>
-                                            En proceso
+                                          Iniciar preparación
                                         </button>
                                     @elseif($pedido->estado === \App\Models\Pedido::ESTADO_EN_PREPARACION)
                                         <span
