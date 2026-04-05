@@ -13,13 +13,13 @@
 
         {{-- HEADER PRINCIPAL --}}
         <div class="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <div class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-slate-900 via-indigo-600 to-sky-500"></div>
+            
 
             <div class="flex items-center gap-4 px-5 py-4">
                 <div
-                    class="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 text-white shadow-md">
+                    class="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-400 via-orange-500 to-orange-600 text-white shadow-md">
                     <i class="fa-solid fa-bag-shopping text-lg"></i>
-                    <div class="absolute inset-0 rounded-2xl bg-indigo-500/20 blur-lg"></div>
+                    <div class="absolute inset-0 rounded-2xl bg-orange-500/20 blur-lg"></div>
                 </div>
 
                 <div class="min-w-0">
@@ -170,7 +170,7 @@
                 </div>
                 <div class="flex flex-col gap-2 sm:flex-row">
                     <form method="GET" class="w-full sm:w-auto">
-                       <input type="hidden" name="estado" value="{{ $estado }}">
+                        <input type="hidden" name="estado" value="{{ $estado }}">
                         <div class="relative min-w-[220px]">
                             <i
                                 class="fa-solid fa-location-dot pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
