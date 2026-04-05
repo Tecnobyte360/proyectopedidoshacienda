@@ -468,6 +468,6 @@ class Pedido extends Model
             self::ESTADO_ENTREGADO            => 'Pedido entregado',
             self::ESTADO_CANCELADO            => 'Pedido cancelado',
             default                           => 'Actualización de pedido',
-        ];
+        };
     }
 }
