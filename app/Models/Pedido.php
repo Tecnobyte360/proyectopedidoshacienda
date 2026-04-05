@@ -40,6 +40,7 @@ class Pedido extends Model
         'conversacion_completa',
         'resumen_conversacion',
         'codigo_seguimiento',
+        'token_entrega',
         'fecha_estado',
         'fecha_entregado',
         'fecha_cancelado',
@@ -166,6 +167,88 @@ class Pedido extends Model
         ]);
     }
 
+    public function generarTokenEntrega(): string
+    {
+        $token = str_pad((string) random_int(0, 9999), 4, '0', STR_PAD_LEFT);
+        $this->token_entrega = $token;
+        $this->saveQuietly(); // sin disparar observers ni eventos
+        return $token;
+    }
+
+    public function notificarTokenEntrega(string $token): void
+    {
+        $telefono = $this->telefono_whatsapp ?: $this->telefono_contacto ?: $this->telefono;
+
+        if (!$telefono || !$this->connection_id) {
+            Log::warning('⚠️ No se puede enviar token: falta teléfono o connection_id', [
+                'pedido_id' => $this->id,
+            ]);
+            return;
+        }
+
+        $mensaje = "🛵 ¡Hola {$this->cliente_nombre}!\n\n"
+            . "Tu pedido #{$this->id} ya va en camino 🚀\n\n"
+            . "🔐 *Tu código de verificación de entrega es:*\n\n"
+            . "        *{$token}*\n\n"
+            . "Dáselo al domiciliario cuando llegue para confirmar la entrega.\n\n"
+            . "🔎 Sigue tu pedido aquí:\n{$this->url_seguimiento}";
+
+        $payload = [
+            'number'       => $this->normalizarTelefono($telefono),
+            'body'         => $mensaje,
+            'connectionId' => (int) $this->connection_id,
+            'whatsappId'   => (int) ($this->whatsapp_id ?: $this->connection_id),
+        ];
+
+        try {
+            $apiToken = $this->obtenerTokenWhatsapp();
+
+            if (!$apiToken) {
+                Log::error('❌ No se pudo obtener token WhatsApp para enviar token de entrega', [
+                    'pedido_id' => $this->id,
+                ]);
+                return;
+            }
+
+            $response = $this->postWhatsappSend($apiToken, $payload);
+
+            if ($response->successful()) {
+                Log::info('✅ Token de entrega enviado al cliente', [
+                    'pedido_id' => $this->id,
+                    'token'     => $token,
+                ]);
+                return;
+            }
+
+            // Reintento si sesión expirada
+            $body    = $response->json();
+            $rawBody = $response->body();
+
+            if ($response->status() === 401 && $this->esSesionExpirada($body, $rawBody)) {
+                $newApiToken = $this->refrescarTokenWhatsapp() ?? $this->loginWhatsapp(force: true);
+
+                if ($newApiToken) {
+                    $retry = $this->postWhatsappSend($newApiToken, $payload);
+                    if ($retry->successful()) {
+                        Log::info('✅ Token de entrega enviado en reintento', ['pedido_id' => $this->id]);
+                        return;
+                    }
+                }
+            }
+
+            Log::error('❌ No se pudo enviar token de entrega al cliente', [
+                'pedido_id' => $this->id,
+                'status'    => $response->status(),
+                'body'      => $response->body(),
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('❌ Excepción enviando token de entrega', [
+                'pedido_id' => $this->id,
+                'error'     => $e->getMessage(),
+            ]);
+        }
+    }
+
     /*
     |==========================================================================
     | NOTIFICACIÓN WHATSAPP
@@ -198,20 +281,27 @@ class Pedido extends Model
 
         $mensaje = match ($this->estado) {
             self::ESTADO_EN_PREPARACION =>
-                "👨‍🍳 ¡Hola {$this->cliente_nombre}!\n\nTu pedido #{$this->id} ya está en preparación 🥩🔥",
+            "👨‍🍳 ¡Hola {$this->cliente_nombre}!\n\nTu pedido #{$this->id} ya está en preparación 🥩🔥",
 
-            self::ESTADO_REPARTIDOR_EN_CAMINO =>
-                "🛵 ¡Hola {$this->cliente_nombre}!\n\nTu pedido #{$this->id} ya va en camino 🚀",
+            // 👇 Ya no notifica aquí — lo hace notificarTokenEntrega con el token incluido
+            self::ESTADO_REPARTIDOR_EN_CAMINO => null,
 
             self::ESTADO_ENTREGADO =>
-                "✅ ¡Hola {$this->cliente_nombre}!\n\nTu pedido #{$this->id} fue entregado.\nGracias por tu compra 🙌",
+            "✅ ¡Hola {$this->cliente_nombre}!\n\nTu pedido #{$this->id} fue entregado.\nGracias por tu compra 🙌",
 
             self::ESTADO_CANCELADO =>
-                "❌ Hola {$this->cliente_nombre}\n\nTu pedido #{$this->id} fue cancelado.\nSi tienes dudas escríbenos.",
+            "❌ Hola {$this->cliente_nombre}\n\nTu pedido #{$this->id} fue cancelado.\nSi tienes dudas escríbenos.",
 
             default =>
-                "📦 Hola {$this->cliente_nombre}\n\nTu pedido #{$this->id} ha sido actualizado.",
+            "📦 Hola {$this->cliente_nombre}\n\nTu pedido #{$this->id} ha sido actualizado.",
         };
+
+        // Si el estado no tiene mensaje (como repartidor_en_camino), salir sin enviar
+        if ($mensaje === null) {
+            return;
+        }
+
+        $mensaje .= "\n\n🔎 Puedes seguirlo aquí:\n{$this->url_seguimiento}";
 
         $mensaje .= "\n\n🔎 Puedes seguirlo aquí:\n{$this->url_seguimiento}";
 

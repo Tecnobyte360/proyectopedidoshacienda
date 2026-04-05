@@ -13,7 +13,7 @@
 
         {{-- HEADER PRINCIPAL --}}
         <div class="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-            
+
 
             <div class="flex items-center gap-4 px-5 py-4">
                 <div
@@ -373,18 +373,23 @@
                                             <i class="fa-solid fa-spinner fa-spin hidden"
                                                 wire:loading.class.remove="hidden"
                                                 wire:target="marcarEnCamino({{ $pedido->id }})"></i>
-                                            Despachar
+                                            Terminar preparación
                                         </button>
                                     @elseif ($pedido->estado === \App\Models\Pedido::ESTADO_REPARTIDOR_EN_CAMINO)
-                                        <button type="button" wire:click="marcarEntregado({{ $pedido->id }})"
-                                            wire:loading.attr="disabled"
-                                            wire:target="marcarEntregado({{ $pedido->id }})"
-                                            class="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-3 py-2 text-xs font-bold text-white transition hover:bg-emerald-600 disabled:opacity-60 disabled:cursor-not-allowed">
-                                            <i class="fa-solid fa-circle-check" wire:loading.class="hidden"
-                                                wire:target="marcarEntregado({{ $pedido->id }})"></i>
-                                            <i class="fa-solid fa-spinner fa-spin hidden"
-                                                wire:loading.class.remove="hidden"
-                                                wire:target="marcarEntregado({{ $pedido->id }})"></i>
+
+                                    @elseif ($pedido->estado === \App\Models\Pedido::ESTADO_REPARTIDOR_EN_CAMINO)
+                                        {{-- Token visible para el domiciliario --}}
+                                        @if ($pedido->token_entrega)
+                                            <div
+                                                class="mb-1.5 inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-bold text-violet-700">
+                                                <i class="fa-solid fa-key text-[10px]"></i>
+                                                Token: <span
+                                                    class="tracking-widest">{{ $pedido->token_entrega }}</span>
+                                            </div>
+                                        @endif
+                                        <button type="button" wire:click="abrirModalEntrega({{ $pedido->id }})"
+                                            class="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-3 py-2 text-xs font-bold text-white transition hover:bg-emerald-600">
+                                            <i class="fa-solid fa-circle-check"></i>
                                             Confirmar entrega
                                         </button>
                                     @elseif ($pedido->estado === \App\Models\Pedido::ESTADO_ENTREGADO)
@@ -425,6 +430,71 @@
                 </table>
             </div>
         </div>
+        {{-- MODAL TOKEN ENTREGA --}}
+        @if ($modalTokenAbierto)
+            <div class="fixed inset-0 z-50 flex items-center justify-center p-4"
+                style="background: rgba(15,23,42,0.55); backdrop-filter: blur(4px);">
+
+                <div class="w-full max-w-sm rounded-2xl border border-slate-200 bg-white shadow-2xl" wire:click.stop>
+
+                    {{-- Header --}}
+                    <div class="flex items-center gap-3 border-b border-slate-100 px-5 py-4">
+                        <div
+                            class="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
+                            <i class="fa-solid fa-key text-sm"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-bold text-slate-800">Verificar entrega</h3>
+                            <p class="text-xs text-slate-500">Pedido
+                                #{{ str_pad($pedidoIdEntregando, 3, '0', STR_PAD_LEFT) }}</p>
+                        </div>
+                        <button wire:click="cerrarModalEntrega"
+                            class="ml-auto flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition">
+                            <i class="fa-solid fa-xmark text-sm"></i>
+                        </button>
+                    </div>
+
+                    {{-- Body --}}
+                    <div class="px-5 py-5">
+                        <p class="text-sm text-slate-600 leading-relaxed">
+                            Ingresa el código de 4 dígitos que el cliente recibió por WhatsApp para confirmar la
+                            entrega.
+                        </p>
+
+                        <div class="mt-4">
+                            <input wire:model="tokenIngresado" wire:keydown.enter="confirmarEntregaConToken"
+                                type="text" inputmode="numeric" maxlength="4" placeholder="0000" autofocus
+                                class="w-full rounded-xl border {{ $tokenError ? 'border-rose-400 bg-rose-50 focus:ring-rose-100' : 'border-slate-200 bg-slate-50 focus:ring-indigo-100' }} px-4 py-3 text-center text-2xl font-bold tracking-[0.5em] text-slate-800 outline-none transition focus:border-indigo-400 focus:bg-white focus:ring-4" />
+
+                            @if ($tokenError)
+                                <div
+                                    class="mt-2.5 flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">
+                                    <i class="fa-solid fa-triangle-exclamation text-[11px]"></i>
+                                    {{ $tokenError }}
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+
+                    {{-- Footer --}}
+                    <div class="flex gap-2 border-t border-slate-100 px-5 py-4">
+                        <button wire:click="cerrarModalEntrega"
+                            class="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">
+                            Cancelar
+                        </button>
+                        <button wire:click="confirmarEntregaConToken" wire:loading.attr="disabled"
+                            wire:target="confirmarEntregaConToken"
+                            class="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-600 disabled:opacity-60">
+                            <i class="fa-solid fa-circle-check" wire:loading.class="hidden"
+                                wire:target="confirmarEntregaConToken"></i>
+                            <i class="fa-solid fa-spinner fa-spin hidden" wire:loading.class.remove="hidden"
+                                wire:target="confirmarEntregaConToken"></i>
+                            Confirmar entrega
+                        </button>
+                    </div>
+                </div>
+            </div>
+        @endif
 
         {{-- TOAST --}}
         <div id="toast"
