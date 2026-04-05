@@ -9,7 +9,8 @@ use Livewire\Component;
 
 class Index extends Component
 {
-    public $pedidos = [];
+    // ✅ Sin tipado array — Livewire maneja la Collection correctamente
+    public $pedidos;
 
     protected $listeners = [
         'pedidoActualizado' => 'cargarPedidos',
@@ -32,8 +33,8 @@ class Index extends Component
 
     public function marcarEnPreparacion(int $pedidoId): void
     {
+        // ✅ dd() eliminado — era el culpable de romper la respuesta AJAX de Livewire
 
-      dd('ENTRÓ AL MÉTODO', $pedidoId);
         Log::info('CLICK iniciar preparación', [
             'pedido_id' => $pedidoId,
         ]);
@@ -43,8 +44,8 @@ class Index extends Component
         $estadoActual = trim((string) $pedido->estado);
 
         Log::info('Pedido cargado para iniciar preparación', [
-            'id' => $pedido->id,
-            'estado_actual' => $estadoActual,
+            'id'                   => $pedido->id,
+            'estado_actual'        => $estadoActual,
             'estado_nuevo_constante' => Pedido::ESTADO_NUEVO,
         ]);
 
@@ -55,12 +56,12 @@ class Index extends Component
             Pedido::ESTADO_RECOGIDO,
         ], true)) {
             Log::warning('No se puede pasar a preparación por estado no permitido', [
-                'pedido_id' => $pedido->id,
+                'pedido_id'     => $pedido->id,
                 'estado_actual' => $estadoActual,
             ]);
 
             $this->dispatch('notify', [
-                'type' => 'warning',
+                'type'    => 'warning',
                 'message' => "El pedido #{$pedido->id} no se puede pasar a preparación porque está en estado: {$estadoActual}.",
             ]);
 
@@ -73,7 +74,7 @@ class Index extends Component
             ]);
 
             $this->dispatch('notify', [
-                'type' => 'info',
+                'type'    => 'info',
                 'message' => "El pedido #{$pedido->id} ya está en preparación.",
             ]);
 
@@ -91,7 +92,7 @@ class Index extends Component
         );
 
         Log::info('Estado cambiado correctamente a preparación', [
-            'pedido_id' => $pedido->id,
+            'pedido_id'    => $pedido->id,
             'nuevo_estado' => $pedido->fresh()->estado,
         ]);
 
@@ -99,19 +100,19 @@ class Index extends Component
         $this->dispatch('pedidoActualizado');
 
         $this->dispatch('notify', [
-            'type' => 'success',
+            'type'    => 'success',
             'message' => "Pedido #{$pedido->id} enviado a preparación correctamente.",
         ]);
     }
 
     public function marcarEnCamino(int $pedidoId): void
     {
-        $pedido = Pedido::findOrFail($pedidoId);
+        $pedido       = Pedido::findOrFail($pedidoId);
         $estadoActual = trim((string) $pedido->estado);
 
         if ($estadoActual !== Pedido::ESTADO_EN_PREPARACION) {
             $this->dispatch('notify', [
-                'type' => 'warning',
+                'type'    => 'warning',
                 'message' => "El pedido #{$pedido->id} debe estar en preparación antes de pasarlo a en camino.",
             ]);
             return;
@@ -131,19 +132,19 @@ class Index extends Component
         $this->dispatch('pedidoActualizado');
 
         $this->dispatch('notify', [
-            'type' => 'success',
+            'type'    => 'success',
             'message' => "Pedido #{$pedido->id} marcado como en camino.",
         ]);
     }
 
     public function marcarEntregado(int $pedidoId): void
     {
-        $pedido = Pedido::findOrFail($pedidoId);
+        $pedido       = Pedido::findOrFail($pedidoId);
         $estadoActual = trim((string) $pedido->estado);
 
         if ($estadoActual !== Pedido::ESTADO_REPARTIDOR_EN_CAMINO) {
             $this->dispatch('notify', [
-                'type' => 'warning',
+                'type'    => 'warning',
                 'message' => "El pedido #{$pedido->id} debe estar en camino antes de marcarlo como entregado.",
             ]);
             return;
@@ -163,14 +164,14 @@ class Index extends Component
         $this->dispatch('pedidoActualizado');
 
         $this->dispatch('notify', [
-            'type' => 'success',
+            'type'    => 'success',
             'message' => "Pedido #{$pedido->id} marcado como entregado.",
         ]);
     }
 
     public function cancelarPedido(int $pedidoId): void
     {
-        $pedido = Pedido::findOrFail($pedidoId);
+        $pedido       = Pedido::findOrFail($pedidoId);
         $estadoActual = trim((string) $pedido->estado);
 
         if (in_array($estadoActual, [
@@ -178,7 +179,7 @@ class Index extends Component
             Pedido::ESTADO_CANCELADO,
         ], true)) {
             $this->dispatch('notify', [
-                'type' => 'warning',
+                'type'    => 'warning',
                 'message' => "El pedido #{$pedido->id} no se puede cancelar porque está en estado: {$estadoActual}.",
             ]);
             return;
@@ -198,7 +199,7 @@ class Index extends Component
         $this->dispatch('pedidoActualizado');
 
         $this->dispatch('notify', [
-            'type' => 'success',
+            'type'    => 'success',
             'message' => "Pedido #{$pedido->id} cancelado correctamente.",
         ]);
     }
