@@ -3,6 +3,7 @@
 namespace App\Livewire\Pedidos;
 
 use App\Models\Pedido;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 class SeguimientoPedido extends Component
@@ -28,6 +29,12 @@ class SeguimientoPedido extends Component
         return [
             "echo:pedido-seguimiento.{$this->codigo},pedido.actualizado" => 'pedidoActualizadoEnTiempoReal',
         ];
+    }
+
+    #[On('seguimiento-actualizado')]
+    public function refrescarDesdeJs(): void
+    {
+        $this->cargarPedido();
     }
 
     public function pedidoActualizadoEnTiempoReal($event = null): void

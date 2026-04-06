@@ -151,7 +151,7 @@ class Pedido extends Model
 
     $this->load(['sede', 'detalles', 'historialEstados']);
 
-    broadcast(new PedidoActualizado($this, 'estado_actualizado'))->toOthers();
+broadcast(new PedidoActualizado($this, 'estado_actualizado'));
 }
 
     public function registrarHistorial(

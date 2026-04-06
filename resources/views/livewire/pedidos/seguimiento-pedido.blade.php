@@ -1,4 +1,18 @@
-<div class="tracking-page min-h-screen bg-white text-slate-800 overflow-x-hidden">
+<div
+    id="seguimiento-pedido-root"
+    data-codigo-seguimiento="{{ $pedido->codigo_seguimiento }}"
+    class="tracking-page min-h-screen bg-white text-slate-800 overflow-x-hidden"
+>
+    <div id="seguimiento-estado-flash" class="status-flash hidden opacity-0">
+        <div class="status-flash__icon">
+            <i class="fa-solid fa-bolt"></i>
+        </div>
+        <div>
+            <p class="status-flash__title">Actualización en tiempo real</p>
+            <p id="seguimiento-estado-flash-text" class="status-flash__text">El estado de tu pedido cambió.</p>
+        </div>
+    </div>
+
     <div class="bg-glow bg-glow-1"></div>
     <div class="bg-glow bg-glow-2"></div>
 
@@ -25,41 +39,27 @@
 
         $ordenEstados = ['nuevo', 'en_preparacion', 'repartidor_en_camino', 'recogido', 'entregado'];
         $indiceActual = array_search($estadoActual, $ordenEstados);
-        $cantidadItems = $pedido->detalles->count();
-        $telefono = $pedido->telefono_contacto ?? ($pedido->telefono_whatsapp ?? $pedido->telefono);
     @endphp
 
     <div class="page">
-
         <div class="glass header">
             <div class="header-left">
-
-               
-
-               
                 <h1 class="header-title">
                     Hola, <span>{{ $pedido->cliente_nombre ?? 'Cliente' }}</span> 👋
                 </h1>
 
-                
                 <p class="header-desc">
                     {{ $metaEstado['label'] === 'Cancelado'
                         ? 'Tu pedido fue cancelado. Puedes revisar los detalles a continuación.'
                         : 'Estamos procesando tu pedido. Aquí verás cada avance en tiempo real.' }}
                 </p>
 
-            
                 <div class="header-tags">
-
-                  
-
                     <div class="tag code">
                         <i class="fa-solid fa-receipt"></i>
                         Pedido #{{ str_pad($pedido->id, 5, '0', STR_PAD_LEFT) }}
                     </div>
-
                 </div>
-
             </div>
 
             <div class="header-right">
@@ -71,8 +71,6 @@
                 </span>
             </div>
         </div>
-
-      
 
         @if ($estadoActual !== 'cancelado')
             <div class="glass progress-section progress-dark">
@@ -181,7 +179,6 @@
                     </div>
                 </div>
 
-              
                 @if ($pedido->notas)
                     <div class="glass notes-panel">
                         <h2 class="panel-title">Notas del pedido</h2>
@@ -227,6 +224,68 @@
                 pointer-events: none;
                 z-index: 0;
                 opacity: .4
+            }
+
+            .status-flash {
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                z-index: 80;
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                min-width: 280px;
+                max-width: 360px;
+                padding: 14px 16px;
+                border-radius: 18px;
+                border: 1px solid rgba(16, 185, 129, 0.2);
+                background: rgba(255, 255, 255, 0.96);
+                box-shadow: 0 22px 50px rgba(15, 23, 42, 0.16);
+                backdrop-filter: blur(16px);
+                transition: opacity .35s ease, transform .35s ease;
+                transform: translateY(0);
+            }
+
+            .status-flash.hidden {
+                display: none;
+            }
+
+            .status-flash.opacity-0 {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+
+            .status-flash.opacity-100 {
+                opacity: 1;
+                transform: translateY(0);
+            }
+
+            .status-flash__icon {
+                width: 42px;
+                height: 42px;
+                border-radius: 14px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background: rgba(16, 185, 129, 0.12);
+                color: #10b981;
+                flex-shrink: 0;
+            }
+
+            .status-flash__title {
+                margin: 0;
+                font-size: 12px;
+                font-weight: 800;
+                letter-spacing: .14em;
+                text-transform: uppercase;
+                color: #10b981;
+            }
+
+            .status-flash__text {
+                margin: 4px 0 0;
+                font-size: 13px;
+                color: var(--text-primary);
+                font-weight: 600;
             }
 
             .bg-glow {
@@ -295,27 +354,6 @@
                 border-radius: inherit
             }
 
-            .header-eyebrow {
-                display: inline-flex;
-                align-items: center;
-                gap: 8px;
-                font-size: 11px;
-                font-weight: 600;
-                letter-spacing: .2em;
-                text-transform: uppercase;
-                color: var(--accent);
-                margin-bottom: .75rem
-            }
-
-            .header-eyebrow .dot {
-                width: 6px;
-                height: 6px;
-                border-radius: 50%;
-                background: var(--accent);
-                box-shadow: 0 0 8px var(--accent);
-                animation: pulse-dot 2s infinite
-            }
-
             .header h1 {
                 font-family: 'Syne', sans-serif;
                 font-size: clamp(1.8rem, 4vw, 2.8rem);
@@ -327,45 +365,6 @@
 
             .header h1 span {
                 color: var(--accent)
-            }
-
-            .header-sub {
-                font-size: .9rem;
-                color: var(--text-secondary);
-                margin-top: .5rem;
-                max-width: 420px;
-                line-height: 1.6
-            }
-
-            .header-badges {
-                display: flex;
-                gap: .75rem;
-                margin-top: 1.25rem;
-                flex-wrap: wrap
-            }
-
-            .badge {
-                display: inline-flex;
-                align-items: center;
-                gap: 6px;
-                padding: 6px 14px;
-                border-radius: 100px;
-                font-size: 11.5px;
-                font-weight: 600;
-                letter-spacing: .06em;
-                border: 1px solid
-            }
-
-            .badge-status {
-                background: var(--accent-dim);
-                border-color: rgba(16, 212, 142, .25);
-                color: var(--accent)
-            }
-
-            .badge-id {
-                background: rgba(255, 255, 255, .04);
-                border-color: var(--border);
-                color: var(--text-secondary)
             }
 
             .header-right {
@@ -392,40 +391,6 @@
                 text-align: right
             }
 
-            .stats-row {
-                display: grid;
-                grid-template-columns: repeat(4, 1fr);
-                gap: 1rem;
-                margin-bottom: 1.5rem;
-                animation: fadeUp .6s .08s ease both
-            }
-
-            .stat-card {
-                padding: 1.25rem 1.5rem
-            }
-
-            .stat-label {
-                font-size: 10.5px;
-                font-weight: 600;
-                letter-spacing: .2em;
-                text-transform: uppercase;
-                color: var(--text-muted);
-                margin-bottom: .5rem
-            }
-
-            .stat-value {
-                font-family: 'Syne', sans-serif;
-                font-size: 1.35rem;
-                font-weight: 700;
-                color: var(--text-primary)
-            }
-
-            .stat-sub {
-                font-size: 12px;
-                color: var(--text-muted);
-                margin-top: .2rem
-            }
-
             .progress-section {
                 padding: 2rem 2.5rem;
                 margin-bottom: 1.5rem;
@@ -434,16 +399,10 @@
 
             .progress-dark {
                 background: #0f172a;
-                /* negro elegante */
                 border: 1px solid rgba(255, 255, 255, 0.08);
             }
 
-            /* título */
-            .progress-dark .section-title {
-                color: rgba(255, 255, 255, 0.6);
-            }
-
-            /* pasos texto */
+            .progress-dark .section-title,
             .progress-dark .step-label {
                 color: rgba(255, 255, 255, 0.6);
             }
@@ -453,35 +412,29 @@
                 border-color: rgba(255, 255, 255, 0.08);
             }
 
-            /* líneas */
             .progress-dark .step-item:not(:last-child)::after {
                 background: rgba(255, 255, 255, 0.15);
             }
 
-            /* iconos base */
             .progress-dark .step-icon-wrap {
                 background: rgba(255, 255, 255, 0.05);
                 border-color: rgba(255, 255, 255, 0.15);
                 color: rgba(255, 255, 255, 0.6);
             }
 
-            /* completados */
             .progress-dark .step-item.completed .step-icon-wrap {
                 background: rgba(16, 185, 129, 0.2);
                 border-color: rgba(16, 185, 129, 0.4);
                 color: #10b981;
             }
 
-            /* activo 🔥 */
             .progress-dark .step-item.active .step-icon-wrap {
                 background: #10b981;
                 border-color: #10b981;
                 color: #0f172a;
-                box-shadow: 0 0 0 6px rgba(16, 185, 129, 0.15),
-                    0 0 20px rgba(16, 185, 129, 0.4);
+                box-shadow: 0 0 0 6px rgba(16, 185, 129, 0.15), 0 0 20px rgba(16, 185, 129, 0.4);
             }
 
-            /* texto activo */
             .progress-dark .step-item.active .step-label {
                 color: #ffffff;
             }
@@ -663,37 +616,37 @@
             .timeline-dot.blue {
                 background: rgba(74, 158, 255, .12);
                 border-color: rgba(74, 158, 255, .25);
-                color: var(--blue)
+                color: #4a9eff
             }
 
             .timeline-dot.amber {
                 background: rgba(245, 166, 35, .12);
                 border-color: rgba(245, 166, 35, .25);
-                color: var(--amber)
+                color: #f5a623
             }
 
             .timeline-dot.violet {
                 background: rgba(167, 139, 250, .12);
                 border-color: rgba(167, 139, 250, .25);
-                color: var(--violet)
+                color: #a78bfa
             }
 
             .timeline-dot.indigo {
                 background: rgba(129, 140, 248, .12);
                 border-color: rgba(129, 140, 248, .25);
-                color: var(--indigo)
+                color: #818cf8
             }
 
             .timeline-dot.emerald {
                 background: rgba(16, 212, 142, .12);
                 border-color: rgba(16, 212, 142, .25);
-                color: var(--emerald)
+                color: #10d48e
             }
 
             .timeline-dot.rose {
                 background: rgba(251, 113, 133, .12);
                 border-color: rgba(251, 113, 133, .25);
-                color: var(--rose)
+                color: #fb7185
             }
 
             .timeline-line {
@@ -748,7 +701,6 @@
             }
 
             .products-panel,
-            .summary-panel,
             .notes-panel {
                 padding: 1.75rem
             }
@@ -811,60 +763,6 @@
                 white-space: nowrap
             }
 
-            .summary-rows {
-                display: flex;
-                flex-direction: column;
-                margin-top: 1.25rem
-            }
-
-            .summary-row {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                padding: .65rem 0;
-                border-bottom: 1px solid var(--border);
-                font-size: 13px
-            }
-
-            .summary-row:last-child {
-                border: none
-            }
-
-            .summary-key {
-                color: var(--text-secondary)
-            }
-
-            .summary-val {
-                font-weight: 600;
-                color: var(--text-primary)
-            }
-
-            .total-row {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                padding: 1.1rem 1.25rem;
-                background: var(--accent-dim);
-                border: 1px solid rgba(16, 212, 142, .2);
-                border-radius: 14px;
-                margin-top: 1rem
-            }
-
-            .total-row-label {
-                font-size: 11px;
-                font-weight: 700;
-                letter-spacing: .18em;
-                text-transform: uppercase;
-                color: var(--accent)
-            }
-
-            .total-row-val {
-                font-family: 'Syne', sans-serif;
-                font-size: 1.5rem;
-                font-weight: 800;
-                color: var(--accent)
-            }
-
             .notes-text {
                 font-size: 13px;
                 color: var(--text-secondary);
@@ -885,9 +783,7 @@
             }
 
             @keyframes pulse-dot {
-
-                0%,
-                100% {
+                0%, 100% {
                     box-shadow: 0 0 0 0 rgba(16, 212, 142, .5)
                 }
 
@@ -901,10 +797,6 @@
                     grid-template-columns: 1fr
                 }
 
-                .stats-row {
-                    grid-template-columns: repeat(2, 1fr)
-                }
-
                 .header {
                     grid-template-columns: 1fr
                 }
@@ -915,10 +807,6 @@
             }
 
             @media (max-width:580px) {
-                .stats-row {
-                    grid-template-columns: 1fr 1fr
-                }
-
                 .header,
                 .progress-section,
                 .history-panel {
@@ -926,15 +814,23 @@
                 }
 
                 .products-panel,
-                .summary-panel,
                 .notes-panel {
                     padding: 1.25rem
+                }
+
+                .status-flash {
+                    left: 16px;
+                    right: 16px;
+                    min-width: auto;
+                    max-width: none;
                 }
             }
         </style>
     @endpush
 
     @push('scripts')
+        @vite('resources/js/seguimiento-pedido.js')
+
         <script>
             document.addEventListener('DOMContentLoaded', () => {
                 document.querySelectorAll('.timeline-item').forEach((el, i) => {
