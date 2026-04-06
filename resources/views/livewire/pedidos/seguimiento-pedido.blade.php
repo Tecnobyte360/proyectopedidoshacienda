@@ -1,7 +1,7 @@
 <div
     id="seguimiento-pedido-root"
     data-codigo-seguimiento="{{ $pedido->codigo_seguimiento }}"
-    class="tracking-page min-h-screen bg-white text-slate-800 overflow-x-hidden"
+    class="tracking-page min-h-screen overflow-x-hidden bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.10),_transparent_28%),radial-gradient(circle_at_bottom_right,_rgba(59,130,246,0.08),_transparent_25%),linear-gradient(180deg,_#f8fafc_0%,_#eef2f7_100%)] text-slate-800"
 >
     <div id="seguimiento-estado-flash" class="status-flash hidden opacity-0">
         <div class="status-flash__icon">
@@ -13,854 +13,648 @@
         </div>
     </div>
 
-    <div class="bg-glow bg-glow-1"></div>
-    <div class="bg-glow bg-glow-2"></div>
-
     @php
         $estados = [
-            'nuevo' => ['label' => 'Pedido recibido', 'icon' => 'fa-solid fa-bell', 'color' => 'blue'],
-            'en_preparacion' => ['label' => 'En preparación', 'icon' => 'fa-solid fa-utensils', 'color' => 'amber'],
+            'nuevo' => [
+                'label' => 'Pedido recibido',
+                'icon' => 'fa-solid fa-bell',
+                'color' => 'blue',
+            ],
+            'en_preparacion' => [
+                'label' => 'En preparación',
+                'icon' => 'fa-solid fa-utensils',
+                'color' => 'amber',
+            ],
             'repartidor_en_camino' => [
                 'label' => 'Repartidor en camino',
                 'icon' => 'fa-solid fa-motorcycle',
                 'color' => 'violet',
             ],
-            'recogido' => ['label' => 'Recogido', 'icon' => 'fa-solid fa-box-open', 'color' => 'indigo'],
-            'entregado' => ['label' => 'Entregado', 'icon' => 'fa-solid fa-circle-check', 'color' => 'emerald'],
-            'cancelado' => ['label' => 'Cancelado', 'icon' => 'fa-solid fa-ban', 'color' => 'rose'],
+            'entregado' => [
+                'label' => 'Entregado',
+                'icon' => 'fa-solid fa-circle-check',
+                'color' => 'emerald',
+            ],
+            'cancelado' => [
+                'label' => 'Cancelado',
+                'icon' => 'fa-solid fa-ban',
+                'color' => 'rose',
+            ],
         ];
 
         $estadoActual = $pedido->estado ?? 'nuevo';
+
         $metaEstado = $estados[$estadoActual] ?? [
             'label' => ucfirst(str_replace('_', ' ', $estadoActual)),
             'icon' => 'fa-solid fa-circle',
             'color' => 'blue',
         ];
 
-        $ordenEstados = ['nuevo', 'en_preparacion', 'repartidor_en_camino', 'recogido', 'entregado'];
+        $ordenEstados = ['nuevo', 'en_preparacion', 'repartidor_en_camino', 'entregado'];
         $indiceActual = array_search($estadoActual, $ordenEstados);
+
+        $badgeEstadoClasses = match ($metaEstado['color']) {
+            'amber' => 'bg-amber-50 text-amber-700 ring-amber-200',
+            'violet' => 'bg-violet-50 text-violet-700 ring-violet-200',
+            'emerald' => 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+            'rose' => 'bg-rose-50 text-rose-700 ring-rose-200',
+            default => 'bg-sky-50 text-sky-700 ring-sky-200',
+        };
     @endphp
 
-    <div class="page">
-        <div class="glass header">
-            <div class="header-left">
-                <h1 class="header-title">
-                    Hola, <span>{{ $pedido->cliente_nombre ?? 'Cliente' }}</span> 👋
-                </h1>
+    <div class="relative z-10 mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
 
-                <p class="header-desc">
-                    {{ $metaEstado['label'] === 'Cancelado'
-                        ? 'Tu pedido fue cancelado. Puedes revisar los detalles a continuación.'
-                        : 'Estamos procesando tu pedido. Aquí verás cada avance en tiempo real.' }}
-                </p>
+        {{-- HERO --}}
+        <section class="relative overflow-hidden rounded-[2rem] border border-white/70 bg-white/80 shadow-[0_30px_80px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+            <div class="absolute inset-0 bg-[linear-gradient(135deg,rgba(16,185,129,0.08),transparent_40%,rgba(59,130,246,0.06))]"></div>
+            <div class="absolute -top-20 -right-20 h-60 w-60 rounded-full bg-emerald-400/10 blur-3xl"></div>
+            <div class="absolute -bottom-20 -left-20 h-60 w-60 rounded-full bg-sky-400/10 blur-3xl"></div>
 
-                <div class="header-tags">
-                    <div class="tag code">
-                        <i class="fa-solid fa-receipt"></i>
-                        Pedido #{{ str_pad($pedido->id, 5, '0', STR_PAD_LEFT) }}
+            <div class="relative grid gap-6 px-6 py-7 md:grid-cols-[1fr_auto] md:px-8 md:py-8 xl:px-10">
+                <div class="min-w-0">
+                    <div class="mb-4 flex flex-wrap items-center gap-3">
+                        <span class="inline-flex items-center gap-2 rounded-full bg-slate-900 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-white shadow-lg">
+                            <span class="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                            Seguimiento en tiempo real
+                        </span>
+
+                        <span class="inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-semibold ring-1 {{ $badgeEstadoClasses }}">
+                            <i class="{{ $metaEstado['icon'] }}"></i>
+                            {{ $metaEstado['label'] }}
+                        </span>
+                    </div>
+
+                    <h1 class="text-3xl font-black tracking-tight text-slate-900 md:text-5xl">
+                        Hola, <span class="bg-gradient-to-r from-emerald-600 to-sky-600 bg-clip-text text-transparent">
+                            {{ $pedido->cliente_nombre ?? 'Cliente' }}
+                        </span> 👋
+                    </h1>
+
+                    <p class="mt-3 max-w-3xl text-sm leading-7 text-slate-600 md:text-base">
+                        {{ $metaEstado['label'] === 'Cancelado'
+                            ? 'Tu pedido fue cancelado. Aquí puedes revisar el detalle completo y el historial de eventos registrados.'
+                            : 'Estamos gestionando tu pedido y aquí podrás ver cada cambio de estado, el historial y el detalle de productos de forma clara y elegante.' }}
+                    </p>
+
+                    <div class="mt-5 flex flex-wrap gap-3">
+                        <div class="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm">
+                            <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-white shadow-md">
+                                <i class="fa-solid fa-receipt"></i>
+                            </div>
+                            <div class="leading-tight">
+                                <div class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Pedido</div>
+                                <div>#{{ str_pad($pedido->id, 5, '0', STR_PAD_LEFT) }}</div>
+                            </div>
+                        </div>
+
+                        <div class="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm">
+                            <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600">
+                                <i class="fa-solid fa-mobile-screen-button"></i>
+                            </div>
+                            <div class="leading-tight">
+                                <div class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Canal</div>
+                                <div>{{ ucfirst($pedido->canal ?? 'Whatsapp') }}</div>
+                            </div>
+                        </div>
+
+                        <div class="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm">
+                            <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-500/10 text-sky-600">
+                                <i class="fa-regular fa-calendar"></i>
+                            </div>
+                            <div class="leading-tight">
+                                <div class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Fecha</div>
+                                <div>{{ optional($pedido->fecha_pedido ?? $pedido->created_at)->format('d/m/Y') }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex items-start md:justify-end">
+                    <div class="min-w-[260px] rounded-[1.75rem] border border-slate-200 bg-slate-950 px-6 py-5 text-white shadow-[0_25px_60px_rgba(15,23,42,0.25)]">
+                        <p class="text-[11px] font-bold uppercase tracking-[0.22em] text-white/50">Total del pedido</p>
+                        <p class="mt-2 text-4xl font-black tracking-tight">
+                            ${{ number_format($pedido->total, 0, ',', '.') }}
+                        </p>
+
+                        <div class="mt-5 space-y-3 text-sm text-white/75">
+                            <div class="flex items-center justify-between border-b border-white/10 pb-2">
+                                <span>Estado actual</span>
+                                <span class="font-semibold text-white">{{ $metaEstado['label'] }}</span>
+                            </div>
+                            <div class="flex items-center justify-between border-b border-white/10 pb-2">
+                                <span>Código seguimiento</span>
+                                <span class="font-semibold text-white">{{ $pedido->codigo_seguimiento }}</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span>Canal</span>
+                                <span class="font-semibold text-white">{{ ucfirst($pedido->canal ?? 'whatsapp') }}</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
+        </section>
 
-            <div class="header-right">
-                <span class="total-label">Total del pedido</span>
-                <span class="total-display">${{ number_format($pedido->total, 0, ',', '.') }}</span>
-                <span class="total-label" style="margin-top:4px;">
-                    {{ ucfirst($pedido->canal ?? 'whatsapp') }} ·
-                    {{ optional($pedido->fecha_pedido ?? $pedido->created_at)->format('d/m/Y') }}
-                </span>
-            </div>
-        </div>
-
+        {{-- PROGRESO --}}
         @if ($estadoActual !== 'cancelado')
-            <div class="glass progress-section progress-dark">
-                <p class="section-title">Progreso del pedido</p>
-
-                <div class="steps-track">
-                    @foreach ($ordenEstados as $i => $estadoPaso)
-                        @php
-                            $paso = $estados[$estadoPaso];
-                            $completado = $indiceActual !== false && $i < $indiceActual;
-                            $activo = $estadoPaso === $estadoActual;
-                        @endphp
-
-                        <div class="step-item {{ $completado ? 'completed' : '' }} {{ $activo ? 'active' : '' }}">
-                            <div class="step-icon-wrap">
-                                <i class="{{ $paso['icon'] }}"></i>
-                            </div>
-                            <p class="step-label">{{ $paso['label'] }}</p>
-                            <div class="step-indicator"></div>
-                        </div>
-                    @endforeach
+            <section class="mt-6 overflow-hidden rounded-[2rem] border border-slate-200 bg-slate-950 shadow-[0_25px_70px_rgba(15,23,42,0.16)]">
+                <div class="border-b border-white/10 px-6 py-5 md:px-8">
+                    <p class="text-[11px] font-bold uppercase tracking-[0.24em] text-white/45">Estado del pedido</p>
+                    <h2 class="mt-2 text-xl font-bold text-white md:text-2xl">Progreso en tiempo real</h2>
+                    <p class="mt-1 text-sm text-white/55">Visualiza en qué etapa va tu pedido.</p>
                 </div>
-            </div>
+
+                <div class="px-4 py-6 sm:px-6 md:px-8">
+                    <div class="steps-track">
+                        @foreach ($ordenEstados as $i => $estadoPaso)
+                            @php
+                                $paso = $estados[$estadoPaso];
+                                $completado = $indiceActual !== false && $i < $indiceActual;
+                                $activo = $estadoPaso === $estadoActual;
+                            @endphp
+
+                            <div class="step-item {{ $completado ? 'completed' : '' }} {{ $activo ? 'active' : '' }}">
+                                <div class="step-line-bg"></div>
+
+                                <div class="step-icon-wrap">
+                                    <i class="{{ $paso['icon'] }}"></i>
+                                </div>
+
+                                <div class="mt-4 text-center">
+                                    <p class="step-label">{{ $paso['label'] }}</p>
+                                    <span class="step-mini">
+                                        {{ $activo ? 'Actual' : ($completado ? 'Completado' : 'Pendiente') }}
+                                    </span>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            </section>
         @endif
 
-        <div class="body-grid">
-            <div class="glass history-panel">
-                <div class="panel-header">
-                    <h2 class="panel-title">Historial del pedido</h2>
-                    <span class="panel-count">{{ $historial->count() }} eventos</span>
+        {{-- GRID --}}
+        <section class="mt-6 grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+            {{-- HISTORIAL --}}
+            <div class="overflow-hidden rounded-[2rem] border border-white/70 bg-white/85 shadow-[0_25px_70px_rgba(15,23,42,0.07)] backdrop-blur-xl">
+                <div class="flex items-center justify-between border-b border-slate-100 px-6 py-5 md:px-8">
+                    <div>
+                        <p class="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">Trazabilidad</p>
+                        <h2 class="mt-1 text-xl font-bold text-slate-900">Historial del pedido</h2>
+                    </div>
+
+                    <span class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
+                        {{ $historial->count() }} eventos
+                    </span>
                 </div>
 
-                <div class="timeline">
-                    @forelse($historial->sortByDesc('fecha_evento') as $item)
-                        @php
-                            $color = $estados[$item->estado_nuevo]['color'] ?? 'blue';
-                            $icon = $estados[$item->estado_nuevo]['icon'] ?? 'fa-solid fa-circle';
-                            $titulo =
-                                $item->titulo ?:
-                                $estados[$item->estado_nuevo]['label'] ??
-                                    ucfirst(str_replace('_', ' ', $item->estado_nuevo));
-                        @endphp
+                <div class="px-6 py-6 md:px-8">
+                    <div class="timeline">
+                        @forelse($historial->sortByDesc('fecha_evento') as $item)
+                            @php
+                                $color = $estados[$item->estado_nuevo]['color'] ?? 'blue';
+                                $icon = $estados[$item->estado_nuevo]['icon'] ?? 'fa-solid fa-circle';
+                                $titulo = $item->titulo ?: ($estados[$item->estado_nuevo]['label'] ?? ucfirst(str_replace('_', ' ', $item->estado_nuevo)));
+                            @endphp
 
-                        <div class="timeline-item">
-                            <div class="timeline-left">
-                                <div class="timeline-dot {{ $color }}">
-                                    <i class="{{ $icon }}"></i>
+                            <div class="timeline-item">
+                                <div class="timeline-left">
+                                    <div class="timeline-dot {{ $color }}">
+                                        <i class="{{ $icon }}"></i>
+                                    </div>
+                                    <div class="timeline-line"></div>
                                 </div>
-                                <div class="timeline-line"></div>
-                            </div>
 
-                            <div class="timeline-body">
-                                <p class="tl-title">{{ $titulo }}</p>
+                                <div class="timeline-card">
+                                    <div class="flex flex-wrap items-start justify-between gap-3">
+                                        <div>
+                                            <p class="tl-title">{{ $titulo }}</p>
+                                            @if ($item->descripcion)
+                                                <p class="tl-desc">{{ $item->descripcion }}</p>
+                                            @endif
+                                        </div>
 
-                                @if ($item->descripcion)
-                                    <p class="tl-desc">{{ $item->descripcion }}</p>
-                                @endif
-
-                                <div class="tl-time">
-                                    <i class="fa-regular fa-clock" style="font-size:10px;"></i>
-                                    {{ optional($item->fecha_evento)->format('d/m/Y · h:i a') }}
+                                        <span class="tl-badge">
+                                            <i class="fa-regular fa-clock"></i>
+                                            {{ optional($item->fecha_evento)->format('d/m/Y · h:i a') }}
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    @empty
-                        <div class="timeline-item">
-                            <div class="timeline-body">
-                                <p class="tl-title">Sin movimientos</p>
-                                <p class="tl-desc">Todavía no hay actualizaciones registradas para este pedido.</p>
+                        @empty
+                            <div class="rounded-3xl border border-dashed border-slate-200 bg-slate-50 px-6 py-10 text-center">
+                                <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-sm text-slate-400">
+                                    <i class="fa-regular fa-clock text-2xl"></i>
+                                </div>
+                                <h3 class="mt-4 text-lg font-bold text-slate-800">Sin movimientos</h3>
+                                <p class="mt-2 text-sm text-slate-500">
+                                    Todavía no hay actualizaciones registradas para este pedido.
+                                </p>
                             </div>
-                        </div>
-                    @endforelse
+                        @endforelse
+                    </div>
                 </div>
             </div>
 
-            <div class="right-col">
-                <div class="glass products-panel">
-                    <div class="panel-header" style="margin-bottom:0;">
-                        <h2 class="panel-title">Productos</h2>
+            {{-- DERECHA --}}
+            <div class="space-y-6">
+                {{-- PRODUCTOS --}}
+                <div class="overflow-hidden rounded-[2rem] border border-white/70 bg-white/85 shadow-[0_25px_70px_rgba(15,23,42,0.07)] backdrop-blur-xl">
+                    <div class="border-b border-slate-100 px-6 py-5">
+                        <p class="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">Detalle</p>
+                        <h2 class="mt-1 text-xl font-bold text-slate-900">Productos del pedido</h2>
                     </div>
 
-                    <div class="product-list">
+                    <div class="space-y-3 p-5">
                         @forelse($pedido->detalles as $detalle)
                             <div class="product-row">
                                 <div class="product-icon">
-                                    <i class="fa-solid fa-box"></i>
+                                    <i class="fa-solid fa-box-open"></i>
                                 </div>
 
-                                <div style="flex:1;">
-                                    <p class="product-name">{{ $detalle->producto }}</p>
-                                    <p class="product-qty">
+                                <div class="min-w-0 flex-1">
+                                    <p class="truncate text-sm font-bold text-slate-900">
+                                        {{ $detalle->producto }}
+                                    </p>
+                                    <p class="mt-1 text-xs font-medium text-slate-500">
                                         {{ rtrim(rtrim(number_format($detalle->cantidad, 3, '.', ''), '0'), '.') }}
                                         {{ $detalle->unidad }}
                                     </p>
                                 </div>
 
-                                <p class="product-price">${{ number_format($detalle->subtotal, 0, ',', '.') }}</p>
+                                <div class="text-right">
+                                    <p class="text-sm font-black tracking-tight text-slate-900">
+                                        ${{ number_format($detalle->subtotal, 0, ',', '.') }}
+                                    </p>
+                                </div>
                             </div>
                         @empty
-                            <div class="product-row">
-                                <div style="flex:1;">
-                                    <p class="product-name">No hay productos registrados</p>
-                                </div>
+                            <div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-5 py-6 text-sm text-slate-500">
+                                No hay productos registrados.
                             </div>
                         @endforelse
                     </div>
                 </div>
 
+                {{-- NOTAS --}}
                 @if ($pedido->notas)
-                    <div class="glass notes-panel">
-                        <h2 class="panel-title">Notas del pedido</h2>
-                        <p class="notes-text">{{ $pedido->notas }}</p>
+                    <div class="overflow-hidden rounded-[2rem] border border-amber-200/70 bg-gradient-to-br from-amber-50 to-orange-50 shadow-[0_20px_50px_rgba(251,191,36,0.10)]">
+                        <div class="flex items-center gap-3 border-b border-amber-100 px-6 py-5">
+                            <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-amber-500 shadow-sm">
+                                <i class="fa-solid fa-note-sticky"></i>
+                            </div>
+                            <div>
+                                <p class="text-[11px] font-bold uppercase tracking-[0.22em] text-amber-500">Observaciones</p>
+                                <h2 class="text-lg font-bold text-slate-900">Notas del pedido</h2>
+                            </div>
+                        </div>
+
+                        <div class="px-6 py-5">
+                            <p class="text-sm leading-7 text-slate-700">{{ $pedido->notas }}</p>
+                        </div>
                     </div>
                 @endif
             </div>
-        </div>
+        </section>
     </div>
 
     @push('styles')
         <style>
-            *,
-            :before,
-            :after {
-                box-sizing: border-box
-            }
-
-            :root {
-                --bg: #ffffff;
-                --surface: rgba(255, 255, 255, 0.9);
-                --surface-hover: rgba(255, 255, 255, 1);
-                --border: rgba(0, 0, 0, 0.08);
-                --border-strong: rgba(0, 0, 0, 0.15);
-                --text-primary: #0f172a;
-                --text-secondary: rgba(15, 23, 42, 0.7);
-                --text-muted: rgba(15, 23, 42, 0.5);
-                --accent: #10b981;
-                --accent-glow: rgba(16, 185, 129, 0.25);
-                --accent-dim: rgba(16, 185, 129, 0.1);
-            }
-
-            .tracking-page {
-                font-family: 'DM Sans', sans-serif;
-                position: relative
-            }
-
-            .tracking-page::before {
-                content: '';
-                position: fixed;
-                inset: 0;
-                background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
-                pointer-events: none;
-                z-index: 0;
-                opacity: .4
-            }
-
-            .status-flash {
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                z-index: 80;
-                display: flex;
-                align-items: center;
-                gap: 12px;
-                min-width: 280px;
-                max-width: 360px;
-                padding: 14px 16px;
-                border-radius: 18px;
-                border: 1px solid rgba(16, 185, 129, 0.2);
-                background: rgba(255, 255, 255, 0.96);
-                box-shadow: 0 22px 50px rgba(15, 23, 42, 0.16);
-                backdrop-filter: blur(16px);
-                transition: opacity .35s ease, transform .35s ease;
-                transform: translateY(0);
-            }
-
-            .status-flash.hidden {
-                display: none;
-            }
-
-            .status-flash.opacity-0 {
-                opacity: 0;
-                transform: translateY(-10px);
-            }
-
-            .status-flash.opacity-100 {
-                opacity: 1;
-                transform: translateY(0);
-            }
-
-            .status-flash__icon {
-                width: 42px;
-                height: 42px;
-                border-radius: 14px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                background: rgba(16, 185, 129, 0.12);
-                color: #10b981;
-                flex-shrink: 0;
-            }
-
-            .status-flash__title {
-                margin: 0;
-                font-size: 12px;
-                font-weight: 800;
-                letter-spacing: .14em;
-                text-transform: uppercase;
-                color: #10b981;
-            }
-
-            .status-flash__text {
-                margin: 4px 0 0;
-                font-size: 13px;
-                color: var(--text-primary);
-                font-weight: 600;
-            }
-
-            .bg-glow {
-                position: fixed;
-                border-radius: 50%;
-                filter: blur(120px);
-                pointer-events: none;
-                z-index: 0
-            }
-
-            .bg-glow-1 {
-                width: 600px;
-                height: 600px;
-                top: -200px;
-                left: -150px;
-                background: radial-gradient(circle, rgba(16, 212, 142, .06) 0%, transparent 70%)
-            }
-
-            .bg-glow-2 {
-                width: 500px;
-                height: 500px;
-                bottom: -100px;
-                right: -100px;
-                background: radial-gradient(circle, rgba(255, 255, 255, 0.07) 0%, transparent 70%)
-            }
-
-            .page {
-                position: relative;
-                z-index: 1;
-                width: 100%;
-                max-width: 100%;
-                padding: 2.5rem 2rem 4rem;
-            }
-
-            .glass {
-                background: var(--surface);
-                border: 1px solid var(--border);
-                backdrop-filter: blur(20px);
-                -webkit-backdrop-filter: blur(20px);
-                border-radius: 20px;
-                transition: border-color .3s, background .3s
-            }
-
-            .glass:hover {
-                border-color: var(--border-strong);
-                background: var(--surface-hover)
-            }
-
-            .header {
-                display: grid;
-                grid-template-columns: 1fr auto;
-                gap: 2rem;
-                align-items: center;
-                padding: 2rem 2.5rem;
-                margin-bottom: 1.5rem;
-                animation: fadeUp .6s ease both;
-                position: relative;
-                overflow: hidden
-            }
-
-            .header::before {
-                content: '';
-                position: absolute;
-                inset: 0;
-                background: linear-gradient(135deg, rgba(16, 212, 142, .04) 0%, transparent 60%);
-                border-radius: inherit
-            }
-
-            .header h1 {
-                font-family: 'Syne', sans-serif;
-                font-size: clamp(1.8rem, 4vw, 2.8rem);
-                font-weight: 800;
-                color: var(--text-primary);
-                line-height: 1.1;
-                letter-spacing: -.02em
-            }
-
-            .header h1 span {
-                color: var(--accent)
-            }
-
-            .header-right {
-                display: flex;
-                flex-direction: column;
-                align-items: flex-end;
-                gap: .5rem
-            }
-
-            .total-display {
-                font-family: 'Syne', sans-serif;
-                font-size: 2.6rem;
-                font-weight: 800;
-                color: var(--text-primary);
-                letter-spacing: -.03em;
-                line-height: 1
-            }
-
-            .total-label {
-                font-size: 11px;
-                letter-spacing: .18em;
-                text-transform: uppercase;
-                color: var(--text-muted);
-                text-align: right
-            }
-
-            .progress-section {
-                padding: 2rem 2.5rem;
-                margin-bottom: 1.5rem;
-                animation: fadeUp .6s .15s ease both
-            }
-
-            .progress-dark {
-                background: #0f172a;
-                border: 1px solid rgba(255, 255, 255, 0.08);
-            }
-
-            .progress-dark .section-title,
-            .progress-dark .step-label {
-                color: rgba(255, 255, 255, 0.6);
-            }
-
-            .progress-dark:hover {
-                background: #0f172a !important;
-                border-color: rgba(255, 255, 255, 0.08);
-            }
-
-            .progress-dark .step-item:not(:last-child)::after {
-                background: rgba(255, 255, 255, 0.15);
-            }
-
-            .progress-dark .step-icon-wrap {
-                background: rgba(255, 255, 255, 0.05);
-                border-color: rgba(255, 255, 255, 0.15);
-                color: rgba(255, 255, 255, 0.6);
-            }
-
-            .progress-dark .step-item.completed .step-icon-wrap {
-                background: rgba(16, 185, 129, 0.2);
-                border-color: rgba(16, 185, 129, 0.4);
-                color: #10b981;
-            }
-
-            .progress-dark .step-item.active .step-icon-wrap {
-                background: #10b981;
-                border-color: #10b981;
-                color: #0f172a;
-                box-shadow: 0 0 0 6px rgba(16, 185, 129, 0.15), 0 0 20px rgba(16, 185, 129, 0.4);
-            }
-
-            .progress-dark .step-item.active .step-label {
-                color: #ffffff;
-            }
-
-            .section-title {
-                font-family: 'Syne', sans-serif;
-                font-size: .8rem;
-                font-weight: 700;
-                letter-spacing: .22em;
-                text-transform: uppercase;
-                color: var(--text-muted);
-                margin-bottom: 2.25rem
-            }
-
-            .steps-track {
-                display: flex;
-                align-items: flex-start;
-                gap: 0;
-                position: relative
-            }
-
-            .step-item {
-                flex: 1;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                position: relative
-            }
-
-            .step-item:not(:last-child)::after {
-                content: '';
-                position: absolute;
-                top: 20px;
-                left: 50%;
-                width: 100%;
-                height: 2px;
-                background: var(--border-strong);
-                z-index: 0
-            }
-
-            .step-item.completed:not(:last-child)::after {
-                background: linear-gradient(90deg, var(--accent), rgba(16, 212, 142, .4))
-            }
-
-            .step-icon-wrap {
-                position: relative;
-                z-index: 1;
-                width: 40px;
-                height: 40px;
-                border-radius: 12px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 14px;
-                border: 1.5px solid var(--border-strong);
-                background: rgba(255, 255, 255, .04);
-                color: var(--text-muted);
-                transition: all .4s ease
-            }
-
-            .step-item.completed .step-icon-wrap {
-                background: rgba(16, 212, 142, .12);
-                border-color: rgba(16, 212, 142, .35);
-                color: var(--accent)
-            }
-
-            .step-item.active .step-icon-wrap {
-                background: var(--accent);
-                border-color: var(--accent);
-                color: #070d1a;
-                box-shadow: 0 0 0 6px var(--accent-dim), 0 0 20px var(--accent-glow);
-                transform: scale(1.12)
-            }
-
-            .step-label {
-                margin-top: .75rem;
-                font-size: 11px;
-                font-weight: 600;
-                text-align: center;
-                color: var(--text-muted);
-                letter-spacing: .04em;
-                max-width: 90px;
-                line-height: 1.35
-            }
-
-            .step-item.completed .step-label {
-                color: var(--accent)
-            }
-
-            .step-item.active .step-label {
-                color: var(--text-primary)
-            }
-
-            .step-indicator {
-                width: 6px;
-                height: 6px;
-                border-radius: 50%;
-                background: transparent;
-                margin-top: .4rem
-            }
-
-            .step-item.active .step-indicator {
-                background: var(--accent);
-                box-shadow: 0 0 6px var(--accent);
-                animation: pulse-dot 1.8s infinite
-            }
-
-            .body-grid {
-                display: grid;
-                grid-template-columns: 1fr 380px;
-                gap: 1.5rem;
-                animation: fadeUp .6s .22s ease both
-            }
-
-            .history-panel {
-                padding: 2rem 2.5rem
-            }
-
-            .panel-header {
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                margin-bottom: 1.75rem
-            }
-
-            .panel-title {
-                font-family: 'Syne', sans-serif;
-                font-size: 1.05rem;
-                font-weight: 700;
-                color: var(--text-primary)
-            }
-
-            .panel-count {
-                font-size: 11.5px;
-                font-weight: 600;
-                letter-spacing: .1em;
-                color: var(--text-muted);
-                background: rgba(255, 255, 255, .05);
-                border: 1px solid var(--border);
-                padding: 4px 12px;
-                border-radius: 100px
-            }
-
-            .timeline {
-                display: flex;
-                flex-direction: column
-            }
-
-            .timeline-item {
-                display: flex;
-                gap: 1rem;
-                padding-bottom: 1.5rem;
-                position: relative
-            }
-
-            .timeline-item:not(:last-child) .timeline-line {
-                display: block
-            }
-
-            .timeline-left {
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                flex-shrink: 0
-            }
-
-            .timeline-dot {
-                width: 30px;
-                height: 30px;
-                border-radius: 9px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 11px;
-                flex-shrink: 0;
-                border: 1px solid
-            }
-
-            .timeline-dot.blue {
-                background: rgba(74, 158, 255, .12);
-                border-color: rgba(74, 158, 255, .25);
-                color: #4a9eff
-            }
-
-            .timeline-dot.amber {
-                background: rgba(245, 166, 35, .12);
-                border-color: rgba(245, 166, 35, .25);
-                color: #f5a623
-            }
-
-            .timeline-dot.violet {
-                background: rgba(167, 139, 250, .12);
-                border-color: rgba(167, 139, 250, .25);
-                color: #a78bfa
-            }
-
-            .timeline-dot.indigo {
-                background: rgba(129, 140, 248, .12);
-                border-color: rgba(129, 140, 248, .25);
-                color: #818cf8
-            }
-
-            .timeline-dot.emerald {
-                background: rgba(16, 212, 142, .12);
-                border-color: rgba(16, 212, 142, .25);
-                color: #10d48e
-            }
-
-            .timeline-dot.rose {
-                background: rgba(251, 113, 133, .12);
-                border-color: rgba(251, 113, 133, .25);
-                color: #fb7185
-            }
-
-            .timeline-line {
-                flex: 1;
-                width: 1px;
-                background: var(--border);
-                min-height: 16px;
-                display: none;
-                margin: 4px 0
-            }
-
-            .timeline-body {
-                flex: 1;
-                padding: .9rem 1.1rem;
-                border-radius: 14px;
-                background: rgba(255, 255, 255, .025);
-                border: 1px solid var(--border);
-                transition: background .25s, border-color .25s
-            }
-
-            .timeline-body:hover {
-                background: rgba(255, 255, 255, .05);
-                border-color: var(--border-strong)
-            }
-
-            .tl-title {
-                font-size: 13.5px;
-                font-weight: 600;
-                color: var(--text-primary);
-                margin-bottom: .25rem
-            }
-
-            .tl-desc {
-                font-size: 12.5px;
-                color: var(--text-secondary);
-                line-height: 1.55
-            }
-
-            .tl-time {
-                display: flex;
-                align-items: center;
-                gap: 5px;
-                font-size: 11.5px;
-                color: var(--text-muted);
-                margin-top: .5rem
-            }
-
-            .right-col {
-                display: flex;
-                flex-direction: column;
-                gap: 1.25rem
-            }
-
-            .products-panel,
-            .notes-panel {
-                padding: 1.75rem
-            }
-
-            .product-list {
-                display: flex;
-                flex-direction: column;
-                gap: .65rem;
-                margin-top: 1.25rem
-            }
-
-            .product-row {
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                gap: 1rem;
-                padding: .85rem 1rem;
-                border-radius: 12px;
-                background: rgba(255, 255, 255, .025);
-                border: 1px solid var(--border);
-                transition: background .2s, border-color .2s
-            }
-
-            .product-row:hover {
-                background: rgba(255, 255, 255, .05);
-                border-color: var(--border-strong)
-            }
-
-            .product-icon {
-                width: 34px;
-                height: 34px;
-                border-radius: 9px;
-                background: var(--accent-dim);
-                border: 1px solid rgba(16, 212, 142, .2);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 13px;
-                color: var(--accent);
-                flex-shrink: 0
-            }
-
-            .product-name {
-                font-size: 13px;
-                font-weight: 600;
-                color: var(--text-primary)
-            }
-
-            .product-qty {
-                font-size: 11.5px;
-                color: var(--text-muted);
-                margin-top: 2px
-            }
-
-            .product-price {
-                font-family: 'Syne', sans-serif;
-                font-size: 13.5px;
-                font-weight: 700;
-                color: var(--text-primary);
-                white-space: nowrap
-            }
-
-            .notes-text {
-                font-size: 13px;
-                color: var(--text-secondary);
-                line-height: 1.65;
-                margin-top: .75rem
-            }
-
-            @keyframes fadeUp {
-                from {
-                    opacity: 0;
-                    transform: translateY(22px)
+            *,:before,:after{box-sizing:border-box}
+
+            .tracking-page{
+                font-family:'Inter',sans-serif;
+                position:relative;
+            }
+
+            .tracking-page::before{
+                content:'';
+                position:fixed;
+                inset:0;
+                pointer-events:none;
+                z-index:0;
+                opacity:.18;
+                background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E");
+            }
+
+            .status-flash{
+                position:fixed;
+                top:20px;
+                right:20px;
+                z-index:80;
+                display:flex;
+                align-items:center;
+                gap:12px;
+                min-width:290px;
+                max-width:380px;
+                padding:14px 16px;
+                border-radius:20px;
+                border:1px solid rgba(16,185,129,.18);
+                background:rgba(255,255,255,.95);
+                box-shadow:0 25px 60px rgba(15,23,42,.14);
+                backdrop-filter:blur(18px);
+                transition:opacity .35s ease, transform .35s ease;
+                transform:translateY(0);
+            }
+
+            .status-flash.hidden{display:none}
+            .status-flash.opacity-0{opacity:0;transform:translateY(-10px)}
+            .status-flash.opacity-100{opacity:1;transform:translateY(0)}
+
+            .status-flash__icon{
+                width:44px;
+                height:44px;
+                border-radius:16px;
+                display:flex;
+                align-items:center;
+                justify-content:center;
+                background:rgba(16,185,129,.12);
+                color:#10b981;
+                flex-shrink:0;
+            }
+
+            .status-flash__title{
+                margin:0;
+                font-size:11px;
+                font-weight:900;
+                letter-spacing:.16em;
+                text-transform:uppercase;
+                color:#10b981;
+            }
+
+            .status-flash__text{
+                margin:4px 0 0;
+                font-size:13px;
+                color:#0f172a;
+                font-weight:600;
+            }
+
+            .steps-track{
+                display:grid;
+                grid-template-columns:repeat(4,minmax(0,1fr));
+                gap:0;
+            }
+
+            .step-item{
+                position:relative;
+                display:flex;
+                flex-direction:column;
+                align-items:center;
+                padding:0 8px;
+            }
+
+            .step-line-bg{
+                position:absolute;
+                top:21px;
+                left:50%;
+                width:100%;
+                height:2px;
+                background:rgba(255,255,255,.12);
+                z-index:0;
+            }
+
+            .step-item:last-child .step-line-bg{display:none}
+            .step-item.completed .step-line-bg{
+                background:linear-gradient(90deg,#10b981,rgba(16,185,129,.15));
+            }
+
+            .step-icon-wrap{
+                position:relative;
+                z-index:1;
+                width:44px;
+                height:44px;
+                border-radius:16px;
+                display:flex;
+                align-items:center;
+                justify-content:center;
+                border:1px solid rgba(255,255,255,.14);
+                background:rgba(255,255,255,.05);
+                color:rgba(255,255,255,.55);
+                font-size:15px;
+                transition:all .35s ease;
+            }
+
+            .step-item.completed .step-icon-wrap{
+                background:rgba(16,185,129,.18);
+                border-color:rgba(16,185,129,.38);
+                color:#34d399;
+            }
+
+            .step-item.active .step-icon-wrap{
+                background:#10b981;
+                border-color:#10b981;
+                color:#052e26;
+                transform:scale(1.08);
+                box-shadow:0 0 0 8px rgba(16,185,129,.10),0 0 28px rgba(16,185,129,.35);
+            }
+
+            .step-label{
+                font-size:13px;
+                font-weight:700;
+                color:rgba(255,255,255,.88);
+                line-height:1.4;
+            }
+
+            .step-mini{
+                display:inline-block;
+                margin-top:6px;
+                font-size:10px;
+                font-weight:800;
+                letter-spacing:.14em;
+                text-transform:uppercase;
+                color:rgba(255,255,255,.40);
+            }
+
+            .step-item.active .step-mini{color:#6ee7b7}
+            .step-item.completed .step-mini{color:#34d399}
+
+            .timeline{
+                display:flex;
+                flex-direction:column;
+                gap:18px;
+            }
+
+            .timeline-item{
+                display:flex;
+                gap:14px;
+                align-items:flex-start;
+            }
+
+            .timeline-left{
+                display:flex;
+                flex-direction:column;
+                align-items:center;
+                flex-shrink:0;
+            }
+
+            .timeline-dot{
+                width:34px;
+                height:34px;
+                border-radius:12px;
+                display:flex;
+                align-items:center;
+                justify-content:center;
+                font-size:12px;
+                border:1px solid;
+                box-shadow:0 8px 18px rgba(15,23,42,.05);
+            }
+
+            .timeline-dot.blue{background:rgba(59,130,246,.10);border-color:rgba(59,130,246,.20);color:#2563eb}
+            .timeline-dot.amber{background:rgba(245,158,11,.10);border-color:rgba(245,158,11,.20);color:#d97706}
+            .timeline-dot.violet{background:rgba(139,92,246,.10);border-color:rgba(139,92,246,.20);color:#7c3aed}
+            .timeline-dot.emerald{background:rgba(16,185,129,.10);border-color:rgba(16,185,129,.20);color:#059669}
+            .timeline-dot.rose{background:rgba(244,63,94,.10);border-color:rgba(244,63,94,.20);color:#e11d48}
+
+            .timeline-line{
+                width:2px;
+                flex:1;
+                min-height:26px;
+                margin-top:8px;
+                border-radius:999px;
+                background:linear-gradient(180deg,rgba(148,163,184,.28),rgba(148,163,184,.08));
+            }
+
+            .timeline-item:last-child .timeline-line{display:none}
+
+            .timeline-card{
+                flex:1;
+                border:1px solid rgba(148,163,184,.18);
+                background:linear-gradient(180deg,rgba(255,255,255,.98),rgba(248,250,252,.96));
+                border-radius:20px;
+                padding:16px 18px;
+                box-shadow:0 14px 35px rgba(15,23,42,.05);
+                transition:transform .22s ease, box-shadow .22s ease, border-color .22s ease;
+            }
+
+            .timeline-card:hover{
+                transform:translateY(-2px);
+                box-shadow:0 22px 45px rgba(15,23,42,.08);
+                border-color:rgba(148,163,184,.28);
+            }
+
+            .tl-title{
+                font-size:15px;
+                font-weight:800;
+                color:#0f172a;
+                margin:0 0 4px;
+            }
+
+            .tl-desc{
+                font-size:13px;
+                line-height:1.7;
+                color:#475569;
+                margin:0;
+            }
+
+            .tl-badge{
+                display:inline-flex;
+                align-items:center;
+                gap:6px;
+                white-space:nowrap;
+                border-radius:999px;
+                border:1px solid rgba(148,163,184,.18);
+                background:#f8fafc;
+                padding:7px 10px;
+                font-size:11px;
+                font-weight:800;
+                letter-spacing:.04em;
+                color:#64748b;
+            }
+
+            .product-row{
+                display:flex;
+                align-items:center;
+                gap:14px;
+                border:1px solid rgba(148,163,184,.16);
+                background:linear-gradient(180deg,#fff,#f8fafc);
+                border-radius:20px;
+                padding:14px 15px;
+                box-shadow:0 10px 24px rgba(15,23,42,.04);
+                transition:transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+            }
+
+            .product-row:hover{
+                transform:translateY(-2px);
+                border-color:rgba(16,185,129,.24);
+                box-shadow:0 18px 38px rgba(15,23,42,.08);
+            }
+
+            .product-icon{
+                width:44px;
+                height:44px;
+                border-radius:16px;
+                display:flex;
+                align-items:center;
+                justify-content:center;
+                background:linear-gradient(135deg,rgba(16,185,129,.12),rgba(59,130,246,.10));
+                color:#059669;
+                flex-shrink:0;
+            }
+
+            @media (max-width: 900px){
+                .steps-track{
+                    grid-template-columns:1fr;
+                    gap:18px;
                 }
 
-                to {
-                    opacity: 1;
-                    transform: translateY(0)
+                .step-item{
+                    align-items:flex-start;
+                    text-align:left;
+                    padding-left:0;
+                }
+
+                .step-line-bg{
+                    display:none;
+                }
+
+                .step-item .mt-4{
+                    margin-top:10px !important;
+                    text-align:left !important;
                 }
             }
 
-            @keyframes pulse-dot {
-                0%, 100% {
-                    box-shadow: 0 0 0 0 rgba(16, 212, 142, .5)
-                }
-
-                50% {
-                    box-shadow: 0 0 0 6px rgba(16, 212, 142, 0)
-                }
-            }
-
-            @media (max-width:900px) {
-                .body-grid {
-                    grid-template-columns: 1fr
-                }
-
-                .header {
-                    grid-template-columns: 1fr
-                }
-
-                .header-right {
-                    align-items: flex-start
-                }
-            }
-
-            @media (max-width:580px) {
-                .header,
-                .progress-section,
-                .history-panel {
-                    padding: 1.5rem
-                }
-
-                .products-panel,
-                .notes-panel {
-                    padding: 1.25rem
-                }
-
-                .status-flash {
-                    left: 16px;
-                    right: 16px;
-                    min-width: auto;
-                    max-width: none;
+            @media (max-width: 640px){
+                .status-flash{
+                    left:16px;
+                    right:16px;
+                    min-width:auto;
+                    max-width:none;
                 }
             }
         </style>
     @endpush
 
     @push('scripts')
-       
-
         <script>
             document.addEventListener('DOMContentLoaded', () => {
                 document.querySelectorAll('.timeline-item').forEach((el, i) => {
                     el.style.opacity = '0';
-                    el.style.transform = 'translateX(-16px)';
-                    el.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+                    el.style.transform = 'translateY(16px)';
+                    el.style.transition = 'opacity .5s ease, transform .5s ease';
+
                     setTimeout(() => {
                         el.style.opacity = '1';
-                        el.style.transform = 'translateX(0)';
-                    }, 350 + i * 110);
+                        el.style.transform = 'translateY(0)';
+                    }, 180 + i * 90);
                 });
 
                 document.querySelectorAll('.product-row').forEach((el, i) => {
                     el.style.opacity = '0';
-                    el.style.transform = 'translateY(10px)';
-                    el.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
+                    el.style.transform = 'translateY(12px)';
+                    el.style.transition = 'opacity .45s ease, transform .45s ease';
+
                     setTimeout(() => {
                         el.style.opacity = '1';
                         el.style.transform = 'translateY(0)';
-                    }, 500 + i * 80);
+                    }, 320 + i * 70);
                 });
 
                 const activeStep = document.querySelector('.step-item.active .step-icon-wrap');
                 if (activeStep) {
                     setInterval(() => {
-                        activeStep.style.boxShadow =
-                            '0 0 0 6px rgba(16,212,142,0.2), 0 0 28px rgba(16,212,142,0.35)';
+                        activeStep.style.boxShadow = '0 0 0 8px rgba(16,185,129,.12), 0 0 30px rgba(16,185,129,.38)';
                         setTimeout(() => {
-                            activeStep.style.boxShadow =
-                                '0 0 0 6px rgba(16,212,142,0.06), 0 0 14px rgba(16,212,142,0.2)';
+                            activeStep.style.boxShadow = '0 0 0 8px rgba(16,185,129,.08), 0 0 18px rgba(16,185,129,.22)';
                         }, 900);
                     }, 1800);
                 }
