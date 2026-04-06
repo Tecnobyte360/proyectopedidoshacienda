@@ -16,30 +16,39 @@
     <div class="bg-glow bg-glow-1"></div>
     <div class="bg-glow bg-glow-2"></div>
 
-    @php
-        $estados = [
-            'nuevo' => ['label' => 'Pedido recibido', 'icon' => 'fa-solid fa-bell', 'color' => 'blue'],
-            'en_preparacion' => ['label' => 'En preparación', 'icon' => 'fa-solid fa-utensils', 'color' => 'amber'],
-            'repartidor_en_camino' => [
-                'label' => 'Repartidor en camino',
-                'icon' => 'fa-solid fa-motorcycle',
-                'color' => 'violet',
-            ],
-         }
-            'entregado' => ['label' => 'Entregado', 'icon' => 'fa-solid fa-circle-check', 'color' => 'emerald'],
-            'cancelado' => ['label' => 'Cancelado', 'icon' => 'fa-solid fa-ban', 'color' => 'rose'],
-        ];
+   @php
+    $estados = [
+        'nuevo' => [
+            'label' => 'Pedido recibido',
+            'icon' => 'fa-solid fa-bell',
+            'color' => 'blue'
+        ],
 
-        $estadoActual = $pedido->estado ?? 'nuevo';
-        $metaEstado = $estados[$estadoActual] ?? [
-            'label' => ucfirst(str_replace('_', ' ', $estadoActual)),
-            'icon' => 'fa-solid fa-circle',
-            'color' => 'blue',
-        ];
+        'en_preparacion' => [
+            'label' => 'En preparación',
+            'icon' => 'fa-solid fa-utensils',
+            'color' => 'amber'
+        ],
 
-      $ordenEstados = ['nuevo', 'en_preparacion', 'repartidor_en_camino', 'entregado'];
-        $indiceActual = array_search($estadoActual, $ordenEstados);
-    @endphp
+        'repartidor_en_camino' => [
+            'label' => 'Repartidor en camino',
+            'icon' => 'fa-solid fa-motorcycle',
+            'color' => 'violet',
+        ],
+
+        'entregado' => [
+            'label' => 'Entregado',
+            'icon' => 'fa-solid fa-circle-check',
+            'color' => 'emerald',
+        ],
+
+        'cancelado' => [
+            'label' => 'Cancelado',
+            'icon' => 'fa-solid fa-ban',
+            'color' => 'rose',
+        ],
+    ];
+@endphp
 
     <div class="page">
         <div class="glass header">
