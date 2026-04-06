@@ -13,19 +13,36 @@
 
         {{-- HEADER PRINCIPAL --}}
         <div class="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-orange-400 via-orange-500 to-orange-600">
+            </div>
 
+            <div class="flex flex-col gap-4 px-5 py-5 lg:flex-row lg:items-center lg:justify-between">
+                {{-- Lado izquierdo --}}
+                <div class="flex min-w-0 items-center gap-4">
+                    <div
+                        class="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-400 via-orange-500 to-orange-600 text-white shadow-md">
+                        <i class="fa-solid fa-bag-shopping text-lg"></i>
+                        <div class="absolute inset-0 rounded-2xl bg-orange-500/20 blur-lg"></div>
+                    </div>
 
-            <div class="flex items-center gap-4 px-5 py-4">
-                <div
-                    class="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-400 via-orange-500 to-orange-600 text-white shadow-md">
-                    <i class="fa-solid fa-bag-shopping text-lg"></i>
-                    <div class="absolute inset-0 rounded-2xl bg-orange-500/20 blur-lg"></div>
+                    <div class="min-w-0">
+                        <div
+                            class="inline-flex items-center gap-2 rounded-full bg-orange-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-orange-600 ring-1 ring-orange-100">
+                            <span class="h-2 w-2 rounded-full bg-orange-500 animate-pulse"></span>
+                            Operación en tiempo real
+                        </div>
+
+                        <h4 class="mt-2 text-2xl font-semibold tracking-tight text-slate-800 md:text-3xl">
+                            Gestión de Pedidos
+                        </h4>
+
+                      
+                    </div>
                 </div>
 
-                <div class="min-w-0">
-                    <h4 class="mt-1.5 text-2xl font-semibold tracking-tight text-slate-800 md:text-3xl">
-                        Gestión de Pedidos
-                    </h4>
+                {{-- Lado derecho --}}
+                <div class="w-full lg:w-auto lg:min-w-[420px]">
+                    @livewire('whatsapp-status-monitor')
                 </div>
             </div>
         </div>
