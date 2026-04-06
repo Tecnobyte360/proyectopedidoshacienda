@@ -1,4 +1,4 @@
-<div wire:poll.{{ in_array($status, ['qrcode', 'pairing']) ? '5000ms' : '30000ms' }}="verificarEstado">
+<div wire:poll.{{ in_array($status, ['qrcode', 'pairing', 'disconnected', 'timeout', 'not_connected']) ? '5000ms' : '30000ms' }}="verificarEstado">
 
     @php
         $config = match ($status) {
