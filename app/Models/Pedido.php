@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Events\PedidoActualizado;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
@@ -110,43 +111,48 @@ class Pedido extends Model
     |==========================================================================
     */
 
-    public function cambiarEstado(
-        string $nuevoEstado,
-        ?string $descripcion = null,
-        ?string $titulo = null,
-        ?string $usuario = null,
-        ?int $usuarioId = null
-    ): void {
-        $estadoAnterior = $this->estado;
+  public function cambiarEstado(
+    string $nuevoEstado,
+    ?string $descripcion = null,
+    ?string $titulo = null,
+    ?string $usuario = null,
+    ?int $usuarioId = null
+): void {
+    $estadoAnterior = $this->estado;
 
-        if ($estadoAnterior === $nuevoEstado) {
-            return;
-        }
-
-        $this->estado            = $nuevoEstado;
-        $this->fecha_estado      = now();
-        $this->observacion_estado = $descripcion;
-
-        if ($nuevoEstado === self::ESTADO_ENTREGADO) {
-            $this->fecha_entregado = now();
-        }
-        if ($nuevoEstado === self::ESTADO_CANCELADO) {
-            $this->fecha_cancelado = now();
-        }
-
-        $this->save();
-
-        $this->registrarHistorial(
-            estadoNuevo: $nuevoEstado,
-            estadoAnterior: $estadoAnterior,
-            titulo: $titulo,
-            descripcion: $descripcion,
-            usuario: $usuario,
-            usuarioId: $usuarioId
-        );
-
-        $this->notificarClienteCambioEstado();
+    if ($estadoAnterior === $nuevoEstado) {
+        return;
     }
+
+    $this->estado             = $nuevoEstado;
+    $this->fecha_estado       = now();
+    $this->observacion_estado = $descripcion;
+
+    if ($nuevoEstado === self::ESTADO_ENTREGADO) {
+        $this->fecha_entregado = now();
+    }
+
+    if ($nuevoEstado === self::ESTADO_CANCELADO) {
+        $this->fecha_cancelado = now();
+    }
+
+    $this->save();
+
+    $this->registrarHistorial(
+        estadoNuevo: $nuevoEstado,
+        estadoAnterior: $estadoAnterior,
+        titulo: $titulo,
+        descripcion: $descripcion,
+        usuario: $usuario,
+        usuarioId: $usuarioId
+    );
+
+    $this->notificarClienteCambioEstado();
+
+    $this->load(['sede', 'detalles', 'historialEstados']);
+
+    broadcast(new PedidoActualizado($this, 'estado_actualizado'))->toOthers();
+}
 
     public function registrarHistorial(
         string $estadoNuevo,

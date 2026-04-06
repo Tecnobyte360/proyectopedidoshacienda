@@ -1,5 +1,4 @@
-<div wire:poll.{{ in_array($status, ['qrcode', 'pairing', 'disconnected', 'timeout', 'not_connected']) ? '5000ms' : '30000ms' }}="verificarEstado">
-
+<div wire:poll.{{ in_array($status, ['qrcode', 'pairing']) ? '5000ms' : '30000ms' }}="verificarEstado">
     @php
         $config = match ($status) {
             'connected' => [
@@ -39,6 +38,8 @@
                 'ping' => false,
             ],
         };
+
+        $qrHash = !blank($qrCode) ? md5($qrCode) : 'sin-qr';
     @endphp
 
     <div class="flex items-center justify-between rounded-xl border {{ $config['bg'] }} px-4 py-2.5 shadow-sm">
@@ -71,9 +72,7 @@
                 </div>
 
                 @if ($phoneNumber)
-                    <p class="mt-0.5 text-[11px] {{ $config['sub'] }}">
-                        {{ $phoneNumber }}
-                    </p>
+                    <p class="mt-0.5 text-[11px] {{ $config['sub'] }}">{{ $phoneNumber }}</p>
                 @endif
 
                 @if ($disconnectReason)
@@ -127,11 +126,15 @@
     </div>
 
     @if ($showQr && $qrCode && in_array($status, ['qrcode', 'pairing']))
-        <div class="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-4">
+        <div
+            wire:key="qr-panel-{{ $qrHash }}"
+            class="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-4">
             <div class="flex flex-col items-center gap-3 sm:flex-row sm:items-start sm:gap-6">
+
                 <div class="flex shrink-0 flex-col items-center gap-2">
                     <div class="rounded-xl border-4 border-white bg-white p-2 shadow-md">
                         <img
+                            wire:key="qr-image-{{ $qrHash }}"
                             src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=4&data={{ urlencode($qrCode) }}"
                             alt="QR WhatsApp"
                             width="200"
@@ -151,19 +154,19 @@
                     <ol class="mt-2 space-y-1.5 text-xs text-amber-700">
                         <li class="flex items-start gap-2">
                             <span class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-amber-500 text-[9px] font-bold text-white">1</span>
-                            Abre WhatsApp en tu teléfono
+                            Abre WhatsApp en tu teléfono.
                         </li>
                         <li class="flex items-start gap-2">
                             <span class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-amber-500 text-[9px] font-bold text-white">2</span>
-                            Ve a <strong>Dispositivos vinculados</strong> → <strong>Vincular dispositivo</strong>
+                            Ve a <strong>Dispositivos vinculados</strong> → <strong>Vincular dispositivo</strong>.
                         </li>
                         <li class="flex items-start gap-2">
                             <span class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-amber-500 text-[9px] font-bold text-white">3</span>
-                            Escanea el código QR que aparece a la izquierda
+                            Escanea el código QR que aparece a la izquierda.
                         </li>
                         <li class="flex items-start gap-2">
                             <span class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-amber-500 text-[9px] font-bold text-white">4</span>
-                            El sistema verificará automáticamente la reconexión
+                            El sistema verificará automáticamente la reconexión.
                         </li>
                     </ol>
 

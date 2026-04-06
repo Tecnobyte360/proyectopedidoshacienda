@@ -89,11 +89,11 @@ class WhatsappStatusMonitor extends Component
                 ?? $conexion['profileName']
                 ?? $conexion['name']
                 ?? '';
-            $this->lastChecked = now()->format('h:i a');
+            $this->lastChecked = now()->format('h:i:s a');
 
-            $qrDesdeListado = $conexion['qrcode'] ?? null;
-            if (!blank($qrDesdeListado)) {
-                $this->qrCode = $qrDesdeListado;
+            $qrListado = $conexion['qrcode'] ?? null;
+            if (!blank($qrListado)) {
+                $this->qrCode = $qrListado;
             }
 
             Log::info('📡 Monitor WA estado', [
@@ -140,11 +140,6 @@ class WhatsappStatusMonitor extends Component
 
         if ($estadoAnterior && $estadoAnterior !== 'CONNECTED') {
             Cache::forget($this->cacheAlertaDesconexion);
-
-            Log::info('✅ WhatsApp reconectado', [
-                'connectionId' => $this->connectionId,
-                'phoneNumber'  => $this->phoneNumber,
-            ]);
         }
 
         Cache::put($this->cacheEstadoAnterior, 'CONNECTED', now()->addHours(2));
@@ -155,13 +150,11 @@ class WhatsappStatusMonitor extends Component
         $this->status = 'qrcode';
         $this->statusLabel = $estadoApi === 'PAIRING'
             ? 'Emparejando / esperando QR'
-            : 'Esperando escaneo QR';
+            : 'Escanea el nuevo QR';
 
         $this->disconnectReason = 'requiere escaneo QR';
         $this->showQr = true;
 
-        // Si la API reporta estado QR pero no mandó el código,
-        // lo intentamos recuperar automáticamente.
         if (blank($this->qrCode) && $this->connectionId) {
             $this->solicitarNuevoQrInterno();
         }
@@ -178,60 +171,43 @@ class WhatsappStatusMonitor extends Component
 
     private function procesarDesconectado(string $estadoApi): void
     {
-        $this->status = match ($estadoApi) {
-            'TIMEOUT'       => 'timeout',
-            'NOT_CONNECTED' => 'not_connected',
-            default         => 'disconnected',
-        };
-
-        $this->statusLabel = match ($estadoApi) {
-            'TIMEOUT'       => 'Tiempo agotado',
-            'NOT_CONNECTED' => 'No conectado',
-            'DISCONNECTED'  => 'Desconectado',
-            default         => "Sin conexión ({$estadoApi})",
-        };
-
-        $this->disconnectReason = match ($estadoApi) {
-            'TIMEOUT'       => 'expiró la sesión o el QR',
-            'NOT_CONNECTED' => 'no hay sesión activa',
-            'DISCONNECTED'  => 'desconexión de la sesión',
-            default         => "estado {$estadoApi}",
-        };
-
+        $this->status = 'disconnected';
+        $this->statusLabel = 'Generando QR...';
+        $this->disconnectReason = 'la sesión se desconectó, intentando generar un nuevo QR';
         $this->showQr = false;
-
-        // Muy importante:
-        // limpiamos QR viejo para forzar refresco real
         $this->qrCode = null;
 
-        if ($this->connectionId) {
-            $this->solicitarNuevoQrInterno();
-        }
+        $this->intentarGenerarQr();
 
         if (!blank($this->qrCode)) {
             $this->status = 'qrcode';
             $this->statusLabel = 'Escanea el nuevo QR';
-            $this->disconnectReason = 'la sesión se desconectó, escanea para reconectar';
+            $this->disconnectReason = 'QR generado automáticamente';
             $this->showQr = true;
+        } else {
+            $this->status = match ($estadoApi) {
+                'TIMEOUT'       => 'timeout',
+                'NOT_CONNECTED' => 'not_connected',
+                default         => 'disconnected',
+            };
+
+            $this->statusLabel = 'Desconectado';
+            $this->disconnectReason = 'la API no devolvió un QR nuevo todavía';
         }
 
         $this->enviarAlertaSiNecesario($estadoApi);
         Cache::put($this->cacheEstadoAnterior, $estadoApi, now()->addHours(2));
     }
 
-    private function setEstado(string $status, string $label): void
-    {
-        $this->status = $status;
-        $this->statusLabel = $label;
-        $this->lastChecked = now()->format('h:i a');
-    }
-
     public function solicitarNuevoQr(): void
     {
+        $this->status = 'disconnected';
+        $this->statusLabel = 'Generando QR...';
+        $this->disconnectReason = 'solicitando nuevo QR';
         $this->qrCode = null;
         $this->showQr = false;
 
-        $this->solicitarNuevoQrInterno();
+        $this->intentarGenerarQr();
 
         if (!blank($this->qrCode)) {
             $this->status = 'qrcode';
@@ -241,7 +217,22 @@ class WhatsappStatusMonitor extends Component
             return;
         }
 
-        $this->verificarEstado();
+        $this->status = 'disconnected';
+        $this->statusLabel = 'Desconectado';
+        $this->disconnectReason = 'no fue posible obtener el QR desde la API';
+    }
+
+    private function intentarGenerarQr(): void
+    {
+        for ($i = 1; $i <= 4; $i++) {
+            $this->solicitarNuevoQrInterno();
+
+            if (!blank($this->qrCode)) {
+                return;
+            }
+
+            usleep(800000);
+        }
     }
 
     private function solicitarNuevoQrInterno(): void
@@ -258,13 +249,12 @@ class WhatsappStatusMonitor extends Component
                 return;
             }
 
-            // Consulta detalle de la conexión
             $response = Http::withoutVerifying()
                 ->withToken($token)
                 ->timeout(20)
                 ->get("https://wa-api.tecnobyteapp.com:1422/whatsapp/{$this->connectionId}");
 
-            Log::info('🔄 Refresco QR', [
+            Log::info('🔄 Refresco QR - detalle conexión', [
                 'connectionId' => $this->connectionId,
                 'httpStatus'   => $response->status(),
                 'body'         => $response->body(),
@@ -276,45 +266,40 @@ class WhatsappStatusMonitor extends Component
 
                 if ($conexion && !blank($conexion['qrcode'] ?? null)) {
                     $this->qrCode = $conexion['qrcode'];
+                    return;
                 }
             }
 
-            // Si aún no hay QR, volvemos a consultar el listado general
-            if (blank($this->qrCode)) {
-                $retry = Http::withoutVerifying()
-                    ->withToken($token)
-                    ->timeout(20)
-                    ->get('https://wa-api.tecnobyteapp.com:1422/whatsapp/');
+            $retry = Http::withoutVerifying()
+                ->withToken($token)
+                ->timeout(20)
+                ->get('https://wa-api.tecnobyteapp.com:1422/whatsapp/');
 
-                Log::info('🔁 Reconsulta listado WA para QR', [
-                    'status' => $retry->status(),
-                    'body'   => $retry->body(),
-                ]);
+            Log::info('🔁 Reconsulta listado WA para QR', [
+                'status' => $retry->status(),
+                'body'   => $retry->body(),
+            ]);
 
-                if ($retry->successful()) {
-                    $whatsapps = collect($retry->json('whatsapps', []));
-                    $conexion = $whatsapps->firstWhere('id', $this->connectionId);
+            if ($retry->successful()) {
+                $whatsapps = collect($retry->json('whatsapps', []));
+                $conexion = $whatsapps->firstWhere('id', $this->connectionId);
 
-                    if ($conexion && !blank($conexion['qrcode'] ?? null)) {
-                        $this->qrCode = $conexion['qrcode'];
-                    }
+                if ($conexion && !blank($conexion['qrcode'] ?? null)) {
+                    $this->qrCode = $conexion['qrcode'];
                 }
-            }
-
-            if (!blank($this->qrCode)) {
-                $this->showQr = true;
-                $this->status = 'qrcode';
-                $this->statusLabel = 'Escanea el nuevo QR';
-            } else {
-                Log::warning('⚠️ No fue posible obtener QR nuevo', [
-                    'connectionId' => $this->connectionId,
-                ]);
             }
         } catch (\Throwable $e) {
             Log::error('❌ Error refrescando QR', [
                 'error' => $e->getMessage(),
             ]);
         }
+    }
+
+    private function setEstado(string $status, string $label): void
+    {
+        $this->status = $status;
+        $this->statusLabel = $label;
+        $this->lastChecked = now()->format('h:i:s a');
     }
 
     private function obtenerTokenForzado(): ?string
@@ -348,11 +333,6 @@ class WhatsappStatusMonitor extends Component
                     'password' => $password,
                 ]);
 
-            Log::info('🔐 Login WA intento', [
-                'status' => $response->status(),
-                'body'   => $response->body(),
-            ]);
-
             if ($response->failed()) {
                 Log::error('❌ Monitor WA: Login falló', [
                     'status' => $response->status(),
@@ -371,7 +351,6 @@ class WhatsappStatusMonitor extends Component
             }
 
             Cache::put($cacheKey, $token, now()->addMinutes(20));
-            Log::info('✅ Monitor WA: Token obtenido');
 
             return $token;
         } catch (\Throwable $e) {
@@ -385,26 +364,12 @@ class WhatsappStatusMonitor extends Component
     private function enviarAlertaSiNecesario(string $estadoApi): void
     {
         $minutos = (int) env('WHATSAPP_ALERTA_MINUTOS', 30);
-
         if ($minutos <= 0) {
             $minutos = 30;
         }
 
         if (!Cache::has($this->cacheAlertaDesconexion)) {
-            Cache::put(
-                $this->cacheAlertaDesconexion,
-                true,
-                now()->addMinutes($minutos)
-            );
-
-            Log::warning('🚨 ALERTA WHATSAPP DESCONEXION', [
-                'estado'               => $estadoApi,
-                'connectionId'         => $this->connectionId,
-                'phoneNumber'          => $this->phoneNumber,
-                'minutos_configurados' => $minutos,
-                'motivo'               => $this->disconnectReason,
-            ]);
-
+            Cache::put($this->cacheAlertaDesconexion, true, now()->addMinutes($minutos));
             $this->enviarCorreoAlerta($estadoApi);
         }
     }
@@ -419,7 +384,6 @@ class WhatsappStatusMonitor extends Component
                 ->all();
 
             if (empty($destinatarios)) {
-                Log::warning('⚠️ Monitor WA: Sin correos en ALERTAS_TECNICAS_EMAILS');
                 return;
             }
 
@@ -443,11 +407,6 @@ class WhatsappStatusMonitor extends Component
                     ->to($destinatarios)
                     ->subject("🚨 ALERTA CRÍTICA: WhatsApp DESCONECTADO - {$appNombre}")
             );
-
-            Log::info('📧 Alerta correo enviada', [
-                'estado'        => $estadoApi,
-                'destinatarios' => $destinatarios,
-            ]);
         } catch (\Throwable $e) {
             Log::error('❌ Error enviando correo alerta WA', [
                 'error' => $e->getMessage(),

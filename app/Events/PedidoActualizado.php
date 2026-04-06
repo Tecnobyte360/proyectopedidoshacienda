@@ -15,12 +15,15 @@ class PedidoActualizado implements ShouldBroadcastNow
 
     public function __construct(public Pedido $pedido, public string $accion = 'actualizado')
     {
-        $this->pedido->load(['sede', 'detalles']);
+        $this->pedido->load(['sede', 'detalles', 'historialEstados']);
     }
 
-    public function broadcastOn(): Channel
+    public function broadcastOn(): array
     {
-        return new Channel('pedidos');
+        return [
+            new Channel('pedidos'),
+            new Channel('pedido-seguimiento.' . $this->pedido->codigo_seguimiento),
+        ];
     }
 
     public function broadcastAs(): string
@@ -32,6 +35,7 @@ class PedidoActualizado implements ShouldBroadcastNow
     {
         return [
             'id'                   => $this->pedido->id,
+            'codigo_seguimiento'   => $this->pedido->codigo_seguimiento,
             'accion'               => $this->accion,
             'cliente_nombre'       => $this->pedido->cliente_nombre,
             'telefono'             => $this->pedido->telefono,
@@ -46,6 +50,8 @@ class PedidoActualizado implements ShouldBroadcastNow
             'detalles'             => $this->formatearDetalles(),
             'created_at'           => optional($this->pedido->created_at)?->format('d/m/Y H:i:s'),
             'resumen_conversacion' => $this->pedido->resumen_conversacion,
+            'historial'            => $this->formatearHistorial(),
+            'fecha_estado'         => optional($this->pedido->fecha_estado)?->toDateTimeString(),
         ];
     }
 
@@ -59,6 +65,24 @@ class PedidoActualizado implements ShouldBroadcastNow
                 'subtotal' => number_format((float) $detalle->subtotal, 0, ',', '.'),
             ];
         })->toArray();
+    }
+
+    private function formatearHistorial(): array
+    {
+        return $this->pedido->historialEstados
+            ->sortByDesc('fecha_evento')
+            ->map(function ($item) {
+                return [
+                    'estado_anterior' => $item->estado_anterior,
+                    'estado_nuevo'    => $item->estado_nuevo,
+                    'titulo'          => $item->titulo,
+                    'descripcion'     => $item->descripcion,
+                    'usuario'         => $item->usuario,
+                    'fecha_evento'    => optional($item->fecha_evento)?->format('d/m/Y h:i a'),
+                ];
+            })
+            ->values()
+            ->toArray();
     }
 
     private function formatearCantidad(float $cantidad): string
