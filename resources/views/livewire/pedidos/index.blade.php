@@ -36,7 +36,7 @@
                             Gestión de Pedidos
                         </h4>
 
-                    
+
                     </div>
                 </div>
 
@@ -246,6 +246,10 @@
                                 class="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-[0.22em] text-slate-500">
                                 Total</th>
                             <th
+                                class="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-[0.22em] text-slate-500">
+                                Domiciliario
+                            </th>
+                            <th
                                 class="px-4 py-3 text-center text-[10px] font-bold uppercase tracking-[0.22em] text-slate-500">
                                 Acción</th>
                         </tr>
@@ -365,70 +369,122 @@
                                         ${{ number_format($pedido->total, 0, ',', '.') }}
                                     </span>
                                 </td>
-
-                                <td class="px-4 py-3.5 text-center align-middle">
-                                    @if ($pedido->estado === \App\Models\Pedido::ESTADO_NUEVO)
-                                        <button type="button" wire:click="marcarEnPreparacion({{ $pedido->id }})"
-                                            wire:loading.attr="disabled"
-                                            wire:target="marcarEnPreparacion({{ $pedido->id }})"
-                                            class="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-3 py-2 text-xs font-bold text-white transition hover:bg-amber-600 disabled:opacity-60 disabled:cursor-not-allowed">
-                                            <i class="fa-solid fa-utensils" wire:loading.class="hidden"
-                                                wire:target="marcarEnPreparacion({{ $pedido->id }})"></i>
-                                            <i class="fa-solid fa-spinner fa-spin hidden"
-                                                wire:loading.class.remove="hidden"
-                                                wire:target="marcarEnPreparacion({{ $pedido->id }})"></i>
-                                            Iniciar preparación
-                                        </button>
-                                    @elseif ($pedido->estado === \App\Models\Pedido::ESTADO_EN_PREPARACION)
-                                        <button type="button" wire:click="marcarEnCamino({{ $pedido->id }})"
-                                            wire:loading.attr="disabled"
-                                            wire:target="marcarEnCamino({{ $pedido->id }})"
-                                            class="inline-flex items-center gap-2 rounded-xl bg-violet-500 px-3 py-2 text-xs font-bold text-white transition hover:bg-violet-600 disabled:opacity-60 disabled:cursor-not-allowed">
-                                            <i class="fa-solid fa-motorcycle" wire:loading.class="hidden"
-                                                wire:target="marcarEnCamino({{ $pedido->id }})"></i>
-                                            <i class="fa-solid fa-spinner fa-spin hidden"
-                                                wire:loading.class.remove="hidden"
-                                                wire:target="marcarEnCamino({{ $pedido->id }})"></i>
-                                            Despachar
-                                        </button>
-                                    @elseif ($pedido->estado === \App\Models\Pedido::ESTADO_REPARTIDOR_EN_CAMINO)
-                                        <div class="flex flex-col items-center gap-2">
-                                            {{-- Token visible para el domiciliario --}}
-                                            @if ($pedido->token_entrega)
-                                                <div
-                                                    class="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-bold text-violet-700">
-                                                    <i class="fa-solid fa-key text-[10px]"></i>
-                                                    Token: <span
-                                                        class="tracking-widest">{{ $pedido->token_entrega }}</span>
-                                                </div>
-                                            @endif
-                                            <button type="button"
-                                                wire:click="abrirModalEntrega({{ $pedido->id }})"
-                                                class="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-3 py-2 text-xs font-bold text-white transition hover:bg-emerald-600">
-                                                <i class="fa-solid fa-circle-check"></i>
-                                                Confirmar entrega
-                                            </button>
+                                <td class="px-4 py-3.5 align-middle">
+                                    @if ($pedido->domiciliario)
+                                        <div class="flex flex-col">
+                                            <span class="text-sm font-semibold text-slate-800">
+                                                {{ $pedido->domiciliario->nombre }}
+                                            </span>
+                                            <span class="text-xs text-slate-500">
+                                                {{ $pedido->domiciliario->telefono ?: 'Sin teléfono' }}
+                                            </span>
                                         </div>
-                                    @elseif ($pedido->estado === \App\Models\Pedido::ESTADO_ENTREGADO)
-                                        <span
-                                            class="inline-flex items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 border border-emerald-200">
-                                            <i class="fa-solid fa-circle-check"></i>
-                                            Entregado
-                                        </span>
-                                    @elseif ($pedido->estado === \App\Models\Pedido::ESTADO_CANCELADO)
-                                        <span
-                                            class="inline-flex items-center gap-2 rounded-xl bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 border border-rose-200">
-                                            <i class="fa-solid fa-ban"></i>
-                                            Cancelado
-                                        </span>
                                     @else
                                         <span
-                                            class="inline-flex items-center gap-2 rounded-xl bg-slate-100 px-3 py-2 text-xs font-bold text-slate-600 border border-slate-200">
-                                            <i class="fa-solid fa-circle-info"></i>
-                                            {{ ucfirst(str_replace('_', ' ', $pedido->estado)) }}
+                                            class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-500">
+                                            <i class="fa-solid fa-user-clock"></i>
+                                            Sin asignar
                                         </span>
                                     @endif
                                 </td>
+                               <td class="px-4 py-3.5 text-center align-middle">
+    @if ($pedido->estado === \App\Models\Pedido::ESTADO_NUEVO)
+        <button type="button" wire:click="marcarEnPreparacion({{ $pedido->id }})"
+            wire:loading.attr="disabled"
+            wire:target="marcarEnPreparacion({{ $pedido->id }})"
+            class="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-3 py-2 text-xs font-bold text-white transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-60">
+            <i class="fa-solid fa-utensils" wire:loading.class="hidden"
+                wire:target="marcarEnPreparacion({{ $pedido->id }})"></i>
+            <i class="fa-solid fa-spinner fa-spin hidden" wire:loading.class.remove="hidden"
+                wire:target="marcarEnPreparacion({{ $pedido->id }})"></i>
+            Iniciar preparación
+        </button>
+    @elseif ($pedido->estado === \App\Models\Pedido::ESTADO_EN_PREPARACION)
+        <div class="flex flex-col items-center gap-2">
+            @if ($pedido->domiciliario)
+                <div
+                    class="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-bold text-violet-700">
+                    <i class="fa-solid fa-user-check text-[10px]"></i>
+                    {{ $pedido->domiciliario->nombre }}
+                </div>
+            @endif
+
+            <button type="button" wire:click="abrirModalDespacho({{ $pedido->id }})"
+                wire:loading.attr="disabled"
+                wire:target="abrirModalDespacho({{ $pedido->id }})"
+                class="inline-flex items-center gap-2 rounded-xl bg-violet-500 px-3 py-2 text-xs font-bold text-white transition hover:bg-violet-600 disabled:cursor-not-allowed disabled:opacity-60">
+                <i class="fa-solid fa-motorcycle" wire:loading.class="hidden"
+                    wire:target="abrirModalDespacho({{ $pedido->id }})"></i>
+                <i class="fa-solid fa-spinner fa-spin hidden" wire:loading.class.remove="hidden"
+                    wire:target="abrirModalDespacho({{ $pedido->id }})"></i>
+                {{ $pedido->domiciliario ? 'Reasignar y despachar' : 'Asignar y despachar' }}
+            </button>
+        </div>
+    @elseif ($pedido->estado === \App\Models\Pedido::ESTADO_REPARTIDOR_EN_CAMINO)
+        <div class="flex flex-col items-center gap-2">
+            @if ($pedido->domiciliario)
+                <div
+                    class="inline-flex items-center gap-1.5 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-1 text-xs font-bold text-sky-700">
+                    <i class="fa-solid fa-motorcycle text-[10px]"></i>
+                    {{ $pedido->domiciliario->nombre }}
+                </div>
+            @endif
+
+            @if ($pedido->token_entrega)
+                <div
+                    class="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-bold text-violet-700">
+                    <i class="fa-solid fa-key text-[10px]"></i>
+                    Token:
+                    <span class="tracking-widest">{{ $pedido->token_entrega }}</span>
+                </div>
+            @endif
+
+            <button type="button" wire:click="abrirModalEntrega({{ $pedido->id }})"
+                class="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-3 py-2 text-xs font-bold text-white transition hover:bg-emerald-600">
+                <i class="fa-solid fa-circle-check"></i>
+                Confirmar entrega
+            </button>
+        </div>
+    @elseif ($pedido->estado === \App\Models\Pedido::ESTADO_ENTREGADO)
+        <div class="flex flex-col items-center gap-2">
+            @if ($pedido->domiciliario)
+                <div
+                    class="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">
+                    <i class="fa-solid fa-user-check text-[10px]"></i>
+                    {{ $pedido->domiciliario->nombre }}
+                </div>
+            @endif
+
+            <span
+                class="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700">
+                <i class="fa-solid fa-circle-check"></i>
+                Entregado
+            </span>
+        </div>
+    @elseif ($pedido->estado === \App\Models\Pedido::ESTADO_CANCELADO)
+        <div class="flex flex-col items-center gap-2">
+            @if ($pedido->domiciliario)
+                <div
+                    class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-bold text-slate-600">
+                    <i class="fa-solid fa-user text-[10px]"></i>
+                    {{ $pedido->domiciliario->nombre }}
+                </div>
+            @endif
+
+            <span
+                class="inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700">
+                <i class="fa-solid fa-ban"></i>
+                Cancelado
+            </span>
+        </div>
+    @else
+        <span
+            class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-100 px-3 py-2 text-xs font-bold text-slate-600">
+            <i class="fa-solid fa-circle-info"></i>
+            {{ ucfirst(str_replace('_', ' ', $pedido->estado)) }}
+        </span>
+    @endif
+</td>
                             </tr>
                         @empty
                             <tr class="empty-state">
@@ -447,6 +503,75 @@
                 </table>
             </div>
         </div>
+
+        @if ($modalDespachoAbierto)
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4"
+        style="background: rgba(15,23,42,0.55); backdrop-filter: blur(4px);">
+
+        <div class="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-2xl" wire:click.stop>
+
+            {{-- Header --}}
+            <div class="flex items-center gap-3 border-b border-slate-100 px-5 py-4">
+                <div
+                    class="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-100 text-violet-600">
+                    <i class="fa-solid fa-motorcycle text-sm"></i>
+                </div>
+                <div>
+                    <h3 class="text-sm font-bold text-slate-800">Asignar domiciliario</h3>
+                    <p class="text-xs text-slate-500">
+                        Pedido #{{ str_pad($pedidoIdDespacho, 3, '0', STR_PAD_LEFT) }}
+                    </p>
+                </div>
+                <button wire:click="cerrarModalDespacho"
+                    class="ml-auto flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition">
+                    <i class="fa-solid fa-xmark text-sm"></i>
+                </button>
+            </div>
+
+            {{-- Body --}}
+            <div class="px-5 py-5">
+                <p class="mb-4 text-sm text-slate-600 leading-relaxed">
+                    Selecciona el domiciliario que llevará este pedido.
+                </p>
+
+                <select wire:model.live="domiciliarioSeleccionado"
+                    class="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-700 outline-none transition focus:border-violet-400 focus:bg-white focus:ring-4 focus:ring-violet-100">
+                    <option value="">-- Seleccionar domiciliario --</option>
+                    @foreach ($domiciliarios as $domiciliario)
+                        <option value="{{ $domiciliario->id }}">
+                            {{ $domiciliario->nombre }} - {{ $domiciliario->telefono ?: 'Sin teléfono' }}
+                        </option>
+                    @endforeach
+                </select>
+
+                @error('domiciliarioSeleccionado')
+                    <div
+                        class="mt-2.5 flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">
+                        <i class="fa-solid fa-triangle-exclamation text-[11px]"></i>
+                        {{ $message }}
+                    </div>
+                @enderror
+            </div>
+
+            {{-- Footer --}}
+            <div class="flex gap-2 border-t border-slate-100 px-5 py-4">
+                <button wire:click="cerrarModalDespacho"
+                    class="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">
+                    Cancelar
+                </button>
+                <button wire:click="confirmarDespacho" wire:loading.attr="disabled"
+                    wire:target="confirmarDespacho"
+                    class="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-violet-500 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-violet-600 disabled:opacity-60">
+                    <i class="fa-solid fa-motorcycle" wire:loading.class="hidden"
+                        wire:target="confirmarDespacho"></i>
+                    <i class="fa-solid fa-spinner fa-spin hidden" wire:loading.class.remove="hidden"
+                        wire:target="confirmarDespacho"></i>
+                    Asignar y despachar
+                </button>
+            </div>
+        </div>
+    </div>
+@endif
         {{-- MODAL TOKEN ENTREGA --}}
         @if ($modalTokenAbierto)
             <div class="fixed inset-0 z-50 flex items-center justify-center p-4"

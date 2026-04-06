@@ -566,4 +566,9 @@ broadcast(new PedidoActualizado($this, 'estado_actualizado'));
             default                           => 'Actualización de pedido',
         };
     }
+
+     public function domiciliario()
+    {
+        return $this->belongsTo(Domiciliario::class);
+    }
 }
