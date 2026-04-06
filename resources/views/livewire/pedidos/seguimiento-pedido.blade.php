@@ -829,7 +829,7 @@
     @endpush
 
     @push('scripts')
-        @vite('resources/js/seguimiento-pedido.js')
+       
 
         <script>
             document.addEventListener('DOMContentLoaded', () => {

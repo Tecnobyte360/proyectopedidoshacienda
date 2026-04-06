@@ -2,7 +2,7 @@ import "./bootstrap";
 
 import Echo from "laravel-echo";
 import Pusher from "pusher-js";
-
+import "./seguimiento-pedido";
 window.Pusher = Pusher;
 
 const isLocal =
