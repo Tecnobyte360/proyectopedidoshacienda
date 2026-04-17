@@ -81,11 +81,11 @@
                     {{-- Botón expandir / contraer --}}
                     <button type="button"
                             x-data
-                            @click="$store.ui.toggle()"
-                            :title="$store.ui.fullscreen ? 'Contraer (ESC)' : 'Pantalla completa'"
+                            @click="$store.ui?.toggle()"
+                            :title="$store.ui?.fullscreen ? 'Contraer (ESC)' : 'Pantalla completa'"
                             class="shrink-0 flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-orange-600 transition shadow-sm">
                         <i class="fa-solid"
-                           :class="$store.ui.fullscreen ? 'fa-compress' : 'fa-expand'"></i>
+                           :class="$store.ui?.fullscreen ? 'fa-compress' : 'fa-expand'"></i>
                     </button>
                 </div>
             </div>
