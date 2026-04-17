@@ -141,42 +141,61 @@ function initPedidosRealtime() {
     };
 
     // ── Resaltado de pedidos recién llegados ──────────────────────────────────
-    // Mantenemos un Set con los IDs recientes (últimos 6 segundos). Cuando
-    // Livewire re-renderiza la lista, volvemos a aplicar la clase a cada
-    // elemento que tenga `data-pedido-id` coincidente.
+    // Set con los IDs recientes. Como Livewire re-renderiza de forma asíncrona
+    // después de recibir el broadcast, aplicamos la clase con varios reintentos
+    // (100ms, 400ms, 900ms, 1500ms, 2500ms) para atrapar el momento en que la
+    // fila/card ya esté en el DOM.
     const pedidosRecientes = new Set();
-
-    function marcarPedidoReciente(id, duracionMs = 6000) {
-        if (!id) return;
-        pedidosRecientes.add(id);
-        aplicarResaltado();
-        setTimeout(() => {
-            pedidosRecientes.delete(id);
-            aplicarResaltado();
-        }, duracionMs);
-    }
+    const DURACION_HIGHLIGHT_MS = 6000;
+    const DELAYS_REINTENTO = [50, 150, 400, 800, 1500, 2500, 4000];
 
     function aplicarResaltado() {
-        document.querySelectorAll("[data-pedido-id]").forEach((el) => {
+        const nodos = document.querySelectorAll("[data-pedido-id]");
+        nodos.forEach((el) => {
             const id = parseInt(el.dataset.pedidoId, 10);
             if (pedidosRecientes.has(id)) {
-                el.classList.add("new-order-highlight");
+                if (!el.classList.contains("new-order-highlight")) {
+                    el.classList.add("new-order-highlight");
+                    console.log(`✨ Resaltando pedido #${id}`, el);
+                }
             } else {
                 el.classList.remove("new-order-highlight");
             }
         });
     }
 
-    // Re-aplicar tras cada morph/update de Livewire (la lista puede haberse
-    // re-renderizado por el listener de echo en el componente PHP).
-    document.addEventListener("livewire:init", () => {
-        if (window.Livewire?.hook) {
-            Livewire.hook("morph.updated", () => {
-                // Esperamos un tick para que el DOM termine de pintarse.
-                setTimeout(aplicarResaltado, 30);
-            });
-        }
-    });
+    function marcarPedidoReciente(id) {
+        if (!id) return;
+        pedidosRecientes.add(id);
+
+        // Reintentos escalonados para garantizar que la fila esté en el DOM
+        DELAYS_REINTENTO.forEach((ms) => setTimeout(aplicarResaltado, ms));
+
+        // Auto-limpiar después de la duración del highlight
+        setTimeout(() => {
+            pedidosRecientes.delete(id);
+            aplicarResaltado();
+        }, DURACION_HIGHLIGHT_MS);
+    }
+
+    // Re-aplicar después de cualquier re-render de Livewire.
+    // Esto captura el caso cuando Livewire recibe el broadcast, refresca la
+    // lista, y necesitamos repintar la clase en el nuevo DOM.
+    function engancharLivewire() {
+        if (!window.Livewire?.hook) return false;
+        Livewire.hook("morph.updated", () => {
+            setTimeout(aplicarResaltado, 20);
+        });
+        Livewire.hook("commit", ({ respond }) => {
+            respond(() => setTimeout(aplicarResaltado, 20));
+        });
+        console.log("🔗 Hooks de Livewire registrados");
+        return true;
+    }
+
+    if (!engancharLivewire()) {
+        document.addEventListener("livewire:init", engancharLivewire);
+    }
 
     window.Echo.channel("pedidos")
         .listen(".pedido.confirmado", (event) => {
@@ -186,17 +205,13 @@ function initPedidosRealtime() {
                 `🔥 Nuevo pedido de ${event.cliente_nombre ?? "cliente"}`,
                 "success",
             );
-            // Resaltar en cuanto Livewire refresque la lista
-            marcarPedidoReciente(event.id, 6000);
-            // Aplicar también tras un pequeño delay por si el refresh tarda
-            setTimeout(aplicarResaltado, 600);
+            marcarPedidoReciente(event.id);
         })
         .listen(".pedido.actualizado", (event) => {
             console.log("🔄 pedido.actualizado", event);
             const estado = LABEL[event.estado] ?? event.estado ?? "actualizado";
             toast(`Pedido #${event.id}: ${estado}`, "info");
-            marcarPedidoReciente(event.id, 4000);
-            setTimeout(aplicarResaltado, 600);
+            marcarPedidoReciente(event.id);
         });
 
     console.log("✅ Pedidos realtime listo (canal: pedidos)");
