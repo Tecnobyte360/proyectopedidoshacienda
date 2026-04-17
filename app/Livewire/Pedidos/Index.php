@@ -27,9 +27,33 @@ class Index extends Component
     public int $pedidoIdDespacho = 0;
     public ?int $domiciliarioSeleccionado = null;
 
+    /**
+     * Livewire 3 — formato `echo:CANAL,NOMBRE_EVENTO`.
+     * Cuando el event class usa `broadcastAs('pedido.confirmado')`,
+     * el listener debe llevar el punto de prefijo (`.pedido.confirmado`).
+     */
     protected $listeners = [
-        'pedidoActualizado' => 'refrescar',
+        'echo:pedidos,.pedido.confirmado' => 'onPedidoConfirmado',
+        'echo:pedidos,.pedido.actualizado' => 'onPedidoActualizado',
+        'pedidoActualizado' => 'refrescar',   // evento local legacy
     ];
+
+    public function onPedidoConfirmado($event = null): void
+    {
+        $this->refrescar();
+
+        $nombre = $event['cliente_nombre'] ?? 'cliente';
+        $this->dispatch('nuevo-pedido-en-vivo', cliente: $nombre);
+    }
+
+    public function onPedidoActualizado($event = null): void
+    {
+        $this->refrescar();
+
+        $id = $event['id'] ?? null;
+        $estado = $event['estado'] ?? null;
+        $this->dispatch('pedido-actualizado-en-vivo', id: $id, estado: $estado);
+    }
 
     protected $queryString = [
         'estado' => ['except' => 'todos'],
