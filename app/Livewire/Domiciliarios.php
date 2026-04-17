@@ -3,18 +3,21 @@
 namespace App\Livewire;
 
 use App\Models\Domiciliario;
+use App\Models\ZonaCobertura;
 use Livewire\Component;
 
 class Domiciliarios extends Component
 {
     public ?int $domiciliarioId = null;
 
-    public string $nombre = '';
-    public string $telefono = '';
-    public string $vehiculo = '';
-    public string $placa = '';
-    public string $estado = 'disponible';
-    public bool $activo = true;
+    public string $nombre       = '';
+    public string $pais_codigo  = '+57';
+    public string $telefono     = '';
+    public string $vehiculo     = '';
+    public string $placa        = '';
+    public string $estado       = 'disponible';
+    public bool   $activo       = true;
+    public array  $zonasIds     = [];
 
     public string $buscar = '';
 
@@ -28,12 +31,15 @@ class Domiciliarios extends Component
     protected function rules(): array
     {
         return [
-            'nombre'   => ['required', 'string', 'max:255'],
-            'telefono' => ['nullable', 'string', 'max:30'],
-            'vehiculo' => ['nullable', 'string', 'max:100'],
-            'placa'    => ['nullable', 'string', 'max:20'],
-            'estado'   => ['required', 'in:disponible,ocupado,inactivo'],
-            'activo'   => ['boolean'],
+            'nombre'      => ['required', 'string', 'max:255'],
+            'pais_codigo' => ['required', 'string', 'max:6'],
+            'telefono'    => ['nullable', 'string', 'max:30'],
+            'vehiculo'    => ['nullable', 'string', 'max:100'],
+            'placa'       => ['nullable', 'string', 'max:20'],
+            'estado'      => ['required', 'in:disponible,ocupado,inactivo'],
+            'activo'      => ['boolean'],
+            'zonasIds'    => ['array'],
+            'zonasIds.*'  => ['integer', 'exists:zonas_cobertura,id'],
         ];
     }
 
@@ -51,6 +57,7 @@ class Domiciliarios extends Component
     {
         try {
             $domiciliarios = Domiciliario::query()
+                ->with('zonas')
                 ->when($this->buscar !== '', function ($query) {
                     $query->where(function ($q) {
                         $q->where('nombre', 'like', '%' . $this->buscar . '%')
@@ -64,6 +71,8 @@ class Domiciliarios extends Component
 
             return view('livewire.domiciliarios', [
                 'domiciliarios' => $domiciliarios,
+                'zonasDisponibles' => ZonaCobertura::activas()->orderBy('nombre')->get(),
+                'paises'           => Domiciliario::PAISES,
             ])->layout('layouts.app');
 
         } catch (\Throwable $e) {
@@ -75,7 +84,9 @@ class Domiciliarios extends Component
             ]);
 
             return view('livewire.domiciliarios', [
-                'domiciliarios' => collect(),
+                'domiciliarios'    => collect(),
+                'zonasDisponibles' => collect(),
+                'paises'           => Domiciliario::PAISES,
             ])->layout('layouts.app');
         }
     }
@@ -94,15 +105,17 @@ class Domiciliarios extends Component
     public function abrirModalEditar(int $id): void
     {
         try {
-            $domiciliario = Domiciliario::findOrFail($id);
+            $domiciliario = Domiciliario::with('zonas')->findOrFail($id);
 
             $this->domiciliarioId = $domiciliario->id;
-            $this->nombre = $domiciliario->nombre ?? '';
-            $this->telefono = $domiciliario->telefono ?? '';
-            $this->vehiculo = $domiciliario->vehiculo ?? '';
-            $this->placa = $domiciliario->placa ?? '';
-            $this->estado = $domiciliario->estado ?? 'disponible';
-            $this->activo = (bool) $domiciliario->activo;
+            $this->nombre         = $domiciliario->nombre ?? '';
+            $this->pais_codigo    = $domiciliario->pais_codigo ?? '+57';
+            $this->telefono       = $domiciliario->telefono ?? '';
+            $this->vehiculo       = $domiciliario->vehiculo ?? '';
+            $this->placa          = $domiciliario->placa ?? '';
+            $this->estado         = $domiciliario->estado ?? 'disponible';
+            $this->activo         = (bool) $domiciliario->activo;
+            $this->zonasIds       = $domiciliario->zonas->pluck('id')->toArray();
 
             $this->modoEdicion = true;
             $this->modalAbierto = true;
@@ -133,40 +146,34 @@ class Domiciliarios extends Component
         try {
             $this->validate();
 
+            $datos = [
+                'nombre'      => $this->nombre,
+                'pais_codigo' => $this->pais_codigo,
+                'telefono'    => $this->telefono,
+                'vehiculo'    => $this->vehiculo,
+                'placa'       => $this->placa,
+                'estado'      => $this->estado,
+                'activo'      => $this->activo,
+            ];
+
             if ($this->modoEdicion && $this->domiciliarioId) {
-
                 $domiciliario = Domiciliario::findOrFail($this->domiciliarioId);
-
-                $domiciliario->update([
-                    'nombre'   => $this->nombre,
-                    'telefono' => $this->telefono,
-                    'vehiculo' => $this->vehiculo,
-                    'placa'    => $this->placa,
-                    'estado'   => $this->estado,
-                    'activo'   => $this->activo,
-                ]);
+                $domiciliario->update($datos);
 
                 $this->dispatch('notify', [
                     'type' => 'success',
                     'message' => 'Domiciliario actualizado correctamente.',
                 ]);
-
             } else {
-
-                Domiciliario::create([
-                    'nombre'   => $this->nombre,
-                    'telefono' => $this->telefono,
-                    'vehiculo' => $this->vehiculo,
-                    'placa'    => $this->placa,
-                    'estado'   => $this->estado,
-                    'activo'   => $this->activo,
-                ]);
+                $domiciliario = Domiciliario::create($datos);
 
                 $this->dispatch('notify', [
                     'type' => 'success',
                     'message' => 'Domiciliario creado correctamente.',
                 ]);
             }
+
+            $domiciliario->zonas()->sync($this->zonasIds);
 
             $this->cerrarModal();
 
@@ -219,11 +226,13 @@ class Domiciliarios extends Component
     private function resetFormulario(): void
     {
         $this->domiciliarioId = null;
-        $this->nombre = '';
-        $this->telefono = '';
-        $this->vehiculo = '';
-        $this->placa = '';
-        $this->estado = 'disponible';
-        $this->activo = true;
+        $this->nombre         = '';
+        $this->pais_codigo    = '+57';
+        $this->telefono       = '';
+        $this->vehiculo       = '';
+        $this->placa          = '';
+        $this->estado         = 'disponible';
+        $this->activo         = true;
+        $this->zonasIds       = [];
     }
 }

@@ -24,6 +24,7 @@ class DatabaseSeeder extends Seeder
         // ✅ Aquí llamamos al seeder de sedes
         $this->call([
             SedeSeeder::class,
+            ProductosSeeder::class,
         ]);
     }
 }

@@ -7,7 +7,11 @@ use App\Events\PedidoConfirmado;
 use App\Models\AnsPedido;
 use App\Models\DetallePedido;
 use App\Models\Pedido;
+use App\Models\Producto;
 use App\Models\Sede;
+use App\Models\ZonaCobertura;
+use App\Services\BotCatalogoService;
+use App\Services\ZonaResolverService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -268,7 +272,11 @@ class WhatsappWebhookController extends Controller
 
         $pedidosInfo  = $this->buscarPedidosClienteSQL($from, $message);
         $ansInfo      = $this->construirResumenAns();
-        $systemPrompt = $this->getSystemPrompt($pedidosInfo, $this->infoEmpresa(), $name, $ansInfo);
+
+        // Resolver sede para inyectar catálogo correcto (precios pueden variar por sede)
+        $sedeId = $this->obtenerSedeIdDesdeConexion($connectionId);
+
+        $systemPrompt = $this->getSystemPrompt($pedidosInfo, $this->infoEmpresa(), $name, $ansInfo, $sedeId);
 
         $messages = array_merge(
             [['role' => 'system', 'content' => $systemPrompt]],
@@ -327,6 +335,18 @@ class WhatsappWebhookController extends Controller
 
         return $reply;
     }
+    /**
+     * Obtiene el ID de la sede asociada a la conexión.
+     * Por ahora usa la primera sede activa como fallback. Si más adelante
+     * cada conexión tiene su sede, basta con agregar la lógica aquí.
+     */
+    private function obtenerSedeIdDesdeConexion(?string $connectionId): ?int
+    {
+        return Cache::remember('default_sede_id', now()->addMinutes(10), function () {
+            return Sede::query()->orderBy('id')->value('id');
+        });
+    }
+
     private function obtenerEmpresaIdDesdeConexion(?string $connectionId): ?int
     {
         if (!$connectionId) {
@@ -483,10 +503,13 @@ class WhatsappWebhookController extends Controller
                 $response = Http::withToken(env('OPENAI_API_KEY'))
                     ->timeout(35)
                     ->post('https://api.openai.com/v1/chat/completions', [
-                        'model'       => 'gpt-4o-mini',
-                        'messages'    => $messages,
-                        'temperature' => 0.4,
-                        'max_tokens'  => 700,
+                        'model'             => 'gpt-4o-mini',
+                        'messages'          => $messages,
+                        'temperature'       => 0.85,   // más natural y variable (antes 0.4)
+                        'top_p'             => 0.9,
+                        'frequency_penalty' => 0.4,    // evita repetir palabras
+                        'presence_penalty'  => 0.4,    // empuja a usar variedad
+                        'max_tokens'        => 700,
                         'tools'       => $this->getToolsDefinicion(),
                         'tool_choice' => 'auto',
                     ]);
@@ -977,23 +1000,81 @@ class WhatsappWebhookController extends Controller
         $connectionId = $conexionData['connection_id'];
         $whatsappId = $conexionData['whatsapp_id'];
 
-        $sedeNombre = $orderData['location'] ?? $orderData['neighborhood'] ?? null;
-
-        $sede = $sedeNombre
-            ? Sede::where('nombre', 'LIKE', "%{$sedeNombre}%")->first() ?? Sede::first()
-            : Sede::first();
+        $sede = Sede::find($this->obtenerSedeIdDesdeConexion($connectionId)) ?? Sede::first();
 
         $partes = array_filter([
             $orderData['notes'] ?? null,
             isset($orderData['address']) ? "Dirección: {$orderData['address']}" : null,
             isset($orderData['neighborhood']) ? "Barrio: {$orderData['neighborhood']}" : null,
             isset($orderData['payment_method']) ? "Pago: {$orderData['payment_method']}" : null,
+            isset($orderData['coupon_code']) ? "Cupón: {$orderData['coupon_code']}" : null,
         ]);
 
         $notas = implode(' | ', $partes) ?: 'Solicitud vía WhatsApp';
         $pickupTime = !empty($orderData['pickup_time']) ? $orderData['pickup_time'] : null;
         $telefonoWhatsapp = $this->normalizarTelefono($from);
         $telefonoContacto = $this->normalizarTelefono($orderData['phone'] ?? $from);
+
+        // Resolver dirección y barrio desde la respuesta del bot
+        $direccion = trim((string) ($orderData['address'] ?? ''));
+        $barrio    = trim((string) ($orderData['neighborhood'] ?? ''));
+
+        // Resolver zona de cobertura por nombre del barrio
+        $zonaCobertura = $barrio
+            ? ZonaCobertura::resolverPorBarrio($barrio, $sede?->id)
+            : null;
+
+        // ── Validar y resolver productos contra el catálogo ──
+        /** @var BotCatalogoService $catalogo */
+        $catalogo = app(BotCatalogoService::class);
+
+        $productosValidados = [];
+        $productosNoEncontrados = [];
+        $subtotalProductos = 0;
+
+        foreach (($orderData['products'] ?? []) as $product) {
+            $entrada = $product['code'] ?? $product['name'] ?? '';
+            $producto = $catalogo->resolverProducto($entrada, $sede?->id);
+
+            $cantidad = (float) ($product['quantity'] ?? 1);
+
+            if ($producto) {
+                $precio = $producto->precioParaSede($sede?->id);
+                $sub = $precio * $cantidad;
+                $subtotalProductos += $sub;
+
+                $productosValidados[] = [
+                    'producto_id'     => $producto->id,
+                    'codigo_producto' => $producto->codigo,
+                    'producto'        => $producto->nombre,
+                    'cantidad'        => $cantidad,
+                    'unidad'          => $product['unit'] ?? $producto->unidad,
+                    'precio_unitario' => $precio,
+                    'subtotal'        => $sub,
+                ];
+            } else {
+                Log::warning('⚠️ Producto del bot no está en catálogo', [
+                    'entrada' => $entrada,
+                    'producto_data' => $product,
+                ]);
+                $productosNoEncontrados[] = $entrada;
+
+                // Lo guardamos sin producto_id para no perder el registro
+                $productosValidados[] = [
+                    'producto_id'     => null,
+                    'codigo_producto' => null,
+                    'producto'        => $product['name'] ?? 'Producto desconocido',
+                    'cantidad'        => $cantidad,
+                    'unidad'          => $product['unit'] ?? 'unidad',
+                    'precio_unitario' => 0,
+                    'subtotal'        => 0,
+                ];
+            }
+        }
+
+        // Costo de envío de la zona (0 si no se resolvió)
+        $costoEnvio = $zonaCobertura?->costo_envio ?? 0;
+        $totalCalculado = $subtotalProductos + $costoEnvio;
 
         $pedido = Pedido::create([
             'sede_id'               => $sede?->id,
@@ -1003,9 +1084,12 @@ class WhatsappWebhookController extends Controller
             'estado'                => 'nuevo',
             'fecha_estado'          => now(),
             'observacion_estado'    => 'Pedido creado automáticamente desde WhatsApp',
-            'total'                 => (float) ($orderData['total'] ?? 0),
+            'total'                 => $totalCalculado,
             'notas'                 => $notas,
             'cliente_nombre'        => $orderData['customer_name'] ?? $name,
+            'direccion'             => $direccion ?: null,
+            'barrio'                => $barrio ?: null,
+            'zona_cobertura_id'     => $zonaCobertura?->id,
             'telefono_whatsapp'     => $telefonoWhatsapp,
             'telefono_contacto'     => $telefonoContacto,
             'telefono'              => $telefonoWhatsapp,
@@ -1016,16 +1100,18 @@ class WhatsappWebhookController extends Controller
             'resumen_conversacion'  => $orderData['notes'] ?? '',
         ]);
 
-        foreach (($orderData['products'] ?? []) as $product) {
-            DetallePedido::create([
-                'pedido_id'       => $pedido->id,
-                'producto'        => $product['name'] ?? 'Producto',
-                'cantidad'        => (float) ($product['quantity'] ?? 1),
-                'unidad'          => $product['unit'] ?? 'unidad',
-                'precio_unitario' => (float) ($product['price'] ?? 0),
-                'subtotal'        => (float) ($product['subtotal'] ?? 0),
-            ]);
+        foreach ($productosValidados as $linea) {
+            DetallePedido::create(array_merge(['pedido_id' => $pedido->id], $linea));
         }
+
+        Log::info('📦 PEDIDO REGISTRADO con catálogo', [
+            'pedido_id'       => $pedido->id,
+            'subtotal'        => $subtotalProductos,
+            'envio'           => $costoEnvio,
+            'total'           => $totalCalculado,
+            'zona'            => $zonaCobertura?->nombre,
+            'no_encontrados'  => $productosNoEncontrados,
+        ]);
 
         DB::commit();
 
@@ -1239,96 +1325,121 @@ class WhatsappWebhookController extends Controller
         string $pedidosInfo = '',
         string $infoEmpresa = '',
         string $name = 'Cliente',
-        string $ansInfo = ''
+        string $ansInfo = '',
+        ?int $sedeId = null
     ): string {
+        /** @var BotCatalogoService $catalogo */
+        $catalogo = app(BotCatalogoService::class);
+
+        $catalogoTexto = $catalogo->catalogoFormateado($sedeId);
+        $promosTexto   = $catalogo->promocionesFormateadas($sedeId);
+        $zonasTexto    = $catalogo->zonasFormateadas($sedeId);
+
+        $hora = (int) now()->format('H');
+        $saludoHora = $hora < 12 ? 'buenos días' : ($hora < 19 ? 'buenas tardes' : 'buenas noches');
+
         return <<<PROMPT
-Eres el asesor comercial de Alimentos La Hacienda.
+Eres Sofía, asesora de Alimentos La Hacienda en Bello, Antioquia. Atiendes pedidos por WhatsApp.
 
-Hablas como una persona real del equipo de ventas.
-Nunca digas que eres una inteligencia artificial.
-Si el cliente pregunta si eres humano responde solo:
-"Soy asesor del equipo de Alimentos La Hacienda y estoy aquí para ayudarte con tu pedido."
+# Quién eres
+Eres una persona real, paisa, cálida, ágil y servicial. Hablas natural, como alguien
+del barrio que conoce a sus clientes. NO eres formal ni acartonada. Suenas como una
+amiga que trabaja en el local.
 
-━━━ CONTEXTO ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-{$infoEmpresa}
+Si el cliente pregunta si eres bot o humano, responde:
+"Soy Sofía, del equipo de La Hacienda. Estoy aquí pa ayudarte con tu pedido 😊"
 
-HISTORIAL DEL CLIENTE:
+# Cómo hablas
+- Cercana y natural. Usa expresiones como "claro que sí", "listo", "dale", "a la orden", "con gusto", "perfecto".
+- Frases cortas, como en WhatsApp real. NUNCA párrafos largos.
+- A veces solo 1 línea. Máximo 3-4 líneas por mensaje.
+- Tutea siempre. Nada de "usted" salvo que el cliente lo prefiera.
+- Usa *negrita* WhatsApp solo para precios y datos clave (no abuses).
+- Emojis con criterio: 😊 🔥 🍗 🥩 🚚 🙌 👍 — máximo 1 o 2 por mensaje.
+- Saludas según la hora actual ({$saludoHora}) si es el primer mensaje.
+- Si el cliente es recurrente, salúdalo por su nombre y haz referencia a su última compra.
+- NUNCA repitas la misma frase de bienvenida o cierre. Varía siempre.
+- Reacciona a lo que dice el cliente: "uy qué rica esa pechuga 🍗", "tranquila, te ayudo", "hermana, eso queda divino con...".
+
+# Lo que sabes (úsalo para responder)
+Empresa: {$infoEmpresa}
+
+Cliente actual: {$name}
+Historial de este cliente:
 {$pedidosInfo}
 
+Catálogo disponible HOY (precios oficiales — NO inventes nada fuera de aquí):
+{$catalogoTexto}
+
+Promociones vigentes:
+{$promosTexto}
+
+Zonas donde entregamos:
+{$zonasTexto}
+
+Tiempos para cancelar/adicionar pedidos:
 {$ansInfo}
 
-━━━ ESTILO ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-- Lenguaje natural, cercano pero profesional.
-- Máximo 3 a 5 líneas por mensaje.
-- Sin párrafos largos. Sin sonar robótico.
-- Sin lenguaje técnico. Sin muchas preguntas juntas.
-- Emojis moderados: 😊 👍 🚚
+# Reglas innegociables
+1. NUNCA inventes productos ni precios. Solo los del catálogo de arriba.
+2. Si te piden algo que no tienes, dilo de forma natural y sugiere lo más parecido:
+   "Uy hermana, manejo *muslos* a \$9.800 y *pechuga* a \$14.500 ¿cuál te tinca?"
+3. Si el barrio NO está en zonas de cobertura, dilo claro pero amable:
+   "Mami, a ese barrio aún no llegamos 😔 ¿puedes recoger en la sede?"
+4. Solo llama confirmar_pedido cuando el cliente diga: sí / dale / listo / ok / confirmo.
+5. Necesitas: nombre, dirección, barrio (cubierto), teléfono y ≥1 producto del catálogo.
+6. Nunca confirmes dos veces en la misma conversación.
 
-━━━ FLUJO ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-1. Saluda siempre primero.
-2. Entender qué necesita.
-3. Preguntar barrio.
-4. Validar cobertura.
-5. Construir el pedido.
-6. Pedir datos solo cuando el cliente ya decidió.
-7. Mostrar resumen y pedir confirmación.
-8. Confirmar solo cuando el cliente diga: sí, correcto, listo, ok, confirmado.
+# Cómo presentar el resumen antes de confirmar
+Hazlo tipo charla, no como una factura. Ejemplo natural:
 
-⚠️ REGLA CRÍTICA:
-NUNCA llames la función confirmar_pedido si no hay al menos 1 producto válido.
-NUNCA envíes products vacío.
-ANTES de confirmar debes tener producto, cantidad, barrio, dirección, teléfono y nombre.
+"Listo {$name}, te lo dejo así:
 
-━━━ DATOS NECESARIOS ━━━━━━━━━━━━━━━━━━━━━━━━
-✅ Nombre
-✅ Dirección completa
-✅ Barrio
-✅ Teléfono
-✅ Al menos 1 producto con cantidad
+🍗 *2 lb Pechuga deshuesada* — \$29.000
+🥓 *1 paquete Tocineta* — \$22.000
 
-━━━ CONFIRMACIÓN ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Antes de confirmar SIEMPRE muestra el resumen así:
+📍 Cra 50 #45-12, *Niquía*
+👤 {$name} · 📞 3001234567
 
-"Por favor revisa tu pedido 👇"
+🚚 Envío *gratis* (zona Norte)
+💵 *Total: \$51.000* — pago contra entrega
 
-📦 Pedido
-[productos]
+¿Le damos? 🙌"
 
-📍 Dirección
-[dirección]
+# Few-shot — así suenan tus mensajes (varía SIEMPRE, no copies literal)
 
-👤 Recibe
-[nombre]
+Cliente: "hola buenas"
+Tú: "¡Hola! 👋 Bienvenida a La Hacienda. ¿Qué te provoca hoy?"
 
-📞 Teléfono
-[teléfono]
+Cliente: "qué tienen?"
+Tú: "Hoy tenemos carnes frescas, pollo, cerdo y embutidos 🥩🍗 ¿Buscas algo en especial o te paso la lista?"
 
-💵 Pago
-Contra entrega
+Cliente: "tienen pollo?"
+Tú: "Claro 🍗 Manejo *pechuga deshuesada* a \$14.500/lb, *muslos* a \$9.800/lb y *pollo entero* a \$28.000. ¿Cuál te llevo?"
 
-Termina SIEMPRE con: "¿Todo correcto para confirmar?"
+Cliente: "1 kilo pechuga"
+Tú: "Perfecto, *2 libras de pechuga* serían \$29.000 (ese kilo manejémoslo en libras 😉). ¿Para qué barrio?"
 
-━━━ FUNCIÓN confirmar_pedido ━━━━━━━━━━━━━━━━━
-Llama a la función confirmar_pedido ÚNICAMENTE cuando:
-- El cliente confirmó con sí / correcto / listo / ok / confirmado
-- Ya tienes: nombre, dirección, barrio, teléfono y al menos un producto válido
+Cliente: "Niquia"
+Tú: "Genial, Niquía nos queda cerquita y el envío te sale *gratis* 🚚 ¿Algo más o cerramos pedido?"
 
-Ejemplo válido de products:
-[
-  {
-    "name": "Producto",
-    "quantity": 2,
-    "unit": "libras"
-  }
-]
+Cliente: "no, ya"
+Tú: "Listo. ¿Me das tu nombre, dirección y teléfono pa cuadrar la entrega?"
 
-NO la llames si falta algún dato.
-NO inventes datos.
-NO la llames más de una vez por conversación.
+Cliente: "Andrés, calle 50 #20-15, 3001234567"
+Tú: [muestra resumen tipo el ejemplo de arriba con todos los datos]
 
-━━━ ANS ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-- Si el cliente pregunta por cancelar o adicionar, respeta la validación que ya hizo el sistema.
-- No prometas cancelar o adicionar si el tiempo ANS ya expiró.
+Cliente: "dale, confirmo"
+Tú: [llamas confirmar_pedido]
+
+Cliente: "tienen camarones?"
+Tú: "Mira, camarones no manejo 😅 pero si quieres algo del mar te queda mejor por otro lado. Lo que sí tengo y vuela es *carne molida* y *pechuga* — ¿te muestro?"
+
+Cliente: "vivo en Caldas"
+Tú: "Uy hermano, hasta Caldas aún no llegamos 😔 pero si pasas por el local en Bello te lo tenemos listo. ¿Te late?"
+
+Cliente: "muy caro"
+Tú: "Te entiendo 🙏 Si quieres algo más económico, los *muslos a \$9.800/lb* salen muy bien y son riquísimos para sudado. ¿Probamos con eso?"
 PROMPT;
     }
 
@@ -1339,33 +1450,32 @@ PROMPT;
                 'type'     => 'function',
                 'function' => [
                     'name'        => 'confirmar_pedido',
-                    'description' => 'Confirma y registra el pedido. Llama SOLO cuando el cliente aceptó explícitamente y tienes todos los datos requeridos.',
+                    'description' => 'Registra el pedido en el sistema. Llama SOLO cuando el cliente aceptó explícitamente, los productos son del catálogo y el barrio está cubierto.',
                     'parameters'  => [
                         'type'       => 'object',
                         'properties' => [
                             'products' => [
                                 'type'        => 'array',
-                                'description' => 'Productos del pedido',
+                                'description' => 'Productos del pedido — DEBEN ser del catálogo. Usa el código SKU si lo conoces.',
                                 'items'       => [
                                     'type'       => 'object',
                                     'properties' => [
-                                        'name'     => ['type' => 'string', 'description' => 'Nombre del producto'],
-                                        'quantity' => ['type' => 'number', 'description' => 'Cantidad'],
-                                        'unit'     => ['type' => 'string', 'description' => 'Unidad (kg, libra, unidad, etc.)'],
-                                        'price'    => ['type' => 'number', 'description' => 'Precio unitario, 0 si no se conoce'],
-                                        'subtotal' => ['type' => 'number', 'description' => 'Subtotal, 0 si no se conoce'],
+                                        'code'     => ['type' => 'string', 'description' => 'Código SKU del producto (recomendado, ej: POL-PEC).'],
+                                        'name'     => ['type' => 'string', 'description' => 'Nombre exacto del producto en el catálogo.'],
+                                        'quantity' => ['type' => 'number', 'description' => 'Cantidad numérica.'],
+                                        'unit'     => ['type' => 'string', 'description' => 'Unidad del catálogo (libra, kg, unidad, paquete...).'],
                                     ],
                                     'required' => ['name', 'quantity', 'unit'],
                                 ],
                             ],
                             'customer_name'  => ['type' => 'string', 'description' => 'Nombre completo del cliente'],
                             'phone'          => ['type' => 'string', 'description' => 'Teléfono del cliente'],
-                            'address'        => ['type' => 'string', 'description' => 'Dirección de entrega'],
-                            'neighborhood'   => ['type' => 'string', 'description' => 'Barrio'],
+                            'address'        => ['type' => 'string', 'description' => 'Dirección de entrega exacta'],
+                            'neighborhood'   => ['type' => 'string', 'description' => 'Barrio (debe estar en alguna zona de cobertura del catálogo)'],
                             'location'       => ['type' => 'string', 'description' => 'Ciudad o zona'],
-                            'payment_method' => ['type' => 'string', 'description' => 'Método de pago'],
+                            'payment_method' => ['type' => 'string', 'description' => 'Método de pago (default: contra entrega)'],
                             'pickup_time'    => ['type' => 'string', 'description' => 'Hora estimada de entrega'],
-                            'total'          => ['type' => 'number', 'description' => 'Total del pedido'],
+                            'coupon_code'    => ['type' => 'string', 'description' => 'Código de cupón si el cliente lo mencionó'],
                             'notes'          => ['type' => 'string', 'description' => 'Notas adicionales del pedido'],
                         ],
                         'required' => ['products', 'customer_name', 'phone', 'address', 'neighborhood'],

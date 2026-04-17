@@ -46,6 +46,14 @@ class Pedido extends Model
         'fecha_entregado',
         'fecha_cancelado',
         'observacion_estado',
+        'direccion',
+        'barrio',
+        'lat',
+        'lng',
+        'zona_cobertura_id',
+        'domiciliario_id',
+        'fecha_asignacion_domiciliario',
+        'fecha_salida_domiciliario',
     ];
 
     protected $casts = [
@@ -57,6 +65,8 @@ class Pedido extends Model
         'empresa_id'      => 'integer',
         'connection_id'   => 'integer',
         'whatsapp_id'     => 'integer',
+        'lat'             => 'float',
+        'lng'             => 'float',
     ];
 
     protected static function booted()
@@ -151,7 +161,12 @@ class Pedido extends Model
 
     $this->load(['sede', 'detalles', 'historialEstados']);
 
-broadcast(new PedidoActualizado($this, 'estado_actualizado'));
+    // Broadcast protegido: no debe romper la operación si Reverb no está corriendo
+    try {
+        broadcast(new PedidoActualizado($this, 'estado_actualizado'));
+    } catch (\Throwable $e) {
+        \Log::warning('Broadcast PedidoActualizado falló (Reverb caído?): ' . $e->getMessage());
+    }
 }
 
     public function registrarHistorial(
@@ -570,5 +585,84 @@ broadcast(new PedidoActualizado($this, 'estado_actualizado'));
      public function domiciliario()
     {
         return $this->belongsTo(Domiciliario::class);
+    }
+
+    public function zonaCobertura()
+    {
+        return $this->belongsTo(ZonaCobertura::class, 'zona_cobertura_id');
+    }
+
+    /**
+     * Calcula el semáforo del pedido según el tiempo transcurrido
+     * en el estado actual versus el ANS configurado.
+     *
+     * Retorna ['color', 'minutos_transcurridos', 'minutos_objetivo',
+     *          'minutos_alerta', 'minutos_critico', 'porcentaje', 'mensaje', 'ans_nombre']
+     * Color: verde | amarillo | rojo | gris (sin ANS o estado final)
+     */
+    public function semaforoEstado(): array
+    {
+        $estado = trim((string) $this->estado);
+
+        // Estados finales: gris fijo
+        if (in_array($estado, [self::ESTADO_ENTREGADO, self::ESTADO_CANCELADO], true)) {
+            return [
+                'color'                 => 'gris',
+                'minutos_transcurridos' => 0,
+                'minutos_objetivo'      => 0,
+                'minutos_alerta'        => 0,
+                'minutos_critico'       => 0,
+                'porcentaje'            => 100,
+                'mensaje'               => $estado === self::ESTADO_ENTREGADO ? 'Finalizado' : 'Cancelado',
+                'ans_nombre'            => null,
+            ];
+        }
+
+        // Mapear estado legacy 'confirmado' a 'nuevo'
+        $estadoBuscar = $estado === 'confirmado' ? self::ESTADO_NUEVO : $estado;
+
+        $ans = AnsTiempoPedido::paraEstado($estadoBuscar);
+
+        $referencia = $this->fecha_estado ?? $this->created_at ?? now();
+        $minutos    = (int) $referencia->diffInMinutes(now());
+
+        if (!$ans) {
+            return [
+                'color'                 => 'gris',
+                'minutos_transcurridos' => $minutos,
+                'minutos_objetivo'      => 0,
+                'minutos_alerta'        => 0,
+                'minutos_critico'       => 0,
+                'porcentaje'            => 0,
+                'mensaje'               => "{$minutos} min en estado",
+                'ans_nombre'            => null,
+            ];
+        }
+
+        if ($minutos >= $ans->minutos_critico) {
+            $color   = 'rojo';
+            $mensaje = "Vencido (+{$minutos} min)";
+        } elseif ($minutos >= $ans->minutos_alerta) {
+            $color   = 'amarillo';
+            $mensaje = "Atención: {$minutos} min";
+        } else {
+            $color   = 'verde';
+            $mensaje = "{$minutos} min";
+        }
+
+        $porcentaje = $ans->minutos_critico > 0
+            ? min(100, (int) round(($minutos / $ans->minutos_critico) * 100))
+            : 0;
+
+        return [
+            'color'                 => $color,
+            'minutos_transcurridos' => $minutos,
+            'minutos_objetivo'      => (int) $ans->minutos_objetivo,
+            'minutos_alerta'        => (int) $ans->minutos_alerta,
+            'minutos_critico'       => (int) $ans->minutos_critico,
+            'porcentaje'            => $porcentaje,
+            'mensaje'               => $mensaje,
+            'ans_nombre'            => $ans->nombre,
+        ];
     }
 }

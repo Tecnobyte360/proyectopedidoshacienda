@@ -4,16 +4,17 @@ namespace App\Livewire\Pedidos;
 
 use App\Models\Domiciliario;
 use App\Models\Pedido;
+use App\Models\ZonaCobertura;
 use Illuminate\Support\Facades\Auth;
+use Livewire\Attributes\Computed;
 use Livewire\Component;
 
 class Index extends Component
 {
-    public $pedidos;
     public $domiciliarios = [];
 
     public string $estado = 'todos';
-    public string $zona   = 'todas';
+    public string $zona   = 'todas';   // 'todas' | id de zona | 'sin_zona'
 
     // Modal token entrega
     public bool   $modalTokenAbierto  = false;
@@ -27,7 +28,7 @@ class Index extends Component
     public ?int $domiciliarioSeleccionado = null;
 
     protected $listeners = [
-        'pedidoActualizado' => 'cargarPedidos',
+        'pedidoActualizado' => 'refrescar',
     ];
 
     protected $queryString = [
@@ -35,25 +36,10 @@ class Index extends Component
         'zona'   => ['except' => 'todas'],
     ];
 
-    public function mount(): void
+    public function refrescar(): void
     {
-        $this->cargarPedidos();
-    }
-
-    public function cargarPedidos(): void
-    {
-        try {
-            $this->pedidos = Pedido::with(['detalles', 'sede', 'domiciliario'])->latest()->get();
-        } catch (\Throwable $e) {
-            report($e);
-
-            $this->pedidos = collect();
-
-            $this->dispatch('notify', [
-                'type' => 'error',
-                'message' => 'No se pudieron cargar los pedidos.',
-            ]);
-        }
+        // Limpia el cache de la propiedad computed para forzar recarga
+        unset($this->pedidos);
     }
 
     public function cambiarTab(string $estado): void
@@ -63,19 +49,42 @@ class Index extends Component
 
     public function updatedZona(): void {}
 
-    public function getPedidosFiltradosProperty()
+    #[Computed]
+    public function pedidos()
     {
-        $pedidos = $this->pedidos ?? collect();
+        try {
+            return Pedido::with(['detalles', 'sede', 'domiciliario', 'zonaCobertura'])
+                ->latest()
+                ->get();
+        } catch (\Throwable $e) {
+            report($e);
+            return collect();
+        }
+    }
+
+    #[Computed]
+    public function pedidosFiltrados()
+    {
+        $pedidos = $this->pedidos;
 
         if ($this->estado !== 'todos') {
-            $pedidos = $pedidos->where('estado', $this->estado);
+            // 'confirmado' es estado legacy → se trata como 'nuevo'
+            $estadosBuscar = $this->estado === Pedido::ESTADO_NUEVO
+                ? [Pedido::ESTADO_NUEVO, 'confirmado']
+                : [$this->estado];
+
+            $pedidos = $pedidos->whereIn('estado', $estadosBuscar);
         }
 
         if ($this->zona !== 'todas') {
-            $pedidos = $pedidos->where('zona', $this->zona);
+            if ($this->zona === 'sin_zona') {
+                $pedidos = $pedidos->whereNull('zona_cobertura_id');
+            } else {
+                $pedidos = $pedidos->where('zona_cobertura_id', (int) $this->zona);
+            }
         }
 
-        return $pedidos;
+        return $pedidos->values();
     }
 
     public function marcarEnPreparacion(int $pedidoId): void
@@ -115,7 +124,7 @@ class Index extends Component
                 $usuario?->id
             );
 
-            $this->cargarPedidos();
+            $this->refrescar();
 
             $this->dispatch('notify', [
                 'type' => 'success',
@@ -239,7 +248,7 @@ class Index extends Component
             $pedido->notificarTokenEntrega($token);
 
             $this->cerrarModalDespacho();
-            $this->cargarPedidos();
+            $this->refrescar();
 
             $this->dispatch('notify', [
                 'type'    => 'success',
@@ -310,7 +319,7 @@ class Index extends Component
             }
 
             $this->cerrarModalEntrega();
-            $this->cargarPedidos();
+            $this->refrescar();
 
             $this->dispatch('notify', [
                 'type' => 'success',
@@ -355,7 +364,7 @@ class Index extends Component
                 $pedido->domiciliario->save();
             }
 
-            $this->cargarPedidos();
+            $this->refrescar();
 
             $this->dispatch('notify', [
                 'type' => 'success',
@@ -373,9 +382,9 @@ class Index extends Component
 
     public function render()
     {
+        // pedidos y pedidosFiltrados son #[Computed] → accesibles directamente en la vista
         return view('livewire.pedidos.index', [
-            'pedidos'          => $this->pedidos,
-            'pedidosFiltrados' => $this->pedidosFiltrados,
+            'zonasDisponibles' => ZonaCobertura::activas()->orderBy('nombre')->get(),
         ])->layout('layouts.app');
     }
 }

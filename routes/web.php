@@ -5,11 +5,28 @@ use Illuminate\Support\Str;
 use App\Events\PedidoConfirmado;
 use App\Livewire\Pedidos\Index as PedidosIndex;
 use App\Livewire\Pedidos\SeguimientoPedido;
+use App\Livewire\Productos\Index as ProductosIndex;
+use App\Livewire\Categorias\Index as CategoriasIndex;
+use App\Livewire\Promociones\Index as PromocionesIndex;
+use App\Livewire\Domiciliarios as DomiciliariosIndex;
+use App\Livewire\Reportes\Index as ReportesIndex;
+use App\Livewire\Zonas\Index as ZonasIndex;
+use App\Livewire\Despachos\Index as DespachosIndex;
+use App\Livewire\Ans\Index as AnsIndex;
 use App\Models\Sede;
 use App\Models\Pedido;
 use App\Models\DetallePedido;
 
 Route::get('/pedidos', PedidosIndex::class)->name('pedidos.index');
+
+Route::get('/productos',     ProductosIndex::class)->name('productos.index');
+Route::get('/categorias',    CategoriasIndex::class)->name('categorias.index');
+Route::get('/promociones',   PromocionesIndex::class)->name('promociones.index');
+Route::get('/domiciliarios', DomiciliariosIndex::class)->name('domiciliarios.index');
+Route::get('/zonas',         ZonasIndex::class)->name('zonas.index');
+Route::get('/despachos',     DespachosIndex::class)->name('despachos.index');
+Route::get('/reportes',      ReportesIndex::class)->name('reportes.index');
+Route::get('/ans-tiempos',   AnsIndex::class)->name('ans.index');
 
 Route::get('/seguimiento-pedido/{codigo}', SeguimientoPedido::class)
     ->name('pedidos.seguimiento');
