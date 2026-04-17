@@ -189,7 +189,8 @@
                         ->implode('');
                 @endphp
 
-                <div class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden
+                <div data-pedido-id="{{ $pedido->id }}"
+                     class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden
                             {{ $pedido->estado === \App\Models\Pedido::ESTADO_CANCELADO ? 'opacity-75' : '' }}">
 
                     {{-- Header del card --}}
@@ -335,7 +336,8 @@
                                     ->implode('');
                             @endphp
 
-                            <tr class="transition hover:bg-slate-50 {{ $pedido->estado === \App\Models\Pedido::ESTADO_CANCELADO ? 'opacity-75' : '' }}">
+                            <tr data-pedido-id="{{ $pedido->id }}"
+                                class="transition hover:bg-slate-50 {{ $pedido->estado === \App\Models\Pedido::ESTADO_CANCELADO ? 'opacity-75' : '' }}">
 
                                 {{-- Pedido --}}
                                 <td class="px-3 py-3.5 align-middle">

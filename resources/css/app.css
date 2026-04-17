@@ -44,3 +44,41 @@
     border-radius: 9999px;
     background: linear-gradient(to bottom, #f97316, #fbbf24);
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   HIGHLIGHT de pedidos recién llegados en tiempo real.
+   Se aplica a elementos con data-pedido-id incluidos en el Set de recientes.
+   Funciona tanto en <tr> de la tabla como en <div> de cards móviles.
+   ───────────────────────────────────────────────────────────────────────── */
+@keyframes newOrderHighlight {
+    0% {
+        background-color: rgba(251, 191, 36, 0.35);
+        box-shadow: 0 0 0 3px rgba(251, 146, 60, 0.55);
+        transform: scale(1);
+    }
+    50% {
+        background-color: rgba(253, 224, 71, 0.20);
+        box-shadow: 0 0 0 2px rgba(251, 146, 60, 0.35);
+        transform: scale(1.005);
+    }
+    100% {
+        background-color: transparent;
+        box-shadow: 0 0 0 0 transparent;
+        transform: scale(1);
+    }
+}
+
+[data-pedido-id].new-order-highlight {
+    animation: newOrderHighlight 1.5s ease-in-out 3;
+    position: relative;
+    z-index: 1;
+}
+
+tr[data-pedido-id].new-order-highlight td {
+    background-color: rgba(251, 191, 36, 0.10);
+}
+
+div[data-pedido-id].new-order-highlight {
+    border-color: #f59e0b !important;
+    border-width: 2px;
+}

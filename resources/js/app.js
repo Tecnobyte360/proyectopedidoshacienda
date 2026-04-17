@@ -140,6 +140,44 @@ function initPedidosRealtime() {
         cancelado: "Cancelado",
     };
 
+    // ── Resaltado de pedidos recién llegados ──────────────────────────────────
+    // Mantenemos un Set con los IDs recientes (últimos 6 segundos). Cuando
+    // Livewire re-renderiza la lista, volvemos a aplicar la clase a cada
+    // elemento que tenga `data-pedido-id` coincidente.
+    const pedidosRecientes = new Set();
+
+    function marcarPedidoReciente(id, duracionMs = 6000) {
+        if (!id) return;
+        pedidosRecientes.add(id);
+        aplicarResaltado();
+        setTimeout(() => {
+            pedidosRecientes.delete(id);
+            aplicarResaltado();
+        }, duracionMs);
+    }
+
+    function aplicarResaltado() {
+        document.querySelectorAll("[data-pedido-id]").forEach((el) => {
+            const id = parseInt(el.dataset.pedidoId, 10);
+            if (pedidosRecientes.has(id)) {
+                el.classList.add("new-order-highlight");
+            } else {
+                el.classList.remove("new-order-highlight");
+            }
+        });
+    }
+
+    // Re-aplicar tras cada morph/update de Livewire (la lista puede haberse
+    // re-renderizado por el listener de echo en el componente PHP).
+    document.addEventListener("livewire:init", () => {
+        if (window.Livewire?.hook) {
+            Livewire.hook("morph.updated", () => {
+                // Esperamos un tick para que el DOM termine de pintarse.
+                setTimeout(aplicarResaltado, 30);
+            });
+        }
+    });
+
     window.Echo.channel("pedidos")
         .listen(".pedido.confirmado", (event) => {
             console.log("📦 pedido.confirmado", event);
@@ -148,11 +186,17 @@ function initPedidosRealtime() {
                 `🔥 Nuevo pedido de ${event.cliente_nombre ?? "cliente"}`,
                 "success",
             );
+            // Resaltar en cuanto Livewire refresque la lista
+            marcarPedidoReciente(event.id, 6000);
+            // Aplicar también tras un pequeño delay por si el refresh tarda
+            setTimeout(aplicarResaltado, 600);
         })
         .listen(".pedido.actualizado", (event) => {
             console.log("🔄 pedido.actualizado", event);
             const estado = LABEL[event.estado] ?? event.estado ?? "actualizado";
             toast(`Pedido #${event.id}: ${estado}`, "info");
+            marcarPedidoReciente(event.id, 4000);
+            setTimeout(aplicarResaltado, 600);
         });
 
     console.log("✅ Pedidos realtime listo (canal: pedidos)");
