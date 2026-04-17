@@ -20,6 +20,45 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @livewireStyles
 
+    {{-- Store global Alpine — registrado en el <head> ANTES de cualquier script Livewire/Alpine.
+         Esto garantiza que el listener de 'alpine:init' esté presente cuando Alpine arranque. --}}
+    <script>
+        (function () {
+            const registrarStore = () => {
+                if (!window.Alpine) return false;
+                if (Alpine.store && Alpine.store('ui')) return true;
+                if (Alpine.store) {
+                    Alpine.store('ui', {
+                        fullscreen: false,
+                        toggle() { this.fullscreen = !this.fullscreen; },
+                    });
+                    return true;
+                }
+                return false;
+            };
+
+            // 1) Antes de que Alpine arranque
+            document.addEventListener('alpine:init', registrarStore);
+
+            // 2) Después de que Alpine ya arrancó (fallback)
+            document.addEventListener('alpine:initialized', registrarStore);
+
+            // 3) Reintento por si el evento ya pasó cuando este script corrió
+            const intentar = () => { if (!registrarStore()) setTimeout(intentar, 50); };
+            if (document.readyState !== 'loading') intentar();
+            else document.addEventListener('DOMContentLoaded', intentar);
+
+            // ESC sale del fullscreen
+            window.addEventListener('keydown', (e) => {
+                try {
+                    if (e.key === 'Escape' && window.Alpine?.store('ui')?.fullscreen) {
+                        window.Alpine.store('ui').fullscreen = false;
+                    }
+                } catch (_) {}
+            });
+        })();
+    </script>
+
     <style>
         html,
         body {
@@ -34,26 +73,26 @@
 <body class="bg-[#f7f7f9] text-slate-800 antialiased">
 
     {{-- SIDEBAR --}}
-    <div x-data x-show="!$store.ui.fullscreen" x-transition.opacity.duration.200ms>
+    <div x-data x-show="!($store.ui?.fullscreen)" x-transition.opacity.duration.200ms>
         <livewire:layouts.sidebar />
     </div>
 
     {{-- TOPBAR --}}
-    <div x-data x-show="!$store.ui.fullscreen" x-transition.opacity.duration.200ms>
+    <div x-data x-show="!($store.ui?.fullscreen)" x-transition.opacity.duration.200ms>
         <livewire:layouts.topbar />
     </div>
 
     {{-- CONTENIDO --}}
     <main x-data class="min-h-screen transition-all duration-300"
-          :class="$store.ui.fullscreen ? 'pt-0 pl-0' : 'pt-20 md:pl-64'">
+          :class="$store.ui?.fullscreen ? 'pt-0 pl-0' : 'pt-20 md:pl-64'">
         {{ $slot }}
     </main>
 
     {{-- BOTÓN FLOTANTE PARA SALIR DE FULLSCREEN --}}
     <button x-data
-            x-show="$store.ui.fullscreen"
+            x-show="$store.ui?.fullscreen"
             x-transition
-            @click="$store.ui.fullscreen = false"
+            @click="$store.ui && ($store.ui.fullscreen = false)"
             title="Salir de pantalla completa (ESC)"
             class="fixed top-4 right-4 z-[60] flex h-11 w-11 items-center justify-center rounded-full bg-slate-900 text-white shadow-2xl hover:bg-slate-700 transition"
             style="display: none;">
@@ -94,20 +133,6 @@
     {{-- Alpine ya viene incluido en Livewire 4 — NO cargar el CDN aparte (duplicaría y rompería wire:click) --}}
 
     <script>
-        // Store global de UI (modo pantalla completa)
-        document.addEventListener('alpine:init', () => {
-            Alpine.store('ui', {
-                fullscreen: false,
-                toggle() { this.fullscreen = !this.fullscreen; },
-            });
-        });
-
-        // ESC sale del modo fullscreen
-        window.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && window.Alpine?.store('ui')?.fullscreen) {
-                window.Alpine.store('ui').fullscreen = false;
-            }
-        });
 
         let audioUnlocked = false;
 
