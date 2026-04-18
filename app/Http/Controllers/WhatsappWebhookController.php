@@ -1376,14 +1376,27 @@ class WhatsappWebhookController extends Controller
             return $promptService->renderizar($config->system_prompt, $contexto);
         }
 
-        // Fallback: prompt hardcoded (lo que ya teníamos)
-        /** @var BotCatalogoService $catalogo */
+        // Sino, usar la plantilla por defecto (también renderizando variables)
+        return $promptService->renderizar(BotPromptService::plantillaPorDefecto(), $contexto);
+    }
+
+    /**
+     * @deprecated — código legacy del prompt hardcoded. NO se llama, queda solo
+     * por compatibilidad si algún test viejo lo invoca. El prompt real lo construye
+     * BotPromptService::plantillaPorDefecto() o el editor del usuario.
+     */
+    private function _getSystemPromptHardcodedDEPRECATED(): string
+    {
+        $config = \App\Models\ConfiguracionBot::actual();
         $catalogo = app(BotCatalogoService::class);
-
-        $catalogoTexto = $catalogo->catalogoFormateado($sedeId);
-        $promosTexto   = $catalogo->promocionesFormateadas($sedeId);
-        $zonasTexto    = $catalogo->zonasFormateadas($sedeId);
-
+        $catalogoTexto = '';
+        $promosTexto   = '';
+        $zonasTexto    = '';
+        $name = '';
+        $sedeId = null;
+        $infoEmpresa = '';
+        $pedidosInfo = '';
+        $ansInfo = '';
         $nombreAsesora = $config->nombre_asesora ?: 'Sofía';
 
         // Nota sobre imágenes (solo si está activo)
