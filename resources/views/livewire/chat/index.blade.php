@@ -1,6 +1,17 @@
 <div class="h-[calc(100vh-5rem)] flex flex-col lg:flex-row bg-slate-100"
      wire:poll.10s="refrescar">
 
+    @php $cfgBot = \App\Models\ConfiguracionBot::actual(); @endphp
+
+    {{-- Banner de advertencia si el bot está apagado globalmente --}}
+    @if(!$cfgBot->activo)
+        <div class="absolute top-20 left-0 right-0 z-20 bg-rose-500 text-white px-4 py-2 text-center text-xs font-bold shadow lg:left-64">
+            ⚠️ El bot está APAGADO en {{ \Illuminate\Support\Facades\Route::has('configuracion.bot') ? '' : '' }}
+            <a href="{{ route('configuracion.bot') }}" class="underline">Configuración del bot</a>
+            — los clientes escriben pero la IA no responde.
+        </div>
+    @endif
+
     {{-- ╔═══ COLUMNA IZQUIERDA: lista de conversaciones ═══╗ --}}
     <aside class="w-full lg:w-96 flex-shrink-0 bg-white border-r border-slate-200 flex flex-col">
 

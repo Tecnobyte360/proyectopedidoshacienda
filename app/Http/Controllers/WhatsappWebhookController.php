@@ -257,6 +257,26 @@ class WhatsappWebhookController extends Controller
 
     private function procesarMensaje(string $from, string $name, string $message, ?string $connectionId): string
     {
+        // ── CAPA -2: Kill switch global del bot ──────────────────────────────
+        // Si el operador apagó el bot desde /configuracion/bot, NO responde a nadie.
+        // Aún persistimos los mensajes del cliente en BD para que aparezcan en /chat
+        // y el operador pueda atenderlos manualmente.
+        $configBot = \App\Models\ConfiguracionBot::actual();
+        if (!$configBot->activo) {
+            try {
+                $telefonoNorm = $this->normalizarTelefono($from);
+                $cliente      = \App\Models\Cliente::encontrarOCrearPorTelefono($telefonoNorm, $name);
+                $convService  = app(\App\Services\ConversacionService::class);
+                $conv         = $convService->obtenerOCrearActiva($telefonoNorm, $cliente->id);
+                $convService->agregarMensaje($conv, \App\Models\MensajeWhatsapp::ROL_USER, $message);
+            } catch (\Throwable $e) {
+                Log::warning('No se persistió mensaje (bot OFF): ' . $e->getMessage());
+            }
+
+            Log::info('🔌 Bot DESACTIVADO globalmente — sin respuesta', ['phone' => $from]);
+            return '';   // sin respuesta
+        }
+
         // ── CAPA -1: Modo intervención humana ─────────────────────────────────
         // Si un operador tomó control de la conversación, el bot NO responde.
         // El mensaje sí se persiste (ya se hace en procesarConIA), pero no se
