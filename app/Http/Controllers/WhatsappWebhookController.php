@@ -491,7 +491,7 @@ class WhatsappWebhookController extends Controller
             Log::info('🗺️ Tool call validar_cobertura', compact('from', 'direccion', 'barrio', 'ciudad'));
 
             $sedeId    = $this->obtenerSedeIdDesdeConexion($connectionId);
-            $resultado = $this->validarCoberturaDireccion($direccion, $barrio, $ciudad, $sedeId);
+            $resultado = $this->validarCoberturaDireccion($direccion, $barrio, $ciudad, $sedeId, $from);
 
             // Respuesta de la tool para OpenAI — formato segunda llamada
             $toolResponseMessages = array_merge(
@@ -1305,7 +1305,8 @@ class WhatsappWebhookController extends Controller
       string $direccion,
       ?string $barrio = null,
       ?string $ciudad = 'Bello',
-      ?int $sedeId = null
+      ?int $sedeId = null,
+      ?string $telefonoCliente = null
   ): array {
       $zonaResolver = app(ZonaResolverService::class);
 
@@ -1385,6 +1386,25 @@ class WhatsappWebhookController extends Controller
           $mensajeBase .= " Pedido mínimo para domicilio en esta zona: *{$pedidoMinimoStr}*.";
       }
 
+      // 🎁 Si el cliente tiene beneficio vigente (por cumpleaños, etc),
+      // se lo mencionamos para que el bot lo sepa y no olvide honrarlo.
+      $beneficioInfo = null;
+      if (!empty($telefonoCliente)) {
+          $telNorm = $this->normalizarTelefono($telefonoCliente);
+          $clientePosible = Cliente::where('telefono_normalizado', $telNorm)->first();
+          if ($clientePosible) {
+              $ben = $clientePosible->beneficioVigente(\App\Models\BeneficioCliente::TIPO_ENVIO_GRATIS);
+              if ($ben) {
+                  $beneficioInfo = [
+                      'tipo'          => 'envio_gratis',
+                      'origen'        => $ben->origen,
+                      'vigente_hasta' => $ben->vigente_hasta?->format('d/m/Y'),
+                  ];
+                  $mensajeBase .= " 🎁 *Beneficio activo*: envío gratis por {$ben->origen} (vigente hasta {$ben->vigente_hasta?->format('d/m')}).";
+              }
+          }
+      }
+
       // ── Sede más cercana (si tenemos coordenadas del cliente) ─────────
       $sedeCercana = null;
       $sedeCercanaNombre = null;
@@ -1413,6 +1433,7 @@ class WhatsappWebhookController extends Controller
           'sede_sugerida'      => $sedeCercanaNombre,
           'sede_sugerida_id'   => $sedeCercana?->id,
           'distancia_km'       => $distanciaKm ? round($distanciaKm, 2) : null,
+          'beneficio_activo'   => $beneficioInfo,
           'mensaje_sugerido'   => $mensajeBase,
           'metodo_usado'       => $metodo,
       ];
@@ -1468,7 +1489,8 @@ class WhatsappWebhookController extends Controller
             $direccion,
             $barrio,
             'Bello',
-            $sede?->id
+            $sede?->id,
+            $from
         );
 
         $zonaCobertura = null;
@@ -1567,6 +1589,23 @@ class WhatsappWebhookController extends Controller
 
         // Costo de envío de la zona (0 si no se resolvió)
         $costoEnvio = $zonaCobertura?->costo_envio ?? 0;
+
+        // 🎁 ¿Tiene beneficio de envío gratis vigente? (ej. por cumpleaños)
+        $beneficioAplicado = null;
+        if ($zonaCobertura && (float) $costoEnvio > 0) {
+            $beneficioAplicado = $cliente->beneficioVigente(
+                \App\Models\BeneficioCliente::TIPO_ENVIO_GRATIS
+            );
+            if ($beneficioAplicado) {
+                Log::info('🎁 Beneficio envío gratis aplicado', [
+                    'cliente_id'   => $cliente->id,
+                    'beneficio_id' => $beneficioAplicado->id,
+                    'ahorro'       => $costoEnvio,
+                ]);
+                $costoEnvio = 0;
+            }
+        }
+
         $totalCalculado = $subtotalProductos + $costoEnvio;
 
         // ── VALIDACIÓN: pedido mínimo por zona ──────────────────────────────
@@ -1647,8 +1686,17 @@ class WhatsappWebhookController extends Controller
             'envio'           => $costoEnvio,
             'total'           => $totalCalculado,
             'zona'            => $zonaCobertura?->nombre,
+            'beneficio'       => $beneficioAplicado?->id,
             'no_encontrados'  => $productosNoEncontrados,
         ]);
+
+        // Marcar beneficio como usado si fue aplicado
+        if ($beneficioAplicado) {
+            $beneficioAplicado->update([
+                'usado_at'  => now(),
+                'pedido_id' => $pedido->id,
+            ]);
+        }
 
         DB::commit();
 

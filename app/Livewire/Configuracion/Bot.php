@@ -42,7 +42,10 @@ class Bot extends Component
     public array  $cumpleanos_dias_semana_arr    = [true, true, true, true, true, true, true];
 
     // Conexión de WhatsApp por defecto para envíos salientes (cumpleaños, etc)
-    public ?int   $connection_id_default         = null;
+    public ?int   $connection_id_default                  = null;
+
+    // Días que dura el beneficio de envío gratis después de la felicitación
+    public int    $cumpleanos_dias_vigencia_beneficio     = 3;
 
     public array $modelosDisponibles = [
         'gpt-4o-mini' => 'GPT-4o mini (rápido, económico)',
@@ -90,6 +93,8 @@ class Bot extends Component
         $this->connection_id_default = $cfg->connection_id_default
             ? (int) $cfg->connection_id_default
             : null;
+
+        $this->cumpleanos_dias_vigencia_beneficio = (int) ($cfg->cumpleanos_dias_vigencia_beneficio ?? 3);
     }
 
     public function cargarPlantillaCumpleanosDefault(): void
@@ -162,9 +167,26 @@ class Bot extends Component
                 $cliente->update(['ultima_felicitacion_anio' => $anioActual]);
                 $registro->update(['estado' => \App\Models\FelicitacionCumpleanos::ESTADO_ENVIADO]);
 
+                // 🎁 Crear beneficio de envío gratis
+                try {
+                    $cfg = ConfiguracionBot::actual();
+                    $diasVigencia = max(1, (int) ($cfg->cumpleanos_dias_vigencia_beneficio ?? 3));
+                    \App\Models\BeneficioCliente::create([
+                        'cliente_id'      => $cliente->id,
+                        'felicitacion_id' => $registro->id,
+                        'tipo'            => \App\Models\BeneficioCliente::TIPO_ENVIO_GRATIS,
+                        'origen'          => \App\Models\BeneficioCliente::ORIGEN_CUMPLEANOS,
+                        'descripcion'     => "Regalo de cumpleaños {$anioActual} — envío manual",
+                        'otorgado_at'     => now(),
+                        'vigente_hasta'   => now()->addDays($diasVigencia - 1)->toDateString(),
+                    ]);
+                } catch (\Throwable $e) {
+                    \Log::warning('Beneficio manual cumpleaños falló: ' . $e->getMessage());
+                }
+
                 $this->dispatch('notify', [
                     'type'    => 'success',
-                    'message' => '✅ Felicitación enviada a ' . $nombre,
+                    'message' => '✅ Felicitación enviada a ' . $nombre . ' (envío gratis otorgado)',
                 ]);
             } else {
                 $registro->update([
@@ -265,7 +287,8 @@ class Bot extends Component
             'cumpleanos_ventana_desde'     => 'nullable|string|regex:/^\d{2}:\d{2}$/',
             'cumpleanos_ventana_hasta'     => 'nullable|string|regex:/^\d{2}:\d{2}$/',
             'cumpleanos_dias_semana_arr'   => 'array|size:7',
-            'connection_id_default'        => 'nullable|integer',
+            'connection_id_default'                 => 'nullable|integer',
+            'cumpleanos_dias_vigencia_beneficio'    => 'integer|min:1|max:30',
         ];
     }
 

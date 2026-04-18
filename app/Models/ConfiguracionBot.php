@@ -38,6 +38,7 @@ class ConfiguracionBot extends Model
         'cumpleanos_ventana_hasta',
         'cumpleanos_dias_semana',
         'connection_id_default',
+        'cumpleanos_dias_vigencia_beneficio',
     ];
 
     protected $casts = [

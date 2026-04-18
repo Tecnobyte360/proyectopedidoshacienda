@@ -445,6 +445,19 @@
                     Protección anti-madrugada: si por error se configura una hora fuera de esta ventana, el sistema no envía.
                 </p>
 
+                {{-- Fila 2a: vigencia del beneficio de envío gratis --}}
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">
+                        🎁 Vigencia del beneficio (envío gratis)
+                    </label>
+                    <input type="number" min="1" max="30" wire:model="cumpleanos_dias_vigencia_beneficio"
+                           class="w-40 rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                    <span class="text-sm text-slate-600 ml-2">día(s) a partir del envío del mensaje</span>
+                    <p class="text-xs text-slate-500 mt-1">
+                        Cuando se envía la felicitación, se le otorga al cliente envío gratis por N días. Si pide en ese rango, el sistema aplica el descuento automáticamente.
+                    </p>
+                </div>
+
                 {{-- Fila 2b: conexión de WhatsApp por defecto --}}
                 <div>
                     <label class="block text-sm font-medium text-slate-700 mb-1">

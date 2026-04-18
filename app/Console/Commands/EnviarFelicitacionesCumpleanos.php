@@ -170,7 +170,28 @@ class EnviarFelicitacionesCumpleanos extends Command
             $cliente->update(['ultima_felicitacion_anio' => $anoActual]);
             $registro->update(['estado' => FelicitacionCumpleanos::ESTADO_ENVIADO]);
 
-            $this->line($linea . ' ✅');
+            // 🎁 Otorgar beneficio de envío gratis por cumpleaños
+            $diasVigencia = max(1, (int) ($config->cumpleanos_dias_vigencia_beneficio ?? 3));
+            try {
+                $beneficio = \App\Models\BeneficioCliente::create([
+                    'cliente_id'      => $cliente->id,
+                    'felicitacion_id' => $registro->id,
+                    'tipo'            => \App\Models\BeneficioCliente::TIPO_ENVIO_GRATIS,
+                    'origen'          => \App\Models\BeneficioCliente::ORIGEN_CUMPLEANOS,
+                    'descripcion'     => "Regalo de cumpleaños {$anoActual} — vigente {$diasVigencia} día(s)",
+                    'otorgado_at'     => now(),
+                    'vigente_hasta'   => now()->addDays($diasVigencia - 1)->toDateString(),
+                ]);
+                Log::info('🎁 Beneficio envío gratis otorgado', [
+                    'cliente_id'    => $cliente->id,
+                    'beneficio_id'  => $beneficio->id,
+                    'vigente_hasta' => $beneficio->vigente_hasta,
+                ]);
+            } catch (\Throwable $e) {
+                Log::warning('No se pudo crear beneficio de cumpleaños: ' . $e->getMessage());
+            }
+
+            $this->line($linea . ' ✅ (envío gratis ' . $diasVigencia . 'd)');
             $enviados++;
 
             Log::info('🎂 Felicitación enviada', [

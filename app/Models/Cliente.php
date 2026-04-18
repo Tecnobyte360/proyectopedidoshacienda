@@ -238,4 +238,27 @@ class Cliente extends Model
         $default = ConfiguracionBot::actual()->connection_id_default;
         return $default ? (int) $default : null;
     }
+
+    public function beneficios()
+    {
+        return $this->hasMany(BeneficioCliente::class);
+    }
+
+    /**
+     * Devuelve el beneficio vigente del tipo solicitado (o null).
+     * Por defecto busca el primero que encuentre de cualquier tipo.
+     */
+    public function beneficioVigente(?string $tipo = null): ?BeneficioCliente
+    {
+        $q = $this->beneficios()->vigentes();
+        if ($tipo) {
+            $q->where('tipo', $tipo);
+        }
+        return $q->orderBy('vigente_hasta')->first();
+    }
+
+    public function tieneEnvioGratisVigente(): bool
+    {
+        return $this->beneficioVigente(BeneficioCliente::TIPO_ENVIO_GRATIS) !== null;
+    }
 }

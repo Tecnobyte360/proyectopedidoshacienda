@@ -105,6 +105,7 @@
                             <th class="px-4 py-3 text-left">Teléfono</th>
                             <th class="px-4 py-3 text-left">Conexión</th>
                             <th class="px-4 py-3 text-left">Estado</th>
+                            <th class="px-4 py-3 text-left">Beneficio</th>
                             <th class="px-4 py-3 text-left">Origen</th>
                             <th class="px-4 py-3 text-left">Fecha</th>
                             <th class="px-4 py-3 text-right">Acciones</th>
@@ -132,6 +133,28 @@
                                                  @endif">
                                         {{ $f->badgeIcono() }} {{ ucfirst(str_replace('_', ' ', $f->estado)) }}
                                     </span>
+                                </td>
+                                <td class="px-4 py-3 text-xs">
+                                    @php
+                                        $benef = \App\Models\BeneficioCliente::where('felicitacion_id', $f->id)->first();
+                                    @endphp
+                                    @if($benef)
+                                        @php $est = $benef->estado(); @endphp
+                                        <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-semibold
+                                                     @if($est === 'usado') bg-emerald-100 text-emerald-700
+                                                     @elseif($est === 'vigente') bg-amber-100 text-amber-700
+                                                     @else bg-slate-100 text-slate-500
+                                                     @endif"
+                                              title="{{ $benef->descripcion }}">
+                                            🎁
+                                            @if($est === 'usado')  Usado #{{ $benef->pedido_id }}
+                                            @elseif($est === 'vigente') Vigente
+                                            @else Expirado
+                                            @endif
+                                        </span>
+                                    @else
+                                        <span class="text-xs text-slate-400">—</span>
+                                    @endif
                                 </td>
                                 <td class="px-4 py-3 text-xs text-slate-600">
                                     @switch($f->origen)
@@ -228,6 +251,45 @@
                         <div>
                             <p class="text-xs font-semibold uppercase text-rose-600 tracking-wide mb-1">⚠️ Error</p>
                             <div class="rounded-xl bg-rose-50 border border-rose-200 p-4 text-sm text-rose-800 whitespace-pre-line">{{ $detalle->error_detalle }}</div>
+                        </div>
+                    @endif
+
+                    {{-- 🎁 Beneficio otorgado por esta felicitación --}}
+                    @php
+                        $beneficio = \App\Models\BeneficioCliente::where('felicitacion_id', $detalle->id)->first();
+                    @endphp
+                    @if($beneficio)
+                        <div>
+                            <p class="text-xs font-semibold uppercase text-slate-500 tracking-wide mb-1">🎁 Beneficio otorgado</p>
+                            <div class="rounded-xl bg-pink-50 border border-pink-200 p-4 text-sm space-y-1">
+                                <div class="flex items-center justify-between">
+                                    <span class="font-semibold text-slate-800">{{ $beneficio->etiquetaTipo() }}</span>
+                                    @php $estado = $beneficio->estado(); @endphp
+                                    <span class="text-xs font-bold px-2 py-0.5 rounded-full
+                                                 @if($estado === 'usado') bg-emerald-100 text-emerald-700
+                                                 @elseif($estado === 'vigente') bg-amber-100 text-amber-700
+                                                 @else bg-slate-200 text-slate-600
+                                                 @endif">
+                                        @if($estado === 'usado') ✅ Usado
+                                        @elseif($estado === 'vigente') ⏳ Vigente
+                                        @else ❌ Expirado
+                                        @endif
+                                    </span>
+                                </div>
+                                <p class="text-xs text-slate-600">{{ $beneficio->descripcion }}</p>
+                                <p class="text-xs text-slate-600">
+                                    Otorgado: {{ $beneficio->otorgado_at->format('d/m/Y H:i') }} ·
+                                    Vigente hasta: {{ $beneficio->vigente_hasta?->format('d/m/Y') ?? '—' }}
+                                </p>
+                                @if($beneficio->usado_at)
+                                    <p class="text-xs text-emerald-700 font-semibold">
+                                        Usado el {{ $beneficio->usado_at->format('d/m/Y H:i') }}
+                                        @if($beneficio->pedido_id)
+                                            en pedido <a href="/pedidos" class="underline">#{{ $beneficio->pedido_id }}</a>
+                                        @endif
+                                    </p>
+                                @endif
+                            </div>
                         </div>
                     @endif
                 </div>
