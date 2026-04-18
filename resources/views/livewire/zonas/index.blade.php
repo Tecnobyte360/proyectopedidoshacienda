@@ -280,7 +280,23 @@
                         <label class="block text-sm font-medium text-slate-700 mb-1">Descripción</label>
                         <input type="text" wire:model="descripcion" placeholder="Descripción breve"
                                class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                        @error('descripcion') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
                     </div>
+
+                    {{-- Banner de errores generales de validación --}}
+                    @if($errors->any())
+                        <div class="rounded-xl bg-rose-50 border border-rose-200 px-4 py-3">
+                            <p class="text-sm font-semibold text-rose-800 mb-1">
+                                <i class="fa-solid fa-triangle-exclamation mr-1"></i>
+                                Hay {{ $errors->count() }} {{ $errors->count() === 1 ? 'error' : 'errores' }} en el formulario:
+                            </p>
+                            <ul class="text-xs text-rose-700 list-disc list-inside space-y-0.5">
+                                @foreach($errors->all() as $err)
+                                    <li>{{ $err }}</li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @endif
 
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
@@ -292,11 +308,13 @@
                                     <option value="{{ $sede->id }}">{{ $sede->nombre }}</option>
                                 @endforeach
                             </select>
+                            @error('sede_id') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-1">Costo de envío</label>
                             <input type="number" step="100" wire:model="costo_envio" min="0"
-                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                                   class="w-full rounded-xl border px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643] @error('costo_envio') border-rose-300 @else border-slate-200 @enderror">
+                            @error('costo_envio') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-1">
@@ -304,12 +322,14 @@
                                 <span class="text-xs text-slate-400 font-normal">(0 = sin mínimo)</span>
                             </label>
                             <input type="number" step="1000" wire:model="pedido_minimo" min="0" placeholder="30000"
-                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                                   class="w-full rounded-xl border px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643] @error('pedido_minimo') border-rose-300 @else border-slate-200 @enderror">
+                            @error('pedido_minimo') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-1">Tiempo estimado (min)</label>
                             <input type="number" wire:model="tiempo_estimado_min" min="1" placeholder="30"
-                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                                   class="w-full rounded-xl border px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643] @error('tiempo_estimado_min') border-rose-300 @else border-slate-200 @enderror">
+                            @error('tiempo_estimado_min') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
                         </div>
                     </div>
 

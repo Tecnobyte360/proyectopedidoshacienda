@@ -128,26 +128,38 @@ class Index extends Component
 
     public function abrirModalEditar(int $id): void
     {
-        $zona = ZonaCobertura::with('barrios')->findOrFail($id);
+        try {
+            $zona = ZonaCobertura::with('barrios')->findOrFail($id);
 
-        $this->editandoId          = $zona->id;
-        $this->sede_id             = $zona->sede_id;
-        $this->nombre              = $zona->nombre;
-        $this->descripcion         = (string) $zona->descripcion;
-        $this->color               = (string) ($zona->color ?? '#d68643');
-        $this->costo_envio         = (float) $zona->costo_envio;
-        $this->pedido_minimo       = (float) $zona->pedido_minimo;
-        $this->tiempo_estimado_min = $zona->tiempo_estimado_min;
-        $this->orden               = (int) $zona->orden;
-        $this->activa              = (bool) $zona->activa;
-        $this->poligono            = $zona->poligono;
-        $this->centro_lat          = $zona->centro_lat;
-        $this->centro_lng          = $zona->centro_lng;
-        $this->area_km2            = $zona->area_km2;
+            $this->editandoId          = $zona->id;
+            $this->sede_id             = $zona->sede_id;
+            $this->nombre              = $zona->nombre;
+            $this->descripcion         = (string) $zona->descripcion;
+            $this->color               = (string) ($zona->color ?? '#d68643');
+            $this->costo_envio         = (float) $zona->costo_envio;
+            // pedido_minimo puede no existir si no se corrió la migración
+            $this->pedido_minimo       = (float) ($zona->pedido_minimo ?? 0);
+            $this->tiempo_estimado_min = $zona->tiempo_estimado_min;
+            $this->orden               = (int) $zona->orden;
+            $this->activa              = (bool) $zona->activa;
+            $this->poligono            = $zona->poligono;
+            $this->centro_lat          = $zona->centro_lat;
+            $this->centro_lng          = $zona->centro_lng;
+            $this->area_km2            = $zona->area_km2;
 
-        $this->barriosTexto = $zona->barrios->pluck('nombre')->join("\n");
+            $this->barriosTexto = $zona->barrios->pluck('nombre')->join("\n");
 
-        $this->modalAbierto = true;
+            $this->modalAbierto = true;
+        } catch (\Throwable $e) {
+            \Log::error('Zonas: error al abrir modal editar', [
+                'error' => $e->getMessage(),
+                'id'    => $id,
+            ]);
+            $this->dispatch('notify', [
+                'type'    => 'error',
+                'message' => '❌ No se pudo cargar la zona. Revisa migraciones pendientes o contacta al admin.',
+            ]);
+        }
     }
 
     public function cerrarModal(): void
@@ -158,35 +170,96 @@ class Index extends Component
 
     public function guardar(): void
     {
+        // 1) Validación de los campos (Livewire muestra errores inline en el form)
         $data = $this->validate();
 
-        DB::transaction(function () use ($data) {
-            $zona = ZonaCobertura::updateOrCreate(
-                ['id' => $this->editandoId],
-                $data
-            );
+        // 2) Validaciones de negocio que no caben en rules()
+        $erroresNegocio = [];
 
-            // Procesar barrios desde textarea (uno por línea)
-            $nombres = collect(preg_split('/\r\n|\r|\n|,/', $this->barriosTexto))
-                ->map(fn ($n) => trim($n))
-                ->filter()
-                ->unique(fn ($n) => ZonaCobertura::normalizar($n))
-                ->values();
+        if (empty(trim($this->nombre))) {
+            $erroresNegocio[] = 'El nombre de la zona es obligatorio.';
+        }
 
-            // Limpiar y volver a crear
-            $zona->barrios()->delete();
+        if (!$this->poligono || count($this->poligono) < 3) {
+            $erroresNegocio[] = 'Debes dibujar un polígono en el mapa (mínimo 3 puntos).';
+        }
 
-            foreach ($nombres as $nombre) {
-                $zona->barrios()->create(['nombre' => $nombre]);
+        if ($this->costo_envio < 0) {
+            $erroresNegocio[] = 'El costo de envío no puede ser negativo.';
+        }
+
+        if ($this->pedido_minimo < 0) {
+            $erroresNegocio[] = 'El pedido mínimo no puede ser negativo.';
+        }
+
+        if (!empty($erroresNegocio)) {
+            $this->dispatch('notify', [
+                'type'    => 'error',
+                'message' => "⚠️ " . implode(' ', $erroresNegocio),
+            ]);
+            return;
+        }
+
+        // 3) Guardado en BD — protegido con try/catch para no mostrar 500
+        try {
+            DB::transaction(function () use ($data) {
+                $zona = ZonaCobertura::updateOrCreate(
+                    ['id' => $this->editandoId],
+                    $data
+                );
+
+                $nombres = collect(preg_split('/\r\n|\r|\n|,/', $this->barriosTexto))
+                    ->map(fn ($n) => trim($n))
+                    ->filter()
+                    ->unique(fn ($n) => ZonaCobertura::normalizar($n))
+                    ->values();
+
+                $zona->barrios()->delete();
+
+                foreach ($nombres as $nombre) {
+                    $zona->barrios()->create(['nombre' => $nombre]);
+                }
+            });
+
+            $this->cerrarModal();
+
+            $this->dispatch('notify', [
+                'type'    => 'success',
+                'message' => $this->editandoId ? '✅ Zona actualizada.' : '✅ Zona creada.',
+            ]);
+        } catch (\Illuminate\Database\QueryException $e) {
+            \Log::error('Zonas: error BD al guardar', [
+                'error'   => $e->getMessage(),
+                'zona_id' => $this->editandoId,
+            ]);
+
+            $mensaje = '❌ Error de base de datos al guardar la zona.';
+
+            // Pistas claras para el usuario
+            if (str_contains($e->getMessage(), 'pedido_minimo')) {
+                $mensaje = '⚠️ Falta correr la migración: php artisan migrate --force';
+            } elseif (str_contains($e->getMessage(), 'Unknown column')) {
+                $mensaje = '⚠️ Falta correr migraciones pendientes. Contacta al admin técnico.';
+            } elseif (str_contains($e->getMessage(), 'Duplicate entry')) {
+                $mensaje = '⚠️ Ya existe una zona con ese nombre.';
             }
-        });
 
-        $this->cerrarModal();
+            $this->dispatch('notify', [
+                'type'    => 'error',
+                'message' => $mensaje,
+            ]);
+        } catch (\Throwable $e) {
+            \Log::error('Zonas: excepción al guardar', [
+                'error'   => $e->getMessage(),
+                'trace'   => $e->getTraceAsString(),
+                'zona_id' => $this->editandoId,
+            ]);
 
-        $this->dispatch('notify', [
-            'type'    => 'success',
-            'message' => $this->editandoId ? 'Zona actualizada.' : 'Zona creada.',
-        ]);
+            $this->dispatch('notify', [
+                'type'    => 'error',
+                'message' => '❌ Algo falló al guardar. Revisa los campos e intenta de nuevo.',
+            ]);
+        }
     }
 
     public function toggleActiva(int $id): void

@@ -89,7 +89,14 @@
                     <p class="text-xs text-slate-500">Ingresos por día (sin cancelados)</p>
                 </div>
                 <span class="text-xs text-slate-400">
-                    <i class="fa-solid fa-chart-line mr-1"></i> Últimos {{ count($this->ventasPorDia) }} días
+                    <i class="fa-solid fa-chart-line mr-1"></i>
+                    @switch($rango)
+                        @case('hoy')       Hoy @break
+                        @case('semana')    Últimos 7 días @break
+                        @case('mes')       Últimos 30 días @break
+                        @case('trimestre') Últimos 90 días @break
+                        @default           Últimos {{ count($this->ventasPorDia) }} días
+                    @endswitch
                 </span>
             </div>
 

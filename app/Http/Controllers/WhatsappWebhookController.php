@@ -1385,18 +1385,36 @@ class WhatsappWebhookController extends Controller
           $mensajeBase .= " Pedido mínimo para domicilio en esta zona: *{$pedidoMinimoStr}*.";
       }
 
+      // ── Sede más cercana (si tenemos coordenadas del cliente) ─────────
+      $sedeCercana = null;
+      $sedeCercanaNombre = null;
+      $distanciaKm = null;
+      if ($coord && isset($coord['lat'], $coord['lng'])) {
+          $sedeCercana = Sede::masCercanaA((float) $coord['lat'], (float) $coord['lng']);
+          if ($sedeCercana) {
+              $sedeCercanaNombre = $sedeCercana->nombre;
+              $distanciaKm = $sedeCercana->_distancia_km ?? null;
+              if ($distanciaKm) {
+                  $mensajeBase .= " Te despacharemos desde *{$sedeCercanaNombre}* (a " . number_format($distanciaKm, 1) . " km).";
+              }
+          }
+      }
+
       return [
-          'cubierta'          => true,
-          'zona'              => $zona->nombre,
-          'zona_id'           => $zona->id,
-          'costo_envio'       => (float) $zona->costo_envio,
-          'costo_envio_str'   => $costoStr,
-          'pedido_minimo'     => $pedidoMinimo,
-          'pedido_minimo_str' => $pedidoMinimoStr,
-          'tiempo_estimado'   => $tiempoStr,
-          'coordenadas'       => $coord,
-          'mensaje_sugerido'  => $mensajeBase,
-          'metodo_usado'      => $metodo,
+          'cubierta'           => true,
+          'zona'               => $zona->nombre,
+          'zona_id'            => $zona->id,
+          'costo_envio'        => (float) $zona->costo_envio,
+          'costo_envio_str'    => $costoStr,
+          'pedido_minimo'      => $pedidoMinimo,
+          'pedido_minimo_str'  => $pedidoMinimoStr,
+          'tiempo_estimado'    => $tiempoStr,
+          'coordenadas'        => $coord,
+          'sede_sugerida'      => $sedeCercanaNombre,
+          'sede_sugerida_id'   => $sedeCercana?->id,
+          'distancia_km'       => $distanciaKm ? round($distanciaKm, 2) : null,
+          'mensaje_sugerido'   => $mensajeBase,
+          'metodo_usado'       => $metodo,
       ];
   }
 
@@ -1456,6 +1474,20 @@ class WhatsappWebhookController extends Controller
         $zonaCobertura = null;
         if (!empty($validacion['zona_id'])) {
             $zonaCobertura = ZonaCobertura::find($validacion['zona_id']);
+        }
+
+        // Si la validación sugirió una sede más cercana, la usamos.
+        // Esto permite que una cadena con varias sedes despache desde la más próxima.
+        if (!empty($validacion['sede_sugerida_id'])) {
+            $sedeSugerida = Sede::find($validacion['sede_sugerida_id']);
+            if ($sedeSugerida && $sedeSugerida->activa) {
+                Log::info('📍 Despachando desde sede más cercana', [
+                    'sede_original' => $sede?->nombre,
+                    'sede_cercana'  => $sedeSugerida->nombre,
+                    'distancia_km'  => $validacion['distancia_km'] ?? null,
+                ]);
+                $sede = $sedeSugerida;
+            }
         }
 
         // ── VALIDACIÓN ESTRICTA de cobertura ───────────────────────────────
@@ -2075,8 +2107,10 @@ PROMPT;
                 'description' => 'Verifica si una dirección está dentro de una zona de cobertura antes de confirmar un pedido. '
                     . 'DEBES llamarla SIEMPRE que el cliente te dé su dirección, ANTES de pedir el resto de datos o confirmar. '
                     . 'Si la dirección no está cubierta, NO confirmes el pedido y ofrece recoger en sede. '
-                    . 'Retorna: cubierta (bool), zona, costo_envio, tiempo_estimado, pedido_minimo (0 = sin mínimo), mensaje_sugerido. '
-                    . 'IMPORTANTE: si pedido_minimo > 0, avísale al cliente el mínimo ANTES de que siga pidiendo, para que no se lleve una sorpresa.',
+                    . 'Retorna: cubierta (bool), zona, costo_envio, tiempo_estimado, pedido_minimo (0=sin mínimo), '
+                    . 'sede_sugerida (la sede más cercana que despachará), distancia_km, mensaje_sugerido. '
+                    . 'IMPORTANTE: si pedido_minimo > 0, avísale al cliente el mínimo ANTES de que siga pidiendo. '
+                    . 'Si sede_sugerida viene, menciónala al cliente: "Te despachamos desde [sede_sugerida] (a X km)".',
                 'parameters'  => [
                     'type'       => 'object',
                     'properties' => [

@@ -13,7 +13,7 @@ use Livewire\Component;
 
 class Index extends Component
 {
-    public string $rango = 'hoy';   // hoy | semana | mes | trimestre
+    public string $rango = 'semana';   // hoy | semana | mes | trimestre
     public ?int   $sedeId = null;
 
     public function actualizar(): void
@@ -104,6 +104,11 @@ class Index extends Component
     {
         [$inicio, $fin] = $this->rangoFechas();
 
+        // Si el rango es "hoy", agrupamos por HORA para que se vea evolución
+        if ($this->rango === 'hoy') {
+            return $this->ventasPorHoraHoy($inicio, $fin);
+        }
+
         $datos = (clone $this->baseQuery())
             ->where('estado', '!=', 'cancelado')
             ->select(
@@ -127,6 +132,36 @@ class Index extends Component
                 'pedidos'  => (int) ($datos[$key]->pedidos ?? 0),
             ];
             $cursor->addDay();
+        }
+
+        return $resultado;
+    }
+
+    /**
+     * Para el rango "hoy": ventas agrupadas por hora (00-23).
+     * Así la gráfica muestra evolución dentro del día en lugar de un solo punto.
+     */
+    private function ventasPorHoraHoy(Carbon $inicio, Carbon $fin): array
+    {
+        $datos = (clone $this->baseQuery())
+            ->where('estado', '!=', 'cancelado')
+            ->select(
+                DB::raw("HOUR(fecha_pedido) as hora"),
+                DB::raw('COALESCE(SUM(total), 0) as ventas'),
+                DB::raw('COUNT(*) as pedidos')
+            )
+            ->groupBy('hora')
+            ->orderBy('hora')
+            ->get()
+            ->keyBy('hora');
+
+        $resultado = [];
+        for ($h = 0; $h < 24; $h++) {
+            $resultado[] = [
+                'dia'     => sprintf('%02d:00', $h),
+                'ventas'  => (float) ($datos[$h]->ventas ?? 0),
+                'pedidos' => (int) ($datos[$h]->pedidos ?? 0),
+            ];
         }
 
         return $resultado;
