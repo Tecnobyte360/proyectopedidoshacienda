@@ -27,7 +27,10 @@ class SeguimientoPedido extends Component
     public function getListeners(): array
     {
         return [
-            "echo:pedido-seguimiento.{$this->codigo},pedido.actualizado" => 'pedidoActualizadoEnTiempoReal',
+            // El PUNTO LITERAL inicial antes de "pedido.actualizado" es CLAVE.
+            // Sin él, Livewire antepone el namespace "App\Events\..." y el evento
+            // nunca coincide con el broadcastAs() personalizado.
+            "echo:pedido-seguimiento.{$this->codigo},.pedido.actualizado" => 'pedidoActualizadoEnTiempoReal',
         ];
     }
 

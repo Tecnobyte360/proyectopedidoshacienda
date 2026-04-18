@@ -325,8 +325,6 @@ class Pedido extends Model
 
         $mensaje .= "\n\n🔎 Puedes seguirlo aquí:\n{$this->url_seguimiento}";
 
-        $mensaje .= "\n\n🔎 Puedes seguirlo aquí:\n{$this->url_seguimiento}";
-
         $payload = [
             'number'       => $this->normalizarTelefono($telefono),
             'body'         => $mensaje,
