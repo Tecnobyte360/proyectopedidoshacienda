@@ -219,6 +219,30 @@ class Domiciliarios extends Component
         }
     }
 
+    /**
+     * Libera a todos los domiciliarios activos (pone estado=disponible).
+     * Útil cuando quedaron "ocupados" pegados por un bug o reinicio.
+     */
+    public function liberarTodos(): void
+    {
+        try {
+            $n = Domiciliario::where('activo', true)
+                ->whereIn('estado', ['ocupado', 'en_ruta'])
+                ->orWhereNull('estado')
+                ->update(['estado' => 'disponible']);
+
+            $this->dispatch('notify', [
+                'type'    => 'success',
+                'message' => "🔓 {$n} domiciliario(s) liberados. Ahora aparecen disponibles en /pedidos.",
+            ]);
+        } catch (\Throwable $e) {
+            $this->dispatch('notify', [
+                'type'    => 'error',
+                'message' => 'Error al liberar: ' . $e->getMessage(),
+            ]);
+        }
+    }
+
     /* ==========================
      * HELPERS
      * ==========================*/

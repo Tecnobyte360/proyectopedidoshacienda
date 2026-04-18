@@ -7,10 +7,17 @@
             <p class="text-sm text-slate-500">Gestiona los repartidores de tu equipo.</p>
         </div>
 
-        <button wire:click="abrirModalCrear"
-                class="rounded-2xl bg-[#d68643] px-5 py-3 text-white font-semibold shadow hover:bg-[#c97a36] transition">
-            <i class="fa-solid fa-plus mr-2"></i> Nuevo domiciliario
-        </button>
+        <div class="flex flex-wrap gap-2">
+            <button wire:click="liberarTodos"
+                    wire:confirm="¿Liberar a todos los domiciliarios ocupados/en ruta? Esto pone su estado en 'disponible' para que vuelvan a aparecer en pedidos."
+                    class="rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-3 font-semibold transition">
+                <i class="fa-solid fa-lock-open mr-2"></i> Liberar todos
+            </button>
+            <button wire:click="abrirModalCrear"
+                    class="rounded-2xl bg-[#d68643] px-5 py-3 text-white font-semibold shadow hover:bg-[#c97a36] transition">
+                <i class="fa-solid fa-plus mr-2"></i> Nuevo domiciliario
+            </button>
+        </div>
     </div>
 
     {{-- KPIS --}}
