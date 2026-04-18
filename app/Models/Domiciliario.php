@@ -27,6 +27,23 @@ class Domiciliario extends Model
         'activo' => 'boolean',
     ];
 
+    public const ESTADO_DISPONIBLE = 'disponible';
+    public const ESTADO_EN_RUTA    = 'en_ruta';
+    public const ESTADO_OCUPADO    = 'ocupado';
+
+    protected static function booted(): void
+    {
+        // Si se crea un domiciliario sin estado, lo ponemos disponible por defecto
+        static::creating(function ($d) {
+            if (empty($d->estado)) {
+                $d->estado = self::ESTADO_DISPONIBLE;
+            }
+            if ($d->activo === null) {
+                $d->activo = true;
+            }
+        });
+    }
+
     public const PAISES = [
         ['codigo' => '+57',  'nombre' => 'Colombia',       'flag' => '🇨🇴'],
         ['codigo' => '+1',   'nombre' => 'Estados Unidos', 'flag' => '🇺🇸'],

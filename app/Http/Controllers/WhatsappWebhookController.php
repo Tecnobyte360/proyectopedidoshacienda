@@ -1522,11 +1522,36 @@ class WhatsappWebhookController extends Controller
     ?string $connectionId = null
 ): string {
     try {
-        $confirmKey = "pedido_confirmado_" . $this->normalizarTelefono($from);
+        $telNorm = $this->normalizarTelefono($from);
+        $confirmKey = "pedido_confirmado_" . $telNorm;
 
         if (Cache::has($confirmKey)) {
-            Log::warning('⚠️ Pedido ya confirmado recientemente', compact('from'));
-            return "Tu pedido ya fue registrado 😊 Escríbeme el número de pedido para consultarlo.";
+            // El cliente acaba de confirmar un pedido. Traemos el último pedido
+            // para darle una respuesta útil y no un mensaje genérico.
+            Log::warning('⚠️ Bot intentó confirmar de nuevo un pedido ya registrado', compact('from'));
+
+            $ultimoPedido = Pedido::where('telefono_whatsapp', $telNorm)
+                ->orderByDesc('id')
+                ->first();
+
+            if ($ultimoPedido) {
+                $total = '$' . number_format((float) $ultimoPedido->total, 0, ',', '.');
+                $beneficio = \App\Models\BeneficioCliente::where('pedido_id', $ultimoPedido->id)->first();
+
+                $msg = "Tu pedido #{$ultimoPedido->id} ya quedó registrado ✅\n\n"
+                    . "💵 Total: {$total}\n";
+
+                if ($beneficio) {
+                    $msg .= "🎁 Incluye envío gratis por " . $beneficio->origen . ".\n";
+                }
+
+                $msg .= "\n🔎 Seguimiento:\n" . $ultimoPedido->url_seguimiento
+                    . "\n\nSi necesitas algo distinto al pedido #{$ultimoPedido->id}, cuéntame qué es y te ayudo 🙌";
+
+                return $msg;
+            }
+
+            return "Tu pedido ya fue registrado 😊 Cuéntame qué necesitas ahora y te ayudo.";
         }
 
         Cache::put($confirmKey, true, now()->addMinutes(2));
@@ -1810,7 +1835,7 @@ class WhatsappWebhookController extends Controller
             'from' => $from,
         ]);
 
-        return $this->construirMensajeConfirmacionPedido($pedido, $orderData, $name);
+        return $this->construirMensajeConfirmacionPedido($pedido, $orderData, $name, $beneficioAplicado);
     } catch (\Throwable $e) {
         DB::rollBack();
         Cache::forget("pedido_confirmado_" . $this->normalizarTelefono($from));
@@ -1836,8 +1861,12 @@ class WhatsappWebhookController extends Controller
         return '⚠️ Tu pedido no se pudo registrar en este momento. Ya lo estamos revisando, te contactamos en breve.';
     }
 }
-    private function construirMensajeConfirmacionPedido(Pedido $pedido, array $orderData, string $name): string
-    {
+    private function construirMensajeConfirmacionPedido(
+        Pedido $pedido,
+        array $orderData,
+        string $name,
+        ?\App\Models\BeneficioCliente $beneficioAplicado = null
+    ): string {
         $lineas = [
             "¡Listo {$name}! Tu pedido quedó confirmado ✅",
             '',
@@ -1866,6 +1895,14 @@ class WhatsappWebhookController extends Controller
 
         if (!empty($pedido->telefono_contacto)) {
             $lineas[] = "📞 *Contacto:* {$pedido->telefono_contacto}";
+        }
+
+        // 🎁 Si se aplicó un beneficio, avisarle al cliente para que sepa
+        // que ya lo usamos automáticamente (evita que pregunte después).
+        if ($beneficioAplicado) {
+            $lineas[] = '';
+            $lineas[] = "🎁 *Envío GRATIS aplicado* (beneficio por "
+                . $beneficioAplicado->origen . ") — no pagaste costo de envío.";
         }
 
         $total = (float) $pedido->total;
