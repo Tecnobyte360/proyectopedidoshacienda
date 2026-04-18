@@ -83,9 +83,7 @@
     </aside>
 
     {{-- ╔═══ COLUMNA DERECHA: chat seleccionado ═══╗ --}}
-    <main class="flex-1 flex flex-col bg-[#efeae2]"
-          style="background-image: linear-gradient(rgba(239,234,226,0.95), rgba(239,234,226,0.95)),
-                                     url('data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'40\' height=\'40\' viewBox=\'0 0 40 40\'><circle cx=\'2\' cy=\'2\' r=\'1\' fill=\'%23d4cab8\' opacity=\'0.3\'/></svg>');">
+    <section class="flex-1 flex flex-col min-w-0 bg-[#efeae2]">
 
         @if($conversacionActiva)
             @php
@@ -96,7 +94,7 @@
             @endphp
 
             {{-- Header del chat --}}
-            <header class="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between gap-3">
+            <div class="relative z-10 bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between gap-3 shadow-sm">
                 <div class="flex items-center gap-3 min-w-0">
                     <div class="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-[#d68643] to-[#a85f24] text-white font-bold text-sm">
                         {{ $iniAct ?: 'C' }}
@@ -138,7 +136,7 @@
                         </a>
                     @endif
                 </div>
-            </header>
+            </div>
 
             {{-- Área de mensajes --}}
             <div class="flex-1 overflow-y-auto px-4 py-4 space-y-2" id="chat-messages">
@@ -197,7 +195,7 @@
                 </div>
             </div>
         @endif
-    </main>
+    </section>
 
     {{-- Auto-scroll al final del chat al abrir y al recibir mensaje --}}
     <script>
