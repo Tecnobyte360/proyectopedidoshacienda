@@ -193,6 +193,20 @@ class Index extends Component
             ? Sede::find($this->sedeId)
             : Sede::where('activa', true)->first();
 
+        // Si la sede tiene dirección pero no coords, intentar geocodificar
+        if ($sede && (!$sede->latitud || !$sede->longitud) && !empty($sede->direccion)) {
+            try {
+                $g = app(\App\Services\GeocodingService::class)
+                    ->geocodificar($sede->direccion, null, 'Bello');
+                if ($g) {
+                    $sede->update(['latitud' => $g['lat'], 'longitud' => $g['lng']]);
+                    $sede->refresh();
+                }
+            } catch (\Throwable $e) {
+                // ignorar
+            }
+        }
+
         $origen = ($sede && $sede->latitud && $sede->longitud)
             ? [
                 'lat'     => (float) $sede->latitud,

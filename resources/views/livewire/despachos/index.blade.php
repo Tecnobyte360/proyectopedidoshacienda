@@ -141,10 +141,18 @@
                 </div>
             </div>
 
+            @if(!$ruta['origen'])
+                <div class="px-5 py-2 bg-amber-50 border-y border-amber-200 text-xs text-amber-800">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    La sede no tiene coordenadas configuradas — la ruta se muestra solo con los pedidos.
+                    Configura lat/lng de la sede para ver la ruta completa desde el origen.
+                </div>
+            @endif
+
             <div wire:ignore
                  id="mapa-despacho"
                  data-ruta="{{ json_encode($ruta) }}"
-                 style="height: 360px;"></div>
+                 style="height: 360px; background:#e5e7eb;"></div>
         </div>
 
         {{-- JS inline (evita @push que rompe en Livewire al re-render) --}}
@@ -152,10 +160,12 @@
             (function () {
                 function iniciarMapaDespacho() {
                     const el = document.getElementById('mapa-despacho');
-                    if (!el || !window.L) return;
+                    if (!el) return;
+                    if (!window.L) return false;   // Leaflet aún no cargado
 
                     const data = JSON.parse(el.dataset.ruta || '{}');
-                    if (!data.origen && (!data.paradas || data.paradas.length === 0)) return;
+                    const tienePuntos = data.origen || (data.paradas && data.paradas.length > 0);
+                    if (!tienePuntos) return true;   // nada que dibujar, pero no reintentar
 
                     // Limpiar mapa previo si había
                     if (el._leafletMap) {
@@ -166,7 +176,7 @@
 
                     const puntos = [];
                     if (data.origen) puntos.push([data.origen.lat, data.origen.lng]);
-                    (data.paradas || []).forEach(p => puntos.push([p.lat, p.lng]));
+                    (data.paradas || []).forEach(function (p) { puntos.push([p.lat, p.lng]); });
 
                     const map = L.map('mapa-despacho');
                     el._leafletMap = map;
@@ -217,25 +227,34 @@
                     }
 
                     if (puntos.length === 1) {
-                        map.setView(puntos[0], 14);
+                        map.setView(puntos[0], 15);
                     } else if (puntos.length > 1) {
                         map.fitBounds(puntos, { padding: [40, 40] });
                     }
+
+                    // Leaflet a veces necesita invalidateSize cuando se inserta
+                    // en un contenedor que cambió tamaño (como un collapse de Livewire)
+                    setTimeout(function () {
+                        try { map.invalidateSize(); } catch (e) {}
+                    }, 200);
+
+                    return true;
                 }
 
-                // Intentar iniciar ahora y después de que Leaflet se cargue
-                if (window.L) {
-                    iniciarMapaDespacho();
-                } else {
-                    setTimeout(iniciarMapaDespacho, 300);
-                    setTimeout(iniciarMapaDespacho, 800);
-                }
+                // Polling hasta que Leaflet cargue
+                var intentos = 0;
+                var intervalo = setInterval(function () {
+                    intentos++;
+                    if (iniciarMapaDespacho() || intentos > 30) {
+                        clearInterval(intervalo);
+                    }
+                }, 200);
 
                 // Re-render cuando Livewire actualiza el DOM
                 if (window.Livewire && !window._despachoHookRegistered) {
                     window._despachoHookRegistered = true;
                     Livewire.hook('morph.updated', function () {
-                        setTimeout(iniciarMapaDespacho, 80);
+                        setTimeout(iniciarMapaDespacho, 100);
                     });
                 }
             })();
