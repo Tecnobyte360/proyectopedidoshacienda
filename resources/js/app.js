@@ -5,18 +5,46 @@ import Pusher from "pusher-js";
 import "./seguimiento-pedido";
 window.Pusher = Pusher;
 
-const isLocal =
-    window.location.hostname === "localhost" ||
-    window.location.hostname === "127.0.0.1";
+// ─────────────────────────────────────────────────────────────────────────────
+// CONFIG REVERB — auto-detección
+//
+// 1. En producción HTTPS (cualquier dominio que NO sea localhost):
+//    usa el mismo host por wss en puerto 443. Requiere nginx proxy de /app y /apps.
+//
+// 2. En desarrollo local con `php artisan reverb:start` (puerto 8080):
+//    usa ws://127.0.0.1:8080.
+//
+// 3. Para casos custom (puerto distinto, etc), define en index.html:
+//    <meta name="reverb-host" content="...">
+//    <meta name="reverb-port" content="...">
+//    <meta name="reverb-scheme" content="http|https">
+// ─────────────────────────────────────────────────────────────────────────────
+
+const meta = (name) =>
+    document.querySelector(`meta[name="reverb-${name}"]`)?.content;
+
+const host = window.location.hostname;
+const isLocal = host === "localhost" || host === "127.0.0.1";
+
+const reverbHost = meta("host") ?? (isLocal ? "127.0.0.1" : host);
+const reverbPort = parseInt(
+    meta("port") ?? (isLocal ? 8080 : 443),
+    10,
+);
+const reverbScheme =
+    meta("scheme") ?? (isLocal ? "http" : "https");
+const useTLS = reverbScheme === "https";
+
+console.log("🔌 Reverb config:", { host: reverbHost, port: reverbPort, tls: useTLS });
 
 window.Echo = new Echo({
     broadcaster: "reverb",
     key: "app-key",
-    wsHost: isLocal ? "127.0.0.1" : "pedidosonline.tecnobyte360.com",
-    wsPort: isLocal ? 8080 : 443,
-    wssPort: isLocal ? 8080 : 443,
-    forceTLS: !isLocal,
-    enabledTransports: isLocal ? ["ws"] : ["ws", "wss"],
+    wsHost: reverbHost,
+    wsPort: reverbPort,
+    wssPort: reverbPort,
+    forceTLS: useTLS,
+    enabledTransports: useTLS ? ["wss"] : ["ws"],
     disableStats: true,
 });
 
