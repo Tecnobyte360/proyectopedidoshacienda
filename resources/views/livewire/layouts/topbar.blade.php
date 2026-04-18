@@ -12,6 +12,7 @@
         'reportes.index'       => ['Reportes',       'Métricas de ventas y operaciones',           'fa-chart-line'],
         'ans.index'            => ['ANS Tiempos',    'Configuración de tiempos por estado',        'fa-stopwatch'],
         'configuracion.bot'    => ['Bot WhatsApp',   'Comportamiento de la asesora IA',            'fa-robot'],
+        'clientes.index'       => ['Clientes',       'Quién compra, qué compra, cuánto compra',    'fa-users'],
         'pedidos.seguimiento'  => ['Seguimiento',    'Estado del pedido',                          'fa-route'],
     ];
 

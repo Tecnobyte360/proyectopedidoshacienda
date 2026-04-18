@@ -51,6 +51,7 @@ class Pedido extends Model
         'lat',
         'lng',
         'zona_cobertura_id',
+        'cliente_id',
         'domiciliario_id',
         'fecha_asignacion_domiciliario',
         'fecha_salida_domiciliario',
@@ -590,6 +591,11 @@ class Pedido extends Model
     public function zonaCobertura()
     {
         return $this->belongsTo(ZonaCobertura::class, 'zona_cobertura_id');
+    }
+
+    public function cliente()
+    {
+        return $this->belongsTo(Cliente::class);
     }
 
     /**

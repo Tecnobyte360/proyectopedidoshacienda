@@ -19,6 +19,7 @@ class Bot extends Component
 
     public string $nombre_asesora            = 'Sofía';
     public string $frase_bienvenida          = '';
+    public string $info_empresa              = '';
     public bool   $activo                    = true;
 
     // Prompt personalizado
@@ -44,6 +45,7 @@ class Bot extends Component
         $this->max_tokens                = (int) $cfg->max_tokens;
         $this->nombre_asesora            = (string) ($cfg->nombre_asesora ?? 'Sofía');
         $this->frase_bienvenida          = (string) ($cfg->frase_bienvenida ?? '');
+        $this->info_empresa              = (string) ($cfg->info_empresa ?? '');
         $this->activo                    = (bool) $cfg->activo;
 
         $this->usar_prompt_personalizado = (bool) ($cfg->usar_prompt_personalizado ?? false);
@@ -71,6 +73,7 @@ class Bot extends Component
             'max_tokens'                => 'integer|min:100|max:4000',
             'nombre_asesora'            => 'required|string|max:60',
             'frase_bienvenida'          => 'nullable|string|max:500',
+            'info_empresa'              => 'nullable|string|max:2000',
             'activo'                    => 'boolean',
             'usar_prompt_personalizado' => 'boolean',
             'system_prompt'             => 'nullable|string|max:20000',

@@ -14,6 +14,7 @@ use App\Livewire\Zonas\Index as ZonasIndex;
 use App\Livewire\Despachos\Index as DespachosIndex;
 use App\Livewire\Ans\Index as AnsIndex;
 use App\Livewire\Configuracion\Bot as ConfiguracionBot;
+use App\Livewire\Clientes\Index as ClientesIndex;
 use App\Models\Sede;
 use App\Models\Pedido;
 use App\Models\DetallePedido;
@@ -29,6 +30,7 @@ Route::get('/despachos',     DespachosIndex::class)->name('despachos.index');
 Route::get('/reportes',      ReportesIndex::class)->name('reportes.index');
 Route::get('/ans-tiempos',     AnsIndex::class)->name('ans.index');
 Route::get('/configuracion/bot', ConfiguracionBot::class)->name('configuracion.bot');
+Route::get('/clientes',          ClientesIndex::class)->name('clientes.index');
 
 Route::get('/seguimiento-pedido/{codigo}', SeguimientoPedido::class)
     ->name('pedidos.seguimiento');

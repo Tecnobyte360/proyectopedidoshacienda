@@ -99,6 +99,99 @@
         <i class="fa-solid fa-compress"></i>
     </button>
 
+    {{-- ╔═══ MODAL DE CONFIRMACIÓN GLOBAL ═══╗
+         Uso desde cualquier botón:
+         <button @click.prevent="$dispatch('confirm-show', {
+             message: '¿Eliminar este registro?',
+             confirmText: 'Sí, eliminar',
+             type: 'danger',
+             onConfirm: () => $wire.eliminar(123),
+         })">Eliminar</button>
+    --}}
+    <div x-data="{
+            open: false,
+            title: 'Confirmar acción',
+            message: '',
+            confirmText: 'Aceptar',
+            cancelText: 'Cancelar',
+            type: 'primary',
+            callback: null,
+            init() {
+                window.addEventListener('confirm-show', (e) => {
+                    this.title       = e.detail.title       ?? 'Confirmar acción';
+                    this.message     = e.detail.message     ?? '¿Estás seguro?';
+                    this.confirmText = e.detail.confirmText ?? 'Aceptar';
+                    this.cancelText  = e.detail.cancelText  ?? 'Cancelar';
+                    this.type        = e.detail.type        ?? 'primary';
+                    this.callback    = e.detail.onConfirm   ?? null;
+                    this.open = true;
+                });
+                window.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape' && this.open) this.cancel();
+                });
+            },
+            confirm() {
+                this.open = false;
+                if (typeof this.callback === 'function') this.callback();
+                this.callback = null;
+            },
+            cancel() { this.open = false; this.callback = null; }
+         }"
+         x-show="open"
+         x-transition.opacity.duration.150ms
+         @click.self="cancel()"
+         class="fixed inset-0 z-[200] flex items-center justify-center p-4"
+         style="display: none; background: rgba(15,23,42,0.55); backdrop-filter: blur(4px);">
+
+        <div x-show="open"
+             x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="opacity-0 scale-95"
+             x-transition:enter-end="opacity-100 scale-100"
+             class="w-full max-w-md rounded-2xl bg-white shadow-2xl overflow-hidden">
+
+            {{-- Header con ícono según tipo --}}
+            <div class="flex items-start gap-4 px-6 pt-6 pb-2">
+                <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl"
+                     :class="{
+                        'bg-amber-100 text-amber-600': type === 'primary',
+                        'bg-rose-100 text-rose-600':   type === 'danger',
+                        'bg-emerald-100 text-emerald-600': type === 'success',
+                        'bg-blue-100 text-blue-600':   type === 'info',
+                     }">
+                    <i class="fa-solid"
+                       :class="{
+                           'fa-circle-question': type === 'primary',
+                           'fa-triangle-exclamation': type === 'danger',
+                           'fa-circle-check': type === 'success',
+                           'fa-circle-info': type === 'info',
+                       }"></i>
+                </div>
+                <div class="flex-1 pt-1">
+                    <h3 class="text-base font-bold text-slate-800" x-text="title"></h3>
+                    <p class="mt-1 text-sm text-slate-600 leading-relaxed" x-text="message"></p>
+                </div>
+            </div>
+
+            {{-- Acciones --}}
+            <div class="flex flex-col-reverse sm:flex-row gap-2 px-6 py-4 bg-slate-50 border-t border-slate-100">
+                <button type="button" @click="cancel()"
+                        class="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition">
+                    <span x-text="cancelText"></span>
+                </button>
+                <button type="button" @click="confirm()"
+                        :class="{
+                            'bg-[#d68643] hover:bg-[#c97a36]': type === 'primary',
+                            'bg-rose-500 hover:bg-rose-600':    type === 'danger',
+                            'bg-emerald-500 hover:bg-emerald-600': type === 'success',
+                            'bg-blue-500 hover:bg-blue-600':    type === 'info',
+                        }"
+                        class="flex-1 rounded-xl px-4 py-2.5 text-sm font-bold text-white transition shadow">
+                    <span x-text="confirmText"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+
     {{-- TOAST NOTIFICATIONS --}}
     <div x-data="{ messages: [] }"
          x-init="

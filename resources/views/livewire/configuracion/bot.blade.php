@@ -144,6 +144,26 @@
             </div>
         </section>
 
+        {{-- INFO EMPRESA --}}
+        <section class="rounded-2xl bg-white shadow border border-slate-200 p-6">
+            <div class="flex items-center gap-2 mb-4">
+                <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-50 text-orange-600">
+                    <i class="fa-solid fa-building"></i>
+                </span>
+                <div class="flex-1">
+                    <h3 class="text-lg font-bold text-slate-800">Información de la empresa</h3>
+                    <p class="text-xs text-slate-500">Lo que la IA sabe sobre tu negocio. Se inyecta como variable <code class="bg-slate-100 px-1 rounded">{empresa}</code> en el prompt.</p>
+                </div>
+            </div>
+
+            <textarea wire:model="info_empresa" rows="6"
+                      placeholder="Ej:&#10;Alimentos La Hacienda&#10;- Más de 25 años de experiencia.&#10;- Ubicada en Bello, Antioquia.&#10;- Calidad, frescura y servicio al cliente."
+                      class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-mono leading-relaxed focus:border-[#d68643] focus:ring-[#d68643]"></textarea>
+            <p class="text-[11px] text-slate-400 mt-1">
+                Describe brevemente: nombre, ubicación, años de experiencia, valores, servicios. La IA usará esto cuando el cliente pregunte por la empresa.
+            </p>
+        </section>
+
         {{-- BIENVENIDA --}}
         <section class="rounded-2xl bg-white shadow border border-slate-200 p-6">
             <div class="flex items-center gap-2 mb-4">
@@ -195,8 +215,14 @@
                                 <i class="fa-solid fa-pen-to-square text-[#d68643] mr-1"></i>
                                 Tu prompt
                             </label>
-                            <button type="button" wire:click="cargarPlantillaPorDefecto"
-                                    wire:confirm="¿Cargar la plantilla por defecto? Reemplazará el contenido actual."
+                            <button type="button"
+                                    @click.prevent="$dispatch('confirm-show', {
+                                        title: 'Cargar plantilla por defecto',
+                                        message: 'Reemplazará el contenido actual del editor. ¿Seguro?',
+                                        confirmText: 'Sí, reemplazar',
+                                        type: 'primary',
+                                        onConfirm: () => $wire.cargarPlantillaPorDefecto(),
+                                    })"
                                     class="text-[11px] font-semibold text-[#d68643] hover:underline">
                                 <i class="fa-solid fa-rotate-left mr-1"></i> Cargar plantilla por defecto
                             </button>

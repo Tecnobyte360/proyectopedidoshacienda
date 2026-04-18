@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Events\PedidoActualizado;
 use App\Events\PedidoConfirmado;
 use App\Models\AnsPedido;
+use App\Models\Cliente;
 use App\Models\DetallePedido;
 use App\Models\Pedido;
 use App\Models\Producto;
@@ -277,7 +278,18 @@ class WhatsappWebhookController extends Controller
         // Resolver sede para inyectar catálogo correcto (precios pueden variar por sede)
         $sedeId = $this->obtenerSedeIdDesdeConexion($connectionId);
 
-        $systemPrompt = $this->getSystemPrompt($pedidosInfo, $this->infoEmpresa(), $name, $ansInfo, $sedeId);
+        // ── CLIENTE: identificar/crear y enriquecer el contexto ──────────────
+        $telefonoNorm = $this->normalizarTelefono($from);
+        $cliente = Cliente::encontrarOCrearPorTelefono($telefonoNorm, $name);
+
+        // Usar el nombre del cliente guardado si está mejor que el de WhatsApp
+        $nombreParaPrompt = $cliente->nombre !== 'Cliente' ? $cliente->nombre : $name;
+
+        // Agregar resumen del cliente al historial textual del prompt
+        $resumenCliente = $cliente->resumenParaBot();
+        $pedidosInfo = $resumenCliente . "\n\n" . $pedidosInfo;
+
+        $systemPrompt = $this->getSystemPrompt($pedidosInfo, $this->infoEmpresa(), $nombreParaPrompt, $ansInfo, $sedeId);
 
         $messages = array_merge(
             [['role' => 'system', 'content' => $systemPrompt]],
@@ -1105,8 +1117,24 @@ class WhatsappWebhookController extends Controller
         $costoEnvio = $zonaCobertura?->costo_envio ?? 0;
         $totalCalculado = $subtotalProductos + $costoEnvio;
 
+        // ── CLIENTE: encontrar/crear y actualizar datos ────────────────────
+        $cliente = Cliente::encontrarOCrearPorTelefono(
+            $telefonoWhatsapp,
+            $orderData['customer_name'] ?? $name
+        );
+
+        // Actualizar el nombre/dirección/barrio si vienen mejorados en el pedido
+        $datosClienteActualizar = [
+            'nombre'              => $orderData['customer_name'] ?? $cliente->nombre,
+            'direccion_principal' => $direccion ?: $cliente->direccion_principal,
+            'barrio'              => $barrio ?: $cliente->barrio,
+            'zona_cobertura_id'   => $zonaCobertura?->id ?? $cliente->zona_cobertura_id,
+        ];
+        $cliente->update($datosClienteActualizar);
+
         $pedido = Pedido::create([
             'sede_id'               => $sede?->id,
+            'cliente_id'            => $cliente->id,
             'empresa_id'            => $empresaId,
             'fecha_pedido'          => now(),
             'hora_entrega'          => $pickupTime,
@@ -1143,6 +1171,13 @@ class WhatsappWebhookController extends Controller
         ]);
 
         DB::commit();
+
+        // Recalcular métricas del cliente (total_pedidos, total_gastado, etc.)
+        try {
+            $cliente->refresh()->recalcularMetricas();
+        } catch (\Throwable $e) {
+            Log::warning('No se pudo recalcular métricas del cliente: ' . $e->getMessage());
+        }
 
         $pedido->load(['sede', 'detalles', 'historialEstados']);
 
@@ -1342,6 +1377,14 @@ class WhatsappWebhookController extends Controller
 
     private function infoEmpresa(): string
     {
+        $config = \App\Models\ConfiguracionBot::actual();
+        $info = trim((string) $config->info_empresa);
+
+        if ($info !== '') {
+            return $info;
+        }
+
+        // Fallback si no se ha configurado
         return "Alimentos La Hacienda\n"
             . "- Más de 25 años de experiencia.\n"
             . "- Ubicada en Bello, Antioquia.\n"

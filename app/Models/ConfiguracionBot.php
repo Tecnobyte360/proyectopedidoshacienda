@@ -23,6 +23,7 @@ class ConfiguracionBot extends Model
         'max_tokens',
         'nombre_asesora',
         'frase_bienvenida',
+        'info_empresa',
         'usar_prompt_personalizado',
         'system_prompt',
         'activo',

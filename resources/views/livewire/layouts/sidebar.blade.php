@@ -36,6 +36,7 @@
             [
                 'title' => 'Operaciones',
                 'items' => [
+                    ['name' => 'Clientes',      'icon' => 'fa-users',              'route' => 'clientes.index',      'badge' => null],
                     ['name' => 'Domiciliarios', 'icon' => 'fa-motorcycle',         'route' => 'domiciliarios.index', 'badge' => null],
                     ['name' => 'Zonas',         'icon' => 'fa-map-location-dot',   'route' => 'zonas.index',         'badge' => null],
                     ['name' => 'Reportes',      'icon' => 'fa-chart-line',         'route' => 'reportes.index',      'badge' => null],
