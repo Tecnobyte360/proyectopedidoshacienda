@@ -53,6 +53,7 @@
                             'badge' => (\Schema::hasTable('bot_alertas')
                                 ? (\App\Models\BotAlerta::where('resuelta', false)->count() ?: null)
                                 : null)],
+                        ['name' => 'Felicitaciones', 'icon' => 'fa-cake-candles', 'route' => 'felicitaciones.index', 'badge' => null],
                     ],
                 ],
             ];

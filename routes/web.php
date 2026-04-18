@@ -18,6 +18,7 @@ use App\Livewire\Clientes\Index as ClientesIndex;
 use App\Livewire\Conversaciones\Index as ConversacionesIndex;
 use App\Livewire\Chat\Index as ChatIndex;
 use App\Livewire\Alertas\Index as AlertasIndex;
+use App\Livewire\Felicitaciones\Index as FelicitacionesIndex;
 use App\Models\Sede;
 use App\Models\Pedido;
 use App\Models\DetallePedido;
@@ -37,6 +38,7 @@ Route::get('/clientes',          ClientesIndex::class)->name('clientes.index');
 Route::get('/conversaciones',    ConversacionesIndex::class)->name('conversaciones.index');
 Route::get('/chat',              ChatIndex::class)->name('chat.index');
 Route::get('/alertas',           AlertasIndex::class)->name('alertas.index');
+Route::get('/felicitaciones',    FelicitacionesIndex::class)->name('felicitaciones.index');
 
 Route::get('/seguimiento-pedido/{codigo}', SeguimientoPedido::class)
     ->name('pedidos.seguimiento');

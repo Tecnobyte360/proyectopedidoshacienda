@@ -16,6 +16,7 @@
         'conversaciones.index' => ['Conversaciones', 'Historial de cada chat con el bot',          'fa-comments'],
         'chat.index'           => ['Chat en vivo',   'Atiende clientes en tiempo real',            'fa-headset'],
         'alertas.index'        => ['Alertas del bot','Errores operativos: OpenAI, WhatsApp',       'fa-triangle-exclamation'],
+        'felicitaciones.index' => ['Felicitaciones',  'Historial de felicitaciones de cumpleaños',  'fa-cake-candles'],
         'pedidos.seguimiento'  => ['Seguimiento',    'Estado del pedido',                          'fa-route'],
     ];
 

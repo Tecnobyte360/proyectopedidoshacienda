@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\Cliente;
 use App\Models\ConfiguracionBot;
+use App\Models\FelicitacionCumpleanos;
 use App\Services\WhatsappSenderService;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
@@ -59,29 +60,67 @@ class EnviarFelicitacionesCumpleanos extends Command
         $enviados = 0;
         $fallidos = 0;
 
+        $origen = $this->option('force')
+            ? FelicitacionCumpleanos::ORIGEN_FORCE
+            : ($this->option('dry-run')
+                ? FelicitacionCumpleanos::ORIGEN_MANUAL
+                : FelicitacionCumpleanos::ORIGEN_SCHEDULED);
+
         foreach ($clientes as $cliente) {
             $nombre = trim($cliente->nombre ?: 'crack') ?: 'crack';
             $mensaje = $this->renderizar($plantilla, $cliente);
 
             $linea = sprintf('  → %s (%s)', $nombre, $cliente->telefono_normalizado);
 
+            // Registro base (todos los intentos quedan en historial)
+            $registro = FelicitacionCumpleanos::create([
+                'cliente_id'     => $cliente->id,
+                'cliente_nombre' => $nombre,
+                'telefono'       => $cliente->telefono_normalizado,
+                'mensaje'        => $mensaje,
+                'origen'         => $origen,
+                'anio'           => $anoActual,
+                'estado'         => FelicitacionCumpleanos::ESTADO_DRY_RUN, // placeholder
+                'enviado_at'     => now(),
+            ]);
+
             if ($this->option('dry-run')) {
+                $registro->update(['estado' => FelicitacionCumpleanos::ESTADO_DRY_RUN]);
                 $this->line($linea . ' [DRY-RUN, no se envía]');
                 continue;
             }
 
-            $ok = $wa->enviarTexto($cliente->telefono_normalizado, $mensaje);
+            try {
+                $ok = $wa->enviarTexto($cliente->telefono_normalizado, $mensaje);
+            } catch (\Throwable $e) {
+                $ok = false;
+                $registro->update([
+                    'estado'        => FelicitacionCumpleanos::ESTADO_FALLIDO,
+                    'error_detalle' => $e->getMessage(),
+                ]);
+                $this->line($linea . ' ❌ (' . $e->getMessage() . ')');
+                $fallidos++;
+                continue;
+            }
 
             if ($ok) {
                 $cliente->update(['ultima_felicitacion_anio' => $anoActual]);
+                $registro->update(['estado' => FelicitacionCumpleanos::ESTADO_ENVIADO]);
+
                 $this->line($linea . ' ✅');
                 $enviados++;
+
                 Log::info('🎂 Felicitación enviada', [
-                    'cliente_id' => $cliente->id,
-                    'nombre'     => $nombre,
-                    'telefono'   => $cliente->telefono_normalizado,
+                    'cliente_id'     => $cliente->id,
+                    'nombre'         => $nombre,
+                    'telefono'       => $cliente->telefono_normalizado,
+                    'felicitacion_id' => $registro->id,
                 ]);
             } else {
+                $registro->update([
+                    'estado'        => FelicitacionCumpleanos::ESTADO_FALLIDO,
+                    'error_detalle' => 'La API de WhatsApp respondió con error. Revisa los logs.',
+                ]);
                 $this->line($linea . ' ❌');
                 $fallidos++;
             }
