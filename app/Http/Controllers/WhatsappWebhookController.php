@@ -1545,8 +1545,9 @@ class WhatsappWebhookController extends Controller
                     $msg .= "🎁 Incluye envío gratis por " . $beneficio->origen . ".\n";
                 }
 
-                $msg .= "\n🔎 Seguimiento:\n" . $ultimoPedido->url_seguimiento
-                    . "\n\nSi necesitas algo distinto al pedido #{$ultimoPedido->id}, cuéntame qué es y te ayudo 🙌";
+                // El enlace de seguimiento ya fue enviado en la confirmación inicial,
+                // no lo repetimos para no saturar al cliente.
+                $msg .= "\nSi necesitas algo distinto al pedido #{$ultimoPedido->id}, cuéntame qué es y te ayudo 🙌";
 
                 return $msg;
             }

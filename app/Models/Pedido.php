@@ -212,8 +212,7 @@ class Pedido extends Model
             . "Tu pedido #{$this->id} ya va en camino 🚀\n\n"
             . "🔐 *Tu código de verificación de entrega es:*\n\n"
             . "        *{$token}*\n\n"
-            . "Dáselo al domiciliario cuando llegue para confirmar la entrega.\n\n"
-            . "🔎 Sigue tu pedido aquí:\n{$this->url_seguimiento}";
+            . "Dáselo al domiciliario cuando llegue para confirmar la entrega.";
 
         $payload = [
             'number'       => $this->normalizarTelefono($telefono),
@@ -323,7 +322,12 @@ class Pedido extends Model
             return;
         }
 
-        $mensaje .= "\n\n🔎 Puedes seguirlo aquí:\n{$this->url_seguimiento}";
+        // El link de seguimiento SOLO se envía en la confirmación inicial del pedido
+        // (eso lo maneja construirMensajeConfirmacionPedido en el webhook controller).
+        // Aquí en las actualizaciones de estado NO lo repetimos para no saturar
+        // al cliente con el mismo enlace una y otra vez.
+        // Si en algún estado específico quisieras incluirlo (ej. al entregar),
+        // puedes concatenarlo condicionalmente.
 
         $payload = [
             'number'       => $this->normalizarTelefono($telefono),
