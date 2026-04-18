@@ -58,7 +58,11 @@ class ConversacionWhatsapp extends Model
 
     public function mensajes(): HasMany
     {
-        return $this->hasMany(MensajeWhatsapp::class, 'conversacion_id')->orderBy('created_at');
+        // Orden cronológico estable: created_at + id como tiebreaker
+        // (varios mensajes en el mismo segundo son comunes en chat)
+        return $this->hasMany(MensajeWhatsapp::class, 'conversacion_id')
+            ->orderBy('created_at')
+            ->orderBy('id');
     }
 
     public function ultimosMensajes(int $cantidad = 20): HasMany
@@ -66,6 +70,7 @@ class ConversacionWhatsapp extends Model
         return $this->hasMany(MensajeWhatsapp::class, 'conversacion_id')
             ->whereIn('rol', ['user', 'assistant'])
             ->orderByDesc('created_at')
+            ->orderByDesc('id')
             ->limit($cantidad);
     }
 
@@ -85,9 +90,11 @@ class ConversacionWhatsapp extends Model
      */
     public function historialParaIA(int $cantidad = 20): array
     {
-        return $this->mensajes()
+        // Tomamos los últimos N por id desc (estable) y luego volteamos a cronológico
+        return MensajeWhatsapp::query()
+            ->where('conversacion_id', $this->id)
             ->whereIn('rol', ['user', 'assistant'])
-            ->orderByDesc('created_at')
+            ->orderByDesc('id')
             ->limit($cantidad)
             ->get()
             ->reverse()
