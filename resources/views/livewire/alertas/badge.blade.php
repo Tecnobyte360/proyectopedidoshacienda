@@ -1,4 +1,4 @@
-<div class="relative" x-data="{ open: @entangle('abierto') }" @click.outside="open = false; $wire.cerrar()" wire:poll.30s>
+<div class="relative" x-data="{ open: @entangle('abierto') }" @click.outside="open = false; $wire.cerrar()" wire:poll.30s="refrescar">
     {{-- Botón de la campana --}}
     <button type="button"
             wire:click="toggle"
