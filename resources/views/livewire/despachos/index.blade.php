@@ -147,7 +147,7 @@
                  style="height: 360px;"></div>
         </div>
 
-        @push('scripts')
+        {{-- JS inline (evita @push que rompe en Livewire al re-render) --}}
         <script>
             (function () {
                 function iniciarMapaDespacho() {
@@ -160,7 +160,9 @@
                     // Limpiar mapa previo si había
                     if (el._leafletMap) {
                         el._leafletMap.remove();
+                        el._leafletMap = null;
                     }
+                    el.innerHTML = '';
 
                     const puntos = [];
                     if (data.origen) puntos.push([data.origen.lat, data.origen.lng]);
@@ -174,40 +176,37 @@
                         attribution: '© OpenStreetMap'
                     }).addTo(map);
 
-                    // Sede (verde)
                     if (data.origen) {
                         const sedeIcon = L.divIcon({
                             className: 'sede-marker',
-                            html: `<div style="background:#10b981;color:#fff;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-weight:bold;box-shadow:0 2px 8px rgba(0,0,0,0.3);border:3px solid #fff">🏪</div>`,
+                            html: '<div style="background:#10b981;color:#fff;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-weight:bold;box-shadow:0 2px 8px rgba(0,0,0,0.3);border:3px solid #fff">🏪</div>',
                             iconSize: [36, 36],
                             iconAnchor: [18, 18],
                         });
                         L.marker([data.origen.lat, data.origen.lng], { icon: sedeIcon })
                             .addTo(map)
-                            .bindPopup(`<b>${data.origen.nombre}</b><br>${data.origen.detalle || ''}`);
+                            .bindPopup('<b>' + (data.origen.nombre || 'Sede') + '</b><br>' + (data.origen.detalle || ''));
                     }
 
-                    // Paradas numeradas
-                    (data.paradas || []).forEach((p, i) => {
+                    (data.paradas || []).forEach(function (p, i) {
                         const num = i + 1;
                         const pinIcon = L.divIcon({
                             className: 'pedido-marker',
-                            html: `<div style="background:#d68643;color:#fff;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-weight:bold;box-shadow:0 2px 8px rgba(0,0,0,0.3);border:3px solid #fff">${num}</div>`,
+                            html: '<div style="background:#d68643;color:#fff;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-weight:bold;box-shadow:0 2px 8px rgba(0,0,0,0.3);border:3px solid #fff">' + num + '</div>',
                             iconSize: [32, 32],
                             iconAnchor: [16, 16],
                         });
                         L.marker([p.lat, p.lng], { icon: pinIcon })
                             .addTo(map)
-                            .bindPopup(`
-                                <b>#${num} ${p.nombre}</b><br>
-                                ${p.direccion}<br>
-                                ${p.barrio ? `📍 ${p.barrio}<br>` : ''}
-                                ${p.telefono ? `📞 ${p.telefono}<br>` : ''}
-                                💵 $${Number(p.total).toLocaleString('es-CO')}
-                            `);
+                            .bindPopup(
+                                '<b>#' + num + ' ' + (p.nombre || '') + '</b><br>' +
+                                (p.direccion || '') + '<br>' +
+                                (p.barrio ? ('📍 ' + p.barrio + '<br>') : '') +
+                                (p.telefono ? ('📞 ' + p.telefono + '<br>') : '') +
+                                '💵 $' + Number(p.total || 0).toLocaleString('es-CO')
+                            );
                     });
 
-                    // Línea conectando los puntos
                     if (puntos.length > 1) {
                         L.polyline(puntos, {
                             color: '#d68643',
@@ -217,28 +216,30 @@
                         }).addTo(map);
                     }
 
-                    // Ajustar vista
                     if (puntos.length === 1) {
                         map.setView(puntos[0], 14);
-                    } else {
+                    } else if (puntos.length > 1) {
                         map.fitBounds(puntos, { padding: [40, 40] });
                     }
                 }
 
-                // Inicial + en cada re-render de Livewire
-                document.addEventListener('DOMContentLoaded', iniciarMapaDespacho);
-                if (window.Livewire) {
-                    Livewire.hook('morph.updated', () => setTimeout(iniciarMapaDespacho, 80));
+                // Intentar iniciar ahora y después de que Leaflet se cargue
+                if (window.L) {
+                    iniciarMapaDespacho();
+                } else {
+                    setTimeout(iniciarMapaDespacho, 300);
+                    setTimeout(iniciarMapaDespacho, 800);
                 }
-                // Por si Livewire carga después
-                document.addEventListener('livewire:init', () => {
-                    Livewire.hook('morph.updated', () => setTimeout(iniciarMapaDespacho, 80));
-                });
-                // Intento adicional (el @push puede cargar antes que Leaflet)
-                setTimeout(iniciarMapaDespacho, 300);
+
+                // Re-render cuando Livewire actualiza el DOM
+                if (window.Livewire && !window._despachoHookRegistered) {
+                    window._despachoHookRegistered = true;
+                    Livewire.hook('morph.updated', function () {
+                        setTimeout(iniciarMapaDespacho, 80);
+                    });
+                }
             })();
         </script>
-        @endpush
     @endif
 
     {{-- ZONAS --}}
