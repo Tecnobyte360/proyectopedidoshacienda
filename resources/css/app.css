@@ -1,9 +1,9 @@
 @import "tailwindcss";
 
-@source "../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php";
-@source "../../storage/framework/views/*.php";
-@source "../**/*.blade.php";
-@source "../**/*.js";
+/* Source paths — el plugin @tailwindcss/vite usa AUTO content detection PERO
+   no escanea archivos PHP/Blade por default. @source los agrega. */
+@source "../views";
+@source "../../app";
 
 @keyframes newOrderPulse {
     0% {
