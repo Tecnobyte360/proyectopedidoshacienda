@@ -19,15 +19,15 @@
     [$titulo, $subtitulo, $icono] = $titulos[$current] ?? ['Panel', 'Bienvenido', 'fa-house'];
 @endphp
 
-<header class="fixed top-0 right-0 left-0 md:left-64 z-30 h-20 border-b border-slate-200 bg-white/90 backdrop-blur-lg shadow-sm">
-    <div class="flex h-full items-center justify-between px-4 md:px-8 gap-4">
+<header class="app-topbar fixed top-0 right-0 left-0 lg:left-64 z-30 h-20 border-b border-slate-200 bg-white/90 backdrop-blur-lg shadow-sm">
+    <div class="flex h-full items-center justify-between px-4 lg:px-8 gap-4">
 
         {{-- IZQUIERDA: hamburguesa móvil + título --}}
         <div class="flex items-center gap-4 min-w-0">
 
-            {{-- Botón hamburguesa solo en móvil --}}
-            <button onclick="window.dispatchEvent(new CustomEvent('sidebar-toggle'))"
-                    class="md:hidden flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 transition">
+            {{-- Botón hamburguesa solo en móvil/tablet --}}
+            <button onclick="document.getElementById('mobile-sidebar').classList.remove('-translate-x-full'); document.getElementById('mobile-backdrop').classList.remove('hidden');"
+                    class="lg:hidden flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 transition">
                 <i class="fa-solid fa-bars"></i>
             </button>
 

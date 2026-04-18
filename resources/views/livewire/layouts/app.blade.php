@@ -25,44 +25,40 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @livewireStyles
 
-    {{-- Store global Alpine — registrado en el <head> ANTES de cualquier script Livewire/Alpine.
-         Esto garantiza que el listener de 'alpine:init' esté presente cuando Alpine arranque. --}}
+    {{-- Fullscreen mode — toggle simple con body class + localStorage (sin Alpine store).
+         Cualquier botón que llame a window.toggleFullscreen() activa/desactiva el modo. --}}
     <script>
         (function () {
-            const registrarStore = () => {
-                if (!window.Alpine) return false;
-                if (Alpine.store && Alpine.store('ui')) return true;
-                if (Alpine.store) {
-                    Alpine.store('ui', {
-                        fullscreen: false,
-                        toggle() { this.fullscreen = !this.fullscreen; },
-                    });
-                    return true;
-                }
-                return false;
+            // Restaurar estado al cargar
+            if (localStorage.getItem('fullscreen') === '1') {
+                document.documentElement.classList.add('preload-fullscreen');
+                document.addEventListener('DOMContentLoaded', () => {
+                    document.body.classList.add('is-fullscreen');
+                });
+            }
+
+            window.toggleFullscreen = function () {
+                const on = !document.body.classList.contains('is-fullscreen');
+                document.body.classList.toggle('is-fullscreen', on);
+                localStorage.setItem('fullscreen', on ? '1' : '0');
             };
 
-            // 1) Antes de que Alpine arranque
-            document.addEventListener('alpine:init', registrarStore);
-
-            // 2) Después de que Alpine ya arrancó (fallback)
-            document.addEventListener('alpine:initialized', registrarStore);
-
-            // 3) Reintento por si el evento ya pasó cuando este script corrió
-            const intentar = () => { if (!registrarStore()) setTimeout(intentar, 50); };
-            if (document.readyState !== 'loading') intentar();
-            else document.addEventListener('DOMContentLoaded', intentar);
-
-            // ESC sale del fullscreen
-            window.addEventListener('keydown', (e) => {
-                try {
-                    if (e.key === 'Escape' && window.Alpine?.store('ui')?.fullscreen) {
-                        window.Alpine.store('ui').fullscreen = false;
-                    }
-                } catch (_) {}
+            window.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape' && document.body.classList.contains('is-fullscreen')) {
+                    document.body.classList.remove('is-fullscreen');
+                    localStorage.setItem('fullscreen', '0');
+                }
             });
         })();
     </script>
+
+    {{-- CSS para el modo fullscreen (oculta sidebar, topbar, ajusta padding) --}}
+    <style>
+        body.is-fullscreen aside.app-sidebar,
+        body.is-fullscreen header.app-topbar { display: none !important; }
+        body.is-fullscreen main             { padding-top: 0 !important; padding-left: 0 !important; }
+        body.is-fullscreen #btn-exit-fullscreen { display: flex !important; }
+    </style>
 
     <style>
         html,
@@ -77,30 +73,23 @@
 </head>
 <body class="bg-[#f7f7f9] text-slate-800 antialiased">
 
-    {{-- SIDEBAR --}}
-    <div x-data x-show="!($store.ui?.fullscreen)" x-transition.opacity.duration.200ms>
-        <livewire:layouts.sidebar />
-    </div>
+    {{-- SIDEBAR (Livewire — siempre presente, oculto solo por CSS según body class) --}}
+    <livewire:layouts.sidebar />
 
-    {{-- TOPBAR --}}
-    <div x-data x-show="!($store.ui?.fullscreen)" x-transition.opacity.duration.200ms>
-        <livewire:layouts.topbar />
-    </div>
+    {{-- TOPBAR (Livewire — siempre presente) --}}
+    <livewire:layouts.topbar />
 
     {{-- CONTENIDO --}}
-    <main x-data class="min-h-screen transition-all duration-300"
-          :class="$store.ui?.fullscreen ? 'pt-0 pl-0' : 'pt-20 md:pl-64'">
+    <main class="min-h-screen pt-20 lg:pl-64 transition-all duration-300">
         {{ $slot }}
     </main>
 
-    {{-- BOTÓN FLOTANTE PARA SALIR DE FULLSCREEN --}}
-    <button x-data
-            x-show="$store.ui?.fullscreen"
-            x-transition
-            @click="$store.ui && ($store.ui.fullscreen = false)"
+    {{-- BOTÓN FLOTANTE PARA SALIR DE FULLSCREEN (controlado por body class) --}}
+    <button id="btn-exit-fullscreen"
+            type="button"
+            onclick="document.body.classList.remove('is-fullscreen'); localStorage.setItem('fullscreen','0');"
             title="Salir de pantalla completa (ESC)"
-            class="fixed top-4 right-4 z-[60] flex h-11 w-11 items-center justify-center rounded-full bg-slate-900 text-white shadow-2xl hover:bg-slate-700 transition"
-            style="display: none;">
+            class="hidden fixed top-4 right-4 z-[60] h-11 w-11 items-center justify-center rounded-full bg-slate-900 text-white shadow-2xl hover:bg-slate-700 transition">
         <i class="fa-solid fa-compress"></i>
     </button>
 

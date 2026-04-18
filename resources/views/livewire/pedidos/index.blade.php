@@ -78,14 +78,12 @@
                         @livewire('whatsapp-status-monitor')
                     </div>
 
-                    {{-- Botón expandir / contraer --}}
+                    {{-- Botón expandir / contraer pantalla completa --}}
                     <button type="button"
-                            x-data
-                            @click="$store.ui?.toggle()"
-                            :title="$store.ui?.fullscreen ? 'Contraer (ESC)' : 'Pantalla completa'"
+                            onclick="window.toggleFullscreen && window.toggleFullscreen()"
+                            title="Pantalla completa (ESC para salir)"
                             class="shrink-0 flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-orange-600 transition shadow-sm">
-                        <i class="fa-solid"
-                           :class="$store.ui?.fullscreen ? 'fa-compress' : 'fa-expand'"></i>
+                        <i class="fa-solid fa-expand"></i>
                     </button>
                 </div>
             </div>
