@@ -1367,9 +1367,34 @@ class WhatsappWebhookController extends Controller
           ];
       }
 
-      $costoStr = ((float) $zona->costo_envio) > 0
-          ? '$' . number_format((float) $zona->costo_envio, 0, ',', '.')
-          : 'gratis';
+      $costoOriginal = (float) $zona->costo_envio;
+
+      // 🎁 Detectar beneficio vigente ANTES de construir el mensaje
+      // para que el costo mostrado sea YA el final (con descuento aplicado).
+      $beneficioInfo = null;
+      $costoEfectivo = $costoOriginal;
+
+      if (!empty($telefonoCliente)) {
+          $telNorm = $this->normalizarTelefono($telefonoCliente);
+          $clientePosible = Cliente::where('telefono_normalizado', $telNorm)->first();
+          if ($clientePosible) {
+              $ben = $clientePosible->beneficioVigente(\App\Models\BeneficioCliente::TIPO_ENVIO_GRATIS);
+              if ($ben) {
+                  $beneficioInfo = [
+                      'tipo'            => 'envio_gratis',
+                      'origen'          => $ben->origen,
+                      'vigente_hasta'   => $ben->vigente_hasta?->format('d/m/Y'),
+                      'descripcion'     => $ben->descripcion,
+                      'ahorro_original' => $costoOriginal,
+                  ];
+                  $costoEfectivo = 0;   // ← el cliente NO paga envío
+              }
+          }
+      }
+
+      $costoStr = $costoEfectivo > 0
+          ? '$' . number_format($costoEfectivo, 0, ',', '.')
+          : 'GRATIS';
 
       $tiempoMin = $zona->tiempo_estimado_min ?? null;
       $tiempoStr = $tiempoMin
@@ -1381,28 +1406,14 @@ class WhatsappWebhookController extends Controller
           ? '$' . number_format($pedidoMinimo, 0, ',', '.')
           : null;
 
-      $mensajeBase = "Sí llegamos a tu dirección ✅ Zona *{$zona->nombre}* — envío {$costoStr}, {$tiempoStr}.";
+      $mensajeBase = "Sí llegamos a tu dirección ✅ Zona *{$zona->nombre}* — envío *{$costoStr}*, {$tiempoStr}.";
+      if ($beneficioInfo) {
+          $mensajeBase .= " 🎁 *Envío GRATIS aplicado por {$beneficioInfo['origen']}* "
+              . "(hasta {$beneficioInfo['vigente_hasta']}). Normalmente sería \$"
+              . number_format($costoOriginal, 0, ',', '.') . ".";
+      }
       if ($pedidoMinimoStr) {
           $mensajeBase .= " Pedido mínimo para domicilio en esta zona: *{$pedidoMinimoStr}*.";
-      }
-
-      // 🎁 Si el cliente tiene beneficio vigente (por cumpleaños, etc),
-      // se lo mencionamos para que el bot lo sepa y no olvide honrarlo.
-      $beneficioInfo = null;
-      if (!empty($telefonoCliente)) {
-          $telNorm = $this->normalizarTelefono($telefonoCliente);
-          $clientePosible = Cliente::where('telefono_normalizado', $telNorm)->first();
-          if ($clientePosible) {
-              $ben = $clientePosible->beneficioVigente(\App\Models\BeneficioCliente::TIPO_ENVIO_GRATIS);
-              if ($ben) {
-                  $beneficioInfo = [
-                      'tipo'          => 'envio_gratis',
-                      'origen'        => $ben->origen,
-                      'vigente_hasta' => $ben->vigente_hasta?->format('d/m/Y'),
-                  ];
-                  $mensajeBase .= " 🎁 *Beneficio activo*: envío gratis por {$ben->origen} (vigente hasta {$ben->vigente_hasta?->format('d/m')}).";
-              }
-          }
       }
 
       // ── Sede más cercana (si tenemos coordenadas del cliente) ─────────
@@ -1421,21 +1432,23 @@ class WhatsappWebhookController extends Controller
       }
 
       return [
-          'cubierta'           => true,
-          'zona'               => $zona->nombre,
-          'zona_id'            => $zona->id,
-          'costo_envio'        => (float) $zona->costo_envio,
-          'costo_envio_str'    => $costoStr,
-          'pedido_minimo'      => $pedidoMinimo,
-          'pedido_minimo_str'  => $pedidoMinimoStr,
-          'tiempo_estimado'    => $tiempoStr,
-          'coordenadas'        => $coord,
-          'sede_sugerida'      => $sedeCercanaNombre,
-          'sede_sugerida_id'   => $sedeCercana?->id,
-          'distancia_km'       => $distanciaKm ? round($distanciaKm, 2) : null,
-          'beneficio_activo'   => $beneficioInfo,
-          'mensaje_sugerido'   => $mensajeBase,
-          'metodo_usado'       => $metodo,
+          'cubierta'            => true,
+          'zona'                => $zona->nombre,
+          'zona_id'             => $zona->id,
+          // costo_envio ya refleja el descuento aplicado
+          'costo_envio'         => $costoEfectivo,
+          'costo_envio_str'     => $costoStr,
+          'costo_envio_original'=> $costoOriginal,
+          'pedido_minimo'       => $pedidoMinimo,
+          'pedido_minimo_str'   => $pedidoMinimoStr,
+          'tiempo_estimado'     => $tiempoStr,
+          'coordenadas'         => $coord,
+          'sede_sugerida'       => $sedeCercanaNombre,
+          'sede_sugerida_id'    => $sedeCercana?->id,
+          'distancia_km'        => $distanciaKm ? round($distanciaKm, 2) : null,
+          'beneficio_activo'    => $beneficioInfo,
+          'mensaje_sugerido'    => $mensajeBase,
+          'metodo_usado'        => $metodo,
       ];
   }
 
