@@ -27,12 +27,47 @@ class EnviarFelicitacionesCumpleanos extends Command
             return Command::SUCCESS;
         }
 
-        $hoy = Carbon::now();
+        $hoy = Carbon::now('America/Bogota');
         $anoActual = (int) $hoy->format('Y');
-        $mes = (int) $hoy->format('m');
-        $dia = (int) $hoy->format('d');
 
-        // Clientes cuyo cumpleaños es hoy (mes y día coinciden)
+        // ── Validar día de la semana permitido ───────────────────────────
+        // Carbon: dayOfWeek es 0=Dom...6=Sab. Convertimos a índice L-D (0=Lun..6=Dom).
+        $diasSemanaStr = str_pad((string) ($config->cumpleanos_dias_semana ?: '1111111'), 7, '1');
+        $diasSemana = [
+            1 => 0, // Lun
+            2 => 1, // Mar
+            3 => 2, // Mié
+            4 => 3, // Jue
+            5 => 4, // Vie
+            6 => 5, // Sáb
+            0 => 6, // Dom
+        ];
+        $idxHoy = $diasSemana[$hoy->dayOfWeek] ?? 0;
+        if (($diasSemanaStr[$idxHoy] ?? '1') !== '1' && !$this->option('force')) {
+            $this->warn('🚫 Hoy (' . $hoy->isoFormat('dddd') . ') NO está en los días permitidos según la configuración.');
+            return Command::SUCCESS;
+        }
+
+        // ── Validar ventana horaria ──────────────────────────────────────
+        $horaActual = $hoy->format('H:i');
+        $desde = $config->cumpleanos_ventana_desde ?: '00:00';
+        $hasta = $config->cumpleanos_ventana_hasta ?: '23:59';
+        if (!$this->option('force') && ($horaActual < $desde || $horaActual > $hasta)) {
+            $this->warn("🚫 Hora actual {$horaActual} está fuera de la ventana permitida ({$desde} - {$hasta}).");
+            return Command::SUCCESS;
+        }
+
+        // ── Aplicar anticipación: calcular fecha objetivo ────────────────
+        $anticipacion = (int) ($config->cumpleanos_dias_anticipacion ?? 0);
+        $fechaObjetivo = $hoy->copy()->addDays($anticipacion);
+        $mes = (int) $fechaObjetivo->format('m');
+        $dia = (int) $fechaObjetivo->format('d');
+
+        if ($anticipacion > 0) {
+            $this->info("📅 Buscando cumpleañeros con {$anticipacion} día(s) de anticipación → fecha objetivo: {$fechaObjetivo->format('d/m')}");
+        }
+
+        // Clientes cuyo cumpleaños cae en la fecha objetivo
         $query = Cliente::query()
             ->whereNotNull('fecha_nacimiento')
             ->where('activo', true)
@@ -90,40 +125,52 @@ class EnviarFelicitacionesCumpleanos extends Command
                 continue;
             }
 
-            try {
-                $ok = $wa->enviarTexto($cliente->telefono_normalizado, $mensaje);
-            } catch (\Throwable $e) {
-                $ok = false;
+            // ── Envío con reintentos según configuración ─────────────
+            $maxReintentos = (int) ($config->cumpleanos_reintentos_max ?? 2);
+            $ok = false;
+            $ultimoError = null;
+            $intentos = 0;
+
+            for ($i = 0; $i <= $maxReintentos; $i++) {
+                $intentos++;
+                try {
+                    $ok = $wa->enviarTexto($cliente->telefono_normalizado, $mensaje);
+                    if ($ok) break;
+                    $ultimoError = 'La API de WhatsApp respondió con error (intento ' . $intentos . ').';
+                } catch (\Throwable $e) {
+                    $ultimoError = $e->getMessage();
+                }
+
+                if (!$ok && $i < $maxReintentos) {
+                    // Esperar un poco antes del siguiente intento (backoff simple)
+                    sleep(min(3, $i + 1));
+                }
+            }
+
+            if (!$ok) {
                 $registro->update([
                     'estado'        => FelicitacionCumpleanos::ESTADO_FALLIDO,
-                    'error_detalle' => $e->getMessage(),
+                    'error_detalle' => $ultimoError . ' [Intentos: ' . $intentos . ']',
                 ]);
-                $this->line($linea . ' ❌ (' . $e->getMessage() . ')');
+                $this->line($linea . ' ❌ (' . $intentos . ' intento(s))');
                 $fallidos++;
                 continue;
             }
 
-            if ($ok) {
-                $cliente->update(['ultima_felicitacion_anio' => $anoActual]);
-                $registro->update(['estado' => FelicitacionCumpleanos::ESTADO_ENVIADO]);
+            // Éxito (llegamos aquí solo si ok=true)
+            $cliente->update(['ultima_felicitacion_anio' => $anoActual]);
+            $registro->update(['estado' => FelicitacionCumpleanos::ESTADO_ENVIADO]);
 
-                $this->line($linea . ' ✅');
-                $enviados++;
+            $this->line($linea . ' ✅');
+            $enviados++;
 
-                Log::info('🎂 Felicitación enviada', [
-                    'cliente_id'     => $cliente->id,
-                    'nombre'         => $nombre,
-                    'telefono'       => $cliente->telefono_normalizado,
-                    'felicitacion_id' => $registro->id,
-                ]);
-            } else {
-                $registro->update([
-                    'estado'        => FelicitacionCumpleanos::ESTADO_FALLIDO,
-                    'error_detalle' => 'La API de WhatsApp respondió con error. Revisa los logs.',
-                ]);
-                $this->line($linea . ' ❌');
-                $fallidos++;
-            }
+            Log::info('🎂 Felicitación enviada', [
+                'cliente_id'     => $cliente->id,
+                'nombre'         => $nombre,
+                'telefono'       => $cliente->telefono_normalizado,
+                'intentos'       => $intentos,
+                'felicitacion_id' => $registro->id,
+            ]);
 
             // Pequeña pausa para no saturar la API de WhatsApp
             usleep(500_000);

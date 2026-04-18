@@ -388,14 +388,84 @@
                     </div>
                 </label>
 
+                {{-- Fila 1: cuándo enviar --}}
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1">Hora de envío</label>
                         <input type="time" wire:model="cumpleanos_hora"
                                class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
-                        <p class="text-xs text-slate-500 mt-1">Hora local (Bogotá). El cron corre cada hora y dispara a esta.</p>
+                        <p class="text-xs text-slate-500 mt-1">Hora local (Bogotá). Se revisa cada minuto.</p>
                         @error('cumpleanos_hora') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
                     </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Días de anticipación</label>
+                        <select wire:model="cumpleanos_dias_anticipacion"
+                                class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                            <option value="0">El mismo día 🎂</option>
+                            <option value="1">1 día antes</option>
+                            <option value="2">2 días antes</option>
+                            <option value="3">3 días antes</option>
+                            <option value="7">Una semana antes</option>
+                        </select>
+                        <p class="text-xs text-slate-500 mt-1">Cuándo enviarle el mensaje relativo a su cumpleaños.</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Reintentos si falla</label>
+                        <select wire:model="cumpleanos_reintentos_max"
+                                class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                            <option value="0">Sin reintentos</option>
+                            <option value="1">1 reintento</option>
+                            <option value="2">2 reintentos</option>
+                            <option value="3">3 reintentos</option>
+                            <option value="5">5 reintentos</option>
+                        </select>
+                        <p class="text-xs text-slate-500 mt-1">Si WhatsApp falla, cuántas veces reintentar.</p>
+                    </div>
+                </div>
+
+                {{-- Fila 2: ventana horaria --}}
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">
+                            Ventana permitida — desde
+                        </label>
+                        <input type="time" wire:model="cumpleanos_ventana_desde"
+                               class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">
+                            Ventana permitida — hasta
+                        </label>
+                        <input type="time" wire:model="cumpleanos_ventana_hasta"
+                               class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                    </div>
+                </div>
+                <p class="text-xs text-slate-500 -mt-2">
+                    <i class="fa-solid fa-shield-halved text-emerald-500 mr-1"></i>
+                    Protección anti-madrugada: si por error se configura una hora fuera de esta ventana, el sistema no envía.
+                </p>
+
+                {{-- Fila 3: días de la semana --}}
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-2">Días permitidos de la semana</label>
+                    <div class="flex flex-wrap gap-2">
+                        @php
+                            $nombresDias = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+                        @endphp
+                        @foreach($nombresDias as $i => $nombre)
+                            <label class="inline-flex items-center gap-2 cursor-pointer select-none rounded-xl border-2 px-4 py-2 transition
+                                          {{ ($cumpleanos_dias_semana_arr[$i] ?? true) ? 'border-pink-500 bg-pink-50 text-pink-700' : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300' }}">
+                                <input type="checkbox" wire:model.live="cumpleanos_dias_semana_arr.{{ $i }}" class="hidden">
+                                <span class="font-semibold text-sm">{{ $nombre }}</span>
+                                @if($cumpleanos_dias_semana_arr[$i] ?? true)
+                                    <i class="fa-solid fa-check text-pink-500 text-xs"></i>
+                                @endif
+                            </label>
+                        @endforeach
+                    </div>
+                    <p class="text-xs text-slate-500 mt-2">
+                        Si un cliente cumple años en un día no permitido, el mensaje se posterga al siguiente día habilitado.
+                    </p>
                 </div>
 
                 <div>

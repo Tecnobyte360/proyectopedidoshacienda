@@ -71,6 +71,18 @@ class Bot extends Component
         $this->cumpleanos_activo  = (bool) ($cfg->cumpleanos_activo ?? true);
         $this->cumpleanos_hora    = (string) ($cfg->cumpleanos_hora ?: '09:00');
         $this->cumpleanos_mensaje = (string) ($cfg->cumpleanos_mensaje ?: ConfiguracionBot::CUMPLEANOS_PLANTILLA_DEFAULT);
+
+        $this->cumpleanos_dias_anticipacion = (int) ($cfg->cumpleanos_dias_anticipacion ?? 0);
+        $this->cumpleanos_reintentos_max    = (int) ($cfg->cumpleanos_reintentos_max ?? 2);
+        $this->cumpleanos_ventana_desde     = (string) ($cfg->cumpleanos_ventana_desde ?: '08:00');
+        $this->cumpleanos_ventana_hasta     = (string) ($cfg->cumpleanos_ventana_hasta ?: '20:00');
+
+        // String '1111111' → array de booleans [true, true, true, true, true, true, true]
+        $diasStr = str_pad((string) ($cfg->cumpleanos_dias_semana ?: '1111111'), 7, '1');
+        $this->cumpleanos_dias_semana_arr = [];
+        for ($i = 0; $i < 7; $i++) {
+            $this->cumpleanos_dias_semana_arr[] = ($diasStr[$i] ?? '1') === '1';
+        }
     }
 
     public function cargarPlantillaCumpleanosDefault(): void
@@ -236,15 +248,30 @@ class Bot extends Component
             'activo'                    => 'boolean',
             'usar_prompt_personalizado' => 'boolean',
             'system_prompt'             => 'nullable|string|max:20000',
-            'cumpleanos_activo'         => 'boolean',
-            'cumpleanos_hora'           => 'nullable|string|regex:/^\d{2}:\d{2}$/',
-            'cumpleanos_mensaje'        => 'nullable|string|max:2000',
+            'cumpleanos_activo'            => 'boolean',
+            'cumpleanos_hora'              => 'nullable|string|regex:/^\d{2}:\d{2}$/',
+            'cumpleanos_mensaje'           => 'nullable|string|max:2000',
+            'cumpleanos_dias_anticipacion' => 'integer|min:0|max:30',
+            'cumpleanos_reintentos_max'    => 'integer|min:0|max:5',
+            'cumpleanos_ventana_desde'     => 'nullable|string|regex:/^\d{2}:\d{2}$/',
+            'cumpleanos_ventana_hasta'     => 'nullable|string|regex:/^\d{2}:\d{2}$/',
+            'cumpleanos_dias_semana_arr'   => 'array|size:7',
         ];
     }
 
     public function guardar(): void
     {
         $data = $this->validate();
+
+        // Convertir array de booleans a string '1010111'
+        if (isset($data['cumpleanos_dias_semana_arr'])) {
+            $diasStr = '';
+            foreach ($data['cumpleanos_dias_semana_arr'] as $activo) {
+                $diasStr .= $activo ? '1' : '0';
+            }
+            $data['cumpleanos_dias_semana'] = $diasStr;
+            unset($data['cumpleanos_dias_semana_arr']);
+        }
 
         $cfg = ConfiguracionBot::actual();
         $cfg->update($data);
