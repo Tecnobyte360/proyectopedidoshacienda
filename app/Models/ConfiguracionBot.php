@@ -37,6 +37,7 @@ class ConfiguracionBot extends Model
         'cumpleanos_ventana_desde',
         'cumpleanos_ventana_hasta',
         'cumpleanos_dias_semana',
+        'connection_id_default',
     ];
 
     protected $casts = [

@@ -10,14 +10,15 @@ class Index extends Component
 {
     use WithPagination;
 
-    public string $filtroEstado = 'todas';  // todas | enviado | fallido | dry_run
-    public string $filtroOrigen = 'todos';  // todos | scheduled | manual | force
-    public string $busqueda     = '';
-    public ?int   $anio         = null;
+    public string $filtroEstado     = 'todas';  // todas | enviado | fallido | dry_run
+    public string $filtroOrigen     = 'todos';  // todos | scheduled | manual | force
+    public string $filtroConexion   = 'todas';  // todas | <id> | ninguna
+    public string $busqueda         = '';
+    public ?int   $anio             = null;
 
     public ?int $detalleId = null;
 
-    protected $queryString = ['filtroEstado', 'filtroOrigen', 'busqueda', 'anio'];
+    protected $queryString = ['filtroEstado', 'filtroOrigen', 'filtroConexion', 'busqueda', 'anio'];
 
     public function mount(): void
     {
@@ -26,7 +27,7 @@ class Index extends Component
 
     public function updating($name): void
     {
-        if (in_array($name, ['filtroEstado', 'filtroOrigen', 'busqueda', 'anio'], true)) {
+        if (in_array($name, ['filtroEstado', 'filtroOrigen', 'filtroConexion', 'busqueda', 'anio'], true)) {
             $this->resetPage();
         }
     }
@@ -56,7 +57,8 @@ class Index extends Component
 
         try {
             $wa = app(\App\Services\WhatsappSenderService::class);
-            $ok = $wa->enviarTexto($reg->telefono, $reg->mensaje);
+            // Mantener la conexión original del registro si la tiene
+            $ok = $wa->enviarTexto($reg->telefono, $reg->mensaje, $reg->connection_id);
 
             if ($ok) {
                 $reg->update([
@@ -107,6 +109,12 @@ class Index extends Component
             $query->where('origen', $this->filtroOrigen);
         }
 
+        if ($this->filtroConexion === 'ninguna') {
+            $query->whereNull('connection_id');
+        } elseif ($this->filtroConexion !== 'todas' && is_numeric($this->filtroConexion)) {
+            $query->where('connection_id', (int) $this->filtroConexion);
+        }
+
         if ($this->busqueda !== '') {
             $b = $this->busqueda;
             $query->where(function ($q) use ($b) {
@@ -138,12 +146,21 @@ class Index extends Component
             $aniosDisponibles = [(int) now()->format('Y')];
         }
 
+        $conexionesUsadas = FelicitacionCumpleanos::query()
+            ->whereNotNull('connection_id')
+            ->select('connection_id')
+            ->distinct()
+            ->orderBy('connection_id')
+            ->pluck('connection_id')
+            ->toArray();
+
         $detalle = $this->detalleId ? FelicitacionCumpleanos::find($this->detalleId) : null;
 
         return view('livewire.felicitaciones.index', compact(
             'felicitaciones',
             'totales',
             'aniosDisponibles',
+            'conexionesUsadas',
             'detalle'
         ))->layout('layouts.app');
     }

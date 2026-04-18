@@ -212,4 +212,30 @@ class Cliente extends Model
             ? "https://wa.me/{$this->telefono_normalizado}"
             : null;
     }
+
+    /**
+     * Devuelve el connection_id de WhatsApp por el cual debería salir un
+     * mensaje dirigido a este cliente.
+     *
+     * Prioridad:
+     *   1. La conexión de su última conversación activa/cerrada (por donde le
+     *      escribieron antes — esa es la "línea oficial" con este cliente).
+     *   2. La conexión por defecto configurada en el bot (si está configurada).
+     *   3. null → WhatsappSenderService usará la conexión genérica.
+     */
+    public function conexionWhatsappPreferida(): ?int
+    {
+        $ultimaConv = ConversacionWhatsapp::query()
+            ->where('cliente_id', $this->id)
+            ->whereNotNull('connection_id')
+            ->orderByDesc('id')
+            ->first();
+
+        if ($ultimaConv?->connection_id) {
+            return (int) $ultimaConv->connection_id;
+        }
+
+        $default = ConfiguracionBot::actual()->connection_id_default;
+        return $default ? (int) $default : null;
+    }
 }

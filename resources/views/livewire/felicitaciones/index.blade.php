@@ -36,7 +36,7 @@
 
     {{-- Filtros --}}
     <div class="rounded-2xl bg-white border border-slate-200 p-4">
-        <div class="grid md:grid-cols-4 gap-3">
+        <div class="grid md:grid-cols-5 gap-3">
             <div>
                 <label class="block text-xs font-semibold text-slate-600 mb-1">Año</label>
                 <select wire:model.live="anio"
@@ -67,6 +67,19 @@
                 </select>
             </div>
             <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">
+                    <i class="fa-brands fa-whatsapp"></i> Conexión
+                </label>
+                <select wire:model.live="filtroConexion"
+                        class="w-full rounded-xl border-slate-200 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                    <option value="todas">Todas</option>
+                    <option value="ninguna">Sin conexión asignada</option>
+                    @foreach($conexionesUsadas as $c)
+                        <option value="{{ $c }}">WhatsApp #{{ $c }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div>
                 <label class="block text-xs font-semibold text-slate-600 mb-1">Buscar</label>
                 <input type="text" wire:model.live.debounce.400ms="busqueda"
                        placeholder="Nombre o teléfono..."
@@ -90,6 +103,7 @@
                         <tr>
                             <th class="px-4 py-3 text-left">Cliente</th>
                             <th class="px-4 py-3 text-left">Teléfono</th>
+                            <th class="px-4 py-3 text-left">Conexión</th>
                             <th class="px-4 py-3 text-left">Estado</th>
                             <th class="px-4 py-3 text-left">Origen</th>
                             <th class="px-4 py-3 text-left">Fecha</th>
@@ -101,6 +115,15 @@
                             <tr class="hover:bg-slate-50">
                                 <td class="px-4 py-3 font-semibold text-slate-800">{{ $f->cliente_nombre }}</td>
                                 <td class="px-4 py-3 font-mono text-xs text-slate-600">{{ $f->telefono }}</td>
+                                <td class="px-4 py-3">
+                                    @if($f->connection_id)
+                                        <span class="inline-flex items-center gap-1 text-xs font-mono px-2 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">
+                                            <i class="fa-brands fa-whatsapp"></i> #{{ $f->connection_id }}
+                                        </span>
+                                    @else
+                                        <span class="text-xs text-slate-400">—</span>
+                                    @endif
+                                </td>
                                 <td class="px-4 py-3">
                                     <span class="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full
                                                  @if($f->estado === 'enviado') bg-emerald-100 text-emerald-700
@@ -173,12 +196,26 @@
                             <p class="text-slate-800">{{ $detalle->origen }}</p>
                         </div>
                         <div>
+                            <p class="text-xs font-semibold uppercase text-slate-500 tracking-wide">Conexión WhatsApp</p>
+                            <p class="text-slate-800 font-mono">
+                                @if($detalle->connection_id)
+                                    <i class="fa-brands fa-whatsapp text-emerald-600"></i> #{{ $detalle->connection_id }}
+                                @else
+                                    <span class="text-slate-400">Por defecto del sistema</span>
+                                @endif
+                            </p>
+                        </div>
+                        <div>
                             <p class="text-xs font-semibold uppercase text-slate-500 tracking-wide">Año</p>
                             <p class="text-slate-800">{{ $detalle->anio }}</p>
                         </div>
                         <div>
                             <p class="text-xs font-semibold uppercase text-slate-500 tracking-wide">ID</p>
                             <p class="text-slate-800 font-mono">#{{ $detalle->id }}</p>
+                        </div>
+                        <div>
+                            <p class="text-xs font-semibold uppercase text-slate-500 tracking-wide">Teléfono destino</p>
+                            <p class="text-slate-800 font-mono">{{ $detalle->telefono }}</p>
                         </div>
                     </div>
 

@@ -445,6 +445,24 @@
                     Protección anti-madrugada: si por error se configura una hora fuera de esta ventana, el sistema no envía.
                 </p>
 
+                {{-- Fila 2b: conexión de WhatsApp por defecto --}}
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">
+                        <i class="fa-brands fa-whatsapp text-emerald-600"></i>
+                        Conexión de WhatsApp por defecto
+                    </label>
+                    <select wire:model="connection_id_default"
+                            class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                        <option value="">— Automática (la que haya usado el cliente) —</option>
+                        @foreach($conexionesDetectadas as $cid)
+                            <option value="{{ $cid }}">WhatsApp #{{ $cid }}</option>
+                        @endforeach
+                    </select>
+                    <p class="text-xs text-slate-500 mt-1">
+                        Se usa cuando el cliente nunca ha escrito (no tiene conversación previa). Si el cliente ya tiene conversación, se usa SIEMPRE la misma línea por donde se contactaron antes.
+                    </p>
+                </div>
+
                 {{-- Fila 3: días de la semana --}}
                 <div>
                     <label class="block text-sm font-medium text-slate-700 mb-2">Días permitidos de la semana</label>

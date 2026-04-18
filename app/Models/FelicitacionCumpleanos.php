@@ -13,6 +13,7 @@ class FelicitacionCumpleanos extends Model
         'cliente_id',
         'cliente_nombre',
         'telefono',
+        'connection_id',
         'estado',
         'mensaje',
         'error_detalle',
@@ -22,8 +23,9 @@ class FelicitacionCumpleanos extends Model
     ];
 
     protected $casts = [
-        'enviado_at' => 'datetime',
-        'anio'       => 'integer',
+        'enviado_at'    => 'datetime',
+        'anio'          => 'integer',
+        'connection_id' => 'integer',
     ];
 
     public const ESTADO_ENVIADO = 'enviado';

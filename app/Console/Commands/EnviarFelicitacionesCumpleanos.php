@@ -105,13 +105,22 @@ class EnviarFelicitacionesCumpleanos extends Command
             $nombre = trim($cliente->nombre ?: 'crack') ?: 'crack';
             $mensaje = $this->renderizar($plantilla, $cliente);
 
-            $linea = sprintf('  → %s (%s)', $nombre, $cliente->telefono_normalizado);
+            // Resolver por cuál WhatsApp sale el mensaje
+            $connectionId = $cliente->conexionWhatsappPreferida();
+
+            $linea = sprintf(
+                '  → %s (%s)%s',
+                $nombre,
+                $cliente->telefono_normalizado,
+                $connectionId ? " [conn #{$connectionId}]" : ''
+            );
 
             // Registro base (todos los intentos quedan en historial)
             $registro = FelicitacionCumpleanos::create([
                 'cliente_id'     => $cliente->id,
                 'cliente_nombre' => $nombre,
                 'telefono'       => $cliente->telefono_normalizado,
+                'connection_id'  => $connectionId,
                 'mensaje'        => $mensaje,
                 'origen'         => $origen,
                 'anio'           => $anoActual,
@@ -134,7 +143,7 @@ class EnviarFelicitacionesCumpleanos extends Command
             for ($i = 0; $i <= $maxReintentos; $i++) {
                 $intentos++;
                 try {
-                    $ok = $wa->enviarTexto($cliente->telefono_normalizado, $mensaje);
+                    $ok = $wa->enviarTexto($cliente->telefono_normalizado, $mensaje, $connectionId);
                     if ($ok) break;
                     $ultimoError = 'La API de WhatsApp respondió con error (intento ' . $intentos . ').';
                 } catch (\Throwable $e) {

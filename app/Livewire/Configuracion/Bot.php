@@ -41,6 +41,9 @@ class Bot extends Component
     // Array de 7 booleans: L M X J V S D
     public array  $cumpleanos_dias_semana_arr    = [true, true, true, true, true, true, true];
 
+    // Conexión de WhatsApp por defecto para envíos salientes (cumpleaños, etc)
+    public ?int   $connection_id_default         = null;
+
     public array $modelosDisponibles = [
         'gpt-4o-mini' => 'GPT-4o mini (rápido, económico)',
         'gpt-4o'      => 'GPT-4o (más natural, más caro)',
@@ -83,6 +86,10 @@ class Bot extends Component
         for ($i = 0; $i < 7; $i++) {
             $this->cumpleanos_dias_semana_arr[] = ($diasStr[$i] ?? '1') === '1';
         }
+
+        $this->connection_id_default = $cfg->connection_id_default
+            ? (int) $cfg->connection_id_default
+            : null;
     }
 
     public function cargarPlantillaCumpleanosDefault(): void
@@ -133,11 +140,13 @@ class Bot extends Component
         ]);
 
         $anioActual = (int) now()->format('Y');
+        $connectionId = $cliente->conexionWhatsappPreferida();
 
         $registro = \App\Models\FelicitacionCumpleanos::create([
             'cliente_id'     => $cliente->id,
             'cliente_nombre' => $nombre,
             'telefono'       => $cliente->telefono_normalizado,
+            'connection_id'  => $connectionId,
             'mensaje'        => $mensaje,
             'origen'         => \App\Models\FelicitacionCumpleanos::ORIGEN_MANUAL,
             'anio'           => $anioActual,
@@ -147,7 +156,7 @@ class Bot extends Component
 
         try {
             $wa = app(\App\Services\WhatsappSenderService::class);
-            $ok = $wa->enviarTexto($cliente->telefono_normalizado, $mensaje);
+            $ok = $wa->enviarTexto($cliente->telefono_normalizado, $mensaje, $connectionId);
 
             if ($ok) {
                 $cliente->update(['ultima_felicitacion_anio' => $anioActual]);
@@ -256,6 +265,7 @@ class Bot extends Component
             'cumpleanos_ventana_desde'     => 'nullable|string|regex:/^\d{2}:\d{2}$/',
             'cumpleanos_ventana_hasta'     => 'nullable|string|regex:/^\d{2}:\d{2}$/',
             'cumpleanos_dias_semana_arr'   => 'array|size:7',
+            'connection_id_default'        => 'nullable|integer',
         ];
     }
 
@@ -284,8 +294,20 @@ class Bot extends Component
 
     public function render()
     {
+        // Conexiones de WhatsApp detectadas (sacadas de las conversaciones)
+        $conexionesDetectadas = \App\Models\ConversacionWhatsapp::query()
+            ->whereNotNull('connection_id')
+            ->select('connection_id')
+            ->distinct()
+            ->orderBy('connection_id')
+            ->pluck('connection_id')
+            ->filter()
+            ->values()
+            ->toArray();
+
         return view('livewire.configuracion.bot', [
             'variablesDisponibles' => BotPromptService::variablesDisponibles(),
+            'conexionesDetectadas' => $conexionesDetectadas,
         ])->layout('layouts.app');
     }
 }
