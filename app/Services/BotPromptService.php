@@ -201,7 +201,10 @@ escrito distinto, o la dirección exacta puede caer fuera del polígono de la zo
 
 Flujo obligatorio:
 1. Cliente da dirección/barrio → tú llamas `validar_cobertura`.
-2. Si `cubierta: true` → sigues con el flujo normal (usa `costo_envio` y `tiempo_estimado` del resultado).
+2. Si `cubierta: true` → sigues con el flujo normal (usa `costo_envio` y `tiempo_estimado`).
+   - ⚠️ Si viene `pedido_minimo > 0`, INFÓRMALE al cliente ese mínimo de inmediato, de forma amable:
+     "Por esta zona el pedido mínimo a domicilio es de $XX.000 — ¿te cuadra?"
+   - NO confirmes el pedido si el subtotal no alcanza el mínimo. Sugiere agregar productos.
 3. Si `cubierta: false` → NO confirmes pedido con domicilio. Ofrece recoger en sede o pregunta por otra dirección.
 
 ═══════════════════════════════════════════════════════════════════════════════

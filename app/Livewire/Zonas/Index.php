@@ -28,6 +28,7 @@ class Index extends Component
     public string  $descripcion         = '';
     public string  $color               = '#d68643';
     public float   $costo_envio         = 0;
+    public float   $pedido_minimo       = 0;
     public ?int    $tiempo_estimado_min = null;
     public int     $orden               = 0;
     public bool    $activa              = true;
@@ -48,6 +49,7 @@ class Index extends Component
             'descripcion'         => 'nullable|string|max:255',
             'color'               => 'nullable|string|max:16',
             'costo_envio'         => 'numeric|min:0',
+            'pedido_minimo'       => 'numeric|min:0',
             'tiempo_estimado_min' => 'nullable|integer|min:1|max:600',
             'orden'               => 'integer|min:0',
             'activa'              => 'boolean',
@@ -134,6 +136,7 @@ class Index extends Component
         $this->descripcion         = (string) $zona->descripcion;
         $this->color               = (string) ($zona->color ?? '#d68643');
         $this->costo_envio         = (float) $zona->costo_envio;
+        $this->pedido_minimo       = (float) $zona->pedido_minimo;
         $this->tiempo_estimado_min = $zona->tiempo_estimado_min;
         $this->orden               = (int) $zona->orden;
         $this->activa              = (bool) $zona->activa;
@@ -221,6 +224,7 @@ class Index extends Component
         $this->descripcion         = '';
         $this->color               = '#d68643';
         $this->costo_envio         = 0;
+        $this->pedido_minimo       = 0;
         $this->tiempo_estimado_min = null;
         $this->orden               = 0;
         $this->activa              = true;

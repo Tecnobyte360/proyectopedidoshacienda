@@ -198,7 +198,7 @@
                             </div>
                         </div>
 
-                        <div class="flex items-center justify-between text-xs text-slate-500 mb-3">
+                        <div class="flex items-center justify-between text-xs text-slate-500 mb-3 flex-wrap gap-2">
                             <div>
                                 <i class="fa-solid fa-truck mr-1 text-[#d68643]"></i>
                                 ${{ number_format($zona->costo_envio, 0, ',', '.') }}
@@ -207,6 +207,12 @@
                                 <div>
                                     <i class="fa-solid fa-clock mr-1 text-[#d68643]"></i>
                                     {{ $zona->tiempo_estimado_min }} min
+                                </div>
+                            @endif
+                            @if((float) $zona->pedido_minimo > 0)
+                                <div>
+                                    <i class="fa-solid fa-cart-shopping mr-1 text-[#d68643]"></i>
+                                    mín ${{ number_format($zona->pedido_minimo, 0, ',', '.') }}
                                 </div>
                             @endif
                         </div>
@@ -290,6 +296,14 @@
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-1">Costo de envío</label>
                             <input type="number" step="100" wire:model="costo_envio" min="0"
+                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">
+                                Pedido mínimo
+                                <span class="text-xs text-slate-400 font-normal">(0 = sin mínimo)</span>
+                            </label>
+                            <input type="number" step="1000" wire:model="pedido_minimo" min="0" placeholder="30000"
                                    class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
                         </div>
                         <div>

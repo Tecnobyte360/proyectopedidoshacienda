@@ -1375,16 +1375,28 @@ class WhatsappWebhookController extends Controller
           ? "{$tiempoMin} min"
           : '~30-45 min';
 
+      $pedidoMinimo = (float) $zona->pedido_minimo;
+      $pedidoMinimoStr = $pedidoMinimo > 0
+          ? '$' . number_format($pedidoMinimo, 0, ',', '.')
+          : null;
+
+      $mensajeBase = "Sí llegamos a tu dirección ✅ Zona *{$zona->nombre}* — envío {$costoStr}, {$tiempoStr}.";
+      if ($pedidoMinimoStr) {
+          $mensajeBase .= " Pedido mínimo para domicilio en esta zona: *{$pedidoMinimoStr}*.";
+      }
+
       return [
-          'cubierta'         => true,
-          'zona'             => $zona->nombre,
-          'zona_id'          => $zona->id,
-          'costo_envio'      => (float) $zona->costo_envio,
-          'costo_envio_str'  => $costoStr,
-          'tiempo_estimado'  => $tiempoStr,
-          'coordenadas'      => $coord,
-          'mensaje_sugerido' => "Sí llegamos a tu dirección ✅ Zona *{$zona->nombre}* — envío {$costoStr}, {$tiempoStr}.",
-          'metodo_usado'     => $metodo,
+          'cubierta'          => true,
+          'zona'              => $zona->nombre,
+          'zona_id'           => $zona->id,
+          'costo_envio'       => (float) $zona->costo_envio,
+          'costo_envio_str'   => $costoStr,
+          'pedido_minimo'     => $pedidoMinimo,
+          'pedido_minimo_str' => $pedidoMinimoStr,
+          'tiempo_estimado'   => $tiempoStr,
+          'coordenadas'       => $coord,
+          'mensaje_sugerido'  => $mensajeBase,
+          'metodo_usado'      => $metodo,
       ];
   }
 
@@ -1524,6 +1536,34 @@ class WhatsappWebhookController extends Controller
         // Costo de envío de la zona (0 si no se resolvió)
         $costoEnvio = $zonaCobertura?->costo_envio ?? 0;
         $totalCalculado = $subtotalProductos + $costoEnvio;
+
+        // ── VALIDACIÓN: pedido mínimo por zona ──────────────────────────────
+        // Solo aplica si hay zona (es domicilio) y tiene mínimo configurado.
+        if ($zonaCobertura && (float) $zonaCobertura->pedido_minimo > 0) {
+            $minimo = (float) $zonaCobertura->pedido_minimo;
+            if ($subtotalProductos < $minimo) {
+                Cache::forget($confirmKey);
+                DB::rollBack();
+
+                $faltaStr  = '$' . number_format($minimo - $subtotalProductos, 0, ',', '.');
+                $minimoStr = '$' . number_format($minimo, 0, ',', '.');
+
+                $mensaje = "Uy, para domicilio en *{$zonaCobertura->nombre}* el pedido mínimo es de {$minimoStr} 😔\n\n"
+                    . "Te faltan {$faltaStr} para completar. ¿Agregamos algo más?";
+
+                Log::warning('🚫 Pedido rechazado — no alcanza mínimo de zona', [
+                    'from'     => $from,
+                    'zona'     => $zonaCobertura->nombre,
+                    'minimo'   => $minimo,
+                    'subtotal' => $subtotalProductos,
+                ]);
+
+                $conversationHistory[] = ['role' => 'assistant', 'content' => $mensaje];
+                Cache::put($cacheKey, $conversationHistory, now()->addMinutes(45));
+
+                return $mensaje;
+            }
+        }
 
         // ── CLIENTE: encontrar/crear y actualizar datos ────────────────────
         $cliente = Cliente::encontrarOCrearPorTelefono(
@@ -2035,7 +2075,8 @@ PROMPT;
                 'description' => 'Verifica si una dirección está dentro de una zona de cobertura antes de confirmar un pedido. '
                     . 'DEBES llamarla SIEMPRE que el cliente te dé su dirección, ANTES de pedir el resto de datos o confirmar. '
                     . 'Si la dirección no está cubierta, NO confirmes el pedido y ofrece recoger en sede. '
-                    . 'Retorna: cubierta (bool), zona, costo_envio, tiempo_estimado, mensaje_sugerido.',
+                    . 'Retorna: cubierta (bool), zona, costo_envio, tiempo_estimado, pedido_minimo (0 = sin mínimo), mensaje_sugerido. '
+                    . 'IMPORTANTE: si pedido_minimo > 0, avísale al cliente el mínimo ANTES de que siga pidiendo, para que no se lleve una sorpresa.',
                 'parameters'  => [
                     'type'       => 'object',
                     'properties' => [

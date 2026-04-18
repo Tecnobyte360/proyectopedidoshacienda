@@ -22,6 +22,7 @@ class ZonaCobertura extends Model
         'centro_lng',
         'area_km2',
         'costo_envio',
+        'pedido_minimo',
         'tiempo_estimado_min',
         'orden',
         'activa',
@@ -30,6 +31,7 @@ class ZonaCobertura extends Model
     protected $casts = [
         'activa'              => 'boolean',
         'costo_envio'         => 'decimal:2',
+        'pedido_minimo'       => 'decimal:2',
         'tiempo_estimado_min' => 'integer',
         'orden'               => 'integer',
         'poligono'            => 'array',
