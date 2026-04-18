@@ -11,6 +11,7 @@ use App\Models\Producto;
 use App\Models\Sede;
 use App\Models\ZonaCobertura;
 use App\Services\BotCatalogoService;
+use App\Services\BotPromptService;
 use App\Services\ZonaResolverService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -1356,6 +1357,26 @@ class WhatsappWebhookController extends Controller
         string $ansInfo = '',
         ?int $sedeId = null
     ): string {
+        /** @var BotPromptService $promptService */
+        $promptService = app(BotPromptService::class);
+
+        // Construir contexto con todas las variables resueltas
+        $contexto = $promptService->construirContexto(
+            $name,
+            $sedeId,
+            $infoEmpresa,
+            $pedidosInfo,
+            $ansInfo
+        );
+
+        $config = \App\Models\ConfiguracionBot::actual();
+
+        // Si el usuario activó "prompt personalizado" y guardó algo, usarlo
+        if ($config->usar_prompt_personalizado && !empty(trim($config->system_prompt ?? ''))) {
+            return $promptService->renderizar($config->system_prompt, $contexto);
+        }
+
+        // Fallback: prompt hardcoded (lo que ya teníamos)
         /** @var BotCatalogoService $catalogo */
         $catalogo = app(BotCatalogoService::class);
 
@@ -1363,7 +1384,6 @@ class WhatsappWebhookController extends Controller
         $promosTexto   = $catalogo->promocionesFormateadas($sedeId);
         $zonasTexto    = $catalogo->zonasFormateadas($sedeId);
 
-        $config = \App\Models\ConfiguracionBot::actual();
         $nombreAsesora = $config->nombre_asesora ?: 'Sofía';
 
         // Nota sobre imágenes (solo si está activo)
@@ -1837,7 +1857,9 @@ PROMPT;
                 ->orWhere('id', is_numeric($codigo) ? (int) $codigo : null)
                 ->first();
 
-            if (!$producto || empty($producto->imagen_url)) {
+            $url = $producto?->urlImagen();
+
+            if (!$producto || empty($url)) {
                 Log::info('⚠️ Producto sin imagen o no encontrado', ['codigo' => $codigo]);
                 continue;
             }
@@ -1850,7 +1872,7 @@ PROMPT;
                 $producto->unidad
             );
 
-            if ($this->enviarImagenWhatsapp($from, $producto->imagen_url, $caption, $connectionId)) {
+            if ($this->enviarImagenWhatsapp($from, $url, $caption, $connectionId)) {
                 $enviadas++;
             }
         }

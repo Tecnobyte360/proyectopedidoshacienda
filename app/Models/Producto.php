@@ -22,6 +22,7 @@ class Producto extends Model
         'unidad',
         'precio_base',
         'imagen_url',
+        'imagen_path',
         'palabras_clave',
         'activo',
         'destacado',
@@ -95,6 +96,19 @@ class Producto extends Model
         }
 
         return (float) $this->precio_base;
+    }
+
+    /**
+     * URL pública de la imagen del producto.
+     * Prioridad: imagen_path (storage local) → imagen_url (externa) → null.
+     */
+    public function urlImagen(): ?string
+    {
+        if (!empty($this->imagen_path)) {
+            return asset('storage/' . ltrim($this->imagen_path, '/'));
+        }
+
+        return !empty($this->imagen_url) ? $this->imagen_url : null;
     }
 
     public function disponibleEnSede(?int $sedeId): bool

@@ -23,6 +23,8 @@ class ConfiguracionBot extends Model
         'max_tokens',
         'nombre_asesora',
         'frase_bienvenida',
+        'usar_prompt_personalizado',
+        'system_prompt',
         'activo',
     ];
 
@@ -30,6 +32,7 @@ class ConfiguracionBot extends Model
         'enviar_imagenes_productos' => 'boolean',
         'enviar_imagen_destacados'  => 'boolean',
         'saludar_con_promociones'   => 'boolean',
+        'usar_prompt_personalizado' => 'boolean',
         'activo'                    => 'boolean',
         'temperatura'               => 'float',
         'max_tokens'                => 'integer',

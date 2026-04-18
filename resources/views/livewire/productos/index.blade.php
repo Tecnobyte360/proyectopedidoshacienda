@@ -100,8 +100,8 @@
                                 <td class="px-3 py-3 align-middle">
                                     <div class="flex items-center gap-3">
                                         <div class="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-amber-50 to-orange-100 border border-amber-100">
-                                            @if($producto->imagen_url)
-                                                <img src="{{ $producto->imagen_url }}" alt="" class="h-full w-full object-cover">
+                                            @if($producto->urlImagen())
+                                                <img src="{{ $producto->urlImagen() }}" alt="" class="h-full w-full object-cover">
                                             @else
                                                 <span class="text-xl">{{ $producto->categoria?->icono_emoji ?? '📦' }}</span>
                                             @endif
@@ -218,8 +218,8 @@
             @forelse($productos as $producto)
                 <div class="rounded-2xl bg-white shadow hover:shadow-lg transition overflow-hidden">
                     <div class="relative h-40 bg-gradient-to-br from-amber-50 to-orange-100 flex items-center justify-center">
-                        @if($producto->imagen_url)
-                            <img src="{{ $producto->imagen_url }}" alt="{{ $producto->nombre }}" class="h-full w-full object-cover">
+                        @if($producto->urlImagen())
+                            <img src="{{ $producto->urlImagen() }}" alt="{{ $producto->nombre }}" class="h-full w-full object-cover">
                         @else
                             <span class="text-5xl">{{ $producto->categoria?->icono_emoji ?? '📦' }}</span>
                         @endif
@@ -354,19 +354,81 @@
                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]"></textarea>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">URL imagen</label>
-                            <input type="url" wire:model="imagen_url" placeholder="https://..."
-                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                    {{-- IMAGEN: subir archivo o pegar URL --}}
+                    <div class="rounded-xl border border-slate-200 p-4">
+                        <h4 class="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+                            <i class="fa-solid fa-camera text-[#d68643]"></i> Imagen del producto
+                        </h4>
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+                            {{-- Preview --}}
+                            <div class="md:col-span-1">
+                                <div class="aspect-square w-full rounded-xl bg-gradient-to-br from-amber-50 to-orange-100 border border-amber-100 flex items-center justify-center overflow-hidden relative">
+                                    @if($imagenFile)
+                                        <img src="{{ $imagenFile->temporaryUrl() }}" alt="" class="h-full w-full object-cover">
+                                        <div class="absolute bottom-2 left-2 right-2 rounded-lg bg-amber-500/90 px-2 py-1 text-[10px] font-bold text-white text-center">
+                                            <i class="fa-solid fa-clock mr-1"></i> Pendiente de guardar
+                                        </div>
+                                    @elseif($imagen_path)
+                                        <img src="{{ asset('storage/' . $imagen_path) }}" alt="" class="h-full w-full object-cover">
+                                        <button type="button" wire:click="quitarImagenActual"
+                                                wire:confirm="¿Quitar la imagen actual?"
+                                                class="absolute top-2 right-2 h-7 w-7 rounded-full bg-red-500 text-white shadow hover:bg-red-600 transition">
+                                            <i class="fa-solid fa-trash text-xs"></i>
+                                        </button>
+                                    @elseif($imagen_url)
+                                        <img src="{{ $imagen_url }}" alt="" class="h-full w-full object-cover"
+                                             onerror="this.style.display='none'">
+                                    @else
+                                        <div class="text-center text-slate-400">
+                                            <i class="fa-solid fa-image text-3xl mb-2"></i>
+                                            <p class="text-xs">Sin imagen</p>
+                                        </div>
+                                    @endif
+                                </div>
+                            </div>
+
+                            {{-- Inputs --}}
+                            <div class="md:col-span-2 space-y-3">
+
+                                {{-- Subir archivo --}}
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-700 mb-1">
+                                        <i class="fa-solid fa-cloud-arrow-up mr-1"></i> Subir desde tu equipo
+                                    </label>
+                                    <input type="file" wire:model="imagenFile"
+                                           accept="image/jpeg,image/png,image/webp"
+                                           class="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs file:mr-3 file:rounded-lg file:border-0 file:bg-[#d68643] file:px-3 file:py-1.5 file:text-white file:font-semibold file:cursor-pointer">
+                                    @error('imagenFile') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
+                                    <p class="text-[10px] text-slate-400 mt-1">JPG, PNG o WebP — máx 2 MB</p>
+
+                                    <div wire:loading wire:target="imagenFile" class="text-xs text-amber-600 mt-1">
+                                        <i class="fa-solid fa-spinner fa-spin"></i> Cargando imagen...
+                                    </div>
+                                </div>
+
+                                <div class="text-center text-[10px] text-slate-400 uppercase font-semibold">— O —</div>
+
+                                {{-- URL externa --}}
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-700 mb-1">
+                                        <i class="fa-solid fa-link mr-1"></i> URL externa
+                                    </label>
+                                    <input type="url" wire:model="imagen_url" placeholder="https://..."
+                                           class="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs focus:border-[#d68643] focus:ring-[#d68643]">
+                                    <p class="text-[10px] text-slate-400 mt-1">Si subes archivo, este URL se ignora.</p>
+                                </div>
+                            </div>
                         </div>
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">
-                                Palabras clave <span class="text-xs text-slate-400">(coma)</span>
-                            </label>
-                            <input type="text" wire:model="palabrasClaveTexto" placeholder="pollo, pechuga, deshuesada"
-                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
-                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">
+                            Palabras clave <span class="text-xs text-slate-400">(coma — para que el bot encuentre el producto)</span>
+                        </label>
+                        <input type="text" wire:model="palabrasClaveTexto" placeholder="pollo, pechuga, deshuesada"
+                               class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
                     </div>
 
                     <div class="rounded-xl border border-slate-200 p-4">

@@ -3,6 +3,7 @@
 namespace App\Livewire\Configuracion;
 
 use App\Models\ConfiguracionBot;
+use App\Services\BotPromptService;
 use Livewire\Component;
 
 class Bot extends Component
@@ -19,6 +20,10 @@ class Bot extends Component
     public string $nombre_asesora            = 'Sofía';
     public string $frase_bienvenida          = '';
     public bool   $activo                    = true;
+
+    // Prompt personalizado
+    public bool   $usar_prompt_personalizado = false;
+    public string $system_prompt             = '';
 
     public array $modelosDisponibles = [
         'gpt-4o-mini' => 'GPT-4o mini (rápido, económico)',
@@ -40,6 +45,18 @@ class Bot extends Component
         $this->nombre_asesora            = (string) ($cfg->nombre_asesora ?? 'Sofía');
         $this->frase_bienvenida          = (string) ($cfg->frase_bienvenida ?? '');
         $this->activo                    = (bool) $cfg->activo;
+
+        $this->usar_prompt_personalizado = (bool) ($cfg->usar_prompt_personalizado ?? false);
+        $this->system_prompt             = (string) ($cfg->system_prompt ?? '');
+    }
+
+    public function cargarPlantillaPorDefecto(): void
+    {
+        $this->system_prompt = BotPromptService::plantillaPorDefecto();
+        $this->dispatch('notify', [
+            'type'    => 'info',
+            'message' => 'Plantilla por defecto cargada — recuerda guardar.',
+        ]);
     }
 
     protected function rules(): array
@@ -55,6 +72,8 @@ class Bot extends Component
             'nombre_asesora'            => 'required|string|max:60',
             'frase_bienvenida'          => 'nullable|string|max:500',
             'activo'                    => 'boolean',
+            'usar_prompt_personalizado' => 'boolean',
+            'system_prompt'             => 'nullable|string|max:20000',
         ];
     }
 
@@ -73,6 +92,8 @@ class Bot extends Component
 
     public function render()
     {
-        return view('livewire.configuracion.bot')->layout('layouts.app');
+        return view('livewire.configuracion.bot', [
+            'variablesDisponibles' => BotPromptService::variablesDisponibles(),
+        ])->layout('layouts.app');
     }
 }

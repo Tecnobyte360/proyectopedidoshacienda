@@ -159,6 +159,119 @@
             <p class="text-[11px] text-slate-400 mt-1">Si la dejas vacía, la IA improvisa el saludo según la hora y el cliente.</p>
         </section>
 
+        {{-- ╔═══ EDITOR DE PROMPT PERSONALIZADO ═══╗ --}}
+        <section class="rounded-2xl bg-white shadow border border-slate-200 p-6">
+            <div class="flex items-center gap-2 mb-4">
+                <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-rose-50 text-rose-600">
+                    <i class="fa-solid fa-code"></i>
+                </span>
+                <div class="flex-1">
+                    <h3 class="text-lg font-bold text-slate-800">Prompt personalizado del bot</h3>
+                    <p class="text-xs text-slate-500">Edita exactamente lo que ve la IA — usa las variables del panel.</p>
+                </div>
+            </div>
+
+            {{-- Toggle activación --}}
+            <label class="inline-flex items-start gap-3 cursor-pointer w-full justify-between rounded-xl border-2 border-rose-200 bg-rose-50/30 p-4 hover:bg-rose-50/60 transition mb-4">
+                <div class="flex-1">
+                    <div class="text-sm font-bold text-slate-800 mb-1">
+                        ⚡ Usar prompt personalizado
+                    </div>
+                    <div class="text-xs text-slate-600">
+                        Si lo activas, la IA usará TU prompt en lugar del de fábrica.
+                        Asegúrate de incluir todas las variables necesarias para que el bot funcione bien.
+                    </div>
+                </div>
+                <input type="checkbox" wire:model.live="usar_prompt_personalizado"
+                       class="mt-1 rounded border-slate-300 text-[#d68643] h-6 w-6">
+            </label>
+
+            @if($usar_prompt_personalizado)
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    {{-- Editor textarea --}}
+                    <div class="lg:col-span-2">
+                        <div class="flex items-center justify-between mb-2">
+                            <label class="text-sm font-medium text-slate-700">
+                                <i class="fa-solid fa-pen-to-square text-[#d68643] mr-1"></i>
+                                Tu prompt
+                            </label>
+                            <button type="button" wire:click="cargarPlantillaPorDefecto"
+                                    wire:confirm="¿Cargar la plantilla por defecto? Reemplazará el contenido actual."
+                                    class="text-[11px] font-semibold text-[#d68643] hover:underline">
+                                <i class="fa-solid fa-rotate-left mr-1"></i> Cargar plantilla por defecto
+                            </button>
+                        </div>
+
+                        <textarea wire:model="system_prompt" rows="22"
+                                  placeholder="Escribe tu prompt aquí, usando {variables} del panel derecho..."
+                                  class="w-full rounded-xl border border-slate-200 px-4 py-3 text-xs font-mono leading-relaxed focus:border-rose-400 focus:ring-2 focus:ring-rose-100"
+                                  spellcheck="false"></textarea>
+
+                        @error('system_prompt')
+                            <p class="text-xs text-red-600 mt-1">{{ $message }}</p>
+                        @enderror
+
+                        <div class="text-[10px] text-slate-400 mt-1 flex items-center gap-3">
+                            <span>{{ strlen($system_prompt) }} / 20.000 caracteres</span>
+                            <span>·</span>
+                            <span>~{{ ceil(strlen($system_prompt) / 4) }} tokens estimados</span>
+                        </div>
+                    </div>
+
+                    {{-- Panel de variables --}}
+                    <div class="lg:col-span-1">
+                        <label class="block text-sm font-medium text-slate-700 mb-2">
+                            <i class="fa-solid fa-puzzle-piece text-purple-500 mr-1"></i>
+                            Variables disponibles
+                        </label>
+                        <p class="text-[10px] text-slate-500 mb-2">
+                            Click para copiar. Pega donde necesites en el prompt.
+                        </p>
+
+                        <div class="space-y-1.5 max-h-[440px] overflow-y-auto pr-1">
+                            @foreach($variablesDisponibles as $v)
+                                <button type="button"
+                                        x-data
+                                        @click="
+                                            navigator.clipboard.writeText('{{ '{' . $v['key'] . '}' }}');
+                                            $el.querySelector('.copy-status').textContent = '✓ Copiado';
+                                            setTimeout(() => $el.querySelector('.copy-status').textContent = '', 1200);
+                                        "
+                                        class="group block w-full text-left rounded-lg border border-slate-200 bg-white hover:bg-purple-50 hover:border-purple-300 transition px-3 py-2">
+                                    <div class="flex items-center justify-between">
+                                        <code class="text-[11px] font-mono font-bold text-purple-700">
+                                            {{ '{' . $v['key'] . '}' }}
+                                        </code>
+                                        <span class="copy-status text-[10px] text-emerald-600 font-semibold"></span>
+                                    </div>
+                                    <div class="text-[10px] text-slate-500 mt-0.5">{{ $v['descripcion'] }}</div>
+                                </button>
+                            @endforeach
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-4 rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-800 flex items-start gap-2">
+                    <i class="fa-solid fa-circle-info mt-0.5"></i>
+                    <div>
+                        <strong>Tips para un buen prompt:</strong>
+                        <ul class="list-disc ml-4 mt-1 space-y-0.5">
+                            <li>SIEMPRE incluye <code>{catalogo}</code> para que la IA conozca tus productos.</li>
+                            <li>Incluye <code>{zonas}</code> para que valide cobertura.</li>
+                            <li>Si activas imágenes, incluye <code>{nota_imagenes}</code> para que la IA sepa cuándo usarlas.</li>
+                            <li>Define reglas claras de cuándo llamar a <code>confirmar_pedido</code>.</li>
+                            <li>Las variables se reemplazan al construir cada conversación.</li>
+                        </ul>
+                    </div>
+                </div>
+            @else
+                <div class="rounded-xl bg-slate-50 border border-slate-200 p-4 text-sm text-slate-600">
+                    <i class="fa-solid fa-info-circle text-slate-400 mr-2"></i>
+                    Estás usando el prompt de fábrica. Activa el toggle de arriba para personalizarlo.
+                </div>
+            @endif
+        </section>
+
         {{-- BOTÓN GUARDAR --}}
         <div class="flex justify-end pt-4">
             <button type="submit"
