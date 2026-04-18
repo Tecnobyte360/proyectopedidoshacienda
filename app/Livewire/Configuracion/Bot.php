@@ -113,12 +113,22 @@ class Bot extends Component
     public function getCumpleanerosHoyProperty()
     {
         $hoy = now('America/Bogota');
+
+        // Compat MySQL / SQLite
+        $driver = \DB::connection()->getDriverName();
+        $mesExpr = $driver === 'sqlite'
+            ? "CAST(strftime('%m', fecha_nacimiento) AS INTEGER)"
+            : "MONTH(fecha_nacimiento)";
+        $diaExpr = $driver === 'sqlite'
+            ? "CAST(strftime('%d', fecha_nacimiento) AS INTEGER)"
+            : "DAY(fecha_nacimiento)";
+
         return \App\Models\Cliente::query()
             ->whereNotNull('fecha_nacimiento')
             ->where('activo', true)
             ->whereNotNull('telefono_normalizado')
-            ->whereRaw('MONTH(fecha_nacimiento) = ?', [(int) $hoy->format('m')])
-            ->whereRaw('DAY(fecha_nacimiento) = ?',   [(int) $hoy->format('d')])
+            ->whereRaw("{$mesExpr} = ?", [(int) $hoy->format('m')])
+            ->whereRaw("{$diaExpr} = ?", [(int) $hoy->format('d')])
             ->get(['id', 'nombre', 'telefono_normalizado', 'fecha_nacimiento', 'ultima_felicitacion_anio']);
     }
 

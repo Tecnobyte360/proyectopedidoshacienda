@@ -67,13 +67,21 @@ class EnviarFelicitacionesCumpleanos extends Command
             $this->info("📅 Buscando cumpleañeros con {$anticipacion} día(s) de anticipación → fecha objetivo: {$fechaObjetivo->format('d/m')}");
         }
 
-        // Clientes cuyo cumpleaños cae en la fecha objetivo
+        // Clientes cuyo cumpleaños cae en la fecha objetivo (compat MySQL/SQLite)
+        $driver = \DB::connection()->getDriverName();
+        $mesExpr = $driver === 'sqlite'
+            ? "CAST(strftime('%m', fecha_nacimiento) AS INTEGER)"
+            : "MONTH(fecha_nacimiento)";
+        $diaExpr = $driver === 'sqlite'
+            ? "CAST(strftime('%d', fecha_nacimiento) AS INTEGER)"
+            : "DAY(fecha_nacimiento)";
+
         $query = Cliente::query()
             ->whereNotNull('fecha_nacimiento')
             ->where('activo', true)
             ->whereNotNull('telefono_normalizado')
-            ->whereRaw('MONTH(fecha_nacimiento) = ?', [$mes])
-            ->whereRaw('DAY(fecha_nacimiento) = ?',   [$dia]);
+            ->whereRaw("{$mesExpr} = ?", [$mes])
+            ->whereRaw("{$diaExpr} = ?", [$dia]);
 
         if (!$this->option('force')) {
             $query->where(function ($q) use ($anoActual) {
