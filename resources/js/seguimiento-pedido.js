@@ -1,24 +1,7 @@
-import Echo from "laravel-echo";
-import Pusher from "pusher-js";
-
-window.Pusher = Pusher;
-
-const isLocal =
-    window.location.hostname === "localhost" ||
-    window.location.hostname === "127.0.0.1";
-
-if (!window.Echo) {
-    window.Echo = new Echo({
-        broadcaster: "reverb",
-        key: "app-key",
-        wsHost: isLocal ? "127.0.0.1" : "pedidosonline.tecnobyte360.com",
-        wsPort: isLocal ? 8080 : 443,
-        wssPort: isLocal ? 8080 : 443,
-        forceTLS: !isLocal,
-        enabledTransports: isLocal ? ["ws"] : ["ws", "wss"],
-        disableStats: true,
-    });
-}
+// Nota: Echo se inicializa en app.js. Este módulo solo lo usa.
+// Si por alguna razón app.js no se cargó aún, dejamos un fallback mínimo
+// — pero intencionalmente NO creamos un Echo distinto, para no duplicar
+// conexiones WebSocket.
 
 document.addEventListener("DOMContentLoaded", () => {
     initSeguimientoPedidoRealtime();

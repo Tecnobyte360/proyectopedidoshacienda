@@ -558,10 +558,7 @@
             </div>
         @endif
 
-        {{-- AUDIO --}}
-        <audio id="new-order-sound" preload="auto">
-            <source src="{{ asset('sounds/new-order.mp3') }}" type="audio/mpeg">
-        </audio>
+        {{-- AUDIO se mueve al layout para que no se reemplace en re-renders de Livewire --}}
     </div>
 </div>
 

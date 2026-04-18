@@ -20,8 +20,12 @@ window.Pusher = Pusher;
 //    <meta name="reverb-scheme" content="http|https">
 // ─────────────────────────────────────────────────────────────────────────────
 
-const meta = (name) =>
-    document.querySelector(`meta[name="reverb-${name}"]`)?.content;
+// Lee meta tag. Retorna undefined si está ausente O si está vacío, para que
+// el fallback con `??` siempre aplique en vez de quedarse con "".
+const meta = (name) => {
+    const v = document.querySelector(`meta[name="reverb-${name}"]`)?.content;
+    return v && v.trim() !== "" ? v.trim() : undefined;
+};
 
 const host = window.location.hostname;
 const isLocal = host === "localhost" || host === "127.0.0.1";

@@ -219,6 +219,11 @@
 
     {{-- Alpine ya viene incluido en Livewire 3 — NO cargar el CDN aparte (duplicaría y rompería wire:click) --}}
 
+    {{-- AUDIO nuevo pedido — FUERA de cualquier componente Livewire para que no se reemplace en re-renders --}}
+    <audio id="new-order-sound" preload="auto">
+        <source src="{{ asset('sounds/new-order.mp3') }}" type="audio/mpeg">
+    </audio>
+
     <script>
 
         let audioUnlocked = false;
