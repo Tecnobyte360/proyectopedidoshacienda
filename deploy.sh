@@ -82,12 +82,18 @@ step "4/8  Corriendo migraciones"
 docker exec "$CONTAINER_APP" php artisan migrate --force || warn "Migraciones con problemas"
 ok "Migraciones aplicadas"
 
-# ─── Paso 5: Limpiar TODO cache ────────────────────────────────────────────
+# ─── Paso 5: Limpiar TODO cache + arreglar permisos ────────────────────────
 step "5/8  Limpiando caches (views compiladas, config, rutas, bootstrap)"
 docker exec "$CONTAINER_APP" rm -rf storage/framework/views/*.php 2>/dev/null || true
 docker exec "$CONTAINER_APP" rm -rf bootstrap/cache/*.php 2>/dev/null || true
 docker exec "$CONTAINER_APP" php artisan optimize:clear
 ok "Cache limpio"
+
+# CRÍTICO: arreglar permisos después de borrar como root
+step "    Reparando permisos de storage y bootstrap/cache (evita 500)"
+docker exec "$CONTAINER_APP" chown -R www-data:www-data storage bootstrap/cache 2>/dev/null || true
+docker exec "$CONTAINER_APP" chmod -R 775 storage bootstrap/cache 2>/dev/null || true
+ok "Permisos OK"
 
 # ─── Paso 6: Recompilar cache para producción ──────────────────────────────
 step "6/8  Recompilando cache para producción"
