@@ -1291,13 +1291,15 @@ class WhatsappWebhookController extends Controller
     */
 
   /**
-   * Valida la cobertura de una dirección.
+   * Valida la cobertura de una dirección — PRIORIZA el polígono del mapa.
    *
    * Estrategia (en orden):
-   *   1. Si hay barrio → match directo por nombre (ZonaCobertura::resolverPorBarrio)
-   *   2. Si no encontró y hay dirección → geocode (Nominatim) → point-in-polygon
-   *
-   * Retorna array listo para devolver a OpenAI o para usar en confirmar_pedido.
+   *   1. Geocode (Nominatim) de la dirección completa → lat/lng
+   *      → point-in-polygon contra los polígonos dibujados en /zonas
+   *      Este es el método CORRECTO: el mapa es la verdad.
+   *   2. Si el geocode falla o el punto cae fuera de todos los polígonos:
+   *      fallback por nombre de barrio (match exacto/parcial).
+   *   3. Si todo falla, sin cobertura.
    */
   private function validarCoberturaDireccion(
       string $direccion,
@@ -1307,43 +1309,60 @@ class WhatsappWebhookController extends Controller
   ): array {
       $zonaResolver = app(ZonaResolverService::class);
 
-      // Estrategia 1: por nombre de barrio
-      $zona = null;
+      $zona   = null;
       $metodo = null;
+      $coord  = null;
 
-      if (!empty($barrio)) {
-          $zona = \App\Models\ZonaCobertura::resolverPorBarrio($barrio, $sedeId);
-          if ($zona) {
-              $metodo = 'barrio_nombre';
-          }
-      }
-
-      // Estrategia 2: geocode + point-in-polygon
-      if (!$zona && !empty($direccion)) {
+      // ── Estrategia 1: Geocode + polígono (el mapa manda) ──────────────
+      if (!empty($direccion) || !empty($barrio)) {
           $geocode = app(GeocodingService::class)->geocodificar(
-              $direccion,
+              $direccion ?: '',
               $barrio,
               $ciudad ?: 'Bello'
           );
 
           if ($geocode) {
+              $coord = $geocode;
               $zona = $zonaResolver->porCoordenadas($geocode['lat'], $geocode['lng'], $sedeId);
               if ($zona) {
-                  $metodo = 'coordenadas';
+                  $metodo = 'poligono_mapa';
+                  Log::info('✅ Cobertura por polígono', [
+                      'zona'  => $zona->nombre,
+                      'coord' => $geocode,
+                  ]);
+              } else {
+                  Log::info('⚠️ Dirección geocodificada pero fuera de todos los polígonos', [
+                      'coord' => $geocode,
+                  ]);
               }
+          }
+      }
+
+      // ── Estrategia 2: Fallback por nombre de barrio ──────────────────
+      // Solo aplica si el geocode NO encontró polígono. Es menos preciso
+      // pero cubre casos donde Nominatim no resuelve direcciones colombianas.
+      if (!$zona && !empty($barrio)) {
+          $zona = \App\Models\ZonaCobertura::resolverPorBarrio($barrio, $sedeId);
+          if ($zona) {
+              $metodo = 'barrio_nombre_fallback';
+              Log::info('⚠️ Cobertura por nombre de barrio (geocode falló)', [
+                  'barrio' => $barrio,
+                  'zona'   => $zona->nombre,
+              ]);
           }
       }
 
       if (!$zona) {
           return [
-              'cubierta'        => false,
-              'zona'            => null,
-              'costo_envio'     => null,
-              'tiempo_estimado' => null,
-              'mensaje_sugerido' => "Mmm, esa dirección me queda fuera de cobertura 😔. "
-                  . "Pero te puedo dejar el pedido listo para que lo recojas en nuestra sede — "
-                  . "o si tienes otro barrio/dirección más cercana cuéntame y lo reviso.",
-              'metodo_usado'    => null,
+              'cubierta'         => false,
+              'zona'             => null,
+              'costo_envio'      => null,
+              'tiempo_estimado'  => null,
+              'coordenadas'      => $coord,
+              'mensaje_sugerido' => "Verifiqué tu dirección en el mapa y me queda fuera de cobertura 😔. "
+                  . "Puedo dejarte el pedido listo para que lo recojas en sede — "
+                  . "o si me pasas otra dirección más cercana, lo valido otra vez.",
+              'metodo_usado'     => null,
           ];
       }
 
@@ -1351,19 +1370,21 @@ class WhatsappWebhookController extends Controller
           ? '$' . number_format((float) $zona->costo_envio, 0, ',', '.')
           : 'gratis';
 
-      $tiempoStr = $zona->tiempo_estimado
-          ? (is_numeric($zona->tiempo_estimado) ? "{$zona->tiempo_estimado} min" : (string) $zona->tiempo_estimado)
+      $tiempoMin = $zona->tiempo_estimado_min ?? null;
+      $tiempoStr = $tiempoMin
+          ? "{$tiempoMin} min"
           : '~30-45 min';
 
       return [
-          'cubierta'        => true,
-          'zona'            => $zona->nombre,
-          'zona_id'         => $zona->id,
-          'costo_envio'     => (float) $zona->costo_envio,
-          'costo_envio_str' => $costoStr,
-          'tiempo_estimado' => $tiempoStr,
-          'mensaje_sugerido' => "Sí llegamos a *{$zona->nombre}* 🚚. Envío {$costoStr}, aproximadamente {$tiempoStr}.",
-          'metodo_usado'    => $metodo,
+          'cubierta'         => true,
+          'zona'             => $zona->nombre,
+          'zona_id'          => $zona->id,
+          'costo_envio'      => (float) $zona->costo_envio,
+          'costo_envio_str'  => $costoStr,
+          'tiempo_estimado'  => $tiempoStr,
+          'coordenadas'      => $coord,
+          'mensaje_sugerido' => "Sí llegamos a tu dirección ✅ Zona *{$zona->nombre}* — envío {$costoStr}, {$tiempoStr}.",
+          'metodo_usado'     => $metodo,
       ];
   }
 

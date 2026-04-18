@@ -77,7 +77,13 @@ class ZonaCobertura extends Model
 
     /**
      * Resuelve la zona de cobertura a partir del nombre de un barrio.
-     * Compara normalizado (sin acentos, lowercase, sin espacios extras).
+     *
+     * Intenta 3 estrategias en orden:
+     *   1. Match exacto del barrio normalizado (rápido).
+     *   2. Match parcial — el input contiene el barrio o viceversa.
+     *      Ej: "Reserva de Bucaros" matchea "Bucaros".
+     *   3. Match contra el nombre de la zona directamente
+     *      (por si el cliente nombró la zona en lugar del barrio).
      */
     public static function resolverPorBarrio(?string $barrio, ?int $sedeId = null): ?self
     {
@@ -87,15 +93,60 @@ class ZonaCobertura extends Model
 
         $normalizado = self::normalizar($barrio);
 
-        $query = ZonaBarrio::query()
+        $baseScope = fn ($q) => $q->where('activa', true)
+            ->when($sedeId, fn ($qq) => $qq->where(function ($qqq) use ($sedeId) {
+                $qqq->where('sede_id', $sedeId)->orWhereNull('sede_id');
+            }));
+
+        // Estrategia 1: exacto
+        $exacto = ZonaBarrio::query()
             ->with('zona')
             ->where('nombre_normalizado', $normalizado)
-            ->whereHas('zona', fn ($q) => $q->where('activa', true)
-                ->when($sedeId, fn ($qq) => $qq->where(function ($qqq) use ($sedeId) {
-                    $qqq->where('sede_id', $sedeId)->orWhereNull('sede_id');
-                })));
+            ->whereHas('zona', $baseScope)
+            ->first()?->zona;
 
-        return $query->first()?->zona;
+        if ($exacto) return $exacto;
+
+        // Estrategia 2: barrios cuyo nombre_normalizado está CONTENIDO en el input
+        // Ej: input = "reserva de bucaros", barrio BD = "bucaros" → match
+        // Traemos los barrios activos y filtramos en PHP (evita diferencias MySQL/SQLite)
+        $candidatos = ZonaBarrio::query()
+            ->with('zona')
+            ->whereHas('zona', $baseScope)
+            ->get();
+
+        // 2a. El barrio BD está contenido en lo que dijo el cliente
+        foreach ($candidatos as $c) {
+            $barrioDb = (string) $c->nombre_normalizado;
+            if ($barrioDb !== '' && str_contains($normalizado, $barrioDb)) {
+                return $c->zona;
+            }
+        }
+
+        // 2b. Lo que dijo el cliente está contenido en el barrio BD
+        foreach ($candidatos as $c) {
+            $barrioDb = (string) $c->nombre_normalizado;
+            if ($barrioDb !== '' && str_contains($barrioDb, $normalizado)) {
+                return $c->zona;
+            }
+        }
+
+        // Estrategia 3: match contra el nombre de la zona directamente
+        $zonas = self::query()
+            ->where('activa', true)
+            ->when($sedeId, fn ($qq) => $qq->where(function ($qqq) use ($sedeId) {
+                $qqq->where('sede_id', $sedeId)->orWhereNull('sede_id');
+            }))
+            ->get();
+
+        foreach ($zonas as $z) {
+            $nz = self::normalizar((string) $z->nombre);
+            if ($nz !== '' && (str_contains($normalizado, $nz) || str_contains($nz, $normalizado))) {
+                return $z;
+            }
+        }
+
+        return null;
     }
 
     public static function normalizar(string $texto): string
