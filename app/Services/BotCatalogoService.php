@@ -77,7 +77,10 @@ class BotCatalogoService
         $productos = $this->productosActivos($sedeId);
 
         if ($productos->isEmpty()) {
-            return "(No hay productos activos en el catálogo)";
+            return "⚠️ CATÁLOGO VACÍO — el local aún no ha cargado productos disponibles.\n"
+                 . "Tu única respuesta válida es: \"En este momento no tengo productos cargados,\n"
+                 . "te paso con el equipo para confirmarte qué hay disponible 🙏\".\n"
+                 . "NO inventes productos. NO ofrezcas categorías genéricas. NO confirmes pedidos.";
         }
 
         $lineas = [];
