@@ -16,6 +16,7 @@ use App\Models\MensajeWhatsapp;
 use App\Services\BotCatalogoService;
 use App\Services\BotPromptService;
 use App\Services\ConversacionService;
+use App\Services\GeocodingService;
 use App\Services\ZonaResolverService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -474,6 +475,55 @@ class WhatsappWebhookController extends Controller
 
         $toolCalls   = $response['choices'][0]['message']['tool_calls'] ?? null;
         $textContent = $response['choices'][0]['message']['content'] ?? null;
+
+        // ── Tool call: validar_cobertura ──────────────────────────────────────
+        // El bot pregunta si una dirección está cubierta. NO confirma pedido.
+        // Devuelve un "tool result" como mensaje del bot y guarda en el historial
+        // para que la siguiente turn de OpenAI incorpore la respuesta.
+        if ($toolCalls && ($toolCalls[0]['function']['name'] ?? '') === 'validar_cobertura') {
+            $rawArgs = $toolCalls[0]['function']['arguments'] ?? '{}';
+            $args    = json_decode($rawArgs, true) ?: [];
+
+            $direccion = trim((string) ($args['direccion'] ?? ''));
+            $barrio    = trim((string) ($args['barrio'] ?? ''));
+            $ciudad    = trim((string) ($args['ciudad'] ?? 'Bello'));
+
+            Log::info('🗺️ Tool call validar_cobertura', compact('from', 'direccion', 'barrio', 'ciudad'));
+
+            $sedeId    = $this->obtenerSedeIdDesdeConexion($connectionId);
+            $resultado = $this->validarCoberturaDireccion($direccion, $barrio, $ciudad, $sedeId);
+
+            // Respuesta de la tool para OpenAI — formato segunda llamada
+            $toolResponseMessages = array_merge(
+                [['role' => 'system', 'content' => $systemPrompt]],
+                $conversationHistory,
+                [[
+                    'role'       => 'assistant',
+                    'content'    => null,
+                    'tool_calls' => $toolCalls,
+                ]],
+                [[
+                    'role'         => 'tool',
+                    'tool_call_id' => $toolCalls[0]['id'] ?? 'call_1',
+                    'name'         => 'validar_cobertura',
+                    'content'      => json_encode($resultado, JSON_UNESCAPED_UNICODE),
+                ]]
+            );
+
+            $followUp = $this->llamarOpenAI($toolResponseMessages);
+            $reply    = $followUp['choices'][0]['message']['content']
+                ?? ($resultado['mensaje_sugerido'] ?? 'Déjame verificar tu dirección un momento 🙌');
+
+            $conversationHistory[] = ['role' => 'assistant', 'content' => $reply];
+            Cache::put($cacheKey, $conversationHistory, now()->addMinutes(45));
+
+            $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_ASSISTANT, $reply, [
+                'tipo' => 'tool_call',
+                'meta' => ['tool' => 'validar_cobertura', 'resultado' => $resultado],
+            ]);
+
+            return $reply;
+        }
 
         // ── Tool call: enviar_imagen_producto ─────────────────────────────────
         if ($toolCalls && ($toolCalls[0]['function']['name'] ?? '') === 'enviar_imagen_producto') {
@@ -1240,6 +1290,83 @@ class WhatsappWebhookController extends Controller
     |==========================================================================
     */
 
+  /**
+   * Valida la cobertura de una dirección.
+   *
+   * Estrategia (en orden):
+   *   1. Si hay barrio → match directo por nombre (ZonaCobertura::resolverPorBarrio)
+   *   2. Si no encontró y hay dirección → geocode (Nominatim) → point-in-polygon
+   *
+   * Retorna array listo para devolver a OpenAI o para usar en confirmar_pedido.
+   */
+  private function validarCoberturaDireccion(
+      string $direccion,
+      ?string $barrio = null,
+      ?string $ciudad = 'Bello',
+      ?int $sedeId = null
+  ): array {
+      $zonaResolver = app(ZonaResolverService::class);
+
+      // Estrategia 1: por nombre de barrio
+      $zona = null;
+      $metodo = null;
+
+      if (!empty($barrio)) {
+          $zona = \App\Models\ZonaCobertura::resolverPorBarrio($barrio, $sedeId);
+          if ($zona) {
+              $metodo = 'barrio_nombre';
+          }
+      }
+
+      // Estrategia 2: geocode + point-in-polygon
+      if (!$zona && !empty($direccion)) {
+          $geocode = app(GeocodingService::class)->geocodificar(
+              $direccion,
+              $barrio,
+              $ciudad ?: 'Bello'
+          );
+
+          if ($geocode) {
+              $zona = $zonaResolver->porCoordenadas($geocode['lat'], $geocode['lng'], $sedeId);
+              if ($zona) {
+                  $metodo = 'coordenadas';
+              }
+          }
+      }
+
+      if (!$zona) {
+          return [
+              'cubierta'        => false,
+              'zona'            => null,
+              'costo_envio'     => null,
+              'tiempo_estimado' => null,
+              'mensaje_sugerido' => "Mmm, esa dirección me queda fuera de cobertura 😔. "
+                  . "Pero te puedo dejar el pedido listo para que lo recojas en nuestra sede — "
+                  . "o si tienes otro barrio/dirección más cercana cuéntame y lo reviso.",
+              'metodo_usado'    => null,
+          ];
+      }
+
+      $costoStr = ((float) $zona->costo_envio) > 0
+          ? '$' . number_format((float) $zona->costo_envio, 0, ',', '.')
+          : 'gratis';
+
+      $tiempoStr = $zona->tiempo_estimado
+          ? (is_numeric($zona->tiempo_estimado) ? "{$zona->tiempo_estimado} min" : (string) $zona->tiempo_estimado)
+          : '~30-45 min';
+
+      return [
+          'cubierta'        => true,
+          'zona'            => $zona->nombre,
+          'zona_id'         => $zona->id,
+          'costo_envio'     => (float) $zona->costo_envio,
+          'costo_envio_str' => $costoStr,
+          'tiempo_estimado' => $tiempoStr,
+          'mensaje_sugerido' => "Sí llegamos a *{$zona->nombre}* 🚚. Envío {$costoStr}, aproximadamente {$tiempoStr}.",
+          'metodo_usado'    => $metodo,
+      ];
+  }
+
   private function guardarPedidoDesdeToolCall(
     array $orderData,
     string $from,
@@ -1285,10 +1412,45 @@ class WhatsappWebhookController extends Controller
         $direccion = trim((string) ($orderData['address'] ?? ''));
         $barrio    = trim((string) ($orderData['neighborhood'] ?? ''));
 
-        // Resolver zona de cobertura por nombre del barrio
-        $zonaCobertura = $barrio
-            ? ZonaCobertura::resolverPorBarrio($barrio, $sede?->id)
-            : null;
+        // Resolver zona de cobertura — primero por barrio, si falla intenta geocode
+        $validacion = $this->validarCoberturaDireccion(
+            $direccion,
+            $barrio,
+            'Bello',
+            $sede?->id
+        );
+
+        $zonaCobertura = null;
+        if (!empty($validacion['zona_id'])) {
+            $zonaCobertura = ZonaCobertura::find($validacion['zona_id']);
+        }
+
+        // ── VALIDACIÓN ESTRICTA de cobertura ───────────────────────────────
+        // Regla: si el cliente dio dirección/barrio para domicilio pero no
+        // coincide con ninguna zona activa → se rechaza el pedido.
+        // Excepción: si NO dio dirección ni barrio (es pedido para recoger
+        // en sede), se permite crearlo sin zona.
+        $indicoDomicilio = (!empty($direccion) || !empty($barrio));
+
+        if ($indicoDomicilio && !$zonaCobertura) {
+            Cache::forget($confirmKey);   // liberar el lock de deduplicación
+            DB::rollBack();
+
+            $mensaje = "Uy, esa dirección me queda fuera de la zona de cobertura 😔\n\n"
+                . "Pero el pedido te lo puedo dejar listo para que lo recojas en la sede, o "
+                . "si tienes otra dirección cercana me la pasas y vuelvo a revisar 🙌";
+
+            Log::warning('🚫 Pedido rechazado — fuera de cobertura', [
+                'from'      => $from,
+                'direccion' => $direccion,
+                'barrio'    => $barrio,
+            ]);
+
+            $conversationHistory[] = ['role' => 'assistant', 'content' => $mensaje];
+            Cache::put($cacheKey, $conversationHistory, now()->addMinutes(45));
+
+            return $mensaje;
+        }
 
         // ── Validar y resolver productos contra el catálogo ──
         /** @var BotCatalogoService $catalogo */
@@ -1842,6 +2004,36 @@ PROMPT;
                         'required' => ['products', 'customer_name', 'phone', 'address', 'neighborhood'],
                     ],
                 ],
+        ];
+
+        // Tool: validar_cobertura — siempre disponible
+        $tools[] = [
+            'type'     => 'function',
+            'function' => [
+                'name'        => 'validar_cobertura',
+                'description' => 'Verifica si una dirección está dentro de una zona de cobertura antes de confirmar un pedido. '
+                    . 'DEBES llamarla SIEMPRE que el cliente te dé su dirección, ANTES de pedir el resto de datos o confirmar. '
+                    . 'Si la dirección no está cubierta, NO confirmes el pedido y ofrece recoger en sede. '
+                    . 'Retorna: cubierta (bool), zona, costo_envio, tiempo_estimado, mensaje_sugerido.',
+                'parameters'  => [
+                    'type'       => 'object',
+                    'properties' => [
+                        'direccion' => [
+                            'type'        => 'string',
+                            'description' => 'Dirección tal cual la dio el cliente (ej: "Calle 50 #23-45"). Obligatoria.',
+                        ],
+                        'barrio' => [
+                            'type'        => 'string',
+                            'description' => 'Barrio mencionado por el cliente (ej: "Niquía", "Paris"). Opcional pero recomendado.',
+                        ],
+                        'ciudad' => [
+                            'type'        => 'string',
+                            'description' => 'Ciudad o municipio (default: Bello).',
+                        ],
+                    ],
+                    'required' => ['direccion'],
+                ],
+            ],
         ];
 
         // Tool 2: enviar_imagen_producto — SOLO si está activado en config
