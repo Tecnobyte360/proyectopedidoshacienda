@@ -11,8 +11,11 @@ use App\Models\Pedido;
 use App\Models\Producto;
 use App\Models\Sede;
 use App\Models\ZonaCobertura;
+use App\Models\ConversacionWhatsapp;
+use App\Models\MensajeWhatsapp;
 use App\Services\BotCatalogoService;
 use App\Services\BotPromptService;
+use App\Services\ConversacionService;
 use App\Services\ZonaResolverService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -373,13 +376,6 @@ class WhatsappWebhookController extends Controller
     private function procesarConIA(string $from, string $name, string $message, ?string $connectionId = null): string
     {
         $cacheKey = "whatsapp_chat_{$from}";
-        $conversationHistory = Cache::get($cacheKey, []);
-
-        $conversationHistory[] = ['role' => 'user', 'content' => $message];
-
-        if (count($conversationHistory) > 20) {
-            $conversationHistory = array_slice($conversationHistory, -20);
-        }
 
         $pedidosInfo  = $this->buscarPedidosClienteSQL($from, $message);
         $ansInfo      = $this->construirResumenAns();
@@ -390,6 +386,22 @@ class WhatsappWebhookController extends Controller
         // ── CLIENTE: identificar/crear y enriquecer el contexto ──────────────
         $telefonoNorm = $this->normalizarTelefono($from);
         $cliente = Cliente::encontrarOCrearPorTelefono($telefonoNorm, $name);
+
+        // ── CONVERSACIÓN: obtener/crear y persistir mensaje del usuario ──────
+        /** @var ConversacionService $convService */
+        $convService = app(ConversacionService::class);
+        $conversacion = $convService->obtenerOCrearActiva(
+            $telefonoNorm,
+            $cliente->id,
+            $sedeId,
+            $connectionId ? (int) $connectionId : null
+        );
+
+        // Persistir mensaje del cliente
+        $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_USER, $message);
+
+        // ── HISTORIAL: leer de BD (últimos 20 mensajes user/assistant) ───────
+        $conversationHistory = $conversacion->fresh()->historialParaIA(20);
 
         // Usar el nombre del cliente guardado si está mejor que el de WhatsApp
         $nombreParaPrompt = $cliente->nombre !== 'Cliente' ? $cliente->nombre : $name;
@@ -438,6 +450,12 @@ class WhatsappWebhookController extends Controller
             $conversationHistory[] = ['role' => 'assistant', 'content' => $reply];
             Cache::put($cacheKey, $conversationHistory, now()->addMinutes(45));
 
+            // Persistir respuesta del bot en BD
+            $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_ASSISTANT, $reply, [
+                'tipo' => 'tool_call',
+                'meta' => ['tool' => 'enviar_imagen_producto', 'codigos' => $codigos, 'imagenes_enviadas' => $enviadas],
+            ]);
+
             return $reply;
         }
 
@@ -478,6 +496,9 @@ class WhatsappWebhookController extends Controller
 
         $conversationHistory[] = ['role' => 'assistant', 'content' => $reply];
         Cache::put($cacheKey, $conversationHistory, now()->addMinutes(45));
+
+        // Persistir respuesta del bot en BD
+        $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_ASSISTANT, $reply);
 
         Log::info('💬 CAPA 3: Respuesta conversacional IA', compact('from', 'reply'));
 
@@ -1286,6 +1307,19 @@ class WhatsappWebhookController extends Controller
             $cliente->refresh()->recalcularMetricas();
         } catch (\Throwable $e) {
             Log::warning('No se pudo recalcular métricas del cliente: ' . $e->getMessage());
+        }
+
+        // Vincular el pedido a la conversación activa (si existe)
+        try {
+            $convActiva = \App\Models\ConversacionWhatsapp::where('telefono_normalizado', $telefonoWhatsapp)
+                ->where('estado', \App\Models\ConversacionWhatsapp::ESTADO_ACTIVA)
+                ->orderByDesc('id')
+                ->first();
+            if ($convActiva) {
+                app(\App\Services\ConversacionService::class)->vincularPedido($convActiva, $pedido->id);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('No se pudo vincular pedido a conversación: ' . $e->getMessage());
         }
 
         $pedido->load(['sede', 'detalles', 'historialEstados']);

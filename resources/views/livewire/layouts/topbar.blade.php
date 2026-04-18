@@ -13,6 +13,7 @@
         'ans.index'            => ['ANS Tiempos',    'Configuración de tiempos por estado',        'fa-stopwatch'],
         'configuracion.bot'    => ['Bot WhatsApp',   'Comportamiento de la asesora IA',            'fa-robot'],
         'clientes.index'       => ['Clientes',       'Quién compra, qué compra, cuánto compra',    'fa-users'],
+        'conversaciones.index' => ['Conversaciones', 'Historial de cada chat con el bot',          'fa-comments'],
         'pedidos.seguimiento'  => ['Seguimiento',    'Estado del pedido',                          'fa-route'],
     ];
 
