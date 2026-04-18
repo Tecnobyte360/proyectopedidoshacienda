@@ -119,13 +119,15 @@
                 <div class="flex items-center gap-2">
                     @if($conversacionActiva->atendida_por_humano)
                         <button wire:click="devolverAlBot"
+                                title="El bot retomará automáticamente la conversación"
                                 class="rounded-xl bg-emerald-500 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-600 transition">
                             <i class="fa-solid fa-robot mr-1"></i> Devolver al bot
                         </button>
                     @else
                         <button wire:click="tomarControl"
+                                title="Silencia al bot — solo TÚ respondes a este cliente"
                                 class="rounded-xl bg-blue-500 px-3 py-2 text-xs font-bold text-white hover:bg-blue-600 transition">
-                            <i class="fa-solid fa-hand mr-1"></i> Tomar control
+                            <i class="fa-solid fa-hand mr-1"></i> Silenciar bot
                         </button>
                     @endif
 
@@ -171,18 +173,31 @@
             </div>
 
             {{-- Input para responder --}}
-            <form wire:submit.prevent="enviar"
-                  class="bg-white border-t border-slate-200 px-3 py-3 flex items-center gap-2">
-                <textarea wire:model="nuevoMensaje"
-                          placeholder="Escribe tu respuesta..."
-                          rows="1"
-                          @keydown.enter.prevent="$wire.enviar()"
-                          class="flex-1 resize-none rounded-2xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-2 focus:ring-amber-100"></textarea>
-                <button type="submit"
-                        class="flex h-11 w-11 items-center justify-center rounded-full bg-[#d68643] text-white shadow hover:bg-[#c97a36] transition">
-                    <i class="fa-solid fa-paper-plane"></i>
-                </button>
-            </form>
+            <div class="bg-white border-t border-slate-200">
+                <form wire:submit.prevent="enviar"
+                      class="px-3 py-3 flex items-center gap-2">
+                    <textarea wire:model="nuevoMensaje"
+                              placeholder="Escribe tu respuesta..."
+                              rows="1"
+                              @keydown.enter.prevent="$wire.enviar()"
+                              class="flex-1 resize-none rounded-2xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-2 focus:ring-amber-100"></textarea>
+                    <button type="submit"
+                            class="flex h-11 w-11 items-center justify-center rounded-full bg-[#d68643] text-white shadow hover:bg-[#c97a36] transition">
+                        <i class="fa-solid fa-paper-plane"></i>
+                    </button>
+                </form>
+
+                {{-- Hint sobre el modo --}}
+                <div class="px-4 pb-2 text-[10px] text-slate-500 flex items-center gap-2">
+                    @if($conversacionActiva->atendida_por_humano)
+                        <i class="fa-solid fa-circle text-blue-500 text-[6px]"></i>
+                        <span><strong>Modo manual:</strong> el bot está silenciado — solo tú respondes a este cliente.</span>
+                    @else
+                        <i class="fa-solid fa-circle text-emerald-500 text-[6px]"></i>
+                        <span><strong>Modo mixto:</strong> tu mensaje se envía y el bot SIGUE respondiendo automáticamente. Click en "Silenciar bot" si quieres tomar control total.</span>
+                    @endif
+                </div>
+            </div>
 
         @else
             {{-- Empty state --}}

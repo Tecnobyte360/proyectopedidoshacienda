@@ -69,10 +69,8 @@ class Index extends Component
             return;
         }
 
-        // Auto-activar modo humano si no lo está
-        if (!$conv->atendida_por_humano) {
-            $conv->update(['atendida_por_humano' => true]);
-        }
+        // ⚠️ NO se auto-activa modo humano. El bot SIGUE respondiendo al cliente.
+        // Si quieres silenciar al bot, usa el botón "Tomar control" explícitamente.
 
         // Enviar a WhatsApp DIRECTO (sin pasar por controller)
         $sent = $this->enviarAWhatsapp($conv->telefono_normalizado, $texto, $conv->connection_id);
