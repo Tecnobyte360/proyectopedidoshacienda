@@ -22,6 +22,11 @@ Route::get('/whatsapp-webhook', function () {
 });
 
 Route::post('/whatsapp-webhook', [WhatsappWebhookController::class, 'receive']);
+
+// Endpoints de intervención humana (chat en vivo del admin)
+Route::post('/chat/enviar-manual',   [WhatsappWebhookController::class, 'enviarMensajeManual']);
+Route::post('/chat/tomar-control',   [WhatsappWebhookController::class, 'tomarControl']);
+Route::post('/chat/devolver-al-bot', [WhatsappWebhookController::class, 'devolverAlBot']);
 Route::get('/whatsapp-webhook/orders/search', [WhatsappWebhookController::class, 'searchOrders']);
 Route::get('/whatsapp-webhook/orders/{id}', [WhatsappWebhookController::class, 'showOrder']);
 

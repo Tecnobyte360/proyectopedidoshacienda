@@ -2,10 +2,12 @@
 
 namespace App\Services;
 
+use App\Events\MensajeWhatsappNuevo;
 use App\Models\Cliente;
 use App\Models\ConversacionWhatsapp;
 use App\Models\MensajeWhatsapp;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Maneja la persistencia de conversaciones WhatsApp en BD.
@@ -107,6 +109,13 @@ class ConversacionService
             }
 
             $conversacion->update($updates);
+
+            // Broadcast en tiempo real al admin (chat en vivo)
+            try {
+                broadcast(new MensajeWhatsappNuevo($mensaje->load('conversacion.cliente')));
+            } catch (\Throwable $e) {
+                Log::warning('Broadcast MensajeWhatsappNuevo fallo: ' . $e->getMessage());
+            }
 
             return $mensaje;
         });

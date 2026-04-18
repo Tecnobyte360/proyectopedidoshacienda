@@ -257,6 +257,34 @@ class WhatsappWebhookController extends Controller
 
     private function procesarMensaje(string $from, string $name, string $message, ?string $connectionId): string
     {
+        // ── CAPA -1: Modo intervención humana ─────────────────────────────────
+        // Si un operador tomó control de la conversación, el bot NO responde.
+        // El mensaje sí se persiste (ya se hace en procesarConIA), pero no se
+        // genera respuesta automática. El humano responderá manualmente.
+        $telefonoNorm = $this->normalizarTelefono($from);
+        $convActiva   = \App\Models\ConversacionWhatsapp::where('telefono_normalizado', $telefonoNorm)
+            ->where('estado', \App\Models\ConversacionWhatsapp::ESTADO_ACTIVA)
+            ->orderByDesc('id')
+            ->first();
+
+        if ($convActiva && $convActiva->atendida_por_humano) {
+            // Persistir mensaje del cliente para que el operador lo vea
+            try {
+                $cliente = \App\Models\Cliente::encontrarOCrearPorTelefono($telefonoNorm, $name);
+                $convActiva->update(['cliente_id' => $convActiva->cliente_id ?? $cliente->id]);
+                app(\App\Services\ConversacionService::class)->agregarMensaje(
+                    $convActiva,
+                    \App\Models\MensajeWhatsapp::ROL_USER,
+                    $message
+                );
+            } catch (\Throwable $e) {
+                Log::warning('No se persistió mensaje en modo humano: ' . $e->getMessage());
+            }
+
+            Log::info('🧍 Modo humano activo — bot NO responde', ['phone' => $from]);
+            return '';   // sin respuesta automática
+        }
+
         // ── CAPA 0: Buffer + debounce — agrupar mensajes seguidos del mismo cliente ──
         // Si el cliente manda 3 mensajes en 4 segundos, esperamos a que termine de
         // escribir y respondemos UNA sola vez con todo el contexto.
@@ -1776,6 +1804,70 @@ PROMPT;
         }
 
         return $tools;
+    }
+
+    /*
+    |==========================================================================
+    | INTERVENCIÓN HUMANA — endpoints para que un operador chatee manualmente
+    |==========================================================================
+    */
+
+    /**
+     * Envía un mensaje manual desde el admin al cliente vía WhatsApp.
+     * También lo persiste en la conversación.
+     */
+    public function enviarMensajeManual(Request $request)
+    {
+        $data = $request->validate([
+            'conversacion_id' => 'required|integer|exists:conversaciones_whatsapp,id',
+            'mensaje'         => 'required|string|max:4000',
+        ]);
+
+        $conversacion = \App\Models\ConversacionWhatsapp::findOrFail($data['conversacion_id']);
+        $telefono     = $conversacion->telefono_normalizado;
+
+        // Enviar a WhatsApp
+        $sent = $this->enviarRespuestaWhatsapp(
+            $telefono,
+            $data['mensaje'],
+            $conversacion->connection_id
+        );
+
+        if (!$sent) {
+            return response()->json(['status' => 'error', 'message' => 'No se pudo enviar a WhatsApp'], 500);
+        }
+
+        // Persistir como mensaje del bot (pero marcado como humano en meta)
+        app(\App\Services\ConversacionService::class)->agregarMensaje(
+            $conversacion,
+            \App\Models\MensajeWhatsapp::ROL_ASSISTANT,
+            $data['mensaje'],
+            ['meta' => ['enviado_por_humano' => true, 'usuario_id' => auth()->id()]]
+        );
+
+        return response()->json(['status' => 'ok']);
+    }
+
+    /**
+     * Toma control de la conversación — el bot deja de responder a este cliente.
+     */
+    public function tomarControl(Request $request)
+    {
+        $data = $request->validate(['conversacion_id' => 'required|integer|exists:conversaciones_whatsapp,id']);
+        $conv = \App\Models\ConversacionWhatsapp::findOrFail($data['conversacion_id']);
+        $conv->update(['atendida_por_humano' => true]);
+        return response()->json(['status' => 'ok', 'atendida_por_humano' => true]);
+    }
+
+    /**
+     * Devuelve el control al bot.
+     */
+    public function devolverAlBot(Request $request)
+    {
+        $data = $request->validate(['conversacion_id' => 'required|integer|exists:conversaciones_whatsapp,id']);
+        $conv = \App\Models\ConversacionWhatsapp::findOrFail($data['conversacion_id']);
+        $conv->update(['atendida_por_humano' => false]);
+        return response()->json(['status' => 'ok', 'atendida_por_humano' => false]);
     }
 
     /*

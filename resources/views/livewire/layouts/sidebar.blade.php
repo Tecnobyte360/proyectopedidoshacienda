@@ -21,8 +21,9 @@
                 [
                     'title' => 'Principal',
                     'items' => [
-                        ['name' => 'Pedidos',     'icon' => 'fa-bag-shopping', 'route' => 'pedidos.index',      'badge' => null],
-                        ['name' => 'Despachos',   'icon' => 'fa-paper-plane',  'route' => 'despachos.index',    'badge' => null],
+                        ['name' => 'Pedidos',      'icon' => 'fa-bag-shopping', 'route' => 'pedidos.index',      'badge' => null],
+                        ['name' => 'Chat en vivo', 'icon' => 'fa-headset',      'route' => 'chat.index',         'badge' => 'NEW'],
+                        ['name' => 'Despachos',    'icon' => 'fa-paper-plane',  'route' => 'despachos.index',    'badge' => null],
                     ],
                 ],
                 [

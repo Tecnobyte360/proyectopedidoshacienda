@@ -14,6 +14,7 @@
         'configuracion.bot'    => ['Bot WhatsApp',   'Comportamiento de la asesora IA',            'fa-robot'],
         'clientes.index'       => ['Clientes',       'Quién compra, qué compra, cuánto compra',    'fa-users'],
         'conversaciones.index' => ['Conversaciones', 'Historial de cada chat con el bot',          'fa-comments'],
+        'chat.index'           => ['Chat en vivo',   'Atiende clientes en tiempo real',            'fa-headset'],
         'pedidos.seguimiento'  => ['Seguimiento',    'Estado del pedido',                          'fa-route'],
     ];
 
