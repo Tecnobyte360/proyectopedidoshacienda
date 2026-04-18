@@ -7,6 +7,11 @@
 
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
+    {{-- Config de Reverb leída por resources/js/app.js (auto-detección con override) --}}
+    <meta name="reverb-host"   content="{{ env('REVERB_PUBLIC_HOST', '') }}">
+    <meta name="reverb-port"   content="{{ env('REVERB_PUBLIC_PORT', '') }}">
+    <meta name="reverb-scheme" content="{{ env('REVERB_PUBLIC_SCHEME', '') }}">
+
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 
