@@ -5,7 +5,9 @@ namespace App\Livewire\Chat;
 use App\Models\ConversacionWhatsapp;
 use App\Models\MensajeWhatsapp;
 use App\Services\ConversacionService;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -62,43 +64,125 @@ class Index extends Component
         if ($texto === '' || !$this->conversacionActivaId) return;
 
         $conv = ConversacionWhatsapp::find($this->conversacionActivaId);
-        if (!$conv) return;
+        if (!$conv) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Conversación no encontrada.']);
+            return;
+        }
 
-        // Si no estaba en modo humano, lo activamos automáticamente
+        // Auto-activar modo humano si no lo está
         if (!$conv->atendida_por_humano) {
             $conv->update(['atendida_por_humano' => true]);
         }
 
-        // Enviar a WhatsApp via el método del controller
-        try {
-            $controller = app(\App\Http\Controllers\WhatsappWebhookController::class);
-            // Llamar al método público enviarMensajeManual a través de un Request fake
-            $request = new \Illuminate\Http\Request();
-            $request->merge([
-                'conversacion_id' => $conv->id,
-                'mensaje'         => $texto,
-            ]);
+        // Enviar a WhatsApp DIRECTO (sin pasar por controller)
+        $sent = $this->enviarAWhatsapp($conv->telefono_normalizado, $texto, $conv->connection_id);
 
-            $resp = $controller->enviarMensajeManual($request);
-
-            if ($resp->getStatusCode() !== 200) {
-                $this->dispatch('notify', [
-                    'type'    => 'error',
-                    'message' => 'No se pudo enviar el mensaje a WhatsApp.',
-                ]);
-                return;
-            }
-
-            $this->nuevoMensaje = '';
-
-            $this->dispatch('mensaje-enviado');
-        } catch (\Throwable $e) {
-            \Log::error('Error enviando mensaje manual: ' . $e->getMessage());
+        if (!$sent) {
             $this->dispatch('notify', [
                 'type'    => 'error',
-                'message' => 'Error: ' . $e->getMessage(),
+                'message' => '⚠️ No se pudo enviar el mensaje a WhatsApp. Revisa el token.',
             ]);
+            return;
         }
+
+        // Persistir como mensaje del operador
+        try {
+            app(ConversacionService::class)->agregarMensaje(
+                $conv,
+                MensajeWhatsapp::ROL_ASSISTANT,
+                $texto,
+                ['meta' => ['enviado_por_humano' => true, 'usuario_id' => auth()->id()]]
+            );
+        } catch (\Throwable $e) {
+            Log::warning('No se persistió mensaje manual: ' . $e->getMessage());
+        }
+
+        $this->nuevoMensaje = '';
+        $this->dispatch('mensaje-enviado');
+
+        $this->dispatch('notify', [
+            'type'    => 'success',
+            'message' => '✓ Mensaje enviado',
+        ]);
+    }
+
+    /**
+     * Envía un mensaje a WhatsApp directamente vía TecnoByteApp.
+     */
+    private function enviarAWhatsapp(string $telefono, string $mensaje, $connectionId = null): bool
+    {
+        try {
+            $token = $this->obtenerTokenWhatsapp();
+            if (!$token) {
+                Log::error('Token WhatsApp no disponible para chat manual');
+                return false;
+            }
+
+            $payload = [
+                'number' => $telefono,
+                'body'   => $mensaje,
+            ];
+            if ($connectionId) {
+                $payload['whatsappId']   = (int) $connectionId;
+                $payload['connectionId'] = (int) $connectionId;
+            }
+
+            $response = Http::withoutVerifying()
+                ->withToken($token)
+                ->timeout(20)
+                ->post('https://wa-api.tecnobyteapp.com:1422/api/messages/send', $payload);
+
+            if ($response->successful()) {
+                return true;
+            }
+
+            // Reintento con refresh de token
+            if ($response->status() === 401) {
+                Cache::forget('whatsapp_api_token');
+                $newToken = $this->obtenerTokenWhatsapp();
+                if ($newToken) {
+                    $retry = Http::withoutVerifying()
+                        ->withToken($newToken)
+                        ->timeout(20)
+                        ->post('https://wa-api.tecnobyteapp.com:1422/api/messages/send', $payload);
+                    return $retry->successful();
+                }
+            }
+
+            Log::warning('Envío WhatsApp manual falló', [
+                'status' => $response->status(),
+                'body'   => $response->body(),
+            ]);
+            return false;
+        } catch (\Throwable $e) {
+            Log::error('Excepción enviando WA manual: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Obtiene el token cacheado o hace login a TecnoByteApp.
+     */
+    private function obtenerTokenWhatsapp(): ?string
+    {
+        return Cache::remember('whatsapp_api_token', 1200, function () {
+            try {
+                $resp = Http::withoutVerifying()
+                    ->timeout(15)
+                    ->post('https://wa-api.tecnobyteapp.com:1422/auth/login', [
+                        'email'    => env('WHATSAPP_API_EMAIL'),
+                        'password' => env('WHATSAPP_API_PASSWORD'),
+                    ]);
+
+                if ($resp->successful()) {
+                    return $resp->json('token');
+                }
+                return null;
+            } catch (\Throwable $e) {
+                Log::error('Login WA falló: ' . $e->getMessage());
+                return null;
+            }
+        });
     }
 
     public function render()
