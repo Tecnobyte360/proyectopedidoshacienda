@@ -457,7 +457,7 @@
             <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4"
                  style="background: rgba(15,23,42,0.55); backdrop-filter: blur(4px);">
 
-                <div class="w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl border border-slate-200 bg-white shadow-2xl max-h-[90vh] flex flex-col" wire:click.stop>
+                <div class="w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl border border-slate-200 bg-white shadow-2xl max-h-[90vh] flex flex-col" @click.stop>
                     <div class="flex items-center gap-3 border-b border-slate-100 px-4 sm:px-5 py-4 shrink-0">
                         <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-100 text-violet-600">
                             <i class="fa-solid fa-motorcycle"></i>
@@ -512,7 +512,7 @@
             <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4"
                  style="background: rgba(15,23,42,0.55); backdrop-filter: blur(4px);">
 
-                <div class="w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl border border-slate-200 bg-white shadow-2xl" wire:click.stop>
+                <div class="w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl border border-slate-200 bg-white shadow-2xl" @click.stop>
                     <div class="flex items-center gap-3 border-b border-slate-100 px-4 sm:px-5 py-4">
                         <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
                             <i class="fa-solid fa-key"></i>
