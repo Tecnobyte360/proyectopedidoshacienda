@@ -31,9 +31,15 @@ class Bot extends Component
     public string $system_prompt             = '';
 
     // Felicitaciones de cumpleaños
-    public bool   $cumpleanos_activo  = true;
-    public string $cumpleanos_hora    = '09:00';
-    public string $cumpleanos_mensaje = '';
+    public bool   $cumpleanos_activo             = true;
+    public string $cumpleanos_hora               = '09:00';
+    public string $cumpleanos_mensaje            = '';
+    public int    $cumpleanos_dias_anticipacion  = 0;     // 0=mismo día
+    public int    $cumpleanos_reintentos_max     = 2;
+    public string $cumpleanos_ventana_desde      = '08:00';
+    public string $cumpleanos_ventana_hasta      = '20:00';
+    // Array de 7 booleans: L M X J V S D
+    public array  $cumpleanos_dias_semana_arr    = [true, true, true, true, true, true, true];
 
     public array $modelosDisponibles = [
         'gpt-4o-mini' => 'GPT-4o mini (rápido, económico)',
@@ -73,6 +79,133 @@ class Bot extends Component
         $this->dispatch('notify', [
             'type'    => 'info',
             'message' => 'Plantilla de cumpleaños restaurada — recuerda guardar.',
+        ]);
+    }
+
+    /**
+     * Devuelve los clientes cuyo cumpleaños es HOY.
+     * Se muestra como tabla en la UI para saber a quién le llegaría el mensaje.
+     */
+    public function getCumpleanerosHoyProperty()
+    {
+        $hoy = now('America/Bogota');
+        return \App\Models\Cliente::query()
+            ->whereNotNull('fecha_nacimiento')
+            ->where('activo', true)
+            ->whereNotNull('telefono_normalizado')
+            ->whereRaw('MONTH(fecha_nacimiento) = ?', [(int) $hoy->format('m')])
+            ->whereRaw('DAY(fecha_nacimiento) = ?',   [(int) $hoy->format('d')])
+            ->get(['id', 'nombre', 'telefono_normalizado', 'fecha_nacimiento', 'ultima_felicitacion_anio']);
+    }
+
+    /**
+     * Envía YA la felicitación a un cliente específico (botón "Enviar ahora").
+     */
+    public function enviarFelicitacionManual(int $clienteId): void
+    {
+        $cliente = \App\Models\Cliente::find($clienteId);
+        if (!$cliente || !$cliente->telefono_normalizado) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Cliente no encontrado.']);
+            return;
+        }
+
+        $plantilla = trim($this->cumpleanos_mensaje) !== ''
+            ? $this->cumpleanos_mensaje
+            : ConfiguracionBot::CUMPLEANOS_PLANTILLA_DEFAULT;
+
+        $nombre = trim($cliente->nombre ?: 'crack');
+        $primerNombre = $nombre !== '' ? explode(' ', $nombre)[0] : 'crack';
+        $mensaje = strtr($plantilla, [
+            '{nombre}'          => $primerNombre,
+            '{nombre_completo}' => $nombre,
+        ]);
+
+        $anioActual = (int) now()->format('Y');
+
+        $registro = \App\Models\FelicitacionCumpleanos::create([
+            'cliente_id'     => $cliente->id,
+            'cliente_nombre' => $nombre,
+            'telefono'       => $cliente->telefono_normalizado,
+            'mensaje'        => $mensaje,
+            'origen'         => \App\Models\FelicitacionCumpleanos::ORIGEN_MANUAL,
+            'anio'           => $anioActual,
+            'estado'         => \App\Models\FelicitacionCumpleanos::ESTADO_DRY_RUN,
+            'enviado_at'     => now(),
+        ]);
+
+        try {
+            $wa = app(\App\Services\WhatsappSenderService::class);
+            $ok = $wa->enviarTexto($cliente->telefono_normalizado, $mensaje);
+
+            if ($ok) {
+                $cliente->update(['ultima_felicitacion_anio' => $anioActual]);
+                $registro->update(['estado' => \App\Models\FelicitacionCumpleanos::ESTADO_ENVIADO]);
+
+                $this->dispatch('notify', [
+                    'type'    => 'success',
+                    'message' => '✅ Felicitación enviada a ' . $nombre,
+                ]);
+            } else {
+                $registro->update([
+                    'estado'        => \App\Models\FelicitacionCumpleanos::ESTADO_FALLIDO,
+                    'error_detalle' => 'La API de WhatsApp respondió con error.',
+                ]);
+
+                $this->dispatch('notify', [
+                    'type'    => 'error',
+                    'message' => '❌ No se pudo enviar a ' . $nombre . '. Revisa el historial.',
+                ]);
+            }
+        } catch (\Throwable $e) {
+            $registro->update([
+                'estado'        => \App\Models\FelicitacionCumpleanos::ESTADO_FALLIDO,
+                'error_detalle' => $e->getMessage(),
+            ]);
+            $this->dispatch('notify', [
+                'type'    => 'error',
+                'message' => '❌ Error: ' . $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Envía YA a TODOS los cumpleañeros de hoy que no han sido felicitados
+     * este año. Útil cuando no se quiere depender del scheduler.
+     */
+    public function enviarFelicitacionesDeHoy(): void
+    {
+        $anioActual = (int) now()->format('Y');
+
+        $clientes = $this->cumpleanerosHoy
+            ->filter(fn ($c) => $c->ultima_felicitacion_anio !== $anioActual);
+
+        if ($clientes->isEmpty()) {
+            $this->dispatch('notify', [
+                'type'    => 'info',
+                'message' => 'No hay cumpleañeros pendientes hoy (o ya fueron felicitados).',
+            ]);
+            return;
+        }
+
+        $enviados = 0;
+        $fallidos = 0;
+
+        foreach ($clientes as $c) {
+            $this->enviarFelicitacionManual($c->id);
+            // enviarFelicitacionManual ya emite sus propias notificaciones;
+            // solo contamos por estado final.
+            $ultimo = \App\Models\FelicitacionCumpleanos::where('cliente_id', $c->id)
+                ->where('anio', $anioActual)
+                ->orderByDesc('id')
+                ->first();
+            if ($ultimo?->estado === \App\Models\FelicitacionCumpleanos::ESTADO_ENVIADO) $enviados++;
+            else $fallidos++;
+            usleep(500_000);
+        }
+
+        $this->dispatch('notify', [
+            'type'    => $fallidos === 0 ? 'success' : 'warning',
+            'message' => "📨 {$enviados} enviados" . ($fallidos > 0 ? ", {$fallidos} fallidos" : '') . '. Mira el historial.',
         ]);
     }
 

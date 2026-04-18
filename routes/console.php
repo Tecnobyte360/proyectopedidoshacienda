@@ -16,23 +16,21 @@ Artisan::command('inspire', function () {
 */
 
 // 🎂 Felicitaciones de cumpleaños
-// Corre cada hora. El comando internamente chequea si estamos en la hora
-// configurada en ConfiguracionBot (cumpleanos_hora, ej: "09:00").
-// Así si el admin cambia la hora, no hay que redeployar.
+// Evaluamos cada minuto y comparamos HH:MM exacto con la hora configurada
+// en ConfiguracionBot. Así el admin puede elegir cualquier hora (incluso :22).
 Schedule::command('clientes:felicitar-cumpleanos')
-    ->hourly()
+    ->everyMinute()
     ->timezone('America/Bogota')
     ->when(function () {
         try {
             $config = ConfiguracionBot::actual();
             if (!$config->cumpleanos_activo) return false;
 
-            $horaConfig = $config->cumpleanos_hora ?: '09:00';
+            $horaConfig = trim($config->cumpleanos_hora ?: '09:00');
             $horaActual = now('America/Bogota')->format('H:i');
 
-            // La hora configurada es HH:MM, comparamos solo con la hora (HH)
-            // porque ->hourly() corre al minuto 00 de cada hora.
-            return substr($horaActual, 0, 2) === substr($horaConfig, 0, 2);
+            // Comparación exacta HH:MM (ambos formatos iguales)
+            return $horaActual === $horaConfig;
         } catch (\Throwable $e) {
             return false;
         }

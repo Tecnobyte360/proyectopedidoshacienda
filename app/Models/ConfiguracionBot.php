@@ -32,6 +32,11 @@ class ConfiguracionBot extends Model
         'cumpleanos_activo',
         'cumpleanos_hora',
         'cumpleanos_mensaje',
+        'cumpleanos_dias_anticipacion',
+        'cumpleanos_reintentos_max',
+        'cumpleanos_ventana_desde',
+        'cumpleanos_ventana_hasta',
+        'cumpleanos_dias_semana',
     ];
 
     protected $casts = [
@@ -42,8 +47,10 @@ class ConfiguracionBot extends Model
         'agrupar_mensajes_segundos' => 'integer',
         'usar_prompt_personalizado' => 'boolean',
         'activo'                    => 'boolean',
-        'cumpleanos_activo'         => 'boolean',
-        'temperatura'               => 'float',
+        'cumpleanos_activo'            => 'boolean',
+        'cumpleanos_dias_anticipacion' => 'integer',
+        'cumpleanos_reintentos_max'    => 'integer',
+        'temperatura'                  => 'float',
         'max_tokens'                => 'integer',
         'max_imagenes_por_mensaje'  => 'integer',
     ];
