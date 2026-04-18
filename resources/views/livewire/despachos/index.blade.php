@@ -100,6 +100,147 @@
         </div>
     </div>
 
+    {{-- 🗺️ MAPA DE RUTA (aparece cuando hay pedidos seleccionados) --}}
+    @if($totalSelected > 0)
+        @php
+            $ruta = $this->rutaParaMapa;
+            $urlGmaps = $this->rutaGoogleMapsUrl;
+        @endphp
+
+        <div class="rounded-2xl bg-white border border-slate-200 shadow-sm mb-6 overflow-hidden">
+            <div class="flex flex-wrap items-center justify-between gap-3 px-5 py-3 border-b border-slate-100 bg-gradient-to-r from-violet-50 to-white">
+                <div>
+                    <h3 class="font-bold text-slate-800 flex items-center gap-2">
+                        🗺️ Ruta de entrega
+                    </h3>
+                    <p class="text-xs text-slate-500">
+                        {{ count($ruta['paradas']) }} parada(s) · ~{{ $ruta['total_km'] }} km desde la sede
+                        @if(count($ruta['paradas']) < $totalSelected)
+                            <span class="text-amber-600 font-semibold">
+                                · {{ $totalSelected - count($ruta['paradas']) }} sin coordenadas
+                            </span>
+                        @endif
+                    </p>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    @if($urlGmaps)
+                        <a href="{{ $urlGmaps }}" target="_blank"
+                           class="inline-flex items-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold px-4 py-2 transition">
+                            <i class="fa-brands fa-google"></i>
+                            Abrir en Google Maps
+                        </a>
+                    @endif
+                    @if($domiciliarioSeleccionado)
+                        <button type="button" wire:click="enviarRutaDomiciliario"
+                                wire:confirm="¿Enviar la ruta por WhatsApp al domiciliario seleccionado?"
+                                class="inline-flex items-center gap-2 rounded-xl bg-[#d68643] hover:bg-[#c97a36] text-white text-xs font-semibold px-4 py-2 transition">
+                            <i class="fa-brands fa-whatsapp"></i>
+                            Enviar ruta al domiciliario
+                        </button>
+                    @endif
+                </div>
+            </div>
+
+            <div wire:ignore
+                 id="mapa-despacho"
+                 data-ruta="{{ json_encode($ruta) }}"
+                 style="height: 360px;"></div>
+        </div>
+
+        @push('scripts')
+        <script>
+            (function () {
+                function iniciarMapaDespacho() {
+                    const el = document.getElementById('mapa-despacho');
+                    if (!el || !window.L) return;
+
+                    const data = JSON.parse(el.dataset.ruta || '{}');
+                    if (!data.origen && (!data.paradas || data.paradas.length === 0)) return;
+
+                    // Limpiar mapa previo si había
+                    if (el._leafletMap) {
+                        el._leafletMap.remove();
+                    }
+
+                    const puntos = [];
+                    if (data.origen) puntos.push([data.origen.lat, data.origen.lng]);
+                    (data.paradas || []).forEach(p => puntos.push([p.lat, p.lng]));
+
+                    const map = L.map('mapa-despacho');
+                    el._leafletMap = map;
+
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        maxZoom: 19,
+                        attribution: '© OpenStreetMap'
+                    }).addTo(map);
+
+                    // Sede (verde)
+                    if (data.origen) {
+                        const sedeIcon = L.divIcon({
+                            className: 'sede-marker',
+                            html: `<div style="background:#10b981;color:#fff;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-weight:bold;box-shadow:0 2px 8px rgba(0,0,0,0.3);border:3px solid #fff">🏪</div>`,
+                            iconSize: [36, 36],
+                            iconAnchor: [18, 18],
+                        });
+                        L.marker([data.origen.lat, data.origen.lng], { icon: sedeIcon })
+                            .addTo(map)
+                            .bindPopup(`<b>${data.origen.nombre}</b><br>${data.origen.detalle || ''}`);
+                    }
+
+                    // Paradas numeradas
+                    (data.paradas || []).forEach((p, i) => {
+                        const num = i + 1;
+                        const pinIcon = L.divIcon({
+                            className: 'pedido-marker',
+                            html: `<div style="background:#d68643;color:#fff;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-weight:bold;box-shadow:0 2px 8px rgba(0,0,0,0.3);border:3px solid #fff">${num}</div>`,
+                            iconSize: [32, 32],
+                            iconAnchor: [16, 16],
+                        });
+                        L.marker([p.lat, p.lng], { icon: pinIcon })
+                            .addTo(map)
+                            .bindPopup(`
+                                <b>#${num} ${p.nombre}</b><br>
+                                ${p.direccion}<br>
+                                ${p.barrio ? `📍 ${p.barrio}<br>` : ''}
+                                ${p.telefono ? `📞 ${p.telefono}<br>` : ''}
+                                💵 $${Number(p.total).toLocaleString('es-CO')}
+                            `);
+                    });
+
+                    // Línea conectando los puntos
+                    if (puntos.length > 1) {
+                        L.polyline(puntos, {
+                            color: '#d68643',
+                            weight: 4,
+                            opacity: 0.75,
+                            dashArray: '8, 8',
+                        }).addTo(map);
+                    }
+
+                    // Ajustar vista
+                    if (puntos.length === 1) {
+                        map.setView(puntos[0], 14);
+                    } else {
+                        map.fitBounds(puntos, { padding: [40, 40] });
+                    }
+                }
+
+                // Inicial + en cada re-render de Livewire
+                document.addEventListener('DOMContentLoaded', iniciarMapaDespacho);
+                if (window.Livewire) {
+                    Livewire.hook('morph.updated', () => setTimeout(iniciarMapaDespacho, 80));
+                }
+                // Por si Livewire carga después
+                document.addEventListener('livewire:init', () => {
+                    Livewire.hook('morph.updated', () => setTimeout(iniciarMapaDespacho, 80));
+                });
+                // Intento adicional (el @push puede cargar antes que Leaflet)
+                setTimeout(iniciarMapaDespacho, 300);
+            })();
+        </script>
+        @endpush
+    @endif
+
     {{-- ZONAS --}}
     @forelse($agrupados as $zonaId => $grupo)
         @php

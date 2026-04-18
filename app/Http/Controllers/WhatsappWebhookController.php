@@ -1752,6 +1752,10 @@ class WhatsappWebhookController extends Controller
         ];
         $cliente->update($datosClienteActualizar);
 
+        // Coordenadas del cliente (si la validación las encontró vía geocoding)
+        $pedidoLat = $validacion['coordenadas']['lat'] ?? null;
+        $pedidoLng = $validacion['coordenadas']['lng'] ?? null;
+
         $pedido = Pedido::create([
             'sede_id'               => $sede?->id,
             'cliente_id'            => $cliente->id,
@@ -1766,6 +1770,8 @@ class WhatsappWebhookController extends Controller
             'cliente_nombre'        => $orderData['customer_name'] ?? $name,
             'direccion'             => $direccion ?: null,
             'barrio'                => $barrio ?: null,
+            'lat'                   => $pedidoLat,
+            'lng'                   => $pedidoLng,
             'zona_cobertura_id'     => $zonaCobertura?->id,
             'telefono_whatsapp'     => $telefonoWhatsapp,
             'telefono_contacto'     => $telefonoContacto,

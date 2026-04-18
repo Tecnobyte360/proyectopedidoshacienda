@@ -177,6 +177,166 @@ class Index extends Component
             ->orderBy('fecha_pedido');
     }
 
+    /**
+     * Construye la ruta con sede como origen + pedidos seleccionados como paradas.
+     * Geocodifica direcciones sin lat/lng al vuelo.
+     */
+    public function getRutaParaMapaProperty(): array
+    {
+        $ids = collect($this->seleccionados)->filter()->keys();
+        if ($ids->isEmpty()) {
+            return ['origen' => null, 'paradas' => [], 'total_km' => 0];
+        }
+
+        // Origen: la sede filtrada o la primera activa
+        $sede = $this->sedeId
+            ? Sede::find($this->sedeId)
+            : Sede::where('activa', true)->first();
+
+        $origen = ($sede && $sede->latitud && $sede->longitud)
+            ? [
+                'lat'     => (float) $sede->latitud,
+                'lng'     => (float) $sede->longitud,
+                'nombre'  => $sede->nombre ?: 'Sede',
+                'detalle' => $sede->direccion ?: '',
+            ]
+            : null;
+
+        $pedidos = Pedido::with('domiciliario')
+            ->whereIn('id', $ids)
+            ->get();
+
+        $paradas = [];
+        $geocoder = app(\App\Services\GeocodingService::class);
+
+        foreach ($pedidos as $p) {
+            $lat = $p->lat ? (float) $p->lat : null;
+            $lng = $p->lng ? (float) $p->lng : null;
+
+            // Geocoding al vuelo si no tiene coordenadas guardadas
+            if ((!$lat || !$lng) && !empty($p->direccion)) {
+                $g = $geocoder->geocodificar($p->direccion, $p->barrio, 'Bello');
+                if ($g) {
+                    $lat = $g['lat'];
+                    $lng = $g['lng'];
+                    // Persistir para siguientes cargas
+                    $p->update(['lat' => $lat, 'lng' => $lng]);
+                }
+            }
+
+            if ($lat && $lng) {
+                $paradas[] = [
+                    'id'        => $p->id,
+                    'lat'       => $lat,
+                    'lng'       => $lng,
+                    'nombre'    => $p->cliente_nombre,
+                    'telefono'  => $p->telefono_contacto ?: $p->telefono,
+                    'direccion' => $p->direccion,
+                    'barrio'    => $p->barrio,
+                    'total'     => (float) $p->total,
+                ];
+            }
+        }
+
+        // Distancia total aproximada (haversine entre puntos sucesivos)
+        $totalKm = 0;
+        if ($origen && count($paradas) > 0) {
+            $prev = $origen;
+            foreach ($paradas as $stop) {
+                $totalKm += Sede::distanciaKm($prev['lat'], $prev['lng'], $stop['lat'], $stop['lng']);
+                $prev = $stop;
+            }
+        }
+
+        return [
+            'origen'   => $origen,
+            'paradas'  => $paradas,
+            'total_km' => round($totalKm, 2),
+        ];
+    }
+
+    /**
+     * URL de Google Maps con waypoints para compartir con el domiciliario.
+     */
+    public function getRutaGoogleMapsUrlProperty(): ?string
+    {
+        $ruta = $this->rutaParaMapa;
+        if (!$ruta['origen'] || empty($ruta['paradas'])) {
+            return null;
+        }
+
+        $origen = $ruta['origen']['lat'] . ',' . $ruta['origen']['lng'];
+        $paradas = collect($ruta['paradas'])->pluck('lat', 'lng')->map(fn($lat, $lng) => "{$lat},{$lng}")->values();
+
+        // Google Maps: destino = última parada; waypoints = intermedias
+        $todos  = collect($ruta['paradas'])->map(fn($p) => "{$p['lat']},{$p['lng']}")->values();
+        $destino = $todos->pop();
+        $waypoints = $todos->implode('|');
+
+        $url = "https://www.google.com/maps/dir/?api=1"
+            . "&origin=" . urlencode($origen)
+            . "&destination=" . urlencode($destino)
+            . "&travelmode=driving";
+
+        if (!empty($waypoints)) {
+            $url .= "&waypoints=" . urlencode($waypoints);
+        }
+
+        return $url;
+    }
+
+    /**
+     * Envía la ruta por WhatsApp al domiciliario seleccionado.
+     */
+    public function enviarRutaDomiciliario(): void
+    {
+        if (!$this->domiciliarioSeleccionado) {
+            $this->dispatch('notify', ['type' => 'warning', 'message' => 'Selecciona un domiciliario primero.']);
+            return;
+        }
+
+        $dom = Domiciliario::find($this->domiciliarioSeleccionado);
+        if (!$dom || !$dom->telefonoInternacional()) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'El domiciliario no tiene teléfono configurado.']);
+            return;
+        }
+
+        $url = $this->rutaGoogleMapsUrl;
+        if (!$url) {
+            $this->dispatch('notify', ['type' => 'warning', 'message' => 'No hay pedidos con coordenadas para armar ruta.']);
+            return;
+        }
+
+        $ruta = $this->rutaParaMapa;
+        $cantidad = count($ruta['paradas']);
+        $mensaje = "🛵 *Hola {$dom->nombre}!*\n\n"
+            . "Te asigno {$cantidad} pedido(s) — ruta estimada {$ruta['total_km']} km.\n\n"
+            . "🗺️ Abre la ruta en Google Maps:\n{$url}\n\n"
+            . "Pasos:\n";
+
+        foreach ($ruta['paradas'] as $i => $stop) {
+            $num = $i + 1;
+            $mensaje .= "\n{$num}. *{$stop['nombre']}* — {$stop['direccion']}";
+            if ($stop['telefono']) {
+                $mensaje .= "\n   📞 {$stop['telefono']}";
+            }
+        }
+
+        try {
+            $wa = app(\App\Services\WhatsappSenderService::class);
+            $ok = $wa->enviarTexto($dom->telefonoInternacional(), $mensaje, null, false);
+
+            $this->dispatch('notify', [
+                'type'    => $ok ? 'success' : 'error',
+                'message' => $ok
+                    ? "✅ Ruta enviada a {$dom->nombre} por WhatsApp."
+                    : "❌ No se pudo enviar la ruta por WhatsApp.",
+            ]);
+        } catch (\Throwable $e) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Error: ' . $e->getMessage()]);
+        }
+    }
+
     public function render()
     {
         $pedidos = $this->pedidosEnPreparacion()->get();
