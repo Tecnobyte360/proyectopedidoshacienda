@@ -1664,6 +1664,13 @@ class WhatsappWebhookController extends Controller
         // Costo de envío de la zona (0 si no se resolvió)
         $costoEnvio = $zonaCobertura?->costo_envio ?? 0;
 
+        // ── CLIENTE: lo resolvemos acá arriba para poder consultar beneficios ──
+        // (antes se hacía más abajo, pero necesitamos el $cliente antes)
+        $cliente = Cliente::encontrarOCrearPorTelefono(
+            $telefonoWhatsapp,
+            $orderData['customer_name'] ?? $name
+        );
+
         // 🎁 ¿Tiene beneficio de envío gratis vigente? (ej. por cumpleaños)
         $beneficioAplicado = null;
         if ($zonaCobertura && (float) $costoEnvio > 0) {
@@ -1710,13 +1717,7 @@ class WhatsappWebhookController extends Controller
             }
         }
 
-        // ── CLIENTE: encontrar/crear y actualizar datos ────────────────────
-        $cliente = Cliente::encontrarOCrearPorTelefono(
-            $telefonoWhatsapp,
-            $orderData['customer_name'] ?? $name
-        );
-
-        // Actualizar el nombre/dirección/barrio si vienen mejorados en el pedido
+        // ── CLIENTE: actualizar datos (ya lo resolvimos arriba) ────────────
         $datosClienteActualizar = [
             'nombre'              => $orderData['customer_name'] ?? $cliente->nombre,
             'direccion_principal' => $direccion ?: $cliente->direccion_principal,
