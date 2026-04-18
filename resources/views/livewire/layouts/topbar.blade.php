@@ -11,6 +11,7 @@
         'zonas.index'          => ['Zonas',          'Cobertura y barrios atendidos',              'fa-map-location-dot'],
         'reportes.index'       => ['Reportes',       'Métricas de ventas y operaciones',           'fa-chart-line'],
         'ans.index'            => ['ANS Tiempos',    'Configuración de tiempos por estado',        'fa-stopwatch'],
+        'configuracion.bot'    => ['Bot WhatsApp',   'Comportamiento de la asesora IA',            'fa-robot'],
         'pedidos.seguimiento'  => ['Seguimiento',    'Estado del pedido',                          'fa-route'],
     ];
 

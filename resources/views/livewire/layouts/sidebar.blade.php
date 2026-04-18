@@ -40,6 +40,7 @@
                     ['name' => 'Zonas',         'icon' => 'fa-map-location-dot',   'route' => 'zonas.index',         'badge' => null],
                     ['name' => 'Reportes',      'icon' => 'fa-chart-line',         'route' => 'reportes.index',      'badge' => null],
                     ['name' => 'ANS Tiempos',   'icon' => 'fa-stopwatch',          'route' => 'ans.index',           'badge' => null],
+                    ['name' => 'Bot WhatsApp',  'icon' => 'fa-robot',              'route' => 'configuracion.bot',   'badge' => null],
                 ],
             ],
         ];

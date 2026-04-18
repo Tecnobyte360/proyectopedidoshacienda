@@ -293,6 +293,32 @@ class WhatsappWebhookController extends Controller
         $toolCalls   = $response['choices'][0]['message']['tool_calls'] ?? null;
         $textContent = $response['choices'][0]['message']['content'] ?? null;
 
+        // ── Tool call: enviar_imagen_producto ─────────────────────────────────
+        if ($toolCalls && ($toolCalls[0]['function']['name'] ?? '') === 'enviar_imagen_producto') {
+            $rawArgs = $toolCalls[0]['function']['arguments'] ?? '{}';
+            $args    = json_decode($rawArgs, true) ?: [];
+
+            $codigos = $args['codigos'] ?? [];
+            $msg     = trim((string) ($args['mensaje_acompañante'] ?? ''));
+
+            Log::info('📷 Tool call enviar_imagen_producto', compact('from', 'codigos', 'msg'));
+
+            // Enviar las imágenes (respeta config y max_imagenes_por_mensaje)
+            $enviadas = $this->enviarImagenesProductos($from, (array) $codigos, $connectionId);
+
+            // Si la IA mandó un mensaje acompañante, también lo guardamos en historial
+            $reply = $msg !== ''
+                ? $msg
+                : ($enviadas > 0
+                    ? "Te mandé {$enviadas} foto(s) 📸"
+                    : "No tengo fotos disponibles de eso ahora 😅");
+
+            $conversationHistory[] = ['role' => 'assistant', 'content' => $reply];
+            Cache::put($cacheKey, $conversationHistory, now()->addMinutes(45));
+
+            return $reply;
+        }
+
         if ($toolCalls && ($toolCalls[0]['function']['name'] ?? '') === 'confirmar_pedido') {
             $rawArgs   = $toolCalls[0]['function']['arguments'] ?? '{}';
             $orderData = json_decode($rawArgs, true);
@@ -500,16 +526,18 @@ class WhatsappWebhookController extends Controller
 
         for ($i = 1; $i <= $intentos; $i++) {
             try {
+                $config = \App\Models\ConfiguracionBot::actual();
+
                 $response = Http::withToken(env('OPENAI_API_KEY'))
                     ->timeout(35)
                     ->post('https://api.openai.com/v1/chat/completions', [
-                        'model'             => 'gpt-4o-mini',
+                        'model'             => $config->modelo_openai ?: 'gpt-4o-mini',
                         'messages'          => $messages,
-                        'temperature'       => 0.85,   // más natural y variable (antes 0.4)
+                        'temperature'       => (float) ($config->temperatura ?? 0.85),
                         'top_p'             => 0.9,
-                        'frequency_penalty' => 0.4,    // evita repetir palabras
-                        'presence_penalty'  => 0.4,    // empuja a usar variedad
-                        'max_tokens'        => 700,
+                        'frequency_penalty' => 0.4,
+                        'presence_penalty'  => 0.4,
+                        'max_tokens'        => (int) ($config->max_tokens ?? 700),
                         'tools'       => $this->getToolsDefinicion(),
                         'tool_choice' => 'auto',
                     ]);
@@ -1335,11 +1363,26 @@ class WhatsappWebhookController extends Controller
         $promosTexto   = $catalogo->promocionesFormateadas($sedeId);
         $zonasTexto    = $catalogo->zonasFormateadas($sedeId);
 
+        $config = \App\Models\ConfiguracionBot::actual();
+        $nombreAsesora = $config->nombre_asesora ?: 'Sofía';
+
+        // Nota sobre imágenes (solo si está activo)
+        $notaImagenes = $config->enviar_imagenes_productos
+            ? "\n# 📸 IMÁGENES (FUNCIÓN enviar_imagen_producto)\n" .
+              "Tienes la función `enviar_imagen_producto` disponible. Úsala con criterio:\n" .
+              "- Cuando el cliente diga \"muéstrame\", \"tienes foto\", \"cómo se ve\".\n" .
+              "- Cuando el cliente dude entre 2 productos similares.\n" .
+              "- Para destacar 1-2 productos al inicio de la conversación si son destacados.\n" .
+              "- Máximo {$config->max_imagenes_por_mensaje} imágenes por llamada.\n" .
+              "- Usa los códigos SKU del catálogo (ej: POL-PEC, RES-MOL).\n" .
+              "- NO la uses en cada mensaje — solo cuando aporte valor."
+            : '';
+
         $hora = (int) now()->format('H');
         $saludoHora = $hora < 12 ? 'buenos días' : ($hora < 19 ? 'buenas tardes' : 'buenas noches');
 
         return <<<PROMPT
-Eres Sofía, asesora de Alimentos La Hacienda en Bello, Antioquia. Atiendes pedidos por WhatsApp.
+Eres {$nombreAsesora}, asesora de Alimentos La Hacienda en Bello, Antioquia. Atiendes pedidos por WhatsApp.
 
 # Quién eres
 Eres una persona real, paisa, cálida, ágil y servicial. Hablas natural, como alguien
@@ -1347,7 +1390,8 @@ del barrio que conoce a sus clientes. NO eres formal ni acartonada. Suenas como 
 amiga que trabaja en el local.
 
 Si el cliente pregunta si eres bot o humano, responde:
-"Soy Sofía, del equipo de La Hacienda. Estoy aquí pa ayudarte con tu pedido 😊"
+"Soy {$nombreAsesora}, del equipo de La Hacienda. Estoy aquí pa ayudarte con tu pedido 😊"
+{$notaImagenes}
 
 # Cómo hablas
 - Cercana y natural. Usa expresiones como "claro que sí", "listo", "dale", "a la orden", "con gusto", "perfecto".
@@ -1445,8 +1489,11 @@ PROMPT;
 
     private function getToolsDefinicion(): array
     {
-        return [
-            [
+        $config = \App\Models\ConfiguracionBot::actual();
+        $tools = [];
+
+        // Tool 1: confirmar_pedido — siempre disponible
+        $tools[] = [
                 'type'     => 'function',
                 'function' => [
                     'name'        => 'confirmar_pedido',
@@ -1481,8 +1528,35 @@ PROMPT;
                         'required' => ['products', 'customer_name', 'phone', 'address', 'neighborhood'],
                     ],
                 ],
-            ],
         ];
+
+        // Tool 2: enviar_imagen_producto — SOLO si está activado en config
+        if ($config->enviar_imagenes_productos) {
+            $tools[] = [
+                'type'     => 'function',
+                'function' => [
+                    'name'        => 'enviar_imagen_producto',
+                    'description' => 'Envía al cliente las fotos de uno o varios productos del catálogo (máx ' . $config->max_imagenes_por_mensaje . ' por llamada). Úsala cuando el cliente pida ver el producto, dude entre opciones, o quieras mostrarle algo apetitoso. NO la uses para todos los mensajes — solo cuando aporte valor.',
+                    'parameters'  => [
+                        'type'       => 'object',
+                        'properties' => [
+                            'codigos' => [
+                                'type'        => 'array',
+                                'description' => 'Lista de códigos SKU del catálogo (máx ' . $config->max_imagenes_por_mensaje . '). Ej: ["POL-PEC", "RES-MOL"]',
+                                'items'       => ['type' => 'string'],
+                            ],
+                            'mensaje_acompañante' => [
+                                'type'        => 'string',
+                                'description' => 'Texto natural breve que se enviará junto con las fotos. Ej: "Mira qué frescas 😍"',
+                            ],
+                        ],
+                        'required' => ['codigos'],
+                    ],
+                ],
+            ];
+        }
+
+        return $tools;
     }
 
     /*
@@ -1677,6 +1751,111 @@ PROMPT;
             ->withToken($token)
             ->timeout(20)
             ->post('https://wa-api.tecnobyteapp.com:1422/api/messages/send', $payload);
+    }
+
+    /**
+     * Envía una imagen al cliente vía TecnoByteApp WhatsApp.
+     * Usa el endpoint /api/messages/send con `mediaUrl` y `caption`.
+     */
+    private function enviarImagenWhatsapp(string $from, string $imagenUrl, string $caption = '', $connectionId = null): bool
+    {
+        try {
+            $payload = [
+                'number'   => $from,
+                'mediaUrl' => $imagenUrl,
+                'caption'  => $caption,
+                'body'     => $caption,   // por compat
+            ];
+
+            if (!empty($connectionId)) {
+                $payload['whatsappId']   = (int) $connectionId;
+                $payload['connectionId'] = (int) $connectionId;
+            }
+
+            Log::info('📷 ENVIANDO IMAGEN WHATSAPP', [
+                'phone'  => $from,
+                'imagen' => $imagenUrl,
+            ]);
+
+            $token = $this->obtenerTokenWhatsapp();
+            if (!$token) {
+                Log::error('❌ Token WhatsApp no disponible para imagen');
+                return false;
+            }
+
+            $response = $this->postWhatsappSend($token, $payload);
+
+            if ($response->successful()) {
+                Log::info('✅ Imagen enviada', ['phone' => $from]);
+                return true;
+            }
+
+            // Reintento con refresh de token si vence sesión
+            if ($response->status() === 401) {
+                $newToken = $this->refrescarTokenWhatsapp() ?: $this->loginWhatsapp(true);
+                if ($newToken) {
+                    $retry = $this->postWhatsappSend($newToken, $payload);
+                    if ($retry->successful()) {
+                        Log::info('✅ Imagen enviada (tras refresh)', ['phone' => $from]);
+                        return true;
+                    }
+                }
+            }
+
+            Log::warning('⚠️ No se pudo enviar imagen', [
+                'phone'  => $from,
+                'status' => $response->status(),
+                'body'   => $response->body(),
+            ]);
+            return false;
+        } catch (\Throwable $e) {
+            Log::error('❌ Excepción enviando imagen WhatsApp', [
+                'phone' => $from,
+                'error' => $e->getMessage(),
+            ]);
+            return false;
+        }
+    }
+
+    /**
+     * Envía hasta N imágenes de productos respetando la configuración del bot.
+     * Retorna cuántas se enviaron.
+     */
+    private function enviarImagenesProductos(string $from, array $productosCodigos, $connectionId = null): int
+    {
+        $config = \App\Models\ConfiguracionBot::actual();
+        if (!$config->enviar_imagenes_productos) {
+            return 0;
+        }
+
+        $max = $config->max_imagenes_por_mensaje ?: 3;
+        $codigos = array_slice($productosCodigos, 0, $max);
+        $enviadas = 0;
+
+        foreach ($codigos as $codigo) {
+            $producto = \App\Models\Producto::where('codigo', $codigo)
+                ->orWhere('id', is_numeric($codigo) ? (int) $codigo : null)
+                ->first();
+
+            if (!$producto || empty($producto->imagen_url)) {
+                Log::info('⚠️ Producto sin imagen o no encontrado', ['codigo' => $codigo]);
+                continue;
+            }
+
+            $caption = sprintf(
+                "*%s*\n%s\n💵 $%s/%s",
+                $producto->nombre,
+                $producto->descripcion_corta ?? '',
+                number_format((float) $producto->precio_base, 0, ',', '.'),
+                $producto->unidad
+            );
+
+            if ($this->enviarImagenWhatsapp($from, $producto->imagen_url, $caption, $connectionId)) {
+                $enviadas++;
+            }
+        }
+
+        return $enviadas;
     }
 
     private function obtenerTokenWhatsapp(): ?string
