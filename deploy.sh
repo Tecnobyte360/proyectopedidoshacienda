@@ -117,36 +117,45 @@ fi
 # ─── Verificación final ────────────────────────────────────────────────────
 step "✅ Verificación final"
 
-VIEWS_OK=$(docker exec "$CONTAINER_APP" grep -c "md:pl-64" resources/views/livewire/layouts/app.blade.php 2>/dev/null || echo 0)
-ALPINE_OK=$(docker exec "$CONTAINER_APP" grep -c "registrarStore" resources/views/livewire/layouts/app.blade.php 2>/dev/null || echo 0)
-PRODUCTOS=$(docker exec "$CONTAINER_APP" php artisan tinker --execute="echo App\Models\Producto::count();" 2>/dev/null | tail -1 || echo "?")
-CLIENTES=$(docker exec "$CONTAINER_APP" php artisan tinker --execute="echo App\Models\Cliente::count();" 2>/dev/null | tail -1 || echo "?")
+# Sanea con tr para quitar saltos de línea / caracteres raros del docker exec
+clean_int() { echo "${1:-0}" | tr -dc '0-9' | head -c 5; }
 
-if [ "$VIEWS_OK" -gt 0 ] && [ "$ALPINE_OK" -gt 0 ]; then
+LAYOUT_RESP=$(clean_int "$(docker exec "$CONTAINER_APP" grep -c 'lg:pl-64' resources/views/livewire/layouts/app.blade.php 2>/dev/null)")
+SIDEBAR_OK=$(clean_int "$(docker exec "$CONTAINER_APP" grep -c 'app-sidebar' resources/views/livewire/layouts/sidebar.blade.php 2>/dev/null)")
+FULLSCREEN_OK=$(clean_int "$(docker exec "$CONTAINER_APP" grep -c 'toggleFullscreen' resources/views/livewire/layouts/app.blade.php 2>/dev/null)")
+
+PRODUCTOS=$(docker exec "$CONTAINER_APP" php artisan tinker --execute="echo App\Models\Producto::count();" 2>/dev/null | tail -1 | tr -dc '0-9')
+CLIENTES=$(docker exec "$CONTAINER_APP" php artisan tinker --execute="echo App\Models\Cliente::count();" 2>/dev/null | tail -1 | tr -dc '0-9')
+
+LAYOUT_RESP=${LAYOUT_RESP:-0}
+SIDEBAR_OK=${SIDEBAR_OK:-0}
+FULLSCREEN_OK=${FULLSCREEN_OK:-0}
+
+if [ "$LAYOUT_RESP" -gt 0 ] && [ "$SIDEBAR_OK" -gt 0 ]; then
     echo -e "${GREEN}${BOLD}"
     echo "═══════════════════════════════════════════════════"
     echo "  ✅ DEPLOY COMPLETADO CON ÉXITO"
     echo "═══════════════════════════════════════════════════"
     echo -e "${RESET}"
-    echo "  Layout responsive .... ✓ (md:pl-64 en su lugar)"
-    echo "  Alpine store ......... ✓ (registrarStore presente)"
-    echo "  Productos en BD ...... ${PRODUCTOS}"
-    echo "  Clientes en BD ....... ${CLIENTES}"
+    echo "  Layout lg:pl-64 ...... ✓ (${LAYOUT_RESP} ocurrencias)"
+    echo "  Sidebar app-sidebar .. ✓ (${SIDEBAR_OK} ocurrencias)"
+    echo "  toggleFullscreen ..... ${FULLSCREEN_OK} ocurrencias"
+    echo "  Productos en BD ...... ${PRODUCTOS:-?}"
+    echo "  Clientes en BD ....... ${CLIENTES:-?}"
     echo "  Commit ............... ${LATEST_COMMIT}"
     echo ""
-    echo "  💡 IMPORTANTE: en el navegador haz Ctrl+Shift+R"
-    echo "     para limpiar caché del browser."
+    echo "  💡 En el navegador: Ctrl+Shift+R para limpiar caché."
     echo ""
 else
     echo -e "${RED}${BOLD}"
     echo "═══════════════════════════════════════════════════"
-    echo "  ⚠ DEPLOY INCOMPLETO — revisa estos puntos:"
+    echo "  ⚠ DEPLOY INCOMPLETO — el container no tiene código nuevo"
     echo "═══════════════════════════════════════════════════"
     echo -e "${RESET}"
-    [ "$VIEWS_OK" -eq 0 ] && echo "  ✗ md:pl-64 NO está en app.blade.php del container"
-    [ "$ALPINE_OK" -eq 0 ] && echo "  ✗ registrarStore NO está en app.blade.php del container"
+    [ "$LAYOUT_RESP" -eq 0 ] && echo "  ✗ lg:pl-64 NO está en app.blade.php del container"
+    [ "$SIDEBAR_OK" -eq 0 ] && echo "  ✗ app-sidebar NO está en sidebar.blade.php del container"
     echo ""
-    echo "  Posible causa: el Dockerfile usa COPY estático. Prueba:"
+    echo "  Solución: forzar recreación del container:"
     echo "    docker compose stop $CONTAINER_APP"
     echo "    docker compose rm -f $CONTAINER_APP"
     echo "    docker compose up -d --build $CONTAINER_APP"
