@@ -96,6 +96,72 @@
             </div>
         </section>
 
+        {{-- ╔═══ AGRUPACIÓN DE MENSAJES (DEBOUNCE) ═══╗ --}}
+        <section class="rounded-2xl bg-white shadow border border-slate-200 p-6">
+            <div class="flex items-center gap-2 mb-4">
+                <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-50 text-cyan-600">
+                    <i class="fa-solid fa-comments"></i>
+                </span>
+                <div class="flex-1">
+                    <h3 class="text-lg font-bold text-slate-800">Agrupar mensajes seguidos del cliente</h3>
+                    <p class="text-xs text-slate-500">Evita responder a cada mensaje aislado — espera a que el cliente termine de escribir.</p>
+                </div>
+            </div>
+
+            <div class="space-y-4">
+
+                <label class="inline-flex items-start gap-3 cursor-pointer w-full justify-between rounded-xl border-2 border-cyan-200 bg-cyan-50/40 p-4 hover:bg-cyan-50/70 transition">
+                    <div class="flex-1">
+                        <div class="text-sm font-bold text-slate-800 mb-1">
+                            🧩 Esperar antes de responder
+                        </div>
+                        <div class="text-xs text-slate-600 leading-relaxed">
+                            Si el cliente manda <strong>"Hola"</strong> + <strong>"Quiero pollo"</strong> + <strong>"Para mañana"</strong>
+                            en 3 mensajes seguidos, el bot espera unos segundos, los agrupa
+                            y responde UNA sola vez con todo el contexto. Mucho más natural.
+                        </div>
+                    </div>
+                    <input type="checkbox" wire:model.live="agrupar_mensajes_activo"
+                           class="mt-1 rounded border-slate-300 text-[#d68643] h-6 w-6">
+                </label>
+
+                @if($agrupar_mensajes_activo)
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 ml-2 pl-4 border-l-2 border-cyan-200">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">
+                                Segundos a esperar
+                                <span class="text-xs text-slate-400">({{ $agrupar_mensajes_segundos }}s)</span>
+                            </label>
+                            <input type="range" wire:model.live="agrupar_mensajes_segundos"
+                                   min="1" max="15" step="1"
+                                   class="w-full">
+                            <div class="flex justify-between text-[10px] text-slate-400 mt-1">
+                                <span>1s (rápido)</span>
+                                <span>15s (relajado)</span>
+                            </div>
+                        </div>
+
+                        <div class="rounded-xl bg-slate-50 border border-slate-200 p-3 text-xs text-slate-600">
+                            <i class="fa-solid fa-lightbulb text-amber-500 mr-1"></i>
+                            <strong>Recomendación:</strong> 4-6 segundos.
+                            Menos puede cortar al cliente, más se siente lento.
+                        </div>
+                    </div>
+
+                    <div class="flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 p-3 text-xs text-amber-800">
+                        <i class="fa-solid fa-circle-info mt-0.5"></i>
+                        <div>
+                            <strong>Cómo funciona:</strong> cuando llega un mensaje, el bot lo guarda en un buffer
+                            y espera N segundos. Si llega otro mensaje del MISMO cliente en ese tiempo, los agrupa.
+                            Solo el último mensaje "gana" y procesa toda la conversación junta.
+                            Garantiza que <strong>nunca</strong> se mezclen pedidos de clientes distintos
+                            (cada cliente tiene su propio buffer aislado por teléfono).
+                        </div>
+                    </div>
+                @endif
+            </div>
+        </section>
+
         {{-- MOTOR IA --}}
         <section class="rounded-2xl bg-white shadow border border-slate-200 p-6">
             <div class="flex items-center gap-2 mb-4">

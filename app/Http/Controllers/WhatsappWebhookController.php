@@ -92,6 +92,22 @@ class WhatsappWebhookController extends Controller
 
             $reply = $this->procesarMensaje($from, $name, $message, $connectionId);
 
+            // Si el reply está vacío, este request perdió el debounce — otro request
+            // (el último mensaje del cliente) está procesando todo agrupado. Salir
+            // sin enviar nada al cliente para no duplicar respuestas.
+            if (trim((string) $reply) === '') {
+                Log::info('💬 Request superseded por debounce — no enviar respuesta', [
+                    'from'       => $from,
+                    'message_id' => $messageId,
+                ]);
+
+                if ($messageId) {
+                    Cache::put("processed_whatsapp_msg_{$messageId}", true, now()->addMinutes(10));
+                }
+
+                return response()->json(['status' => 'superseded_by_newer_message']);
+            }
+
             Log::info('💬 RESPUESTA GENERADA', compact('reply', 'from', 'messageId', 'connectionId'));
 
             $sent = $this->enviarRespuestaWhatsapp($from, $reply, $connectionId);
@@ -238,6 +254,29 @@ class WhatsappWebhookController extends Controller
 
     private function procesarMensaje(string $from, string $name, string $message, ?string $connectionId): string
     {
+        // ── CAPA 0: Buffer + debounce — agrupar mensajes seguidos del mismo cliente ──
+        // Si el cliente manda 3 mensajes en 4 segundos, esperamos a que termine de
+        // escribir y respondemos UNA sola vez con todo el contexto.
+        $config = \App\Models\ConfiguracionBot::actual();
+
+        if ($config->agrupar_mensajes_activo && (int) $config->agrupar_mensajes_segundos > 0) {
+            $resultadoAgrupado = $this->agruparOEsperarMensajes(
+                $from,
+                $name,
+                $message,
+                $connectionId,
+                (int) $config->agrupar_mensajes_segundos
+            );
+
+            // Si retorna null, este request no es el "ganador" — otro lo procesará
+            if ($resultadoAgrupado === null) {
+                return '';   // string vacío → el llamador no envía nada al cliente
+            }
+
+            // Sustituir el mensaje único por el agrupado
+            $message = $resultadoAgrupado;
+        }
+
         if ($this->tieneAccionPendiente($from)) {
             $reply = $this->resolverAccionPendiente($from, $name, $message);
             if ($reply) {
@@ -259,6 +298,76 @@ class WhatsappWebhookController extends Controller
         }
 
         return $this->procesarConIA($from, $name, $message, $connectionId);
+    }
+
+    /**
+     * Sistema buffer + debounce.
+     *
+     * Cada llamada agrega el mensaje al buffer del cliente y espera N segundos.
+     * Si durante esa espera llega otro mensaje del MISMO cliente, este request se
+     * "rinde" (devuelve null) y deja que el más nuevo procese todos los mensajes
+     * acumulados. Solo el último mensaje del cliente "gana" y procesa todo junto.
+     *
+     * Resultado:
+     *   - string  → este request es el ganador, debe procesar el mensaje agrupado
+     *   - null    → otro mensaje más nuevo está procesando, este sale silencioso
+     */
+    private function agruparOEsperarMensajes(
+        string $from,
+        string $name,
+        string $message,
+        ?string $connectionId,
+        int $segundosEspera
+    ): ?string {
+        $bufferKey = "wa_buffer_{$from}";
+        $myTimestamp = (string) round(microtime(true) * 1000);   // millis como ID único
+
+        // Añadir mi mensaje al buffer
+        $buffer = Cache::get($bufferKey, ['mensajes' => [], 'last_ts' => '0']);
+        $buffer['mensajes'][] = ['ts' => $myTimestamp, 'texto' => $message];
+        $buffer['last_ts']    = $myTimestamp;
+
+        Cache::put($bufferKey, $buffer, now()->addMinutes(2));
+
+        Log::info('💬 Buffer: mensaje agregado, esperando', [
+            'phone'    => $from,
+            'mi_ts'    => $myTimestamp,
+            'esperar'  => $segundosEspera . 's',
+            'mensajes' => count($buffer['mensajes']),
+        ]);
+
+        // Esperar a que el cliente termine de escribir
+        sleep($segundosEspera);
+
+        // Después del sleep, ¿soy yo el último mensaje del cliente?
+        $bufferActual = Cache::get($bufferKey);
+
+        if (!$bufferActual || $bufferActual['last_ts'] !== $myTimestamp) {
+            Log::info('💬 Buffer: mensaje obsoleto, otro request procesará', [
+                'phone'      => $from,
+                'mi_ts'      => $myTimestamp,
+                'last_ts'    => $bufferActual['last_ts'] ?? '(null)',
+            ]);
+            return null;   // No soy el ganador, salgo sin responder
+        }
+
+        // ¡Soy el ganador! Junto todos los mensajes pendientes y proceso una vez
+        $textoCompleto = collect($bufferActual['mensajes'])
+            ->pluck('texto')
+            ->map(fn ($t) => trim((string) $t))
+            ->filter()
+            ->join("\n");
+
+        // Limpio el buffer (no liberar el lock todavía — hasta que termine procesarConIA)
+        Cache::forget($bufferKey);
+
+        Log::info('💬 Buffer: GANADOR procesa mensajes agrupados', [
+            'phone'        => $from,
+            'cantidad'     => count($bufferActual['mensajes']),
+            'texto_total'  => mb_substr($textoCompleto, 0, 200),
+        ]);
+
+        return $textoCompleto;
     }
 
     private function procesarConIA(string $from, string $name, string $message, ?string $connectionId = null): string

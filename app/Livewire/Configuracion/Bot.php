@@ -13,6 +13,10 @@ class Bot extends Component
     public bool   $enviar_imagen_destacados  = false;
     public bool   $saludar_con_promociones   = true;
 
+    // Buffer de mensajes (debounce)
+    public bool   $agrupar_mensajes_activo   = true;
+    public int    $agrupar_mensajes_segundos = 5;
+
     public string $modelo_openai             = 'gpt-4o-mini';
     public float  $temperatura               = 0.85;
     public int    $max_tokens                = 700;
@@ -40,6 +44,8 @@ class Bot extends Component
         $this->max_imagenes_por_mensaje  = (int) $cfg->max_imagenes_por_mensaje;
         $this->enviar_imagen_destacados  = (bool) $cfg->enviar_imagen_destacados;
         $this->saludar_con_promociones   = (bool) $cfg->saludar_con_promociones;
+        $this->agrupar_mensajes_activo   = (bool) ($cfg->agrupar_mensajes_activo ?? true);
+        $this->agrupar_mensajes_segundos = (int) ($cfg->agrupar_mensajes_segundos ?? 5);
         $this->modelo_openai             = (string) ($cfg->modelo_openai ?? 'gpt-4o-mini');
         $this->temperatura               = (float) $cfg->temperatura;
         $this->max_tokens                = (int) $cfg->max_tokens;
@@ -68,6 +74,8 @@ class Bot extends Component
             'max_imagenes_por_mensaje'  => 'integer|min:1|max:10',
             'enviar_imagen_destacados'  => 'boolean',
             'saludar_con_promociones'   => 'boolean',
+            'agrupar_mensajes_activo'   => 'boolean',
+            'agrupar_mensajes_segundos' => 'integer|min:1|max:30',
             'modelo_openai'             => 'required|string|max:60',
             'temperatura'               => 'numeric|min:0|max:2',
             'max_tokens'                => 'integer|min:100|max:4000',
