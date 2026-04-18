@@ -23,6 +23,7 @@ class Index extends Component
     public string  $pais_codigo         = '+57';
     public string  $telefono            = '';
     public string  $email               = '';
+    public ?string $fecha_nacimiento    = null;
     public string  $direccion_principal = '';
     public string  $barrio              = '';
     public ?int    $zona_cobertura_id   = null;
@@ -46,6 +47,7 @@ class Index extends Component
             'pais_codigo'         => 'required|string|max:6',
             'telefono'            => 'required|string|max:30',
             'email'               => 'nullable|email|max:120',
+            'fecha_nacimiento'    => 'nullable|date|before:today',
             'direccion_principal' => 'nullable|string|max:255',
             'barrio'              => 'nullable|string|max:120',
             'zona_cobertura_id'   => 'nullable|exists:zonas_cobertura,id',
@@ -73,6 +75,7 @@ class Index extends Component
         $this->pais_codigo         = $cli->pais_codigo ?? '+57';
         $this->telefono            = $cli->telefono;
         $this->email               = (string) $cli->email;
+        $this->fecha_nacimiento    = $cli->fecha_nacimiento?->format('Y-m-d');
         $this->direccion_principal = (string) $cli->direccion_principal;
         $this->barrio              = (string) $cli->barrio;
         $this->zona_cobertura_id   = $cli->zona_cobertura_id;
@@ -153,6 +156,7 @@ class Index extends Component
         $this->pais_codigo         = '+57';
         $this->telefono            = '';
         $this->email               = '';
+        $this->fecha_nacimiento    = null;
         $this->direccion_principal = '';
         $this->barrio              = '';
         $this->zona_cobertura_id   = null;

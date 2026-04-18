@@ -30,6 +30,11 @@ class Bot extends Component
     public bool   $usar_prompt_personalizado = false;
     public string $system_prompt             = '';
 
+    // Felicitaciones de cumpleaños
+    public bool   $cumpleanos_activo  = true;
+    public string $cumpleanos_hora    = '09:00';
+    public string $cumpleanos_mensaje = '';
+
     public array $modelosDisponibles = [
         'gpt-4o-mini' => 'GPT-4o mini (rápido, económico)',
         'gpt-4o'      => 'GPT-4o (más natural, más caro)',
@@ -56,6 +61,19 @@ class Bot extends Component
 
         $this->usar_prompt_personalizado = (bool) ($cfg->usar_prompt_personalizado ?? false);
         $this->system_prompt             = (string) ($cfg->system_prompt ?? '');
+
+        $this->cumpleanos_activo  = (bool) ($cfg->cumpleanos_activo ?? true);
+        $this->cumpleanos_hora    = (string) ($cfg->cumpleanos_hora ?: '09:00');
+        $this->cumpleanos_mensaje = (string) ($cfg->cumpleanos_mensaje ?: ConfiguracionBot::CUMPLEANOS_PLANTILLA_DEFAULT);
+    }
+
+    public function cargarPlantillaCumpleanosDefault(): void
+    {
+        $this->cumpleanos_mensaje = ConfiguracionBot::CUMPLEANOS_PLANTILLA_DEFAULT;
+        $this->dispatch('notify', [
+            'type'    => 'info',
+            'message' => 'Plantilla de cumpleaños restaurada — recuerda guardar.',
+        ]);
     }
 
     public function cargarPlantillaPorDefecto(): void
@@ -85,6 +103,9 @@ class Bot extends Component
             'activo'                    => 'boolean',
             'usar_prompt_personalizado' => 'boolean',
             'system_prompt'             => 'nullable|string|max:20000',
+            'cumpleanos_activo'         => 'boolean',
+            'cumpleanos_hora'           => 'nullable|string|regex:/^\d{2}:\d{2}$/',
+            'cumpleanos_mensaje'        => 'nullable|string|max:2000',
         ];
     }
 

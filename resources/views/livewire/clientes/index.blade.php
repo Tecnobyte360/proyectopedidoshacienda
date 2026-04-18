@@ -443,10 +443,21 @@
                         @error('telefono') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
                     </div>
 
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Email (opcional)</label>
-                        <input type="email" wire:model="email"
-                               class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Email (opcional)</label>
+                            <input type="email" wire:model="email"
+                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">
+                                🎂 Fecha de nacimiento
+                                <span class="text-xs text-slate-400 font-normal">(opcional)</span>
+                            </label>
+                            <input type="date" wire:model="fecha_nacimiento" max="{{ date('Y-m-d') }}"
+                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                            @error('fecha_nacimiento') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
+                        </div>
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">

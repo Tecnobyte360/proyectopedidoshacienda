@@ -29,6 +29,9 @@ class ConfiguracionBot extends Model
         'usar_prompt_personalizado',
         'system_prompt',
         'activo',
+        'cumpleanos_activo',
+        'cumpleanos_hora',
+        'cumpleanos_mensaje',
     ];
 
     protected $casts = [
@@ -39,10 +42,23 @@ class ConfiguracionBot extends Model
         'agrupar_mensajes_segundos' => 'integer',
         'usar_prompt_personalizado' => 'boolean',
         'activo'                    => 'boolean',
+        'cumpleanos_activo'         => 'boolean',
         'temperatura'               => 'float',
         'max_tokens'                => 'integer',
         'max_imagenes_por_mensaje'  => 'integer',
     ];
+
+    /** Plantilla por defecto del mensaje de cumpleaños */
+    public const CUMPLEANOS_PLANTILLA_DEFAULT = <<<'MSG'
+¡Feliz cumpleaños, {nombre}! 🎉🎂
+
+De parte de todo el equipo de *Alimentos La Hacienda* queremos desearte un día increíble lleno de alegría y de cosas ricas 🥳.
+
+Como regalito de cumpleaños, hoy tienes *envío gratis* en tu pedido 🎁🚚.
+Solo escríbenos cuando quieras pedir y nosotros nos encargamos del resto.
+
+¡Que la pases muy bonito! 🙌
+MSG;
 
     /**
      * Obtiene (cacheada) la única instancia. Si no existe, crea una con defaults.

@@ -364,6 +364,62 @@
             @endif
         </section>
 
+        {{-- ─────────────────────────────────────────────────────────────
+             🎂 FELICITACIONES DE CUMPLEAÑOS
+             ───────────────────────────────────────────────────────────── --}}
+        <section class="rounded-2xl bg-white border border-slate-200 p-6 shadow-sm">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-pink-50 text-pink-600 text-xl">
+                    🎂
+                </div>
+                <div>
+                    <h3 class="font-bold text-slate-800">Felicitaciones de cumpleaños</h3>
+                    <p class="text-xs text-slate-500">El sistema envía un mensaje automático a los clientes cuyo cumpleaños es hoy.</p>
+                </div>
+            </div>
+
+            <div class="space-y-4">
+                <label class="flex items-start gap-3 cursor-pointer">
+                    <input type="checkbox" wire:model="cumpleanos_activo"
+                           class="mt-1 rounded border-slate-300 text-pink-500 focus:ring-pink-400">
+                    <div>
+                        <div class="text-sm font-semibold text-slate-800">Enviar felicitaciones automáticamente</div>
+                        <div class="text-xs text-slate-500">Cuando un cliente cumpla años, el bot le envía un mensaje desde WhatsApp.</div>
+                    </div>
+                </label>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Hora de envío</label>
+                        <input type="time" wire:model="cumpleanos_hora"
+                               class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                        <p class="text-xs text-slate-500 mt-1">Hora local (Bogotá). El cron corre cada hora y dispara a esta.</p>
+                        @error('cumpleanos_hora') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
+                    </div>
+                </div>
+
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <label class="block text-sm font-medium text-slate-700">Mensaje de felicitación</label>
+                        <button type="button" wire:click="cargarPlantillaCumpleanosDefault"
+                                class="text-xs font-semibold text-[#a85f24] hover:underline">
+                            <i class="fa-solid fa-rotate-left mr-1"></i> Restaurar plantilla
+                        </button>
+                    </div>
+                    <textarea wire:model="cumpleanos_mensaje" rows="8"
+                              class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-mono focus:border-[#d68643] focus:ring-[#d68643]"></textarea>
+                    @error('cumpleanos_mensaje') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
+                    <div class="mt-2 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-xs text-slate-600">
+                        <strong class="text-slate-800">Variables disponibles:</strong>
+                        <code class="mx-1 px-1.5 py-0.5 bg-white rounded border border-slate-200">{nombre}</code>
+                        primer nombre del cliente,
+                        <code class="mx-1 px-1.5 py-0.5 bg-white rounded border border-slate-200">{nombre_completo}</code>
+                        nombre completo.
+                    </div>
+                </div>
+            </div>
+        </section>
+
         {{-- BOTÓN GUARDAR --}}
         <div class="flex justify-end pt-4">
             <button type="submit"

@@ -19,6 +19,8 @@ class Cliente extends Model
         'telefono',
         'telefono_normalizado',
         'email',
+        'fecha_nacimiento',
+        'ultima_felicitacion_anio',
         'direccion_principal',
         'barrio',
         'zona_cobertura_id',
@@ -37,15 +39,17 @@ class Cliente extends Model
     ];
 
     protected $casts = [
-        'preferencias'        => 'array',
-        'activo'              => 'boolean',
-        'lat'                 => 'float',
-        'lng'                 => 'float',
-        'total_pedidos'       => 'integer',
-        'total_gastado'       => 'decimal:2',
-        'ticket_promedio'     => 'decimal:2',
-        'fecha_primer_pedido' => 'datetime',
-        'fecha_ultimo_pedido' => 'datetime',
+        'preferencias'             => 'array',
+        'activo'                   => 'boolean',
+        'lat'                      => 'float',
+        'lng'                      => 'float',
+        'total_pedidos'            => 'integer',
+        'total_gastado'            => 'decimal:2',
+        'ticket_promedio'          => 'decimal:2',
+        'fecha_nacimiento'         => 'date',
+        'ultima_felicitacion_anio' => 'integer',
+        'fecha_primer_pedido'      => 'datetime',
+        'fecha_ultimo_pedido'      => 'datetime',
     ];
 
     /*
