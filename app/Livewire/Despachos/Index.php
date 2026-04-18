@@ -22,6 +22,10 @@ class Index extends Component
     public ?int $domiciliarioSeleccionado = null;
     public string $notaDespacho = '';
 
+    // Modo masivo por zona: mapa [zona_id => domiciliario_id]
+    public array $domiciliariosPorZona = [];
+    public bool  $modoMasivoPorZona    = false;
+
     protected $listeners = [
         'pedidoActualizado' => 'refrescar',
     ];
@@ -84,7 +88,188 @@ class Index extends Component
         $this->modalAbierto = false;
         $this->domiciliarioSeleccionado = null;
         $this->notaDespacho = '';
+        $this->domiciliariosPorZona = [];
+        $this->modoMasivoPorZona    = false;
         $this->resetValidation();
+    }
+
+    /**
+     * Devuelve los pedidos seleccionados agrupados por zona.
+     * Formato: [zona_id => ['zona' => ZonaCobertura|null, 'pedidos' => Collection]]
+     */
+    public function getSeleccionadosPorZonaProperty()
+    {
+        $ids = collect($this->seleccionados)->filter()->keys();
+        if ($ids->isEmpty()) return collect();
+
+        return Pedido::with('zonaCobertura')
+            ->whereIn('id', $ids)
+            ->get()
+            ->groupBy(fn ($p) => $p->zona_cobertura_id ?? 0)
+            ->map(fn ($grupo, $zonaId) => [
+                'zona_id' => $zonaId ?: null,
+                'zona'    => $grupo->first()->zonaCobertura,
+                'pedidos' => $grupo,
+                'total'   => $grupo->sum('total'),
+            ]);
+    }
+
+    /**
+     * Despacho MASIVO: asigna un domiciliario DIFERENTE a cada zona
+     * en una sola transacción. Ejecuta la misma lógica que confirmarDespacho
+     * pero para cada grupo por separado.
+     */
+    public function confirmarDespachoMasivoPorZona(): void
+    {
+        $grupos = $this->seleccionadosPorZona;
+
+        if ($grupos->isEmpty()) {
+            $this->dispatch('notify', ['type' => 'warning', 'message' => 'No hay pedidos seleccionados.']);
+            return;
+        }
+
+        // Validar que CADA zona con pedidos tenga un domiciliario asignado
+        $sinDomiciliario = [];
+        foreach ($grupos as $zonaId => $grupo) {
+            $key = $zonaId ?: 0;
+            if (empty($this->domiciliariosPorZona[$key])) {
+                $sinDomiciliario[] = $grupo['zona']?->nombre ?? 'Sin zona';
+            }
+        }
+
+        if (!empty($sinDomiciliario)) {
+            $this->dispatch('notify', [
+                'type'    => 'error',
+                'message' => '⚠️ Asigna un domiciliario para: ' . implode(', ', $sinDomiciliario),
+            ]);
+            return;
+        }
+
+        $usuario = Auth::user();
+        $totalDespachados = 0;
+        $zonasDespachadas = 0;
+
+        DB::transaction(function () use ($grupos, $usuario, &$totalDespachados, &$zonasDespachadas) {
+            foreach ($grupos as $zonaId => $grupo) {
+                $key = $zonaId ?: 0;
+                $domId = $this->domiciliariosPorZona[$key] ?? null;
+                if (!$domId) continue;
+
+                $domiciliario = Domiciliario::find($domId);
+                if (!$domiciliario) continue;
+
+                $pedidos = $grupo['pedidos']->filter(fn ($p) => $p->estado === Pedido::ESTADO_EN_PREPARACION);
+
+                foreach ($pedidos as $pedido) {
+                    if ($pedido->domiciliario_id && $pedido->domiciliario_id !== $domiciliario->id) {
+                        $anterior = Domiciliario::find($pedido->domiciliario_id);
+                        if ($anterior && $anterior->estado === 'ocupado') {
+                            $anterior->estado = 'disponible';
+                            $anterior->save();
+                        }
+                    }
+
+                    $pedido->domiciliario_id = $domiciliario->id;
+                    $pedido->fecha_asignacion_domiciliario = now();
+                    $pedido->fecha_salida_domiciliario     = now();
+                    $pedido->save();
+
+                    $pedido->registrarHistorial(
+                        estadoNuevo: $pedido->estado,
+                        estadoAnterior: $pedido->estado,
+                        titulo: 'Domiciliario asignado',
+                        descripcion: "Asignado a {$domiciliario->nombre} (zona: " . ($grupo['zona']?->nombre ?? 'Sin zona') . ")",
+                        usuario: $usuario?->name,
+                        usuarioId: $usuario?->id
+                    );
+
+                    $token = $pedido->generarTokenEntrega();
+
+                    $pedido->cambiarEstado(
+                        Pedido::ESTADO_REPARTIDOR_EN_CAMINO,
+                        "Tu pedido va en camino con {$domiciliario->nombre}.",
+                        'Pedido en camino',
+                        $usuario?->name,
+                        $usuario?->id
+                    );
+
+                    $pedido->notificarTokenEntrega($token);
+
+                    $totalDespachados++;
+                }
+
+                if ($pedidos->isNotEmpty()) {
+                    $domiciliario->estado = 'ocupado';
+                    $domiciliario->save();
+
+                    // Enviar ruta a este domiciliario por WhatsApp
+                    $this->enviarRutaADomiciliario(
+                        $domiciliario,
+                        $pedidos->pluck('id')->all(),
+                        $grupo['zona']?->nombre ?? 'Sin zona'
+                    );
+
+                    $zonasDespachadas++;
+                }
+            }
+        });
+
+        $this->cerrarModal();
+        $this->seleccionados = [];
+
+        $this->dispatch('notify', [
+            'type'    => 'success',
+            'message' => "✅ {$totalDespachados} pedido(s) despachados en {$zonasDespachadas} zona(s). Se envió ruta por WhatsApp a cada domiciliario.",
+        ]);
+    }
+
+    /**
+     * Envía ruta específica a UN domiciliario con SUS pedidos.
+     */
+    private function enviarRutaADomiciliario(Domiciliario $dom, array $pedidoIds, string $nombreZona): void
+    {
+        if (!$dom->telefonoInternacional()) return;
+
+        $pedidos = Pedido::whereIn('id', $pedidoIds)->get();
+        $sede = Sede::where('activa', true)->first();
+
+        $origen = ($sede && $sede->latitud && $sede->longitud)
+            ? "{$sede->latitud},{$sede->longitud}"
+            : null;
+
+        $paradas = $pedidos->filter(fn ($p) => $p->lat && $p->lng);
+
+        if ($paradas->isEmpty()) return;
+
+        $puntos = $paradas->map(fn ($p) => "{$p->lat},{$p->lng}")->values();
+        $destino = $puntos->pop();
+        $waypoints = $puntos->implode('|');
+
+        $url = "https://www.google.com/maps/dir/?api=1"
+            . ($origen ? "&origin=" . urlencode($origen) : '')
+            . "&destination=" . urlencode($destino)
+            . "&travelmode=driving"
+            . (!empty($waypoints) ? "&waypoints=" . urlencode($waypoints) : '');
+
+        $mensaje = "🛵 *Hola {$dom->nombre}!*\n\n"
+            . "Te asigno {$pedidos->count()} pedido(s) en *{$nombreZona}*.\n\n"
+            . "🗺️ Ruta en Google Maps:\n{$url}\n\n"
+            . "Paradas:\n";
+
+        foreach ($pedidos as $i => $p) {
+            $num = $i + 1;
+            $mensaje .= "\n{$num}. *{$p->cliente_nombre}* — {$p->direccion}";
+            if ($p->telefono_contacto) {
+                $mensaje .= "\n   📞 {$p->telefono_contacto}";
+            }
+        }
+
+        try {
+            app(\App\Services\WhatsappSenderService::class)
+                ->enviarTexto($dom->telefonoInternacional(), $mensaje, null, false);
+        } catch (\Throwable $e) {
+            \Log::warning('No se pudo enviar ruta al domiciliario: ' . $e->getMessage());
+        }
     }
 
     public function confirmarDespacho(): void
