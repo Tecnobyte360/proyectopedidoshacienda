@@ -114,7 +114,8 @@
                         🗺️ Ruta de entrega
                     </h3>
                     <p class="text-xs text-slate-500">
-                        {{ count($ruta['paradas']) }} parada(s) · ~{{ $ruta['total_km'] }} km desde la sede
+                        <span>{{ count($ruta['paradas']) }} parada(s) · ~{{ $ruta['total_km'] }} km línea recta</span>
+                        <span id="ruta-info-osrm" class="text-[#d68643] font-semibold"></span>
                         @if(count($ruta['paradas']) < $totalSelected)
                             <span class="text-amber-600 font-semibold">
                                 · {{ $totalSelected - count($ruta['paradas']) }} sin coordenadas
@@ -125,15 +126,15 @@
                 <div class="flex flex-wrap gap-2">
                     @if($urlGmaps)
                         <a href="{{ $urlGmaps }}" target="_blank"
-                           class="inline-flex items-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold px-4 py-2 transition">
+                           class="inline-flex items-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold px-4 py-2 transition shadow">
                             <i class="fa-brands fa-google"></i>
-                            Abrir en Google Maps
+                            🧭 Iniciar navegación en Google Maps
                         </a>
                     @endif
                     @if($domiciliarioSeleccionado)
                         <button type="button" wire:click="enviarRutaDomiciliario"
                                 wire:confirm="¿Enviar la ruta por WhatsApp al domiciliario seleccionado?"
-                                class="inline-flex items-center gap-2 rounded-xl bg-[#d68643] hover:bg-[#c97a36] text-white text-xs font-semibold px-4 py-2 transition">
+                                class="inline-flex items-center gap-2 rounded-xl bg-[#d68643] hover:bg-[#c97a36] text-white text-xs font-bold px-4 py-2 transition">
                             <i class="fa-brands fa-whatsapp"></i>
                             Enviar ruta al domiciliario
                         </button>
@@ -159,10 +160,57 @@
         @script
         <script>
             (function () {
+                // Abre Google Maps para ir de la ubicación ACTUAL del domiciliario a un punto específico
+                window.navegarHasta = function (lat, lng) {
+                    var url = 'https://www.google.com/maps/dir/?api=1'
+                            + '&destination=' + lat + ',' + lng
+                            + '&travelmode=driving';
+                    window.open(url, '_blank');
+                };
+
+                // Abre Waze con navegación directa (apps móviles lo abren de una)
+                window.navegarWaze = function (lat, lng) {
+                    window.open('https://www.waze.com/ul?ll=' + lat + ',' + lng + '&navigate=yes', '_blank');
+                };
+
+                function buildPopupPedido(p, num) {
+                    var html = '<div style="min-width:200px">';
+                    html += '<b>#' + num + ' ' + (p.nombre || '') + '</b><br>';
+                    if (p.direccion) html += '📍 ' + p.direccion + '<br>';
+                    if (p.barrio) html += '🏘️ ' + p.barrio + '<br>';
+                    if (p.telefono) html += '📞 ' + p.telefono + '<br>';
+                    html += '💵 $' + Number(p.total || 0).toLocaleString('es-CO');
+                    html += '<div style="margin-top:10px;display:flex;gap:4px;flex-wrap:wrap">';
+                    html += '<button onclick="navegarHasta(' + p.lat + ',' + p.lng + ')" '
+                         + 'style="background:#4285f4;color:#fff;border:none;border-radius:6px;padding:6px 10px;font-size:11px;font-weight:600;cursor:pointer">'
+                         + '🧭 Google Maps</button>';
+                    html += '<button onclick="navegarWaze(' + p.lat + ',' + p.lng + ')" '
+                         + 'style="background:#33ccff;color:#fff;border:none;border-radius:6px;padding:6px 10px;font-size:11px;font-weight:600;cursor:pointer">'
+                         + '🚗 Waze</button>';
+                    if (p.telefono) {
+                        html += '<a href="https://wa.me/' + p.telefono.replace(/\D/g,'') + '" target="_blank" '
+                             + 'style="background:#25d366;color:#fff;border-radius:6px;padding:6px 10px;font-size:11px;font-weight:600;text-decoration:none">'
+                             + '💬 WA</a>';
+                    }
+                    html += '</div></div>';
+                    return html;
+                }
+
+                // Llama OSRM para obtener la ruta real por calles
+                function fetchRutaOSRM(puntos) {
+                    if (puntos.length < 2) return Promise.resolve(null);
+                    var coords = puntos.map(function (p) { return p[1] + ',' + p[0]; }).join(';');
+                    var url = 'https://router.project-osrm.org/route/v1/driving/' + coords
+                            + '?overview=full&geometries=geojson';
+                    return fetch(url)
+                        .then(function (r) { return r.ok ? r.json() : null; })
+                        .catch(function () { return null; });
+                }
+
                 function iniciarMapaDespacho() {
                     var el = document.getElementById('mapa-despacho');
-                    if (!el) return true;           // no div, nada que hacer
-                    if (!window.L) return false;    // Leaflet aún no cargado, reintentar
+                    if (!el) return true;
+                    if (!window.L) return false;
 
                     var data;
                     try { data = JSON.parse(el.dataset.ruta || '{}'); }
@@ -209,23 +257,45 @@
                         });
                         L.marker([p.lat, p.lng], { icon: pinIcon })
                             .addTo(map)
-                            .bindPopup(
-                                '<b>#' + num + ' ' + (p.nombre || '') + '</b><br>' +
-                                (p.direccion || '') + '<br>' +
-                                (p.barrio ? ('📍 ' + p.barrio + '<br>') : '') +
-                                (p.telefono ? ('📞 ' + p.telefono + '<br>') : '') +
-                                '💵 $' + Number(p.total || 0).toLocaleString('es-CO')
-                            );
+                            .bindPopup(buildPopupPedido(p, num));
                     });
 
+                    // Línea recta provisional (mientras llega OSRM)
+                    var lineaProvisional = null;
                     if (puntos.length > 1) {
-                        L.polyline(puntos, { color: '#d68643', weight: 4, opacity: 0.75, dashArray: '8, 8' }).addTo(map);
+                        lineaProvisional = L.polyline(puntos, {
+                            color: '#d68643', weight: 3, opacity: 0.4, dashArray: '8, 8'
+                        }).addTo(map);
                     }
 
+                    // Zoom inicial
                     if (puntos.length === 1) {
                         map.setView(puntos[0], 15);
                     } else if (puntos.length > 1) {
                         map.fitBounds(puntos, { padding: [40, 40] });
+                    }
+
+                    // Traer ruta real por calles (OSRM) y dibujar encima
+                    if (puntos.length > 1) {
+                        fetchRutaOSRM(puntos).then(function (osrm) {
+                            if (!osrm || !osrm.routes || !osrm.routes[0]) return;
+
+                            var geometry = osrm.routes[0].geometry;
+                            if (lineaProvisional) map.removeLayer(lineaProvisional);
+
+                            L.geoJSON(geometry, {
+                                style: { color: '#d68643', weight: 5, opacity: 0.85 }
+                            }).addTo(map);
+
+                            var dur = osrm.routes[0].duration; // segundos
+                            var dist = osrm.routes[0].distance; // metros
+                            if (dur && dist) {
+                                var min = Math.round(dur / 60);
+                                var km = (dist / 1000).toFixed(1);
+                                var info = document.getElementById('ruta-info-osrm');
+                                if (info) info.textContent = ' · ' + km + ' km real · ~' + min + ' min conduciendo';
+                            }
+                        });
                     }
 
                     setTimeout(function () { try { map.invalidateSize(); } catch (e) {} }, 250);
