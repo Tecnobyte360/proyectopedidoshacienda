@@ -66,6 +66,54 @@ class Index extends Component
         $this->area_km2   = isset($data['area_km2']) ? (float) $data['area_km2'] : null;
     }
 
+    /**
+     * Consulta OpenStreetMap (Overpass API) para encontrar los barrios
+     * que están DENTRO del polígono actual y los carga en el textarea.
+     * Se fusiona con los barrios ya escritos, sin duplicados.
+     */
+    public function autodetectarBarrios(): void
+    {
+        if (!$this->poligono || count($this->poligono) < 3) {
+            $this->dispatch('notify', [
+                'type'    => 'warning',
+                'message' => 'Primero dibuja un polígono en el mapa.',
+            ]);
+            return;
+        }
+
+        $barriosOsm = app(\App\Services\OverpassService::class)
+            ->barriosEnPoligono($this->poligono);
+
+        if (empty($barriosOsm)) {
+            $this->dispatch('notify', [
+                'type'    => 'info',
+                'message' => 'OpenStreetMap no encontró barrios en esa zona. Puedes escribirlos a mano.',
+            ]);
+            return;
+        }
+
+        // Barrios ya escritos en el textarea
+        $existentes = collect(preg_split('/\r\n|\r|\n|,/', $this->barriosTexto))
+            ->map(fn ($n) => trim($n))
+            ->filter()
+            ->mapWithKeys(fn ($n) => [\App\Models\ZonaCobertura::normalizar($n) => $n]);
+
+        // Merge (priorizando lo ya escrito)
+        foreach ($barriosOsm as $b) {
+            $key = \App\Models\ZonaCobertura::normalizar($b);
+            if (!$existentes->has($key)) {
+                $existentes->put($key, $b);
+            }
+        }
+
+        $this->barriosTexto = $existentes->values()->sort()->join("\n");
+
+        $this->dispatch('notify', [
+            'type'    => 'success',
+            'message' => '✨ ' . count($barriosOsm) . ' barrios detectados desde OpenStreetMap.',
+        ]);
+    }
+
     public function updatingSearch(): void       { $this->resetPage(); }
     public function updatingFiltroEstado(): void { $this->resetPage(); }
     public function updatingFiltroSedeId(): void { $this->resetPage(); }

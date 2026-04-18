@@ -388,15 +388,32 @@
                     </div>
 
                     <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">
-                            Barrios incluidos
-                            <span class="text-xs text-slate-400 font-normal">(uno por línea o separados por coma)</span>
-                        </label>
-                        <textarea wire:model="barriosTexto" rows="4" placeholder="Niquía&#10;Belén&#10;Pajarito"
+                        <div class="flex items-center justify-between mb-1">
+                            <label class="block text-sm font-medium text-slate-700">
+                                Barrios incluidos
+                                <span class="text-xs text-slate-400 font-normal">(uno por línea o separados por coma)</span>
+                            </label>
+                            <button type="button"
+                                    wire:click="autodetectarBarrios"
+                                    wire:loading.attr="disabled"
+                                    wire:target="autodetectarBarrios"
+                                    class="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-[#d68643] hover:bg-[#c97a36] text-white transition disabled:opacity-60 disabled:cursor-wait">
+                                <span wire:loading.remove wire:target="autodetectarBarrios">
+                                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                                    Auto-detectar
+                                </span>
+                                <span wire:loading wire:target="autodetectarBarrios" class="flex items-center gap-1.5">
+                                    <i class="fa-solid fa-spinner fa-spin"></i>
+                                    Consultando OSM…
+                                </span>
+                            </button>
+                        </div>
+                        <textarea wire:model="barriosTexto" rows="6" placeholder="Niquía&#10;Belén&#10;Pajarito&#10;&#10;Dibuja un polígono arriba y presiona Auto-detectar para llenarlo automáticamente."
                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]"></textarea>
                         <p class="text-xs text-slate-500 mt-1">
                             <i class="fa-solid fa-info-circle"></i>
-                            El sistema normaliza los nombres para emparejar lo que escribe el cliente en WhatsApp.
+                            Auto-detectar busca los barrios en OpenStreetMap dentro del polígono dibujado.
+                            También puedes escribirlos a mano. El sistema normaliza para emparejar lo que escribe el cliente.
                         </p>
                     </div>
 
