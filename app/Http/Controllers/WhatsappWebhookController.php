@@ -592,6 +592,39 @@ class WhatsappWebhookController extends Controller
         $reply = $textContent
             ?? 'En este momento no logré procesar tu mensaje. ¿Me lo repites con un poquito más de detalle?';
 
+        // 🛑 DETECTOR DE ALUCINACIÓN DE CONFIRMACIÓN:
+        // Si el bot dice "pedido registrado / confirmado / va en camino"
+        // pero NO llamó a confirmar_pedido → es una mentira. Registramos
+        // alerta operativa para que el admin lo vea y corrijamos el prompt.
+        $fraseFalsaConfirmacion = $this->detectarFalsaConfirmacion($reply);
+        if ($fraseFalsaConfirmacion) {
+            Log::warning('⚠️ ALUCINACIÓN: Bot dijo que confirmó pero NO llamó la función', [
+                'from'  => $from,
+                'frase' => $fraseFalsaConfirmacion,
+                'reply' => mb_substr($reply, 0, 300),
+            ]);
+
+            try {
+                app(\App\Services\BotAlertaService::class)->registrar(
+                    \App\Models\BotAlerta::TIPO_OTRO,
+                    '🤥 Bot dijo que confirmó un pedido pero NO lo hizo',
+                    "El bot respondió \"{$fraseFalsaConfirmacion}\" al cliente {$from} "
+                        . "pero NO invocó la función confirmar_pedido. El pedido NO está registrado en BD. "
+                        . "Revisa /chat para ver la conversación y completarlo manualmente si es necesario.",
+                    \App\Models\BotAlerta::SEV_WARNING,
+                    null,
+                    [
+                        'from'         => $from,
+                        'frase'        => $fraseFalsaConfirmacion,
+                        'reply'        => mb_substr($reply, 0, 500),
+                        'conversacion_id' => $conversacion->id,
+                    ]
+                );
+            } catch (\Throwable $e) {
+                Log::warning('No se pudo registrar alerta de falsa confirmación: ' . $e->getMessage());
+            }
+        }
+
         $conversationHistory[] = ['role' => 'assistant', 'content' => $reply];
         Cache::put($cacheKey, $conversationHistory, now()->addMinutes(45));
 
@@ -601,6 +634,34 @@ class WhatsappWebhookController extends Controller
         Log::info('💬 CAPA 3: Respuesta conversacional IA', compact('from', 'reply'));
 
         return $reply;
+    }
+
+    /**
+     * Detecta si el bot dijo que confirmó/registró un pedido SIN haber llamado
+     * la función. Si encuentra la frase, retorna la frase detectada; sino, null.
+     */
+    private function detectarFalsaConfirmacion(string $reply): ?string
+    {
+        $frases = [
+            'pedido quedó registrado',
+            'pedido registrado',
+            'pedido confirmado',
+            'va en camino',
+            'salió en camino',
+            'sale en camino',
+            'lo estamos preparando',
+            'tu pedido #',
+            'quedó en preparación',
+            'tu pedido quedó listo',
+        ];
+
+        $lower = mb_strtolower($reply);
+        foreach ($frases as $f) {
+            if (str_contains($lower, $f)) {
+                return $f;
+            }
+        }
+        return null;
     }
     /**
      * Obtiene el ID de la sede asociada a la conexión.
@@ -2127,7 +2188,15 @@ PROMPT;
                 'type'     => 'function',
                 'function' => [
                     'name'        => 'confirmar_pedido',
-                    'description' => 'Registra el pedido en el sistema. Llama SOLO cuando el cliente aceptó explícitamente, los productos son del catálogo y el barrio está cubierto.',
+                    'description' => 'Registra el pedido en el sistema. LLAMA SIEMPRE QUE NECESITES confirmar un pedido — '
+                        . 'no basta con responderle al cliente que su pedido quedó registrado, DEBES llamar esta función '
+                        . 'o el pedido NO existe. '
+                        . 'Condiciones previas obligatorias: '
+                        . '(1) el cliente confirmó explícitamente con "sí/dale/listo/confirmo/ok confirmo" — NUNCA con un simple "gracias"; '
+                        . '(2) los productos son del catálogo; '
+                        . '(3) el barrio está cubierto (ya llamaste validar_cobertura); '
+                        . '(4) tienes nombre, dirección y teléfono del cliente. '
+                        . 'DESPUÉS de llamar esta función, el sistema te devuelve un mensaje — ese sí le puedes decir al cliente "tu pedido quedó registrado #N".',
                     'parameters'  => [
                         'type'       => 'object',
                         'properties' => [
