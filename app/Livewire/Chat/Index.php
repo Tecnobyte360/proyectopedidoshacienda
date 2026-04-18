@@ -113,6 +113,16 @@ class Index extends Component
             $token = $this->obtenerTokenWhatsapp();
             if (!$token) {
                 Log::error('Token WhatsApp no disponible para chat manual');
+                try {
+                    app(\App\Services\BotAlertaService::class)->registrar(
+                        \App\Models\BotAlerta::TIPO_WHATSAPP_TOKEN,
+                        '📱 Token de WhatsApp no disponible (chat manual)',
+                        'No se pudo obtener el token de WhatsApp al intentar enviar un mensaje manual desde el chat interno. Verifica WHATSAPP_API_EMAIL / WHATSAPP_API_PASSWORD en .env.',
+                        \App\Models\BotAlerta::SEV_CRITICA,
+                        null,
+                        ['telefono' => $telefono]
+                    );
+                } catch (\Throwable $e) { /* no bloquear */ }
                 return false;
             }
 
@@ -151,6 +161,21 @@ class Index extends Component
                 'status' => $response->status(),
                 'body'   => $response->body(),
             ]);
+
+            try {
+                app(\App\Services\BotAlertaService::class)->registrar(
+                    \App\Models\BotAlerta::TIPO_WHATSAPP_ENVIO,
+                    '📤 Falló envío manual de WhatsApp',
+                    'Un mensaje enviado desde el chat interno no pudo entregarse. Status ' . $response->status() . '.',
+                    \App\Models\BotAlerta::SEV_WARNING,
+                    $response->status(),
+                    [
+                        'telefono' => $telefono,
+                        'body'     => mb_substr((string) $response->body(), 0, 500),
+                    ]
+                );
+            } catch (\Throwable $e) { /* no bloquear */ }
+
             return false;
         } catch (\Throwable $e) {
             Log::error('Excepción enviando WA manual: ' . $e->getMessage());

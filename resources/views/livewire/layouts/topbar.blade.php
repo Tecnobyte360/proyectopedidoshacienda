@@ -15,6 +15,7 @@
         'clientes.index'       => ['Clientes',       'Quién compra, qué compra, cuánto compra',    'fa-users'],
         'conversaciones.index' => ['Conversaciones', 'Historial de cada chat con el bot',          'fa-comments'],
         'chat.index'           => ['Chat en vivo',   'Atiende clientes en tiempo real',            'fa-headset'],
+        'alertas.index'        => ['Alertas del bot','Errores operativos: OpenAI, WhatsApp',       'fa-triangle-exclamation'],
         'pedidos.seguimiento'  => ['Seguimiento',    'Estado del pedido',                          'fa-route'],
     ];
 
@@ -64,14 +65,8 @@
                 <span class="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-white"></span>
             </button>
 
-            {{-- Notificaciones --}}
-            <button class="relative flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 transition"
-                    title="Notificaciones">
-                <i class="fa-solid fa-bell"></i>
-                <span class="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
-                    3
-                </span>
-            </button>
+            {{-- Alertas del bot (campana con dropdown) --}}
+            <livewire:alertas.badge />
 
             {{-- Separador --}}
             <div class="hidden md:block h-8 w-px bg-slate-200"></div>

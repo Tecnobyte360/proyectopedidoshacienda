@@ -714,15 +714,31 @@ class WhatsappWebhookController extends Controller
     private function llamarOpenAI(array $messages): ?array
     {
         $intentos = 2;
+        $ultimoStatus = null;
+        $ultimoBody   = null;
+        $ultimaExc    = null;
+
+        $config = \App\Models\ConfiguracionBot::actual();
+        $modelo = $config->modelo_openai ?: 'gpt-4o-mini';
+
+        // ── Validación temprana: API key falta ────────────────────────────
+        if (empty(env('OPENAI_API_KEY'))) {
+            app(\App\Services\BotAlertaService::class)->registrar(
+                \App\Models\BotAlerta::TIPO_OPENAI_KEY,
+                '🔑 OPENAI_API_KEY no configurada',
+                'No hay API key de OpenAI en el archivo .env. El bot no puede responder. Configúrala con tu key de https://platform.openai.com/api-keys',
+                \App\Models\BotAlerta::SEV_CRITICA
+            );
+            Log::error('❌ OPENAI_API_KEY no configurada');
+            return null;
+        }
 
         for ($i = 1; $i <= $intentos; $i++) {
             try {
-                $config = \App\Models\ConfiguracionBot::actual();
-
                 $response = Http::withToken(env('OPENAI_API_KEY'))
                     ->timeout(35)
                     ->post('https://api.openai.com/v1/chat/completions', [
-                        'model'             => $config->modelo_openai ?: 'gpt-4o-mini',
+                        'model'             => $modelo,
                         'messages'          => $messages,
                         'temperature'       => (float) ($config->temperatura ?? 0.85),
                         'top_p'             => 0.9,
@@ -737,12 +753,16 @@ class WhatsappWebhookController extends Controller
                     return $response->json();
                 }
 
+                $ultimoStatus = $response->status();
+                $ultimoBody   = $response->body();
+
                 Log::warning("⚠️ OpenAI intento {$i} falló", [
-                    'status' => $response->status(),
-                    'body'   => $response->body(),
+                    'status' => $ultimoStatus,
+                    'body'   => $ultimoBody,
                 ]);
             } catch (\Throwable $e) {
-                Log::warning("⚠️ OpenAI excepción intento {$i}", ['error' => $e->getMessage()]);
+                $ultimaExc = $e->getMessage();
+                Log::warning("⚠️ OpenAI excepción intento {$i}", ['error' => $ultimaExc]);
             }
 
             if ($i < $intentos) {
@@ -750,7 +770,34 @@ class WhatsappWebhookController extends Controller
             }
         }
 
-        Log::error('❌ OpenAI falló todos los intentos');
+        // ── Falló todos los intentos: registrar alerta clasificada ──────────
+        try {
+            $alertaService = app(\App\Services\BotAlertaService::class);
+
+            if ($ultimaExc !== null && $ultimoStatus === null) {
+                // Excepción de red / timeout
+                $alertaService->registrar(
+                    \App\Models\BotAlerta::TIPO_OPENAI_TIMEOUT,
+                    '⌛ Sin conexión a OpenAI',
+                    "No fue posible contactar la API de OpenAI tras {$intentos} intentos.\nÚltimo error: {$ultimaExc}",
+                    \App\Models\BotAlerta::SEV_CRITICA,
+                    null,
+                    ['modelo' => $modelo, 'excepcion' => $ultimaExc]
+                );
+            } else {
+                $alertaService->registrarErrorOpenAI($ultimoStatus, $ultimoBody, [
+                    'modelo' => $modelo,
+                ]);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('No se pudo registrar alerta de OpenAI: ' . $e->getMessage());
+        }
+
+        Log::error('❌ OpenAI falló todos los intentos', [
+            'status' => $ultimoStatus,
+            'modelo' => $modelo,
+        ]);
+
         return null;
     }
 
@@ -2553,6 +2600,43 @@ PROMPT;
         array $contexto = [],
         int $cooldownMinutes = 10
     ): void {
+        // ── 1) Registrar en el panel de alertas del bot ──
+        try {
+            $tipoUpper = strtoupper($tipo);
+            $esToken = str_contains($tipoUpper, 'TOKEN') || str_contains($tipoUpper, 'SESIÓN') || str_contains($tipoUpper, 'SESION');
+            $esDesconectado = str_contains($tipoUpper, 'DESCONECTADO') || str_contains($tipoUpper, 'NO CONECTADO');
+
+            if ($esToken) {
+                $tipoAlerta = \App\Models\BotAlerta::TIPO_WHATSAPP_TOKEN;
+                $severidad  = \App\Models\BotAlerta::SEV_CRITICA;
+                $titulo     = '📱 Problema con el token de WhatsApp';
+            } elseif ($esDesconectado) {
+                $tipoAlerta = \App\Models\BotAlerta::TIPO_WHATSAPP_ENVIO;
+                $severidad  = \App\Models\BotAlerta::SEV_CRITICA;
+                $titulo     = '📤 WhatsApp desconectado';
+            } else {
+                $tipoAlerta = \App\Models\BotAlerta::TIPO_WHATSAPP_ENVIO;
+                $severidad  = \App\Models\BotAlerta::SEV_WARNING;
+                $titulo     = '📤 ' . ucfirst(strtolower($tipo));
+            }
+
+            $codigoHttp = isset($contexto['status']) && is_numeric($contexto['status'])
+                ? (int) $contexto['status']
+                : null;
+
+            app(\App\Services\BotAlertaService::class)->registrar(
+                $tipoAlerta,
+                $titulo,
+                $mensaje,
+                $severidad,
+                $codigoHttp,
+                $contexto
+            );
+        } catch (\Throwable $e) {
+            Log::warning('No se pudo registrar BotAlerta desde notificarFallaWhatsapp: ' . $e->getMessage());
+        }
+
+        // ── 2) Enviar correo (comportamiento original) ──
         try {
             $destinatarios = collect(explode(',', (string) env('ALERTAS_TECNICAS_EMAILS', '')))
                 ->map(fn($email) => trim($email))

@@ -46,6 +46,15 @@
                         ['name' => 'Bot WhatsApp',  'icon' => 'fa-robot',              'route' => 'configuracion.bot',   'badge' => null],
                     ],
                 ],
+                [
+                    'title' => 'Sistema',
+                    'items' => [
+                        ['name' => 'Alertas del bot', 'icon' => 'fa-triangle-exclamation', 'route' => 'alertas.index',
+                            'badge' => (\Schema::hasTable('bot_alertas')
+                                ? (\App\Models\BotAlerta::where('resuelta', false)->count() ?: null)
+                                : null)],
+                    ],
+                ],
             ];
         @endphp
 
