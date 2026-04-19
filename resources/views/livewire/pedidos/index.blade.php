@@ -1,4 +1,120 @@
 <div class="min-h-screen bg-slate-50" wire:poll.30s="refrescar">
+
+    {{-- 🚀 BARRA FLOTANTE — aparece cuando hay pedidos seleccionados para despacho masivo --}}
+    @php $cantSel = collect($seleccionadosMasivo)->filter()->count(); @endphp
+    @if($cantSel > 0)
+        <div class="fixed bottom-6 left-1/2 -translate-x-1/2 z-40">
+            <div class="flex items-center gap-3 rounded-2xl bg-slate-900 text-white shadow-2xl px-5 py-3">
+                <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-[#d68643] font-bold">{{ $cantSel }}</span>
+                <span class="text-sm font-semibold">pedido(s) seleccionado(s)</span>
+                <button wire:click="limpiarSeleccionMasiva" class="ml-2 text-xs text-slate-400 hover:text-white">
+                    Cancelar
+                </button>
+                <button wire:click="abrirModalMasivo"
+                        class="ml-2 inline-flex items-center gap-2 rounded-xl bg-[#d68643] hover:bg-[#c97a36] px-4 py-2 text-sm font-bold transition shadow">
+                    <i class="fa-solid fa-motorcycle"></i>
+                    Despachar selección
+                </button>
+            </div>
+        </div>
+    @endif
+
+    {{-- 🗺️ MODAL DESPACHO MASIVO POR ZONA --}}
+    @if($modalMasivoAbierto)
+        @php
+            $gruposM = $this->seleccionadosMasivoPorZona;
+            $domsLista = \App\Models\Domiciliario::where('activo', true)
+                ->orderByRaw("CASE estado WHEN 'disponible' THEN 0 WHEN 'ocupado' THEN 1 ELSE 2 END")
+                ->orderBy('nombre')->with('zonas')->get();
+        @endphp
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 overflow-y-auto"
+             wire:click.self="cerrarModalMasivo">
+            <div class="w-full max-w-3xl rounded-2xl bg-white shadow-2xl my-8" @click.stop>
+                <div class="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+                    <div>
+                        <h3 class="text-lg font-bold text-slate-800">🚀 Despacho masivo</h3>
+                        <p class="text-xs text-slate-500">{{ $cantSel }} pedido(s) en {{ $gruposM->count() }} zona(s)</p>
+                    </div>
+                    <button wire:click="cerrarModalMasivo" class="text-slate-400 hover:text-slate-600">
+                        <i class="fa-solid fa-xmark text-xl"></i>
+                    </button>
+                </div>
+
+                <div class="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+                    @if($gruposM->count() > 1)
+                        <div class="rounded-xl bg-violet-50 border border-violet-200 p-3 text-sm text-violet-800">
+                            <i class="fa-solid fa-circle-info mr-1"></i>
+                            Tienes pedidos de <b>{{ $gruposM->count() }} zonas distintas</b>. Asigna un domiciliario por zona.
+                        </div>
+                    @endif
+
+                    @foreach($gruposM as $zonaId => $grupo)
+                        @php
+                            $keyG = $zonaId ?: 0;
+                            $nombreZ = $grupo['zona']?->nombre ?? 'Sin zona';
+                            $colorZ = $grupo['zona']?->color ?? '#94a3b8';
+                            $domsZona = $grupo['zona']
+                                ? $domsLista->filter(fn($d) => $d->zonas->contains('id', $zonaId))
+                                : collect();
+                        @endphp
+                        <div class="rounded-2xl border-2 border-slate-200 overflow-hidden">
+                            <div class="flex items-center gap-3 px-4 py-3 bg-slate-50 border-b border-slate-200">
+                                <div class="w-3 h-10 rounded-full" style="background: {{ $colorZ }}"></div>
+                                <div class="flex-1">
+                                    <div class="font-bold text-slate-800">📍 {{ $nombreZ }}</div>
+                                    <div class="text-xs text-slate-500">
+                                        {{ $grupo['pedidos']->count() }} pedido(s) · ${{ number_format($grupo['total'], 0, ',', '.') }}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="px-4 py-3 space-y-2">
+                                <label class="block text-xs font-semibold text-slate-600">Domiciliario:</label>
+                                <select wire:model="domiciliariosPorZonaMasivo.{{ $keyG }}"
+                                        class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                                    <option value="">— Selecciona —</option>
+                                    @if($domsZona->isNotEmpty())
+                                        <optgroup label="✓ Cubren esta zona">
+                                            @foreach($domsZona as $d)
+                                                <option value="{{ $d->id }}">{{ $d->nombre }} ({{ ucfirst($d->estado) }})</option>
+                                            @endforeach
+                                        </optgroup>
+                                        <optgroup label="Otros">
+                                            @foreach($domsLista->whereNotIn('id', $domsZona->pluck('id')) as $d)
+                                                <option value="{{ $d->id }}">{{ $d->nombre }} ({{ ucfirst($d->estado) }})</option>
+                                            @endforeach
+                                        </optgroup>
+                                    @else
+                                        @foreach($domsLista as $d)
+                                            <option value="{{ $d->id }}">{{ $d->nombre }} ({{ ucfirst($d->estado) }})</option>
+                                        @endforeach
+                                    @endif
+                                </select>
+                                <div class="text-xs text-slate-500 space-y-0.5 pt-1">
+                                    @foreach($grupo['pedidos'] as $p)
+                                        <div>• #{{ $p->id }} {{ $p->cliente_nombre }} — {{ $p->direccion }}</div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+
+                <div class="flex justify-end gap-3 p-4 border-t border-slate-100 bg-slate-50">
+                    <button type="button" wire:click="cerrarModalMasivo"
+                            class="rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-white">
+                        Cancelar
+                    </button>
+                    <button type="button" wire:click="confirmarDespachoMasivo"
+                            wire:confirm="¿Confirmar el despacho masivo?"
+                            class="rounded-xl bg-violet-600 hover:bg-violet-700 px-6 py-2.5 text-sm font-bold text-white shadow">
+                        <i class="fa-solid fa-paper-plane mr-2"></i>
+                        Despachar {{ $cantSel }} pedido(s)
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
     <div class="w-full px-3 py-4 sm:px-6 sm:py-6 lg:px-8">
 
         @php
@@ -302,6 +418,13 @@
                 <table class="min-w-full">
                     <thead class="bg-slate-50">
                         <tr>
+                            <th class="px-3 py-3 w-10">
+                                <button type="button" wire:click="seleccionarTodosVisibles"
+                                        title="Seleccionar todos los despachables visibles"
+                                        class="text-slate-400 hover:text-[#d68643] transition">
+                                    <i class="fa-solid fa-check-double text-sm"></i>
+                                </button>
+                            </th>
                             @php
                                 $cols = [
                                     ['label' => 'Pedido',       'cls' => ''],
@@ -334,8 +457,29 @@
                                     ->implode('');
                             @endphp
 
+                            @php
+                                $despachable = in_array($pedido->estado, [
+                                    \App\Models\Pedido::ESTADO_NUEVO,
+                                    \App\Models\Pedido::ESTADO_EN_PREPARACION,
+                                    'confirmado',
+                                ], true);
+                                $estaSeleccionado = !empty($seleccionadosMasivo[$pedido->id]);
+                            @endphp
+
                             <tr data-pedido-id="{{ $pedido->id }}"
-                                class="transition hover:bg-slate-50 {{ $pedido->estado === \App\Models\Pedido::ESTADO_CANCELADO ? 'opacity-75' : '' }}">
+                                class="transition hover:bg-slate-50
+                                       {{ $pedido->estado === \App\Models\Pedido::ESTADO_CANCELADO ? 'opacity-75' : '' }}
+                                       {{ $estaSeleccionado ? 'bg-amber-50' : '' }}">
+
+                                {{-- Checkbox de selección masiva (solo para despachables) --}}
+                                <td class="px-3 py-3.5 align-middle">
+                                    @if($despachable)
+                                        <input type="checkbox"
+                                               wire:click="toggleSeleccionMasiva({{ $pedido->id }})"
+                                               @checked($estaSeleccionado)
+                                               class="rounded border-slate-300 text-[#d68643] focus:ring-[#d68643] cursor-pointer">
+                                    @endif
+                                </td>
 
                                 {{-- Pedido --}}
                                 <td class="px-3 py-3.5 align-middle">

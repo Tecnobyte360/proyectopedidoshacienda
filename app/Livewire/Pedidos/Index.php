@@ -22,10 +22,15 @@ class Index extends Component
     public string $tokenIngresado     = '';
     public string $tokenError         = '';
 
-    // Modal despacho con domiciliario
+    // Modal despacho con domiciliario (individual)
     public bool $modalDespachoAbierto = false;
     public int $pedidoIdDespacho = 0;
     public ?int $domiciliarioSeleccionado = null;
+
+    // 🚀 DESPACHO MASIVO: selección múltiple + asignación por zona
+    public array $seleccionadosMasivo = [];     // [pedido_id => true]
+    public bool  $modalMasivoAbierto = false;
+    public array $domiciliariosPorZonaMasivo = [];   // [zona_id => domiciliario_id]
 
     /**
      * Livewire 3 — formato `echo:CANAL,NOMBRE_EVENTO`.
@@ -64,6 +69,183 @@ class Index extends Component
     {
         // Limpia el cache de la propiedad computed para forzar recarga
         unset($this->pedidos);
+    }
+
+    /*
+    |==========================================================================
+    | 🚀 DESPACHO MASIVO (selección múltiple + asignación por zona)
+    |==========================================================================
+    */
+
+    public function toggleSeleccionMasiva(int $pedidoId): void
+    {
+        if (isset($this->seleccionadosMasivo[$pedidoId])) {
+            unset($this->seleccionadosMasivo[$pedidoId]);
+        } else {
+            $this->seleccionadosMasivo[$pedidoId] = true;
+        }
+    }
+
+    public function seleccionarTodosVisibles(): void
+    {
+        // Solo pedidos en estado "en_preparacion" o "nuevo" se pueden despachar
+        $estadosDespachables = [Pedido::ESTADO_NUEVO, Pedido::ESTADO_EN_PREPARACION, 'confirmado'];
+
+        foreach ($this->pedidosFiltrados as $p) {
+            if (in_array($p->estado, $estadosDespachables, true)) {
+                $this->seleccionadosMasivo[$p->id] = true;
+            }
+        }
+    }
+
+    public function limpiarSeleccionMasiva(): void
+    {
+        $this->seleccionadosMasivo = [];
+    }
+
+    public function abrirModalMasivo(): void
+    {
+        $ids = collect($this->seleccionadosMasivo)->filter()->keys();
+        if ($ids->isEmpty()) {
+            $this->dispatch('notify', ['type' => 'warning', 'message' => 'Selecciona al menos un pedido.']);
+            return;
+        }
+        $this->modalMasivoAbierto = true;
+        $this->domiciliariosPorZonaMasivo = [];
+    }
+
+    public function cerrarModalMasivo(): void
+    {
+        $this->modalMasivoAbierto = false;
+        $this->domiciliariosPorZonaMasivo = [];
+    }
+
+    /**
+     * Pedidos seleccionados agrupados por zona, para el modal masivo.
+     */
+    public function getSeleccionadosMasivoPorZonaProperty()
+    {
+        $ids = collect($this->seleccionadosMasivo)->filter()->keys();
+        if ($ids->isEmpty()) return collect();
+
+        return Pedido::with('zonaCobertura')
+            ->whereIn('id', $ids)
+            ->get()
+            ->groupBy(fn ($p) => $p->zona_cobertura_id ?? 0)
+            ->map(fn ($grupo, $zonaId) => [
+                'zona_id' => $zonaId ?: null,
+                'zona'    => $grupo->first()->zonaCobertura,
+                'pedidos' => $grupo,
+                'total'   => $grupo->sum('total'),
+            ]);
+    }
+
+    public function confirmarDespachoMasivo(): void
+    {
+        $grupos = $this->seleccionadosMasivoPorZona;
+
+        if ($grupos->isEmpty()) {
+            $this->dispatch('notify', ['type' => 'warning', 'message' => 'No hay pedidos seleccionados.']);
+            return;
+        }
+
+        // Validar domiciliario por cada zona
+        $faltantes = [];
+        foreach ($grupos as $zonaId => $grupo) {
+            $key = $zonaId ?: 0;
+            if (empty($this->domiciliariosPorZonaMasivo[$key])) {
+                $faltantes[] = $grupo['zona']?->nombre ?? 'Sin zona';
+            }
+        }
+
+        if (!empty($faltantes)) {
+            $this->dispatch('notify', [
+                'type'    => 'error',
+                'message' => '⚠️ Asigna domiciliario para: ' . implode(', ', $faltantes),
+            ]);
+            return;
+        }
+
+        $usuario = Auth::user();
+        $totalDespachados = 0;
+        $zonasDespachadas = 0;
+
+        \DB::transaction(function () use ($grupos, $usuario, &$totalDespachados, &$zonasDespachadas) {
+            foreach ($grupos as $zonaId => $grupo) {
+                $key = $zonaId ?: 0;
+                $domId = $this->domiciliariosPorZonaMasivo[$key] ?? null;
+                if (!$domId) continue;
+
+                $domiciliario = Domiciliario::find($domId);
+                if (!$domiciliario) continue;
+
+                // Pasar primero los "nuevos" a "en_preparacion" para poder despacharlos
+                foreach ($grupo['pedidos'] as $pedido) {
+                    if ($pedido->estado === Pedido::ESTADO_NUEVO || $pedido->estado === 'confirmado') {
+                        $pedido->cambiarEstado(
+                            Pedido::ESTADO_EN_PREPARACION,
+                            'Pedido en preparación (auto antes de despacho masivo)',
+                            'En preparación',
+                            $usuario?->name,
+                            $usuario?->id
+                        );
+                        $pedido->refresh();
+                    }
+                }
+
+                foreach ($grupo['pedidos'] as $pedido) {
+                    if ($pedido->estado !== Pedido::ESTADO_EN_PREPARACION) continue;
+
+                    if ($pedido->domiciliario_id && $pedido->domiciliario_id !== $domiciliario->id) {
+                        $anterior = Domiciliario::find($pedido->domiciliario_id);
+                        if ($anterior && $anterior->estado === 'ocupado') {
+                            $anterior->estado = 'disponible';
+                            $anterior->save();
+                        }
+                    }
+
+                    $pedido->domiciliario_id = $domiciliario->id;
+                    $pedido->fecha_asignacion_domiciliario = now();
+                    $pedido->fecha_salida_domiciliario     = now();
+                    $pedido->save();
+
+                    $pedido->registrarHistorial(
+                        estadoNuevo: $pedido->estado,
+                        estadoAnterior: $pedido->estado,
+                        titulo: 'Domiciliario asignado (despacho masivo)',
+                        descripcion: "Asignado a {$domiciliario->nombre}",
+                        usuario: $usuario?->name,
+                        usuarioId: $usuario?->id
+                    );
+
+                    $token = $pedido->generarTokenEntrega();
+
+                    $pedido->cambiarEstado(
+                        Pedido::ESTADO_REPARTIDOR_EN_CAMINO,
+                        "Tu pedido va en camino con {$domiciliario->nombre}.",
+                        'Pedido en camino',
+                        $usuario?->name,
+                        $usuario?->id
+                    );
+
+                    $pedido->notificarTokenEntrega($token);
+                    $totalDespachados++;
+                }
+
+                $domiciliario->estado = 'ocupado';
+                $domiciliario->save();
+                $zonasDespachadas++;
+            }
+        });
+
+        $this->cerrarModalMasivo();
+        $this->seleccionadosMasivo = [];
+        unset($this->pedidos);
+
+        $this->dispatch('notify', [
+            'type'    => 'success',
+            'message' => "✅ {$totalDespachados} pedido(s) despachados en {$zonasDespachadas} zona(s).",
+        ]);
     }
 
     public function cambiarTab(string $estado): void
