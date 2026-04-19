@@ -174,13 +174,19 @@ class Cliente extends Model
     public function resumenParaBot(): string
     {
         $totalPedidos = (int) ($this->total_pedidos ?? 0);
+        $nombre = trim($this->nombre ?: '');
+        $tieneNombre = $nombre !== '' && !in_array(mb_strtolower($nombre), ['cliente', 'usuario'], true);
 
         if ($totalPedidos <= 0) {
-            return "Cliente nuevo (primera vez que escribe).";
+            return $tieneNombre
+                ? "Cliente nuevo (primera vez que escribe). Su nombre es: *{$nombre}* — úsalo al saludar."
+                : "Cliente nuevo (primera vez que escribe). NO sabemos su nombre — pídelo cuando vayas a tomar el pedido.";
         }
 
         $partes = [
-            "Cliente recurrente — {$totalPedidos} pedido(s) previo(s).",
+            $tieneNombre
+                ? "🟢 *Cliente recurrente conocido*: *{$nombre}* — {$totalPedidos} pedido(s) previo(s). USA SU NOMBRE al saludar."
+                : "Cliente recurrente — {$totalPedidos} pedido(s) previo(s) (sin nombre registrado).",
         ];
 
         if ($this->fecha_ultimo_pedido) {
