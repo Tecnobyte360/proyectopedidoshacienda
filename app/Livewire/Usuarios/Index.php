@@ -77,6 +77,16 @@ class Index extends Component
         $rol  = $data['rol'];
         unset($data['rol']);
 
+        // 🔒 Bloqueo de privilegio: solo un super-admin puede crear/asignar otro super-admin.
+        // Si un admin de tenant intenta forzar 'super-admin' por DOM, se rechaza.
+        if ($rol === 'super-admin' && !auth()->user()?->hasRole('super-admin')) {
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => '⛔ No tienes permisos para asignar el rol Super-admin.',
+            ]);
+            return;
+        }
+
         if (empty($data['password'])) {
             unset($data['password']);
         } else {
@@ -180,9 +190,17 @@ class Index extends Component
             'admins'   => $this->aplicarFiltroTenant(User::role('admin'))->count(),
         ];
 
+        // 🔒 Filtrar el rol "super-admin" del listado: SOLO un super-admin
+        // puede asignar/ver el rol super-admin. Para los admins de tenants,
+        // este rol NUNCA debe aparecer en el dropdown.
+        $rolesQuery = Role::orderBy('name');
+        if (!auth()->user()?->hasRole('super-admin')) {
+            $rolesQuery->where('name', '!=', 'super-admin');
+        }
+
         return view('livewire.usuarios.index', [
             'usuarios' => $usuarios,
-            'roles'    => Role::orderBy('name')->get(),
+            'roles'    => $rolesQuery->get(),
             'sedes'    => Sede::orderBy('nombre')->get(),
             'kpis'     => $kpis,
         ])->layout('layouts.app');

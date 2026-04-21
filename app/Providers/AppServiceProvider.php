@@ -2,6 +2,9 @@
 
 namespace App\Providers;
 
+use App\Services\HostingerDnsService;
+use App\Services\TenantManager;
+use App\Services\WhatsappResolverService;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 
@@ -12,7 +15,14 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // 🔥 CRÍTICO: TenantManager DEBE ser singleton.
+        // Si no, cada app(TenantManager::class) crea una instancia nueva
+        // y el set() del middleware no es visible para los componentes Livewire.
+        $this->app->singleton(TenantManager::class);
+
+        // Mismo razonamiento para los demás servicios con caché en memoria
+        $this->app->singleton(WhatsappResolverService::class);
+        $this->app->singleton(HostingerDnsService::class);
     }
 
     /**
