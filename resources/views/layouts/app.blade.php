@@ -80,7 +80,9 @@
     <livewire:layouts.topbar />
 
     {{-- CONTENIDO --}}
-    <main class="min-h-screen pt-20 lg:pl-64 transition-all duration-300">
+    {{-- Si está impersonando, sumamos ~3rem extra de pt para no tapar con el banner --}}
+    @php $impersonando = session()->has('tenant_imitado_id'); @endphp
+    <main class="min-h-screen lg:pl-64 transition-all duration-300 {{ $impersonando ? 'pt-32' : 'pt-20' }}">
         {{ $slot }}
     </main>
 

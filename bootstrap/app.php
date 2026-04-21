@@ -21,6 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
             'tenant'     => \App\Http\Middleware\SetCurrentTenant::class,
             'no_super_sin_imp' => \App\Http\Middleware\BloquearSuperAdminSinImpersonar::class,
+            'solo_principal'   => \App\Http\Middleware\SoloDominioPrincipal::class,
         ]);
 
         // Si no está autenticado y golpea una ruta protegida, redirigir al login

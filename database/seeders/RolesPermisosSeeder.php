@@ -101,9 +101,27 @@ class RolesPermisosSeeder extends Seeder
             }
         }
 
+        // 🔒 PERMISOS DE PLATAFORMA — exclusivos del super-admin (dueño TecnoByte360).
+        // Un admin de tenant (cliente) NUNCA debe tenerlos, porque le darían
+        // poder sobre OTROS tenants (ver/editar planes, pagos, etc.).
+        $permisosPlataforma = [
+            'tenants.gestionar',
+            'planes.gestionar',
+            'suscripciones.gestionar',
+            'pagos.gestionar',
+            'roles.gestionar',   // editar matriz de permisos = afectaría a TODOS los tenants
+        ];
+
+        // Permisos de operación = todos los catalogados aquí MENOS los de plataforma
+        $permisosOperacion = collect(self::PERMISOS)
+            ->flatten()
+            ->reject(fn ($p) => in_array($p, $permisosPlataforma, true))
+            ->values()
+            ->all();
+
         // Roles
         $admin = Role::firstOrCreate(['name' => 'admin', 'guard_name' => 'web']);
-        $admin->syncPermissions(Permission::all());
+        $admin->syncPermissions($permisosOperacion);
 
         $gerente = Role::firstOrCreate(['name' => 'gerente', 'guard_name' => 'web']);
         $gerente->syncPermissions([

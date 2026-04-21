@@ -82,8 +82,15 @@ Route::middleware(['no_super_sin_imp'])->group(function () {
     Route::get('/felicitaciones',    FelicitacionesIndex::class)->middleware('permission:felicitaciones.ver')->name('felicitaciones.index');
     Route::get('/sedes',             SedesIndex::class)->middleware('permission:sedes.gestionar')->name('sedes.index');
     Route::get('/usuarios',          UsuariosIndex::class)->middleware('permission:usuarios.ver')->name('usuarios.index');
-    Route::get('/roles',             RolesIndex::class)->middleware('permission:roles.gestionar')->name('roles.index');
+    // Roles ya NO se gestionan por tenant — los roles son globales
+    // (compartidos por todos), entonces solo el super-admin desde el dominio
+    // principal puede tocarlos. Lo movemos abajo con `solo_principal`.
 });
+
+// 🔒 Roles globales — solo super-admin desde dominio principal
+Route::get('/roles', RolesIndex::class)
+    ->middleware(['permission:roles.gestionar', 'solo_principal'])
+    ->name('roles.index');
 
 // 🌟 SUPER-ADMIN — solo TecnoByte360 (dueño plataforma)
 Route::get('/admin/tenants',       AdminTenantsIndex::class)->middleware('permission:tenants.gestionar')->name('admin.tenants.index');
@@ -93,6 +100,13 @@ Route::get('/admin/pagos',         AdminPagosIndex::class)->middleware('permissi
 Route::get('/admin/documentacion', AdminDocumentacion::class)
     ->middleware('permission:tenants.gestionar')
     ->name('admin.documentacion');
+
+// 🎭 Salir del modo impersonación (vuelve al super-admin)
+Route::get('/admin/dejar-impersonar', function () {
+    session()->forget('tenant_imitado_id');
+    return redirect()->route('admin.tenants.index')
+        ->with('info', 'Volviste al modo super-admin.');
+})->middleware('permission:tenants.gestionar')->name('admin.dejar-impersonar');
 
 }); // fin auth group
 

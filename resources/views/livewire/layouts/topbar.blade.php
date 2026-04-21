@@ -29,9 +29,41 @@
     ];
 
     [$titulo, $subtitulo, $icono] = $titulos[$current] ?? ['Panel', 'Bienvenido', 'fa-house'];
+
+    // 🎭 Detectar modo impersonación
+    $tenantImitadoId = session('tenant_imitado_id');
+    $tenantImitado = $tenantImitadoId
+        ? app(\App\Services\TenantManager::class)->withoutTenant(
+            fn () => \App\Models\Tenant::find($tenantImitadoId)
+          )
+        : null;
 @endphp
 
-<header class="app-topbar fixed top-0 right-0 left-0 lg:left-64 z-30 h-20 border-b border-slate-200 bg-white/90 backdrop-blur-lg shadow-sm">
+{{-- 🎭 BANNER DE IMPERSONACIÓN — visible siempre que el super-admin esté "viendo como" un tenant --}}
+@if($tenantImitado)
+    <div class="fixed top-0 right-0 left-0 lg:left-64 z-40 bg-gradient-to-r from-violet-600 via-fuchsia-600 to-pink-600 text-white shadow-lg">
+        <div class="flex items-center justify-between px-4 lg:px-8 py-2 gap-3">
+            <div class="flex items-center gap-3 min-w-0">
+                <div class="hidden sm:flex h-8 w-8 items-center justify-center rounded-lg bg-white/20 backdrop-blur flex-shrink-0">
+                    <i class="fa-solid fa-mask text-sm"></i>
+                </div>
+                <div class="min-w-0">
+                    <div class="text-xs font-bold uppercase tracking-wider text-white/80">Modo super-admin · viendo como</div>
+                    <div class="text-sm font-extrabold truncate">{{ $tenantImitado->nombre }}</div>
+                </div>
+            </div>
+            <a href="{{ route('admin.dejar-impersonar') }}"
+               class="inline-flex items-center gap-2 rounded-xl bg-white text-violet-700 hover:bg-violet-50 font-bold px-4 py-2 text-sm shadow-md transition flex-shrink-0">
+                <i class="fa-solid fa-arrow-right-from-bracket"></i>
+                <span class="hidden sm:inline">Volver al super-admin</span>
+                <span class="sm:hidden">Salir</span>
+            </a>
+        </div>
+    </div>
+@endif
+
+<header class="app-topbar fixed right-0 left-0 lg:left-64 z-30 h-20 border-b border-slate-200 bg-white/90 backdrop-blur-lg shadow-sm
+               {{ $tenantImitado ? 'top-12 sm:top-12' : 'top-0' }}">
     <div class="flex h-full items-center justify-between px-4 lg:px-8 gap-4">
 
         {{-- IZQUIERDA: hamburguesa móvil + título --}}
