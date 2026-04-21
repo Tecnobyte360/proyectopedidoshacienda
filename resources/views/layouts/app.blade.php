@@ -215,6 +215,33 @@
         </template>
     </div>
 
+    {{-- 🎭 Función global: salir de impersonación con reload garantizado --}}
+    <script>
+        window.salirDeImpersonacion = async function (btn) {
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Saliendo...';
+            }
+            try {
+                await fetch('{{ url('/admin/dejar-impersonar') }}', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': btn?.dataset.csrf || document.querySelector('meta[name="csrf-token"]').content,
+                        'Accept': 'application/json',
+                        'Cache-Control': 'no-cache',
+                    },
+                    credentials: 'same-origin',
+                    redirect: 'manual',  // no seguir el redirect, lo manejamos a mano
+                });
+            } catch (e) {
+                console.warn('Salida de impersonación: fetch terminó con', e);
+                // Continuamos al reload igual — la sesión ya se borró del lado server
+            }
+            // Reload duro a la página de tenants, con cache buster
+            window.location.replace('{{ url('/admin/tenants') }}?_=' + Date.now());
+        };
+    </script>
+
     @livewireScripts
 
     {{-- Alpine ya viene incluido en Livewire 3 — NO cargar el CDN aparte (duplicaría y rompería wire:click) --}}
