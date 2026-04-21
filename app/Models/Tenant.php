@@ -47,12 +47,39 @@ class Tenant extends Model
     public const PLAN_PRO     = 'pro';
     public const PLAN_EMPRESA = 'empresa';
 
+    /**
+     * Normaliza un slug a formato DNS-válido (kebab-case).
+     * Let's Encrypt y los estándares DNS NO aceptan: _ . espacios mayúsculas.
+     * Solo se permite: a-z, 0-9, y "-" (no al inicio/fin).
+     */
+    public static function normalizarSlug(string $valor): string
+    {
+        // Str::slug ya pasa a minúsculas y reemplaza espacios/acentos por "-"
+        $slug = Str::slug($valor, '-');
+        // Por si quedaron guiones bajos (Str::slug los preserva en algunos casos)
+        $slug = str_replace('_', '-', $slug);
+        // Colapsar guiones repetidos
+        $slug = preg_replace('/-+/', '-', $slug);
+        // Trim de "-" en bordes
+        $slug = trim($slug, '-');
+        return $slug;
+    }
+
     protected static function booted(): void
     {
-        // Auto-generar slug si no viene
-        static::creating(function ($tenant) {
+        // Auto-generar / normalizar slug
+        static::saving(function ($tenant) {
+            // Si no viene slug, generar desde nombre
             if (empty($tenant->slug)) {
-                $base = Str::slug($tenant->nombre);
+                $tenant->slug = self::normalizarSlug($tenant->nombre);
+            } else {
+                // Si viene, normalizarlo (por si trae _ . espacios MAYÚSC.)
+                $tenant->slug = self::normalizarSlug($tenant->slug);
+            }
+
+            // Garantizar unicidad en INSERT
+            if (!$tenant->exists) {
+                $base = $tenant->slug;
                 $slug = $base;
                 $i = 1;
                 while (self::where('slug', $slug)->exists()) {

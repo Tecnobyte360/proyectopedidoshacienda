@@ -58,7 +58,15 @@ class Index extends Component
     {
         return [
             'nombre'              => 'required|string|max:150',
-            'slug'                => 'nullable|string|max:80|alpha_dash|unique:tenants,slug,' . ($this->editandoId ?? 'NULL'),
+            'slug'                => [
+                'nullable',
+                'string',
+                'max:80',
+                // Solo a-z, 0-9 y guion medio. NO _ . espacios MAYÚSC.
+                // (Let's Encrypt rechaza otros caracteres en subdominios.)
+                'regex:/^[a-z0-9]+(-[a-z0-9]+)*$/',
+                'unique:tenants,slug,' . ($this->editandoId ?? 'NULL'),
+            ],
             'plan'                => 'required|in:basico,pro,empresa',
             'activo'              => 'boolean',
             'contacto_nombre'     => 'nullable|string|max:120',
@@ -127,8 +135,21 @@ class Index extends Component
         $this->resetCampos();
     }
 
+    /**
+     * Sanea el slug en vivo mientras el usuario escribe (solo a-z 0-9 -).
+     */
+    public function updatedSlug(): void
+    {
+        $this->slug = Tenant::normalizarSlug($this->slug);
+    }
+
     public function guardar(): void
     {
+        // Normalizar antes de validar para que la regex no falle por mayúsculas/espacios
+        if ($this->slug !== '') {
+            $this->slug = Tenant::normalizarSlug($this->slug);
+        }
+
         $data = $this->validate();
 
         $crear = $data['crear_admin_inicial'] ?? false;
