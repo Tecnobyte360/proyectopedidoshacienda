@@ -32,7 +32,10 @@
             <div class="w-full max-w-3xl rounded-2xl bg-white shadow-2xl my-8" @click.stop>
                 <div class="flex items-center justify-between border-b border-slate-100 px-6 py-4">
                     <div>
-                        <h3 class="text-lg font-bold text-slate-800">🚀 Despacho masivo</h3>
+                        <h3 class="text-lg font-bold text-slate-800">
+                            <i class="fa-solid fa-rocket text-violet-500"></i>
+                            Despacho masivo
+                        </h3>
                         <p class="text-xs text-slate-500">{{ $cantSel }} pedido(s) en {{ $gruposM->count() }} zona(s)</p>
                     </div>
                     <button wire:click="cerrarModalMasivo" class="text-slate-400 hover:text-slate-600">
@@ -61,7 +64,9 @@
                             <div class="flex items-center gap-3 px-4 py-3 bg-slate-50 border-b border-slate-200">
                                 <div class="w-3 h-10 rounded-full" style="background: {{ $colorZ }}"></div>
                                 <div class="flex-1">
-                                    <div class="font-bold text-slate-800">📍 {{ $nombreZ }}</div>
+                                    <div class="font-bold text-slate-800">
+                                        <i class="fa-solid fa-location-dot text-rose-500"></i> {{ $nombreZ }}
+                                    </div>
                                     <div class="text-xs text-slate-500">
                                         {{ $grupo['pedidos']->count() }} pedido(s) · ${{ number_format($grupo['total'], 0, ',', '.') }}
                                     </div>

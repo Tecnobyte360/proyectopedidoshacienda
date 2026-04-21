@@ -9,11 +9,12 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ConversacionWhatsapp extends Model
 {
-    use SoftDeletes;
+    use SoftDeletes, \App\Models\Concerns\BelongsToTenant;
 
     protected $table = 'conversaciones_whatsapp';
 
     protected $fillable = [
+        'tenant_id',
         'cliente_id',
         'telefono_normalizado',
         'canal',

@@ -12,6 +12,16 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Multi-Tenant Base Domain
+    |--------------------------------------------------------------------------
+    | Dominio base de la plataforma SaaS. Los tenants se acceden por subdominio:
+    |   {tenant_slug}.{tenant_base_domain}  →  cliente.tecnobyte360.com
+    | El middleware SetCurrentTenant lo usa para extraer el tenant del host.
+    */
+    'tenant_base_domain' => env('TENANT_BASE_DOMAIN', 'tecnobyte360.com'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     */

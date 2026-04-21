@@ -4,7 +4,8 @@
     <div class="flex flex-wrap items-center justify-between gap-4">
         <div>
             <h2 class="text-2xl font-extrabold text-slate-800 flex items-center gap-2">
-                🚨 Alertas del bot
+                <i class="fa-solid fa-triangle-exclamation text-rose-500"></i>
+                Alertas del bot
             </h2>
             <p class="text-sm text-slate-500">
                 Errores operativos: OpenAI, WhatsApp, Reverb. El sistema deduplica errores repetidos.
@@ -72,9 +73,9 @@
                 <select wire:model.live="filtroSeveridad"
                         class="w-full rounded-xl border-slate-200 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
                     <option value="todas">Todas</option>
-                    <option value="critica">🔴 Crítica</option>
-                    <option value="warning">🟡 Warning</option>
-                    <option value="info">🔵 Info</option>
+                    <option value="critica">Crítica</option>
+                    <option value="warning">Warning</option>
+                    <option value="info">Info</option>
                 </select>
             </div>
             <div>

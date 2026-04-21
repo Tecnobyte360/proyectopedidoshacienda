@@ -7,9 +7,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class FelicitacionCumpleanos extends Model
 {
+    use \App\Models\Concerns\BelongsToTenant;
+
     protected $table = 'felicitaciones_cumpleanos';
 
     protected $fillable = [
+        'tenant_id',
         'cliente_id',
         'cliente_nombre',
         'telefono',

@@ -71,6 +71,33 @@ class WhatsappWebhookController extends Controller
             return response()->json(['status' => 'ignored']);
         }
 
+        // 🏢 MULTI-TENANT: detectar a qué tenant pertenece esta conexión
+        if ($connectionId) {
+            $tenant = app(\App\Services\WhatsappResolverService::class)
+                ->tenantPorConnectionId((int) $connectionId);
+
+            if ($tenant) {
+                app(\App\Services\TenantManager::class)->set($tenant);
+                Log::info('🏢 Tenant detectado por connection_id', [
+                    'connection_id' => $connectionId,
+                    'tenant_id'     => $tenant->id,
+                    'tenant'        => $tenant->nombre,
+                ]);
+            } else {
+                // Si no hay tenant para esta conexión, usar el tenant 1 (legacy/default)
+                $defaultTenant = app(\App\Services\TenantManager::class)->withoutTenant(
+                    fn () => \App\Models\Tenant::where('activo', true)->orderBy('id')->first()
+                );
+                if ($defaultTenant) {
+                    app(\App\Services\TenantManager::class)->set($defaultTenant);
+                    Log::warning('⚠️ Connection_id sin tenant asignado, usando default', [
+                        'connection_id' => $connectionId,
+                        'tenant_default' => $defaultTenant->nombre,
+                    ]);
+                }
+            }
+        }
+
         if ($fromMe) {
             Log::info('↩️ Mensaje propio ignorado', ['message_id' => $messageId, 'from' => $from]);
             return response()->json(['status' => 'self_message_ignored']);
@@ -2703,13 +2730,15 @@ PROMPT;
 
     private function obtenerTokenWhatsapp(): ?string
     {
-        $cacheKey = 'whatsapp_api_token';
+        $cacheKey = app(\App\Services\WhatsappResolverService::class)->tokenCacheKey();
         return Cache::get($cacheKey) ?: $this->loginWhatsapp();
     }
 
     private function loginWhatsapp(bool $force = false): ?string
     {
-        $cacheKey = 'whatsapp_api_token';
+        $resolver = app(\App\Services\WhatsappResolverService::class);
+        $cred = $resolver->credenciales();
+        $cacheKey = $resolver->tokenCacheKey();
 
         if ($force) {
             Cache::forget($cacheKey);
@@ -2720,12 +2749,20 @@ PROMPT;
             }
         }
 
+        if (empty($cred['email']) || empty($cred['password'])) {
+            Log::error('❌ Tenant sin credenciales WhatsApp configuradas', [
+                'tenant_id' => app(\App\Services\TenantManager::class)->id(),
+            ]);
+            return null;
+        }
+
         try {
+            $endpointLogin = rtrim($cred['api_base_url'], '/') . '/auth/login';
             $response = Http::withoutVerifying()
                 ->timeout(20)
-                ->post('https://wa-api.tecnobyteapp.com:1422/auth/login', [
-                    'email'    => env('WHATSAPP_API_EMAIL'),
-                    'password' => env('WHATSAPP_API_PASSWORD'),
+                ->post($endpointLogin, [
+                    'email'    => $cred['email'],
+                    'password' => $cred['password'],
                 ]);
 
             if ($response->failed()) {
@@ -2793,7 +2830,9 @@ PROMPT;
 
     private function refrescarTokenWhatsapp(): ?string
     {
-        $cacheKey = 'whatsapp_api_token';
+        $resolver = app(\App\Services\WhatsappResolverService::class);
+        $cred = $resolver->credenciales();
+        $cacheKey = $resolver->tokenCacheKey();
         $token    = Cache::get($cacheKey);
 
         if (!$token) {
@@ -2802,10 +2841,11 @@ PROMPT;
         }
 
         try {
+            $endpointRefresh = rtrim($cred['api_base_url'], '/') . '/auth/refresh_token';
             $response = Http::withoutVerifying()
                 ->withToken($token)
                 ->timeout(20)
-                ->post('https://wa-api.tecnobyteapp.com:1422/auth/refresh_token');
+                ->post($endpointRefresh);
 
             if ($response->failed()) {
                 Log::warning('⚠️ ERROR REFRESH TOKEN WHATSAPP', [

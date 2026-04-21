@@ -9,11 +9,12 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Cliente extends Model
 {
-    use SoftDeletes;
+    use SoftDeletes, \App\Models\Concerns\BelongsToTenant;
 
     protected $table = 'clientes';
 
     protected $fillable = [
+        'tenant_id',
         'nombre',
         'pais_codigo',
         'telefono',

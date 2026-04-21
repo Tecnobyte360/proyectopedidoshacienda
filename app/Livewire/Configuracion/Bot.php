@@ -271,6 +271,37 @@ class Bot extends Component
         ]);
     }
 
+    /**
+     * Sincroniza el prompt de la BD con la plantilla actual de fábrica
+     * (BotPromptService::plantillaPorDefecto). Hace TODO en un solo paso:
+     *   1. Carga la plantilla al textarea
+     *   2. La guarda en BD inmediatamente
+     *   3. Limpia caché del bot
+     *
+     * Útil cuando se actualiza el código y se quiere "resetear" el prompt.
+     */
+    public function sincronizarConPlantillaDeFabrica(): void
+    {
+        $plantilla = BotPromptService::plantillaPorDefecto();
+
+        $cfg = ConfiguracionBot::actual();
+        $cfg->update([
+            'system_prompt'             => $plantilla,
+            'usar_prompt_personalizado' => true,
+        ]);
+
+        // Refrescar el estado local de la vista
+        $this->system_prompt             = $plantilla;
+        $this->usar_prompt_personalizado = true;
+
+        ConfiguracionBot::limpiarCache();
+
+        $this->dispatch('notify', [
+            'type'    => 'success',
+            'message' => '✅ Prompt sincronizado con la plantilla de fábrica y guardado.',
+        ]);
+    }
+
     protected function rules(): array
     {
         return [

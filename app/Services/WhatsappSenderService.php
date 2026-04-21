@@ -20,9 +20,8 @@ use Illuminate\Support\Facades\Log;
  */
 class WhatsappSenderService
 {
-    private const ENDPOINT_LOGIN = 'https://wa-api.tecnobyteapp.com:1422/auth/login';
-    private const ENDPOINT_SEND  = 'https://wa-api.tecnobyteapp.com:1422/api/messages/send';
-    private const CACHE_KEY      = 'whatsapp_api_token';
+    private const ENDPOINT_LOGIN_PATH = '/auth/login';
+    private const ENDPOINT_SEND_PATH  = '/api/messages/send';
 
     public function enviarTexto(
         string $telefono,
@@ -31,9 +30,16 @@ class WhatsappSenderService
         bool $persistirEnConversacion = true,
         array $metaExtra = []
     ): bool {
-        $token = $this->obtenerToken();
+        // Resolver credenciales del tenant actual
+        $resolver = app(\App\Services\WhatsappResolverService::class);
+        $cred = $resolver->credenciales();
+        $cacheKey = $resolver->tokenCacheKey();
+
+        $token = $this->obtenerToken($cred, $cacheKey);
         if (!$token) {
-            Log::error('WA Sender: token no disponible');
+            Log::error('WA Sender: token no disponible para tenant', [
+                'tenant_id' => app(\App\Services\TenantManager::class)->id(),
+            ]);
             return false;
         }
 
@@ -46,25 +52,25 @@ class WhatsappSenderService
             $payload['connectionId'] = $connectionId;
         }
 
+        $endpointSend = rtrim($cred['api_base_url'], '/') . self::ENDPOINT_SEND_PATH;
         $ok = false;
 
         try {
             $resp = Http::withoutVerifying()
                 ->withToken($token)
                 ->timeout(20)
-                ->post(self::ENDPOINT_SEND, $payload);
+                ->post($endpointSend, $payload);
 
             if ($resp->successful()) {
                 $ok = true;
             } elseif ($resp->status() === 401) {
-                // Reintentar con token fresco
-                Cache::forget(self::CACHE_KEY);
-                $nuevo = $this->obtenerToken();
+                Cache::forget($cacheKey);
+                $nuevo = $this->obtenerToken($cred, $cacheKey);
                 if ($nuevo) {
                     $retry = Http::withoutVerifying()
                         ->withToken($nuevo)
                         ->timeout(20)
-                        ->post(self::ENDPOINT_SEND, $payload);
+                        ->post($endpointSend, $payload);
                     $ok = $retry->successful();
                 }
             } else {
@@ -72,6 +78,7 @@ class WhatsappSenderService
                     'status' => $resp->status(),
                     'body'   => $resp->body(),
                     'to'     => $telefono,
+                    'tenant_id' => app(\App\Services\TenantManager::class)->id(),
                 ]);
             }
         } catch (\Throwable $e) {
@@ -79,7 +86,6 @@ class WhatsappSenderService
             return false;
         }
 
-        // 💾 Si envió OK, persistir en la conversación del cliente
         if ($ok && $persistirEnConversacion) {
             $this->persistirEnConversacion($telefono, $mensaje, $connectionId, $metaExtra);
         }
@@ -139,15 +145,23 @@ class WhatsappSenderService
         return $tel;
     }
 
-    private function obtenerToken(): ?string
+    private function obtenerToken(array $cred, string $cacheKey): ?string
     {
-        return Cache::remember(self::CACHE_KEY, 1200, function () {
+        if (empty($cred['email']) || empty($cred['password'])) {
+            Log::warning('WA Sender: credenciales vacías', [
+                'tenant_id' => app(\App\Services\TenantManager::class)->id(),
+            ]);
+            return null;
+        }
+
+        return Cache::remember($cacheKey, 1200, function () use ($cred) {
             try {
+                $endpoint = rtrim($cred['api_base_url'], '/') . self::ENDPOINT_LOGIN_PATH;
                 $resp = Http::withoutVerifying()
                     ->timeout(15)
-                    ->post(self::ENDPOINT_LOGIN, [
-                        'email'    => env('WHATSAPP_API_EMAIL'),
-                        'password' => env('WHATSAPP_API_PASSWORD'),
+                    ->post($endpoint, [
+                        'email'    => $cred['email'],
+                        'password' => $cred['password'],
                     ]);
                 return $resp->successful() ? $resp->json('token') : null;
             } catch (\Throwable $e) {

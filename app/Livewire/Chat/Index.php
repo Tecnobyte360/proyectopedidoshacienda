@@ -135,10 +135,14 @@ class Index extends Component
                 $payload['connectionId'] = (int) $connectionId;
             }
 
+            $resolver = app(\App\Services\WhatsappResolverService::class);
+            $cred = $resolver->credenciales();
+            $endpointSend = rtrim($cred['api_base_url'], '/') . '/api/messages/send';
+
             $response = Http::withoutVerifying()
                 ->withToken($token)
                 ->timeout(20)
-                ->post('https://wa-api.tecnobyteapp.com:1422/api/messages/send', $payload);
+                ->post($endpointSend, $payload);
 
             if ($response->successful()) {
                 return true;
@@ -146,13 +150,13 @@ class Index extends Component
 
             // Reintento con refresh de token
             if ($response->status() === 401) {
-                Cache::forget('whatsapp_api_token');
+                Cache::forget($resolver->tokenCacheKey());
                 $newToken = $this->obtenerTokenWhatsapp();
                 if ($newToken) {
                     $retry = Http::withoutVerifying()
                         ->withToken($newToken)
                         ->timeout(20)
-                        ->post('https://wa-api.tecnobyteapp.com:1422/api/messages/send', $payload);
+                        ->post($endpointSend, $payload);
                     return $retry->successful();
                 }
             }
@@ -188,13 +192,22 @@ class Index extends Component
      */
     private function obtenerTokenWhatsapp(): ?string
     {
-        return Cache::remember('whatsapp_api_token', 1200, function () {
+        $resolver = app(\App\Services\WhatsappResolverService::class);
+        $cred = $resolver->credenciales();
+        $cacheKey = $resolver->tokenCacheKey();
+
+        if (empty($cred['email']) || empty($cred['password'])) {
+            return null;
+        }
+
+        return Cache::remember($cacheKey, 1200, function () use ($cred) {
             try {
+                $endpoint = rtrim($cred['api_base_url'], '/') . '/auth/login';
                 $resp = Http::withoutVerifying()
                     ->timeout(15)
-                    ->post('https://wa-api.tecnobyteapp.com:1422/auth/login', [
-                        'email'    => env('WHATSAPP_API_EMAIL'),
-                        'password' => env('WHATSAPP_API_PASSWORD'),
+                    ->post($endpoint, [
+                        'email'    => $cred['email'],
+                        'password' => $cred['password'],
                     ]);
 
                 if ($resp->successful()) {

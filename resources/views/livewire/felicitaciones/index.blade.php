@@ -4,7 +4,8 @@
     <div class="flex flex-wrap items-center justify-between gap-4">
         <div>
             <h2 class="text-2xl font-extrabold text-slate-800 flex items-center gap-2">
-                🎂 Historial de felicitaciones
+                <i class="fa-solid fa-cake-candles text-pink-500"></i>
+                Historial de felicitaciones
             </h2>
             <p class="text-sm text-slate-500">
                 Trazabilidad de los mensajes de cumpleaños enviados a los clientes.
@@ -19,17 +20,17 @@
             <p class="mt-1 text-2xl font-extrabold text-slate-800">{{ $totales['total'] }}</p>
         </div>
         <div class="rounded-2xl bg-white border border-slate-200 p-4">
-            <p class="text-xs uppercase tracking-wide text-slate-500 font-semibold">✅ Enviados</p>
+            <p class="text-xs uppercase tracking-wide text-slate-500 font-semibold"><i class="fa-solid fa-circle-check text-emerald-500"></i> Enviados</p>
             <p class="mt-1 text-2xl font-extrabold text-emerald-600">{{ $totales['enviados'] }}</p>
         </div>
         <div class="rounded-2xl bg-white border border-slate-200 p-4">
-            <p class="text-xs uppercase tracking-wide text-slate-500 font-semibold">❌ Fallidos</p>
+            <p class="text-xs uppercase tracking-wide text-slate-500 font-semibold"><i class="fa-solid fa-circle-xmark text-rose-500"></i> Fallidos</p>
             <p class="mt-1 text-2xl font-extrabold {{ $totales['fallidos'] > 0 ? 'text-rose-600' : 'text-slate-400' }}">
                 {{ $totales['fallidos'] }}
             </p>
         </div>
         <div class="rounded-2xl bg-white border border-slate-200 p-4">
-            <p class="text-xs uppercase tracking-wide text-slate-500 font-semibold">👁️ Dry-run (prueba)</p>
+            <p class="text-xs uppercase tracking-wide text-slate-500 font-semibold"><i class="fa-solid fa-eye"></i> Dry-run (prueba)</p>
             <p class="mt-1 text-2xl font-extrabold text-slate-500">{{ $totales['dry_run'] }}</p>
         </div>
     </div>
@@ -51,9 +52,9 @@
                 <select wire:model.live="filtroEstado"
                         class="w-full rounded-xl border-slate-200 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
                     <option value="todas">Todos</option>
-                    <option value="enviado">✅ Enviados</option>
-                    <option value="fallido">❌ Fallidos</option>
-                    <option value="dry_run">👁️ Dry-run</option>
+                    <option value="enviado">Enviados</option>
+                    <option value="fallido">Fallidos</option>
+                    <option value="dry_run">Dry-run</option>
                 </select>
             </div>
             <div>
@@ -61,9 +62,9 @@
                 <select wire:model.live="filtroOrigen"
                         class="w-full rounded-xl border-slate-200 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
                     <option value="todos">Todos</option>
-                    <option value="scheduled">🤖 Automático</option>
-                    <option value="manual">✋ Manual</option>
-                    <option value="force">⚡ Force</option>
+                    <option value="scheduled">Automático</option>
+                    <option value="manual">Manual</option>
+                    <option value="force">Force</option>
                 </select>
             </div>
             <div>
@@ -131,7 +132,14 @@
                                                  @elseif($f->estado === 'fallido') bg-rose-100 text-rose-700
                                                  @else bg-slate-100 text-slate-600
                                                  @endif">
-                                        {{ $f->badgeIcono() }} {{ ucfirst(str_replace('_', ' ', $f->estado)) }}
+                                        @if($f->estado === 'enviado')
+                                            <i class="fa-solid fa-circle-check"></i>
+                                        @elseif($f->estado === 'fallido')
+                                            <i class="fa-solid fa-circle-xmark"></i>
+                                        @else
+                                            <i class="fa-solid fa-eye"></i>
+                                        @endif
+                                        {{ ucfirst(str_replace('_', ' ', $f->estado)) }}
                                     </span>
                                 </td>
                                 <td class="px-4 py-3 text-xs">
@@ -146,7 +154,7 @@
                                                      @else bg-slate-100 text-slate-500
                                                      @endif"
                                               title="{{ $benef->descripcion }}">
-                                            🎁
+                                            <i class="fa-solid fa-gift"></i>
                                             @if($est === 'usado')  Usado #{{ $benef->pedido_id }}
                                             @elseif($est === 'vigente') Vigente
                                             @else Expirado
@@ -158,9 +166,9 @@
                                 </td>
                                 <td class="px-4 py-3 text-xs text-slate-600">
                                     @switch($f->origen)
-                                        @case('scheduled') 🤖 Automático @break
-                                        @case('manual')    ✋ Manual @break
-                                        @case('force')     ⚡ Force @break
+                                        @case('scheduled') <i class="fa-solid fa-robot text-violet-500"></i> Automático @break
+                                        @case('manual')    <i class="fa-solid fa-hand text-amber-500"></i> Manual @break
+                                        @case('force')     <i class="fa-solid fa-bolt text-yellow-500"></i> Force @break
                                         @default           {{ $f->origen }}
                                     @endswitch
                                 </td>
@@ -200,7 +208,10 @@
             <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
                 <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-pink-50 to-white">
                     <div>
-                        <h3 class="font-bold text-slate-800">🎂 Felicitación a {{ $detalle->cliente_nombre }}</h3>
+                        <h3 class="font-bold text-slate-800">
+                            <i class="fa-solid fa-cake-candles text-pink-500"></i>
+                            Felicitación a {{ $detalle->cliente_nombre }}
+                        </h3>
                         <p class="text-xs text-slate-500">{{ $detalle->telefono }} · {{ $detalle->enviado_at?->format('d/m/Y H:i:s') }}</p>
                     </div>
                     <button wire:click="cerrarDetalle" class="text-slate-400 hover:text-slate-700 text-xl">
@@ -249,18 +260,18 @@
 
                     @if($detalle->error_detalle)
                         <div>
-                            <p class="text-xs font-semibold uppercase text-rose-600 tracking-wide mb-1">⚠️ Error</p>
+                            <p class="text-xs font-semibold uppercase text-rose-600 tracking-wide mb-1"><i class="fa-solid fa-triangle-exclamation"></i> Error</p>
                             <div class="rounded-xl bg-rose-50 border border-rose-200 p-4 text-sm text-rose-800 whitespace-pre-line">{{ $detalle->error_detalle }}</div>
                         </div>
                     @endif
 
-                    {{-- 🎁 Beneficio otorgado por esta felicitación --}}
+                    {{-- Beneficio otorgado por esta felicitación --}}
                     @php
                         $beneficio = \App\Models\BeneficioCliente::where('felicitacion_id', $detalle->id)->first();
                     @endphp
                     @if($beneficio)
                         <div>
-                            <p class="text-xs font-semibold uppercase text-slate-500 tracking-wide mb-1">🎁 Beneficio otorgado</p>
+                            <p class="text-xs font-semibold uppercase text-slate-500 tracking-wide mb-1"><i class="fa-solid fa-gift text-pink-500"></i> Beneficio otorgado</p>
                             <div class="rounded-xl bg-pink-50 border border-pink-200 p-4 text-sm space-y-1">
                                 <div class="flex items-center justify-between">
                                     <span class="font-semibold text-slate-800">{{ $beneficio->etiquetaTipo() }}</span>
@@ -270,9 +281,9 @@
                                                  @elseif($estado === 'vigente') bg-amber-100 text-amber-700
                                                  @else bg-slate-200 text-slate-600
                                                  @endif">
-                                        @if($estado === 'usado') ✅ Usado
-                                        @elseif($estado === 'vigente') ⏳ Vigente
-                                        @else ❌ Expirado
+                                        @if($estado === 'usado') <i class="fa-solid fa-circle-check"></i> Usado
+                                        @elseif($estado === 'vigente') <i class="fa-solid fa-hourglass-half"></i> Vigente
+                                        @else <i class="fa-solid fa-circle-xmark"></i> Expirado
                                         @endif
                                     </span>
                                 </div>

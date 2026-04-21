@@ -111,7 +111,7 @@
             <div class="flex flex-wrap items-center justify-between gap-3 px-5 py-3 border-b border-slate-100 bg-gradient-to-r from-violet-50 to-white">
                 <div>
                     <h3 class="font-bold text-slate-800 flex items-center gap-2">
-                        🗺️ Ruta de entrega
+                        <i class="fa-solid fa-map text-violet-500"></i> Ruta de entrega
                     </h3>
                     <p class="text-xs text-slate-500">
                         <span>{{ count($ruta['paradas']) }} parada(s) · ~{{ $ruta['total_km'] }} km línea recta</span>
@@ -128,7 +128,8 @@
                         <a href="{{ $urlGmaps }}" target="_blank"
                            class="inline-flex items-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold px-4 py-2 transition shadow">
                             <i class="fa-brands fa-google"></i>
-                            🧭 Iniciar navegación en Google Maps
+                            <i class="fa-solid fa-compass"></i>
+                            Iniciar navegación en Google Maps
                         </a>
                     @endif
                     @if($domiciliarioSeleccionado)
@@ -449,7 +450,8 @@
                 <div class="flex items-center justify-between border-b border-slate-100 px-6 py-4">
                     <div>
                         <h3 class="text-lg font-bold text-slate-800">
-                            {{ $multiZona ? '🗺️ Despacho masivo por zonas' : 'Asignar domiciliario' }}
+                            <i class="fa-solid {{ $multiZona ? 'fa-map' : 'fa-motorcycle' }} text-violet-500"></i>
+                            {{ $multiZona ? 'Despacho masivo por zonas' : 'Asignar domiciliario' }}
                         </h3>
                         <p class="text-xs text-slate-500">
                             {{ $totalSelected }} pedido(s) en {{ $gruposSel->count() }} zona(s)
@@ -487,7 +489,9 @@
                                     <div class="flex items-center gap-3">
                                         <div class="w-3 h-10 rounded-full" style="background: {{ $color }}"></div>
                                         <div>
-                                            <div class="font-bold text-slate-800">📍 {{ $nombreZona }}</div>
+                                            <div class="font-bold text-slate-800">
+                                                <i class="fa-solid fa-location-dot text-rose-500"></i> {{ $nombreZona }}
+                                            </div>
                                             <div class="text-xs text-slate-500">
                                                 {{ $cantPedidos }} pedido(s) · ${{ number_format($grupo['total'], 0, ',', '.') }}
                                             </div>

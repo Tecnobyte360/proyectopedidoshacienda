@@ -17,6 +17,13 @@
         'chat.index'           => ['Chat en vivo',   'Atiende clientes en tiempo real',            'fa-headset'],
         'alertas.index'        => ['Alertas del bot','Errores operativos: OpenAI, WhatsApp',       'fa-triangle-exclamation'],
         'felicitaciones.index' => ['Felicitaciones',  'Historial de felicitaciones de cumpleaños',  'fa-cake-candles'],
+        'sedes.index'          => ['Sedes',           'Puntos de atención y horarios',              'fa-shop'],
+        'usuarios.index'       => ['Usuarios',        'Cuentas de acceso a la plataforma',          'fa-users-gear'],
+        'roles.index'          => ['Roles y permisos','Define qué puede hacer cada rol',            'fa-shield-halved'],
+        'admin.tenants.index'        => ['Tenants',         'Empresas cliente de la plataforma',         'fa-building'],
+        'admin.planes.index'         => ['Planes',          'Catálogo de planes de suscripción',         'fa-money-check-dollar'],
+        'admin.suscripciones.index'  => ['Suscripciones',   'Gestión de planes contratados por tenant',  'fa-receipt'],
+        'admin.pagos.index'          => ['Pagos',           'Historial y registro manual de pagos',      'fa-money-bills'],
         'pedidos.seguimiento'  => ['Seguimiento',    'Estado del pedido',                          'fa-route'],
     ];
 
@@ -72,24 +79,73 @@
             {{-- Separador --}}
             <div class="hidden md:block h-8 w-px bg-slate-200"></div>
 
-            {{-- Avatar / usuario --}}
-            <button class="flex items-center gap-3 rounded-xl px-2 py-1.5 hover:bg-slate-100 transition">
-                @php
-                    $userName = auth()->user()?->name ?? 'Administrador';
-                @endphp
-                <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#d68643] to-[#a85f24] text-white text-sm font-bold shadow-sm">
-                    {{ strtoupper(substr($userName, 0, 1)) }}
-                </div>
-                <div class="hidden md:block text-left">
-                    <div class="text-sm font-semibold text-slate-800 leading-tight">
-                        {{ $userName }}
+            {{-- Avatar / usuario con dropdown --}}
+            @php
+                $u = auth()->user();
+                $userName = $u?->name ?? 'Invitado';
+                $userIniciales = $u?->iniciales() ?: 'U';
+                $userRol = $u?->rolPrincipal() ?? 'sin rol';
+                $userSede = $u?->sede?->nombre ?? 'Sede principal';
+            @endphp
+
+            <div class="relative" x-data="{ open: false }" @click.outside="open = false">
+                <button @click="open = !open"
+                        class="flex items-center gap-3 rounded-xl px-2 py-1.5 hover:bg-slate-100 transition">
+                    <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#d68643] to-[#a85f24] text-white text-sm font-bold shadow-sm">
+                        {{ $userIniciales }}
                     </div>
-                    <div class="text-xs text-slate-500 leading-tight">
-                        Sede principal
+                    <div class="hidden md:block text-left">
+                        <div class="text-sm font-semibold text-slate-800 leading-tight">
+                            {{ $userName }}
+                        </div>
+                        <div class="text-xs text-slate-500 leading-tight capitalize">
+                            {{ $userRol }} · {{ $userSede }}
+                        </div>
                     </div>
+                    <i class="hidden md:block fa-solid fa-chevron-down text-xs text-slate-400 ml-1"></i>
+                </button>
+
+                {{-- Dropdown --}}
+                <div x-show="open"
+                     x-transition:enter="transition ease-out duration-150"
+                     x-transition:enter-start="opacity-0 -translate-y-2"
+                     x-transition:enter-end="opacity-100 translate-y-0"
+                     class="absolute right-0 mt-2 w-64 rounded-2xl border border-slate-200 bg-white shadow-2xl z-50 overflow-hidden"
+                     style="display: none;">
+
+                    <div class="px-4 py-3 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">
+                        <div class="flex items-center gap-3">
+                            <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-[#d68643] to-[#a85f24] text-white font-bold">
+                                {{ $userIniciales }}
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <div class="text-sm font-bold text-slate-800 truncate">{{ $userName }}</div>
+                                <div class="text-xs text-slate-500 truncate">{{ $u?->email }}</div>
+                                <div class="text-[10px] mt-0.5">
+                                    <span class="inline-block bg-violet-100 text-violet-700 font-semibold px-2 py-0.5 rounded-full">{{ $userRol }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    @can('usuarios.ver')
+                        <a href="{{ route('usuarios.index') }}"
+                           class="flex items-center gap-2 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50">
+                            <i class="fa-solid fa-users-gear text-slate-400 w-5"></i>
+                            Gestionar usuarios
+                        </a>
+                    @endcan
+
+                    <form method="POST" action="{{ route('logout') }}">
+                        @csrf
+                        <button type="submit"
+                                class="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-rose-600 hover:bg-rose-50 border-t border-slate-100">
+                            <i class="fa-solid fa-arrow-right-from-bracket text-rose-500 w-5"></i>
+                            Cerrar sesión
+                        </button>
+                    </form>
                 </div>
-                <i class="hidden md:block fa-solid fa-chevron-down text-xs text-slate-400 ml-1"></i>
-            </button>
+            </div>
         </div>
     </div>
 </header>

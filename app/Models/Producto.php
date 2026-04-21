@@ -9,11 +9,12 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Producto extends Model
 {
-    use SoftDeletes;
+    use SoftDeletes, \App\Models\Concerns\BelongsToTenant;
 
     protected $table = 'productos';
 
     protected $fillable = [
+        'tenant_id',
         'categoria_id',
         'codigo',
         'nombre',

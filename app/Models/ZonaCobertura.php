@@ -10,9 +10,12 @@ use Illuminate\Support\Str;
 
 class ZonaCobertura extends Model
 {
+    use \App\Models\Concerns\BelongsToTenant;
+
     protected $table = 'zonas_cobertura';
 
     protected $fillable = [
+        'tenant_id',
         'sede_id',
         'nombre',
         'descripcion',

@@ -9,11 +9,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Domiciliario extends Model
 {
-    use HasFactory;
+    use HasFactory, \App\Models\Concerns\BelongsToTenant;
 
     protected $table = 'domiciliarios';
 
     protected $fillable = [
+        'tenant_id',
         'nombre',
         'pais_codigo',
         'telefono',

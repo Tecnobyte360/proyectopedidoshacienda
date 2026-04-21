@@ -276,22 +276,39 @@
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
                     {{-- Editor textarea --}}
                     <div class="lg:col-span-2">
-                        <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
                             <label class="text-sm font-medium text-slate-700">
                                 <i class="fa-solid fa-pen-to-square text-[#d68643] mr-1"></i>
                                 Tu prompt
                             </label>
-                            <button type="button"
-                                    @click.prevent="$dispatch('confirm-show', {
-                                        title: 'Cargar plantilla por defecto',
-                                        message: 'Reemplazará el contenido actual del editor. ¿Seguro?',
-                                        confirmText: 'Sí, reemplazar',
-                                        type: 'primary',
-                                        onConfirm: () => $wire.cargarPlantillaPorDefecto(),
-                                    })"
-                                    class="text-[11px] font-semibold text-[#d68643] hover:underline">
-                                <i class="fa-solid fa-rotate-left mr-1"></i> Cargar plantilla por defecto
-                            </button>
+                            <div class="flex items-center gap-3">
+                                {{-- Carga + edita (no guarda) --}}
+                                <button type="button"
+                                        @click.prevent="$dispatch('confirm-show', {
+                                            title: 'Cargar plantilla por defecto',
+                                            message: 'Reemplazará el contenido del editor (NO guarda). Tendrás que hacer click en Guardar configuración después.',
+                                            confirmText: 'Sí, cargar',
+                                            type: 'primary',
+                                            onConfirm: () => $wire.cargarPlantillaPorDefecto(),
+                                        })"
+                                        class="text-[11px] font-semibold text-[#d68643] hover:underline">
+                                    <i class="fa-solid fa-rotate-left mr-1"></i> Cargar plantilla
+                                </button>
+
+                                {{-- Sincroniza Y guarda automáticamente --}}
+                                <button type="button"
+                                        @click.prevent="$dispatch('confirm-show', {
+                                            title: 'Sincronizar con plantilla de fábrica',
+                                            message: 'Reemplaza Y guarda inmediatamente el prompt con la versión más reciente del código. Úsalo cuando se actualicen las reglas del bot.',
+                                            confirmText: 'Sincronizar y guardar',
+                                            type: 'success',
+                                            onConfirm: () => $wire.sincronizarConPlantillaDeFabrica(),
+                                        })"
+                                        class="inline-flex items-center gap-1 text-[11px] font-bold text-white bg-emerald-500 hover:bg-emerald-600 px-3 py-1.5 rounded-lg transition shadow-sm">
+                                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                                    Sincronizar y guardar
+                                </button>
+                            </div>
                         </div>
 
                         <textarea wire:model="system_prompt" rows="22"
@@ -370,7 +387,7 @@
         <section class="rounded-2xl bg-white border border-slate-200 p-6 shadow-sm">
             <div class="flex items-center gap-3 mb-4">
                 <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-pink-50 text-pink-600 text-xl">
-                    🎂
+                    <i class="fa-solid fa-cake-candles"></i>
                 </div>
                 <div>
                     <h3 class="font-bold text-slate-800">Felicitaciones de cumpleaños</h3>
@@ -401,7 +418,7 @@
                         <label class="block text-sm font-medium text-slate-700 mb-1">Días de anticipación</label>
                         <select wire:model="cumpleanos_dias_anticipacion"
                                 class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
-                            <option value="0">El mismo día 🎂</option>
+                            <option value="0">El mismo día</option>
                             <option value="1">1 día antes</option>
                             <option value="2">2 días antes</option>
                             <option value="3">3 días antes</option>
@@ -448,7 +465,7 @@
                 {{-- Fila 2a: vigencia del beneficio de envío gratis --}}
                 <div>
                     <label class="block text-sm font-medium text-slate-700 mb-1">
-                        🎁 Vigencia del beneficio (envío gratis)
+                        <i class="fa-solid fa-gift text-pink-500"></i> Vigencia del beneficio (envío gratis)
                     </label>
                     <input type="number" min="1" max="30" wire:model="cumpleanos_dias_vigencia_beneficio"
                            class="w-40 rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
@@ -524,7 +541,7 @@
                     <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
                         <div>
                             <h4 class="text-sm font-bold text-slate-800">
-                                🎁 Cumpleañeros de hoy
+                                <i class="fa-solid fa-gift text-pink-500"></i> Cumpleañeros de hoy
                                 <span class="ml-2 inline-flex items-center justify-center h-5 min-w-5 rounded-full bg-pink-500 text-white text-[11px] font-bold px-2">
                                     {{ count($this->cumpleanerosHoy) }}
                                 </span>

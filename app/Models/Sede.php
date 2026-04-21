@@ -2,17 +2,23 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 
 class Sede extends Model
 {
+    use \App\Models\Concerns\BelongsToTenant;
+
     protected $fillable = [
+        'tenant_id',
         'nombre',
         'direccion',
         'latitud',
         'longitud',
         'hora_apertura',
         'hora_cierre',
+        'horarios',
+        'mensaje_cerrado',
         'activa',
     ];
 
@@ -20,7 +26,99 @@ class Sede extends Model
         'latitud'  => 'float',
         'longitud' => 'float',
         'activa'   => 'boolean',
+        'horarios' => 'array',
     ];
+
+    public const DIAS_SEMANA = [
+        'lunes'     => 'Lunes',
+        'martes'    => 'Martes',
+        'miercoles' => 'Miércoles',
+        'jueves'    => 'Jueves',
+        'viernes'   => 'Viernes',
+        'sabado'    => 'Sábado',
+        'domingo'   => 'Domingo',
+    ];
+
+    /** Mapeo Carbon dayOfWeek (0=Dom..6=Sab) → clave del array horarios */
+    private const CARBON_A_DIA = [
+        0 => 'domingo',
+        1 => 'lunes',
+        2 => 'martes',
+        3 => 'miercoles',
+        4 => 'jueves',
+        5 => 'viernes',
+        6 => 'sabado',
+    ];
+
+    /**
+     * Devuelve los horarios estructurados (con valores por defecto si está vacío).
+     */
+    public function horariosCompletos(): array
+    {
+        $base = $this->horarios ?? [];
+        $resultado = [];
+
+        foreach (self::DIAS_SEMANA as $key => $label) {
+            $resultado[$key] = [
+                'abierto' => $base[$key]['abierto'] ?? true,
+                'abre'    => $base[$key]['abre']    ?? '08:00',
+                'cierra'  => $base[$key]['cierra']  ?? '20:00',
+                'label'   => $label,
+            ];
+        }
+
+        return $resultado;
+    }
+
+    public function horarioDelDia(?Carbon $fecha = null): array
+    {
+        $fecha = $fecha ?: Carbon::now('America/Bogota');
+        $diaKey = self::CARBON_A_DIA[$fecha->dayOfWeek] ?? 'lunes';
+        $todos = $this->horariosCompletos();
+        return array_merge($todos[$diaKey], ['dia_key' => $diaKey]);
+    }
+
+    /**
+     * ¿La sede está abierta AHORA según los horarios configurados?
+     */
+    public function estaAbierta(?Carbon $momento = null): bool
+    {
+        $momento = $momento ?: Carbon::now('America/Bogota');
+        $hoy = $this->horarioDelDia($momento);
+
+        if (!$hoy['abierto']) return false;
+
+        $ahora = $momento->format('H:i');
+        return $ahora >= $hoy['abre'] && $ahora <= $hoy['cierra'];
+    }
+
+    /**
+     * Devuelve un texto humano del horario de hoy.
+     * Ej: "Hoy abierto 8:00 - 18:00" o "Hoy cerrado".
+     */
+    public function horarioHoyTexto(): string
+    {
+        $hoy = $this->horarioDelDia();
+        if (!$hoy['abierto']) {
+            return "Hoy ({$hoy['label']}) cerrado";
+        }
+        return "Hoy ({$hoy['label']}) {$hoy['abre']} - {$hoy['cierra']}";
+    }
+
+    /**
+     * Devuelve el horario completo de la semana en texto multilínea.
+     * Útil para inyectar al prompt del bot.
+     */
+    public function horariosFormateadosTexto(): string
+    {
+        $lineas = ["📍 {$this->nombre}" . ($this->direccion ? " — {$this->direccion}" : '')];
+        foreach ($this->horariosCompletos() as $key => $h) {
+            $lineas[] = $h['abierto']
+                ? "  • {$h['label']}: {$h['abre']} a {$h['cierra']}"
+                : "  • {$h['label']}: cerrado";
+        }
+        return implode("\n", $lineas);
+    }
 
     /**
      * Devuelve la sede más cercana a un punto (lat, lng).

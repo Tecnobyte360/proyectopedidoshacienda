@@ -6,9 +6,12 @@ use Illuminate\Database\Eloquent\Model;
 
 class BotAlerta extends Model
 {
+    use \App\Models\Concerns\BelongsToTenant;
+
     protected $table = 'bot_alertas';
 
     protected $fillable = [
+        'tenant_id',
         'tipo',
         'severidad',
         'titulo',

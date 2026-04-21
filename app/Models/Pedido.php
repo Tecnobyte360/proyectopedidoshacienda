@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Events\PedidoActualizado;
+use App\Models\Concerns\BelongsToTenant;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
@@ -12,7 +13,7 @@ use Illuminate\Support\Str;
 
 class Pedido extends Model
 {
-    use HasFactory;
+    use HasFactory, BelongsToTenant;
 
     protected $table = 'pedidos';
 
@@ -24,6 +25,7 @@ class Pedido extends Model
     const ESTADO_CANCELADO            = 'cancelado';
 
     protected $fillable = [
+        'tenant_id',
         'sede_id',
         'empresa_id',
         'fecha_pedido',
@@ -427,23 +429,45 @@ class Pedido extends Model
     |==========================================================================
     */
 
+    /**
+     * Obtiene credenciales WhatsApp del tenant DUEÑO de este pedido.
+     * Cada pedido tiene tenant_id → usa las credenciales de ese tenant.
+     */
+    private function whatsappCredencialesDelTenant(): array
+    {
+        $tenant = $this->tenant_id
+            ? app(\App\Services\TenantManager::class)->withoutTenant(
+                fn () => \App\Models\Tenant::find($this->tenant_id)
+            )
+            : null;
+
+        return app(\App\Services\WhatsappResolverService::class)->credenciales($tenant);
+    }
+
+    private function whatsappCacheKey(): string
+    {
+        return 'whatsapp_api_token_t' . ($this->tenant_id ?? 'global');
+    }
+
     private function postWhatsappSend(string $token, array $payload)
     {
+        $cred = $this->whatsappCredencialesDelTenant();
+        $endpoint = rtrim($cred['api_base_url'], '/') . '/api/messages/send';
         return Http::withoutVerifying()
             ->withToken($token)
             ->timeout(20)
-            ->post('https://wa-api.tecnobyteapp.com:1422/api/messages/send', $payload);
+            ->post($endpoint, $payload);
     }
 
     private function obtenerTokenWhatsapp(): ?string
     {
-        $cacheKey = 'whatsapp_api_token';
-        return Cache::get($cacheKey) ?: $this->loginWhatsapp();
+        return Cache::get($this->whatsappCacheKey()) ?: $this->loginWhatsapp();
     }
 
     private function loginWhatsapp(bool $force = false): ?string
     {
-        $cacheKey = 'whatsapp_api_token';
+        $cacheKey = $this->whatsappCacheKey();
+        $cred = $this->whatsappCredencialesDelTenant();
 
         if ($force) {
             Cache::forget($cacheKey);
@@ -454,12 +478,18 @@ class Pedido extends Model
             }
         }
 
+        if (empty($cred['email']) || empty($cred['password'])) {
+            Log::error('Pedido: tenant sin credenciales WhatsApp', ['tenant_id' => $this->tenant_id]);
+            return null;
+        }
+
         try {
+            $endpoint = rtrim($cred['api_base_url'], '/') . '/auth/login';
             $response = Http::withoutVerifying()
                 ->timeout(20)
-                ->post('https://wa-api.tecnobyteapp.com:1422/auth/login', [
-                    'email'    => env('WHATSAPP_API_EMAIL'),
-                    'password' => env('WHATSAPP_API_PASSWORD'),
+                ->post($endpoint, [
+                    'email'    => $cred['email'],
+                    'password' => $cred['password'],
                 ]);
 
             if ($response->failed()) {
@@ -490,7 +520,8 @@ class Pedido extends Model
 
     private function refrescarTokenWhatsapp(): ?string
     {
-        $cacheKey = 'whatsapp_api_token';
+        $cacheKey = $this->whatsappCacheKey();
+        $cred = $this->whatsappCredencialesDelTenant();
         $token    = Cache::get($cacheKey);
 
         if (!$token) {
@@ -499,10 +530,11 @@ class Pedido extends Model
         }
 
         try {
+            $endpoint = rtrim($cred['api_base_url'], '/') . '/auth/refresh_token';
             $response = Http::withoutVerifying()
                 ->withToken($token)
                 ->timeout(20)
-                ->post('https://wa-api.tecnobyteapp.com:1422/auth/refresh_token');
+                ->post($endpoint);
 
             if ($response->failed()) {
                 Log::warning('⚠️ ERROR REFRESH TOKEN WHATSAPP', [

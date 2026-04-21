@@ -15,16 +15,18 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // Usuario de prueba
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+        // Usuario de prueba — solo lo crea si NO existe
+        if (!User::where('email', 'test@example.com')->exists()) {
+            User::factory()->create([
+                'name'  => 'Test User',
+                'email' => 'test@example.com',
+            ]);
+        }
 
-        // ✅ Aquí llamamos al seeder de sedes
         $this->call([
             SedeSeeder::class,
             ProductosSeeder::class,
+            RolesPermisosSeeder::class,   // 🔐 roles, permisos y admin por defecto
         ]);
     }
 }

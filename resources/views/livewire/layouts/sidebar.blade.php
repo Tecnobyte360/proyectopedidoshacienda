@@ -16,34 +16,44 @@
 
         @php
             $current = request()->route()?->getName();
+            $u = auth()->user();
 
-            $sections = [
+            // 🌟 SUPER-ADMIN: si está sin impersonar, NO ve secciones operativas
+            // (Pedidos, Chat, Productos, etc). Solo ve sección "Super Admin".
+            // Cuando hace "Ver como" (impersonación), sí ve los menús del tenant.
+            $esSuperAdmin = $u && $u->tenant_id === null && $u->hasRole('super-admin');
+            $estaImpersonando = session()->has('tenant_imitado_id');
+            $verSoloAdmin = $esSuperAdmin && !$estaImpersonando;
+
+            // Cada item incluye 'permission' — el sidebar lo filtra automáticamente.
+            $sectionsRaw = [
                 [
                     'title' => 'Principal',
                     'items' => [
-                        ['name' => 'Pedidos',      'icon' => 'fa-bag-shopping', 'route' => 'pedidos.index',      'badge' => null],
-                        ['name' => 'Chat en vivo', 'icon' => 'fa-headset',      'route' => 'chat.index',         'badge' => 'NEW'],
-                        ['name' => 'Despachos',    'icon' => 'fa-paper-plane',  'route' => 'despachos.index',    'badge' => null],
+                        ['name' => 'Pedidos',      'icon' => 'fa-bag-shopping', 'route' => 'pedidos.index',      'badge' => null,  'permission' => 'pedidos.ver'],
+                        ['name' => 'Chat en vivo', 'icon' => 'fa-headset',      'route' => 'chat.index',         'badge' => null,  'permission' => 'chat.usar'],
+                        ['name' => 'Despachos',    'icon' => 'fa-paper-plane',  'route' => 'despachos.index',    'badge' => null,  'permission' => 'despachos.gestionar'],
                     ],
                 ],
                 [
                     'title' => 'Catálogo',
                     'items' => [
-                        ['name' => 'Productos',   'icon' => 'fa-box',          'route' => 'productos.index',    'badge' => null],
-                        ['name' => 'Categorías',  'icon' => 'fa-layer-group',  'route' => 'categorias.index',   'badge' => null],
-                        ['name' => 'Promociones', 'icon' => 'fa-tags',         'route' => 'promociones.index',  'badge' => null],
+                        ['name' => 'Productos',   'icon' => 'fa-box',          'route' => 'productos.index',    'badge' => null, 'permission' => 'productos.ver'],
+                        ['name' => 'Categorías',  'icon' => 'fa-layer-group',  'route' => 'categorias.index',   'badge' => null, 'permission' => 'categorias.gestionar'],
+                        ['name' => 'Promociones', 'icon' => 'fa-tags',         'route' => 'promociones.index',  'badge' => null, 'permission' => 'promociones.gestionar'],
                     ],
                 ],
                 [
                     'title' => 'Operaciones',
                     'items' => [
-                        ['name' => 'Clientes',       'icon' => 'fa-users',              'route' => 'clientes.index',      'badge' => null],
-                        ['name' => 'Conversaciones', 'icon' => 'fa-comments',           'route' => 'conversaciones.index', 'badge' => null],
-                        ['name' => 'Domiciliarios', 'icon' => 'fa-motorcycle',         'route' => 'domiciliarios.index', 'badge' => null],
-                        ['name' => 'Zonas',         'icon' => 'fa-map-location-dot',   'route' => 'zonas.index',         'badge' => null],
-                        ['name' => 'Reportes',      'icon' => 'fa-chart-line',         'route' => 'reportes.index',      'badge' => null],
-                        ['name' => 'ANS Tiempos',   'icon' => 'fa-stopwatch',          'route' => 'ans.index',           'badge' => null],
-                        ['name' => 'Bot WhatsApp',  'icon' => 'fa-robot',              'route' => 'configuracion.bot',   'badge' => null],
+                        ['name' => 'Clientes',       'icon' => 'fa-users',              'route' => 'clientes.index',      'badge' => null, 'permission' => 'clientes.ver'],
+                        ['name' => 'Conversaciones', 'icon' => 'fa-comments',           'route' => 'conversaciones.index','badge' => null, 'permission' => 'conversaciones.ver'],
+                        ['name' => 'Domiciliarios', 'icon' => 'fa-motorcycle',          'route' => 'domiciliarios.index', 'badge' => null, 'permission' => 'domiciliarios.gestionar'],
+                        ['name' => 'Zonas',         'icon' => 'fa-map-location-dot',    'route' => 'zonas.index',         'badge' => null, 'permission' => 'zonas.gestionar'],
+                        ['name' => 'Reportes',      'icon' => 'fa-chart-line',          'route' => 'reportes.index',      'badge' => null, 'permission' => 'reportes.ver'],
+                        ['name' => 'ANS Tiempos',   'icon' => 'fa-stopwatch',           'route' => 'ans.index',           'badge' => null, 'permission' => 'ans.gestionar'],
+                        ['name' => 'Bot WhatsApp',  'icon' => 'fa-robot',               'route' => 'configuracion.bot',   'badge' => null, 'permission' => 'bot.configurar'],
+                        ['name' => 'Sedes',         'icon' => 'fa-shop',                'route' => 'sedes.index',         'badge' => null, 'permission' => 'sedes.gestionar'],
                     ],
                 ],
                 [
@@ -52,11 +62,40 @@
                         ['name' => 'Alertas del bot', 'icon' => 'fa-triangle-exclamation', 'route' => 'alertas.index',
                             'badge' => (\Schema::hasTable('bot_alertas')
                                 ? (\App\Models\BotAlerta::where('resuelta', false)->count() ?: null)
-                                : null)],
-                        ['name' => 'Felicitaciones', 'icon' => 'fa-cake-candles', 'route' => 'felicitaciones.index', 'badge' => null],
+                                : null),
+                            'permission' => 'alertas.ver'],
+                        ['name' => 'Felicitaciones', 'icon' => 'fa-cake-candles', 'route' => 'felicitaciones.index', 'badge' => null, 'permission' => 'felicitaciones.ver'],
+                        ['name' => 'Usuarios',       'icon' => 'fa-users-gear',   'route' => 'usuarios.index',       'badge' => null, 'permission' => 'usuarios.ver'],
+                        ['name' => 'Roles y permisos','icon' => 'fa-shield-halved','route' => 'roles.index',          'badge' => null, 'permission' => 'roles.gestionar'],
+                    ],
+                ],
+                [
+                    'title' => '⭐ Super Admin',
+                    'items' => [
+                        ['name' => 'Tenants',       'icon' => 'fa-building',           'route' => 'admin.tenants.index',       'badge' => null, 'permission' => 'tenants.gestionar'],
+                        ['name' => 'Planes',        'icon' => 'fa-money-check-dollar', 'route' => 'admin.planes.index',        'badge' => null, 'permission' => 'planes.gestionar'],
+                        ['name' => 'Suscripciones', 'icon' => 'fa-receipt',            'route' => 'admin.suscripciones.index', 'badge' => null, 'permission' => 'suscripciones.gestionar'],
+                        ['name' => 'Pagos',         'icon' => 'fa-money-bills',        'route' => 'admin.pagos.index',         'badge' => null, 'permission' => 'pagos.gestionar'],
                     ],
                 ],
             ];
+
+            // Filtrar items por permisos del usuario y secciones vacías
+            $sections = [];
+            foreach ($sectionsRaw as $sec) {
+                // Si es super-admin sin impersonar, SOLO mostrar la sección "Super Admin"
+                if ($verSoloAdmin && $sec['title'] !== '⭐ Super Admin') {
+                    continue;
+                }
+
+                $items = array_values(array_filter($sec['items'], function ($it) use ($u) {
+                    return !$u || empty($it['permission']) || $u->can($it['permission']);
+                }));
+                if (count($items) > 0) {
+                    $sec['items'] = $items;
+                    $sections[] = $sec;
+                }
+            }
         @endphp
 
         {{-- NAV --}}

@@ -11,9 +11,12 @@ use Illuminate\Support\Facades\Cache;
  */
 class ConfiguracionBot extends Model
 {
+    use \App\Models\Concerns\BelongsToTenant;
+
     protected $table = 'configuraciones_bot';
 
     protected $fillable = [
+        'tenant_id',
         'enviar_imagenes_productos',
         'max_imagenes_por_mensaje',
         'enviar_imagen_destacados',
@@ -70,12 +73,18 @@ Solo escríbenos cuando quieras pedir y nosotros nos encargamos del resto.
 MSG;
 
     /**
-     * Obtiene (cacheada) la única instancia. Si no existe, crea una con defaults.
+     * Obtiene la configuración del tenant actual (cacheada).
+     * Si no existe, la crea con defaults.
+     *
+     * Multi-tenant: cada tenant tiene su propia configuración.
      */
     public static function actual(): self
     {
-        return Cache::remember('config_bot_actual', 60, function () {
-            return self::firstOrCreate(['id' => 1], [
+        $tenantId = app(\App\Services\TenantManager::class)->id();
+        $cacheKey = 'config_bot_actual_' . ($tenantId ?? 'global');
+
+        return Cache::remember($cacheKey, 60, function () use ($tenantId) {
+            $defaults = [
                 'enviar_imagenes_productos' => false,
                 'max_imagenes_por_mensaje'  => 3,
                 'enviar_imagen_destacados'  => false,
@@ -85,13 +94,22 @@ MSG;
                 'max_tokens'                => 700,
                 'nombre_asesora'            => 'Sofía',
                 'activo'                    => true,
-            ]);
+            ];
+
+            // Si hay tenant, busca su config; si no, fallback a la primera (legacy)
+            if ($tenantId) {
+                return self::firstOrCreate(['tenant_id' => $tenantId], $defaults);
+            }
+
+            return self::first() ?? self::create($defaults);
         });
     }
 
     public static function limpiarCache(): void
     {
-        Cache::forget('config_bot_actual');
+        $tenantId = app(\App\Services\TenantManager::class)->id();
+        Cache::forget('config_bot_actual_' . ($tenantId ?? 'global'));
+        Cache::forget('config_bot_actual');   // legacy
     }
 
     protected static function booted(): void

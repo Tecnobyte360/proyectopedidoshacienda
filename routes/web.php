@@ -19,26 +19,78 @@ use App\Livewire\Conversaciones\Index as ConversacionesIndex;
 use App\Livewire\Chat\Index as ChatIndex;
 use App\Livewire\Alertas\Index as AlertasIndex;
 use App\Livewire\Felicitaciones\Index as FelicitacionesIndex;
+use App\Livewire\Sedes\Index as SedesIndex;
+use App\Livewire\Usuarios\Index as UsuariosIndex;
+use App\Livewire\Roles\Index as RolesIndex;
+use App\Livewire\Admin\Tenants\Index as AdminTenantsIndex;
+use App\Livewire\Admin\Planes\Index as AdminPlanesIndex;
+use App\Livewire\Admin\Suscripciones\Index as AdminSuscripcionesIndex;
+use App\Livewire\Admin\Pagos\Index as AdminPagosIndex;
+use App\Http\Controllers\AuthController;
 use App\Models\Sede;
 use App\Models\Pedido;
 use App\Models\DetallePedido;
 
-Route::get('/pedidos', PedidosIndex::class)->name('pedidos.index');
+/*
+|--------------------------------------------------------------------------
+| AUTENTICACIÓN
+|--------------------------------------------------------------------------
+*/
+Route::middleware('guest')->group(function () {
+    Route::get('/login',  [AuthController::class, 'showLogin'])->name('login');
+    Route::post('/login', [AuthController::class, 'login']);
+});
 
-Route::get('/productos',     ProductosIndex::class)->name('productos.index');
-Route::get('/categorias',    CategoriasIndex::class)->name('categorias.index');
-Route::get('/promociones',   PromocionesIndex::class)->name('promociones.index');
-Route::get('/domiciliarios', DomiciliariosIndex::class)->name('domiciliarios.index');
-Route::get('/zonas',         ZonasIndex::class)->name('zonas.index');
-Route::get('/despachos',     DespachosIndex::class)->name('despachos.index');
-Route::get('/reportes',      ReportesIndex::class)->name('reportes.index');
-Route::get('/ans-tiempos',     AnsIndex::class)->name('ans.index');
-Route::get('/configuracion/bot', ConfiguracionBot::class)->name('configuracion.bot');
-Route::get('/clientes',          ClientesIndex::class)->name('clientes.index');
-Route::get('/conversaciones',    ConversacionesIndex::class)->name('conversaciones.index');
-Route::get('/chat',              ChatIndex::class)->name('chat.index');
-Route::get('/alertas',           AlertasIndex::class)->name('alertas.index');
-Route::get('/felicitaciones',    FelicitacionesIndex::class)->name('felicitaciones.index');
+Route::post('/logout', [AuthController::class, 'logout'])
+    ->middleware('auth')
+    ->name('logout');
+
+/*
+|--------------------------------------------------------------------------
+| RUTAS AUTENTICADAS — protegidas con permisos
+|--------------------------------------------------------------------------
+*/
+Route::middleware(['auth'])->group(function () {
+
+Route::get('/', function () {
+    $u = auth()->user();
+    // Super-admin sin impersonar va al panel de tenants
+    if ($u && $u->tenant_id === null && $u->hasRole('super-admin') && !session()->has('tenant_imitado_id')) {
+        return redirect()->route('admin.tenants.index');
+    }
+    return redirect('/pedidos');
+});
+
+// 🏢 Rutas operativas — bloqueadas para super-admin sin impersonar
+Route::middleware(['no_super_sin_imp'])->group(function () {
+    Route::get('/pedidos', PedidosIndex::class)->middleware('permission:pedidos.ver')->name('pedidos.index');
+
+    Route::get('/productos',     ProductosIndex::class)->middleware('permission:productos.ver')->name('productos.index');
+    Route::get('/categorias',    CategoriasIndex::class)->middleware('permission:categorias.gestionar')->name('categorias.index');
+    Route::get('/promociones',   PromocionesIndex::class)->middleware('permission:promociones.gestionar')->name('promociones.index');
+    Route::get('/domiciliarios', DomiciliariosIndex::class)->middleware('permission:domiciliarios.gestionar')->name('domiciliarios.index');
+    Route::get('/zonas',         ZonasIndex::class)->middleware('permission:zonas.gestionar')->name('zonas.index');
+    Route::get('/despachos',     DespachosIndex::class)->middleware('permission:despachos.gestionar')->name('despachos.index');
+    Route::get('/reportes',      ReportesIndex::class)->middleware('permission:reportes.ver')->name('reportes.index');
+    Route::get('/ans-tiempos',   AnsIndex::class)->middleware('permission:ans.gestionar')->name('ans.index');
+    Route::get('/configuracion/bot', ConfiguracionBot::class)->middleware('permission:bot.configurar')->name('configuracion.bot');
+    Route::get('/clientes',          ClientesIndex::class)->middleware('permission:clientes.ver')->name('clientes.index');
+    Route::get('/conversaciones',    ConversacionesIndex::class)->middleware('permission:conversaciones.ver')->name('conversaciones.index');
+    Route::get('/chat',              ChatIndex::class)->middleware('permission:chat.usar')->name('chat.index');
+    Route::get('/alertas',           AlertasIndex::class)->middleware('permission:alertas.ver')->name('alertas.index');
+    Route::get('/felicitaciones',    FelicitacionesIndex::class)->middleware('permission:felicitaciones.ver')->name('felicitaciones.index');
+    Route::get('/sedes',             SedesIndex::class)->middleware('permission:sedes.gestionar')->name('sedes.index');
+    Route::get('/usuarios',          UsuariosIndex::class)->middleware('permission:usuarios.ver')->name('usuarios.index');
+    Route::get('/roles',             RolesIndex::class)->middleware('permission:roles.gestionar')->name('roles.index');
+});
+
+// 🌟 SUPER-ADMIN — solo TecnoByte360 (dueño plataforma)
+Route::get('/admin/tenants',       AdminTenantsIndex::class)->middleware('permission:tenants.gestionar')->name('admin.tenants.index');
+Route::get('/admin/planes',        AdminPlanesIndex::class)->middleware('permission:planes.gestionar')->name('admin.planes.index');
+Route::get('/admin/suscripciones', AdminSuscripcionesIndex::class)->middleware('permission:suscripciones.gestionar')->name('admin.suscripciones.index');
+Route::get('/admin/pagos',         AdminPagosIndex::class)->middleware('permission:pagos.gestionar')->name('admin.pagos.index');
+
+}); // fin auth group
 
 Route::get('/seguimiento-pedido/{codigo}', SeguimientoPedido::class)
     ->name('pedidos.seguimiento');

@@ -37,6 +37,8 @@ class BotPromptService
             ['key' => 'cliente_nombre',         'descripcion' => 'Nombre completo del cliente que está chateando'],
             ['key' => 'cliente_primer_nombre',  'descripcion' => 'Solo el primer nombre del cliente (más natural en WhatsApp)'],
             ['key' => 'cliente_es_conocido',    'descripcion' => 'SI/NO — si ya tenemos el nombre real del cliente en BD'],
+            ['key' => 'horarios_sedes',         'descripcion' => 'Horarios completos de todas las sedes activas'],
+            ['key' => 'sede_estado_actual',     'descripcion' => 'Estado de la sede ahora: ABIERTA o CERRADA + horario de hoy'],
             ['key' => 'saludo_hora',       'descripcion' => 'Saludo según la hora — "buenos días/tardes/noches"'],
             ['key' => 'fecha_actual',      'descripcion' => 'Fecha de hoy (ej: "17 de abril")'],
             ['key' => 'hora_actual',       'descripcion' => 'Hora actual (ej: "14:35")'],
@@ -82,12 +84,35 @@ class BotPromptService
             $clienteConocido = true;
         }
 
+        // Horarios de las sedes
+        $sedes = \App\Models\Sede::where('activa', true)->get();
+        $horariosTexto = $sedes->map(fn ($s) => $s->horariosFormateadosTexto())->implode("\n\n");
+        if ($horariosTexto === '') {
+            $horariosTexto = '(No hay sedes con horarios configurados)';
+        }
+
+        // Estado actual de la primera sede activa
+        $sedeRef = $sedeId
+            ? \App\Models\Sede::find($sedeId)
+            : $sedes->first();
+
+        $estadoSedeTexto = '(Sin sede de referencia)';
+        if ($sedeRef) {
+            $estado = $sedeRef->estaAbierta() ? '🟢 ABIERTA AHORA' : '🔴 CERRADA AHORA';
+            $estadoSedeTexto = "{$sedeRef->nombre}: {$estado}. " . $sedeRef->horarioHoyTexto();
+            if (!$sedeRef->estaAbierta() && $sedeRef->mensaje_cerrado) {
+                $estadoSedeTexto .= "\nMensaje: {$sedeRef->mensaje_cerrado}";
+            }
+        }
+
         return [
             'nombre_asesora'        => $config->nombre_asesora ?: 'Sofía',
             'cliente_nombre'        => $clienteNombre,
             'cliente_primer_nombre' => $primerNombre,
             'cliente_es_conocido'   => $clienteConocido ? 'SI' : 'NO',
             'saludo_hora'           => $saludoHora,
+            'horarios_sedes'        => $horariosTexto,
+            'sede_estado_actual'    => $estadoSedeTexto,
             'fecha_actual'      => now()->locale('es')->isoFormat('D [de] MMMM [de] YYYY'),
             'hora_actual'       => now()->format('H:i'),
             'empresa'           => $infoEmpresa,
@@ -211,6 +236,23 @@ cualquier cosa que sugiera que no eres humana. Si te lo preguntan directo:
 {promociones}
 
 Cuando aplique, mencionalas naturalmente: "Hoy tengo *2x1 en chorizo* 🔥, ¿quieres aprovechar?"
+
+═══════════════════════════════════════════════════════════════════════════════
+# 🏪 HORARIOS DE ATENCIÓN
+
+**Estado actual:** {sede_estado_actual}
+
+**Horarios de todas las sedes:**
+{horarios_sedes}
+
+🛑 **REGLAS DE HORARIO**:
+1. Si el cliente pregunta "¿están abiertos?" / "¿a qué hora abren?" / "¿hasta qué hora atienden?",
+   responde con el horario REAL de la sede (úsalo del bloque de arriba).
+2. Si la sede está CERRADA AHORA y el cliente quiere hacer un pedido para *recoger*,
+   avísale: "Estamos cerrados ahora — abrimos mañana a las XX:XX 🙌"
+3. Para domicilios fuera de horario: cuéntale que llegamos *cuando abramos* o sugiere
+   programar para más tarde si tiene sentido.
+4. NUNCA inventes horarios distintos a los del bloque de arriba.
 
 ═══════════════════════════════════════════════════════════════════════════════
 # 🗺️ COBERTURA DE DOMICILIO

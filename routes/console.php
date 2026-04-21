@@ -18,6 +18,13 @@ Artisan::command('inspire', function () {
 // 🎂 Felicitaciones de cumpleaños
 // Evaluamos cada minuto y comparamos HH:MM exacto con la hora configurada
 // en ConfiguracionBot. Así el admin puede elegir cualquier hora (incluso :22).
+// 🚫 Auto-suspender tenants con suscripción vencida (corre 1 vez al día a las 03:00)
+Schedule::command('tenants:suspender-vencidos')
+    ->dailyAt('03:00')
+    ->timezone('America/Bogota')
+    ->withoutOverlapping()
+    ->runInBackground();
+
 Schedule::command('clientes:felicitar-cumpleanos')
     ->everyMinute()
     ->timezone('America/Bogota')
