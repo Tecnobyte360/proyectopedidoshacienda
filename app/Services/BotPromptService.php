@@ -63,7 +63,9 @@ class BotPromptService
         string $ansInfo,
     ): array {
         $config = ConfiguracionBot::actual();
-        $hora   = (int) now()->format('H');
+        // Forzar timezone Bogotá para que coincida con Sede::estaAbierta()
+        $ahora  = \Carbon\Carbon::now('America/Bogota');
+        $hora   = (int) $ahora->format('H');
 
         $saludoHora = $hora < 12
             ? 'buenos días'
@@ -113,8 +115,8 @@ class BotPromptService
             'saludo_hora'           => $saludoHora,
             'horarios_sedes'        => $horariosTexto,
             'sede_estado_actual'    => $estadoSedeTexto,
-            'fecha_actual'      => now()->locale('es')->isoFormat('D [de] MMMM [de] YYYY'),
-            'hora_actual'       => now()->format('H:i'),
+            'fecha_actual'      => $ahora->locale('es')->isoFormat('D [de] MMMM [de] YYYY'),
+            'hora_actual'       => $ahora->format('h:i a'),  // 12h con AM/PM
             'empresa'           => $infoEmpresa,
             'catalogo'          => $this->catalogo->catalogoFormateado($sedeId),
             'promociones'       => $this->catalogo->promocionesFormateadas($sedeId),
