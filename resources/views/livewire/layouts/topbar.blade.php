@@ -24,6 +24,7 @@
         'admin.planes.index'         => ['Planes',          'Catálogo de planes de suscripción',         'fa-money-check-dollar'],
         'admin.suscripciones.index'  => ['Suscripciones',   'Gestión de planes contratados por tenant',  'fa-receipt'],
         'admin.pagos.index'          => ['Pagos',           'Historial y registro manual de pagos',      'fa-money-bills'],
+        'admin.documentacion'        => ['Documentación',   'Cómo funciona la plataforma SaaS',          'fa-book-open'],
         'pedidos.seguimiento'  => ['Seguimiento',    'Estado del pedido',                          'fa-route'],
     ];
 

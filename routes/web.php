@@ -26,6 +26,7 @@ use App\Livewire\Admin\Tenants\Index as AdminTenantsIndex;
 use App\Livewire\Admin\Planes\Index as AdminPlanesIndex;
 use App\Livewire\Admin\Suscripciones\Index as AdminSuscripcionesIndex;
 use App\Livewire\Admin\Pagos\Index as AdminPagosIndex;
+use App\Livewire\Admin\Documentacion as AdminDocumentacion;
 use App\Http\Controllers\AuthController;
 use App\Models\Sede;
 use App\Models\Pedido;
@@ -89,6 +90,9 @@ Route::get('/admin/tenants',       AdminTenantsIndex::class)->middleware('permis
 Route::get('/admin/planes',        AdminPlanesIndex::class)->middleware('permission:planes.gestionar')->name('admin.planes.index');
 Route::get('/admin/suscripciones', AdminSuscripcionesIndex::class)->middleware('permission:suscripciones.gestionar')->name('admin.suscripciones.index');
 Route::get('/admin/pagos',         AdminPagosIndex::class)->middleware('permission:pagos.gestionar')->name('admin.pagos.index');
+Route::get('/admin/documentacion', AdminDocumentacion::class)
+    ->middleware('permission:tenants.gestionar')
+    ->name('admin.documentacion');
 
 }); // fin auth group
 
