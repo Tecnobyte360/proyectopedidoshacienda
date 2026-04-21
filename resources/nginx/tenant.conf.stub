@@ -1,0 +1,41 @@
+## Generado por: php artisan tenants:setup-subdominio
+## Tenant: {{SLUG}}
+## Dominio: {{DOMINIO}}
+## NO EDITAR A MANO — se regenera al recrear el subdominio.
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name {{DOMINIO}};
+
+    client_max_body_size 50M;
+
+    access_log /var/log/nginx/{{SLUG}}.access.log;
+    error_log  /var/log/nginx/{{SLUG}}.error.log;
+
+    location / {
+        proxy_pass         http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+        proxy_set_header   X-Forwarded-Host  $host;
+        proxy_set_header   Upgrade           $http_upgrade;
+        proxy_set_header   Connection        "upgrade";
+        proxy_read_timeout 90;
+    }
+
+    # WebSockets (Reverb / Laravel WebSockets)
+    location /app {
+        proxy_pass         http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+        proxy_set_header   Upgrade           $http_upgrade;
+        proxy_set_header   Connection        "upgrade";
+        proxy_read_timeout 86400;
+    }
+}
