@@ -124,6 +124,12 @@ class Index extends Component
         $this->modalAbierto = true;
     }
 
+    /** Alias por si Livewire tiene problemas con el nombre original */
+    public function nuevoTenant(): void
+    {
+        $this->abrirModalCrear();
+    }
+
     public function abrirModalEditar(int $id): void
     {
         $t = Tenant::findOrFail($id);

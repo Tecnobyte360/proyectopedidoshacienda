@@ -21,7 +21,7 @@
                             title="Verifica que la API Key de Hostinger funciona">
                         <i class="fa-solid fa-plug"></i> Probar Hostinger
                     </button>
-                    <button wire:click="abrirModalCrear"
+                    <button wire:click="nuevoTenant"
                             class="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-[#d68643] to-[#a85f24] hover:from-[#c97a36] hover:to-[#965520] text-white font-bold px-5 py-3 transition shadow-lg">
                         <i class="fa-solid fa-plus"></i> Nuevo tenant
                     </button>
