@@ -87,13 +87,15 @@
 
             {{-- 🎭 Botón compacto: salir de impersonación --}}
             @if($tenantImitado)
-                <a href="{{ url('/admin/dejar-impersonar') }}"
-                   onclick="window.location.href='{{ url('/admin/dejar-impersonar') }}'; return false;"
-                   title="Estás viendo como '{{ $tenantImitado->nombre }}'. Click para volver al super-admin."
-                   class="inline-flex items-center gap-2 rounded-xl bg-amber-100 text-amber-800 hover:bg-amber-200 font-semibold px-3 py-2 text-sm transition border border-amber-300 cursor-pointer">
-                    <i class="fa-solid fa-mask"></i>
-                    <span class="hidden md:inline">Salir de "{{ \Illuminate\Support\Str::limit($tenantImitado->nombre, 15) }}"</span>
-                </a>
+                <form method="POST" action="{{ url('/admin/dejar-impersonar') }}" class="inline-block">
+                    @csrf
+                    <button type="submit"
+                            title="Estás viendo como '{{ $tenantImitado->nombre }}'. Click para volver al super-admin."
+                            class="inline-flex items-center gap-2 rounded-xl bg-amber-100 text-amber-800 hover:bg-amber-200 font-semibold px-3 py-2 text-sm transition border border-amber-300 cursor-pointer">
+                        <i class="fa-solid fa-mask"></i>
+                        <span class="hidden md:inline">Salir de "{{ \Illuminate\Support\Str::limit($tenantImitado->nombre, 15) }}"</span>
+                    </button>
+                </form>
             @endif
 
             {{-- Separador --}}
