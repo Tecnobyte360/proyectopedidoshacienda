@@ -70,9 +70,13 @@ class Index extends Component
                 'nullable',
                 'string',
                 'max:80',
-                // Solo a-z, 0-9 y guion medio. NO _ . espacios MAYÚSC.
-                // (Let's Encrypt rechaza otros caracteres en subdominios.)
-                'regex:/^[a-z0-9]+(-[a-z0-9]+)*$/',
+                // Regex SOLO se aplica si el slug viene con texto (no vacío)
+                // Para subdominio DNS-válido: a-z, 0-9 y guion medio. NO _ . espacios MAYÚSC.
+                function ($attribute, $value, $fail) {
+                    if (!empty(trim($value)) && !preg_match('/^[a-z0-9]+(-[a-z0-9]+)*$/', $value)) {
+                        $fail('El slug debe ser kebab-case (solo a-z, 0-9 y guiones medios). Ejemplo: mi-empresa');
+                    }
+                },
                 'unique:tenants,slug,' . ($this->editandoId ?? 'NULL'),
             ],
             'plan'                => 'required|in:basico,pro,empresa',
@@ -156,12 +160,22 @@ class Index extends Component
 
     public function guardar(): void
     {
-        // Normalizar antes de validar para que la regex no falle por mayúsculas/espacios
-        if ($this->slug !== '') {
+        // Normalizar slug antes de validar:
+        //   - Si viene vacío, dejarlo como null (el modelo lo autogenera desde el nombre)
+        //   - Si viene con texto, sanearlo a kebab-case (regex queda satisfecha)
+        if (trim($this->slug) === '') {
+            $this->slug = '';   // Livewire necesita string, no null en propiedades typed
+        } else {
             $this->slug = Tenant::normalizarSlug($this->slug);
         }
 
         $data = $this->validate();
+
+        // Si el slug quedó vacío tras la validación, lo quitamos del array
+        // para que NO sobrescriba el slug autogenerado por el modelo en saving().
+        if (empty($data['slug'] ?? null)) {
+            unset($data['slug']);
+        }
 
         $crear = $data['crear_admin_inicial'] ?? false;
         $adminNombre = $data['admin_nombre'] ?? '';
