@@ -34,8 +34,46 @@ if [ ! -d "$PENDING_DIR" ]; then
     exit 0
 fi
 
-# Sólo procesar archivos .conf.pending (marcador de "listo para aplicar")
 shopt -s nullglob
+
+# ─── A) BORRAR tenants encolados (.conf.delete) ─────────────────────
+for FLAG in "$PENDING_DIR"/*.conf.delete; do
+    DOMINIO=$(basename "$FLAG" .conf.delete)
+    echo "$LOG_TAG === ELIMINANDO $DOMINIO ==="
+
+    # 1. Borrar config de Nginx
+    if [ -f "$NGINX_DIR/$DOMINIO.conf" ]; then
+        rm -f "$NGINX_DIR/$DOMINIO.conf"
+        echo "$LOG_TAG ✓ Nginx conf borrado: $NGINX_DIR/$DOMINIO.conf"
+    fi
+
+    # 2. Borrar el .conf de pending si quedó
+    rm -f "$PENDING_DIR/$DOMINIO.conf"
+    rm -f "$PENDING_DIR/$DOMINIO.conf.pending"
+    rm -f "$PENDING_DIR/$DOMINIO.conf.pending.done"
+    rm -f "$PENDING_DIR/$DOMINIO.conf.pending.error"
+
+    # 3. Validar y recargar nginx (sin el conf borrado)
+    if nginx -t 2>/dev/null; then
+        systemctl reload nginx
+        echo "$LOG_TAG ✓ Nginx recargado sin $DOMINIO"
+    else
+        echo "$LOG_TAG ⚠️ nginx -t falló tras borrar $DOMINIO. Revisa manualmente."
+    fi
+
+    # 4. Borrar cert SSL de Let's Encrypt
+    if certbot certificates 2>/dev/null | grep -q "$DOMINIO"; then
+        certbot delete --cert-name "$DOMINIO" --non-interactive 2>&1 || \
+            echo "$LOG_TAG ⚠️ No pude borrar el cert de $DOMINIO con certbot"
+        echo "$LOG_TAG ✓ Cert SSL borrado para $DOMINIO"
+    fi
+
+    # 5. Marcar como hecho
+    mv "$FLAG" "$FLAG.done"
+    echo "$LOG_TAG ✅ $DOMINIO ELIMINADO completamente"
+done
+
+# ─── B) APLICAR tenants nuevos/re-configurados (.conf.pending) ──────
 for FLAG in "$PENDING_DIR"/*.conf.pending; do
     CONF="${FLAG%.pending}"
     DOMINIO=$(basename "$CONF" .conf)

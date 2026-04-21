@@ -397,6 +397,87 @@ class Index extends Component
         $this->subdomTenantId     = null;
     }
 
+    // ─────────────────────────────────────────────────────────────────
+    // 🗑️  ELIMINACIÓN DEFINITIVA (con doble confirmación por nombre)
+    // ─────────────────────────────────────────────────────────────────
+    public bool   $eliminarModalAbierto = false;
+    public ?int   $eliminarTenantId     = null;
+    public string $eliminarTenantNombre = '';
+    public string $eliminarTenantSlug   = '';
+    public string $eliminarConfirmacion = '';
+    public bool   $eliminarCorriendo    = false;
+    public string $eliminarLog          = '';
+
+    public function abrirModalEliminar(int $id): void
+    {
+        $t = app(TenantManager::class)->withoutTenant(fn () => Tenant::find($id));
+        if (!$t) return;
+
+        $this->eliminarModalAbierto = true;
+        $this->eliminarTenantId     = $t->id;
+        $this->eliminarTenantNombre = $t->nombre;
+        $this->eliminarTenantSlug   = $t->slug;
+        $this->eliminarConfirmacion = '';
+        $this->eliminarCorriendo    = false;
+        $this->eliminarLog          = '';
+    }
+
+    public function cerrarModalEliminar(): void
+    {
+        $this->eliminarModalAbierto = false;
+        $this->eliminarTenantId     = null;
+        $this->eliminarTenantNombre = '';
+        $this->eliminarTenantSlug   = '';
+        $this->eliminarConfirmacion = '';
+        $this->eliminarCorriendo    = false;
+        $this->eliminarLog          = '';
+    }
+
+    /**
+     * Ejecuta la eliminación definitiva.
+     * Requiere que el super-admin haya tipeado EXACTAMENTE el nombre del tenant.
+     */
+    public function confirmarEliminacion(): void
+    {
+        if (!$this->eliminarTenantId) return;
+
+        // Validar que tipeó el nombre exacto (sensible a mayúsculas para máxima seguridad)
+        if (trim($this->eliminarConfirmacion) !== trim($this->eliminarTenantNombre)) {
+            $this->dispatch('notify', [
+                'type'    => 'error',
+                'message' => '⛔ El texto no coincide con el nombre del tenant. Tipea exactamente: ' . $this->eliminarTenantNombre,
+            ]);
+            return;
+        }
+
+        $this->eliminarCorriendo = true;
+        $this->eliminarLog = "Iniciando eliminación de '{$this->eliminarTenantNombre}'...\n\n";
+
+        try {
+            $exit = Artisan::call('tenants:eliminar-definitivo', [
+                'slug'    => $this->eliminarTenantSlug,
+                '--force' => true,
+            ]);
+            $this->eliminarLog .= Artisan::output();
+            $this->eliminarLog .= "\n" . ($exit === 0 ? '✅ Eliminación exitosa.' : '❌ Hubo errores. Revisa el log.');
+
+            if ($exit === 0) {
+                $this->dispatch('notify', [
+                    'type'    => 'success',
+                    'message' => "🗑️  Tenant '{$this->eliminarTenantNombre}' eliminado definitivamente.",
+                ]);
+            }
+        } catch (\Throwable $e) {
+            $this->eliminarLog .= "\n❌ Excepción: " . $e->getMessage();
+            $this->dispatch('notify', [
+                'type'    => 'error',
+                'message' => '❌ Error: ' . $e->getMessage(),
+            ]);
+        }
+
+        $this->eliminarCorriendo = false;
+    }
+
     public function dejarImpersonar(): void
     {
         session()->forget('tenant_imitado_id');

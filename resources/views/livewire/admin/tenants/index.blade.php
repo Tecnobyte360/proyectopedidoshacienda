@@ -233,6 +233,13 @@
                                                 class="h-8 w-8 inline-flex items-center justify-center rounded-lg {{ $t->activo ? 'bg-amber-100 hover:bg-amber-200 text-amber-700' : 'bg-emerald-100 hover:bg-emerald-200 text-emerald-700' }} transition">
                                             <i class="fa-solid {{ $t->activo ? 'fa-pause' : 'fa-play' }} text-xs"></i>
                                         </button>
+
+                                        {{-- 🗑️ Eliminar definitivamente --}}
+                                        <button wire:click="abrirModalEliminar({{ $t->id }})"
+                                                title="ELIMINAR DEFINITIVAMENTE — borra DNS, Nginx, SSL y todos los datos"
+                                                class="h-8 w-8 inline-flex items-center justify-center rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-700 transition">
+                                            <i class="fa-solid fa-trash-can text-xs"></i>
+                                        </button>
                                     </div>
                                 </td>
                             </tr>
@@ -467,6 +474,93 @@
                         </button>
                     </div>
                 </form>
+            </div>
+        </div>
+    @endif
+
+    {{-- 🗑️ MODAL: ELIMINACIÓN DEFINITIVA con tipeo del nombre --}}
+    @if($eliminarModalAbierto)
+        <div class="fixed inset-0 z-50 flex items-center justify-center p-4"
+             style="background: rgba(15,23,42,0.65); backdrop-filter: blur(6px);">
+            <div class="bg-white rounded-2xl shadow-2xl max-w-xl w-full overflow-hidden">
+
+                <div class="px-6 py-4 border-b-2 border-rose-200 bg-gradient-to-r from-rose-50 to-rose-100 flex items-center gap-3">
+                    <div class="h-12 w-12 rounded-2xl bg-rose-500 text-white flex items-center justify-center flex-shrink-0">
+                        <i class="fa-solid fa-triangle-exclamation text-xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-extrabold text-rose-900">Eliminar tenant DEFINITIVAMENTE</h3>
+                        <p class="text-xs text-rose-700">Esta acción NO se puede deshacer.</p>
+                    </div>
+                </div>
+
+                <div class="p-6 space-y-4">
+                    {{-- Lo que se va a eliminar --}}
+                    <div class="rounded-xl border border-rose-200 bg-rose-50/50 p-4">
+                        <div class="text-xs font-bold uppercase text-rose-700 mb-2">Se eliminará TODO esto:</div>
+                        <ul class="text-sm text-slate-700 space-y-1.5">
+                            <li><i class="fa-solid fa-circle-xmark text-rose-500 w-5"></i> Tenant <strong>{{ $eliminarTenantNombre }}</strong></li>
+                            <li><i class="fa-solid fa-circle-xmark text-rose-500 w-5"></i> Subdominio <code class="bg-white px-1.5 rounded text-xs">{{ $eliminarTenantSlug }}.tecnobyte360.com</code></li>
+                            <li><i class="fa-solid fa-circle-xmark text-rose-500 w-5"></i> Registro DNS en Hostinger</li>
+                            <li><i class="fa-solid fa-circle-xmark text-rose-500 w-5"></i> Configuración Nginx + certificado SSL</li>
+                            <li><i class="fa-solid fa-circle-xmark text-rose-500 w-5"></i> TODOS los datos: pedidos, clientes, productos, usuarios, sedes, pagos, suscripciones</li>
+                        </ul>
+                    </div>
+
+                    @if(!$eliminarCorriendo && !$eliminarLog)
+                        {{-- Doble confirmación: tipeo del nombre --}}
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-700 mb-2">
+                                Para confirmar, escribe el nombre exacto del tenant:
+                            </label>
+                            <div class="text-base font-bold text-rose-700 mb-2 select-all bg-rose-50 px-3 py-2 rounded-lg font-mono">{{ $eliminarTenantNombre }}</div>
+                            <input type="text"
+                                   wire:model.live="eliminarConfirmacion"
+                                   placeholder="Tipea aquí el nombre exacto"
+                                   class="w-full rounded-xl border-2 border-slate-200 focus:border-rose-500 focus:ring-2 focus:ring-rose-200 px-4 py-3 text-sm font-mono"
+                                   autocomplete="off">
+
+                            @if($eliminarConfirmacion && trim($eliminarConfirmacion) !== trim($eliminarTenantNombre))
+                                <p class="text-xs text-rose-600 mt-1">
+                                    <i class="fa-solid fa-xmark"></i> El texto no coincide.
+                                </p>
+                            @elseif($eliminarConfirmacion === $eliminarTenantNombre)
+                                <p class="text-xs text-emerald-600 mt-1">
+                                    <i class="fa-solid fa-check"></i> Confirmación correcta. Puedes eliminar.
+                                </p>
+                            @endif
+                        </div>
+                    @endif
+
+                    {{-- Spinner / log --}}
+                    @if($eliminarCorriendo)
+                        <div class="flex items-center gap-2 text-rose-600 text-sm font-semibold bg-rose-50 px-3 py-2 rounded-lg">
+                            <i class="fa-solid fa-circle-notch fa-spin"></i> Eliminando... no cierres esta ventana.
+                        </div>
+                    @endif
+
+                    @if($eliminarLog)
+                        <pre class="bg-slate-900 text-rose-200 text-xs p-4 rounded-lg max-h-72 overflow-auto whitespace-pre-wrap">{{ $eliminarLog }}</pre>
+                    @endif
+                </div>
+
+                <div class="px-6 py-4 border-t border-slate-200 bg-slate-50 flex justify-between gap-2">
+                    <button wire:click="cerrarModalEliminar"
+                            class="px-4 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm font-semibold">
+                        {{ $eliminarLog ? 'Cerrar' : 'Cancelar' }}
+                    </button>
+
+                    @if(!$eliminarLog)
+                        <button wire:click="confirmarEliminacion"
+                                wire:loading.attr="disabled"
+                                wire:target="confirmarEliminacion"
+                                @disabled(trim($eliminarConfirmacion) !== trim($eliminarTenantNombre) || $eliminarCorriendo)
+                                class="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-rose-500 hover:bg-rose-600 text-white text-sm font-bold transition disabled:opacity-40 disabled:cursor-not-allowed">
+                            <i class="fa-solid fa-trash-can"></i>
+                            ELIMINAR DEFINITIVAMENTE
+                        </button>
+                    @endif
+                </div>
             </div>
         </div>
     @endif

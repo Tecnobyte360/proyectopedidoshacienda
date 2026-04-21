@@ -33,9 +33,9 @@ echo "[watcher] Iniciado. Vigilando $PENDING_DIR"
 # Loop reactivo: cada vez que se cierra un archivo escrito (close_write) o se mueve a este dir
 inotifywait -m -e close_write,moved_to --format '%f' "$PENDING_DIR" | while read FILE; do
     case "$FILE" in
-        *.conf.pending)
-            echo "[watcher] Detectado nuevo: $FILE"
-            # Pequeño delay para asegurar que el .conf también está escrito
+        *.conf.pending|*.conf.delete)
+            echo "[watcher] Detectado: $FILE"
+            # Pequeño delay para asegurar que el archivo está completo
             sleep 1
             "$APLICAR" || echo "[watcher] aplicar-tenant-subdomain.sh devolvió error"
             ;;
