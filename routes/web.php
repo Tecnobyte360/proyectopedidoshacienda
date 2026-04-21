@@ -108,7 +108,11 @@ Route::middleware(['solo_principal'])->group(function () {
         session()->forget('tenant_imitado_id');
         session()->save();
         return redirect()->route('admin.tenants.index')
-            ->with('info', '✓ Volviste al modo super-admin.');
+            ->with('info', '✓ Volviste al modo super-admin.')
+            ->withHeaders([
+                'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
+                'Pragma'        => 'no-cache',
+            ]);
     })->middleware('permission:tenants.gestionar')->name('admin.dejar-impersonar');
 });
 

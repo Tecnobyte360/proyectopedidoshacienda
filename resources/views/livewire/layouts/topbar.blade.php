@@ -87,7 +87,9 @@
 
             {{-- 🎭 Botón compacto: salir de impersonación --}}
             @if($tenantImitado)
-                <form method="POST" action="{{ url('/admin/dejar-impersonar') }}" class="inline-block">
+                <form method="POST" action="{{ url('/admin/dejar-impersonar') }}"
+                      class="inline-block"
+                      onsubmit="setTimeout(() => window.location.href='{{ url('/admin/tenants') }}?_=' + Date.now(), 50);">
                     @csrf
                     <button type="submit"
                             title="Estás viendo como '{{ $tenantImitado->nombre }}'. Click para volver al super-admin."

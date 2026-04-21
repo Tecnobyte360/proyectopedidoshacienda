@@ -87,136 +87,170 @@
             </div>
         </div>
 
-        {{-- LISTADO --}}
-        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-            @forelse($tenants as $t)
-                @php
-                    $planColors = [
-                        'basico'  => ['bg' => 'bg-slate-100', 'text' => 'text-slate-700', 'border' => 'border-slate-200'],
-                        'pro'     => ['bg' => 'bg-blue-100', 'text' => 'text-blue-700', 'border' => 'border-blue-200'],
-                        'empresa' => ['bg' => 'bg-violet-100', 'text' => 'text-violet-700', 'border' => 'border-violet-200'],
-                    ];
-                    $pc = $planColors[$t->plan] ?? $planColors['basico'];
-                @endphp
-                <div class="rounded-2xl bg-white border-2 {{ $t->activo ? 'border-slate-200' : 'border-rose-200 opacity-75' }} shadow-sm overflow-hidden hover:shadow-lg transition">
-                    {{-- Header con color del tenant --}}
-                    <div class="p-4 text-white" style="background: linear-gradient(135deg, {{ $t->color_primario }}, {{ $t->color_secundario }});">
-                        <div class="flex items-start justify-between">
-                            <div class="flex items-center gap-3 min-w-0">
-                                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-white/20 backdrop-blur-sm font-extrabold">
-                                    {{ strtoupper(substr($t->nombre, 0, 1)) }}
-                                </div>
-                                <div class="min-w-0">
-                                    <h3 class="font-extrabold truncate">{{ $t->nombre }}</h3>
-                                    <p class="text-xs text-white/80 font-mono truncate">@/{{ $t->slug }}</p>
-                                </div>
-                            </div>
-                            <span class="text-[10px] font-bold uppercase px-2 py-1 rounded-full bg-white/20 backdrop-blur-sm capitalize">
-                                {{ $t->plan }}
-                            </span>
-                        </div>
-                    </div>
+        {{-- TABLA --}}
+        <div class="rounded-2xl bg-white border border-slate-200 shadow-sm overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-slate-50 border-b border-slate-200">
+                        <tr class="text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                            <th class="px-4 py-3">Empresa</th>
+                            <th class="px-4 py-3">Plan</th>
+                            <th class="px-4 py-3">Estado</th>
+                            <th class="px-4 py-3">Suscripción</th>
+                            <th class="px-4 py-3 text-center">Usuarios</th>
+                            <th class="px-4 py-3 text-center">Pedidos</th>
+                            <th class="px-4 py-3">Subdominio</th>
+                            <th class="px-4 py-3 text-right">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        @forelse($tenants as $t)
+                            @php
+                                $planBadge = [
+                                    'basico'  => 'bg-slate-100 text-slate-700',
+                                    'pro'     => 'bg-blue-100 text-blue-700',
+                                    'empresa' => 'bg-violet-100 text-violet-700',
+                                ][$t->plan] ?? 'bg-slate-100 text-slate-700';
 
-                    <div class="p-5 space-y-3">
-                        {{-- Estado --}}
-                        <div class="flex items-center justify-between">
-                            @if($t->activo)
-                                <span class="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700">
-                                    <i class="fa-solid fa-circle text-[8px]"></i> Activo
-                                </span>
-                            @else
-                                <span class="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-rose-100 text-rose-700">
-                                    <i class="fa-solid fa-circle text-[8px]"></i> Suspendido
-                                </span>
-                            @endif
+                                $dominio = $t->slug . '.tecnobyte360.com';
+                            @endphp
+                            <tr class="hover:bg-slate-50/80 transition {{ !$t->activo ? 'opacity-60 bg-rose-50/30' : '' }}">
+                                {{-- EMPRESA --}}
+                                <td class="px-4 py-3">
+                                    <div class="flex items-center gap-3 min-w-0">
+                                        <div class="h-10 w-10 rounded-xl flex items-center justify-center text-white font-extrabold text-sm flex-shrink-0 overflow-hidden"
+                                             style="background: linear-gradient(135deg, {{ $t->color_primario }}, {{ $t->color_secundario }});">
+                                            @if($t->logo_url)
+                                                <img src="{{ $t->logo_url }}" class="h-full w-full object-contain" alt="logo">
+                                            @else
+                                                {{ strtoupper(substr($t->nombre, 0, 1)) }}
+                                            @endif
+                                        </div>
+                                        <div class="min-w-0">
+                                            <div class="font-bold text-slate-800 truncate">{{ $t->nombre }}</div>
+                                            <div class="text-xs text-slate-500 font-mono truncate">@/{{ $t->slug }}</div>
+                                            @if($t->contacto_email)
+                                                <div class="text-[11px] text-slate-400 truncate">
+                                                    <i class="fa-solid fa-envelope text-[9px]"></i> {{ $t->contacto_email }}
+                                                </div>
+                                            @endif
+                                        </div>
+                                    </div>
+                                </td>
 
-                            @if($t->trial_ends_at && $t->trial_ends_at->isFuture())
-                                <span class="text-[10px] font-bold px-2 py-1 rounded-full bg-blue-100 text-blue-700">
-                                    Trial · {{ $t->trial_ends_at->diffForHumans() }}
-                                </span>
-                            @elseif($t->subscription_ends_at)
-                                @if($t->subscription_ends_at->isPast())
-                                    <span class="text-[10px] font-bold px-2 py-1 rounded-full bg-rose-100 text-rose-700">
-                                        Vencido {{ $t->subscription_ends_at->diffForHumans() }}
+                                {{-- PLAN --}}
+                                <td class="px-4 py-3">
+                                    <span class="text-[11px] font-bold uppercase px-2 py-1 rounded-full {{ $planBadge }}">
+                                        {{ $t->plan }}
                                     </span>
-                                @else
-                                    <span class="text-[10px] text-slate-500">
-                                        Vence {{ $t->subscription_ends_at->format('d/m/Y') }}
-                                    </span>
-                                @endif
-                            @endif
-                        </div>
+                                </td>
 
-                        {{-- Métricas --}}
-                        <div class="grid grid-cols-3 gap-2 text-center pt-2 border-t border-slate-100">
-                            <div>
-                                <div class="text-lg font-extrabold text-slate-800">{{ $t->users_count }}</div>
-                                <div class="text-[10px] uppercase tracking-wide text-slate-500">Usuarios</div>
-                            </div>
-                            <div>
-                                <div class="text-lg font-extrabold text-slate-800">{{ $t->pedidos_count }}</div>
-                                <div class="text-[10px] uppercase tracking-wide text-slate-500">Pedidos</div>
-                            </div>
-                            <div>
-                                <div class="text-lg font-extrabold text-slate-800">{{ $t->clientes_count }}</div>
-                                <div class="text-[10px] uppercase tracking-wide text-slate-500">Clientes</div>
-                            </div>
-                        </div>
+                                {{-- ESTADO --}}
+                                <td class="px-4 py-3">
+                                    @if($t->activo)
+                                        <span class="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700">
+                                            <i class="fa-solid fa-circle text-[8px]"></i> Activo
+                                        </span>
+                                    @else
+                                        <span class="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-rose-100 text-rose-700">
+                                            <i class="fa-solid fa-pause text-[9px]"></i> Suspendido
+                                        </span>
+                                    @endif
+                                </td>
 
-                        {{-- Contacto --}}
-                        @if($t->contacto_email)
-                            <div class="rounded-xl bg-slate-50 px-3 py-2 text-xs">
-                                <div class="font-semibold text-slate-700">{{ $t->contacto_nombre ?: 'Sin nombre' }}</div>
-                                <div class="text-slate-500 truncate">
-                                    <i class="fa-solid fa-envelope text-[10px]"></i> {{ $t->contacto_email }}
-                                </div>
-                            </div>
-                        @endif
+                                {{-- SUSCRIPCIÓN --}}
+                                <td class="px-4 py-3 text-xs">
+                                    @if($t->trial_ends_at && $t->trial_ends_at->isFuture())
+                                        <span class="font-bold px-2 py-1 rounded-full bg-blue-100 text-blue-700">
+                                            Trial · {{ $t->trial_ends_at->diffForHumans() }}
+                                        </span>
+                                    @elseif($t->subscription_ends_at)
+                                        @if($t->subscription_ends_at->isPast())
+                                            <span class="font-bold px-2 py-1 rounded-full bg-rose-100 text-rose-700">
+                                                Vencido {{ $t->subscription_ends_at->diffForHumans() }}
+                                            </span>
+                                        @else
+                                            <div class="text-slate-700 font-medium">{{ $t->subscription_ends_at->format('d/m/Y') }}</div>
+                                            <div class="text-[10px] text-slate-400">{{ $t->subscription_ends_at->diffForHumans() }}</div>
+                                        @endif
+                                    @else
+                                        <span class="text-slate-400">—</span>
+                                    @endif
+                                </td>
 
-                        {{-- Acciones --}}
-                        <div class="flex flex-wrap gap-2 pt-2">
-                            <button wire:click="impersonar({{ $t->id }})"
-                                    class="flex-1 text-xs font-bold px-3 py-2 rounded-lg bg-violet-500 hover:bg-violet-600 text-white transition">
-                                <i class="fa-solid fa-mask"></i> Ver como
-                            </button>
-                            <button wire:click="abrirModalEditar({{ $t->id }})"
-                                    class="text-xs font-bold px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition">
-                                <i class="fa-solid fa-pen-to-square"></i>
-                            </button>
-                            <button wire:click="toggleActivo({{ $t->id }})"
-                                    class="text-xs font-bold px-3 py-2 rounded-lg {{ $t->activo ? 'bg-amber-100 hover:bg-amber-200 text-amber-700' : 'bg-emerald-100 hover:bg-emerald-200 text-emerald-700' }} transition">
-                                <i class="fa-solid {{ $t->activo ? 'fa-pause' : 'fa-play' }}"></i>
-                            </button>
-                        </div>
+                                {{-- USUARIOS --}}
+                                <td class="px-4 py-3 text-center font-bold text-slate-700">{{ $t->users_count }}</td>
 
-                        {{-- Subdominio --}}
-                        <div class="pt-2">
-                            <button wire:click="configurarSubdominio({{ $t->id }})"
-                                    wire:loading.attr="disabled"
-                                    wire:target="configurarSubdominio({{ $t->id }})"
-                                    class="w-full text-xs font-bold px-3 py-2 rounded-lg bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white transition disabled:opacity-50">
-                                <span wire:loading.remove wire:target="configurarSubdominio({{ $t->id }})">
-                                    <i class="fa-solid fa-rocket"></i> Configurar subdominio
-                                </span>
-                                <span wire:loading wire:target="configurarSubdominio({{ $t->id }})">
-                                    <i class="fa-solid fa-circle-notch fa-spin"></i> Configurando... (puede tardar 1–2 min)
-                                </span>
-                            </button>
-                            <p class="text-[10px] text-slate-400 mt-1 text-center">
-                                Crea DNS en Hostinger + Nginx + SSL automáticamente
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            @empty
-                <div class="md:col-span-2 xl:col-span-3 rounded-2xl bg-white border border-slate-200 p-12 text-center">
-                    <div class="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-slate-400 mb-4">
-                        <i class="fa-solid fa-building text-2xl"></i>
-                    </div>
-                    <p class="text-lg font-semibold text-slate-700">Sin tenants</p>
-                    <p class="text-sm text-slate-500">Crea el primer tenant con el botón de arriba.</p>
-                </div>
-            @endforelse
+                                {{-- PEDIDOS --}}
+                                <td class="px-4 py-3 text-center font-bold text-slate-700">{{ $t->pedidos_count }}</td>
+
+                                {{-- SUBDOMINIO --}}
+                                <td class="px-4 py-3">
+                                    <a href="https://{{ $dominio }}" target="_blank"
+                                       class="text-xs text-[#a85f24] hover:underline font-medium inline-flex items-center gap-1">
+                                        <i class="fa-solid fa-globe text-[10px]"></i>
+                                        {{ $dominio }}
+                                        <i class="fa-solid fa-arrow-up-right-from-square text-[9px] opacity-60"></i>
+                                    </a>
+                                    <div class="mt-1">
+                                        <button wire:click="configurarSubdominio({{ $t->id }})"
+                                                wire:loading.attr="disabled"
+                                                wire:target="configurarSubdominio({{ $t->id }})"
+                                                class="text-[10px] font-bold px-2 py-1 rounded-md bg-sky-100 hover:bg-sky-200 text-sky-700 transition disabled:opacity-50">
+                                            <span wire:loading.remove wire:target="configurarSubdominio({{ $t->id }})">
+                                                <i class="fa-solid fa-rotate"></i> Re-configurar
+                                            </span>
+                                            <span wire:loading wire:target="configurarSubdominio({{ $t->id }})">
+                                                <i class="fa-solid fa-circle-notch fa-spin"></i> ...
+                                            </span>
+                                        </button>
+                                    </div>
+                                </td>
+
+                                {{-- ACCIONES --}}
+                                <td class="px-4 py-3">
+                                    <div class="flex items-center justify-end gap-1">
+                                        <button wire:click="impersonar({{ $t->id }})"
+                                                title="Ver la plataforma como esta empresa"
+                                                class="h-8 w-8 inline-flex items-center justify-center rounded-lg bg-violet-100 hover:bg-violet-200 text-violet-700 transition">
+                                            <i class="fa-solid fa-mask text-xs"></i>
+                                        </button>
+                                        <button wire:click="abrirModalEditar({{ $t->id }})"
+                                                title="Editar tenant"
+                                                class="h-8 w-8 inline-flex items-center justify-center rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition">
+                                            <i class="fa-solid fa-pen-to-square text-xs"></i>
+                                        </button>
+                                        <button @click.prevent="$dispatch('confirm-show', {
+                                                    title: '{{ $t->activo ? '¿Suspender' : '¿Reactivar' }} tenant?',
+                                                    message: '{{ $t->activo
+                                                        ? 'Suspender ' . $t->nombre . '. Sus usuarios no podrán entrar al panel hasta que lo reactives. Los datos NO se borran.'
+                                                        : 'Reactivar ' . $t->nombre . '. Sus usuarios podrán volver a entrar.' }}',
+                                                    confirmText: '{{ $t->activo ? 'Sí, suspender' : 'Sí, reactivar' }}',
+                                                    type: '{{ $t->activo ? 'danger' : 'success' }}',
+                                                    onConfirm: () => $wire.toggleActivo({{ $t->id }}),
+                                                })"
+                                                title="{{ $t->activo ? 'Suspender' : 'Reactivar' }} tenant"
+                                                class="h-8 w-8 inline-flex items-center justify-center rounded-lg {{ $t->activo ? 'bg-amber-100 hover:bg-amber-200 text-amber-700' : 'bg-emerald-100 hover:bg-emerald-200 text-emerald-700' }} transition">
+                                            <i class="fa-solid {{ $t->activo ? 'fa-pause' : 'fa-play' }} text-xs"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="8" class="px-4 py-12 text-center">
+                                    <div class="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-slate-400 mb-3">
+                                        <i class="fa-solid fa-building text-2xl"></i>
+                                    </div>
+                                    <p class="text-base font-semibold text-slate-700">Sin tenants</p>
+                                    <p class="text-sm text-slate-500">Crea la primera empresa con el botón "Nuevo tenant" arriba.</p>
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </div>
         </div>
 
         <div>{{ $tenants->links() }}</div>
