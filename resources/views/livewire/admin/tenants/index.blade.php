@@ -408,10 +408,11 @@
         </div>
     @endif
 
-    {{-- MODAL: log del setup de subdominio --}}
+    {{-- MODAL: log del setup de subdominio (con polling reactivo) --}}
     @if($subdomModalAbierto)
         <div class="fixed inset-0 z-50 flex items-center justify-center p-4"
-             style="background: rgba(15,23,42,0.55); backdrop-filter: blur(4px);">
+             style="background: rgba(15,23,42,0.55); backdrop-filter: blur(4px);"
+             @if($subdomCorriendo) wire:poll.2s="chequearEstadoSubdominio" @endif>
             <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden">
                 <div class="flex items-center justify-between px-5 py-4 border-b border-slate-200 bg-gradient-to-r from-sky-50 to-blue-50">
                     <div>
@@ -419,7 +420,7 @@
                             <i class="fa-solid fa-rocket text-sky-600"></i>
                             Setup de subdominio
                         </h3>
-                        <p class="text-xs text-slate-500">Tenant: {{ $subdomTenantNombre }}</p>
+                        <p class="text-xs text-slate-500">{{ $subdomTenantNombre }} — {{ $subdomDominio }}</p>
                     </div>
                     <button wire:click="cerrarSubdomModal"
                             class="h-9 w-9 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600">
@@ -428,16 +429,66 @@
                 </div>
 
                 <div class="p-5">
+                    {{-- Stepper visual --}}
+                    <div class="flex items-center justify-between mb-4 text-xs font-semibold">
+                        <div class="flex items-center gap-2 {{ in_array($subdomEstado, ['pendiente','aplicado']) || $subdomExito ? 'text-emerald-600' : ($subdomEstado === 'error' ? 'text-rose-600' : 'text-slate-400') }}">
+                            <div class="h-7 w-7 rounded-full flex items-center justify-center
+                                        {{ $subdomCorriendo ? 'bg-sky-100 text-sky-600' : ($subdomExito ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600') }}">
+                                @if($subdomCorriendo)
+                                    <i class="fa-solid fa-circle-notch fa-spin text-xs"></i>
+                                @elseif($subdomExito)
+                                    <i class="fa-solid fa-check text-xs"></i>
+                                @else
+                                    <i class="fa-solid fa-xmark text-xs"></i>
+                                @endif
+                            </div>
+                            <span>1. DNS Hostinger</span>
+                        </div>
+
+                        <div class="flex-1 h-0.5 bg-slate-200 mx-2"></div>
+
+                        <div class="flex items-center gap-2 {{ $subdomEstado === 'aplicado' ? 'text-emerald-600' : ($subdomEstado === 'error' ? 'text-rose-600' : 'text-slate-400') }}">
+                            <div class="h-7 w-7 rounded-full flex items-center justify-center
+                                        {{ $subdomEstado === 'aplicado' ? 'bg-emerald-100 text-emerald-600' : ($subdomEstado === 'error' ? 'bg-rose-100 text-rose-600' : ($subdomCorriendo ? 'bg-sky-100 text-sky-600' : 'bg-slate-100 text-slate-400')) }}">
+                                @if($subdomEstado === 'aplicado')
+                                    <i class="fa-solid fa-check text-xs"></i>
+                                @elseif($subdomEstado === 'error')
+                                    <i class="fa-solid fa-xmark text-xs"></i>
+                                @elseif($subdomCorriendo)
+                                    <i class="fa-solid fa-circle-notch fa-spin text-xs"></i>
+                                @else
+                                    <i class="fa-solid fa-clock text-xs"></i>
+                                @endif
+                            </div>
+                            <span>2. Nginx + SSL</span>
+                        </div>
+
+                        <div class="flex-1 h-0.5 bg-slate-200 mx-2"></div>
+
+                        <div class="flex items-center gap-2 {{ $subdomExito ? 'text-emerald-600' : 'text-slate-400' }}">
+                            <div class="h-7 w-7 rounded-full flex items-center justify-center
+                                        {{ $subdomExito ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400' }}">
+                                <i class="fa-solid {{ $subdomExito ? 'fa-globe' : 'fa-clock' }} text-xs"></i>
+                            </div>
+                            <span>3. Operativo</span>
+                        </div>
+                    </div>
+
                     @if($subdomCorriendo)
-                        <div class="flex items-center gap-2 text-sky-600 text-sm font-semibold mb-3">
-                            <i class="fa-solid fa-circle-notch fa-spin"></i> Procesando... no cierres esta ventana.
+                        <div class="flex items-center gap-2 text-sky-600 text-sm font-semibold mb-3 bg-sky-50 px-3 py-2 rounded-lg">
+                            <i class="fa-solid fa-circle-notch fa-spin"></i>
+                            Procesando... esto suele tardar 5–30 segundos.
                         </div>
                     @elseif($subdomExito)
-                        <div class="flex items-center gap-2 text-emerald-600 text-sm font-semibold mb-3">
-                            <i class="fa-solid fa-check-circle"></i> ¡Listo! El subdominio está operativo.
+                        <div class="flex items-center justify-between gap-2 text-emerald-700 text-sm font-semibold mb-3 bg-emerald-50 px-3 py-2 rounded-lg">
+                            <span><i class="fa-solid fa-check-circle"></i> ¡Listo! El subdominio está operativo con SSL.</span>
+                            <a href="https://{{ $subdomDominio }}" target="_blank"
+                               class="inline-flex items-center gap-1 px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs">
+                                <i class="fa-solid fa-arrow-up-right-from-square"></i> Abrir sitio
+                            </a>
                         </div>
                     @else
-                        <div class="flex items-center gap-2 text-rose-600 text-sm font-semibold mb-3">
+                        <div class="flex items-center gap-2 text-rose-600 text-sm font-semibold mb-3 bg-rose-50 px-3 py-2 rounded-lg">
                             <i class="fa-solid fa-triangle-exclamation"></i> Hubo errores. Revisa el log.
                         </div>
                     @endif

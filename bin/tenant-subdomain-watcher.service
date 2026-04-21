@@ -1,0 +1,15 @@
+[Unit]
+Description=TecnoByte360 - Watcher reactivo de subdominios de tenants
+After=network.target nginx.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/tenant-subdomain-watcher.sh
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/log/tenant-subdomain-watcher.log
+StandardError=append:/var/log/tenant-subdomain-watcher.log
+User=root
+
+[Install]
+WantedBy=multi-user.target

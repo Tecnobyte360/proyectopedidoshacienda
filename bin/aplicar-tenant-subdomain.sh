@@ -80,6 +80,8 @@ for FLAG in "$PENDING_DIR"/*.conf.pending; do
             echo "$LOG_TAG ✓ SSL OK para $DOMINIO"
         else
             echo "$LOG_TAG ⚠️ Certbot falló para $DOMINIO (revisa manualmente)"
+            mv "$FLAG" "$FLAG.error"
+            continue
         fi
     else
         echo "$LOG_TAG ⏭️ no_ssl=true, saltando certbot"

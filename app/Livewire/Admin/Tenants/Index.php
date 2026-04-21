@@ -25,9 +25,13 @@ class Index extends Component
     public bool   $subdomModalAbierto = false;
     public ?int   $subdomTenantId     = null;
     public string $subdomTenantNombre = '';
+    public string $subdomTenantSlug   = '';
+    public string $subdomDominio      = '';
     public string $subdomLog          = '';
     public bool   $subdomCorriendo    = false;
     public bool   $subdomExito        = false;
+    public string $subdomEstado       = 'pendiente'; // pendiente|aplicado|error
+    public ?int   $subdomIniciadoTs   = null;
 
     public string $nombre              = '';
     public string $slug                = '';
@@ -246,12 +250,18 @@ class Index extends Component
             return;
         }
 
+        $base = config('app.tenant_base_domain', 'tecnobyte360.com');
+
         $this->subdomModalAbierto = true;
         $this->subdomTenantId     = $tenant->id;
         $this->subdomTenantNombre = $tenant->nombre;
+        $this->subdomTenantSlug   = $tenant->slug;
+        $this->subdomDominio      = "{$tenant->slug}.{$base}";
         $this->subdomCorriendo    = true;
         $this->subdomExito        = false;
-        $this->subdomLog          = "Iniciando setup para {$tenant->slug}.tecnobyte360.com...\n";
+        $this->subdomEstado       = 'pendiente';
+        $this->subdomIniciadoTs   = time();
+        $this->subdomLog          = "[1/3] Iniciando setup para {$this->subdomDominio}...\n";
 
         try {
             $exit = Artisan::call('tenants:setup-subdominio', [
@@ -259,20 +269,76 @@ class Index extends Component
                 '--wait' => 30,
             ]);
             $this->subdomLog .= Artisan::output();
-            $this->subdomExito = ($exit === 0);
+
+            if ($exit !== 0) {
+                $this->subdomExito     = false;
+                $this->subdomCorriendo = false;
+                $this->subdomEstado    = 'error';
+                return;
+            }
+
+            // Laravel terminó OK → ahora esperamos al watcher del host
+            $this->subdomLog .= "\n[2/3] Esperando al watcher del host (Nginx + certbot)...\n";
+            $this->subdomLog .= "      Polling cada 2s del estado...\n";
         } catch (\Throwable $e) {
             $this->subdomLog .= "\n❌ Excepción: " . $e->getMessage();
-            $this->subdomExito = false;
+            $this->subdomExito     = false;
+            $this->subdomCorriendo = false;
+            $this->subdomEstado    = 'error';
+        }
+    }
+
+    /**
+     * Polling llamado desde wire:poll en el modal cada 2s.
+     * Detecta cuando el watcher del host renombra el .pending a .done o .error.
+     */
+    public function chequearEstadoSubdominio(): void
+    {
+        if (!$this->subdomCorriendo || !$this->subdomDominio) return;
+
+        $base = storage_path('app/nginx-tenants');
+        $pending = "{$base}/{$this->subdomDominio}.conf.pending";
+        $done    = "{$base}/{$this->subdomDominio}.conf.pending.done";
+        $error   = "{$base}/{$this->subdomDominio}.conf.pending.error";
+
+        if (file_exists($done)) {
+            $this->subdomCorriendo = false;
+            $this->subdomExito     = true;
+            $this->subdomEstado    = 'aplicado';
+            $this->subdomLog .= "\n[3/3] ✅ El watcher del host aplicó Nginx + SSL correctamente.\n";
+            $this->subdomLog .= "       Sitio operativo: https://{$this->subdomDominio}\n";
+            $this->dispatch('notify', [
+                'type'    => 'success',
+                'message' => "✅ Subdominio operativo: https://{$this->subdomDominio}",
+            ]);
+            return;
         }
 
-        $this->subdomCorriendo = false;
+        if (file_exists($error)) {
+            $this->subdomCorriendo = false;
+            $this->subdomExito     = false;
+            $this->subdomEstado    = 'error';
+            $this->subdomLog .= "\n❌ El watcher del host marcó error. Revisa /var/log/aplicar-tenant.log en el VPS.\n";
+            $this->dispatch('notify', [
+                'type'    => 'error',
+                'message' => "❌ Falló al aplicar Nginx. Revisa logs del host.",
+            ]);
+            return;
+        }
 
-        $this->dispatch('notify', [
-            'type'    => $this->subdomExito ? 'success' : 'error',
-            'message' => $this->subdomExito
-                ? "✅ Subdominio configurado: https://{$tenant->slug}.tecnobyte360.com"
-                : "❌ Hubo errores configurando el subdominio. Revisa el log.",
-        ]);
+        // Aún pending → seguimos esperando
+        if (file_exists($pending)) {
+            $espera = time() - ($this->subdomIniciadoTs ?? time());
+            // Timeout suave de 3 minutos
+            if ($espera > 180) {
+                $this->subdomCorriendo = false;
+                $this->subdomExito     = false;
+                $this->subdomEstado    = 'error';
+                $this->subdomLog .= "\n⏱️ Timeout: el watcher del host no respondió en 3 min.\n";
+                $this->subdomLog .= "   ¿Está corriendo el servicio?  sudo systemctl status tenant-subdomain-watcher\n";
+                return;
+            }
+        }
     }
 
     public function probarHostinger(): void
