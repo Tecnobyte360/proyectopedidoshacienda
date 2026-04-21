@@ -84,7 +84,10 @@
                             'permission' => 'alertas.ver'],
                         ['name' => 'Felicitaciones', 'icon' => 'fa-cake-candles', 'route' => 'felicitaciones.index', 'badge' => null, 'permission' => 'felicitaciones.ver'],
                         ['name' => 'Usuarios',       'icon' => 'fa-users-gear',   'route' => 'usuarios.index',       'badge' => null, 'permission' => 'usuarios.ver'],
-                        ['name' => 'Roles y permisos','icon' => 'fa-shield-halved','route' => 'roles.index',          'badge' => null, 'permission' => 'roles.gestionar'],
+                        // Roles globales — solo visible desde dominio principal (NO en subdominios de tenant)
+                        ...($enSubdominioTenant ? [] : [
+                            ['name' => 'Roles y permisos','icon' => 'fa-shield-halved','route' => 'roles.index', 'badge' => null, 'permission' => 'roles.gestionar'],
+                        ]),
                     ],
                 ],
                 [

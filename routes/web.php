@@ -92,21 +92,22 @@ Route::get('/roles', RolesIndex::class)
     ->middleware(['permission:roles.gestionar', 'solo_principal'])
     ->name('roles.index');
 
-// 🌟 SUPER-ADMIN — solo TecnoByte360 (dueño plataforma)
-Route::get('/admin/tenants',       AdminTenantsIndex::class)->middleware('permission:tenants.gestionar')->name('admin.tenants.index');
-Route::get('/admin/planes',        AdminPlanesIndex::class)->middleware('permission:planes.gestionar')->name('admin.planes.index');
-Route::get('/admin/suscripciones', AdminSuscripcionesIndex::class)->middleware('permission:suscripciones.gestionar')->name('admin.suscripciones.index');
-Route::get('/admin/pagos',         AdminPagosIndex::class)->middleware('permission:pagos.gestionar')->name('admin.pagos.index');
-Route::get('/admin/documentacion', AdminDocumentacion::class)
-    ->middleware('permission:tenants.gestionar')
-    ->name('admin.documentacion');
+// 🌟 SUPER-ADMIN — solo TecnoByte360 (dueño plataforma).
+// Doble blindaje: permiso + middleware "solo_principal" (404 si entran desde subdominio).
+Route::middleware(['solo_principal'])->group(function () {
+    Route::get('/admin/tenants',       AdminTenantsIndex::class)->middleware('permission:tenants.gestionar')->name('admin.tenants.index');
+    Route::get('/admin/planes',        AdminPlanesIndex::class)->middleware('permission:planes.gestionar')->name('admin.planes.index');
+    Route::get('/admin/suscripciones', AdminSuscripcionesIndex::class)->middleware('permission:suscripciones.gestionar')->name('admin.suscripciones.index');
+    Route::get('/admin/pagos',         AdminPagosIndex::class)->middleware('permission:pagos.gestionar')->name('admin.pagos.index');
+    Route::get('/admin/documentacion', AdminDocumentacion::class)->middleware('permission:tenants.gestionar')->name('admin.documentacion');
 
-// 🎭 Salir del modo impersonación (vuelve al super-admin)
-Route::get('/admin/dejar-impersonar', function () {
-    session()->forget('tenant_imitado_id');
-    return redirect()->route('admin.tenants.index')
-        ->with('info', 'Volviste al modo super-admin.');
-})->middleware('permission:tenants.gestionar')->name('admin.dejar-impersonar');
+    // 🎭 Salir del modo impersonación (vuelve al super-admin)
+    Route::get('/admin/dejar-impersonar', function () {
+        session()->forget('tenant_imitado_id');
+        return redirect()->route('admin.tenants.index')
+            ->with('info', 'Volviste al modo super-admin.');
+    })->middleware('permission:tenants.gestionar')->name('admin.dejar-impersonar');
+});
 
 }); // fin auth group
 
