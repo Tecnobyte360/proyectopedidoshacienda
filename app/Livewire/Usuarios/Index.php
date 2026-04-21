@@ -4,6 +4,7 @@ namespace App\Livewire\Usuarios;
 
 use App\Models\Sede;
 use App\Models\User;
+use App\Services\TenantManager;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -36,7 +37,8 @@ class Index extends Component
 
     public function abrirModalEditar(int $id): void
     {
-        $u = User::with('roles')->findOrFail($id);
+        // Sólo permite editar users del mismo tenant
+        $u = $this->aplicarFiltroTenant(User::with('roles'))->findOrFail($id);
 
         $this->editandoId = $u->id;
         $this->name       = $u->name;
@@ -81,6 +83,13 @@ class Index extends Component
             $data['password'] = Hash::make($data['password']);
         }
 
+        // 🔒 Multi-tenant: si NO estoy editando, asigno el tenant actual.
+        // Así el admin de un tenant nunca puede crear users en otro tenant.
+        if (!$this->editandoId) {
+            $tenantId = app(TenantManager::class)->id();
+            $data['tenant_id'] = $tenantId;  // null si es super-admin sin tenant
+        }
+
         $user = User::updateOrCreate(['id' => $this->editandoId], $data);
         $user->syncRoles([$rol]);
 
@@ -93,8 +102,11 @@ class Index extends Component
 
     public function toggleActivo(int $id): void
     {
-        $u = User::find($id);
-        if (!$u) return;
+        $u = $this->aplicarFiltroTenant(User::query())->find($id);
+        if (!$u) {
+            $this->dispatch('notify', ['type' => 'warning', 'message' => 'Usuario no encontrado o pertenece a otro tenant.']);
+            return;
+        }
 
         // No permitir desactivarse a sí mismo
         if ($u->id === auth()->id()) {
@@ -113,7 +125,14 @@ class Index extends Component
             return;
         }
 
-        User::where('id', $id)->delete();
+        // Sólo permite borrar users del mismo tenant
+        $u = $this->aplicarFiltroTenant(User::query())->find($id);
+        if (!$u) {
+            $this->dispatch('notify', ['type' => 'warning', 'message' => 'Usuario no encontrado o pertenece a otro tenant.']);
+            return;
+        }
+
+        $u->delete();
         $this->dispatch('notify', ['type' => 'success', 'message' => 'Usuario eliminado.']);
     }
 
@@ -130,9 +149,22 @@ class Index extends Component
         $this->resetValidation();
     }
 
+    /**
+     * Aplica el filtro multi-tenant a una query de Users:
+     *  - Si hay tenant activo (subdominio o impersonando) → filtra por tenant_id
+     *  - Si no hay tenant (super-admin en dominio principal) → ve solo super-admins (tenant_id NULL)
+     */
+    private function aplicarFiltroTenant(\Illuminate\Database\Eloquent\Builder $q): \Illuminate\Database\Eloquent\Builder
+    {
+        $tenantId = app(TenantManager::class)->id();
+        return $tenantId
+            ? $q->where('users.tenant_id', $tenantId)
+            : $q->whereNull('users.tenant_id');
+    }
+
     public function render()
     {
-        $usuarios = User::with(['roles', 'sede'])
+        $usuarios = $this->aplicarFiltroTenant(User::with(['roles', 'sede']))
             ->when($this->busqueda, function ($q) {
                 $b = $this->busqueda;
                 $q->where(fn ($qq) => $qq->where('name', 'like', "%{$b}%")
@@ -142,10 +174,10 @@ class Index extends Component
             ->paginate(20);
 
         $kpis = [
-            'total'    => User::count(),
-            'activos'  => User::where('activo', true)->count(),
-            'inactivos'=> User::where('activo', false)->count(),
-            'admins'   => User::role('admin')->count(),
+            'total'    => $this->aplicarFiltroTenant(User::query())->count(),
+            'activos'  => $this->aplicarFiltroTenant(User::query())->where('activo', true)->count(),
+            'inactivos'=> $this->aplicarFiltroTenant(User::query())->where('activo', false)->count(),
+            'admins'   => $this->aplicarFiltroTenant(User::role('admin'))->count(),
         ];
 
         return view('livewire.usuarios.index', [

@@ -8,6 +8,14 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Spatie\Permission\Traits\HasRoles;
 
+/**
+ * Multi-tenant en User:
+ *  - NO usamos BelongsToTenant aquí porque rompe el login del super-admin
+ *    desde subdominios (el scope filtraría users.tenant_id=X y excluiría
+ *    a los super-admins con tenant_id=NULL).
+ *  - El filtrado se hace MANUALMENTE en cada componente Livewire que liste
+ *    usuarios (ej: Usuarios\Index, Roles\Index) usando el TenantManager.
+ */
 class User extends Authenticatable
 {
     use HasFactory, Notifiable, HasRoles;
