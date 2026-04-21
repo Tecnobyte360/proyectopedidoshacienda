@@ -1,23 +1,7 @@
 <div class="min-h-screen bg-slate-50">
     <div class="w-full px-4 py-6 sm:px-6 sm:py-8 lg:px-8 space-y-6">
 
-        @if($tenantImitadoId)
-            <div class="rounded-2xl bg-amber-50 border-2 border-amber-300 p-4 flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                    <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-500 text-white">
-                        <i class="fa-solid fa-mask"></i>
-                    </div>
-                    <div>
-                        <p class="font-bold text-amber-900">Modo impersonación activo</p>
-                        <p class="text-xs text-amber-700">Estás viendo la plataforma como otro tenant. Sal para volver a vista global.</p>
-                    </div>
-                </div>
-                <button wire:click="dejarImpersonar"
-                        class="rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold px-5 py-2.5 transition shadow">
-                    <i class="fa-solid fa-arrow-right-from-bracket mr-1"></i> Salir de impersonación
-                </button>
-            </div>
-        @endif
+        {{-- El banner de impersonación ahora vive en el topbar (visible en TODAS las páginas) --}}
 
         {{-- HEADER --}}
         <div class="rounded-2xl border border-[#fbe9d7] bg-gradient-to-r from-[#fbe9d7]/40 via-white to-white p-5 shadow-sm">

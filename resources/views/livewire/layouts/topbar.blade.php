@@ -52,8 +52,10 @@
                     <div class="text-sm font-extrabold truncate">{{ $tenantImitado->nombre }}</div>
                 </div>
             </div>
-            <a href="{{ route('admin.dejar-impersonar') }}"
-               class="inline-flex items-center gap-2 rounded-xl bg-white text-violet-700 hover:bg-violet-50 font-bold px-4 py-2 text-sm shadow-md transition flex-shrink-0">
+            <a href="{{ url('/admin/dejar-impersonar') }}"
+               wire:navigate.hover="false"
+               onclick="window.location.href='{{ url('/admin/dejar-impersonar') }}'; return false;"
+               class="inline-flex items-center gap-2 rounded-xl bg-white text-violet-700 hover:bg-violet-50 font-bold px-4 py-2 text-sm shadow-md transition flex-shrink-0 cursor-pointer">
                 <i class="fa-solid fa-arrow-right-from-bracket"></i>
                 <span class="hidden sm:inline">Volver al super-admin</span>
                 <span class="sm:hidden">Salir</span>
