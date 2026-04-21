@@ -141,7 +141,7 @@ class Pedido extends Model
                     <div class="text-sm font-bold text-sky-700 mb-1">PASO 2 — Generación de Nginx config</div>
                     <p class="text-xs text-sky-900">
                         El comando <code class="bg-white px-1 rounded">tenants:setup-subdominio</code> toma el template
-                        <code>resources/nginx/tenant.conf.stub</code>, reemplaza <code>{{'{{DOMINIO}}'}}</code> y <code>{{'{{SLUG}}'}}</code>,
+                        <code>resources/nginx/tenant.conf.stub</code>, reemplaza los placeholders de DOMINIO y SLUG,
                         y deja el archivo en <code>storage/app/nginx-tenants/{dominio}.conf</code> + un marcador
                         <code>.pending</code> con metadata JSON (email, no_ssl).
                     </p>
