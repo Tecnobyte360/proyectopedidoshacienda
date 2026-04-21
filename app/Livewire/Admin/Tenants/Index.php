@@ -75,17 +75,14 @@ class Index extends Component
     {
         return [
             'nombre'              => 'required|string|max:150',
+            // Regex acepta vacío (autogenerado por modelo) O kebab-case válido (a-z, 0-9, guion medio).
+            // El `?` final del grupo lo hace opcional → matchea string vacío.
+            // ⚠️ NO usar closure aquí: Livewire 3 no puede serializar closures en rules().
             'slug'                => [
                 'nullable',
                 'string',
                 'max:80',
-                // Regex SOLO se aplica si el slug viene con texto (no vacío)
-                // Para subdominio DNS-válido: a-z, 0-9 y guion medio. NO _ . espacios MAYÚSC.
-                function ($attribute, $value, $fail) {
-                    if (!empty(trim($value)) && !preg_match('/^[a-z0-9]+(-[a-z0-9]+)*$/', $value)) {
-                        $fail('El slug debe ser kebab-case (solo a-z, 0-9 y guiones medios). Ejemplo: mi-empresa');
-                    }
-                },
+                'regex:/^([a-z0-9]+(-[a-z0-9]+)*)?$/',
                 'unique:tenants,slug,' . ($this->editandoId ?? 'NULL'),
             ],
             'plan'                => 'required|in:basico,pro,empresa',
@@ -109,6 +106,15 @@ class Index extends Component
             'admin_nombre'        => 'required_if:crear_admin_inicial,true|nullable|string|max:120',
             'admin_email'         => 'required_if:crear_admin_inicial,true|nullable|email|max:150|unique:users,email',
             'admin_password'      => 'required_if:crear_admin_inicial,true|nullable|string|min:6',
+        ];
+    }
+
+    protected function messages(): array
+    {
+        return [
+            'slug.regex' => 'El slug debe ser kebab-case (solo a-z, 0-9 y guiones medios). Ejemplo: mi-empresa',
+            'slug.unique' => 'Ese slug ya está en uso por otro tenant.',
+            'admin_email.unique' => 'Ya existe un usuario con ese email.',
         ];
     }
 
