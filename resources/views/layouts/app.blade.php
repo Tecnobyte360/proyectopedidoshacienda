@@ -217,28 +217,28 @@
 
     {{-- 🎭 Función global: salir de impersonación con reload garantizado --}}
     <script>
-        window.salirDeImpersonacion = async function (btn) {
-            if (btn) {
-                btn.disabled = true;
-                btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Saliendo...';
-            }
+        window.salirDeImpersonacion = function (btn) {
             try {
-                await fetch('{{ url('/admin/dejar-impersonar') }}', {
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Saliendo...';
+                }
+                var token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+                var url   = "/admin/dejar-impersonar";
+                fetch(url, {
                     method: 'POST',
                     headers: {
-                        'X-CSRF-TOKEN': btn?.dataset.csrf || document.querySelector('meta[name="csrf-token"]').content,
-                        'Accept': 'application/json',
-                        'Cache-Control': 'no-cache',
+                        'X-CSRF-TOKEN': token,
+                        'Accept': 'application/json'
                     },
-                    credentials: 'same-origin',
-                    redirect: 'manual',  // no seguir el redirect, lo manejamos a mano
+                    credentials: 'same-origin'
+                }).finally(function () {
+                    window.location.replace('/admin/tenants?_=' + Date.now());
                 });
             } catch (e) {
-                console.warn('Salida de impersonación: fetch terminó con', e);
-                // Continuamos al reload igual — la sesión ya se borró del lado server
+                console.error('salirDeImpersonacion error', e);
+                window.location.replace('/admin/tenants?_=' + Date.now());
             }
-            // Reload duro a la página de tenants, con cache buster
-            window.location.replace('{{ url('/admin/tenants') }}?_=' + Date.now());
         };
     </script>
 

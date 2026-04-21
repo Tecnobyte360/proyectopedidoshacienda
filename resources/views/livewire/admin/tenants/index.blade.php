@@ -551,10 +551,14 @@
                     </button>
 
                     @if(!$eliminarLog)
+                        @php
+                            $puedeEliminar = trim((string) $eliminarConfirmacion) === trim((string) $eliminarTenantNombre)
+                                             && !$eliminarCorriendo;
+                        @endphp
                         <button wire:click="confirmarEliminacion"
                                 wire:loading.attr="disabled"
                                 wire:target="confirmarEliminacion"
-                                @disabled(trim($eliminarConfirmacion) !== trim($eliminarTenantNombre) || $eliminarCorriendo)
+                                {{ $puedeEliminar ? '' : 'disabled' }}
                                 class="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-rose-500 hover:bg-rose-600 text-white text-sm font-bold transition disabled:opacity-40 disabled:cursor-not-allowed">
                             <i class="fa-solid fa-trash-can"></i>
                             ELIMINAR DEFINITIVAMENTE

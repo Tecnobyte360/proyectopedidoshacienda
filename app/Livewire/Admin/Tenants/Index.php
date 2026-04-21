@@ -62,6 +62,15 @@ class Index extends Component
     public string $admin_email           = '';
     public string $admin_password        = '';
 
+    // 🗑️ Eliminación definitiva
+    public bool   $eliminarModalAbierto  = false;
+    public ?int   $eliminarTenantId      = null;
+    public string $eliminarTenantNombre  = '';
+    public string $eliminarTenantSlug    = '';
+    public string $eliminarConfirmacion  = '';
+    public bool   $eliminarCorriendo     = false;
+    public string $eliminarLog           = '';
+
     protected function rules(): array
     {
         return [
@@ -414,14 +423,6 @@ class Index extends Component
     // ─────────────────────────────────────────────────────────────────
     // 🗑️  ELIMINACIÓN DEFINITIVA (con doble confirmación por nombre)
     // ─────────────────────────────────────────────────────────────────
-    public bool   $eliminarModalAbierto = false;
-    public ?int   $eliminarTenantId     = null;
-    public string $eliminarTenantNombre = '';
-    public string $eliminarTenantSlug   = '';
-    public string $eliminarConfirmacion = '';
-    public bool   $eliminarCorriendo    = false;
-    public string $eliminarLog          = '';
-
     public function abrirModalEliminar(int $id): void
     {
         $t = app(TenantManager::class)->withoutTenant(fn () => Tenant::find($id));
