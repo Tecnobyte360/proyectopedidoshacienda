@@ -305,6 +305,51 @@
                             <label class="block text-sm font-medium text-slate-700 mb-1.5">Color secundario</label>
                             <input type="color" wire:model="color_secundario" class="w-full h-11 rounded-xl border-slate-200">
                         </div>
+
+                        {{-- Logo del tenant --}}
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-slate-700 mb-1.5">
+                                <i class="fa-solid fa-image text-[#d68643]"></i> Logo del tenant
+                                <span class="text-xs text-slate-400 font-normal">(PNG/JPG/SVG/WebP, máx 2MB)</span>
+                            </label>
+
+                            <div class="flex items-center gap-4">
+                                {{-- Vista previa --}}
+                                <div class="h-20 w-20 rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 flex items-center justify-center overflow-hidden flex-shrink-0">
+                                    @if($logo_archivo)
+                                        <img src="{{ $logo_archivo->temporaryUrl() }}" class="h-full w-full object-contain" alt="preview">
+                                    @elseif($logo_url_actual)
+                                        <img src="{{ $logo_url_actual }}" class="h-full w-full object-contain" alt="logo actual">
+                                    @else
+                                        <i class="fa-solid fa-image text-2xl text-slate-300"></i>
+                                    @endif
+                                </div>
+
+                                <div class="flex-1">
+                                    <input type="file"
+                                           wire:model="logo_archivo"
+                                           accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                                           class="block w-full text-sm text-slate-700
+                                                  file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0
+                                                  file:text-sm file:font-semibold
+                                                  file:bg-[#fbe9d7] file:text-[#a85f24] hover:file:bg-[#f5d4ad] cursor-pointer">
+
+                                    <div wire:loading wire:target="logo_archivo" class="text-xs text-sky-600 mt-1">
+                                        <i class="fa-solid fa-circle-notch fa-spin"></i> Subiendo...
+                                    </div>
+
+                                    @error('logo_archivo')
+                                        <div class="text-xs text-rose-600 mt-1">{{ $message }}</div>
+                                    @enderror
+
+                                    @if($logo_url_actual && !$logo_archivo)
+                                        <div class="text-xs text-slate-500 mt-1">
+                                            Logo actual: <a href="{{ $logo_url_actual }}" target="_blank" class="text-[#a85f24] underline">ver</a>
+                                        </div>
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-1.5">Trial vence</label>
                             <input type="date" wire:model="trial_ends_at" class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-2 focus:ring-[#d68643]/20">

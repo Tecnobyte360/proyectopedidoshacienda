@@ -8,13 +8,15 @@ use App\Services\HostingerDnsService;
 use App\Services\TenantManager;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 use Livewire\WithPagination;
 use Spatie\Permission\Models\Role;
 
 class Index extends Component
 {
-    use WithPagination;
+    use WithPagination, WithFileUploads;
 
     public string $busqueda = '';
 
@@ -42,6 +44,8 @@ class Index extends Component
     public string $contacto_telefono   = '';
     public string $color_primario      = '#d68643';
     public string $color_secundario    = '#a85f24';
+    public ?string $logo_url_actual    = null;
+    public $logo_archivo               = null;  // Livewire file upload
     public ?string $trial_ends_at        = null;
     public ?string $subscription_ends_at = null;
     public string $notas_internas      = '';
@@ -78,14 +82,15 @@ class Index extends Component
             'contacto_telefono'   => 'nullable|string|max:30',
             'color_primario'      => 'nullable|string|max:10',
             'color_secundario'    => 'nullable|string|max:10',
+            'logo_archivo'        => 'nullable|image|mimes:png,jpg,jpeg,svg,webp|max:2048',
             'trial_ends_at'       => 'nullable|date',
-            'subscription_ends_at'=> 'nullable|date',
+            'subscription_ends_at' => 'nullable|date',
             'notas_internas'      => 'nullable|string|max:2000',
 
             'whatsapp_email'         => 'nullable|email|max:150',
             'whatsapp_password'      => 'nullable|string|max:150',
             'whatsapp_api_base_url'  => 'nullable|string|max:200',
-            'whatsapp_connection_ids'=> 'nullable|string|max:500',
+            'whatsapp_connection_ids' => 'nullable|string|max:500',
 
             'crear_admin_inicial' => 'boolean',
             'admin_nombre'        => 'required_if:crear_admin_inicial,true|nullable|string|max:120',
@@ -114,6 +119,8 @@ class Index extends Component
         $this->contacto_telefono    = (string) $t->contacto_telefono;
         $this->color_primario       = (string) ($t->color_primario ?: '#d68643');
         $this->color_secundario     = (string) ($t->color_secundario ?: '#a85f24');
+        $this->logo_url_actual      = $t->logo_url;
+        $this->logo_archivo         = null;
         $this->trial_ends_at        = $t->trial_ends_at?->format('Y-m-d');
         $this->subscription_ends_at = $t->subscription_ends_at?->format('Y-m-d');
         $this->notas_internas       = (string) $t->notas_internas;
@@ -159,7 +166,7 @@ class Index extends Component
         $crear = $data['crear_admin_inicial'] ?? false;
         $adminNombre = $data['admin_nombre'] ?? '';
         $adminEmail  = $data['admin_email']  ?? '';
-        $adminPass   = $data['admin_password']?? '';
+        $adminPass   = $data['admin_password'] ?? '';
 
         // Construir whatsapp_config desde los campos
         $waEmail   = $data['whatsapp_email']   ?? '';
@@ -168,16 +175,40 @@ class Index extends Component
         $waConnIds = $data['whatsapp_connection_ids'] ?? '';
 
         unset(
-            $data['crear_admin_inicial'], $data['admin_nombre'],
-            $data['admin_email'], $data['admin_password'],
-            $data['whatsapp_email'], $data['whatsapp_password'],
-            $data['whatsapp_api_base_url'], $data['whatsapp_connection_ids']
+            $data['crear_admin_inicial'],
+            $data['admin_nombre'],
+            $data['admin_email'],
+            $data['admin_password'],
+            $data['whatsapp_email'],
+            $data['whatsapp_password'],
+            $data['whatsapp_api_base_url'],
+            $data['whatsapp_connection_ids'],
+            $data['logo_archivo']
         );
+
+        // Subida del logo (si vino archivo nuevo)
+        if ($this->logo_archivo) {
+            $slug = $data['slug'] ?? ($this->slug ?: 'tenant-' . ($this->editandoId ?? 'new'));
+            $ext  = $this->logo_archivo->getClientOriginalExtension();
+            $path = $this->logo_archivo->storeAs(
+                'tenants/logos',
+                "{$slug}-" . time() . ".{$ext}",
+                'public'
+            );
+            // URL pública /storage/tenants/logos/...
+            $data['logo_url'] = '/storage/' . $path;
+
+            // Borrar logo anterior si existía
+            if ($this->logo_url_actual && str_starts_with($this->logo_url_actual, '/storage/')) {
+                $oldPath = str_replace('/storage/', '', $this->logo_url_actual);
+                Storage::disk('public')->delete($oldPath);
+            }
+        }
 
         // Solo guardar whatsapp_config si hay datos
         if ($waEmail || $waPass || $waConnIds) {
             $ids = collect(explode(',', $waConnIds))
-                ->map(fn ($x) => (int) trim($x))
+                ->map(fn($x) => (int) trim($x))
                 ->filter()
                 ->values()
                 ->all();
@@ -244,7 +275,7 @@ class Index extends Component
      */
     public function configurarSubdominio(int $id): void
     {
-        $tenant = app(TenantManager::class)->withoutTenant(fn () => Tenant::find($id));
+        $tenant = app(TenantManager::class)->withoutTenant(fn() => Tenant::find($id));
         if (!$tenant) {
             $this->dispatch('notify', ['type' => 'error', 'message' => 'Tenant no encontrado.']);
             return;
@@ -385,6 +416,8 @@ class Index extends Component
         $this->contacto_telefono    = '';
         $this->color_primario       = '#d68643';
         $this->color_secundario     = '#a85f24';
+        $this->logo_url_actual      = null;
+        $this->logo_archivo         = null;
         $this->trial_ends_at        = null;
         $this->subscription_ends_at = null;
         $this->notas_internas       = '';
@@ -404,10 +437,11 @@ class Index extends Component
         // Saltar el global scope (super-admin ve todos los tenants)
         $tenants = app(TenantManager::class)->withoutTenant(function () {
             return Tenant::withCount(['users', 'pedidos', 'clientes'])
-                ->when($this->busqueda, fn ($q) => $q->where(fn ($qq) =>
+                ->when($this->busqueda, fn($q) => $q->where(
+                    fn($qq) =>
                     $qq->where('nombre', 'like', "%{$this->busqueda}%")
-                       ->orWhere('slug', 'like', "%{$this->busqueda}%")
-                       ->orWhere('contacto_email', 'like', "%{$this->busqueda}%")
+                        ->orWhere('slug', 'like', "%{$this->busqueda}%")
+                        ->orWhere('contacto_email', 'like', "%{$this->busqueda}%")
                 ))
                 ->orderByDesc('id')
                 ->paginate(15);
@@ -420,7 +454,7 @@ class Index extends Component
                 'trial'    => Tenant::whereNotNull('trial_ends_at')->where('trial_ends_at', '>=', now())->count(),
                 'vencidos' => Tenant::whereNotNull('subscription_ends_at')
                     ->where('subscription_ends_at', '<', now())
-                    ->where(fn ($q) => $q->whereNull('trial_ends_at')->orWhere('trial_ends_at', '<', now()))
+                    ->where(fn($q) => $q->whereNull('trial_ends_at')->orWhere('trial_ends_at', '<', now()))
                     ->count(),
             ];
         });

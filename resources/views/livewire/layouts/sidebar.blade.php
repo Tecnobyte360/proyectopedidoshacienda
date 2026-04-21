@@ -1,22 +1,40 @@
 <div>
     {{-- Wrapper Livewire requiere UN solo root element --}}
 
-    <aside class="app-sidebar fixed inset-y-0 left-0 z-40 hidden lg:flex w-64 flex-col bg-gradient-to-b from-[#c97a36] to-[#a85f24] text-white shadow-2xl">
+    @php
+        // 🎨 Branding dinámico: si hay tenant activo, usar sus colores y logo
+        $tenantActivo = app(\App\Services\TenantManager::class)->current();
+        $bgFrom    = $tenantActivo?->color_primario   ?: '#c97a36';
+        $bgTo      = $tenantActivo?->color_secundario ?: '#a85f24';
+        $brandName = $tenantActivo?->nombre ?: 'TecnoByte360';
+        $brandSub  = $tenantActivo ? 'Panel del cliente' : 'Plataforma SaaS';
+        $brandLogo = $tenantActivo?->logo_url;
+    @endphp
+
+    <aside class="app-sidebar fixed inset-y-0 left-0 z-40 hidden lg:flex w-64 flex-col text-white shadow-2xl"
+           style="background: linear-gradient(to bottom, {{ $bgFrom }}, {{ $bgTo }});">
 
         {{-- LOGO / BRAND --}}
         <div class="flex h-20 items-center gap-3 border-b border-white/10 px-5">
-            <div class="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/15 shadow-lg backdrop-blur">
-                <i class="fa-solid fa-utensils text-lg text-white"></i>
+            <div class="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/15 shadow-lg backdrop-blur overflow-hidden flex-shrink-0">
+                @if($brandLogo)
+                    <img src="{{ $brandLogo }}" alt="logo" class="h-full w-full object-contain">
+                @else
+                    <i class="fa-solid fa-utensils text-lg text-white"></i>
+                @endif
             </div>
             <div class="min-w-0">
-                <div class="truncate text-sm font-extrabold leading-tight">Alimentos</div>
-                <div class="truncate text-xs font-medium text-white/70 leading-tight">La Hacienda</div>
+                <div class="truncate text-sm font-extrabold leading-tight">{{ $brandName }}</div>
+                <div class="truncate text-xs font-medium text-white/70 leading-tight">{{ $brandSub }}</div>
             </div>
         </div>
 
         @php
             $current = request()->route()?->getName();
             $u = auth()->user();
+            // 🔒 Si estamos en un subdominio de tenant, NUNCA mostrar la sección Super Admin,
+            // aunque el usuario logueado sea super-admin (caso raro de seguridad).
+            $enSubdominioTenant = $tenantActivo !== null;
 
             // 🌟 SUPER-ADMIN: si está sin impersonar, NO ve secciones operativas
             // (Pedidos, Chat, Productos, etc). Solo ve sección "Super Admin".
@@ -84,6 +102,10 @@
             // Filtrar items por permisos del usuario y secciones vacías
             $sections = [];
             foreach ($sectionsRaw as $sec) {
+                // 🔒 Sección Super Admin SOLO en el dominio principal (NUNCA en subdominios de cliente)
+                if ($sec['title'] === '⭐ Super Admin' && $enSubdominioTenant) {
+                    continue;
+                }
                 // Si es super-admin sin impersonar, SOLO mostrar la sección "Super Admin"
                 if ($verSoloAdmin && $sec['title'] !== '⭐ Super Admin') {
                     continue;
@@ -162,16 +184,21 @@
     {{-- DRAWER MOBILE — visible solo cuando se activa con el botón hamburguesa --}}
     <aside id="mobile-sidebar"
            class="fixed inset-y-0 left-0 z-50 w-64 transform -translate-x-full transition-transform duration-300
-                  flex flex-col bg-gradient-to-b from-[#c97a36] to-[#a85f24] text-white shadow-2xl lg:hidden">
+                  flex flex-col text-white shadow-2xl lg:hidden"
+           style="background: linear-gradient(to bottom, {{ $bgFrom }}, {{ $bgTo }});">
 
         <div class="flex h-20 items-center justify-between border-b border-white/10 px-5">
             <div class="flex items-center gap-3">
-                <div class="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/15">
-                    <i class="fa-solid fa-utensils text-lg"></i>
+                <div class="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/15 overflow-hidden">
+                    @if($brandLogo)
+                        <img src="{{ $brandLogo }}" alt="logo" class="h-full w-full object-contain">
+                    @else
+                        <i class="fa-solid fa-utensils text-lg"></i>
+                    @endif
                 </div>
                 <div class="min-w-0">
-                    <div class="text-sm font-extrabold leading-tight">Alimentos</div>
-                    <div class="text-xs font-medium text-white/70 leading-tight">La Hacienda</div>
+                    <div class="text-sm font-extrabold leading-tight">{{ $brandName }}</div>
+                    <div class="text-xs font-medium text-white/70 leading-tight">{{ $brandSub }}</div>
                 </div>
             </div>
             <button onclick="document.getElementById('mobile-sidebar').classList.add('-translate-x-full'); document.getElementById('mobile-backdrop').classList.add('hidden');"
