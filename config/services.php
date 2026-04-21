@@ -39,4 +39,15 @@ return [
         'key' => env('API_KEY'),
     ],
 
+    'hostinger' => [
+        'api_key'    => env('HOSTINGER_API_KEY'),
+        'domain'     => env('HOSTINGER_DOMAIN', 'tecnobyte360.com'),
+        'server_ip'  => env('HOSTINGER_SERVER_IP'), // IP del VPS donde apuntan los subdominios
+        'ttl'        => (int) env('HOSTINGER_DNS_TTL', 300),
+    ],
+
+    'certbot' => [
+        'email' => env('CERTBOT_EMAIL', 'admin@tecnobyte360.com'),
+    ],
+
 ];

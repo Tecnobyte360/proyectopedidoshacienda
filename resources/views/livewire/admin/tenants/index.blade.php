@@ -31,10 +31,17 @@
                         <p class="text-sm text-slate-500">Gestiona las empresas que usan tu plataforma SaaS</p>
                     </div>
                 </div>
-                <button wire:click="abrirModalCrear"
-                        class="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-[#d68643] to-[#a85f24] hover:from-[#c97a36] hover:to-[#965520] text-white font-bold px-5 py-3 transition shadow-lg">
-                    <i class="fa-solid fa-plus"></i> Nuevo tenant
-                </button>
+                <div class="flex items-center gap-2">
+                    <button wire:click="probarHostinger"
+                            class="inline-flex items-center gap-2 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-4 py-3 text-sm transition"
+                            title="Verifica que la API Key de Hostinger funciona">
+                        <i class="fa-solid fa-plug"></i> Probar Hostinger
+                    </button>
+                    <button wire:click="abrirModalCrear"
+                            class="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-[#d68643] to-[#a85f24] hover:from-[#c97a36] hover:to-[#965520] text-white font-bold px-5 py-3 transition shadow-lg">
+                        <i class="fa-solid fa-plus"></i> Nuevo tenant
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -196,6 +203,24 @@
                                     class="text-xs font-bold px-3 py-2 rounded-lg {{ $t->activo ? 'bg-amber-100 hover:bg-amber-200 text-amber-700' : 'bg-emerald-100 hover:bg-emerald-200 text-emerald-700' }} transition">
                                 <i class="fa-solid {{ $t->activo ? 'fa-pause' : 'fa-play' }}"></i>
                             </button>
+                        </div>
+
+                        {{-- Subdominio --}}
+                        <div class="pt-2">
+                            <button wire:click="configurarSubdominio({{ $t->id }})"
+                                    wire:loading.attr="disabled"
+                                    wire:target="configurarSubdominio({{ $t->id }})"
+                                    class="w-full text-xs font-bold px-3 py-2 rounded-lg bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white transition disabled:opacity-50">
+                                <span wire:loading.remove wire:target="configurarSubdominio({{ $t->id }})">
+                                    <i class="fa-solid fa-rocket"></i> Configurar subdominio
+                                </span>
+                                <span wire:loading wire:target="configurarSubdominio({{ $t->id }})">
+                                    <i class="fa-solid fa-circle-notch fa-spin"></i> Configurando... (puede tardar 1–2 min)
+                                </span>
+                            </button>
+                            <p class="text-[10px] text-slate-400 mt-1 text-center">
+                                Crea DNS en Hostinger + Nginx + SSL automáticamente
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -379,6 +404,53 @@
                         </button>
                     </div>
                 </form>
+            </div>
+        </div>
+    @endif
+
+    {{-- MODAL: log del setup de subdominio --}}
+    @if($subdomModalAbierto)
+        <div class="fixed inset-0 z-50 flex items-center justify-center p-4"
+             style="background: rgba(15,23,42,0.55); backdrop-filter: blur(4px);">
+            <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden">
+                <div class="flex items-center justify-between px-5 py-4 border-b border-slate-200 bg-gradient-to-r from-sky-50 to-blue-50">
+                    <div>
+                        <h3 class="text-lg font-bold text-slate-800">
+                            <i class="fa-solid fa-rocket text-sky-600"></i>
+                            Setup de subdominio
+                        </h3>
+                        <p class="text-xs text-slate-500">Tenant: {{ $subdomTenantNombre }}</p>
+                    </div>
+                    <button wire:click="cerrarSubdomModal"
+                            class="h-9 w-9 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+
+                <div class="p-5">
+                    @if($subdomCorriendo)
+                        <div class="flex items-center gap-2 text-sky-600 text-sm font-semibold mb-3">
+                            <i class="fa-solid fa-circle-notch fa-spin"></i> Procesando... no cierres esta ventana.
+                        </div>
+                    @elseif($subdomExito)
+                        <div class="flex items-center gap-2 text-emerald-600 text-sm font-semibold mb-3">
+                            <i class="fa-solid fa-check-circle"></i> ¡Listo! El subdominio está operativo.
+                        </div>
+                    @else
+                        <div class="flex items-center gap-2 text-rose-600 text-sm font-semibold mb-3">
+                            <i class="fa-solid fa-triangle-exclamation"></i> Hubo errores. Revisa el log.
+                        </div>
+                    @endif
+
+                    <pre class="bg-slate-900 text-emerald-300 text-xs p-4 rounded-lg max-h-96 overflow-auto whitespace-pre-wrap">{{ $subdomLog ?: 'Sin salida.' }}</pre>
+                </div>
+
+                <div class="px-5 py-3 border-t border-slate-200 bg-slate-50 flex justify-end">
+                    <button wire:click="cerrarSubdomModal"
+                            class="px-4 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm font-semibold">
+                        Cerrar
+                    </button>
+                </div>
             </div>
         </div>
     @endif

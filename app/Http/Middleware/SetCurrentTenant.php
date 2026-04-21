@@ -21,13 +21,41 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class SetCurrentTenant
 {
+    /**
+     * Subdominios "del sistema" — NO son tenants, son rutas legítimas.
+     * Cualquier OTRO subdominio que NO coincida con un tenant registrado
+     * será rechazado con 404 (estricto).
+     */
+    private const SUBDOMINIOS_RESERVADOS = [
+        'www',
+        'api',
+        'admin',
+        'app',
+        'mail',
+        'pedidosonline',     // legacy de Hacienda — mantenido para no romper
+    ];
+
     public function handle(Request $request, Closure $next): Response
     {
         $manager = app(TenantManager::class);
         $tenant = null;
 
-        // 1. Por subdominio (futuro)
-        $tenant = $this->detectarPorSubdominio($request);
+        // 1. Detectar por subdominio
+        $sub = $this->extraerSubdominio($request);
+
+        if ($sub !== null) {
+            // Si es subdominio reservado del sistema, lo dejamos pasar sin tenant
+            if (in_array($sub, self::SUBDOMINIOS_RESERVADOS, true)) {
+                // No es un tenant, sigue normal
+            } else {
+                // Buscar tenant por slug; si NO existe → 404 estricto
+                $tenant = Tenant::where('slug', $sub)->first();
+
+                if (!$tenant) {
+                    abort(404, "El subdominio '{$sub}' no está registrado. Verifica la URL o contacta a tu administrador.");
+                }
+            }
+        }
 
         // 2. Por impersonación de super-admin
         if (!$tenant && session()->has('tenant_imitado_id')) {
@@ -53,26 +81,28 @@ class SetCurrentTenant
         return $next($request);
     }
 
-    private function detectarPorSubdominio(Request $request): ?Tenant
+    /**
+     * Extrae el subdominio del host. Devuelve:
+     *   - string (ej. "la-hacienda") si hay subdominio
+     *   - null si es el dominio raíz o no aplica
+     */
+    private function extraerSubdominio(Request $request): ?string
     {
         $host = $request->getHost();
         $base = config('app.tenant_base_domain');
 
         if (!$base) return null;
 
-        // Si es exactamente el dominio base (sin subdominio), no es un tenant
-        if ($host === $base || $host === 'www.' . $base) {
-            return null;
-        }
+        // Si es exactamente el dominio base, no hay subdominio
+        if ($host === $base) return null;
 
-        // Extraer subdominio (cliente.tecnobyte360.com → "cliente")
+        // Si termina en .{base}, extraer el subdominio
         if (str_ends_with($host, '.' . $base)) {
             $sub = substr($host, 0, -strlen('.' . $base));
-            if ($sub && $sub !== 'www') {
-                return Tenant::where('slug', $sub)->first();
-            }
+            return $sub !== '' ? strtolower($sub) : null;
         }
 
+        // Host no coincide con el dominio base (puede ser una IP o dominio custom)
         return null;
     }
 }

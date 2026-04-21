@@ -4,7 +4,9 @@ namespace App\Livewire\Admin\Tenants;
 
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\HostingerDnsService;
 use App\Services\TenantManager;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -18,6 +20,14 @@ class Index extends Component
 
     public bool $modalAbierto = false;
     public ?int $editandoId   = null;
+
+    // Subdominio: log de salida del comando
+    public bool   $subdomModalAbierto = false;
+    public ?int   $subdomTenantId     = null;
+    public string $subdomTenantNombre = '';
+    public string $subdomLog          = '';
+    public bool   $subdomCorriendo    = false;
+    public bool   $subdomExito        = false;
 
     public string $nombre              = '';
     public string $slug                = '';
@@ -202,6 +212,71 @@ class Index extends Component
         ]);
 
         $this->redirect('/pedidos');
+    }
+
+    /**
+     * Abre el modal y dispara el setup del subdominio (DNS + Nginx + SSL).
+     */
+    public function configurarSubdominio(int $id): void
+    {
+        $tenant = app(TenantManager::class)->withoutTenant(fn () => Tenant::find($id));
+        if (!$tenant) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Tenant no encontrado.']);
+            return;
+        }
+
+        $this->subdomModalAbierto = true;
+        $this->subdomTenantId     = $tenant->id;
+        $this->subdomTenantNombre = $tenant->nombre;
+        $this->subdomCorriendo    = true;
+        $this->subdomExito        = false;
+        $this->subdomLog          = "Iniciando setup para {$tenant->slug}.tecnobyte360.com...\n";
+
+        try {
+            $exit = Artisan::call('tenants:setup-subdominio', [
+                'slug'   => $tenant->slug,
+                '--wait' => 30,
+            ]);
+            $this->subdomLog .= Artisan::output();
+            $this->subdomExito = ($exit === 0);
+        } catch (\Throwable $e) {
+            $this->subdomLog .= "\n❌ Excepción: " . $e->getMessage();
+            $this->subdomExito = false;
+        }
+
+        $this->subdomCorriendo = false;
+
+        $this->dispatch('notify', [
+            'type'    => $this->subdomExito ? 'success' : 'error',
+            'message' => $this->subdomExito
+                ? "✅ Subdominio configurado: https://{$tenant->slug}.tecnobyte360.com"
+                : "❌ Hubo errores configurando el subdominio. Revisa el log.",
+        ]);
+    }
+
+    public function probarHostinger(): void
+    {
+        try {
+            $svc = app(HostingerDnsService::class);
+            $registros = $svc->listarRegistros();
+            $count = is_array($registros) ? count($registros) : 0;
+            $this->dispatch('notify', [
+                'type'    => 'success',
+                'message' => "✓ Conexión OK con Hostinger. {$count} registros DNS en la zona.",
+            ]);
+        } catch (\Throwable $e) {
+            $this->dispatch('notify', [
+                'type'    => 'error',
+                'message' => '❌ Hostinger: ' . $e->getMessage(),
+            ]);
+        }
+    }
+
+    public function cerrarSubdomModal(): void
+    {
+        $this->subdomModalAbierto = false;
+        $this->subdomLog          = '';
+        $this->subdomTenantId     = null;
     }
 
     public function dejarImpersonar(): void
