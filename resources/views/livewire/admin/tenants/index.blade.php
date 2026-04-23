@@ -258,7 +258,6 @@
                 </table>
             </div>
         </div>
-        </div>
 
         <div>{{ $tenants->links() }}</div>
     </div>
