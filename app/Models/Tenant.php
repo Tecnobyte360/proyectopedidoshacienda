@@ -36,8 +36,9 @@ class Tenant extends Model
         'trial_ends_at'        => 'date',
         'subscription_ends_at' => 'date',
         'whatsapp_config'      => 'array',
-        // 🔐 La key se cifra con APP_KEY de Laravel automáticamente al guardar/leer
-        'openai_api_key'       => 'encrypted',
+        // 🔐 Cast tolerante: al leer intenta descifrar; si falla (legacy plaintext)
+        //    devuelve el valor tal cual. Al escribir, siempre cifra.
+        'openai_api_key'       => \App\Casts\EncryptedTolerante::class,
     ];
 
     protected $hidden = [
