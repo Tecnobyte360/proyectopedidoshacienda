@@ -46,6 +46,7 @@ class Index extends Component
     public string $color_secundario    = '#a85f24';
     public ?string $logo_url_actual    = null;
     public $logo_archivo               = null;  // Livewire file upload
+    public string $openai_api_key      = '';    // Key propia del tenant (opcional — si vacía usa global)
     public ?string $trial_ends_at        = null;
     public ?string $subscription_ends_at = null;
     public string $notas_internas      = '';
@@ -93,6 +94,7 @@ class Index extends Component
             'color_primario'      => 'nullable|string|max:10',
             'color_secundario'    => 'nullable|string|max:10',
             'logo_archivo'        => 'nullable|image|mimes:png,jpg,jpeg,svg,webp|max:2048',
+            'openai_api_key'      => 'nullable|string|max:255',
             'trial_ends_at'       => 'nullable|date',
             'subscription_ends_at' => 'nullable|date',
             'notas_internas'      => 'nullable|string|max:2000',
@@ -130,6 +132,12 @@ class Index extends Component
         $this->abrirModalCrear();
     }
 
+    /** Alias corto para edit */
+    public function editarTenant(int $id): void
+    {
+        $this->abrirModalEditar($id);
+    }
+
     public function abrirModalEditar(int $id): void
     {
         $t = Tenant::findOrFail($id);
@@ -146,6 +154,7 @@ class Index extends Component
         $this->color_secundario     = (string) ($t->color_secundario ?: '#a85f24');
         $this->logo_url_actual      = $t->logo_url;
         $this->logo_archivo         = null;
+        $this->openai_api_key       = (string) ($t->openai_api_key ?? '');
         $this->trial_ends_at        = $t->trial_ends_at?->format('Y-m-d');
         $this->subscription_ends_at = $t->subscription_ends_at?->format('Y-m-d');
         $this->notas_internas       = (string) $t->notas_internas;
@@ -407,6 +416,46 @@ class Index extends Component
         }
     }
 
+    /**
+     * Prueba la OpenAI API key que está en el formulario.
+     * Hace un request mínimo a /v1/models — si la key es válida, responde OK.
+     */
+    public function probarOpenaiKey(): void
+    {
+        $key = trim($this->openai_api_key);
+        if ($key === '') {
+            $this->dispatch('notify', [
+                'type'    => 'warning',
+                'message' => '⚠️ Deja el campo vacío para usar la key global, o pega una key para probarla.',
+            ]);
+            return;
+        }
+
+        try {
+            $resp = \Illuminate\Support\Facades\Http::withToken($key)
+                ->timeout(15)
+                ->get('https://api.openai.com/v1/models');
+
+            if ($resp->successful()) {
+                $count = is_array($resp->json('data')) ? count($resp->json('data')) : 0;
+                $this->dispatch('notify', [
+                    'type'    => 'success',
+                    'message' => "✓ Key válida. OpenAI expone {$count} modelos disponibles.",
+                ]);
+            } else {
+                $this->dispatch('notify', [
+                    'type'    => 'error',
+                    'message' => "❌ Key inválida ({$resp->status()}): " . ($resp->json('error.message') ?: $resp->body()),
+                ]);
+            }
+        } catch (\Throwable $e) {
+            $this->dispatch('notify', [
+                'type'    => 'error',
+                'message' => '❌ Error: ' . $e->getMessage(),
+            ]);
+        }
+    }
+
     public function probarHostinger(): void
     {
         try {
@@ -526,6 +575,7 @@ class Index extends Component
         $this->color_secundario     = '#a85f24';
         $this->logo_url_actual      = null;
         $this->logo_archivo         = null;
+        $this->openai_api_key       = '';
         $this->trial_ends_at        = null;
         $this->subscription_ends_at = null;
         $this->notas_internas       = '';

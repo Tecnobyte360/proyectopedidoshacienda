@@ -36,6 +36,8 @@ class Tenant extends Model
         'trial_ends_at'        => 'date',
         'subscription_ends_at' => 'date',
         'whatsapp_config'      => 'array',
+        // 🔐 La key se cifra con APP_KEY de Laravel automáticamente al guardar/leer
+        'openai_api_key'       => 'encrypted',
     ];
 
     protected $hidden = [
@@ -171,5 +173,39 @@ class Tenant extends Model
     public function dominio(): string
     {
         return $this->slug . '.' . config('app.tenant_base_domain', 'tecnobyte360.com');
+    }
+
+    /**
+     * Retorna la OpenAI API key que debe usar este tenant:
+     *   1. La suya propia (tenants.openai_api_key) si está configurada
+     *   2. Si no, la global del .env (OPENAI_API_KEY) como fallback
+     *
+     * Permite que cada cliente use su propio billing de OpenAI,
+     * y que TecnoByte360 provea una key por defecto para el MVP.
+     */
+    public function openaiApiKey(): ?string
+    {
+        $propia = trim((string) $this->openai_api_key);
+        if ($propia !== '') {
+            return $propia;
+        }
+        $global = trim((string) env('OPENAI_API_KEY'));
+        return $global !== '' ? $global : null;
+    }
+
+    /**
+     * Helper estático: obtiene la key del tenant ACTUAL (via TenantManager)
+     * con fallback al .env. Útil desde controllers/services.
+     *
+     *   $key = Tenant::resolverOpenaiKey();
+     */
+    public static function resolverOpenaiKey(): ?string
+    {
+        $tenant = app(\App\Services\TenantManager::class)->current();
+        if ($tenant) {
+            return $tenant->openaiApiKey();
+        }
+        $global = trim((string) env('OPENAI_API_KEY'));
+        return $global !== '' ? $global : null;
     }
 }

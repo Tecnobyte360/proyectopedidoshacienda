@@ -20,14 +20,18 @@ use RuntimeException;
  */
 class TranscripcionAudioService
 {
-    private string $apiKey;
-
     /** Duración máxima permitida (segundos). Whisper acepta hasta 25 MB. */
     private int $maxSegundos = 120;
 
-    public function __construct()
+    /**
+     * Resuelve la API key a usar para Whisper:
+     *   1. La del tenant actual (tenants.openai_api_key)
+     *   2. Fallback al .env global
+     * Se resuelve EN CADA CALL para respetar el tenant activo del request.
+     */
+    private function resolverApiKey(): string
     {
-        $this->apiKey = (string) env('OPENAI_API_KEY');
+        return (string) (\App\Models\Tenant::resolverOpenaiKey() ?? '');
     }
 
     /**
@@ -39,8 +43,9 @@ class TranscripcionAudioService
      */
     public function transcribir(string $audioUrl, string $idioma = 'es'): string
     {
-        if (!$this->apiKey) {
-            Log::error('🎤 OPENAI_API_KEY no configurada para transcripción.');
+        $apiKey = $this->resolverApiKey();
+        if ($apiKey === '') {
+            Log::error('🎤 OpenAI key no resuelta (ni del tenant ni del .env). No se puede transcribir.');
             return '';
         }
 
@@ -71,7 +76,7 @@ class TranscripcionAudioService
             file_put_contents($pathTmp, $bytes);
 
             // 3. Enviar a Whisper
-            $resp = Http::withToken($this->apiKey)
+            $resp = Http::withToken($apiKey)
                 ->timeout(60)
                 ->attach('file', file_get_contents($pathTmp), $nombreTmp)
                 ->post('https://api.openai.com/v1/audio/transcriptions', [

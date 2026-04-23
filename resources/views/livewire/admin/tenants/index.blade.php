@@ -215,7 +215,7 @@
                                                 class="h-8 w-8 inline-flex items-center justify-center rounded-lg bg-violet-100 hover:bg-violet-200 text-violet-700 transition">
                                             <i class="fa-solid fa-mask text-xs"></i>
                                         </button>
-                                        <button wire:click="abrirModalEditar({{ $t->id }})"
+                                        <button wire:click="editarTenant({{ $t->id }})"
                                                 title="Editar tenant"
                                                 class="h-8 w-8 inline-flex items-center justify-center rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition">
                                             <i class="fa-solid fa-pen-to-square text-xs"></i>
@@ -382,6 +382,53 @@
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-1.5">Subscripción vence</label>
                             <input type="date" wire:model="subscription_ends_at" class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-2 focus:ring-[#d68643]/20">
+                        </div>
+                    </div>
+
+                    {{-- 🤖 OpenAI API Key por tenant --}}
+                    <div class="rounded-xl border-2 border-violet-200 bg-violet-50/40 p-4 space-y-3">
+                        <div class="flex items-center gap-2">
+                            <i class="fa-solid fa-robot text-violet-600 text-xl"></i>
+                            <div>
+                                <h4 class="font-bold text-slate-800 text-sm">OpenAI API Key propia (opcional)</h4>
+                                <p class="text-xs text-slate-500">
+                                    Si este tenant tiene su propia cuenta de OpenAI, pega aquí su key.
+                                    Si queda vacío, usa la global (<code class="bg-white px-1 rounded">OPENAI_API_KEY</code> del .env de la plataforma).
+                                </p>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">
+                                sk-... <span class="text-slate-400 font-normal">(https://platform.openai.com/api-keys)</span>
+                            </label>
+                            <div class="flex gap-2">
+                                <input type="password"
+                                       wire:model="openai_api_key"
+                                       placeholder="sk-proj-... (déjalo vacío para usar la key global)"
+                                       class="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm font-mono focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+                                       autocomplete="off">
+                                <button type="button"
+                                        wire:click="probarOpenaiKey"
+                                        wire:loading.attr="disabled"
+                                        wire:target="probarOpenaiKey"
+                                        class="inline-flex items-center gap-2 rounded-xl bg-violet-500 hover:bg-violet-600 text-white font-semibold px-4 py-2 text-sm transition disabled:opacity-50">
+                                    <span wire:loading.remove wire:target="probarOpenaiKey">
+                                        <i class="fa-solid fa-vial"></i> Probar
+                                    </span>
+                                    <span wire:loading wire:target="probarOpenaiKey">
+                                        <i class="fa-solid fa-circle-notch fa-spin"></i>
+                                    </span>
+                                </button>
+                            </div>
+                            @error('openai_api_key')
+                                <p class="text-xs text-rose-600 mt-1">{{ $message }}</p>
+                            @enderror
+                            <p class="text-[11px] text-slate-500 mt-2 flex items-center gap-1">
+                                <i class="fa-solid fa-shield-halved text-slate-400"></i>
+                                La key se guarda cifrada en BD y solo se usa para llamar a OpenAI en nombre de este tenant.
+                                El costo de tokens se factura a la cuenta OpenAI dueña de la key.
+                            </p>
                         </div>
                     </div>
 

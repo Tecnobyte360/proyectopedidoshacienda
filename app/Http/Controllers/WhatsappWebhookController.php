@@ -904,21 +904,27 @@ class WhatsappWebhookController extends Controller
         $config = \App\Models\ConfiguracionBot::actual();
         $modelo = $config->modelo_openai ?: 'gpt-4o-mini';
 
+        // 🔑 Key del tenant actual (con fallback al .env)
+        $openaiKey = \App\Models\Tenant::resolverOpenaiKey();
+
         // ── Validación temprana: API key falta ────────────────────────────
-        if (empty(env('OPENAI_API_KEY'))) {
+        if (empty($openaiKey)) {
+            $tenantActual = app(\App\Services\TenantManager::class)->current();
+            $tenantNombre = $tenantActual?->nombre ?? 'desconocido';
+
             app(\App\Services\BotAlertaService::class)->registrar(
                 \App\Models\BotAlerta::TIPO_OPENAI_KEY,
-                '🔑 OPENAI_API_KEY no configurada',
-                'No hay API key de OpenAI en el archivo .env. El bot no puede responder. Configúrala con tu key de https://platform.openai.com/api-keys',
+                "🔑 OpenAI API key no configurada para tenant {$tenantNombre}",
+                "Configura la key del tenant en /admin/tenants (campo OpenAI API key) o define OPENAI_API_KEY global en el .env como fallback. Sin ella, el bot no puede responder.",
                 \App\Models\BotAlerta::SEV_CRITICA
             );
-            Log::error('❌ OPENAI_API_KEY no configurada');
+            Log::error('❌ OpenAI API key no resuelta', ['tenant' => $tenantNombre]);
             return null;
         }
 
         for ($i = 1; $i <= $intentos; $i++) {
             try {
-                $response = Http::withToken(env('OPENAI_API_KEY'))
+                $response = Http::withToken($openaiKey)
                     ->timeout(35)
                     ->post('https://api.openai.com/v1/chat/completions', [
                         'model'             => $modelo,
