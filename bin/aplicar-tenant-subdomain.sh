@@ -109,12 +109,22 @@ for FLAG in "$PENDING_DIR"/*.conf.pending; do
     systemctl reload nginx
     echo "$LOG_TAG ✓ Nginx recargado con $DOMINIO"
 
-    # 4. Certbot
+    # 4. Certbot — siempre intenta aplicar SSL (con --reinstall por si ya existía el cert).
+    # Esto es importante en RE-CONFIGURACIÓN: la nueva conf no tiene bloque 443 ssl,
+    # certbot lo añade de vuelta usando el cert existente o generando uno nuevo.
     if [ "$NO_SSL" != "true" ]; then
-        echo "$LOG_TAG 🔒 Generando SSL para $DOMINIO con email $EMAIL"
-        if certbot --nginx -d "$DOMINIO" \
-                   --non-interactive --agree-tos \
-                   --email "$EMAIL" --redirect 2>&1; then
+        echo "$LOG_TAG 🔒 Aplicando SSL para $DOMINIO con email $EMAIL"
+
+        # Decidir si usar --reinstall (si ya existe cert) o generar nuevo
+        if certbot certificates 2>/dev/null | grep -q "Certificate Name: $DOMINIO"; then
+            echo "$LOG_TAG · Cert existente encontrado, reinstalando sobre la nueva config"
+            CERTBOT_CMD="certbot --nginx -d $DOMINIO --reinstall --redirect --non-interactive --agree-tos --email $EMAIL"
+        else
+            echo "$LOG_TAG · Cert no existe, generando nuevo"
+            CERTBOT_CMD="certbot --nginx -d $DOMINIO --non-interactive --agree-tos --email $EMAIL --redirect"
+        fi
+
+        if $CERTBOT_CMD 2>&1; then
             echo "$LOG_TAG ✓ SSL OK para $DOMINIO"
         else
             echo "$LOG_TAG ⚠️ Certbot falló para $DOMINIO (revisa manualmente)"
