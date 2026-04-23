@@ -24,6 +24,7 @@
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @livewireStyles
+    <style>[x-cloak] { display: none !important; }</style>
 
     {{-- Fullscreen mode — toggle simple con body class + localStorage (sin Alpine store).
          Cualquier botón que llame a window.toggleFullscreen() activa/desactiva el modo. --}}

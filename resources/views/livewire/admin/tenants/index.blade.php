@@ -263,13 +263,13 @@
         <div>{{ $tenants->links() }}</div>
     </div>
 
-    {{-- MODAL --}}
-    @if($modalAbierto)
-        <div wire:key="modal-tenant-form"
-             class="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto"
-             style="background: rgba(15,23,42,0.55); backdrop-filter: blur(4px);"
-             wire:click.self="cerrarModal">
-            <div x-data="{}" @click.stop class="w-full max-w-3xl rounded-2xl bg-white shadow-2xl my-8 overflow-hidden">
+    {{-- MODAL (siempre montado, se muestra/oculta con Alpine según $modalAbierto) --}}
+    <div x-data x-show="$wire.modalAbierto" x-cloak wire:ignore.self
+         class="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto"
+         style="background: rgba(15,23,42,0.55); backdrop-filter: blur(4px);"
+         @click.self="$wire.cerrarModal()"
+         @keydown.escape.window="$wire.modalAbierto && $wire.cerrarModal()">
+        <div @click.stop class="w-full max-w-3xl rounded-2xl bg-white shadow-2xl my-8 overflow-hidden">
                 <div class="flex items-center justify-between px-6 py-5 bg-gradient-to-r from-[#fbe9d7]/40 via-white to-white border-b border-slate-100">
                     <div class="flex items-center gap-3">
                         <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-[#d68643] to-[#a85f24] text-white shadow">
@@ -523,8 +523,7 @@
                     </div>
                 </form>
             </div>
-        </div>
-    @endif
+    </div>
 
     {{-- 🗑️ MODAL: ELIMINACIÓN DEFINITIVA con tipeo del nombre --}}
     @if($eliminarModalAbierto)
