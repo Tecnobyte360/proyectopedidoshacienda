@@ -9,6 +9,7 @@ use Livewire\Component;
 class Bot extends Component
 {
     public bool   $enviar_imagenes_productos = false;
+    public bool   $transcribir_audios        = true;
     public int    $max_imagenes_por_mensaje  = 3;
     public bool   $enviar_imagen_destacados  = false;
     public bool   $saludar_con_promociones   = true;
@@ -58,6 +59,7 @@ class Bot extends Component
         $cfg = ConfiguracionBot::actual();
 
         $this->enviar_imagenes_productos = (bool) $cfg->enviar_imagenes_productos;
+        $this->transcribir_audios        = (bool) ($cfg->transcribir_audios ?? true);
         $this->max_imagenes_por_mensaje  = (int) $cfg->max_imagenes_por_mensaje;
         $this->enviar_imagen_destacados  = (bool) $cfg->enviar_imagen_destacados;
         $this->saludar_con_promociones   = (bool) $cfg->saludar_con_promociones;
@@ -306,6 +308,7 @@ class Bot extends Component
     {
         return [
             'enviar_imagenes_productos' => 'boolean',
+            'transcribir_audios'        => 'boolean',
             'max_imagenes_por_mensaje'  => 'integer|min:1|max:10',
             'enviar_imagen_destacados'  => 'boolean',
             'saludar_con_promociones'   => 'boolean',
@@ -331,6 +334,20 @@ class Bot extends Component
             'connection_id_default'                 => 'nullable|integer',
             'cumpleanos_dias_vigencia_beneficio'    => 'integer|min:1|max:30',
         ];
+    }
+
+    /**
+     * Guarda el toggle de transcripción apenas se clickea (wire:model.live).
+     */
+    public function updatedTranscribirAudios(bool $value): void
+    {
+        ConfiguracionBot::actual()->update(['transcribir_audios' => $value]);
+        $this->dispatch('notify', [
+            'type'    => 'success',
+            'message' => $value
+                ? '🎤 Transcripción de audios ACTIVADA'
+                : '🔇 Transcripción de audios DESACTIVADA',
+        ]);
     }
 
     public function guardar(): void

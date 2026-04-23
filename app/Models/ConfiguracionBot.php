@@ -18,6 +18,7 @@ class ConfiguracionBot extends Model
     protected $fillable = [
         'tenant_id',
         'enviar_imagenes_productos',
+        'transcribir_audios',
         'max_imagenes_por_mensaje',
         'enviar_imagen_destacados',
         'saludar_con_promociones',
@@ -46,6 +47,7 @@ class ConfiguracionBot extends Model
 
     protected $casts = [
         'enviar_imagenes_productos' => 'boolean',
+        'transcribir_audios'        => 'boolean',
         'enviar_imagen_destacados'  => 'boolean',
         'saludar_con_promociones'   => 'boolean',
         'agrupar_mensajes_activo'   => 'boolean',

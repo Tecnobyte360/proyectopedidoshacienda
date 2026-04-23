@@ -64,6 +64,51 @@ class WhatsappWebhookController extends Controller
         $fromMe       = (bool) ($data['mensaje']['fromMe'] ?? $data['fromMe'] ?? false);
         $connectionId = $data['conexion']['id'] ?? $data['connectionId'] ?? $data['whatsappId'] ?? null;
 
+        // 🎤 AUDIO: si llega un audio (sin texto), lo descargamos y transcribimos
+        //    Soporta múltiples formatos de payload que TecnoByteApp puede enviar.
+        $tipoMensaje = strtolower(
+            $data['mensaje']['type'] ?? $data['type'] ?? $data['messageType'] ?? ''
+        );
+        $audioUrl = $data['mensaje']['audio']['url']
+            ?? $data['mensaje']['mediaUrl']
+            ?? $data['audio']['url']
+            ?? $data['audioUrl']
+            ?? $data['mediaUrl']
+            ?? null;
+
+        $esAudio = !empty($audioUrl)
+            && (empty($message) || in_array($tipoMensaje, ['audio', 'voice', 'ptt'], true));
+
+        if ($esAudio) {
+            try {
+                $config = \App\Models\ConfiguracionBot::actual();
+                $transcribir = property_exists($config, 'transcribir_audios')
+                    ? (bool) ($config->transcribir_audios ?? true)
+                    : true;
+
+                if (!$transcribir) {
+                    Log::info('🎤 Audio ignorado (transcripción desactivada)');
+                    return response()->json(['status' => 'audio_disabled']);
+                }
+
+                Log::info('🎤 Detectado audio, transcribiendo...', ['url' => $audioUrl, 'from' => $from]);
+                $texto = app(\App\Services\TranscripcionAudioService::class)->transcribir($audioUrl);
+
+                if ($texto !== '') {
+                    $message = $texto;
+                    Log::info('🎤 Transcripción OK', ['preview' => mb_substr($texto, 0, 120)]);
+                } else {
+                    Log::warning('🎤 Transcripción vacía; respondiendo al cliente con nota amigable');
+                    // Responder al cliente pero NO abortar el proceso;
+                    // devolvemos mensaje amigable en el flujo normal.
+                    $message = '[El cliente envió una nota de voz pero no se pudo transcribir. Pídele amablemente que la reenvíe o que escriba el mensaje.]';
+                }
+            } catch (\Throwable $e) {
+                Log::error('🎤 Error procesando audio: ' . $e->getMessage());
+                $message = '[Audio recibido pero falló la transcripción. Pídele al cliente que escriba.]';
+            }
+        }
+
         Log::info('📥 DATOS NORMALIZADOS', compact('from', 'name', 'message', 'messageId', 'fromMe', 'connectionId'));
 
         if (!$from || !$message) {

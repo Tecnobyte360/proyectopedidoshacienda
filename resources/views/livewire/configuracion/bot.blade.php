@@ -96,6 +96,42 @@
             </div>
         </section>
 
+        {{-- ╔═══ TRANSCRIPCIÓN DE AUDIOS (WHISPER) ═══╗ --}}
+        <section class="rounded-2xl bg-white shadow border border-slate-200 p-6">
+            <div class="flex items-center gap-2 mb-4">
+                <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+                    <i class="fa-solid fa-microphone"></i>
+                </span>
+                <div class="flex-1">
+                    <h3 class="text-lg font-bold text-slate-800">Notas de voz del cliente</h3>
+                    <p class="text-xs text-slate-500">Transcribe automáticamente los audios que envíe el cliente y los procesa como texto.</p>
+                </div>
+            </div>
+
+            <label class="inline-flex items-start gap-3 cursor-pointer w-full justify-between rounded-xl border-2 border-emerald-200 bg-emerald-50/50 p-4 hover:bg-emerald-50 transition">
+                <div class="flex-1">
+                    <div class="text-sm font-bold text-slate-800 mb-1">
+                        🎤 Transcribir notas de voz con Whisper (OpenAI)
+                    </div>
+                    <div class="text-xs text-slate-600">
+                        Cuando el cliente mande un audio en vez de texto, el bot lo transcribe y responde igual que si hubiera escrito.
+                        Perfecto para clientes que prefieren hablar antes que escribir.
+                    </div>
+                </div>
+                <input type="checkbox" wire:model.live="transcribir_audios"
+                       class="mt-1 rounded border-slate-300 text-[#d68643] h-6 w-6">
+            </label>
+
+            <div class="mt-3 flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 p-3 text-xs text-amber-800">
+                <i class="fa-solid fa-circle-info mt-0.5"></i>
+                <div>
+                    <strong>Costo aproximado:</strong> Whisper cobra ~$0.006 USD por minuto de audio.
+                    Un audio típico de WhatsApp (10-20 seg) cuesta menos de $0.002 USD. Requiere
+                    <code>OPENAI_API_KEY</code> configurada en el .env.
+                </div>
+            </div>
+        </section>
+
         {{-- ╔═══ AGRUPACIÓN DE MENSAJES (DEBOUNCE) ═══╗ --}}
         <section class="rounded-2xl bg-white shadow border border-slate-200 p-6">
             <div class="flex items-center gap-2 mb-4">
