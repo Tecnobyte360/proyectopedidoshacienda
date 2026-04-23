@@ -215,7 +215,7 @@
                                                 class="h-8 w-8 inline-flex items-center justify-center rounded-lg bg-violet-100 hover:bg-violet-200 text-violet-700 transition">
                                             <i class="fa-solid fa-mask text-xs"></i>
                                         </button>
-                                        <button wire:click="editarTenant({{ $t->id }})"
+                                        <button wire:click="abrirModalEditar({{ $t->id }})"
                                                 title="Editar tenant"
                                                 class="h-8 w-8 inline-flex items-center justify-center rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition">
                                             <i class="fa-solid fa-pen-to-square text-xs"></i>
