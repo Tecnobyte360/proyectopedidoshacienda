@@ -64,10 +64,15 @@ class WhatsappWebhookController extends Controller
         $fromMe       = (bool) ($data['mensaje']['fromMe'] ?? $data['fromMe'] ?? false);
         $connectionId = $data['conexion']['id'] ?? $data['connectionId'] ?? $data['whatsappId'] ?? null;
 
-        // 🎤 AUDIO: si llega un audio (sin texto), lo descargamos y transcribimos
+        // 🎤 AUDIO: si llega un audio, lo descargamos y transcribimos
         //    Soporta múltiples formatos de payload que TecnoByteApp puede enviar.
         $tipoMensaje = strtolower(
-            $data['mensaje']['type'] ?? $data['type'] ?? $data['messageType'] ?? ''
+            $data['mensaje']['type']
+                ?? $data['mensaje']['mediaType']
+                ?? $data['type']
+                ?? $data['messageType']
+                ?? $data['mediaType']
+                ?? ''
         );
         $audioUrl = $data['mensaje']['audio']['url']
             ?? $data['mensaje']['mediaUrl']
@@ -76,8 +81,18 @@ class WhatsappWebhookController extends Controller
             ?? $data['mediaUrl']
             ?? null;
 
-        $esAudio = !empty($audioUrl)
-            && (empty($message) || in_array($tipoMensaje, ['audio', 'voice', 'ptt'], true));
+        // Detectar audio por: tipo (audio/ogg, voice, ptt) o URL con extensión de audio.
+        $esAudio = !empty($audioUrl) && (
+            str_starts_with($tipoMensaje, 'audio')
+            || in_array($tipoMensaje, ['voice', 'ptt'], true)
+            || preg_match('/\.(ogg|opus|mp3|m4a|wav|webm|mpga)(\?|$)/i', $audioUrl) === 1
+        );
+
+        // Si es audio, el "body" normalmente trae el nombre del archivo — lo ignoramos
+        // para que no contamine el mensaje que se envía a la IA.
+        if ($esAudio) {
+            $message = '';
+        }
 
         if ($esAudio) {
             try {
