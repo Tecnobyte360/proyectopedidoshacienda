@@ -265,10 +265,11 @@
 
     {{-- MODAL --}}
     @if($modalAbierto)
-        <div class="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto"
+        <div wire:key="modal-tenant-form"
+             class="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto"
              style="background: rgba(15,23,42,0.55); backdrop-filter: blur(4px);"
              wire:click.self="cerrarModal">
-            <div class="w-full max-w-3xl rounded-2xl bg-white shadow-2xl my-8 overflow-hidden" @click.stop>
+            <div x-data="{}" @click.stop class="w-full max-w-3xl rounded-2xl bg-white shadow-2xl my-8 overflow-hidden">
                 <div class="flex items-center justify-between px-6 py-5 bg-gradient-to-r from-[#fbe9d7]/40 via-white to-white border-b border-slate-100">
                     <div class="flex items-center gap-3">
                         <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-[#d68643] to-[#a85f24] text-white shadow">
@@ -527,7 +528,8 @@
 
     {{-- 🗑️ MODAL: ELIMINACIÓN DEFINITIVA con tipeo del nombre --}}
     @if($eliminarModalAbierto)
-        <div class="fixed inset-0 z-50 flex items-center justify-center p-4"
+        <div wire:key="modal-tenant-eliminar"
+             class="fixed inset-0 z-50 flex items-center justify-center p-4"
              style="background: rgba(15,23,42,0.65); backdrop-filter: blur(6px);">
             <div class="bg-white rounded-2xl shadow-2xl max-w-xl w-full overflow-hidden">
 
@@ -618,7 +620,8 @@
 
     {{-- MODAL: log del setup de subdominio (con polling reactivo) --}}
     @if($subdomModalAbierto)
-        <div class="fixed inset-0 z-50 flex items-center justify-center p-4"
+        <div wire:key="modal-tenant-subdom"
+             class="fixed inset-0 z-50 flex items-center justify-center p-4"
              style="background: rgba(15,23,42,0.55); backdrop-filter: blur(4px);"
              @if($subdomCorriendo) wire:poll.2s="chequearEstadoSubdominio" @endif>
             <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden">
