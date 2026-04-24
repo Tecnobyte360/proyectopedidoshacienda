@@ -553,6 +553,31 @@ class Index extends Component
         // ⚠️ NO se auto-activa modo humano. El bot SIGUE respondiendo al cliente.
         // Si quieres silenciar al bot, usa el botón "Tomar control" explícitamente.
 
+        // Si la conversación es de un WIDGET WEB (no WhatsApp), no usamos TecnoByteApp.
+        // El widget pollea los mensajes del operador y los muestra.
+        if ($conv->canal === 'widget') {
+            try {
+                $mensaje = app(ConversacionService::class)->agregarMensaje(
+                    $conv,
+                    MensajeWhatsapp::ROL_ASSISTANT,
+                    $texto,
+                    ['meta' => [
+                        'enviado_por_humano'  => true,
+                        'usuario_id'          => auth()->id(),
+                        'canal_widget'        => true,
+                    ]]
+                );
+                $mensaje->update(['ack' => MensajeWhatsapp::ACK_SENT]);
+            } catch (\Throwable $e) {
+                Log::warning('No se persistió mensaje widget: ' . $e->getMessage());
+            }
+
+            $this->nuevoMensaje = '';
+            $this->dispatch('mensaje-enviado');
+            $this->dispatch('notify', ['type' => 'success', 'message' => '✓ Enviado al widget web']);
+            return;
+        }
+
         // Resolver connection_id del tenant actual (evita enviar desde el número de otro tenant)
         $connectionId = $this->resolverConnectionId($conv->connection_id);
         if (!$connectionId) {

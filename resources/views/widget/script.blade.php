@@ -80,6 +80,8 @@
 
     let sending = false;
     let greeted = false;
+    let lastCheck = new Date().toISOString();
+    let pollInterval = null;
 
     btn.addEventListener('click', () => {
         panel.classList.add('open');
@@ -88,8 +90,31 @@
             greeted = true;
         }
         setTimeout(() => inputEl.focus(), 100);
+        // Arrancar polling de mensajes del operador mientras esté abierto
+        if (!pollInterval) {
+            pollInterval = setInterval(pollOperador, 3000);
+        }
     });
-    closeBtn.addEventListener('click', () => panel.classList.remove('open'));
+    closeBtn.addEventListener('click', () => {
+        panel.classList.remove('open');
+        if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+    });
+
+    function pollOperador() {
+        fetch(CFG.apiBase + '/mensajes?session_id=' + encodeURIComponent(sessionId) + '&since=' + encodeURIComponent(lastCheck), {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' },
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (!data || !Array.isArray(data.mensajes)) return;
+            data.mensajes.forEach(m => {
+                appendMsg('bot', m.texto);
+                if (m.created_at > lastCheck) lastCheck = m.created_at;
+            });
+        })
+        .catch(() => {});
+    }
     sendBtn.addEventListener('click', send);
     inputEl.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
 
@@ -115,8 +140,14 @@
         .then(r => r.json())
         .then(data => {
             typingEl.remove();
-            if (data && data.reply) appendMsg('bot', data.reply);
-            else appendMsg('bot', 'Uy, no logré responderte. Intenta de nuevo.');
+            if (data && data.reply) {
+                appendMsg('bot', data.reply);
+            } else if (data && data.modo === 'humano') {
+                const aviso = appendMsg('bot', '🙌 Un asesor está atendiendo esta conversación. Te responderá en un momento.');
+                aviso.classList.add('typing');
+            } else {
+                appendMsg('bot', 'Uy, no logré responderte. Intenta de nuevo.');
+            }
         })
         .catch(() => {
             typingEl.remove();

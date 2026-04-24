@@ -214,4 +214,5 @@ Route::get('/widget.js',                        [ChatWidgetController::class, 's
 Route::get('/widget-preview',                   fn() => view('widget.preview', ['token' => request('token')]))->withoutMiddleware(['web']);
 Route::get('/api/widget/{token}/config',        [ChatWidgetController::class, 'config'])->withoutMiddleware(['web']);
 Route::post('/api/widget/{token}/mensaje',      [ChatWidgetController::class, 'mensaje'])->withoutMiddleware(['web']);
+Route::get('/api/widget/{token}/mensajes',      [ChatWidgetController::class, 'mensajes'])->withoutMiddleware(['web']);
 Route::options('/api/widget/{token}/{any?}',    [ChatWidgetController::class, 'preflight'])->where('any', '.*')->withoutMiddleware(['web']);

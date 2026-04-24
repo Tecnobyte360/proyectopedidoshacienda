@@ -85,7 +85,11 @@
                                 {{ $iniciales ?: 'C' }}
                             </div>
                         @endif
-                        @if($c->es_interna ?? false)
+                        @if($c->canal === 'widget')
+                            <span class="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-sky-500 text-white text-[10px] border-2 border-white" title="Chat desde web (widget)">
+                                <i class="fa-solid fa-globe"></i>
+                            </span>
+                        @elseif($c->es_interna ?? false)
                             <span class="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-violet-500 text-white text-[10px] border-2 border-white" title="Usuario interno (equipo)">
                                 <i class="fa-solid fa-user-shield"></i>
                             </span>

@@ -5,6 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\ChatWidget;
 use App\Models\ChatWidgetMensaje;
 use App\Models\ChatWidgetSesion;
+use App\Models\ConversacionWhatsapp;
+use App\Models\MensajeWhatsapp;
+use App\Services\ConversacionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -91,7 +94,7 @@ class ChatWidgetController extends Controller
         ]);
         if ($actualiza) $sesion->update($actualiza);
 
-        // Persistir mensaje del visitante
+        // Persistir mensaje del visitante (tabla dedicada del widget)
         ChatWidgetMensaje::create([
             'sesion_id' => $sesion->id,
             'tenant_id' => $widget->tenant_id,
@@ -99,7 +102,25 @@ class ChatWidgetController extends Controller
             'contenido' => $data['mensaje'],
         ]);
 
-        // Generar respuesta con el servicio de IA del bot (modo widget)
+        // ESPEJO en conversaciones_whatsapp para que aparezca en Chat en vivo
+        $conv = $this->espejoConversacion($widget, $sesion);
+        app(ConversacionService::class)->agregarMensaje(
+            $conv,
+            MensajeWhatsapp::ROL_USER,
+            $data['mensaje'],
+            ['meta' => ['canal_widget' => true, 'widget_session_id' => $sesion->session_id]]
+        );
+
+        // Si el operador ya tomó control → NO invocar IA, solo persistir y esperar respuesta humana
+        if ($conv->atendida_por_humano) {
+            return $this->cors(response()->json([
+                'ok'     => true,
+                'reply'  => null,   // sin respuesta inmediata del bot; operador responderá manualmente
+                'modo'   => 'humano',
+            ]), $request);
+        }
+
+        // Generar respuesta con IA del bot (modo widget)
         try {
             $respuesta = app(\App\Services\WidgetChatService::class)->responder(
                 widget: $widget,
@@ -117,6 +138,14 @@ class ChatWidgetController extends Controller
             'rol'       => ChatWidgetMensaje::ROL_ASSISTANT,
             'contenido' => $respuesta,
         ]);
+
+        // Espejo de respuesta en conversaciones_whatsapp
+        app(ConversacionService::class)->agregarMensaje(
+            $conv,
+            MensajeWhatsapp::ROL_ASSISTANT,
+            $respuesta,
+            ['meta' => ['canal_widget' => true, 'widget_session_id' => $sesion->session_id]]
+        );
 
         // Contadores
         $sesion->increment('total_mensajes', 2);
@@ -165,6 +194,90 @@ class ChatWidgetController extends Controller
         ])->render();
 
         return response($js, 200, ['Content-Type' => 'application/javascript; charset=UTF-8']);
+    }
+
+    /**
+     * Busca o crea una ConversacionWhatsapp espejo para esta sesión del widget.
+     * Se usa telefono_normalizado = "web_{session_id}" para identificarla de forma única,
+     * canal='widget' para distinguirla en la UI del Chat en vivo.
+     */
+    private function espejoConversacion(ChatWidget $widget, ChatWidgetSesion $sesion): ConversacionWhatsapp
+    {
+        $telFake = 'web_' . $sesion->session_id;
+
+        $conv = ConversacionWhatsapp::where('telefono_normalizado', $telFake)->first();
+        if ($conv) return $conv;
+
+        // Crear cliente placeholder para la sesión (requerido por ConversacionService)
+        $nombreVisitante = $sesion->visitante_nombre ?: 'Visitante web';
+        $cliente = \App\Models\Cliente::firstOrCreate(
+            ['telefono_normalizado' => $telFake],
+            ['nombre' => $nombreVisitante, 'telefono' => $telFake, 'activo' => true]
+        );
+
+        return ConversacionWhatsapp::create([
+            'tenant_id'            => $widget->tenant_id,
+            'cliente_id'           => $cliente->id,
+            'telefono_normalizado' => $telFake,
+            'canal'                => 'widget',
+            'estado'               => ConversacionWhatsapp::ESTADO_ACTIVA,
+            'primer_mensaje_at'    => now(),
+            'ultimo_mensaje_at'    => now(),
+        ]);
+    }
+
+    /**
+     * Endpoint que el widget pollea para ver si el operador respondió algo nuevo.
+     * GET /api/widget/{token}/mensajes?session_id=X&since=timestamp
+     */
+    public function mensajes(string $token, Request $request)
+    {
+        $widget = ChatWidget::where('token', $token)->where('activo', true)->first();
+        if (!$widget) return $this->cors(response()->json(['error' => 'Widget no encontrado'], 404), $request);
+
+        if (!$widget->dominioAutorizado($request->header('Origin'))) {
+            return $this->cors(response()->json(['error' => 'Dominio no autorizado'], 403), $request);
+        }
+
+        app(\App\Services\TenantManager::class)->set($widget->tenant);
+
+        $sessionId = $request->query('session_id');
+        $since     = $request->query('since');
+
+        if (!$sessionId) return $this->cors(response()->json(['error' => 'session_id requerido'], 400), $request);
+
+        $telFake = 'web_' . $sessionId;
+        $conv = ConversacionWhatsapp::where('telefono_normalizado', $telFake)->first();
+
+        if (!$conv) {
+            return $this->cors(response()->json(['mensajes' => []]), $request);
+        }
+
+        $q = $conv->mensajes()
+            ->where('rol', MensajeWhatsapp::ROL_ASSISTANT)
+            ->whereJsonContains('meta->enviado_por_humano', true);
+
+        if ($since) {
+            try {
+                $q->where('created_at', '>', \Carbon\Carbon::parse($since));
+            } catch (\Throwable $e) { /* ignore */ }
+        }
+
+        $mensajes = $q->orderBy('id')
+            ->get(['contenido', 'tipo', 'meta', 'created_at'])
+            ->map(fn ($m) => [
+                'texto'       => $m->contenido,
+                'tipo'        => $m->tipo ?: 'text',
+                'operador'    => ($m->meta['usuario_id'] ?? null) ? 'Operador' : 'Agente',
+                'media_url'   => $m->meta['media_url'] ?? null,
+                'created_at'  => $m->created_at->toIso8601String(),
+            ]);
+
+        return $this->cors(response()->json([
+            'ok'            => true,
+            'mensajes'      => $mensajes,
+            'modo_humano'   => (bool) $conv->atendida_por_humano,
+        ]), $request);
     }
 
     private function cors($response, Request $request)
