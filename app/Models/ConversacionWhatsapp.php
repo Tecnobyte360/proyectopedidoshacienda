@@ -23,6 +23,8 @@ class ConversacionWhatsapp extends Model
         'estado',
         'atendida_por_humano',
         'es_interna',
+        'departamento_id',
+        'derivada_at',
         'total_mensajes',
         'total_mensajes_cliente',
         'total_mensajes_bot',
@@ -35,6 +37,7 @@ class ConversacionWhatsapp extends Model
     protected $casts = [
         'atendida_por_humano' => 'boolean',
         'es_interna'          => 'boolean',
+        'derivada_at'         => 'datetime',
         'genero_pedido'       => 'boolean',
         'primer_mensaje_at'   => 'datetime',
         'ultimo_mensaje_at'   => 'datetime',

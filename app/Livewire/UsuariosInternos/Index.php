@@ -14,6 +14,7 @@ class Index extends Component
     public string $nombre       = '';
     public string $cargo        = '';
     public string $departamento = '';
+    public ?int   $departamentoId = null;
     public string $notas        = '';
     public bool   $activo       = true;
 
@@ -43,7 +44,9 @@ class Index extends Component
             ->orderBy('nombre')
             ->get();
 
-        return view('livewire.usuarios-internos.index', compact('usuarios'))
+        $departamentos = \App\Models\Departamento::where('activo', true)->orderBy('nombre')->get();
+
+        return view('livewire.usuarios-internos.index', compact('usuarios', 'departamentos'))
             ->layout('layouts.app');
     }
 
@@ -57,13 +60,14 @@ class Index extends Component
     public function abrirEditar(int $id): void
     {
         $u = UsuarioInternoWhatsapp::findOrFail($id);
-        $this->editandoId   = $u->id;
-        $this->telefono     = $u->telefono_normalizado;
-        $this->nombre       = $u->nombre;
-        $this->cargo        = (string) $u->cargo;
-        $this->departamento = (string) $u->departamento;
-        $this->notas        = (string) $u->notas;
-        $this->activo       = $u->activo;
+        $this->editandoId     = $u->id;
+        $this->telefono       = $u->telefono_normalizado;
+        $this->nombre         = $u->nombre;
+        $this->cargo          = (string) $u->cargo;
+        $this->departamento   = (string) $u->departamento;
+        $this->departamentoId = $u->departamento_id;
+        $this->notas          = (string) $u->notas;
+        $this->activo         = $u->activo;
         $this->modal = true;
     }
 
@@ -75,6 +79,7 @@ class Index extends Component
         $data['telefono_normalizado'] = preg_replace('/\D+/', '', $this->telefono);
         unset($data['telefono']);
         $data['activo'] = $this->activo;
+        $data['departamento_id'] = $this->departamentoId ?: null;
 
         if ($this->editandoId) {
             UsuarioInternoWhatsapp::findOrFail($this->editandoId)->update($data);

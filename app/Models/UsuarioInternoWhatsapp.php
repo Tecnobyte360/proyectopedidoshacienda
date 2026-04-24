@@ -13,6 +13,7 @@ class UsuarioInternoWhatsapp extends Model
 
     protected $fillable = [
         'tenant_id',
+        'departamento_id',
         'telefono_normalizado',
         'nombre',
         'cargo',

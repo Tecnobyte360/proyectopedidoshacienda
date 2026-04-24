@@ -489,6 +489,34 @@ class WhatsappWebhookController extends Controller
             return '';   // sin respuesta automática
         }
 
+        // ── CAPA 0.5: Derivación por departamento ───────────────────────────
+        // Si el mensaje tiene palabras clave de algún departamento (ej. "servicio
+        // al cliente", "reclamo", "queja"), derivamos la conversación a ese depto:
+        // silenciamos al bot, notificamos a los usuarios internos del depto y
+        // respondemos al cliente con el saludo automático.
+        try {
+            $cliente2 = \App\Models\Cliente::encontrarOCrearPorTelefono($telefonoNorm, $name);
+            $conv2    = app(\App\Services\ConversacionService::class)
+                ->obtenerOCrearActiva($telefonoNorm, $cliente2->id, null, $connectionId ? (int) $connectionId : null);
+
+            $saludo = app(\App\Services\DerivacionService::class)
+                ->derivarSiAplica($conv2, $message, $cliente2->nombre ?: $name, $telefonoNorm);
+
+            if ($saludo) {
+                // Persistir mensaje del cliente y respuesta del bot
+                app(\App\Services\ConversacionService::class)->agregarMensaje(
+                    $conv2, \App\Models\MensajeWhatsapp::ROL_USER, $message
+                );
+                app(\App\Services\ConversacionService::class)->agregarMensaje(
+                    $conv2, \App\Models\MensajeWhatsapp::ROL_ASSISTANT, $saludo,
+                    ['meta' => ['derivacion_auto' => true]]
+                );
+                return $saludo;
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Derivación falló, seguimos con flujo normal: ' . $e->getMessage());
+        }
+
         // ── CAPA 0: Buffer + debounce — agrupar mensajes seguidos del mismo cliente ──
         // Si el cliente manda 3 mensajes en 4 segundos, esperamos a que termine de
         // escribir y respondemos UNA sola vez con todo el contexto.
