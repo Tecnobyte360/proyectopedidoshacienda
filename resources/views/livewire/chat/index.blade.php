@@ -247,14 +247,21 @@
                                 <p class="text-[10px] text-slate-500 mt-1 text-right flex items-center justify-end gap-1">
                                     <span>{{ $esHumano ? '👤' : '🤖' }} {{ $m->created_at->format('H:i') }}</span>
                                     @php $ack = (int) ($m->ack ?? 0); @endphp
-                                    @if($ack >= 3)
-                                        <i class="fa-solid fa-check-double text-blue-500" title="Leído"></i>
-                                    @elseif($ack === 2)
-                                        <i class="fa-solid fa-check-double text-slate-400" title="Entregado"></i>
-                                    @elseif($ack === 1)
-                                        <i class="fa-solid fa-check text-slate-400" title="Enviado"></i>
+                                    {{-- Solo mostramos ticks/reloj si podemos rastrear el estado (mensaje del operador).
+                                         Los mensajes del bot se envían vía API y asumimos entregados correctamente. --}}
+                                    @if($esHumano)
+                                        @if($ack >= 3)
+                                            <i class="fa-solid fa-check-double text-blue-500" title="Leído"></i>
+                                        @elseif($ack === 2)
+                                            <i class="fa-solid fa-check-double text-slate-400" title="Entregado"></i>
+                                        @elseif($ack === 1)
+                                            <i class="fa-solid fa-check text-slate-400" title="Enviado"></i>
+                                        @else
+                                            <i class="fa-regular fa-clock text-slate-400" title="Pendiente"></i>
+                                        @endif
                                     @else
-                                        <i class="fa-regular fa-clock text-slate-400" title="Pendiente"></i>
+                                        {{-- Bot: asumimos enviado si la API respondió 200. --}}
+                                        <i class="fa-solid fa-check text-slate-400" title="Enviado"></i>
                                     @endif
                                 </p>
                             </div>
