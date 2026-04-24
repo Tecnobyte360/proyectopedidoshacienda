@@ -147,54 +147,44 @@ class Index extends Component
     }
 
     /**
-     * Convierte el audio grabado en el navegador (webm/mp4/etc) a ogg/opus,
-     * que es el formato que WhatsApp acepta como voice note.
-     * Requiere ffmpeg instalado en el contenedor.
+     * Convierte el audio grabado en el navegador a MP3 mono 44.1 kHz 64kbps.
+     * MP3 se reproduce correctamente en WhatsApp móvil y desktop (como audio
+     * adjunto, no voice note, pero reproducible 100% del tiempo).
+     * El formato OGG/Opus como voice note causa "audio no disponible" en
+     * WhatsApp móvil cuando no está generado con parámetros exactos.
      *
      * @return array{0: string, 1: string} [bytesConvertidos, extension]
      */
     private function convertirAOggOpus(string $bytes, string $extOriginal): array
     {
-        // Si ya es ogg no hace falta convertir
-        if ($extOriginal === 'ogg') {
-            return [$bytes, 'ogg'];
-        }
-
         $tmpIn  = tempnam(sys_get_temp_dir(), 'wa_in_') . '.' . $extOriginal;
-        $tmpOut = tempnam(sys_get_temp_dir(), 'wa_out_') . '.ogg';
+        $tmpOut = tempnam(sys_get_temp_dir(), 'wa_out_') . '.mp3';
 
         try {
             file_put_contents($tmpIn, $bytes);
 
-            // Perfil estándar de voice note WhatsApp:
-            //   - OGG/Opus mono 16 kHz a 32 kbps CBR
-            //   - application=voip (optimizado para voz humana)
-            //   - -avoid_negative_ts make_zero y metadata clean para que móvil acepte
             $process = new Process([
                 'ffmpeg', '-y',
                 '-i', $tmpIn,
                 '-vn',
-                '-c:a', 'libopus',
-                '-b:a', '32k',
-                '-ar', '16000',
+                '-c:a', 'libmp3lame',
+                '-b:a', '64k',
+                '-ar', '44100',
                 '-ac', '1',
-                '-application', 'voip',
-                '-frame_duration', '60',
-                '-map_metadata', '-1',
                 $tmpOut,
             ]);
             $process->setTimeout(30);
             $process->run();
 
             if (!$process->isSuccessful() || !file_exists($tmpOut) || filesize($tmpOut) < 100) {
-                Log::warning('🎤 ffmpeg falló al convertir audio, enviando original', [
+                Log::warning('🎤 ffmpeg falló al convertir a mp3, enviando original', [
                     'stderr' => substr($process->getErrorOutput(), 0, 500),
                 ]);
                 return [$bytes, $extOriginal];
             }
 
             $converted = file_get_contents($tmpOut);
-            return [$converted, 'ogg'];
+            return [$converted, 'mp3'];
         } catch (\Throwable $e) {
             Log::warning('🎤 Excepción al convertir audio: ' . $e->getMessage());
             return [$bytes, $extOriginal];
