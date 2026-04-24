@@ -137,14 +137,17 @@
                 url_origen: location.href,
             }),
         })
-        .then(r => r.json())
-        .then(data => {
+        .then(r => r.json().then(data => ({ status: r.status, data })))
+        .then(({ status, data }) => {
             typingEl.remove();
             if (data && data.reply) {
                 appendMsg('bot', data.reply);
             } else if (data && data.modo === 'humano') {
                 const aviso = appendMsg('bot', '🙌 Un asesor está atendiendo esta conversación. Te responderá en un momento.');
                 aviso.classList.add('typing');
+            } else if (data && data.error) {
+                console.error('Widget error:', data);
+                appendMsg('bot', 'Error: ' + data.error);
             } else {
                 appendMsg('bot', 'Uy, no logré responderte. Intenta de nuevo.');
             }

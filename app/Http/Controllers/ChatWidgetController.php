@@ -53,14 +53,23 @@ class ChatWidgetController extends Controller
      */
     public function mensaje(string $token, Request $request)
     {
-        $widget = ChatWidget::where('token', $token)->where('activo', true)->first();
-        if (!$widget) return $this->cors(response()->json(['error' => 'Widget no encontrado'], 404), $request);
+        try {
+
+        $widget = ChatWidget::withoutGlobalScopes()
+            ->where('token', $token)
+            ->where('activo', true)
+            ->first();
+        if (!$widget) return $this->cors(response()->json(['error' => 'Widget no encontrado', 'reply' => 'Widget no encontrado o inactivo.'], 404), $request);
 
         if (!$widget->dominioAutorizado($request->header('Origin'))) {
-            return $this->cors(response()->json(['error' => 'Dominio no autorizado'], 403), $request);
+            return $this->cors(response()->json(['error' => 'Dominio no autorizado', 'reply' => 'Este sitio no está autorizado.'], 403), $request);
         }
 
-        app(\App\Services\TenantManager::class)->set($widget->tenant);
+        $tenant = \App\Models\Tenant::withoutGlobalScopes()->find($widget->tenant_id);
+        if (!$tenant) {
+            return $this->cors(response()->json(['error' => 'Tenant no encontrado', 'reply' => 'Configuración incompleta del widget.'], 500), $request);
+        }
+        app(\App\Services\TenantManager::class)->set($tenant);
 
         $data = $request->validate([
             'session_id'         => 'required|string|max:60',
@@ -159,6 +168,17 @@ class ChatWidgetController extends Controller
             'ok'     => true,
             'reply'  => $respuesta,
         ]), $request);
+
+        } catch (\Throwable $e) {
+            \Log::error('Widget /mensaje fatal: ' . $e->getMessage(), [
+                'trace' => mb_substr($e->getTraceAsString(), 0, 2000),
+            ]);
+            return $this->cors(response()->json([
+                'ok'    => false,
+                'error' => $e->getMessage(),
+                'reply' => 'Error en el servidor: ' . $e->getMessage(),
+            ], 500), $request);
+        }
     }
 
     /**
