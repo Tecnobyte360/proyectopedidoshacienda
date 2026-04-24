@@ -397,6 +397,7 @@ class WhatsappWebhookController extends Controller
         // Si el cliente manda 3 mensajes en 4 segundos, esperamos a que termine de
         // escribir y respondemos UNA sola vez con todo el contexto.
         $config = \App\Models\ConfiguracionBot::actual();
+        $mensajesYaPersistidos = false;
 
         if ($config->agrupar_mensajes_activo && (int) $config->agrupar_mensajes_segundos > 0) {
             $resultadoAgrupado = $this->agruparOEsperarMensajes(
@@ -412,8 +413,9 @@ class WhatsappWebhookController extends Controller
                 return '';   // string vacío → el llamador no envía nada al cliente
             }
 
-            // Sustituir el mensaje único por el agrupado
+            // Sustituir el mensaje único por el agrupado (ya persistido al instante antes del sleep)
             $message = $resultadoAgrupado;
+            $mensajesYaPersistidos = true;
         }
 
         if ($this->tieneAccionPendiente($from)) {
@@ -436,7 +438,7 @@ class WhatsappWebhookController extends Controller
             return $reply;
         }
 
-        return $this->procesarConIA($from, $name, $message, $connectionId);
+        return $this->procesarConIA($from, $name, $message, $connectionId, $mensajesYaPersistidos);
     }
 
     /**
@@ -475,7 +477,24 @@ class WhatsappWebhookController extends Controller
             'mensajes' => count($buffer['mensajes']),
         ]);
 
-        // Esperar a que el cliente termine de escribir
+        // ⚡ Persistir el mensaje del cliente AL INSTANTE (antes del sleep) para
+        // que aparezca ya en el Chat en vivo. La respuesta del bot sí sigue
+        // esperando el buffer, pero el usuario ve el mensaje del cliente sin demora.
+        try {
+            $cliente = \App\Models\Cliente::encontrarOCrearPorTelefono($from, $name);
+            $conv = app(\App\Services\ConversacionService::class)
+                ->obtenerOCrearActiva($from, $cliente->id, null, $connectionId ? (int) $connectionId : null);
+
+            app(\App\Services\ConversacionService::class)->agregarMensaje(
+                $conv,
+                \App\Models\MensajeWhatsapp::ROL_USER,
+                $message
+            );
+        } catch (\Throwable $e) {
+            Log::warning('⚡ No pude persistir el mensaje del cliente al instante: ' . $e->getMessage());
+        }
+
+        // Esperar a que el cliente termine de escribir (solo afecta la respuesta del bot)
         sleep($segundosEspera);
 
         // Después del sleep, ¿soy yo el último mensaje del cliente?
@@ -509,7 +528,7 @@ class WhatsappWebhookController extends Controller
         return $textoCompleto;
     }
 
-    private function procesarConIA(string $from, string $name, string $message, ?string $connectionId = null): string
+    private function procesarConIA(string $from, string $name, string $message, ?string $connectionId = null, bool $yaPersisitido = false): string
     {
         $cacheKey = "whatsapp_chat_{$from}";
 
@@ -533,8 +552,10 @@ class WhatsappWebhookController extends Controller
             $connectionId ? (int) $connectionId : null
         );
 
-        // Persistir mensaje del cliente
-        $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_USER, $message);
+        // Persistir mensaje del cliente (a menos que el buffer ya lo haya hecho al instante)
+        if (!$yaPersisitido) {
+            $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_USER, $message);
+        }
 
         // ── HISTORIAL: leer de BD (últimos 20 mensajes user/assistant) ───────
         $conversationHistory = $conversacion->fresh()->historialParaIA(20);
