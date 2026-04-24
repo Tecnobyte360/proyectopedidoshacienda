@@ -40,10 +40,11 @@
 
             <div class="flex gap-1">
                 @foreach([
-                    'todas'  => ['Todas', 'fa-list'],
-                    'activa' => ['Activas', 'fa-circle-dot'],
-                    'humano' => ['Humano', 'fa-user'],
-                    'bot'    => ['Bot', 'fa-robot'],
+                    'todas'     => ['Todas', 'fa-list'],
+                    'activa'    => ['Activas', 'fa-circle-dot'],
+                    'humano'    => ['Humano', 'fa-user'],
+                    'bot'       => ['Bot', 'fa-robot'],
+                    'internos'  => ['Internos', 'fa-user-shield'],
                 ] as $key => [$label, $icon])
                     <button wire:click="$set('filtroEstado', '{{ $key }}')"
                             class="flex-1 rounded-lg px-2 py-1.5 text-xs font-semibold transition
@@ -83,7 +84,11 @@
                                 {{ $iniciales ?: 'C' }}
                             </div>
                         @endif
-                        @if($c->atendida_por_humano)
+                        @if($c->es_interna ?? false)
+                            <span class="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-violet-500 text-white text-[10px] border-2 border-white" title="Usuario interno (equipo)">
+                                <i class="fa-solid fa-user-shield"></i>
+                            </span>
+                        @elseif($c->atendida_por_humano)
                             <span class="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-blue-500 text-white text-[10px] border-2 border-white" title="Atendida por humano">
                                 <i class="fa-solid fa-user"></i>
                             </span>

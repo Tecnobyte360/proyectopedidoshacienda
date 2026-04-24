@@ -19,7 +19,8 @@ class Index extends Component
 
     public string $nuevoMensaje = '';
     public string $busqueda     = '';
-    public string $filtroEstado = 'todas';   // todas | activa | humano | bot
+    public string $filtroEstado = 'todas';   // todas | activa | humano | bot | internos
+    public bool   $mostrarInternas = false;  // si es false, ocultas conversaciones internas
 
     // Nueva conversación
     public bool   $nuevoChatModal   = false;
@@ -722,9 +723,12 @@ class Index extends Component
                        ->orWhereHas('cliente', fn ($c) => $c->where('nombre', 'like', "%{$this->busqueda}%"));
                 });
             })
-            ->when($this->filtroEstado === 'activa', fn ($q) => $q->where('estado', 'activa'))
-            ->when($this->filtroEstado === 'humano', fn ($q) => $q->where('atendida_por_humano', true))
-            ->when($this->filtroEstado === 'bot',    fn ($q) => $q->where('atendida_por_humano', false))
+            ->when($this->filtroEstado === 'activa',   fn ($q) => $q->where('estado', 'activa'))
+            ->when($this->filtroEstado === 'humano',   fn ($q) => $q->where('atendida_por_humano', true))
+            ->when($this->filtroEstado === 'bot',      fn ($q) => $q->where('atendida_por_humano', false))
+            ->when($this->filtroEstado === 'internos', fn ($q) => $q->where('es_interna', true))
+            ->when($this->filtroEstado !== 'internos' && !$this->mostrarInternas,
+                   fn ($q) => $q->where(fn ($qq) => $qq->where('es_interna', false)->orWhereNull('es_interna')))
             ->orderByDesc('ultimo_mensaje_at')
             ->limit(60)
             ->get();

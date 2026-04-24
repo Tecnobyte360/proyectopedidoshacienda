@@ -225,6 +225,40 @@ class WhatsappWebhookController extends Controller
             return response()->json(['status' => 'self_message_ignored']);
         }
 
+        // 👥 Usuario INTERNO del negocio (staff/equipo) — se persiste el mensaje
+        // pero el bot NO responde ni ejecuta tool-calls. Solo queda en el chat
+        // marcado como conversación interna.
+        $telNormCheck = preg_replace('/\D+/', '', (string) $from);
+        if ($telNormCheck && \App\Models\UsuarioInternoWhatsapp::esInterno($telNormCheck)) {
+            try {
+                $usuarioInterno = \App\Models\UsuarioInternoWhatsapp::withoutGlobalScopes()
+                    ->where('tenant_id', app(\App\Services\TenantManager::class)->id())
+                    ->where('telefono_normalizado', $telNormCheck)
+                    ->first();
+
+                $cliente = \App\Models\Cliente::encontrarOCrearPorTelefono($telNormCheck, $usuarioInterno?->nombre ?: $name);
+                $conv = app(\App\Services\ConversacionService::class)
+                    ->obtenerOCrearActiva($telNormCheck, $cliente->id, null, $connectionId ? (int) $connectionId : null);
+
+                // Marcar la conversación como interna
+                if (!$conv->es_interna) $conv->update(['es_interna' => true, 'atendida_por_humano' => true]);
+
+                app(\App\Services\ConversacionService::class)->agregarMensaje(
+                    $conv,
+                    \App\Models\MensajeWhatsapp::ROL_USER,
+                    $message !== '' ? $message : '(media)'
+                );
+            } catch (\Throwable $e) {
+                Log::warning('No se persistió mensaje de usuario interno: ' . $e->getMessage());
+            }
+
+            Log::info('👥 Usuario interno — bot NO responde', [
+                'phone' => $from,
+                'nombre' => $usuarioInterno->nombre ?? null,
+            ]);
+            return response()->json(['status' => 'internal_user_no_bot']);
+        }
+
         if ($messageId) {
             $alreadyProcessedKey = "processed_whatsapp_msg_{$messageId}";
             $processingKey       = "processing_whatsapp_msg_{$messageId}";
