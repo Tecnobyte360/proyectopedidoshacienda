@@ -6,9 +6,12 @@ use Illuminate\Database\Eloquent\Model;
 
 class AnsPedido extends Model
 {
+    use \App\Models\Concerns\BelongsToTenant;
+
     protected $table = 'ans_pedidos';
 
     protected $fillable = [
+        'tenant_id',
         'accion',
         'tiempo_minutos',
         'tiempo_alerta',
