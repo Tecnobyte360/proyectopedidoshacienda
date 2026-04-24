@@ -69,7 +69,7 @@
                            class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:ring-2 focus:outline-none"
                            onfocus="this.style.borderColor='{{ $colorPrim }}';"
                            onblur="this.style.borderColor='';"
-                           placeholder="tucorreo@{{ $emailDomain }}">
+                           placeholder="{{ 'tucorreo@' . $emailDomain }}">
                 </div>
 
                 <div>
