@@ -105,6 +105,8 @@ class ConversacionService
 
             if ($rol === MensajeWhatsapp::ROL_USER) {
                 $updates['total_mensajes_cliente'] = $conversacion->total_mensajes_cliente + 1;
+                // Incrementar no-leídos solo para mensajes entrantes del cliente
+                $updates['no_leidos'] = ((int) $conversacion->no_leidos) + 1;
             } elseif ($rol === MensajeWhatsapp::ROL_ASSISTANT) {
                 $updates['total_mensajes_bot'] = $conversacion->total_mensajes_bot + 1;
             }

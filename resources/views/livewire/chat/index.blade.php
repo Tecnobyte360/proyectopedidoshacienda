@@ -66,9 +66,10 @@
                     $isActiva = $conversacionActiva && $conversacionActiva->id === $c->id;
                 @endphp
 
+                @php $tieneNoLeidos = (int) ($c->no_leidos ?? 0) > 0; @endphp
                 <button wire:click="seleccionar({{ $c->id }})"
                         class="w-full text-left flex items-center gap-3 px-4 py-3 border-b border-slate-100 hover:bg-amber-50/40 transition
-                              {{ $isActiva ? 'bg-amber-50' : '' }}">
+                              {{ $isActiva ? 'bg-amber-50' : ($tieneNoLeidos ? 'bg-emerald-50/40' : '') }}">
 
                     <div class="relative flex-shrink-0">
                         @if($c->cliente?->profile_pic_url)
@@ -101,10 +102,21 @@
 
                     <div class="flex-1 min-w-0">
                         <div class="flex items-center justify-between gap-2">
-                            <span class="font-semibold text-slate-800 truncate">{{ $c->cliente?->nombre ?? 'Cliente' }}</span>
-                            <span class="text-[10px] text-slate-400 flex-shrink-0">{{ $c->ultimo_mensaje_at?->diffForHumans(null, true) }}</span>
+                            <span class="truncate {{ $tieneNoLeidos ? 'font-extrabold text-slate-900' : 'font-semibold text-slate-800' }}">
+                                {{ $c->cliente?->nombre ?? 'Cliente' }}
+                            </span>
+                            <span class="text-[10px] flex-shrink-0 {{ $tieneNoLeidos ? 'text-emerald-600 font-bold' : 'text-slate-400' }}">
+                                {{ $c->ultimo_mensaje_at?->diffForHumans(null, true) }}
+                            </span>
                         </div>
-                        <div class="text-xs text-slate-500 truncate font-mono">{{ $c->telefono_normalizado }}</div>
+                        <div class="flex items-center justify-between gap-2">
+                            <div class="text-xs truncate font-mono {{ $tieneNoLeidos ? 'text-slate-700' : 'text-slate-500' }}">{{ $c->telefono_normalizado }}</div>
+                            @if($tieneNoLeidos)
+                                <span class="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-emerald-500 text-white text-[11px] font-extrabold flex-shrink-0 shadow-sm">
+                                    {{ $c->no_leidos > 99 ? '99+' : $c->no_leidos }}
+                                </span>
+                            @endif
+                        </div>
                         <div class="text-[10px] text-slate-400">{{ $c->total_mensajes }} mensajes</div>
                     </div>
                 </button>

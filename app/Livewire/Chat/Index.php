@@ -32,6 +32,13 @@ class Index extends Component
     {
         $this->conversacionActivaId = $id;
         $this->nuevoMensaje = '';
+
+        // Marcar como leída
+        ConversacionWhatsapp::where('id', $id)->update([
+            'no_leidos'       => 0,
+            'ultima_vista_at' => now(),
+        ]);
+
         $this->dispatch('chat-cambiado', conversacionId: $id);
     }
 
