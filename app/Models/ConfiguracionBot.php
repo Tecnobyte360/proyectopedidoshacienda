@@ -71,27 +71,47 @@ class ConfiguracionBot extends Model
 
     /** Instrucciones IA por defecto para derivación automática a departamento */
     public const DERIVACION_INSTRUCCIONES_DEFAULT = <<<'TXT'
-⚠️ EJECUTA ESTA FUNCIÓN DE INMEDIATO (no la anuncies en texto).
-NUNCA escribas "voy a derivar" o "déjame un momento" — simplemente LLAMA esta función y el sistema responde automáticamente al cliente con el saludo del departamento.
-Si dices que vas a hacerlo sin llamar la función, el cliente queda sin respuesta.
+⚠️ REGLA DE ORO — EJECUTA ESTA FUNCIÓN, NO HABLES DE ELLA:
 
-Deriva la conversación a un departamento humano cuando detectes que el cliente necesita atención especializada o emocional.
-NO dependas de palabras clave específicas — ANALIZA el TONO, el CONTEXTO y la INTENCIÓN detrás del mensaje.
+❌ PROHIBIDO decir en texto al cliente:
+  - "voy a derivar" / "déjame un momento" / "te paso con..."
+  - "contacta directamente a [departamento]"
+  - "te recomiendo que te comuniques con..."
+  - "ese tema no lo manejo yo" (sin llamar la función)
+  - Cualquier forma de mandar al cliente a buscar ayuda por su cuenta.
 
-DERIVA cuando detectes CUALQUIERA de estas señales:
-• TONO NEGATIVO: irritación, frustración, enojo, sarcasmo, desesperación, urgencia emocional.
-• EXPRESIONES DE MOLESTIA: aunque el cliente no diga "estoy molesto", lee entre líneas.
-• PROBLEMA CON PEDIDO ANTERIOR: cualquier inconformidad con algo ya entregado.
-• PIDE HABLAR CON HUMANO, aunque lo exprese indirecto.
-• FUERA DE TU ALCANCE: precios especiales, descuentos por volumen, facturación, cobros dobles, temas legales.
-• INSISTENCIA: es la tercera vez que insiste en el mismo tema sin resolverse.
+✅ EN VEZ DE ESO: LLAMA esta función. El sistema conecta automáticamente
+al cliente con el departamento correcto y responde por ti con el saludo
+personalizado. Tú NUNCA redactas el mensaje de derivación — lo hace el sistema.
+
+────────────────────────────────────────────────────────────────────────
+
+CUÁNDO derivar (analiza TONO, CONTEXTO e INTENCIÓN, no palabras literales):
+
+• TONO NEGATIVO: irritación, frustración, enojo, sarcasmo, desesperación.
+• EXPRESIONES DE MOLESTIA: mayúsculas, exclamaciones repetidas, palabras
+  fuertes, amenazas ("voy a demandar", "voy a reportar", "nunca más").
+• PROBLEMA CON PEDIDO ANTERIOR: inconformidad con algo ya entregado,
+  aunque use palabras suaves ("me llegó diferente", "está raro").
+• PIDE HABLAR CON HUMANO, aunque indirecto: "con quién hablo", "pásame
+  con alguien", "quién atiende aquí", "no me están entendiendo".
+• TEMA FUERA DEL CATÁLOGO DE VENTAS:
+  - Hoja de vida / empleo / vacantes → RH.
+  - Facturación / cobros / pagos empresariales → Facturación.
+  - Cotizaciones mayoristas / B2B / corporativo → Comercial.
+  - Rastreo de envío / estado de entrega → Logística.
+  - Reclamos / quejas / PQR / devoluciones → Servicio al Cliente.
+• INSISTENCIA: tercera vez que pregunta lo mismo sin resolver.
+
+────────────────────────────────────────────────────────────────────────
 
 NO DERIVES cuando:
-• Consulta simple que puedes responder con el catálogo.
+• Consulta simple que puedes responder con el catálogo/promos.
 • Está armando pedido normalmente.
 • Saludo o conversación casual positiva.
 
-Si hay duda razonable, DERIVA. Mejor derivar de más que dejar a un cliente molesto sin resolver.
+Si hay duda razonable, DERIVA. Mejor derivar de más que dejar a un cliente
+molesto o perdido sin resolver.
 TXT;
 
     /** Frases que, si aparecen en la respuesta del bot SIN tool_call, indican "dijo pero no hizo" derivación */
