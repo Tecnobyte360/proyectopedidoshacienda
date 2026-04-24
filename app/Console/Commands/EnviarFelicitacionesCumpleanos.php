@@ -20,10 +20,37 @@ class EnviarFelicitacionesCumpleanos extends Command
 
     public function handle(WhatsappSenderService $wa): int
     {
+        // Ejecutar por cada tenant activo — en CLI no hay tenant activo por default,
+        // y sin eso los registros se crean con tenant_id=null y no aparecen en el historial.
+        $tenants = \App\Models\Tenant::withoutGlobalScopes()
+            ->where('activo', true)
+            ->get();
+
+        if ($tenants->isEmpty()) {
+            $this->warn('No hay tenants activos.');
+            return Command::SUCCESS;
+        }
+
+        $tm = app(\App\Services\TenantManager::class);
+        $totalGlobal = 0;
+        foreach ($tenants as $t) {
+            $this->info("━━━ Tenant: {$t->nombre} (id={$t->id}) ━━━");
+            $tm->set($t);
+            $this->procesarTenant($wa);
+            $totalGlobal++;
+        }
+        $tm->set(null);
+
+        $this->info("✓ Procesados {$totalGlobal} tenant(s).");
+        return Command::SUCCESS;
+    }
+
+    private function procesarTenant(WhatsappSenderService $wa): int
+    {
         $config = ConfiguracionBot::actual();
 
         if (!$config->cumpleanos_activo && !$this->option('dry-run')) {
-            $this->warn('🚫 Felicitación de cumpleaños DESACTIVADA en la configuración del bot. Usa --dry-run para probar igual.');
+            $this->line('  🚫 Cumpleaños desactivado en este tenant, omitido.');
             return Command::SUCCESS;
         }
 
