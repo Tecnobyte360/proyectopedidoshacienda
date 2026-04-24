@@ -71,25 +71,19 @@ class TranscripcionAudioService
                 return '';
             }
 
-            // 2. Guardar en tmp
-            $nombreTmp = 'whisper-' . uniqid() . '.' . $this->extensionDesdeUrl($audioUrl);
-            $pathTmp   = storage_path("app/tmp/{$nombreTmp}");
-            @mkdir(dirname($pathTmp), 0775, true);
-            file_put_contents($pathTmp, $bytes);
+            // 2. Enviar a Whisper directamente (sin archivo temporal — evita
+            //    problemas de permisos y ahorra I/O de disco).
+            $nombreArchivo = 'whisper-' . uniqid() . '.' . $this->extensionDesdeUrl($audioUrl);
 
-            // 3. Enviar a Whisper
             $resp = Http::withToken($apiKey)
                 ->timeout(60)
-                ->attach('file', file_get_contents($pathTmp), $nombreTmp)
+                ->attach('file', $bytes, $nombreArchivo)
                 ->post('https://api.openai.com/v1/audio/transcriptions', [
                     'model'    => 'whisper-1',
                     'language' => $idioma,
                     // Response simple para solo obtener el texto
                     'response_format' => 'text',
                 ]);
-
-            // 4. Limpiar tmp
-            @unlink($pathTmp);
 
             if (!$resp->successful()) {
                 Log::error('🎤 Whisper devolvió error', [
