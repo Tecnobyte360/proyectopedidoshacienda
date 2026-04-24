@@ -211,41 +211,38 @@
                 @endforeach
             </div>
 
-            {{-- Preview de imagen seleccionada --}}
-            @if($imagen)
-                <div class="bg-slate-50 border-t border-slate-200 px-4 py-3">
+            {{-- Imagen + Input (todo en un solo x-data para compartir estado) --}}
+            <div x-data="chatComposer()"
+                 x-init="init()">
+
+                {{-- Preview de imagen seleccionada --}}
+                <div x-show="imgDataUrl" x-cloak class="bg-slate-50 border-t border-slate-200 px-4 py-3">
                     <div class="flex items-start gap-3">
-                        <img src="{{ $imagen->temporaryUrl() }}" class="h-20 w-20 rounded-lg object-cover border border-slate-200">
+                        <img :src="imgDataUrl" class="h-20 w-20 rounded-lg object-cover border border-slate-200">
                         <div class="flex-1">
-                            <input type="text" wire:model="imagenCaption" placeholder="Caption opcional..."
+                            <input type="text" x-model="imgCaption" placeholder="Caption opcional..."
                                    class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[#d68643] focus:ring-2 focus:ring-amber-100">
                             <div class="flex items-center gap-2 mt-2">
-                                <button wire:click="enviarImagen"
-                                        wire:loading.attr="disabled"
-                                        wire:target="enviarImagen"
+                                <button @click="sendImage()"
+                                        :disabled="sendingImg"
                                         class="inline-flex items-center gap-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-semibold px-4 py-2 text-sm transition disabled:opacity-50">
-                                    <span wire:loading.remove wire:target="enviarImagen">
-                                        <i class="fa-solid fa-paper-plane"></i> Enviar imagen
-                                    </span>
-                                    <span wire:loading wire:target="enviarImagen">
-                                        <i class="fa-solid fa-circle-notch fa-spin"></i> Enviando...
-                                    </span>
+                                    <i class="fa-solid" :class="sendingImg ? 'fa-circle-notch fa-spin' : 'fa-paper-plane'"></i>
+                                    <span x-text="sendingImg ? 'Enviando...' : 'Enviar imagen'"></span>
                                 </button>
-                                <button wire:click="descartarImagen"
+                                <button @click="discardImage()"
                                         class="rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold px-3 py-2 text-sm transition">
                                     <i class="fa-solid fa-trash"></i>
                                 </button>
                             </div>
-                            @error('imagen') <p class="text-xs text-rose-600 mt-1">{{ $message }}</p> @enderror
+                            <p x-show="imgError" x-text="imgError" class="text-xs text-rose-600 mt-1"></p>
                         </div>
                     </div>
                 </div>
-            @endif
 
-            {{-- Input para responder --}}
-            <div class="bg-white border-t border-slate-200"
-                 x-data="audioRecorder()"
-                 x-init="init()">
+                {{-- Input para responder --}}
+                <div class="bg-white border-t border-slate-200"
+                     x-data="audioRecorder()"
+                     x-init="init()">
                 <form wire:submit.prevent="enviar"
                       class="px-3 py-3 flex items-center gap-2">
                     <textarea wire:model="nuevoMensaje"
@@ -276,15 +273,13 @@
                         </button>
                     </div>
 
-                    {{-- Botón adjuntar imagen (fuera de x-if para que Livewire vea el wire:model) --}}
+                    {{-- Botón adjuntar imagen --}}
                     <label x-show="!recording && !preview"
                            title="Adjuntar imagen"
                            class="flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer">
-                        <i class="fa-solid fa-image"
-                           wire:loading.remove wire:target="imagen"></i>
-                        <i class="fa-solid fa-circle-notch fa-spin"
-                           wire:loading wire:target="imagen"></i>
-                        <input type="file" wire:model="imagen" accept="image/*" class="hidden">
+                        <i class="fa-solid fa-image"></i>
+                        <input type="file" accept="image/*" class="hidden"
+                               @change="pickImage($event)">
                     </label>
 
                     {{-- Botón micrófono / detener / enviar audio --}}
@@ -329,6 +324,7 @@
                         <span><strong>Modo mixto:</strong> tu mensaje se envía y el bot SIGUE respondiendo automáticamente. Click en "Silenciar bot" si quieres tomar control total.</span>
                     @endif
                 </div>
+                </div>
             </div>
 
         @else
@@ -364,6 +360,57 @@
 
             scrollToBottom();
         })();
+    </script>
+
+    {{-- Composer (imagen) — selecciona archivo, lo muestra en preview, envía base64 al Livewire --}}
+    <script>
+        function chatComposer() {
+            return {
+                imgDataUrl: null,
+                imgCaption: '',
+                sendingImg: false,
+                imgError: '',
+                init() {},
+                pickImage(e) {
+                    const file = e.target.files && e.target.files[0];
+                    if (!file) return;
+                    this.imgError = '';
+                    if (!file.type.startsWith('image/')) {
+                        this.imgError = 'El archivo no es una imagen.';
+                        e.target.value = '';
+                        return;
+                    }
+                    if (file.size > 15 * 1024 * 1024) {
+                        this.imgError = 'Imagen demasiado grande (máx 15 MB).';
+                        e.target.value = '';
+                        return;
+                    }
+                    const reader = new FileReader();
+                    reader.onload = () => { this.imgDataUrl = reader.result; };
+                    reader.onerror = () => { this.imgError = 'No se pudo leer la imagen.'; };
+                    reader.readAsDataURL(file);
+                    e.target.value = '';
+                },
+                async sendImage() {
+                    if (!this.imgDataUrl || this.sendingImg) return;
+                    this.sendingImg = true;
+                    this.imgError = '';
+                    try {
+                        await this.$wire.enviarImagen(this.imgDataUrl, this.imgCaption);
+                        this.discardImage();
+                    } catch (err) {
+                        this.imgError = 'Error al enviar: ' + (err.message || err);
+                    } finally {
+                        this.sendingImg = false;
+                    }
+                },
+                discardImage() {
+                    this.imgDataUrl = null;
+                    this.imgCaption = '';
+                    this.imgError = '';
+                },
+            };
+        }
     </script>
 
     {{-- Grabador de audio (Alpine component) — Chrome, Firefox, Edge, Safari iOS/Mac --}}

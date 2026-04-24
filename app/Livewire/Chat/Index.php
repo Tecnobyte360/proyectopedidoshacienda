@@ -12,21 +12,14 @@ use Illuminate\Support\Facades\Storage;
 use Symfony\Component\Process\Process;
 use Livewire\Attributes\On;
 use Livewire\Component;
-use Livewire\WithFileUploads;
 
 class Index extends Component
 {
-    use WithFileUploads;
-
     public ?int $conversacionActivaId = null;
 
     public string $nuevoMensaje = '';
     public string $busqueda     = '';
     public string $filtroEstado = 'todas';   // todas | activa | humano | bot
-
-    /** Imagen temporal subida para enviar al cliente. */
-    public $imagen = null;
-    public string $imagenCaption = '';
 
     public function seleccionar(int $id): void
     {
@@ -277,19 +270,43 @@ class Index extends Component
     }
 
     /**
-     * Envía una imagen cargada vía Livewire file upload, con caption opcional.
+     * Envía una imagen desde el chat al cliente por WhatsApp.
+     * Recibe la imagen como data URL base64 (enviada desde JS) para
+     * evitar el endpoint /livewire/upload-file (que tira 401 en producción).
      */
-    public function enviarImagen(): void
+    public function enviarImagen(string $dataUrl = '', string $caption = ''): void
     {
         if (!$this->conversacionActivaId) return;
-        if (!$this->imagen) {
+        if ($dataUrl === '') {
             $this->dispatch('notify', ['type' => 'error', 'message' => 'Selecciona una imagen primero.']);
             return;
         }
 
-        $this->validate([
-            'imagen' => 'required|image|mimes:jpg,jpeg,png,gif,webp|max:15360', // 15 MB
-        ]);
+        if (!preg_match('/^data:(image\/[a-z0-9.+-]+);base64,(.+)$/i', $dataUrl, $m)) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Formato de imagen no reconocido.']);
+            return;
+        }
+
+        $mime  = strtolower($m[1]);
+        $bytes = base64_decode($m[2], true);
+
+        if ($bytes === false || strlen($bytes) < 100) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Imagen inválida o vacía.']);
+            return;
+        }
+
+        if (strlen($bytes) > 15 * 1024 * 1024) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Imagen demasiado grande (máx 15 MB).']);
+            return;
+        }
+
+        $extOrig = match (true) {
+            str_contains($mime, 'png')  => 'png',
+            str_contains($mime, 'gif')  => 'gif',
+            str_contains($mime, 'webp') => 'webp',
+            str_contains($mime, 'bmp')  => 'bmp',
+            default                     => 'jpg',
+        };
 
         $conv = ConversacionWhatsapp::find($this->conversacionActivaId);
         if (!$conv) {
@@ -297,9 +314,7 @@ class Index extends Component
             return;
         }
 
-        $bytes   = file_get_contents($this->imagen->getRealPath());
-        $extOrig = strtolower($this->imagen->getClientOriginalExtension() ?: 'jpg');
-        $caption = trim($this->imagenCaption);
+        $caption = trim($caption);
 
         // Guardar copia pública para mostrar en el chat web
         $filename = 'imagenes-out/img_' . now()->format('Ymd_His') . '_' . uniqid() . '.' . $extOrig;
@@ -333,16 +348,8 @@ class Index extends Component
             Log::warning('No se persistió imagen manual: ' . $e->getMessage());
         }
 
-        $this->imagen        = null;
-        $this->imagenCaption = '';
         $this->dispatch('mensaje-enviado');
         $this->dispatch('notify', ['type' => 'success', 'message' => '✓ Imagen enviada']);
-    }
-
-    public function descartarImagen(): void
-    {
-        $this->imagen        = null;
-        $this->imagenCaption = '';
     }
 
     /**
