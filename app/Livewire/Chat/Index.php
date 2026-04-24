@@ -73,13 +73,14 @@ class Index extends Component
             return;
         }
 
-        // Decodificar data URL
-        if (!preg_match('/^data:(audio\/[a-z0-9.+-]+);base64,(.+)$/i', $dataUrl, $m)) {
+        // Decodificar data URL — aceptamos parámetros del mime (ej. "audio/webm;codecs=opus")
+        if (!preg_match('/^data:(audio\/[^;,]+(?:;[^,]*)?);base64,(.+)$/i', $dataUrl, $m)) {
+            Log::warning('Audio data URL no reconocida', ['preview' => substr($dataUrl, 0, 80)]);
             $this->dispatch('notify', ['type' => 'error', 'message' => 'Formato de audio no reconocido.']);
             return;
         }
 
-        $mime  = strtolower($m[1]);
+        $mime  = strtolower(explode(';', $m[1])[0]);   // solo el tipo base, sin codecs
         $bytes = base64_decode($m[2], true);
 
         if ($bytes === false || strlen($bytes) < 100) {
