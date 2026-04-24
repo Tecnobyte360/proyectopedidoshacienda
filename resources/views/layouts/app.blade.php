@@ -187,34 +187,100 @@
         </div>
     </div>
 
-    {{-- TOAST NOTIFICATIONS --}}
-    <div x-data="{ messages: [] }"
-         x-init="
-            window.addEventListener('notify', e => {
-                const id = Date.now();
-                messages.push({ id, ...e.detail[0] });
-                setTimeout(() => messages = messages.filter(m => m.id !== id), 4000);
+    {{-- ✨ SWEETALERT 2 — notificaciones bonitas --}}
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
+    <style>
+        .swal2-popup {
+            border-radius: 20px !important;
+            padding: 1.75rem !important;
+            font-family: 'Inter', system-ui, sans-serif !important;
+        }
+        .swal2-title {
+            font-size: 1.15rem !important;
+            font-weight: 800 !important;
+            color: #1e293b !important;
+        }
+        .swal2-html-container {
+            font-size: 0.9rem !important;
+            color: #475569 !important;
+        }
+        .swal2-toast {
+            box-shadow: 0 10px 40px rgba(15, 23, 42, 0.15) !important;
+            border-radius: 16px !important;
+        }
+        .swal2-confirm {
+            background: linear-gradient(135deg, #d68643, #a85f24) !important;
+            font-weight: 700 !important;
+            border-radius: 12px !important;
+            padding: 10px 24px !important;
+            box-shadow: 0 4px 12px rgba(214, 134, 67, 0.3) !important;
+        }
+        .swal2-cancel {
+            background: #e2e8f0 !important;
+            color: #475569 !important;
+            font-weight: 600 !important;
+            border-radius: 12px !important;
+            padding: 10px 24px !important;
+        }
+        .swal2-icon.swal2-success { border-color: #10b981 !important; }
+        .swal2-icon.swal2-success [class^='swal2-success-line'] { background: #10b981 !important; }
+        .swal2-icon.swal2-success .swal2-success-ring { border-color: rgba(16, 185, 129, 0.3) !important; }
+        .swal2-icon.swal2-error { border-color: #ef4444 !important; }
+        .swal2-icon.swal2-error [class^='swal2-x-mark-line'] { background: #ef4444 !important; }
+    </style>
+    <script>
+        (function () {
+            if (typeof Swal === 'undefined') return;
+
+            const toast = Swal.mixin({
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 3500,
+                timerProgressBar: true,
+                customClass: { popup: 'swal2-toast' },
+                didOpen: (t) => {
+                    t.addEventListener('mouseenter', Swal.stopTimer);
+                    t.addEventListener('mouseleave', Swal.resumeTimer);
+                },
             });
-            Livewire.on('notify', payload => {
-                const id = Date.now();
-                const data = Array.isArray(payload) ? payload[0] : payload;
-                messages.push({ id, ...data });
-                setTimeout(() => messages = messages.filter(m => m.id !== id), 4000);
+
+            window.showNotify = function (payload) {
+                const data   = Array.isArray(payload) ? payload[0] : payload;
+                const type   = (data && data.type)    || 'info';
+                const msg    = (data && data.message) || '';
+                const title  = (data && data.title)   || '';
+                const iconMap = {
+                    success: 'success', error: 'error',
+                    warning: 'warning', info: 'info', question: 'question'
+                };
+                toast.fire({
+                    icon: iconMap[type] || 'info',
+                    title: title || msg,
+                    text:  title ? msg : '',
+                });
+            };
+
+            // Confirmar acción (reemplazo de wire:confirm nativo)
+            window.showConfirm = function (opts) {
+                return Swal.fire({
+                    title: opts.title || '¿Estás seguro?',
+                    html:  opts.message || '',
+                    icon:  opts.icon || 'question',
+                    showCancelButton: true,
+                    confirmButtonText: opts.confirmText || 'Sí, confirmar',
+                    cancelButtonText:  opts.cancelText  || 'Cancelar',
+                    reverseButtons: true,
+                });
+            };
+
+            document.addEventListener('livewire:initialized', () => {
+                Livewire.on('notify', payload => window.showNotify(payload));
             });
-         "
-         class="fixed top-24 right-6 z-[100] space-y-2">
-        <template x-for="m in messages" :key="m.id">
-            <div class="rounded-xl px-5 py-3 shadow-2xl text-sm font-medium text-white min-w-[260px]"
-                 :class="{
-                    'bg-green-500': m.type === 'success',
-                    'bg-red-500': m.type === 'error',
-                    'bg-amber-500': m.type === 'warning',
-                    'bg-slate-700': m.type === 'info' || !m.type,
-                 }"
-                 x-text="m.message">
-            </div>
-        </template>
-    </div>
+            window.addEventListener('notify', e => window.showNotify(e.detail));
+        })();
+    </script>
 
     {{-- 🎭 Función global: salir de impersonación con reload garantizado --}}
     <script>
