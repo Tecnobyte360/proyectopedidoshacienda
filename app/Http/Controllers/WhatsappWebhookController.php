@@ -1824,23 +1824,26 @@ class WhatsappWebhookController extends Controller
                     'subtotal'        => $sub,
                 ];
             } else {
-                Log::warning('⚠️ Producto del bot no está en catálogo', [
+                Log::warning('⚠️ Producto del bot no está en catálogo — ABORTANDO pedido', [
                     'entrada' => $entrada,
                     'producto_data' => $product,
                 ]);
                 $productosNoEncontrados[] = $entrada;
-
-                // Lo guardamos sin producto_id para no perder el registro
-                $productosValidados[] = [
-                    'producto_id'     => null,
-                    'codigo_producto' => null,
-                    'producto'        => $product['name'] ?? 'Producto desconocido',
-                    'cantidad'        => $cantidad,
-                    'unidad'          => $product['unit'] ?? 'unidad',
-                    'precio_unitario' => 0,
-                    'subtotal'        => 0,
-                ];
             }
+        }
+
+        // 🚫 Si el bot intentó pedir productos que NO existen en el catálogo,
+        // NO registramos el pedido. Devolvemos un mensaje pidiendo al cliente
+        // que ajuste con productos reales.
+        if (!empty($productosNoEncontrados)) {
+            $lista = implode('", "', array_unique($productosNoEncontrados));
+            Log::warning('🚫 Pedido rechazado por productos inexistentes', [
+                'from'                  => $from,
+                'no_encontrados'        => $productosNoEncontrados,
+            ]);
+            return "Ups, {$name} 🙏 no manejamos \"{$lista}\" en el catálogo. "
+                 . "¿Me confirmas qué productos *sí* llevas de los que te he mostrado? "
+                 . "Así te registro el pedido bien 💪";
         }
 
         // Costo de envío de la zona (0 si no se resolvió)
