@@ -12,7 +12,33 @@ class AuthController extends Controller
         if (Auth::check()) {
             return redirect()->intended('/pedidos');
         }
-        return view('auth.login');
+
+        // Resolver tenant por subdominio para branding dinámico
+        $tenant = $this->resolverTenantLogin();
+
+        return view('auth.login', ['tenantBranding' => $tenant]);
+    }
+
+    /**
+     * Intenta resolver el tenant actual por subdominio para mostrar su branding en login.
+     * Devuelve null si es el dominio principal o un subdominio reservado.
+     */
+    private function resolverTenantLogin(): ?\App\Models\Tenant
+    {
+        $host = request()->getHost();
+        $base = config('app.tenant_base_domain', 'tecnobyte360.com');
+
+        if ($host === $base) return null;
+        if (!str_ends_with($host, '.' . $base)) return null;
+
+        $sub = strtolower(substr($host, 0, -strlen('.' . $base)));
+        $reservados = ['www', 'api', 'admin', 'app', 'mail', 'pedidosonline'];
+        if (in_array($sub, $reservados, true)) return null;
+
+        return \App\Models\Tenant::withoutGlobalScopes()
+            ->where('slug', $sub)
+            ->where('activo', true)
+            ->first();
     }
 
     public function login(Request $request)

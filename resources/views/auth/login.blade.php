@@ -1,9 +1,19 @@
+@php
+    $brandName = $tenantBranding?->nombre ?: 'TecnoByte360';
+    $brandLogo = $tenantBranding?->logo_url;
+    $colorPrim = $tenantBranding?->color_primario ?: '#d68643';
+    $colorSec  = $tenantBranding?->color_secundario ?: '#a85f24';
+    $bgLight   = $tenantBranding?->color_primario
+        ? $tenantBranding->color_primario . '22'
+        : '#fbe9d7';
+    $emailDomain = $tenantBranding?->slug ? $tenantBranding->slug . '.com' : 'empresa.com';
+@endphp
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Iniciar sesión | Alimentos La Hacienda</title>
+    <title>Iniciar sesión | {{ $brandName }}</title>
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
@@ -15,15 +25,23 @@
         body { font-family: 'Inter', sans-serif; }
     </style>
 </head>
-<body class="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-[#fbe9d7] via-white to-[#f5d4ad]">
+<body class="min-h-screen flex items-center justify-center p-4"
+      style="background: linear-gradient(135deg, {{ $bgLight }}, #ffffff, {{ $bgLight }});">
 
     <div class="w-full max-w-md">
-        {{-- Brand --}}
+        {{-- Brand dinámico por tenant --}}
         <div class="text-center mb-8">
-            <div class="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-[#d68643] to-[#a85f24] text-white shadow-xl mb-4">
-                <i class="fa-solid fa-utensils text-2xl"></i>
-            </div>
-            <h1 class="text-2xl font-extrabold text-slate-800">Alimentos La Hacienda</h1>
+            @if($brandLogo)
+                <div class="inline-flex h-20 w-20 items-center justify-center rounded-2xl bg-white shadow-xl mb-4 overflow-hidden border-2 border-slate-100">
+                    <img src="{{ $brandLogo }}" alt="{{ $brandName }}" class="h-full w-full object-contain">
+                </div>
+            @else
+                <div class="inline-flex h-16 w-16 items-center justify-center rounded-2xl text-white shadow-xl mb-4"
+                     style="background: linear-gradient(135deg, {{ $colorPrim }}, {{ $colorSec }});">
+                    <i class="fa-solid fa-utensils text-2xl"></i>
+                </div>
+            @endif
+            <h1 class="text-2xl font-extrabold text-slate-800">{{ $brandName }}</h1>
             <p class="text-sm text-slate-500 mt-1">Plataforma de gestión de pedidos</p>
         </div>
 
@@ -47,8 +65,11 @@
                         <i class="fa-solid fa-envelope text-slate-400"></i> Correo electrónico
                     </label>
                     <input type="email" name="email" value="{{ old('email') }}" required autofocus
-                           class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-[#d68643] focus:ring-2 focus:ring-[#d68643]/20"
-                           placeholder="tucorreo@hacienda.com">
+                           style="--tw-ring-color: {{ $colorPrim }}33;"
+                           class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:ring-2 focus:outline-none"
+                           onfocus="this.style.borderColor='{{ $colorPrim }}';"
+                           onblur="this.style.borderColor='';"
+                           placeholder="tucorreo@{{ $emailDomain }}">
                 </div>
 
                 <div>
@@ -56,18 +77,23 @@
                         <i class="fa-solid fa-lock text-slate-400"></i> Contraseña
                     </label>
                     <input type="password" name="password" required
-                           class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-[#d68643] focus:ring-2 focus:ring-[#d68643]/20"
+                           class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:ring-2 focus:outline-none"
+                           style="--tw-ring-color: {{ $colorPrim }}33;"
+                           onfocus="this.style.borderColor='{{ $colorPrim }}';"
+                           onblur="this.style.borderColor='';"
                            placeholder="••••••••">
                 </div>
 
                 <label class="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" name="remember" {{ old('remember') ? 'checked' : '' }}
-                           class="rounded border-slate-300 text-[#d68643] focus:ring-[#d68643]">
+                           class="rounded border-slate-300"
+                           style="color: {{ $colorPrim }};">
                     <span class="text-sm text-slate-600">Recordarme en este equipo</span>
                 </label>
 
                 <button type="submit"
-                        class="w-full rounded-xl bg-gradient-to-r from-[#d68643] to-[#a85f24] hover:from-[#c97a36] hover:to-[#965520] text-white font-bold py-3 transition shadow-lg">
+                        class="w-full rounded-xl text-white font-bold py-3 transition shadow-lg hover:opacity-90"
+                        style="background: linear-gradient(135deg, {{ $colorPrim }}, {{ $colorSec }});">
                     <i class="fa-solid fa-arrow-right-to-bracket mr-1"></i>
                     Entrar
                 </button>
@@ -75,7 +101,7 @@
         </div>
 
         <p class="text-center text-xs text-slate-400 mt-6">
-            © {{ date('Y') }} Alimentos La Hacienda · Todos los derechos reservados
+            © {{ date('Y') }} {{ $brandName }} · Todos los derechos reservados
         </p>
     </div>
 
