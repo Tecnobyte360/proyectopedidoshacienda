@@ -64,8 +64,7 @@ class WhatsappWebhookController extends Controller
         $fromMe       = (bool) ($data['mensaje']['fromMe'] ?? $data['fromMe'] ?? false);
         $connectionId = $data['conexion']['id'] ?? $data['connectionId'] ?? $data['whatsappId'] ?? null;
 
-        // 🎤 AUDIO: si llega un audio, lo descargamos y transcribimos
-        //    Soporta múltiples formatos de payload que TecnoByteApp puede enviar.
+        // 🎤/🖼️ MEDIA: detectar tipo y URL del archivo
         $tipoMensaje = strtolower(
             $data['mensaje']['type']
                 ?? $data['mensaje']['mediaType']
@@ -74,24 +73,67 @@ class WhatsappWebhookController extends Controller
                 ?? $data['mediaType']
                 ?? ''
         );
-        $audioUrl = $data['mensaje']['audio']['url']
+        $mediaUrl = $data['mensaje']['audio']['url']
             ?? $data['mensaje']['mediaUrl']
             ?? $data['audio']['url']
             ?? $data['audioUrl']
             ?? $data['mediaUrl']
             ?? null;
+        $audioUrl = $mediaUrl;   // alias para el resto de la lógica de audio
 
-        // Detectar audio por: tipo (audio/ogg, voice, ptt) o URL con extensión de audio.
+        // Detectar audio
         $esAudio = !empty($audioUrl) && (
             str_starts_with($tipoMensaje, 'audio')
             || in_array($tipoMensaje, ['voice', 'ptt'], true)
             || preg_match('/\.(ogg|opus|mp3|m4a|wav|webm|mpga)(\?|$)/i', $audioUrl) === 1
         );
 
-        // Si es audio, el "body" normalmente trae el nombre del archivo — lo ignoramos
-        // para que no contamine el mensaje que se envía a la IA.
-        if ($esAudio) {
+        // Detectar imagen
+        $esImagen = !empty($mediaUrl) && !$esAudio && (
+            str_starts_with($tipoMensaje, 'image')
+            || preg_match('/\.(jpe?g|png|gif|webp|bmp)(\?|$)/i', $mediaUrl) === 1
+        );
+
+        // Si es audio o imagen, el "body" normalmente trae el nombre del archivo — lo ignoramos
+        if ($esAudio || $esImagen) {
             $message = '';
+        }
+
+        // 🖼️ IMAGEN: descargar, guardar en storage/public y persistir como mensaje del cliente
+        if ($esImagen) {
+            try {
+                $urlLocal = $this->descargarYGuardarImagen($mediaUrl);
+
+                // Resolver tenant por connection_id antes de persistir
+                if ($connectionId) {
+                    $t = app(\App\Services\WhatsappResolverService::class)->tenantPorConnectionId((int) $connectionId);
+                    if ($t) app(\App\Services\TenantManager::class)->set($t);
+                }
+
+                $telefonoNorm = preg_replace('/\D+/', '', $from);
+                $cliente = \App\Models\Cliente::encontrarOCrearPorTelefono($telefonoNorm, $name);
+                $conv = app(\App\Services\ConversacionService::class)
+                    ->obtenerOCrearActiva($telefonoNorm, $cliente->id, null, $connectionId ? (int) $connectionId : null);
+
+                app(\App\Services\ConversacionService::class)->agregarMensaje(
+                    $conv,
+                    \App\Models\MensajeWhatsapp::ROL_USER,
+                    '🖼️ Imagen',
+                    [
+                        'tipo' => 'image',
+                        'meta' => [
+                            'media_url'     => $urlLocal ?: $mediaUrl,
+                            'media_url_src' => $mediaUrl,
+                        ],
+                    ]
+                );
+
+                Log::info('🖼️ Imagen recibida y persistida', ['url' => $urlLocal ?: $mediaUrl]);
+                return response()->json(['status' => 'image_received']);
+            } catch (\Throwable $e) {
+                Log::error('🖼️ Error procesando imagen: ' . $e->getMessage());
+                // Seguimos el flujo normal — el cliente al menos verá el aviso
+            }
         }
 
         if ($esAudio) {
@@ -2712,6 +2754,40 @@ PROMPT;
      * Envía una imagen al cliente vía TecnoByteApp WhatsApp.
      * Usa el endpoint /api/messages/send con `mediaUrl` y `caption`.
      */
+    /**
+     * Descarga la imagen recibida de TecnoByteApp y la guarda en storage/public/imagenes-in.
+     * Devuelve la URL pública local (o null si falla).
+     */
+    private function descargarYGuardarImagen(string $urlRemota): ?string
+    {
+        try {
+            $resp = Http::withoutVerifying()->timeout(30)->get($urlRemota);
+            if (!$resp->successful()) {
+                Log::warning('🖼️ No se pudo descargar la imagen', ['url' => $urlRemota, 'status' => $resp->status()]);
+                return null;
+            }
+
+            $bytes = $resp->body();
+            if (strlen($bytes) < 50 || strlen($bytes) > 15 * 1024 * 1024) {
+                Log::warning('🖼️ Imagen fuera de rango de tamaño', ['bytes' => strlen($bytes)]);
+                return null;
+            }
+
+            $ext = strtolower(pathinfo(parse_url($urlRemota, PHP_URL_PATH) ?: '', PATHINFO_EXTENSION));
+            if (!in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'], true)) {
+                $ext = 'jpg';
+            }
+
+            $filename = 'imagenes-in/img_' . now()->format('Ymd_His') . '_' . uniqid() . '.' . $ext;
+            \Illuminate\Support\Facades\Storage::disk('public')->put($filename, $bytes);
+
+            return rtrim(config('app.url'), '/') . \Illuminate\Support\Facades\Storage::url($filename);
+        } catch (\Throwable $e) {
+            Log::error('🖼️ Excepción descargando imagen: ' . $e->getMessage());
+            return null;
+        }
+    }
+
     private function enviarImagenWhatsapp(string $from, string $imagenUrl, string $caption = '', $connectionId = null): bool
     {
         try {

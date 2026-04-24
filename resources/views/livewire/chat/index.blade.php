@@ -157,12 +157,21 @@
                     @php
                         $mediaUrl = $m->meta['media_url'] ?? null;
                         $esAudio  = ($m->tipo ?? null) === 'audio' && !empty($mediaUrl);
+                        $esImagen = ($m->tipo ?? null) === 'image' && !empty($mediaUrl);
+                        $caption  = $m->meta['caption'] ?? null;
                     @endphp
                     @if($m->rol === 'user')
                         <div class="flex justify-start">
                             <div class="max-w-[70%] rounded-2xl rounded-tl-sm bg-white px-3 py-2 shadow-sm">
                                 @if($esAudio)
                                     <audio src="{{ $mediaUrl }}" controls class="w-64 max-w-full"></audio>
+                                @elseif($esImagen)
+                                    <a href="{{ $mediaUrl }}" target="_blank">
+                                        <img src="{{ $mediaUrl }}" class="rounded-lg max-w-full max-h-64 object-contain" alt="imagen">
+                                    </a>
+                                    @if($caption)
+                                        <p class="text-sm text-slate-800 mt-1 whitespace-pre-wrap">{{ $caption }}</p>
+                                    @endif
                                 @else
                                     <p class="text-sm text-slate-800 whitespace-pre-wrap">{{ $m->contenido }}</p>
                                 @endif
@@ -183,6 +192,13 @@
                                 @endif
                                 @if($esAudio)
                                     <audio src="{{ $mediaUrl }}" controls class="w-64 max-w-full"></audio>
+                                @elseif($esImagen)
+                                    <a href="{{ $mediaUrl }}" target="_blank">
+                                        <img src="{{ $mediaUrl }}" class="rounded-lg max-w-full max-h-64 object-contain" alt="imagen">
+                                    </a>
+                                    @if($caption)
+                                        <p class="text-sm text-slate-800 mt-1 whitespace-pre-wrap">{{ $caption }}</p>
+                                    @endif
                                 @else
                                     <p class="text-sm text-slate-800 whitespace-pre-wrap">{{ $m->contenido }}</p>
                                 @endif
@@ -194,6 +210,37 @@
                     @endif
                 @endforeach
             </div>
+
+            {{-- Preview de imagen seleccionada --}}
+            @if($imagen)
+                <div class="bg-slate-50 border-t border-slate-200 px-4 py-3">
+                    <div class="flex items-start gap-3">
+                        <img src="{{ $imagen->temporaryUrl() }}" class="h-20 w-20 rounded-lg object-cover border border-slate-200">
+                        <div class="flex-1">
+                            <input type="text" wire:model="imagenCaption" placeholder="Caption opcional..."
+                                   class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[#d68643] focus:ring-2 focus:ring-amber-100">
+                            <div class="flex items-center gap-2 mt-2">
+                                <button wire:click="enviarImagen"
+                                        wire:loading.attr="disabled"
+                                        wire:target="enviarImagen"
+                                        class="inline-flex items-center gap-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-semibold px-4 py-2 text-sm transition disabled:opacity-50">
+                                    <span wire:loading.remove wire:target="enviarImagen">
+                                        <i class="fa-solid fa-paper-plane"></i> Enviar imagen
+                                    </span>
+                                    <span wire:loading wire:target="enviarImagen">
+                                        <i class="fa-solid fa-circle-notch fa-spin"></i> Enviando...
+                                    </span>
+                                </button>
+                                <button wire:click="descartarImagen"
+                                        class="rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold px-3 py-2 text-sm transition">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </div>
+                            @error('imagen') <p class="text-xs text-rose-600 mt-1">{{ $message }}</p> @enderror
+                        </div>
+                    </div>
+                </div>
+            @endif
 
             {{-- Input para responder --}}
             <div class="bg-white border-t border-slate-200"
@@ -228,6 +275,15 @@
                             <i class="fa-solid fa-trash text-xs"></i>
                         </button>
                     </div>
+
+                    {{-- Botón adjuntar imagen --}}
+                    <template x-if="!recording && !preview">
+                        <label title="Adjuntar imagen"
+                               class="flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer">
+                            <i class="fa-solid fa-image"></i>
+                            <input type="file" wire:model="imagen" accept="image/*" class="hidden">
+                        </label>
+                    </template>
 
                     {{-- Botón micrófono / detener / enviar audio --}}
                     <template x-if="!recording && !preview">

@@ -12,14 +12,21 @@ use Illuminate\Support\Facades\Storage;
 use Symfony\Component\Process\Process;
 use Livewire\Attributes\On;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 
 class Index extends Component
 {
+    use WithFileUploads;
+
     public ?int $conversacionActivaId = null;
 
     public string $nuevoMensaje = '';
     public string $busqueda     = '';
     public string $filtroEstado = 'todas';   // todas | activa | humano | bot
+
+    /** Imagen temporal subida para enviar al cliente. */
+    public $imagen = null;
+    public string $imagenCaption = '';
 
     public function seleccionar(int $id): void
     {
@@ -265,6 +272,133 @@ class Index extends Component
             return false;
         } catch (\Throwable $e) {
             Log::error('Excepción enviando audio WhatsApp: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Envía una imagen cargada vía Livewire file upload, con caption opcional.
+     */
+    public function enviarImagen(): void
+    {
+        if (!$this->conversacionActivaId) return;
+        if (!$this->imagen) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Selecciona una imagen primero.']);
+            return;
+        }
+
+        $this->validate([
+            'imagen' => 'required|image|mimes:jpg,jpeg,png,gif,webp|max:15360', // 15 MB
+        ]);
+
+        $conv = ConversacionWhatsapp::find($this->conversacionActivaId);
+        if (!$conv) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Conversación no encontrada.']);
+            return;
+        }
+
+        $bytes   = file_get_contents($this->imagen->getRealPath());
+        $extOrig = strtolower($this->imagen->getClientOriginalExtension() ?: 'jpg');
+        $caption = trim($this->imagenCaption);
+
+        // Guardar copia pública para mostrar en el chat web
+        $filename = 'imagenes-out/img_' . now()->format('Ymd_His') . '_' . uniqid() . '.' . $extOrig;
+        Storage::disk('public')->put($filename, $bytes);
+        $mediaUrl = rtrim(config('app.url'), '/') . Storage::url($filename);
+
+        $nombreEnvio = 'image_' . uniqid() . '.' . $extOrig;
+        $sent = $this->enviarImagenAWhatsapp($conv->telefono_normalizado, $bytes, $nombreEnvio, $caption, $conv->connection_id);
+
+        if (!$sent) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => '⚠️ No se pudo enviar la imagen a WhatsApp.']);
+            return;
+        }
+
+        try {
+            app(ConversacionService::class)->agregarMensaje(
+                $conv,
+                MensajeWhatsapp::ROL_ASSISTANT,
+                $caption !== '' ? $caption : '🖼️ Imagen',
+                [
+                    'tipo' => 'image',
+                    'meta' => [
+                        'enviado_por_humano' => true,
+                        'usuario_id'         => auth()->id(),
+                        'media_url'          => $mediaUrl,
+                        'caption'            => $caption,
+                    ],
+                ]
+            );
+        } catch (\Throwable $e) {
+            Log::warning('No se persistió imagen manual: ' . $e->getMessage());
+        }
+
+        $this->imagen        = null;
+        $this->imagenCaption = '';
+        $this->dispatch('mensaje-enviado');
+        $this->dispatch('notify', ['type' => 'success', 'message' => '✓ Imagen enviada']);
+    }
+
+    public function descartarImagen(): void
+    {
+        $this->imagen        = null;
+        $this->imagenCaption = '';
+    }
+
+    /**
+     * Envía una imagen a WhatsApp vía TecnoByteApp (multipart 'medias').
+     */
+    private function enviarImagenAWhatsapp(string $telefono, string $bytes, string $filename, string $caption, $connectionId = null): bool
+    {
+        try {
+            $token = $this->obtenerTokenWhatsapp();
+            if (!$token) {
+                Log::error('Token WhatsApp no disponible para imagen manual');
+                return false;
+            }
+
+            $resolver = app(\App\Services\WhatsappResolverService::class);
+            $cred = $resolver->credenciales();
+            $endpointSend = rtrim($cred['api_base_url'], '/') . '/api/messages/send';
+
+            Log::info('🖼️ ENVIANDO IMAGEN WHATSAPP', [
+                'phone'    => $telefono,
+                'filename' => $filename,
+                'bytes'    => strlen($bytes),
+                'caption'  => $caption,
+            ]);
+
+            $payload = ['number' => $telefono];
+            if ($caption !== '')       $payload['body']       = $caption;
+            if ($connectionId)         $payload['whatsappId'] = (int) $connectionId;
+
+            $makeRequest = function (string $useToken) use ($endpointSend, $bytes, $filename, $payload) {
+                return Http::withoutVerifying()
+                    ->withToken($useToken)
+                    ->timeout(60)
+                    ->attach('medias', $bytes, $filename)
+                    ->post($endpointSend, $payload);
+            };
+
+            $response = $makeRequest($token);
+            if ($response->successful()) return true;
+
+            if ($response->status() === 401) {
+                Cache::forget($resolver->tokenCacheKey());
+                $newToken = $this->obtenerTokenWhatsapp();
+                if ($newToken) {
+                    $retry = $makeRequest($newToken);
+                    return $retry->successful();
+                }
+            }
+
+            Log::warning('Envío imagen WhatsApp falló', [
+                'status' => $response->status(),
+                'body'   => $response->body(),
+            ]);
+            return false;
+        } catch (\Throwable $e) {
+            Log::error('Excepción enviando imagen WhatsApp: ' . $e->getMessage());
             return false;
         }
     }
