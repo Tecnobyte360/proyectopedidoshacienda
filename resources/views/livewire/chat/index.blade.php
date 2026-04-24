@@ -308,7 +308,7 @@
         })();
     </script>
 
-    {{-- Grabador de audio (Alpine component) --}}
+    {{-- Grabador de audio (Alpine component) — Chrome, Firefox, Edge, Safari iOS/Mac --}}
     <script>
         function audioRecorder() {
             return {
@@ -324,47 +324,108 @@
 
                 init() {},
 
+                _pickMimeType() {
+                    // Orden de preferencia: opus > webm > mp4 (iOS) > aac > wav > default.
+                    const candidates = [
+                        'audio/webm;codecs=opus',
+                        'audio/ogg;codecs=opus',
+                        'audio/webm',
+                        'audio/mp4;codecs=mp4a.40.2',   // AAC en container mp4 (iOS Safari)
+                        'audio/mp4',
+                        'audio/aac',
+                        'audio/wav',
+                    ];
+                    const isSupported = (window.MediaRecorder && typeof MediaRecorder.isTypeSupported === 'function')
+                        ? (t) => MediaRecorder.isTypeSupported(t)
+                        : () => false;
+                    return candidates.find(isSupported) || '';
+                },
+
                 async start() {
-                    if (!navigator.mediaDevices || !window.MediaRecorder) {
-                        alert('Tu navegador no soporta grabación de audio.');
+                    // Compatibilidad: getUserMedia moderno + fallbacks
+                    const getUM = (navigator.mediaDevices && navigator.mediaDevices.getUserMedia)
+                        ? (c) => navigator.mediaDevices.getUserMedia(c)
+                        : null;
+
+                    if (!getUM) {
+                        alert('Tu navegador no permite acceder al micrófono. Usa Chrome, Firefox, Edge o Safari (iOS 14.3+).');
                         return;
                     }
+                    if (!window.MediaRecorder) {
+                        alert('Tu navegador no soporta grabación de audio (MediaRecorder). En iPhone necesitas iOS 14.3 o superior.');
+                        return;
+                    }
+                    // HTTPS requerido en producción para getUserMedia (excepto localhost)
+                    if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+                        alert('La grabación de audio requiere HTTPS. Estás en ' + location.protocol);
+                        return;
+                    }
+
                     try {
-                        this._stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                        this._stream = await getUM({
+                            audio: {
+                                echoCancellation: true,
+                                noiseSuppression: true,
+                                autoGainControl: true,
+                            }
+                        });
                     } catch (e) {
-                        alert('No se pudo acceder al micrófono: ' + e.message);
+                        const msg = e && e.name === 'NotAllowedError'
+                            ? 'Permiso de micrófono denegado. Habilítalo en la configuración del navegador.'
+                            : ('No se pudo acceder al micrófono: ' + (e.message || e.name || e));
+                        alert(msg);
                         return;
                     }
+
                     this._chunks = [];
-                    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-                        ? 'audio/webm;codecs=opus'
-                        : (MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' : '');
-                    this._mediaRecorder = new MediaRecorder(this._stream, mimeType ? { mimeType } : undefined);
+                    const mimeType = this._pickMimeType();
+                    try {
+                        this._mediaRecorder = new MediaRecorder(this._stream, mimeType ? { mimeType } : undefined);
+                    } catch (e) {
+                        // Último recurso: sin mimeType forzado
+                        this._mediaRecorder = new MediaRecorder(this._stream);
+                    }
+
                     this._mediaRecorder.ondataavailable = (e) => {
-                        if (e.data.size > 0) this._chunks.push(e.data);
+                        if (e.data && e.data.size > 0) this._chunks.push(e.data);
                     };
                     this._mediaRecorder.onstop = () => {
-                        const type = this._mediaRecorder.mimeType || 'audio/webm';
+                        const type = (this._mediaRecorder && this._mediaRecorder.mimeType) || mimeType || 'audio/webm';
                         this._blob = new Blob(this._chunks, { type });
                         this.preview = URL.createObjectURL(this._blob);
                         this._stopStream();
                     };
-                    this._mediaRecorder.start();
+                    this._mediaRecorder.onerror = (ev) => {
+                        console.error('MediaRecorder error', ev);
+                        alert('Error grabando: ' + (ev.error && ev.error.message || 'desconocido'));
+                        this._stopStream();
+                        this.recording = false;
+                    };
+
+                    // Pide chunks cada 1s — iOS Safari requiere timeslice para algunos formatos
+                    try { this._mediaRecorder.start(1000); } catch (e) { this._mediaRecorder.start(); }
+
                     this.recording = true;
                     this.elapsed = 0;
-                    this._timer = setInterval(() => this.elapsed++, 1000);
+                    this._timer = setInterval(() => {
+                        this.elapsed++;
+                        // Límite de seguridad: 3 minutos
+                        if (this.elapsed >= 180) this.stop();
+                    }, 1000);
                 },
 
                 stop() {
                     if (this._timer) { clearInterval(this._timer); this._timer = null; }
-                    if (this._mediaRecorder && this._mediaRecorder.state !== 'inactive') {
-                        this._mediaRecorder.stop();
-                    }
+                    try {
+                        if (this._mediaRecorder && this._mediaRecorder.state !== 'inactive') {
+                            this._mediaRecorder.stop();
+                        }
+                    } catch (_) {}
                     this.recording = false;
                 },
 
                 descartar() {
-                    if (this.preview) URL.revokeObjectURL(this.preview);
+                    if (this.preview) { try { URL.revokeObjectURL(this.preview); } catch(_) {} }
                     this.preview = null;
                     this._blob = null;
                     this._chunks = [];
@@ -379,7 +440,7 @@
                         this.descartar();
                     } catch (e) {
                         console.error('Error enviando audio', e);
-                        alert('No se pudo enviar el audio: ' + e.message);
+                        alert('No se pudo enviar el audio: ' + (e.message || e));
                     } finally {
                         this.sending = false;
                     }
@@ -389,14 +450,14 @@
                     return new Promise((resolve, reject) => {
                         const reader = new FileReader();
                         reader.onload = () => resolve(reader.result);
-                        reader.onerror = reject;
+                        reader.onerror = () => reject(reader.error || new Error('No se pudo leer el audio'));
                         reader.readAsDataURL(blob);
                     });
                 },
 
                 _stopStream() {
                     if (this._stream) {
-                        this._stream.getTracks().forEach(t => t.stop());
+                        try { this._stream.getTracks().forEach(t => t.stop()); } catch(_) {}
                         this._stream = null;
                     }
                 },
