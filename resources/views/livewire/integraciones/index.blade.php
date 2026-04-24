@@ -365,11 +365,11 @@
                     @endif
 
                     {{-- Test --}}
-                    <div class="rounded-xl border-2 border-dashed border-violet-200 bg-violet-50/30 p-4">
+                    <div class="rounded-xl border-2 border-dashed border-[#fbe9d7] bg-[#fbe9d7]/30 p-4">
                         <button wire:click="probarConexion"
                                 wire:loading.attr="disabled"
                                 wire:target="probarConexion"
-                                class="inline-flex items-center gap-2 rounded-xl bg-violet-500 hover:bg-violet-600 text-white font-semibold px-5 py-2.5 text-sm transition disabled:opacity-50">
+                                class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#d68643] to-[#a85f24] hover:from-[#c97a36] hover:to-[#965520] text-white font-semibold px-5 py-2.5 text-sm transition disabled:opacity-50 shadow">
                             <i class="fa-solid fa-vial" wire:loading.remove wire:target="probarConexion"></i>
                             <i class="fa-solid fa-circle-notch fa-spin" wire:loading wire:target="probarConexion"></i>
                             Probar conexión y query
