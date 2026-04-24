@@ -8,6 +8,8 @@ RUN apt-get update && apt-get install -y \
     zip \
     nano \
     ffmpeg \
+    freetds-dev \
+    freetds-bin \
     libpng-dev \
     libjpeg62-turbo-dev \
     libfreetype6-dev \
@@ -16,9 +18,11 @@ RUN apt-get update && apt-get install -y \
     libzip-dev \
     libicu-dev \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-configure pdo_dblib --with-libdir=lib/x86_64-linux-gnu \
     && docker-php-ext-install \
         pdo \
         pdo_mysql \
+        pdo_dblib \
         mbstring \
         exif \
         pcntl \

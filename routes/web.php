@@ -8,6 +8,7 @@ use App\Livewire\Pedidos\SeguimientoPedido;
 use App\Livewire\Productos\Index as ProductosIndex;
 use App\Livewire\Categorias\Index as CategoriasIndex;
 use App\Livewire\Importaciones\Index as ImportacionesIndex;
+use App\Livewire\Integraciones\Index as IntegracionesIndex;
 use App\Livewire\Promociones\Index as PromocionesIndex;
 use App\Livewire\Domiciliarios as DomiciliariosIndex;
 use App\Livewire\Reportes\Index as ReportesIndex;
@@ -70,6 +71,7 @@ Route::middleware(['no_super_sin_imp'])->group(function () {
     Route::get('/productos',     ProductosIndex::class)->middleware('permission:productos.ver')->name('productos.index');
     Route::get('/categorias',    CategoriasIndex::class)->middleware('permission:categorias.gestionar')->name('categorias.index');
     Route::get('/importaciones', ImportacionesIndex::class)->middleware('permission:productos.ver')->name('importaciones.index');
+    Route::get('/integraciones', IntegracionesIndex::class)->middleware('permission:productos.ver')->name('integraciones.index');
     Route::get('/importaciones/plantilla/{tipo}', function (string $tipo) {
         $tipo = in_array($tipo, ['productos', 'categorias'], true) ? $tipo : 'productos';
 
