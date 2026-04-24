@@ -211,6 +211,61 @@
                         </div>
                     </div>
 
+                    {{-- Explorador BD --}}
+                    <div class="rounded-xl border-2 border-dashed border-sky-200 bg-sky-50/30 p-4 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <h4 class="font-bold text-slate-800 text-sm"><i class="fa-solid fa-database text-sky-600"></i> Explorador de la BD</h4>
+                            <button wire:click="listarTablas"
+                                    wire:loading.attr="disabled"
+                                    wire:target="listarTablas"
+                                    class="inline-flex items-center gap-2 rounded-lg bg-sky-500 hover:bg-sky-600 text-white font-semibold px-3 py-1.5 text-xs transition disabled:opacity-50">
+                                <i class="fa-solid fa-magnifying-glass" wire:loading.remove wire:target="listarTablas"></i>
+                                <i class="fa-solid fa-circle-notch fa-spin" wire:loading wire:target="listarTablas"></i>
+                                Listar tablas
+                            </button>
+                        </div>
+
+                        @if($explorarError)
+                            <p class="text-xs text-rose-600 font-semibold"><i class="fa-solid fa-triangle-exclamation"></i> {{ $explorarError }}</p>
+                        @endif
+
+                        @if(!empty($tablas))
+                            <p class="text-xs text-slate-500">{{ count($tablas) }} tablas. Clic en una para ver columnas y autogenerar el query:</p>
+                            <div class="max-h-40 overflow-y-auto bg-white border border-sky-200 rounded-lg p-2">
+                                <div class="flex flex-wrap gap-1">
+                                    @foreach($tablas as $t)
+                                        <button wire:click="seleccionarTabla('{{ $t }}')"
+                                                class="px-2 py-1 rounded text-xs font-mono transition
+                                                       {{ $tablaSeleccionada === $t ? 'bg-sky-600 text-white' : 'bg-sky-100 text-sky-800 hover:bg-sky-200' }}">
+                                            {{ $t }}
+                                        </button>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endif
+
+                        @if($tablaSeleccionada && !empty($columnas))
+                            <div class="bg-white border border-sky-200 rounded-lg p-3">
+                                <p class="text-xs font-bold text-slate-700 mb-2">
+                                    <i class="fa-solid fa-table-columns text-sky-600"></i>
+                                    Columnas de <code class="bg-slate-100 px-1 rounded">{{ $tablaSeleccionada }}</code>
+                                </p>
+                                <div class="flex flex-wrap gap-1">
+                                    @foreach($columnas as $c)
+                                        <span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-slate-100 text-[10px] font-mono">
+                                            <strong class="text-slate-800">{{ $c['nombre'] }}</strong>
+                                            <span class="text-slate-500">{{ $c['tipo'] }}</span>
+                                        </span>
+                                    @endforeach
+                                </div>
+                                <p class="text-[10px] text-emerald-700 mt-2 font-semibold">
+                                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                                    Query y mapeo auto-rellenados. Ajústalos abajo si hace falta.
+                                </p>
+                            </div>
+                        @endif
+                    </div>
+
                     {{-- Query --}}
                     <div class="rounded-xl border-2 border-slate-200 p-4 space-y-2">
                         <h4 class="font-bold text-slate-800 text-sm"><i class="fa-solid fa-code text-[#d68643]"></i> Query SQL</h4>

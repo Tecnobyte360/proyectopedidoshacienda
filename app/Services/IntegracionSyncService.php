@@ -17,6 +17,105 @@ use RuntimeException;
 class IntegracionSyncService
 {
     /**
+     * Lista todas las tablas de la BD externa.
+     * Devuelve ['ok'=>bool, 'mensaje'=>string, 'tablas'=>array<string>].
+     */
+    public function listarTablas(Integracion $integracion): array
+    {
+        try {
+            $pdo = $this->conectar($integracion);
+            $db  = $integracion->config['database'] ?? '';
+
+            $sql = match ($integracion->tipo) {
+                Integracion::TIPO_SQLSRV =>
+                    "SELECT TABLE_SCHEMA + '.' + TABLE_NAME AS tabla
+                     FROM INFORMATION_SCHEMA.TABLES
+                     WHERE TABLE_TYPE = 'BASE TABLE'
+                     ORDER BY TABLE_SCHEMA, TABLE_NAME",
+                Integracion::TIPO_MYSQL =>
+                    "SELECT TABLE_NAME AS tabla
+                     FROM INFORMATION_SCHEMA.TABLES
+                     WHERE TABLE_SCHEMA = '" . addslashes($db) . "' AND TABLE_TYPE = 'BASE TABLE'
+                     ORDER BY TABLE_NAME",
+                Integracion::TIPO_PGSQL =>
+                    "SELECT schemaname || '.' || tablename AS tabla
+                     FROM pg_catalog.pg_tables
+                     WHERE schemaname NOT IN ('pg_catalog', 'information_schema')
+                     ORDER BY schemaname, tablename",
+                default => throw new RuntimeException('Tipo no soportado'),
+            };
+
+            $stmt = $pdo->query($sql);
+            $tablas = array_column($stmt->fetchAll(PDO::FETCH_ASSOC), 'tabla');
+
+            return ['ok' => true, 'mensaje' => count($tablas) . ' tablas encontradas', 'tablas' => $tablas];
+        } catch (\Throwable $e) {
+            return ['ok' => false, 'mensaje' => $e->getMessage(), 'tablas' => []];
+        }
+    }
+
+    /**
+     * Lista las columnas de una tabla específica.
+     * Devuelve ['ok'=>bool, 'columnas'=>array<['nombre'=>, 'tipo'=>]>, 'muestra'=>array].
+     */
+    public function describirTabla(Integracion $integracion, string $tabla): array
+    {
+        try {
+            $pdo = $this->conectar($integracion);
+
+            // Separar schema.tabla si aplica
+            $schema = null;
+            $tabla_solo = $tabla;
+            if (str_contains($tabla, '.')) {
+                [$schema, $tabla_solo] = explode('.', $tabla, 2);
+            }
+
+            $sql = match ($integracion->tipo) {
+                Integracion::TIPO_SQLSRV =>
+                    "SELECT COLUMN_NAME AS nombre, DATA_TYPE AS tipo, IS_NULLABLE AS nullable
+                     FROM INFORMATION_SCHEMA.COLUMNS
+                     WHERE TABLE_NAME = " . $pdo->quote($tabla_solo)
+                     . ($schema ? " AND TABLE_SCHEMA = " . $pdo->quote($schema) : '') . "
+                     ORDER BY ORDINAL_POSITION",
+                Integracion::TIPO_MYSQL =>
+                    "SELECT COLUMN_NAME AS nombre, DATA_TYPE AS tipo, IS_NULLABLE AS nullable
+                     FROM INFORMATION_SCHEMA.COLUMNS
+                     WHERE TABLE_NAME = " . $pdo->quote($tabla_solo) . "
+                     ORDER BY ORDINAL_POSITION",
+                Integracion::TIPO_PGSQL =>
+                    "SELECT column_name AS nombre, data_type AS tipo, is_nullable AS nullable
+                     FROM information_schema.columns
+                     WHERE table_name = " . $pdo->quote($tabla_solo)
+                     . ($schema ? " AND table_schema = " . $pdo->quote($schema) : '') . "
+                     ORDER BY ordinal_position",
+                default => throw new RuntimeException('Tipo no soportado'),
+            };
+
+            $stmt = $pdo->query($sql);
+            $cols = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            // Preview: 3 filas
+            $preview = [];
+            try {
+                $tblRef = $integracion->tipo === Integracion::TIPO_SQLSRV
+                    ? "[{$schema}].[{$tabla_solo}]"
+                    : ($schema ? "\"{$schema}\".\"{$tabla_solo}\"" : "\"{$tabla_solo}\"");
+                if ($integracion->tipo === Integracion::TIPO_MYSQL) {
+                    $tblRef = "`{$tabla_solo}`";
+                }
+                $sql = $integracion->tipo === Integracion::TIPO_SQLSRV
+                    ? "SELECT TOP 3 * FROM {$tblRef}"
+                    : "SELECT * FROM {$tblRef} LIMIT 3";
+                $preview = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+            } catch (\Throwable $e) { /* preview opcional */ }
+
+            return ['ok' => true, 'columnas' => $cols, 'muestra' => $preview];
+        } catch (\Throwable $e) {
+            return ['ok' => false, 'mensaje' => $e->getMessage(), 'columnas' => [], 'muestra' => []];
+        }
+    }
+
+    /**
      * Prueba la conexión y devuelve ['ok'=>bool, 'mensaje'=>string, 'muestra'=>array].
      * 'muestra' contiene las primeras 5 filas si el query funciona.
      */

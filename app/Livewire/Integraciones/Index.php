@@ -36,6 +36,13 @@ class Index extends Component
     // Resultado del "Probar conexión"
     public ?array $testResult = null;
 
+    // Explorador de BD
+    public array $tablas = [];
+    public string $tablaSeleccionada = '';
+    public array $columnas = [];
+    public array $muestraTabla = [];
+    public ?string $explorarError = null;
+
     protected function rules(): array
     {
         return [
@@ -131,6 +138,91 @@ class Index extends Component
     {
         $i = Integracion::findOrFail($id);
         $i->update(['activo' => !$i->activo]);
+    }
+
+    private function temporalParaExplorar(): Integracion
+    {
+        $temp = new Integracion([
+            'tenant_id' => app(\App\Services\TenantManager::class)->current()?->id,
+            'nombre'    => 'TEST',
+            'tipo'      => $this->tipo,
+            'entidad'   => $this->entidad,
+            'activo'    => true,
+            'config'    => [
+                'host' => $this->host, 'port' => $this->port !== '' ? (int) $this->port : null,
+                'database' => $this->database, 'username' => $this->username, 'password' => $this->password,
+                'query' => $this->query, 'mapeo' => $this->mapeo,
+            ],
+        ]);
+        $temp->exists = false;
+        return $temp;
+    }
+
+    /**
+     * Carga la lista de tablas de la BD externa.
+     */
+    public function listarTablas(): void
+    {
+        $this->explorarError = null;
+        $r = app(IntegracionSyncService::class)->listarTablas($this->temporalParaExplorar());
+        if ($r['ok']) {
+            $this->tablas = $r['tablas'];
+        } else {
+            $this->tablas = [];
+            $this->explorarError = $r['mensaje'];
+        }
+    }
+
+    /**
+     * Al seleccionar una tabla, carga sus columnas y genera un query base.
+     */
+    public function seleccionarTabla(string $tabla): void
+    {
+        $this->tablaSeleccionada = $tabla;
+        $this->explorarError = null;
+
+        $r = app(IntegracionSyncService::class)->describirTabla($this->temporalParaExplorar(), $tabla);
+        if (!$r['ok']) {
+            $this->explorarError = $r['mensaje'];
+            return;
+        }
+
+        $this->columnas     = $r['columnas'];
+        $this->muestraTabla = $r['muestra'];
+
+        // Autogenerar query base con todas las columnas
+        $cols = array_map(fn ($c) => $c['nombre'], $r['columnas']);
+        $tblRef = $this->tipo === 'sqlsrv' ? "[" . str_replace('.', '].[', $tabla) . "]" : $tabla;
+        $this->query = "SELECT " . implode(', ', $cols) . "\nFROM " . $tblRef;
+
+        // Auto-mapeo heurístico: busca columnas parecidas a nuestros campos
+        $this->autoMapear($cols);
+    }
+
+    private function autoMapear(array $cols): void
+    {
+        $normalizados = [];
+        foreach ($cols as $col) {
+            $normalizados[strtolower(preg_replace('/[^a-z0-9]/i', '', $col))] = $col;
+        }
+
+        $reglas = [
+            'codigo'      => ['codigo', 'cod', 'codart', 'codproducto', 'sku', 'referencia', 'ref'],
+            'nombre'      => ['nombre', 'descripcion', 'descrip', 'articulo', 'producto', 'nombreproducto'],
+            'categoria'   => ['categoria', 'familia', 'grupo', 'linea', 'seccion'],
+            'precio_base' => ['preciovta', 'precioventa', 'precio', 'pvp', 'valor', 'preciobase', 'pvta'],
+            'unidad'      => ['unidad', 'unid', 'um', 'unidadmedida', 'presentacion'],
+            'descripcion' => ['descripcionlarga', 'descriplarga', 'detalles', 'detalle', 'observaciones'],
+        ];
+
+        foreach ($reglas as $campoDestino => $patrones) {
+            foreach ($patrones as $p) {
+                if (isset($normalizados[$p])) {
+                    $this->mapeo[$campoDestino] = $normalizados[$p];
+                    break;
+                }
+            }
+        }
     }
 
     /**
