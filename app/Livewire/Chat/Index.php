@@ -8,6 +8,7 @@ use App\Services\ConversacionService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -56,6 +57,142 @@ class Index extends Component
             'type'    => 'info',
             'message' => '🤖 El bot retoma la conversación.',
         ]);
+    }
+
+    /**
+     * Recibe audio grabado en el navegador (data URL base64), lo guarda en
+     * storage público, y lo envía al cliente por WhatsApp con mediaUrl.
+     */
+    public function enviarAudio(string $dataUrl): void
+    {
+        if (!$this->conversacionActivaId) return;
+
+        $conv = ConversacionWhatsapp::find($this->conversacionActivaId);
+        if (!$conv) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Conversación no encontrada.']);
+            return;
+        }
+
+        // Decodificar data URL
+        if (!preg_match('/^data:(audio\/[a-z0-9.+-]+);base64,(.+)$/i', $dataUrl, $m)) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Formato de audio no reconocido.']);
+            return;
+        }
+
+        $mime  = strtolower($m[1]);
+        $bytes = base64_decode($m[2], true);
+
+        if ($bytes === false || strlen($bytes) < 100) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Audio inválido o vacío.']);
+            return;
+        }
+
+        if (strlen($bytes) > 16 * 1024 * 1024) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Audio demasiado grande (máx 16 MB).']);
+            return;
+        }
+
+        $ext = match (true) {
+            str_contains($mime, 'ogg')  => 'ogg',
+            str_contains($mime, 'webm') => 'webm',
+            str_contains($mime, 'mpeg') => 'mp3',
+            str_contains($mime, 'mp4')  => 'm4a',
+            str_contains($mime, 'wav')  => 'wav',
+            default                     => 'webm',
+        };
+
+        $filename = 'audios-out/audio_' . now()->format('Ymd_His') . '_' . uniqid() . '.' . $ext;
+        Storage::disk('public')->put($filename, $bytes);
+
+        $mediaUrl = rtrim(config('app.url'), '/') . Storage::url($filename);
+
+        $sent = $this->enviarAudioAWhatsapp($conv->telefono_normalizado, $mediaUrl, $conv->connection_id);
+
+        if (!$sent) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => '⚠️ No se pudo enviar el audio a WhatsApp.']);
+            return;
+        }
+
+        // Persistir como mensaje del operador con tipo audio y URL
+        try {
+            app(ConversacionService::class)->agregarMensaje(
+                $conv,
+                MensajeWhatsapp::ROL_ASSISTANT,
+                '🎤 Nota de voz',
+                [
+                    'tipo' => 'audio',
+                    'meta' => [
+                        'enviado_por_humano' => true,
+                        'usuario_id'         => auth()->id(),
+                        'media_url'          => $mediaUrl,
+                        'mime'               => $mime,
+                        'bytes'              => strlen($bytes),
+                    ],
+                ]
+            );
+        } catch (\Throwable $e) {
+            Log::warning('No se persistió audio manual: ' . $e->getMessage());
+        }
+
+        $this->dispatch('mensaje-enviado');
+        $this->dispatch('notify', ['type' => 'success', 'message' => '✓ Audio enviado']);
+    }
+
+    /**
+     * Envía un audio a WhatsApp vía TecnoByteApp usando mediaUrl.
+     */
+    private function enviarAudioAWhatsapp(string $telefono, string $mediaUrl, $connectionId = null): bool
+    {
+        try {
+            $token = $this->obtenerTokenWhatsapp();
+            if (!$token) {
+                Log::error('Token WhatsApp no disponible para audio manual');
+                return false;
+            }
+
+            $payload = [
+                'number'   => $telefono,
+                'mediaUrl' => $mediaUrl,
+                'mediaType' => 'audio',
+                'body'     => '',
+            ];
+            if ($connectionId) {
+                $payload['whatsappId']   = (int) $connectionId;
+                $payload['connectionId'] = (int) $connectionId;
+            }
+
+            $resolver = app(\App\Services\WhatsappResolverService::class);
+            $cred = $resolver->credenciales();
+            $endpointSend = rtrim($cred['api_base_url'], '/') . '/api/messages/send';
+
+            $response = Http::withoutVerifying()
+                ->withToken($token)
+                ->timeout(30)
+                ->post($endpointSend, $payload);
+
+            if ($response->successful()) return true;
+
+            if ($response->status() === 401) {
+                Cache::forget($resolver->tokenCacheKey());
+                $newToken = $this->obtenerTokenWhatsapp();
+                if ($newToken) {
+                    $retry = Http::withoutVerifying()
+                        ->withToken($newToken)
+                        ->timeout(30)
+                        ->post($endpointSend, $payload);
+                    return $retry->successful();
+                }
+            }
+
+            Log::warning('Envío audio WhatsApp falló', [
+                'status' => $response->status(),
+                'body'   => $response->body(),
+            ]);
+            return false;
+        } catch (\Throwable $e) {
+            Log::error('Excepción enviando audio WhatsApp: ' . $e->getMessage());
+            return false;
+        }
     }
 
     public function enviar(): void

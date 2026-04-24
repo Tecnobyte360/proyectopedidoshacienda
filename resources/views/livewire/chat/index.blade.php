@@ -154,10 +154,18 @@
             {{-- Área de mensajes --}}
             <div class="flex-1 overflow-y-auto px-4 py-4 space-y-2" id="chat-messages">
                 @foreach($conversacionActiva->mensajes as $m)
+                    @php
+                        $mediaUrl = $m->meta['media_url'] ?? null;
+                        $esAudio  = ($m->tipo ?? null) === 'audio' && !empty($mediaUrl);
+                    @endphp
                     @if($m->rol === 'user')
                         <div class="flex justify-start">
                             <div class="max-w-[70%] rounded-2xl rounded-tl-sm bg-white px-3 py-2 shadow-sm">
-                                <p class="text-sm text-slate-800 whitespace-pre-wrap">{{ $m->contenido }}</p>
+                                @if($esAudio)
+                                    <audio src="{{ $mediaUrl }}" controls class="w-64 max-w-full"></audio>
+                                @else
+                                    <p class="text-sm text-slate-800 whitespace-pre-wrap">{{ $m->contenido }}</p>
+                                @endif
                                 <p class="text-[10px] text-slate-400 mt-1 text-right">
                                     {{ $m->created_at->format('H:i') }}
                                 </p>
@@ -173,7 +181,11 @@
                                         <i class="fa-solid fa-user-tie"></i> Operador
                                     </div>
                                 @endif
-                                <p class="text-sm text-slate-800 whitespace-pre-wrap">{{ $m->contenido }}</p>
+                                @if($esAudio)
+                                    <audio src="{{ $mediaUrl }}" controls class="w-64 max-w-full"></audio>
+                                @else
+                                    <p class="text-sm text-slate-800 whitespace-pre-wrap">{{ $m->contenido }}</p>
+                                @endif
                                 <p class="text-[10px] text-slate-500 mt-1 text-right">
                                     {{ $esHumano ? '👤' : '🤖' }} {{ $m->created_at->format('H:i') }}
                                 </p>
@@ -184,15 +196,66 @@
             </div>
 
             {{-- Input para responder --}}
-            <div class="bg-white border-t border-slate-200">
+            <div class="bg-white border-t border-slate-200"
+                 x-data="audioRecorder()"
+                 x-init="init()">
                 <form wire:submit.prevent="enviar"
                       class="px-3 py-3 flex items-center gap-2">
                     <textarea wire:model="nuevoMensaje"
                               placeholder="Escribe tu respuesta..."
                               rows="1"
+                              x-show="!recording && !preview"
                               @keydown.enter.prevent="$wire.enviar()"
                               class="flex-1 resize-none rounded-2xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-2 focus:ring-amber-100"></textarea>
+
+                    {{-- Indicador de grabación --}}
+                    <div x-show="recording" x-cloak
+                         class="flex-1 flex items-center gap-2 rounded-2xl bg-rose-50 border border-rose-200 px-4 py-2.5">
+                        <span class="relative flex h-3 w-3">
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-3 w-3 bg-rose-500"></span>
+                        </span>
+                        <span class="text-sm font-semibold text-rose-600">Grabando...</span>
+                        <span class="text-xs text-rose-500 ml-auto font-mono" x-text="formatTime(elapsed)"></span>
+                    </div>
+
+                    {{-- Preview antes de enviar --}}
+                    <div x-show="preview" x-cloak
+                         class="flex-1 flex items-center gap-2 rounded-2xl bg-slate-50 border border-slate-200 px-3 py-2">
+                        <audio :src="preview" controls class="flex-1 h-9"></audio>
+                        <button type="button" @click="descartar()"
+                                class="flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 hover:bg-slate-300 text-slate-600">
+                            <i class="fa-solid fa-trash text-xs"></i>
+                        </button>
+                    </div>
+
+                    {{-- Botón micrófono / detener / enviar audio --}}
+                    <template x-if="!recording && !preview">
+                        <button type="button" @click="start()"
+                                title="Grabar nota de voz"
+                                class="flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 transition">
+                            <i class="fa-solid fa-microphone"></i>
+                        </button>
+                    </template>
+                    <template x-if="recording">
+                        <button type="button" @click="stop()"
+                                title="Detener grabación"
+                                class="flex h-11 w-11 items-center justify-center rounded-full bg-rose-500 hover:bg-rose-600 text-white shadow transition">
+                            <i class="fa-solid fa-stop"></i>
+                        </button>
+                    </template>
+                    <template x-if="preview">
+                        <button type="button" @click="send()"
+                                :disabled="sending"
+                                title="Enviar nota de voz"
+                                class="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-500 hover:bg-emerald-600 text-white shadow transition disabled:opacity-50">
+                            <i class="fa-solid" :class="sending ? 'fa-circle-notch fa-spin' : 'fa-paper-plane'"></i>
+                        </button>
+                    </template>
+
+                    {{-- Botón enviar texto --}}
                     <button type="submit"
+                            x-show="!recording && !preview"
                             class="flex h-11 w-11 items-center justify-center rounded-full bg-[#d68643] text-white shadow hover:bg-[#c97a36] transition">
                         <i class="fa-solid fa-paper-plane"></i>
                     </button>
@@ -243,6 +306,108 @@
 
             scrollToBottom();
         })();
+    </script>
+
+    {{-- Grabador de audio (Alpine component) --}}
+    <script>
+        function audioRecorder() {
+            return {
+                recording: false,
+                preview: null,
+                sending: false,
+                elapsed: 0,
+                _mediaRecorder: null,
+                _chunks: [],
+                _stream: null,
+                _timer: null,
+                _blob: null,
+
+                init() {},
+
+                async start() {
+                    if (!navigator.mediaDevices || !window.MediaRecorder) {
+                        alert('Tu navegador no soporta grabación de audio.');
+                        return;
+                    }
+                    try {
+                        this._stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    } catch (e) {
+                        alert('No se pudo acceder al micrófono: ' + e.message);
+                        return;
+                    }
+                    this._chunks = [];
+                    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+                        ? 'audio/webm;codecs=opus'
+                        : (MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' : '');
+                    this._mediaRecorder = new MediaRecorder(this._stream, mimeType ? { mimeType } : undefined);
+                    this._mediaRecorder.ondataavailable = (e) => {
+                        if (e.data.size > 0) this._chunks.push(e.data);
+                    };
+                    this._mediaRecorder.onstop = () => {
+                        const type = this._mediaRecorder.mimeType || 'audio/webm';
+                        this._blob = new Blob(this._chunks, { type });
+                        this.preview = URL.createObjectURL(this._blob);
+                        this._stopStream();
+                    };
+                    this._mediaRecorder.start();
+                    this.recording = true;
+                    this.elapsed = 0;
+                    this._timer = setInterval(() => this.elapsed++, 1000);
+                },
+
+                stop() {
+                    if (this._timer) { clearInterval(this._timer); this._timer = null; }
+                    if (this._mediaRecorder && this._mediaRecorder.state !== 'inactive') {
+                        this._mediaRecorder.stop();
+                    }
+                    this.recording = false;
+                },
+
+                descartar() {
+                    if (this.preview) URL.revokeObjectURL(this.preview);
+                    this.preview = null;
+                    this._blob = null;
+                    this._chunks = [];
+                },
+
+                async send() {
+                    if (!this._blob || this.sending) return;
+                    this.sending = true;
+                    try {
+                        const dataUrl = await this._blobToDataUrl(this._blob);
+                        await this.$wire.enviarAudio(dataUrl);
+                        this.descartar();
+                    } catch (e) {
+                        console.error('Error enviando audio', e);
+                        alert('No se pudo enviar el audio: ' + e.message);
+                    } finally {
+                        this.sending = false;
+                    }
+                },
+
+                _blobToDataUrl(blob) {
+                    return new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload = () => resolve(reader.result);
+                        reader.onerror = reject;
+                        reader.readAsDataURL(blob);
+                    });
+                },
+
+                _stopStream() {
+                    if (this._stream) {
+                        this._stream.getTracks().forEach(t => t.stop());
+                        this._stream = null;
+                    }
+                },
+
+                formatTime(s) {
+                    const m = Math.floor(s / 60);
+                    const sec = s % 60;
+                    return `${m}:${sec.toString().padStart(2, '0')}`;
+                },
+            };
+        }
     </script>
 
     {{-- Real-time: escucha eventos de Reverb y refresca la conversación --}}
