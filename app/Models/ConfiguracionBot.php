@@ -22,6 +22,11 @@ class ConfiguracionBot extends Model
         'max_imagenes_por_mensaje',
         'enviar_imagen_destacados',
         'saludar_con_promociones',
+        'derivacion_activa',
+        'derivacion_instrucciones_ia',
+        'derivacion_fallback_activa',
+        'derivacion_frases_deteccion',
+        'derivacion_departamento_fallback_id',
         'agrupar_mensajes_activo',
         'agrupar_mensajes_segundos',
         'modelo_openai',
@@ -50,6 +55,8 @@ class ConfiguracionBot extends Model
         'transcribir_audios'        => 'boolean',
         'enviar_imagen_destacados'  => 'boolean',
         'saludar_con_promociones'   => 'boolean',
+        'derivacion_activa'         => 'boolean',
+        'derivacion_fallback_activa'=> 'boolean',
         'agrupar_mensajes_activo'   => 'boolean',
         'agrupar_mensajes_segundos' => 'integer',
         'usar_prompt_personalizado' => 'boolean',
@@ -61,6 +68,34 @@ class ConfiguracionBot extends Model
         'max_tokens'                => 'integer',
         'max_imagenes_por_mensaje'  => 'integer',
     ];
+
+    /** Instrucciones IA por defecto para derivación automática a departamento */
+    public const DERIVACION_INSTRUCCIONES_DEFAULT = <<<'TXT'
+⚠️ EJECUTA ESTA FUNCIÓN DE INMEDIATO (no la anuncies en texto).
+NUNCA escribas "voy a derivar" o "déjame un momento" — simplemente LLAMA esta función y el sistema responde automáticamente al cliente con el saludo del departamento.
+Si dices que vas a hacerlo sin llamar la función, el cliente queda sin respuesta.
+
+Deriva la conversación a un departamento humano cuando detectes que el cliente necesita atención especializada o emocional.
+NO dependas de palabras clave específicas — ANALIZA el TONO, el CONTEXTO y la INTENCIÓN detrás del mensaje.
+
+DERIVA cuando detectes CUALQUIERA de estas señales:
+• TONO NEGATIVO: irritación, frustración, enojo, sarcasmo, desesperación, urgencia emocional.
+• EXPRESIONES DE MOLESTIA: aunque el cliente no diga "estoy molesto", lee entre líneas.
+• PROBLEMA CON PEDIDO ANTERIOR: cualquier inconformidad con algo ya entregado.
+• PIDE HABLAR CON HUMANO, aunque lo exprese indirecto.
+• FUERA DE TU ALCANCE: precios especiales, descuentos por volumen, facturación, cobros dobles, temas legales.
+• INSISTENCIA: es la tercera vez que insiste en el mismo tema sin resolverse.
+
+NO DERIVES cuando:
+• Consulta simple que puedes responder con el catálogo.
+• Está armando pedido normalmente.
+• Saludo o conversación casual positiva.
+
+Si hay duda razonable, DERIVA. Mejor derivar de más que dejar a un cliente molesto sin resolver.
+TXT;
+
+    /** Frases que, si aparecen en la respuesta del bot SIN tool_call, indican "dijo pero no hizo" derivación */
+    public const DERIVACION_FRASES_DEFAULT = "voy a derivar,voy a transferir,voy a pasarte,paso con,te voy a conectar,te conecto con,voy a conectarte,déjame un momento para derivar,déjame un momento para pasar,te transfiero,un asesor te va a contactar,te va a llamar un asesor";
 
     /** Plantilla por defecto del mensaje de cumpleaños */
     public const CUMPLEANOS_PLANTILLA_DEFAULT = <<<'MSG'

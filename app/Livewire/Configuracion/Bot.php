@@ -14,6 +14,13 @@ class Bot extends Component
     public bool   $enviar_imagen_destacados  = false;
     public bool   $saludar_con_promociones   = true;
 
+    // Derivación automática por IA
+    public bool   $derivacion_activa                    = true;
+    public bool   $derivacion_fallback_activa           = true;
+    public string $derivacion_instrucciones_ia          = '';
+    public string $derivacion_frases_deteccion          = '';
+    public ?int   $derivacion_departamento_fallback_id  = null;
+
     // Buffer de mensajes (debounce)
     public bool   $agrupar_mensajes_activo   = true;
     public int    $agrupar_mensajes_segundos = 5;
@@ -63,6 +70,12 @@ class Bot extends Component
         $this->max_imagenes_por_mensaje  = (int) $cfg->max_imagenes_por_mensaje;
         $this->enviar_imagen_destacados  = (bool) $cfg->enviar_imagen_destacados;
         $this->saludar_con_promociones   = (bool) $cfg->saludar_con_promociones;
+
+        $this->derivacion_activa                   = (bool) ($cfg->derivacion_activa ?? true);
+        $this->derivacion_fallback_activa          = (bool) ($cfg->derivacion_fallback_activa ?? true);
+        $this->derivacion_instrucciones_ia         = (string) ($cfg->derivacion_instrucciones_ia ?: ConfiguracionBot::DERIVACION_INSTRUCCIONES_DEFAULT);
+        $this->derivacion_frases_deteccion         = (string) ($cfg->derivacion_frases_deteccion ?: ConfiguracionBot::DERIVACION_FRASES_DEFAULT);
+        $this->derivacion_departamento_fallback_id = $cfg->derivacion_departamento_fallback_id;
         $this->agrupar_mensajes_activo   = (bool) ($cfg->agrupar_mensajes_activo ?? true);
         $this->agrupar_mensajes_segundos = (int) ($cfg->agrupar_mensajes_segundos ?? 5);
         $this->modelo_openai             = (string) ($cfg->modelo_openai ?? 'gpt-4o-mini');
@@ -312,6 +325,11 @@ class Bot extends Component
             'max_imagenes_por_mensaje'  => 'integer|min:1|max:10',
             'enviar_imagen_destacados'  => 'boolean',
             'saludar_con_promociones'   => 'boolean',
+            'derivacion_activa'                    => 'boolean',
+            'derivacion_fallback_activa'           => 'boolean',
+            'derivacion_instrucciones_ia'          => 'nullable|string|max:10000',
+            'derivacion_frases_deteccion'          => 'nullable|string|max:2000',
+            'derivacion_departamento_fallback_id'  => 'nullable|integer|exists:departamentos,id',
             'agrupar_mensajes_activo'   => 'boolean',
             'agrupar_mensajes_segundos' => 'integer|min:1|max:30',
             'modelo_openai'             => 'required|string|max:60',

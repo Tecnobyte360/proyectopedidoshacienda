@@ -897,6 +897,74 @@ class WhatsappWebhookController extends Controller
         $reply = $textContent
             ?? 'En este momento no logré procesar tu mensaje. ¿Me lo repites con un poquito más de detalle?';
 
+        // 🎯 DETECTOR DE ALUCINACIÓN DE DERIVACIÓN:
+        // Si el bot dice "voy a derivar" / "te paso con..." SIN haber llamado la tool,
+        // nosotros derivamos manualmente al departamento_fallback para no dejar al cliente esperando.
+        $config = \App\Models\ConfiguracionBot::actual();
+        if (($config->derivacion_activa ?? true) && ($config->derivacion_fallback_activa ?? true)) {
+            $frasesRaw = trim((string) ($config->derivacion_frases_deteccion
+                ?: \App\Models\ConfiguracionBot::DERIVACION_FRASES_DEFAULT));
+            $frases = array_values(array_filter(array_map(fn ($f) => mb_strtolower(trim($f)), explode(',', $frasesRaw))));
+
+            $replyLower = mb_strtolower($reply);
+            $matched = null;
+            foreach ($frases as $f) {
+                if ($f !== '' && str_contains($replyLower, $f)) { $matched = $f; break; }
+            }
+
+            if ($matched) {
+                $deptoFallback = null;
+                if ($config->derivacion_departamento_fallback_id) {
+                    $deptoFallback = \App\Models\Departamento::where('activo', true)->find($config->derivacion_departamento_fallback_id);
+                }
+                if (!$deptoFallback) {
+                    // Usar el primero activo como fallback
+                    $deptoFallback = \App\Models\Departamento::where('activo', true)->orderBy('orden')->first();
+                }
+
+                if ($deptoFallback) {
+                    Log::warning('🛟 Fallback derivación: bot anunció pero no llamó tool, derivamos al departamento configurado', [
+                        'frase_detectada' => $matched,
+                        'departamento'    => $deptoFallback->nombre,
+                        'reply_original'  => mb_substr($reply, 0, 200),
+                    ]);
+
+                    // Marcar la conversación
+                    $conversacion->update([
+                        'departamento_id'     => $deptoFallback->id,
+                        'derivada_at'         => now(),
+                        'atendida_por_humano' => true,
+                    ]);
+
+                    // Notificar al equipo
+                    if ($deptoFallback->notificar_internos) {
+                        try {
+                            $usuarios = \App\Models\UsuarioInternoWhatsapp::withoutGlobalScopes()
+                                ->where('tenant_id', $deptoFallback->tenant_id)
+                                ->where('departamento_id', $deptoFallback->id)
+                                ->where('activo', true)
+                                ->get();
+                            $texto = "🔔 *Derivación (fallback) a {$deptoFallback->nombre}*\n\n"
+                                   . "👤 *Cliente:* {$name}\n"
+                                   . "📞 *Teléfono:* {$from}\n\n"
+                                   . "💬 *Mensaje:*\n" . mb_strimwidth($message, 0, 250, '…') . "\n\n"
+                                   . "_La IA anunció derivar pero no invocó la función. Revisa la plataforma._";
+                            $sender = app(\App\Services\WhatsappSenderService::class);
+                            foreach ($usuarios as $u) {
+                                $sender->enviarTexto($u->telefono_normalizado, $texto, $conversacion->connection_id);
+                            }
+                        } catch (\Throwable $e) {
+                            Log::warning('Fallo notificar fallback: ' . $e->getMessage());
+                        }
+                    }
+
+                    // Reemplazar el texto del bot por el saludo del departamento
+                    $reply = $deptoFallback->saludo_automatico
+                        ?: "Entiendo {$name} 🙏 Voy a pasarte con un asesor de *{$deptoFallback->nombre}* que te atenderá en unos minutos.";
+                }
+            }
+        }
+
         // 🛑 DETECTOR DE ALUCINACIÓN DE CONFIRMACIÓN:
         // Si el bot dice "pedido registrado / confirmado / va en camino"
         // pero NO llamó a confirmar_pedido → es una mentira. Registramos
@@ -2621,30 +2689,20 @@ PROMPT;
             ],
         ];
 
-        // Tool: derivar_a_departamento — si el cliente está molesto, muy molesto,
-        // pide hablar con un humano, tiene un reclamo/queja, o el tema está
-        // fuera de lo que el bot maneja. La IA DECIDE cuándo usarla.
-        $deptos = \App\Models\Departamento::where('activo', true)->orderBy('orden')->get(['id','nombre']);
+        // Tool: derivar_a_departamento — solo si está activada en config y hay departamentos.
+        $deptos = ($config->derivacion_activa ?? true)
+            ? \App\Models\Departamento::where('activo', true)->orderBy('orden')->get(['id','nombre'])
+            : collect();
         if ($deptos->isNotEmpty()) {
             $nombresDeptos = $deptos->pluck('nombre')->all();
+            $instruccionesIA = trim((string) ($config->derivacion_instrucciones_ia
+                ?: \App\Models\ConfiguracionBot::DERIVACION_INSTRUCCIONES_DEFAULT));
+
             $tools[] = [
                 'type'     => 'function',
                 'function' => [
                     'name'        => 'derivar_a_departamento',
-                    'description' => 'Deriva la conversación a un departamento humano cuando detectes que el cliente necesita atención especializada o emocional. '
-                        . 'NO dependas de palabras clave específicas — ANALIZA el TONO, el CONTEXTO y la INTENCIÓN detrás del mensaje.'
-                        . "\n\nDERIVA cuando detectes CUALQUIERA de estas señales:"
-                        . "\n• TONO NEGATIVO: irritación, frustración, enojo, sarcasmo, desesperación, urgencia emocional."
-                        . "\n• EXPRESIONES DE MOLESTIA: aunque el cliente no diga 'estoy molesto', lee entre líneas: mayúsculas gritando, signos de exclamación repetidos, palabras fuertes, amenazas (\"voy a demandar\", \"voy a reportar\", \"nunca más\")."
-                        . "\n• PROBLEMA CON PEDIDO ANTERIOR: cualquier inconformidad con algo ya entregado — aunque use palabras suaves tipo \"me llegó diferente\", \"algo pasó con mi pedido\", \"está raro lo que me enviaron\"."
-                        . "\n• PIDE HABLAR CON HUMANO: aunque lo exprese indirecto: \"con quién hablo\", \"pásame con alguien\", \"quién atiende aquí\", \"no me están entendiendo\"."
-                        . "\n• FUERA DE TU ALCANCE: pregunta precios especiales, descuentos por volumen, trato corporativo, facturación, cobros dobles, temas legales/contables."
-                        . "\n• INSISTENCIA: es al menos la tercera vez en la conversación que insiste en el mismo tema sin resolverse."
-                        . "\n\nNO DERIVES cuando:"
-                        . "\n• El cliente hace una consulta simple que puedes responder con el catálogo o promociones."
-                        . "\n• Está pidiendo productos o armando pedido normalmente."
-                        . "\n• Es un saludo o conversación casual positiva."
-                        . "\n\nIMPORTANTE: tú DECIDES con tu criterio. Si hay duda razonable de que el cliente necesita atención humana, DERIVA. Es mejor derivar de más que dejar a un cliente molesto sin resolver.",
+                    'description' => $instruccionesIA,
                     'parameters'  => [
                         'type'       => 'object',
                         'properties' => [

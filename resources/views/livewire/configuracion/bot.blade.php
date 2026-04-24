@@ -246,6 +246,79 @@
             </div>
         </section>
 
+        {{-- DERIVACIÓN AUTOMÁTICA POR IA --}}
+        <section class="rounded-2xl bg-white shadow border border-slate-200 p-6">
+            <div class="flex items-center gap-2 mb-4">
+                <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
+                    <i class="fa-solid fa-headset"></i>
+                </span>
+                <div class="flex-1">
+                    <h3 class="text-lg font-bold text-slate-800">Derivación automática por IA</h3>
+                    <p class="text-xs text-slate-500">Cuando la IA detecte clientes molestos o fuera del alcance del bot, deriva al departamento correspondiente.</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <label class="inline-flex items-center gap-3 cursor-pointer w-full justify-between rounded-xl border border-slate-200 px-4 py-2.5">
+                    <div>
+                        <span class="text-sm font-semibold text-slate-700">Activar derivación</span>
+                        <p class="text-[11px] text-slate-500">Expone la función a la IA.</p>
+                    </div>
+                    <input type="checkbox" wire:model="derivacion_activa" class="rounded border-slate-300 text-[#d68643] h-5 w-5">
+                </label>
+
+                <label class="inline-flex items-center gap-3 cursor-pointer w-full justify-between rounded-xl border border-slate-200 px-4 py-2.5">
+                    <div>
+                        <span class="text-sm font-semibold text-slate-700">Red de seguridad</span>
+                        <p class="text-[11px] text-slate-500">Si la IA dice "voy a derivar" sin hacerlo, derivamos nosotros.</p>
+                    </div>
+                    <input type="checkbox" wire:model="derivacion_fallback_activa" class="rounded border-slate-300 text-[#d68643] h-5 w-5">
+                </label>
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-sm font-semibold text-slate-700 mb-1">
+                    Instrucciones que recibe la IA (descripción de la función)
+                </label>
+                <textarea wire:model="derivacion_instrucciones_ia" rows="10"
+                          placeholder="Deja vacío para usar la plantilla por defecto."
+                          class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-mono leading-relaxed focus:border-[#d68643] focus:ring-[#d68643]"></textarea>
+                <p class="text-[11px] text-slate-500 mt-1">
+                    Este texto es el que define CUÁNDO y CÓMO la IA decide derivar. Edítalo para ajustar criterio (ej. ser más estricta o más permisiva).
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1">
+                        Frases de detección (fallback)
+                    </label>
+                    <textarea wire:model="derivacion_frases_deteccion" rows="4"
+                              placeholder="voy a derivar, voy a transferir, te paso con, ..."
+                              class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-mono focus:border-[#d68643] focus:ring-[#d68643]"></textarea>
+                    <p class="text-[11px] text-slate-500 mt-1">
+                        Si el texto del bot contiene alguna de estas (separadas por coma), asumimos que está "intentando derivar" y forzamos la derivación.
+                    </p>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1">
+                        Departamento por defecto (fallback)
+                    </label>
+                    <select wire:model="derivacion_departamento_fallback_id"
+                            class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                        <option value="">— Primer departamento activo —</option>
+                        @foreach(\App\Models\Departamento::where('activo', true)->orderBy('nombre')->get() as $d)
+                            <option value="{{ $d->id }}">{{ $d->icono_emoji }} {{ $d->nombre }}</option>
+                        @endforeach
+                    </select>
+                    <p class="text-[11px] text-slate-500 mt-1">
+                        Al activarse el fallback, usamos este departamento. Si vacío, se usa el primero activo.
+                    </p>
+                </div>
+            </div>
+        </section>
+
         {{-- INFO EMPRESA --}}
         <section class="rounded-2xl bg-white shadow border border-slate-200 p-6">
             <div class="flex items-center gap-2 mb-4">
