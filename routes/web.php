@@ -11,6 +11,8 @@ use App\Livewire\Importaciones\Index as ImportacionesIndex;
 use App\Livewire\Integraciones\Index as IntegracionesIndex;
 use App\Livewire\UsuariosInternos\Index as UsuariosInternosIndex;
 use App\Livewire\Departamentos\Index as DepartamentosIndex;
+use App\Livewire\ChatWidgets\Index as ChatWidgetsIndex;
+use App\Http\Controllers\ChatWidgetController;
 use App\Livewire\Promociones\Index as PromocionesIndex;
 use App\Livewire\Domiciliarios as DomiciliariosIndex;
 use App\Livewire\Reportes\Index as ReportesIndex;
@@ -76,6 +78,7 @@ Route::middleware(['no_super_sin_imp'])->group(function () {
     Route::get('/integraciones', IntegracionesIndex::class)->middleware('permission:productos.ver')->name('integraciones.index');
     Route::get('/usuarios-internos', UsuariosInternosIndex::class)->middleware('permission:conversaciones.ver')->name('usuarios-internos.index');
     Route::get('/departamentos',     DepartamentosIndex::class)->middleware('permission:conversaciones.ver')->name('departamentos.index');
+    Route::get('/chat-widgets',      ChatWidgetsIndex::class)->middleware('permission:conversaciones.ver')->name('chat-widgets.index');
     Route::get('/importaciones/plantilla/{tipo}', function (string $tipo) {
         $tipo = in_array($tipo, ['productos', 'categorias'], true) ? $tipo : 'productos';
 
@@ -202,3 +205,13 @@ Route::get('/test-broadcast', function () {
         'link_seguimiento'  => $linkSeguimiento, // 🔥 ESTE ES EL IMPORTANTE
     ]);
 });
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// WIDGET DE CHAT WEB — rutas PÚBLICAS (sin auth) para embeber en sitios externos
+// ═══════════════════════════════════════════════════════════════════════════
+Route::get('/widget.js',                        [ChatWidgetController::class, 'script'])->withoutMiddleware(['web']);
+Route::get('/widget-preview',                   fn() => view('widget.preview', ['token' => request('token')]))->withoutMiddleware(['web']);
+Route::get('/api/widget/{token}/config',        [ChatWidgetController::class, 'config'])->withoutMiddleware(['web']);
+Route::post('/api/widget/{token}/mensaje',      [ChatWidgetController::class, 'mensaje'])->withoutMiddleware(['web']);
+Route::options('/api/widget/{token}/{any?}',    [ChatWidgetController::class, 'preflight'])->where('any', '.*')->withoutMiddleware(['web']);
