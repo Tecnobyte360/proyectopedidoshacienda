@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Promocion extends Model
 {
-    use SoftDeletes;
+    use SoftDeletes, \App\Models\Concerns\BelongsToTenant;
 
     protected $table = 'promociones';
 
@@ -19,6 +19,7 @@ class Promocion extends Model
     public const TIPO_NX1              = 'nx1';
 
     protected $fillable = [
+        'tenant_id',
         'nombre',
         'descripcion',
         'tipo',

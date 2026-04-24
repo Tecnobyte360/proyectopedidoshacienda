@@ -242,16 +242,15 @@ class BotCatalogoService
      */
     public function limpiarCache(): void
     {
-        foreach (['all'] as $sufijo) {
-            Cache::forget("bot_catalogo_productos_{$sufijo}");
-            Cache::forget("bot_promociones_vigentes_{$sufijo}");
-            Cache::forget("bot_zonas_activas_{$sufijo}");
-        }
-        // Y por sede activa
+        $tenantId = app(\App\Services\TenantManager::class)->id() ?? 'none';
+        $sufijos  = ['all'];
         foreach (\App\Models\Sede::pluck('id') as $id) {
-            Cache::forget("bot_catalogo_productos_{$id}");
-            Cache::forget("bot_promociones_vigentes_{$id}");
-            Cache::forget("bot_zonas_activas_{$id}");
+            $sufijos[] = (string) $id;
+        }
+        foreach ($sufijos as $sufijo) {
+            Cache::forget("bot_catalogo_productos_t{$tenantId}_{$sufijo}");
+            Cache::forget("bot_promociones_vigentes_t{$tenantId}_{$sufijo}");
+            Cache::forget("bot_zonas_activas_t{$tenantId}_{$sufijo}");
         }
     }
 

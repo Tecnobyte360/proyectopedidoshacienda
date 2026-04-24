@@ -38,8 +38,9 @@ class AnsTiempoPedido extends Model
      */
     public static function paraEstado(string $estado): ?self
     {
+        $tenantId = app(\App\Services\TenantManager::class)->id() ?? 'none';
         return Cache::remember(
-            "ans_tiempo_estado_{$estado}",
+            "ans_tiempo_estado_t{$tenantId}_{$estado}",
             now()->addMinutes(5),
             fn () => self::where('estado', $estado)->where('activo', true)->first()
         );
@@ -47,8 +48,9 @@ class AnsTiempoPedido extends Model
 
     public static function limpiarCache(): void
     {
+        $tenantId = app(\App\Services\TenantManager::class)->id() ?? 'none';
         foreach (['nuevo', 'en_preparacion', 'repartidor_en_camino'] as $e) {
-            Cache::forget("ans_tiempo_estado_{$e}");
+            Cache::forget("ans_tiempo_estado_t{$tenantId}_{$e}");
         }
     }
 

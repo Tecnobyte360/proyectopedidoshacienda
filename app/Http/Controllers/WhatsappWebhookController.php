@@ -582,7 +582,8 @@ class WhatsappWebhookController extends Controller
         ?string $connectionId,
         int $segundosEspera
     ): ?string {
-        $bufferKey = "wa_buffer_{$from}";
+        $tenantId  = app(\App\Services\TenantManager::class)->id() ?? 'none';
+        $bufferKey = "wa_buffer_t{$tenantId}_{$from}";
         $myTimestamp = (string) round(microtime(true) * 1000);   // millis como ID único
 
         // Añadir mi mensaje al buffer
@@ -652,7 +653,8 @@ class WhatsappWebhookController extends Controller
 
     private function procesarConIA(string $from, string $name, string $message, ?string $connectionId = null, bool $yaPersisitido = false): string
     {
-        $cacheKey = "whatsapp_chat_{$from}";
+        $tenantId = app(\App\Services\TenantManager::class)->id() ?? 'none';
+        $cacheKey = "whatsapp_chat_t{$tenantId}_{$from}";
 
         $pedidosInfo  = $this->buscarPedidosClienteSQL($from, $message);
         $ansInfo      = $this->construirResumenAns();
@@ -1043,7 +1045,8 @@ class WhatsappWebhookController extends Controller
      */
     private function obtenerSedeIdDesdeConexion(?string $connectionId): ?int
     {
-        return Cache::remember('default_sede_id', now()->addMinutes(10), function () {
+        $tenantId = app(\App\Services\TenantManager::class)->id() ?? 'none';
+        return Cache::remember("default_sede_id_t{$tenantId}", now()->addMinutes(10), function () {
             return Sede::query()->orderBy('id')->value('id');
         });
     }
@@ -1625,7 +1628,8 @@ class WhatsappWebhookController extends Controller
 
     private function claveAccionPendiente(string $from): string
     {
-        return 'whatsapp_pending_action_' . $this->normalizarTelefono($from);
+        $tenantId = app(\App\Services\TenantManager::class)->id() ?? 'none';
+        return "whatsapp_pending_action_t{$tenantId}_" . $this->normalizarTelefono($from);
     }
 
     private function resolverAccionPendiente(string $from, string $name, string $message): ?string
@@ -1902,7 +1906,8 @@ class WhatsappWebhookController extends Controller
 ): string {
     try {
         $telNorm = $this->normalizarTelefono($from);
-        $confirmKey = "pedido_confirmado_" . $telNorm;
+        $tenantId = app(\App\Services\TenantManager::class)->id() ?? 'none';
+        $confirmKey = "pedido_confirmado_t{$tenantId}_" . $telNorm;
 
         if (Cache::has($confirmKey)) {
             // El cliente acaba de confirmar un pedido. Traemos el último pedido
@@ -2227,7 +2232,8 @@ class WhatsappWebhookController extends Controller
         return $this->construirMensajeConfirmacionPedido($pedido, $orderData, $name, $beneficioAplicado);
     } catch (\Throwable $e) {
         DB::rollBack();
-        Cache::forget("pedido_confirmado_" . $this->normalizarTelefono($from));
+        $tenantId = app(\App\Services\TenantManager::class)->id() ?? 'none';
+        Cache::forget("pedido_confirmado_t{$tenantId}_" . $this->normalizarTelefono($from));
 
         Log::error('❌ ERROR CRÍTICO AL GUARDAR PEDIDO', [
             'error' => $e->getMessage(),
