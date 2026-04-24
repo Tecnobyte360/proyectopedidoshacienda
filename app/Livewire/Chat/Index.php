@@ -166,14 +166,21 @@ class Index extends Component
         try {
             file_put_contents($tmpIn, $bytes);
 
+            // Perfil estándar de voice note WhatsApp:
+            //   - OGG/Opus mono 16 kHz a 32 kbps CBR
+            //   - application=voip (optimizado para voz humana)
+            //   - -avoid_negative_ts make_zero y metadata clean para que móvil acepte
             $process = new Process([
                 'ffmpeg', '-y',
                 '-i', $tmpIn,
+                '-vn',
                 '-c:a', 'libopus',
-                '-b:a', '64k',
-                '-vbr', 'on',
-                '-ar', '48000',
+                '-b:a', '32k',
+                '-ar', '16000',
                 '-ac', '1',
+                '-application', 'voip',
+                '-frame_duration', '60',
+                '-map_metadata', '-1',
                 $tmpOut,
             ]);
             $process->setTimeout(30);
