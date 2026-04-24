@@ -235,37 +235,103 @@
                         @endif
 
                         @if(!empty($tablas))
-                            <p class="text-xs text-slate-500">{{ count($tablas) }} tablas. Clic en una para ver columnas y autogenerar el query:</p>
-                            <div class="max-h-40 overflow-y-auto bg-white border border-sky-200 rounded-lg p-2">
-                                <div class="flex flex-wrap gap-1">
-                                    @foreach($tablas as $t)
-                                        <button wire:click="seleccionarTabla('{{ $t }}')"
-                                                class="px-2 py-1 rounded text-xs font-mono transition
-                                                       {{ $tablaSeleccionada === $t ? 'bg-sky-600 text-white' : 'bg-sky-100 text-sky-800 hover:bg-sky-200' }}">
-                                            {{ $t }}
-                                        </button>
+                            @php
+                                // Agrupar por schema (dbo.tabla → dbo=[tabla, ...])
+                                $grupos = [];
+                                foreach ($tablas as $t) {
+                                    if (str_contains($t, '.')) {
+                                        [$sch, $tbl] = explode('.', $t, 2);
+                                    } else {
+                                        $sch = 'default'; $tbl = $t;
+                                    }
+                                    $grupos[$sch][] = $tbl;
+                                }
+                                ksort($grupos);
+
+                                // Buscador para filtrar
+                            @endphp
+
+                            <div x-data="{ filtro: '', abiertos: {{ json_encode(array_fill_keys(array_keys($grupos), true)) }} }">
+                                <div class="flex items-center justify-between mb-2">
+                                    <p class="text-xs font-bold text-slate-700">
+                                        <i class="fa-solid fa-database text-sky-600"></i>
+                                        {{ count($tablas) }} tablas en {{ count($grupos) }} schema(s)
+                                    </p>
+                                    <div class="relative">
+                                        <i class="fa-solid fa-search absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-[10px]"></i>
+                                        <input type="text" x-model="filtro" placeholder="Filtrar tablas..."
+                                               class="rounded-lg border border-sky-200 pl-6 pr-2 py-1 text-xs w-48 focus:border-sky-400 focus:ring-1 focus:ring-sky-200">
+                                    </div>
+                                </div>
+
+                                <div class="max-h-72 overflow-y-auto bg-white border border-sky-200 rounded-lg p-2 font-mono">
+                                    @foreach($grupos as $schema => $tablasSchema)
+                                        <div class="mb-1">
+                                            {{-- Schema header --}}
+                                            <button @click="abiertos['{{ $schema }}'] = !abiertos['{{ $schema }}']"
+                                                    type="button"
+                                                    class="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-sky-50 transition text-left">
+                                                <i class="fa-solid text-slate-500 text-[10px] w-3"
+                                                   :class="abiertos['{{ $schema }}'] ? 'fa-chevron-down' : 'fa-chevron-right'"></i>
+                                                <i class="fa-solid fa-folder-open text-amber-500"></i>
+                                                <span class="text-sm font-bold text-slate-800">{{ $schema }}</span>
+                                                <span class="text-[10px] text-slate-500 ml-auto">{{ count($tablasSchema) }} tablas</span>
+                                            </button>
+
+                                            {{-- Tables --}}
+                                            <div x-show="abiertos['{{ $schema }}']" x-collapse class="ml-6 mt-0.5 space-y-0.5 border-l-2 border-slate-100 pl-2">
+                                                @foreach($tablasSchema as $tbl)
+                                                    @php $full = $schema === 'default' ? $tbl : "$schema.$tbl"; @endphp
+                                                    <button wire:click="seleccionarTabla('{{ $full }}')"
+                                                            type="button"
+                                                            x-show="filtro === '' || '{{ strtolower($tbl) }}'.includes(filtro.toLowerCase())"
+                                                            class="w-full flex items-center gap-2 px-2 py-1 rounded text-left transition text-xs
+                                                                   {{ $tablaSeleccionada === $full ? 'bg-sky-500 text-white font-bold' : 'text-slate-700 hover:bg-sky-50' }}">
+                                                        <i class="fa-solid fa-table {{ $tablaSeleccionada === $full ? 'text-white' : 'text-sky-400' }}"></i>
+                                                        <span>{{ $tbl }}</span>
+                                                    </button>
+                                                @endforeach
+                                            </div>
+                                        </div>
                                     @endforeach
                                 </div>
                             </div>
                         @endif
 
                         @if($tablaSeleccionada && !empty($columnas))
-                            <div class="bg-white border border-sky-200 rounded-lg p-3">
-                                <p class="text-xs font-bold text-slate-700 mb-2">
-                                    <i class="fa-solid fa-table-columns text-sky-600"></i>
-                                    Columnas de <code class="bg-slate-100 px-1 rounded">{{ $tablaSeleccionada }}</code>
-                                </p>
-                                <div class="flex flex-wrap gap-1">
-                                    @foreach($columnas as $c)
-                                        <span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-slate-100 text-[10px] font-mono">
-                                            <strong class="text-slate-800">{{ $c['nombre'] }}</strong>
-                                            <span class="text-slate-500">{{ $c['tipo'] }}</span>
-                                        </span>
-                                    @endforeach
+                            <div class="bg-white border-2 border-emerald-200 rounded-lg p-3">
+                                <div class="flex items-center gap-2 mb-3">
+                                    <div class="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500 text-white">
+                                        <i class="fa-solid fa-table"></i>
+                                    </div>
+                                    <div>
+                                        <p class="text-xs font-bold text-slate-800">{{ $tablaSeleccionada }}</p>
+                                        <p class="text-[10px] text-slate-500">{{ count($columnas) }} columnas</p>
+                                    </div>
                                 </div>
-                                <p class="text-[10px] text-emerald-700 mt-2 font-semibold">
+
+                                <table class="w-full text-[11px]">
+                                    <thead class="bg-slate-50">
+                                        <tr>
+                                            <th class="px-2 py-1 text-left font-bold text-slate-600">Columna</th>
+                                            <th class="px-2 py-1 text-left font-bold text-slate-600">Tipo</th>
+                                            <th class="px-2 py-1 text-left font-bold text-slate-600">Null</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-100">
+                                        @foreach($columnas as $c)
+                                            <tr class="hover:bg-slate-50">
+                                                <td class="px-2 py-1 font-mono font-semibold text-slate-800">{{ $c['nombre'] }}</td>
+                                                <td class="px-2 py-1 font-mono text-slate-600">{{ $c['tipo'] }}</td>
+                                                <td class="px-2 py-1 text-slate-500">{{ strtoupper($c['nullable'] ?? '') === 'YES' ? '✓' : '—' }}</td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+
+                                <p class="text-[10px] text-emerald-700 mt-3 font-semibold bg-emerald-50 rounded p-2">
                                     <i class="fa-solid fa-wand-magic-sparkles"></i>
-                                    Query y mapeo auto-rellenados. Ajústalos abajo si hace falta.
+                                    Query y mapeo auto-rellenados abajo. Ajústalos si hace falta.
                                 </p>
                             </div>
                         @endif
