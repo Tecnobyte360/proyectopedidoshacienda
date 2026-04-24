@@ -499,33 +499,9 @@ class WhatsappWebhookController extends Controller
             return '';   // sin respuesta automática
         }
 
-        // ── CAPA 0.5: Derivación por departamento ───────────────────────────
-        // Si el mensaje tiene palabras clave de algún departamento (ej. "servicio
-        // al cliente", "reclamo", "queja"), derivamos la conversación a ese depto:
-        // silenciamos al bot, notificamos a los usuarios internos del depto y
-        // respondemos al cliente con el saludo automático.
-        try {
-            $cliente2 = \App\Models\Cliente::encontrarOCrearPorTelefono($telefonoNorm, $name);
-            $conv2    = app(\App\Services\ConversacionService::class)
-                ->obtenerOCrearActiva($telefonoNorm, $cliente2->id, null, $connectionId ? (int) $connectionId : null);
-
-            $saludo = app(\App\Services\DerivacionService::class)
-                ->derivarSiAplica($conv2, $message, $cliente2->nombre ?: $name, $telefonoNorm);
-
-            if ($saludo) {
-                // Persistir mensaje del cliente y respuesta del bot
-                app(\App\Services\ConversacionService::class)->agregarMensaje(
-                    $conv2, \App\Models\MensajeWhatsapp::ROL_USER, $message
-                );
-                app(\App\Services\ConversacionService::class)->agregarMensaje(
-                    $conv2, \App\Models\MensajeWhatsapp::ROL_ASSISTANT, $saludo,
-                    ['meta' => ['derivacion_auto' => true]]
-                );
-                return $saludo;
-            }
-        } catch (\Throwable $e) {
-            Log::warning('Derivación falló, seguimos con flujo normal: ' . $e->getMessage());
-        }
+        // NOTA: la derivación por keywords fue REMOVIDA — ahora es 100% decisión
+        // de la IA a través de la tool `derivar_a_departamento`. Esto permite
+        // que detecte enojo, frustración y matices que las keywords no capturan.
 
         // ── CAPA 0: Buffer + debounce — agrupar mensajes seguidos del mismo cliente ──
         // Si el cliente manda 3 mensajes en 4 segundos, esperamos a que termine de
@@ -2643,14 +2619,20 @@ PROMPT;
                 'type'     => 'function',
                 'function' => [
                     'name'        => 'derivar_a_departamento',
-                    'description' => 'Deriva la conversación a un departamento humano cuando lo amerite. '
-                        . 'CUÁNDO USARLA (sé proactiva):'
-                        . "\n - Cliente MOLESTO, MUY MOLESTO, frustrado, ofendido o usando palabras fuertes."
-                        . "\n - Reclamo, queja, devolución, problema con pedido anterior."
-                        . "\n - Pide explícitamente hablar con un humano, asesor o persona real."
-                        . "\n - Pregunta algo fuera del catálogo o que requiere decisión humana (descuentos especiales, precios mayoristas, problemas contables, etc.)."
-                        . "\n - Tercera vez que el cliente insiste en el mismo tema sin resolver."
-                        . "\nNO LA USES si el cliente solo pregunta algo simple que puedes responder con el catálogo.",
+                    'description' => 'Deriva la conversación a un departamento humano cuando detectes que el cliente necesita atención especializada o emocional. '
+                        . 'NO dependas de palabras clave específicas — ANALIZA el TONO, el CONTEXTO y la INTENCIÓN detrás del mensaje.'
+                        . "\n\nDERIVA cuando detectes CUALQUIERA de estas señales:"
+                        . "\n• TONO NEGATIVO: irritación, frustración, enojo, sarcasmo, desesperación, urgencia emocional."
+                        . "\n• EXPRESIONES DE MOLESTIA: aunque el cliente no diga 'estoy molesto', lee entre líneas: mayúsculas gritando, signos de exclamación repetidos, palabras fuertes, amenazas (\"voy a demandar\", \"voy a reportar\", \"nunca más\")."
+                        . "\n• PROBLEMA CON PEDIDO ANTERIOR: cualquier inconformidad con algo ya entregado — aunque use palabras suaves tipo \"me llegó diferente\", \"algo pasó con mi pedido\", \"está raro lo que me enviaron\"."
+                        . "\n• PIDE HABLAR CON HUMANO: aunque lo exprese indirecto: \"con quién hablo\", \"pásame con alguien\", \"quién atiende aquí\", \"no me están entendiendo\"."
+                        . "\n• FUERA DE TU ALCANCE: pregunta precios especiales, descuentos por volumen, trato corporativo, facturación, cobros dobles, temas legales/contables."
+                        . "\n• INSISTENCIA: es al menos la tercera vez en la conversación que insiste en el mismo tema sin resolverse."
+                        . "\n\nNO DERIVES cuando:"
+                        . "\n• El cliente hace una consulta simple que puedes responder con el catálogo o promociones."
+                        . "\n• Está pidiendo productos o armando pedido normalmente."
+                        . "\n• Es un saludo o conversación casual positiva."
+                        . "\n\nIMPORTANTE: tú DECIDES con tu criterio. Si hay duda razonable de que el cliente necesita atención humana, DERIVA. Es mejor derivar de más que dejar a un cliente molesto sin resolver.",
                     'parameters'  => [
                         'type'       => 'object',
                         'properties' => [
