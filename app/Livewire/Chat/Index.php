@@ -151,16 +151,23 @@ class Index extends Component
                 return false;
             }
 
+            // Mismo shape que enviarImagenWhatsapp (que sí funciona).
+            // TecnoByteApp infiere el tipo por la extensión del mediaUrl.
             $payload = [
                 'number'   => $telefono,
                 'mediaUrl' => $mediaUrl,
-                'mediaType' => 'audio',
-                'body'     => '',
+                'caption'  => '',
+                'body'     => '🎤 Nota de voz',
             ];
             if ($connectionId) {
                 $payload['whatsappId']   = (int) $connectionId;
                 $payload['connectionId'] = (int) $connectionId;
             }
+
+            Log::info('🎤 ENVIANDO AUDIO WHATSAPP', [
+                'phone'    => $telefono,
+                'mediaUrl' => $mediaUrl,
+            ]);
 
             $resolver = app(\App\Services\WhatsappResolverService::class);
             $cred = $resolver->credenciales();
