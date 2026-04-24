@@ -16,6 +16,7 @@ class Cliente extends Model
     protected $fillable = [
         'tenant_id',
         'nombre',
+        'profile_pic_url',
         'pais_codigo',
         'telefono',
         'telefono_normalizado',

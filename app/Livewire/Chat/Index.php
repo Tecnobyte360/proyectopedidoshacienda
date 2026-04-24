@@ -21,6 +21,12 @@ class Index extends Component
     public string $busqueda     = '';
     public string $filtroEstado = 'todas';   // todas | activa | humano | bot
 
+    // Nueva conversación
+    public bool   $nuevoChatModal   = false;
+    public string $nuevoChatTel     = '';
+    public string $nuevoChatNombre  = '';
+    public string $nuevoChatMensaje = '';
+
     public function seleccionar(int $id): void
     {
         $this->conversacionActivaId = $id;
@@ -114,16 +120,16 @@ class Index extends Component
         [$bytesEnvio, $extEnvio] = $this->convertirAOggOpus($bytes, $ext);
 
         $nombreEnvio = 'voice_' . uniqid() . '.' . $extEnvio;
-        $sent = $this->enviarAudioAWhatsapp($conv->telefono_normalizado, $bytesEnvio, $nombreEnvio, $conv->connection_id);
+        $messageId = $this->enviarAudioAWhatsapp($conv->telefono_normalizado, $bytesEnvio, $nombreEnvio, $conv->connection_id);
 
-        if (!$sent) {
+        if (!$messageId) {
             $this->dispatch('notify', ['type' => 'error', 'message' => '⚠️ No se pudo enviar el audio a WhatsApp.']);
             return;
         }
 
         // Persistir como mensaje del operador con tipo audio y URL
         try {
-            app(ConversacionService::class)->agregarMensaje(
+            $mensaje = app(ConversacionService::class)->agregarMensaje(
                 $conv,
                 MensajeWhatsapp::ROL_ASSISTANT,
                 '🎤 Nota de voz',
@@ -138,6 +144,11 @@ class Index extends Component
                     ],
                 ]
             );
+            // Marcar como enviado + guardar ID externo para que los ticks actualicen
+            $mensaje->update([
+                'ack' => MensajeWhatsapp::ACK_SENT,
+                'mensaje_externo_id' => $messageId,
+            ]);
         } catch (\Throwable $e) {
             Log::warning('No se persistió audio manual: ' . $e->getMessage());
         }
@@ -199,13 +210,13 @@ class Index extends Component
      * TecnoByteApp espera el archivo como multipart/form-data en el campo `medias`
      * (no acepta mediaUrl). El mimetype del archivo hace que se envíe como voice note.
      */
-    private function enviarAudioAWhatsapp(string $telefono, string $bytes, string $filename, $connectionId = null): bool
+    private function enviarAudioAWhatsapp(string $telefono, string $bytes, string $filename, $connectionId = null): ?string
     {
         try {
             $token = $this->obtenerTokenWhatsapp();
             if (!$token) {
                 Log::error('Token WhatsApp no disponible para audio manual');
-                return false;
+                return null;
             }
 
             Log::info('🎤 ENVIANDO AUDIO WHATSAPP', [
@@ -247,14 +258,18 @@ class Index extends Component
 
             $response = $makeRequest($token);
 
-            if ($response->successful()) return true;
+            if ($response->successful()) {
+                return $response->json('messageId') ?: 'sent-' . uniqid();
+            }
 
             if ($response->status() === 401) {
                 Cache::forget($resolver->tokenCacheKey());
                 $newToken = $this->obtenerTokenWhatsapp();
                 if ($newToken) {
                     $retry = $makeRequest($newToken);
-                    return $retry->successful();
+                    if ($retry->successful()) {
+                        return $retry->json('messageId') ?: 'sent-' . uniqid();
+                    }
                 }
             }
 
@@ -262,10 +277,10 @@ class Index extends Component
                 'status' => $response->status(),
                 'body'   => $response->body(),
             ]);
-            return false;
+            return null;
         } catch (\Throwable $e) {
             Log::error('Excepción enviando audio WhatsApp: ' . $e->getMessage());
-            return false;
+            return null;
         }
     }
 
@@ -322,15 +337,15 @@ class Index extends Component
         $mediaUrl = rtrim(config('app.url'), '/') . Storage::url($filename);
 
         $nombreEnvio = 'image_' . uniqid() . '.' . $extOrig;
-        $sent = $this->enviarImagenAWhatsapp($conv->telefono_normalizado, $bytes, $nombreEnvio, $caption, $conv->connection_id);
+        $messageId = $this->enviarImagenAWhatsapp($conv->telefono_normalizado, $bytes, $nombreEnvio, $caption, $conv->connection_id);
 
-        if (!$sent) {
+        if (!$messageId) {
             $this->dispatch('notify', ['type' => 'error', 'message' => '⚠️ No se pudo enviar la imagen a WhatsApp.']);
             return;
         }
 
         try {
-            app(ConversacionService::class)->agregarMensaje(
+            $mensaje = app(ConversacionService::class)->agregarMensaje(
                 $conv,
                 MensajeWhatsapp::ROL_ASSISTANT,
                 $caption !== '' ? $caption : '🖼️ Imagen',
@@ -344,6 +359,10 @@ class Index extends Component
                     ],
                 ]
             );
+            $mensaje->update([
+                'ack' => MensajeWhatsapp::ACK_SENT,
+                'mensaje_externo_id' => $messageId,
+            ]);
         } catch (\Throwable $e) {
             Log::warning('No se persistió imagen manual: ' . $e->getMessage());
         }
@@ -355,13 +374,13 @@ class Index extends Component
     /**
      * Envía una imagen a WhatsApp vía TecnoByteApp (multipart 'medias').
      */
-    private function enviarImagenAWhatsapp(string $telefono, string $bytes, string $filename, string $caption, $connectionId = null): bool
+    private function enviarImagenAWhatsapp(string $telefono, string $bytes, string $filename, string $caption, $connectionId = null): ?string
     {
         try {
             $token = $this->obtenerTokenWhatsapp();
             if (!$token) {
                 Log::error('Token WhatsApp no disponible para imagen manual');
-                return false;
+                return null;
             }
 
             $resolver = app(\App\Services\WhatsappResolverService::class);
@@ -388,14 +407,18 @@ class Index extends Component
             };
 
             $response = $makeRequest($token);
-            if ($response->successful()) return true;
+            if ($response->successful()) {
+                return $response->json('messageId') ?: 'sent-' . uniqid();
+            }
 
             if ($response->status() === 401) {
                 Cache::forget($resolver->tokenCacheKey());
                 $newToken = $this->obtenerTokenWhatsapp();
                 if ($newToken) {
                     $retry = $makeRequest($newToken);
-                    return $retry->successful();
+                    if ($retry->successful()) {
+                        return $retry->json('messageId') ?: 'sent-' . uniqid();
+                    }
                 }
             }
 
@@ -403,11 +426,71 @@ class Index extends Component
                 'status' => $response->status(),
                 'body'   => $response->body(),
             ]);
-            return false;
+            return null;
         } catch (\Throwable $e) {
             Log::error('Excepción enviando imagen WhatsApp: ' . $e->getMessage());
-            return false;
+            return null;
         }
+    }
+
+    public function abrirNuevoChat(): void
+    {
+        $this->nuevoChatModal   = true;
+        $this->nuevoChatTel     = '';
+        $this->nuevoChatNombre  = '';
+        $this->nuevoChatMensaje = '';
+    }
+
+    public function cerrarNuevoChat(): void
+    {
+        $this->nuevoChatModal = false;
+    }
+
+    /**
+     * Crea (o abre si ya existe) una conversación para un número nuevo y envía
+     * el primer mensaje. Si el número nunca ha escrito, lo creamos desde cero.
+     */
+    public function crearNuevoChat(): void
+    {
+        $telefono = preg_replace('/\D+/', '', (string) $this->nuevoChatTel);
+        $texto    = trim($this->nuevoChatMensaje);
+
+        if ($telefono === '' || strlen($telefono) < 8) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Ingresa un teléfono válido (ej. 573001234567).']);
+            return;
+        }
+        if ($texto === '') {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Escribe el primer mensaje.']);
+            return;
+        }
+
+        // Resolver/crear cliente + conversación
+        $cliente = \App\Models\Cliente::encontrarOCrearPorTelefono($telefono, trim($this->nuevoChatNombre) ?: 'Cliente');
+        $conv = app(ConversacionService::class)->obtenerOCrearActiva($telefono, $cliente->id);
+
+        $messageId = $this->enviarAWhatsapp($telefono, $texto, $conv->connection_id);
+
+        if (!$messageId) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => '⚠️ No se pudo enviar el mensaje. Verifica que el número sí use WhatsApp.']);
+            return;
+        }
+
+        try {
+            $mensaje = app(ConversacionService::class)->agregarMensaje(
+                $conv,
+                MensajeWhatsapp::ROL_ASSISTANT,
+                $texto,
+                ['meta' => ['enviado_por_humano' => true, 'usuario_id' => auth()->id()]]
+            );
+            $mensaje->update(['ack' => MensajeWhatsapp::ACK_SENT, 'mensaje_externo_id' => $messageId]);
+        } catch (\Throwable $e) {
+            Log::warning('No se persistió mensaje manual (nuevo chat): ' . $e->getMessage());
+        }
+
+        $this->nuevoChatModal        = false;
+        $this->conversacionActivaId  = $conv->id;
+        $this->dispatch('notify', ['type' => 'success', 'message' => '✓ Chat iniciado']);
+        $this->dispatch('chat-cambiado', conversacionId: $conv->id);
     }
 
     public function enviar(): void
@@ -425,9 +508,9 @@ class Index extends Component
         // Si quieres silenciar al bot, usa el botón "Tomar control" explícitamente.
 
         // Enviar a WhatsApp DIRECTO (sin pasar por controller)
-        $sent = $this->enviarAWhatsapp($conv->telefono_normalizado, $texto, $conv->connection_id);
+        $messageId = $this->enviarAWhatsapp($conv->telefono_normalizado, $texto, $conv->connection_id);
 
-        if (!$sent) {
+        if (!$messageId) {
             $this->dispatch('notify', [
                 'type'    => 'error',
                 'message' => '⚠️ No se pudo enviar el mensaje a WhatsApp. Revisa el token.',
@@ -435,14 +518,18 @@ class Index extends Component
             return;
         }
 
-        // Persistir como mensaje del operador
+        // Persistir como mensaje del operador con ack=sent y ID externo
         try {
-            app(ConversacionService::class)->agregarMensaje(
+            $mensaje = app(ConversacionService::class)->agregarMensaje(
                 $conv,
                 MensajeWhatsapp::ROL_ASSISTANT,
                 $texto,
                 ['meta' => ['enviado_por_humano' => true, 'usuario_id' => auth()->id()]]
             );
+            $mensaje->update([
+                'ack' => MensajeWhatsapp::ACK_SENT,
+                'mensaje_externo_id' => $messageId,
+            ]);
         } catch (\Throwable $e) {
             Log::warning('No se persistió mensaje manual: ' . $e->getMessage());
         }
@@ -459,7 +546,7 @@ class Index extends Component
     /**
      * Envía un mensaje a WhatsApp directamente vía TecnoByteApp.
      */
-    private function enviarAWhatsapp(string $telefono, string $mensaje, $connectionId = null): bool
+    private function enviarAWhatsapp(string $telefono, string $mensaje, $connectionId = null): ?string
     {
         try {
             $token = $this->obtenerTokenWhatsapp();
@@ -475,7 +562,7 @@ class Index extends Component
                         ['telefono' => $telefono]
                     );
                 } catch (\Throwable $e) { /* no bloquear */ }
-                return false;
+                return null;
             }
 
             $payload = [
@@ -497,7 +584,7 @@ class Index extends Component
                 ->post($endpointSend, $payload);
 
             if ($response->successful()) {
-                return true;
+                return $response->json('messageId') ?: 'sent-' . uniqid();
             }
 
             // Reintento con refresh de token
@@ -509,7 +596,9 @@ class Index extends Component
                         ->withToken($newToken)
                         ->timeout(20)
                         ->post($endpointSend, $payload);
-                    return $retry->successful();
+                    if ($retry->successful()) {
+                        return $retry->json('messageId') ?: 'sent-' . uniqid();
+                    }
                 }
             }
 
@@ -532,10 +621,10 @@ class Index extends Component
                 );
             } catch (\Throwable $e) { /* no bloquear */ }
 
-            return false;
+            return null;
         } catch (\Throwable $e) {
             Log::error('Excepción enviando WA manual: ' . $e->getMessage());
-            return false;
+            return null;
         }
     }
 

@@ -55,8 +55,28 @@ class WhatsappWebhookController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Payload vacío'], 400);
         }
 
+        // 🔔 Evento de cambio de estado (ack) — actualiza el mensaje correspondiente
+        if (($data['event'] ?? null) === 'message_status') {
+            return $this->procesarStatusUpdate($data);
+        }
+
+        // 📸 Foto de perfil del contacto — actualizar si llegó
+        $profilePicUrl = $data['chat']['profilePicUrl'] ?? null;
+
         $from    = $data['chat']['phone'] ?? $data['from'] ?? $data['phoneNumber'] ?? null;
         $name    = $data['chat']['name'] ?? $data['name'] ?? 'Cliente';
+
+        // Si vino profilePicUrl + teléfono, actualizar/guardar en el cliente.
+        // Lo hacemos acá arriba para que el chat en vivo lo vea aunque sea
+        // un mensaje rechazado por otras validaciones.
+        if ($profilePicUrl && $from) {
+            try {
+                $telNorm = preg_replace('/\D+/', '', $from);
+                \App\Models\Cliente::withoutGlobalScopes()
+                    ->where('telefono_normalizado', $telNorm)
+                    ->update(['profile_pic_url' => $profilePicUrl]);
+            } catch (\Throwable $e) { /* no bloquear webhook */ }
+        }
         $message = trim(
             $data['mensaje']['body'] ?? $data['body'] ?? $data['message'] ?? $data['text'] ?? ''
         );
@@ -2757,6 +2777,35 @@ PROMPT;
      * Envía una imagen al cliente vía TecnoByteApp WhatsApp.
      * Usa el endpoint /api/messages/send con `mediaUrl` y `caption`.
      */
+    /**
+     * Procesa un evento message_status enviado por TecnoByteApp cuando
+     * cambia el ACK de un mensaje (sent / delivered / read).
+     */
+    private function procesarStatusUpdate(array $data)
+    {
+        $mensajeExternoId = $data['mensaje']['id'] ?? null;
+        $ack              = (int) ($data['mensaje']['ack'] ?? 0);
+
+        if (!$mensajeExternoId) {
+            return response()->json(['status' => 'ignored']);
+        }
+
+        try {
+            $msg = \App\Models\MensajeWhatsapp::where('mensaje_externo_id', $mensajeExternoId)->first();
+            if ($msg && $msg->ack < $ack) {
+                $msg->update(['ack' => $ack]);
+                // Broadcast el cambio para que el Chat en vivo actualice los ticks
+                try {
+                    broadcast(new \App\Events\MensajeWhatsappNuevo($msg->load('conversacion.cliente')));
+                } catch (\Throwable $e) { /* no bloquear */ }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('⚠️ No se pudo actualizar ack de mensaje: ' . $e->getMessage());
+        }
+
+        return response()->json(['status' => 'ack_updated']);
+    }
+
     /**
      * Descarga la imagen recibida de TecnoByteApp y la guarda en storage/public/imagenes-in.
      * Devuelve la URL pública local (o null si falla).

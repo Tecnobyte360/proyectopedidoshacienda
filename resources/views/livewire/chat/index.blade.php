@@ -17,10 +17,19 @@
 
         {{-- Header --}}
         <div class="p-4 border-b border-slate-200 bg-gradient-to-br from-[#d68643] to-[#a85f24] text-white">
-            <h2 class="text-lg font-bold flex items-center gap-2">
-                <i class="fa-solid fa-comments"></i> Chat en vivo
-            </h2>
-            <p class="text-xs text-white/80">Atiende clientes en tiempo real</p>
+            <div class="flex items-start justify-between gap-2">
+                <div>
+                    <h2 class="text-lg font-bold flex items-center gap-2">
+                        <i class="fa-solid fa-comments"></i> Chat en vivo
+                    </h2>
+                    <p class="text-xs text-white/80">Atiende clientes en tiempo real</p>
+                </div>
+                <button wire:click="abrirNuevoChat"
+                        title="Iniciar chat con un número nuevo"
+                        class="flex-shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-white/20 hover:bg-white/30 backdrop-blur px-3 py-2 text-xs font-semibold transition">
+                    <i class="fa-solid fa-pen-to-square"></i> Nuevo
+                </button>
+            </div>
         </div>
 
         {{-- Filtros --}}
@@ -61,9 +70,19 @@
                               {{ $isActiva ? 'bg-amber-50' : '' }}">
 
                     <div class="relative flex-shrink-0">
-                        <div class="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-[#d68643] to-[#a85f24] text-white font-bold">
-                            {{ $iniciales ?: 'C' }}
-                        </div>
+                        @if($c->cliente?->profile_pic_url)
+                            <img src="{{ $c->cliente->profile_pic_url }}"
+                                 class="h-12 w-12 rounded-full object-cover bg-slate-100"
+                                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+                                 alt="avatar">
+                            <div class="h-12 w-12 rounded-full bg-gradient-to-br from-[#d68643] to-[#a85f24] text-white font-bold items-center justify-center" style="display:none;">
+                                {{ $iniciales ?: 'C' }}
+                            </div>
+                        @else
+                            <div class="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-[#d68643] to-[#a85f24] text-white font-bold">
+                                {{ $iniciales ?: 'C' }}
+                            </div>
+                        @endif
                         @if($c->atendida_por_humano)
                             <span class="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-blue-500 text-white text-[10px] border-2 border-white" title="Atendida por humano">
                                 <i class="fa-solid fa-user"></i>
@@ -107,9 +126,15 @@
             {{-- Header del chat --}}
             <div class="relative z-10 bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between gap-3 shadow-sm">
                 <div class="flex items-center gap-3 min-w-0">
-                    <div class="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-[#d68643] to-[#a85f24] text-white font-bold text-sm">
-                        {{ $iniAct ?: 'C' }}
-                    </div>
+                    @if($conversacionActiva->cliente?->profile_pic_url)
+                        <img src="{{ $conversacionActiva->cliente->profile_pic_url }}"
+                             class="h-10 w-10 rounded-full object-cover bg-slate-100 flex-shrink-0"
+                             alt="avatar">
+                    @else
+                        <div class="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-[#d68643] to-[#a85f24] text-white font-bold text-sm flex-shrink-0">
+                            {{ $iniAct ?: 'C' }}
+                        </div>
+                    @endif
                     <div class="min-w-0">
                         <div class="font-semibold text-slate-800 truncate">{{ $conversacionActiva->cliente?->nombre ?? 'Cliente' }}</div>
                         <div class="text-xs text-slate-500 font-mono">
@@ -202,8 +227,18 @@
                                 @else
                                     <p class="text-sm text-slate-800 whitespace-pre-wrap">{{ $m->contenido }}</p>
                                 @endif
-                                <p class="text-[10px] text-slate-500 mt-1 text-right">
-                                    {{ $esHumano ? '👤' : '🤖' }} {{ $m->created_at->format('H:i') }}
+                                <p class="text-[10px] text-slate-500 mt-1 text-right flex items-center justify-end gap-1">
+                                    <span>{{ $esHumano ? '👤' : '🤖' }} {{ $m->created_at->format('H:i') }}</span>
+                                    @php $ack = (int) ($m->ack ?? 0); @endphp
+                                    @if($ack >= 3)
+                                        <i class="fa-solid fa-check-double text-blue-500" title="Leído"></i>
+                                    @elseif($ack === 2)
+                                        <i class="fa-solid fa-check-double text-slate-400" title="Entregado"></i>
+                                    @elseif($ack === 1)
+                                        <i class="fa-solid fa-check text-slate-400" title="Enviado"></i>
+                                    @else
+                                        <i class="fa-regular fa-clock text-slate-400" title="Pendiente"></i>
+                                    @endif
                                 </p>
                             </div>
                         </div>
@@ -619,5 +654,60 @@
                 }
             })();
         </script>
+    @endif
+
+    {{-- Modal: iniciar nueva conversación con un número --}}
+    @if($nuevoChatModal)
+        <div class="fixed inset-0 z-50 flex items-center justify-center p-4"
+             style="background: rgba(15,23,42,0.55); backdrop-filter: blur(4px);"
+             wire:click.self="cerrarNuevoChat">
+            <div class="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden">
+                <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-[#fbe9d7]/40 via-white to-white">
+                    <div class="flex items-center gap-3">
+                        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#d68643] to-[#a85f24] text-white">
+                            <i class="fa-solid fa-pen-to-square"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-slate-800">Nueva conversación</h3>
+                            <p class="text-xs text-slate-500">Envía el primer mensaje a un número</p>
+                        </div>
+                    </div>
+                    <button wire:click="cerrarNuevoChat" class="text-slate-400 hover:text-slate-600">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+                <div class="p-5 space-y-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Teléfono (con código país) *</label>
+                        <input type="text" wire:model="nuevoChatTel" placeholder="573001234567"
+                               class="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-mono focus:border-[#d68643] focus:ring-2 focus:ring-amber-100">
+                        <p class="text-[10px] text-slate-400 mt-1">Solo dígitos. Ej: 573001234567</p>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Nombre (opcional)</label>
+                        <input type="text" wire:model="nuevoChatNombre" placeholder="Nombre del cliente"
+                               class="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-[#d68643] focus:ring-2 focus:ring-amber-100">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Primer mensaje *</label>
+                        <textarea wire:model="nuevoChatMensaje" rows="3" placeholder="Hola, ¿cómo estás?"
+                                  class="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-[#d68643] focus:ring-2 focus:ring-amber-100"></textarea>
+                    </div>
+                </div>
+                <div class="px-5 py-3 border-t border-slate-100 flex justify-end gap-2 bg-slate-50">
+                    <button wire:click="cerrarNuevoChat"
+                            class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                        Cancelar
+                    </button>
+                    <button wire:click="crearNuevoChat"
+                            wire:loading.attr="disabled"
+                            wire:target="crearNuevoChat"
+                            class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#d68643] to-[#a85f24] hover:from-[#c97a36] hover:to-[#965520] px-4 py-2 text-sm font-bold text-white shadow-lg disabled:opacity-50">
+                        <span wire:loading.remove wire:target="crearNuevoChat"><i class="fa-solid fa-paper-plane"></i> Enviar</span>
+                        <span wire:loading wire:target="crearNuevoChat"><i class="fa-solid fa-circle-notch fa-spin"></i> Enviando...</span>
+                    </button>
+                </div>
+            </div>
+        </div>
     @endif
 </div>

@@ -12,6 +12,7 @@ class MensajeWhatsapp extends Model
     protected $fillable = [
         'conversacion_id',
         'rol',
+        'ack',
         'tipo',
         'contenido',
         'meta',
@@ -23,10 +24,17 @@ class MensajeWhatsapp extends Model
 
     protected $casts = [
         'meta'          => 'array',
+        'ack'           => 'integer',
         'latencia_ms'   => 'integer',
         'tokens_input'  => 'integer',
         'tokens_output' => 'integer',
     ];
+
+    public const ACK_PENDING   = 0;
+    public const ACK_SENT      = 1;
+    public const ACK_DELIVERED = 2;
+    public const ACK_READ      = 3;
+    public const ACK_PLAYED    = 4;
 
     public const ROL_USER      = 'user';
     public const ROL_ASSISTANT = 'assistant';
