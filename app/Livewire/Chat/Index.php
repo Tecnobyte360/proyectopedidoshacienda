@@ -151,13 +151,12 @@ class Index extends Component
                 return false;
             }
 
-            // Mismo shape que enviarImagenWhatsapp (que sí funciona).
-            // TecnoByteApp infiere el tipo por la extensión del mediaUrl.
+            // Para audio: NO mandamos body (si va, TecnoByteApp lo envía como texto
+            // e ignora el mediaUrl). Solo mediaUrl + caption vacío.
             $payload = [
                 'number'   => $telefono,
                 'mediaUrl' => $mediaUrl,
                 'caption'  => '',
-                'body'     => '🎤 Nota de voz',
             ];
             if ($connectionId) {
                 $payload['whatsappId']   = (int) $connectionId;
