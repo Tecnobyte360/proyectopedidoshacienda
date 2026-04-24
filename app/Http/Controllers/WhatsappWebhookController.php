@@ -246,7 +246,19 @@ class WhatsappWebhookController extends Controller
         // pero el bot NO responde ni ejecuta tool-calls. Solo queda en el chat
         // marcado como conversación interna.
         $telNormCheck = preg_replace('/\D+/', '', (string) $from);
-        if ($telNormCheck && \App\Models\UsuarioInternoWhatsapp::esInterno($telNormCheck)) {
+        $esInternoAhora = $telNormCheck && \App\Models\UsuarioInternoWhatsapp::esInterno($telNormCheck);
+
+        // Si el número YA NO es interno (fue removido/desactivado), limpiamos la
+        // marca `es_interna` de la conversación para que vuelva al flujo normal.
+        if (!$esInternoAhora && $telNormCheck) {
+            try {
+                \App\Models\ConversacionWhatsapp::where('telefono_normalizado', $telNormCheck)
+                    ->where('es_interna', true)
+                    ->update(['es_interna' => false]);
+            } catch (\Throwable $e) { /* no bloquear */ }
+        }
+
+        if ($esInternoAhora) {
             try {
                 $usuarioInterno = \App\Models\UsuarioInternoWhatsapp::withoutGlobalScopes()
                     ->where('tenant_id', app(\App\Services\TenantManager::class)->id())
