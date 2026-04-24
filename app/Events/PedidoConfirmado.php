@@ -20,7 +20,9 @@ class PedidoConfirmado implements ShouldBroadcastNow
 
     public function broadcastOn(): Channel
     {
-        return new Channel('pedidos');
+        // Canal scoped por tenant — cada empresa tiene su propio canal
+        $tid = $this->pedido->tenant_id ?? 'global';
+        return new Channel("pedidos.tenant.{$tid}");
     }
 
     public function broadcastAs(): string

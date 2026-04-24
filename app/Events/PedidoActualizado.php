@@ -20,8 +20,9 @@ class PedidoActualizado implements ShouldBroadcastNow
 
     public function broadcastOn(): array
     {
+        $tid = $this->pedido->tenant_id ?? 'global';
         return [
-            new Channel('pedidos'),
+            new Channel("pedidos.tenant.{$tid}"),
             new Channel('pedido-seguimiento.' . $this->pedido->codigo_seguimiento),
         ];
     }

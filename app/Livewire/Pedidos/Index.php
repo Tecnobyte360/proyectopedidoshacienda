@@ -37,11 +37,15 @@ class Index extends Component
      * Cuando el event class usa `broadcastAs('pedido.confirmado')`,
      * el listener debe llevar el punto de prefijo (`.pedido.confirmado`).
      */
-    protected $listeners = [
-        'echo:pedidos,.pedido.confirmado' => 'onPedidoConfirmado',
-        'echo:pedidos,.pedido.actualizado' => 'onPedidoActualizado',
-        'pedidoActualizado' => 'refrescar',   // evento local legacy
-    ];
+    public function getListeners(): array
+    {
+        $tid = app(\App\Services\TenantManager::class)->id() ?? 'global';
+        return [
+            "echo:pedidos.tenant.{$tid},.pedido.confirmado"  => 'onPedidoConfirmado',
+            "echo:pedidos.tenant.{$tid},.pedido.actualizado" => 'onPedidoActualizado',
+            'pedidoActualizado' => 'refrescar',   // evento local legacy
+        ];
+    }
 
     public function onPedidoConfirmado($event = null): void
     {

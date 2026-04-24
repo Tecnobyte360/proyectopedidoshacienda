@@ -16,9 +16,11 @@ class MensajeWhatsappNuevo implements ShouldBroadcastNow
 
     public function broadcastOn(): array
     {
+        // Canales scoped por tenant: cada empresa solo recibe sus propios eventos.
+        $tid = $this->mensaje->tenant_id ?? $this->mensaje->conversacion?->tenant_id ?? 'global';
         return [
-            new Channel('chat'),                                          // canal global
-            new Channel('chat.' . $this->mensaje->conversacion_id),       // canal específico
+            new Channel("chat.tenant.{$tid}"),                           // canal por tenant
+            new Channel('chat.' . $this->mensaje->conversacion_id),      // canal específico de conversación
         ];
     }
 
