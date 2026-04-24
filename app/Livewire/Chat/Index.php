@@ -105,9 +105,12 @@ class Index extends Component
         $filename = 'audios-out/audio_' . now()->format('Ymd_His') . '_' . uniqid() . '.' . $ext;
         Storage::disk('public')->put($filename, $bytes);
 
+        // URL pública para nuestro propio chat web (no la enviamos a TecnoByteApp,
+        // solo la guardamos en meta para reproducir en el Chat en vivo).
         $mediaUrl = rtrim(config('app.url'), '/') . Storage::url($filename);
 
-        $sent = $this->enviarAudioAWhatsapp($conv->telefono_normalizado, $mediaUrl, $conv->connection_id);
+        $nombreEnvio = 'voice_' . uniqid() . '.' . $ext;
+        $sent = $this->enviarAudioAWhatsapp($conv->telefono_normalizado, $bytes, $nombreEnvio, $conv->connection_id);
 
         if (!$sent) {
             $this->dispatch('notify', ['type' => 'error', 'message' => '⚠️ No se pudo enviar el audio a WhatsApp.']);
@@ -140,9 +143,11 @@ class Index extends Component
     }
 
     /**
-     * Envía un audio a WhatsApp vía TecnoByteApp usando mediaUrl.
+     * Envía un audio a WhatsApp vía TecnoByteApp.
+     * TecnoByteApp espera el archivo como multipart/form-data en el campo `medias`
+     * (no acepta mediaUrl). El mimetype del archivo hace que se envíe como voice note.
      */
-    private function enviarAudioAWhatsapp(string $telefono, string $mediaUrl, $connectionId = null): bool
+    private function enviarAudioAWhatsapp(string $telefono, string $bytes, string $filename, $connectionId = null): bool
     {
         try {
             $token = $this->obtenerTokenWhatsapp();
@@ -151,31 +156,44 @@ class Index extends Component
                 return false;
             }
 
-            // Para audio: NO mandamos body (si va, TecnoByteApp lo envía como texto
-            // e ignora el mediaUrl). Solo mediaUrl + caption vacío.
-            $payload = [
-                'number'   => $telefono,
-                'mediaUrl' => $mediaUrl,
-                'caption'  => '',
-            ];
-            if ($connectionId) {
-                $payload['whatsappId']   = (int) $connectionId;
-                $payload['connectionId'] = (int) $connectionId;
-            }
-
             Log::info('🎤 ENVIANDO AUDIO WHATSAPP', [
                 'phone'    => $telefono,
-                'mediaUrl' => $mediaUrl,
+                'filename' => $filename,
+                'bytes'    => strlen($bytes),
             ]);
 
             $resolver = app(\App\Services\WhatsappResolverService::class);
             $cred = $resolver->credenciales();
             $endpointSend = rtrim($cred['api_base_url'], '/') . '/api/messages/send';
 
-            $response = Http::withoutVerifying()
-                ->withToken($token)
-                ->timeout(30)
-                ->post($endpointSend, $payload);
+            $makeRequest = function (string $useToken) use ($endpointSend, $telefono, $bytes, $filename, $connectionId) {
+                $req = Http::withoutVerifying()
+                    ->withToken($useToken)
+                    ->timeout(60)
+                    ->asMultipart()
+                    ->attach('medias', $bytes, $filename);
+
+                $form = [
+                    ['name' => 'number', 'contents' => $telefono],
+                ];
+                if ($connectionId) {
+                    $form[] = ['name' => 'whatsappId', 'contents' => (string) $connectionId];
+                }
+
+                // Laravel's Http::attach+post con array: usa la API más simple:
+                return Http::withoutVerifying()
+                    ->withToken($useToken)
+                    ->timeout(60)
+                    ->attach('medias', $bytes, $filename)
+                    ->post($endpointSend, $connectionId ? [
+                        'number'     => $telefono,
+                        'whatsappId' => (int) $connectionId,
+                    ] : [
+                        'number' => $telefono,
+                    ]);
+            };
+
+            $response = $makeRequest($token);
 
             if ($response->successful()) return true;
 
@@ -183,10 +201,7 @@ class Index extends Component
                 Cache::forget($resolver->tokenCacheKey());
                 $newToken = $this->obtenerTokenWhatsapp();
                 if ($newToken) {
-                    $retry = Http::withoutVerifying()
-                        ->withToken($newToken)
-                        ->timeout(30)
-                        ->post($endpointSend, $payload);
+                    $retry = $makeRequest($newToken);
                     return $retry->successful();
                 }
             }
