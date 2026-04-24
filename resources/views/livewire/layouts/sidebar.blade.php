@@ -56,9 +56,10 @@
                 [
                     'title' => 'Catálogo',
                     'items' => [
-                        ['name' => 'Productos',   'icon' => 'fa-box',          'route' => 'productos.index',    'badge' => null, 'permission' => 'productos.ver'],
-                        ['name' => 'Categorías',  'icon' => 'fa-layer-group',  'route' => 'categorias.index',   'badge' => null, 'permission' => 'categorias.gestionar'],
-                        ['name' => 'Promociones', 'icon' => 'fa-tags',         'route' => 'promociones.index',  'badge' => null, 'permission' => 'promociones.gestionar'],
+                        ['name' => 'Productos',     'icon' => 'fa-box',          'route' => 'productos.index',     'badge' => null, 'permission' => 'productos.ver'],
+                        ['name' => 'Categorías',    'icon' => 'fa-layer-group',  'route' => 'categorias.index',    'badge' => null, 'permission' => 'categorias.gestionar'],
+                        ['name' => 'Promociones',   'icon' => 'fa-tags',         'route' => 'promociones.index',   'badge' => null, 'permission' => 'promociones.gestionar'],
+                        ['name' => 'Importaciones', 'icon' => 'fa-file-import',  'route' => 'importaciones.index', 'badge' => null, 'permission' => 'productos.ver'],
                     ],
                 ],
                 [

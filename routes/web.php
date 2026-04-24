@@ -7,6 +7,7 @@ use App\Livewire\Pedidos\Index as PedidosIndex;
 use App\Livewire\Pedidos\SeguimientoPedido;
 use App\Livewire\Productos\Index as ProductosIndex;
 use App\Livewire\Categorias\Index as CategoriasIndex;
+use App\Livewire\Importaciones\Index as ImportacionesIndex;
 use App\Livewire\Promociones\Index as PromocionesIndex;
 use App\Livewire\Domiciliarios as DomiciliariosIndex;
 use App\Livewire\Reportes\Index as ReportesIndex;
@@ -68,6 +69,25 @@ Route::middleware(['no_super_sin_imp'])->group(function () {
 
     Route::get('/productos',     ProductosIndex::class)->middleware('permission:productos.ver')->name('productos.index');
     Route::get('/categorias',    CategoriasIndex::class)->middleware('permission:categorias.gestionar')->name('categorias.index');
+    Route::get('/importaciones', ImportacionesIndex::class)->middleware('permission:productos.ver')->name('importaciones.index');
+    Route::get('/importaciones/plantilla/{tipo}', function (string $tipo) {
+        $tipo = in_array($tipo, ['productos', 'categorias'], true) ? $tipo : 'productos';
+
+        $headers = $tipo === 'categorias'
+            ? ['nombre', 'descripcion', 'icono_emoji', 'color', 'orden', 'activo']
+            : ['codigo', 'nombre', 'categoria', 'unidad', 'precio_base', 'descripcion_corta', 'descripcion', 'palabras_clave', 'activo', 'destacado', 'orden'];
+
+        $ejemplo = $tipo === 'categorias'
+            ? ['Carnes', 'Cortes frescos de res, cerdo y pollo', '🥩', '#d68643', 1, 'si']
+            : ['P001', 'Pechuga de pollo', 'Carnes', 'lb', 15000, 'Pechuga fresca', 'Pechuga de pollo fresca, sin piel', 'pollo,pechuga,blanca', 'si', 'no', 1];
+
+        $content = implode(',', $headers) . "\n" . implode(',', $ejemplo) . "\n";
+
+        return response($content, 200, [
+            'Content-Type'        => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => "attachment; filename=plantilla_{$tipo}.csv",
+        ]);
+    })->middleware('permission:productos.ver')->name('importaciones.plantilla');
     Route::get('/promociones',   PromocionesIndex::class)->middleware('permission:promociones.gestionar')->name('promociones.index');
     Route::get('/domiciliarios', DomiciliariosIndex::class)->middleware('permission:domiciliarios.gestionar')->name('domiciliarios.index');
     Route::get('/zonas',         ZonasIndex::class)->middleware('permission:zonas.gestionar')->name('zonas.index');
