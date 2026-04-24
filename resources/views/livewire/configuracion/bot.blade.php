@@ -355,6 +355,42 @@
         </section>
 
         {{-- ╔═══ EDITOR DE PROMPT PERSONALIZADO ═══╗ --}}
+        {{-- INSTRUCCIONES EXTRA (se SUMAN al prompt, no reemplazan) --}}
+        <section class="rounded-2xl bg-white shadow border border-slate-200 p-6">
+            <div class="flex items-center gap-2 mb-4">
+                <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+                    <i class="fa-solid fa-plus-minus"></i>
+                </span>
+                <div class="flex-1">
+                    <h3 class="text-lg font-bold text-slate-800">Instrucciones extra al prompt</h3>
+                    <p class="text-xs text-slate-500">
+                        Reglas adicionales que se <strong>agregan</strong> al final del prompt (no lo reemplazan).
+                        Perfecto para reglas específicas de tu negocio sin tocar la plantilla base.
+                    </p>
+                </div>
+            </div>
+
+            <textarea wire:model="instrucciones_extra" rows="10"
+                      placeholder="Ejemplos:
+• Nunca ofrezcas entregas los domingos porque estamos cerrados.
+• Si el cliente pregunta por la sede de Envigado, aclara que la atendemos solo los jueves.
+• Para pedidos sobre 500k ofrece siempre el 5% de descuento.
+• Usa la palabra 'parcero' de forma natural, es parte de nuestra marca."
+                      class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-mono leading-relaxed focus:border-[#d68643] focus:ring-[#d68643]"></textarea>
+            <div class="flex items-start gap-3 mt-2">
+                <p class="text-[11px] text-slate-500 flex-1">
+                    💡 <strong>Cómo funciona:</strong> cuando el bot recibe un mensaje, primero carga el prompt base (o tu prompt personalizado si lo activaste abajo), y al final agrega estas instrucciones bajo el título "🔧 REGLAS ADICIONALES DE ESTE NEGOCIO". La IA las lee igual que el resto del prompt.
+                </p>
+                <p class="text-[11px] text-slate-500 flex-shrink-0">
+                    Variables: <code class="bg-slate-100 px-1 rounded">{nombre_asesora}</code>,
+                    <code class="bg-slate-100 px-1 rounded">{fecha_actual}</code>, etc.
+                </p>
+            </div>
+            @error('instrucciones_extra')
+                <p class="text-xs text-rose-600 mt-1">{{ $message }}</p>
+            @enderror
+        </section>
+
         <section class="rounded-2xl bg-white shadow border border-slate-200 p-6">
             <div class="flex items-center gap-2 mb-4">
                 <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-rose-50 text-rose-600">

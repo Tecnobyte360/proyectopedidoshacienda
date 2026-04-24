@@ -2457,12 +2457,24 @@ class WhatsappWebhookController extends Controller
         $config = \App\Models\ConfiguracionBot::actual();
 
         // Si el usuario activó "prompt personalizado" y guardó algo, usarlo
-        if ($config->usar_prompt_personalizado && !empty(trim($config->system_prompt ?? ''))) {
-            return $promptService->renderizar($config->system_prompt, $contexto);
+        $base = ($config->usar_prompt_personalizado && !empty(trim($config->system_prompt ?? '')))
+            ? $config->system_prompt
+            : BotPromptService::plantillaPorDefecto();
+
+        $prompt = $promptService->renderizar($base, $contexto);
+
+        // Si hay INSTRUCCIONES EXTRA definidas por el usuario, las APPENDEAMOS al final.
+        // No reemplazan nada — se suman. Útiles para reglas específicas del negocio
+        // sin tocar la plantilla base.
+        $extra = trim((string) ($config->instrucciones_extra ?? ''));
+        if ($extra !== '') {
+            $extraRendered = $promptService->renderizar($extra, $contexto);
+            $prompt .= "\n\n═══════════════════════════════════════════════════════════════════════════════\n"
+                     . "# 🔧 REGLAS ADICIONALES DE ESTE NEGOCIO\n\n"
+                     . $extraRendered . "\n";
         }
 
-        // Sino, usar la plantilla por defecto (también renderizando variables)
-        return $promptService->renderizar(BotPromptService::plantillaPorDefecto(), $contexto);
+        return $prompt;
     }
 
     /**

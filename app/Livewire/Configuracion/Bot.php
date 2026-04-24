@@ -38,6 +38,9 @@ class Bot extends Component
     public bool   $usar_prompt_personalizado = false;
     public string $system_prompt             = '';
 
+    // Instrucciones extra (se SUMAN al prompt, no reemplazan)
+    public string $instrucciones_extra       = '';
+
     // Felicitaciones de cumpleaños
     public bool   $cumpleanos_activo             = true;
     public string $cumpleanos_hora               = '09:00';
@@ -88,6 +91,7 @@ class Bot extends Component
 
         $this->usar_prompt_personalizado = (bool) ($cfg->usar_prompt_personalizado ?? false);
         $this->system_prompt             = (string) ($cfg->system_prompt ?? '');
+        $this->instrucciones_extra       = (string) ($cfg->instrucciones_extra ?? '');
 
         $this->cumpleanos_activo  = (bool) ($cfg->cumpleanos_activo ?? true);
         $this->cumpleanos_hora    = (string) ($cfg->cumpleanos_hora ?: '09:00');
@@ -341,6 +345,7 @@ class Bot extends Component
             'activo'                    => 'boolean',
             'usar_prompt_personalizado' => 'boolean',
             'system_prompt'             => 'nullable|string|max:20000',
+            'instrucciones_extra'       => 'nullable|string|max:20000',
             'cumpleanos_activo'            => 'boolean',
             'cumpleanos_hora'              => 'nullable|string|regex:/^\d{2}:\d{2}$/',
             'cumpleanos_mensaje'           => 'nullable|string|max:2000',

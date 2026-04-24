@@ -37,6 +37,7 @@ class ConfiguracionBot extends Model
         'info_empresa',
         'usar_prompt_personalizado',
         'system_prompt',
+        'instrucciones_extra',
         'activo',
         'cumpleanos_activo',
         'cumpleanos_hora',
