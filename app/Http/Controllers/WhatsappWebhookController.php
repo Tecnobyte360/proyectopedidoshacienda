@@ -757,6 +757,81 @@ class WhatsappWebhookController extends Controller
             return $reply;
         }
 
+        // ── Tool call: derivar_a_departamento ─────────────────────────────────
+        if ($toolCalls && ($toolCalls[0]['function']['name'] ?? '') === 'derivar_a_departamento') {
+            $rawArgs = $toolCalls[0]['function']['arguments'] ?? '{}';
+            $args    = json_decode($rawArgs, true) ?: [];
+            $nombreDpto = trim((string) ($args['departamento'] ?? ''));
+            $razon      = trim((string) ($args['razon'] ?? ''));
+            $urgencia   = strtolower(trim((string) ($args['urgencia'] ?? 'media')));
+
+            Log::info('🎯 Tool call derivar_a_departamento', compact('from', 'nombreDpto', 'razon', 'urgencia'));
+
+            $depto = \App\Models\Departamento::where('activo', true)
+                ->where('nombre', $nombreDpto)
+                ->first();
+
+            if (!$depto) {
+                // Si la IA escribe mal el nombre, caer a flujo normal
+                $reply = "Un momento {$name}, estoy verificando eso para ti.";
+            } else {
+                // Derivar la conversación
+                $conversacion->update([
+                    'departamento_id'     => $depto->id,
+                    'derivada_at'         => now(),
+                    'atendida_por_humano' => true,
+                ]);
+
+                // Notificar al equipo del departamento con contexto + razón + urgencia
+                if ($depto->notificar_internos) {
+                    $emoji = match ($urgencia) {
+                        'critica' => '🚨🚨🚨',
+                        'alta'    => '🚨',
+                        'baja'    => '📬',
+                        default   => '🔔',
+                    };
+                    try {
+                        $usuarios = \App\Models\UsuarioInternoWhatsapp::withoutGlobalScopes()
+                            ->where('tenant_id', $depto->tenant_id)
+                            ->where('departamento_id', $depto->id)
+                            ->where('activo', true)
+                            ->get();
+
+                        $texto = "{$emoji} *Derivación automática a {$depto->nombre}*\n\n"
+                               . "👤 *Cliente:* {$name}\n"
+                               . "📞 *Teléfono:* {$from}\n"
+                               . "🔖 *Urgencia:* " . strtoupper($urgencia) . "\n\n"
+                               . "💬 *Razón:* {$razon}\n\n"
+                               . "📝 *Mensaje original:*\n" . mb_strimwidth($message, 0, 250, '…') . "\n\n"
+                               . "_Revisa la plataforma para responder._";
+
+                        $sender = app(\App\Services\WhatsappSenderService::class);
+                        foreach ($usuarios as $u) {
+                            $sender->enviarTexto($u->telefono_normalizado, $texto, $conversacion->connection_id);
+                        }
+                    } catch (\Throwable $e) {
+                        Log::warning('Fallo notificar derivación IA: ' . $e->getMessage());
+                    }
+                }
+
+                $reply = $depto->saludo_automatico
+                    ?: "Entiendo {$name} 🙏 Voy a pasarte con un asesor de *{$depto->nombre}* que te atenderá en unos minutos.";
+            }
+
+            $conversationHistory[] = ['role' => 'assistant', 'content' => $reply];
+            Cache::put($cacheKey, $conversationHistory, now()->addMinutes(45));
+            $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_ASSISTANT, $reply, [
+                'tipo' => 'tool_call',
+                'meta' => [
+                    'tool'         => 'derivar_a_departamento',
+                    'departamento' => $nombreDpto,
+                    'razon'        => $razon,
+                    'urgencia'     => $urgencia,
+                ],
+            ]);
+            return $reply;
+        }
+
         // ── Tool call: enviar_imagen_producto ─────────────────────────────────
         if ($toolCalls && ($toolCalls[0]['function']['name'] ?? '') === 'enviar_imagen_producto') {
             $rawArgs = $toolCalls[0]['function']['arguments'] ?? '{}';
@@ -2547,6 +2622,48 @@ PROMPT;
                 ],
             ],
         ];
+
+        // Tool: derivar_a_departamento — si el cliente está molesto, muy molesto,
+        // pide hablar con un humano, tiene un reclamo/queja, o el tema está
+        // fuera de lo que el bot maneja. La IA DECIDE cuándo usarla.
+        $deptos = \App\Models\Departamento::where('activo', true)->orderBy('orden')->get(['id','nombre']);
+        if ($deptos->isNotEmpty()) {
+            $nombresDeptos = $deptos->pluck('nombre')->all();
+            $tools[] = [
+                'type'     => 'function',
+                'function' => [
+                    'name'        => 'derivar_a_departamento',
+                    'description' => 'Deriva la conversación a un departamento humano cuando lo amerite. '
+                        . 'CUÁNDO USARLA (sé proactiva):'
+                        . "\n - Cliente MOLESTO, MUY MOLESTO, frustrado, ofendido o usando palabras fuertes."
+                        . "\n - Reclamo, queja, devolución, problema con pedido anterior."
+                        . "\n - Pide explícitamente hablar con un humano, asesor o persona real."
+                        . "\n - Pregunta algo fuera del catálogo o que requiere decisión humana (descuentos especiales, precios mayoristas, problemas contables, etc.)."
+                        . "\n - Tercera vez que el cliente insiste en el mismo tema sin resolver."
+                        . "\nNO LA USES si el cliente solo pregunta algo simple que puedes responder con el catálogo.",
+                    'parameters'  => [
+                        'type'       => 'object',
+                        'properties' => [
+                            'departamento' => [
+                                'type'        => 'string',
+                                'description' => 'Nombre exacto del departamento a donde derivar. Opciones disponibles: ' . implode(', ', $nombresDeptos),
+                                'enum'        => $nombresDeptos,
+                            ],
+                            'razon' => [
+                                'type'        => 'string',
+                                'description' => 'Resumen breve (1 frase) de POR QUÉ estás derivando. Ej: "Cliente muy molesto por producto dañado" / "Pide precio mayorista" / "Reclamo por cobro doble".',
+                            ],
+                            'urgencia' => [
+                                'type'        => 'string',
+                                'description' => 'Nivel de urgencia. Úsalo para priorizar en la notificación al equipo.',
+                                'enum'        => ['baja', 'media', 'alta', 'critica'],
+                            ],
+                        ],
+                        'required' => ['departamento', 'razon'],
+                    ],
+                ],
+            ];
+        }
 
         // Tool 2: enviar_imagen_producto — SOLO si está activado en config
         if ($config->enviar_imagenes_productos) {
