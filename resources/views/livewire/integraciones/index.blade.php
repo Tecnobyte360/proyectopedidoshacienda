@@ -212,21 +212,26 @@
                     </div>
 
                     {{-- Explorador BD --}}
-                    <div class="rounded-xl border-2 border-dashed border-sky-200 bg-sky-50/30 p-4 space-y-3">
-                        <div class="flex items-center justify-between">
-                            <h4 class="font-bold text-slate-800 text-sm"><i class="fa-solid fa-database text-sky-600"></i> Explorador de la BD</h4>
-                            <button wire:click="listarTablas"
-                                    wire:loading.attr="disabled"
-                                    wire:target="listarTablas"
-                                    class="inline-flex items-center gap-2 rounded-lg bg-sky-500 hover:bg-sky-600 text-white font-semibold px-3 py-1.5 text-xs transition disabled:opacity-50">
-                                <i class="fa-solid fa-magnifying-glass" wire:loading.remove wire:target="listarTablas"></i>
-                                <i class="fa-solid fa-circle-notch fa-spin" wire:loading wire:target="listarTablas"></i>
-                                Listar tablas
-                            </button>
-                        </div>
+                    <div class="rounded-xl border-2 border-dashed border-sky-300 bg-sky-50 p-4 space-y-3">
+                        <h4 class="font-bold text-slate-800 text-sm"><i class="fa-solid fa-database text-sky-600"></i> Explorador de la BD</h4>
+                        <p class="text-xs text-slate-600">
+                            Primero llena host, puerto, BD, usuario y password arriba.
+                            Luego haz clic aquí para ver TODAS las tablas de la base:
+                        </p>
+                        <button wire:click="listarTablas"
+                                wire:loading.attr="disabled"
+                                wire:target="listarTablas"
+                                class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-bold px-4 py-3 text-sm transition disabled:opacity-50 shadow">
+                            <i class="fa-solid fa-magnifying-glass" wire:loading.remove wire:target="listarTablas"></i>
+                            <i class="fa-solid fa-circle-notch fa-spin" wire:loading wire:target="listarTablas"></i>
+                            <span wire:loading.remove wire:target="listarTablas">🔍 Listar todas las tablas de la BD</span>
+                            <span wire:loading wire:target="listarTablas">Conectando...</span>
+                        </button>
 
                         @if($explorarError)
-                            <p class="text-xs text-rose-600 font-semibold"><i class="fa-solid fa-triangle-exclamation"></i> {{ $explorarError }}</p>
+                            <p class="text-xs text-rose-600 font-semibold bg-rose-50 border border-rose-200 rounded p-2">
+                                <i class="fa-solid fa-triangle-exclamation"></i> {{ $explorarError }}
+                            </p>
                         @endif
 
                         @if(!empty($tablas))
