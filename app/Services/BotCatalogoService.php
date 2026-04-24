@@ -21,7 +21,8 @@ class BotCatalogoService
      */
     public function productosActivos(?int $sedeId = null): Collection
     {
-        $cacheKey = "bot_catalogo_productos_" . ($sedeId ?? 'all');
+        $tenantId = app(\App\Services\TenantManager::class)->id() ?? 'none';
+        $cacheKey = "bot_catalogo_productos_t{$tenantId}_" . ($sedeId ?? 'all');
 
         return Cache::remember($cacheKey, 120, function () use ($sedeId) {
             $query = Producto::query()
@@ -41,7 +42,8 @@ class BotCatalogoService
      */
     public function promocionesVigentes(?int $sedeId = null): Collection
     {
-        return Cache::remember("bot_promociones_vigentes_" . ($sedeId ?? 'all'), 120, function () use ($sedeId) {
+        $tenantId = app(\App\Services\TenantManager::class)->id() ?? 'none';
+        return Cache::remember("bot_promociones_vigentes_t{$tenantId}_" . ($sedeId ?? 'all'), 120, function () use ($sedeId) {
             return Promocion::vigentes()
                 ->with(['productos', 'sedes'])
                 ->when($sedeId, fn ($q) => $q->where(function ($qq) use ($sedeId) {
@@ -58,7 +60,8 @@ class BotCatalogoService
      */
     public function zonasActivas(?int $sedeId = null): Collection
     {
-        return Cache::remember("bot_zonas_activas_" . ($sedeId ?? 'all'), 120, function () use ($sedeId) {
+        $tenantId = app(\App\Services\TenantManager::class)->id() ?? 'none';
+        return Cache::remember("bot_zonas_activas_t{$tenantId}_" . ($sedeId ?? 'all'), 120, function () use ($sedeId) {
             return ZonaCobertura::with('barrios')
                 ->where('activa', true)
                 ->when($sedeId, fn ($q) => $q->where(function ($qq) use ($sedeId) {
