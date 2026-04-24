@@ -58,6 +58,7 @@
                     'items' => [
                         ['name' => 'Productos',     'icon' => 'fa-box',          'route' => 'productos.index',     'badge' => null, 'permission' => 'productos.ver'],
                         ['name' => 'Categorías',    'icon' => 'fa-layer-group',  'route' => 'categorias.index',    'badge' => null, 'permission' => 'categorias.gestionar'],
+                        ['name' => 'Cortes',        'icon' => 'fa-scissors',     'route' => 'cortes.index',        'badge' => null, 'permission' => 'productos.ver'],
                         ['name' => 'Promociones',   'icon' => 'fa-tags',         'route' => 'promociones.index',   'badge' => null, 'permission' => 'promociones.gestionar'],
                         ['name' => 'Importaciones', 'icon' => 'fa-file-import',  'route' => 'importaciones.index', 'badge' => null, 'permission' => 'productos.ver'],
                         ['name' => 'Integraciones', 'icon' => 'fa-plug',         'route' => 'integraciones.index', 'badge' => null, 'permission' => 'productos.ver'],

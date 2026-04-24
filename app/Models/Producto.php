@@ -57,6 +57,14 @@ class Producto extends Model
             ->withTimestamps();
     }
 
+    public function cortes(): BelongsToMany
+    {
+        return $this->belongsToMany(Corte::class, 'producto_corte')
+            ->withPivot('orden')
+            ->withTimestamps()
+            ->orderBy('pivot_orden');
+    }
+
     public function promociones(): BelongsToMany
     {
         return $this->belongsToMany(Promocion::class, 'promocion_producto')

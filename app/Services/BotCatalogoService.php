@@ -107,6 +107,12 @@ class BotCatalogoService
                     $p->unidad,
                     $destacado
                 );
+
+                // Cortes disponibles para este producto
+                $cortes = $p->cortes()->where('activo', true)->pluck('nombre');
+                if ($cortes->isNotEmpty()) {
+                    $lineas[] = '      ✂️ Cortes: ' . $cortes->implode(', ');
+                }
             }
         }
 
