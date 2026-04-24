@@ -718,14 +718,37 @@
     .scrollbar-hide::-webkit-scrollbar { display: none; }
     .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 
-    /* Animación cuando llega un pedido nuevo — ring pulsante + shake */
+    /* Animación cuando llega un pedido nuevo — glow intenso + fondo verde */
     @keyframes pedido-glow {
-        0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
-        50%      { box-shadow: 0 0 0 12px rgba(16, 185, 129, 0); }
+        0%   { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.9), inset 0 0 20px rgba(16, 185, 129, 0.3);
+               background-color: rgba(16, 185, 129, 0.25); }
+        50%  { box-shadow: 0 0 0 16px rgba(16, 185, 129, 0), inset 0 0 30px rgba(16, 185, 129, 0.5);
+               background-color: rgba(16, 185, 129, 0.4); }
+        100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0), inset 0 0 20px rgba(16, 185, 129, 0);
+               background-color: rgba(209, 250, 229, 0.3); }
     }
     .pedido-nuevo-highlight {
-        animation: pedido-glow 1.5s ease-out 3;
-        background-color: rgba(209, 250, 229, 0.5) !important;
+        animation: pedido-glow 1.5s ease-out 4;
+        border-left: 5px solid #10b981 !important;
+        position: relative;
+    }
+    .pedido-nuevo-highlight::before {
+        content: '🆕 NUEVO';
+        position: absolute;
+        top: 4px;
+        right: 4px;
+        background: #10b981;
+        color: white;
+        font-size: 9px;
+        font-weight: 900;
+        padding: 2px 8px;
+        border-radius: 6px;
+        z-index: 10;
+        animation: bounce 1s ease-in-out infinite;
+    }
+    @keyframes bounce {
+        0%, 100% { transform: translateY(0); }
+        50%      { transform: translateY(-3px); }
     }
 
     /* Toast de pedido nuevo */
@@ -744,76 +767,108 @@
 function pedidosNotif() {
     return {
         toast: null,
+        _audioCtx: null,
         _audioUnlocked: false,
         _primerosIds: null,
+        _idsConocidos: null,
 
         init() {
-            // Desbloquear audio al primer clic del usuario (navegadores lo exigen)
-            document.addEventListener('click', () => {
-                if (!this._audioUnlocked) {
-                    const a = document.getElementById('new-order-sound');
-                    if (a) a.play().then(() => { a.pause(); a.currentTime = 0; this._audioUnlocked = true; }).catch(() => {});
-                }
-            }, { once: false });
-
-            // Listener del evento Livewire que dispara onPedidoConfirmado
-            window.addEventListener('nuevo-pedido-en-vivo', (e) => {
-                this.notificar(e.detail?.cliente || 'un cliente');
-            });
-
-            // Fallback: detectar pedidos nuevos comparando la lista (para cuando Reverb no funciona pero poll sí)
-            this._trackPolling();
-        },
-
-        notificar(cliente) {
-            // 1. Sonido
-            this._playAudio();
-
-            // 2. Toast
-            this.toast = `🛒 Nuevo pedido de ${cliente}`;
-            setTimeout(() => { this.toast = null; }, 6000);
-
-            // 3. Highlight del primer pedido de la lista (se pinta por 4.5s)
-            setTimeout(() => {
-                const fila = document.querySelector('[data-pedido-id]');
-                if (fila) {
-                    fila.classList.add('pedido-nuevo-highlight');
-                    setTimeout(() => fila.classList.remove('pedido-nuevo-highlight'), 5000);
-                }
-            }, 100);
-
-            // 4. Title del tab pulsante
-            this._flashTitle('🛒 ¡Nuevo pedido!');
-        },
-
-        _playAudio() {
-            const a = document.getElementById('new-order-sound');
-            if (a && this._audioUnlocked) {
-                a.currentTime = 0;
-                a.play().catch(() => {});
-            }
-        },
-
-        _trackPolling() {
-            // Observa cambios en el DOM y si aparece un [data-pedido-id] nuevo, notifica.
-            const snapshot = () => {
-                const ids = Array.from(document.querySelectorAll('[data-pedido-id]'))
-                    .map(n => n.dataset.pedidoId);
-                return ids;
+            // Desbloquear audio al primer click del usuario
+            const unlock = () => {
+                if (this._audioUnlocked) return;
+                try {
+                    const Ctx = window.AudioContext || window.webkitAudioContext;
+                    this._audioCtx = new Ctx();
+                    if (this._audioCtx.state === 'suspended') this._audioCtx.resume();
+                    this._audioUnlocked = true;
+                    console.log('🔓 Audio desbloqueado');
+                } catch (e) { console.warn('No se pudo inicializar audio', e); }
             };
+            document.addEventListener('click', unlock, { once: false });
+            document.addEventListener('keydown', unlock, { once: false });
 
-            this._primerosIds = snapshot();
+            // 1) Listener Livewire para el evento 'nuevo-pedido-en-vivo' dispatch desde onPedidoConfirmado
+            if (window.Livewire) {
+                Livewire.on('nuevo-pedido-en-vivo', (e) => {
+                    const cliente = (e && e.cliente) || (Array.isArray(e) && e[0]?.cliente) || 'un cliente';
+                    this.notificar(cliente);
+                });
+            }
+
+            // 2) Fallback: si Reverb no conecta, detectamos pedidos nuevos comparando IDs tras cada render.
+            //    Guardamos el snapshot actual para no disparar el primer render.
+            this._idsConocidos = this._snapshotIds();
 
             if (window.Livewire?.hook) {
                 Livewire.hook('morph.updated', () => {
-                    const nuevos = snapshot();
-                    if (this._primerosIds && nuevos.length > 0 && nuevos[0] !== this._primerosIds[0]) {
-                        // El top de la lista cambió → es un pedido nuevo
-                        this.notificar('un cliente');
-                    }
-                    this._primerosIds = nuevos;
+                    // Dar tiempo a que el DOM se estabilice
+                    setTimeout(() => this._detectarNuevos(), 50);
                 });
             }
+        },
+
+        _snapshotIds() {
+            return new Set(
+                Array.from(document.querySelectorAll('[data-pedido-id]'))
+                    .map(n => n.dataset.pedidoId)
+            );
+        },
+
+        _detectarNuevos() {
+            const ahora = this._snapshotIds();
+            const nuevos = [...ahora].filter(id => !this._idsConocidos.has(id));
+            this._idsConocidos = ahora;
+
+            if (nuevos.length > 0) {
+                console.log('🛒 Detectados pedidos nuevos:', nuevos);
+                this.notificar('un cliente');
+                // Iluminar todos los nuevos (no solo el primero)
+                nuevos.forEach(id => {
+                    const fila = document.querySelector(`[data-pedido-id="${id}"]`);
+                    if (fila) {
+                        fila.classList.add('pedido-nuevo-highlight');
+                        setTimeout(() => fila.classList.remove('pedido-nuevo-highlight'), 6000);
+                    }
+                });
+            }
+        },
+
+        notificar(cliente) {
+            this._playBeep();
+
+            this.toast = `🛒 Nuevo pedido de ${cliente}`;
+            setTimeout(() => { this.toast = null; }, 7000);
+
+            this._flashTitle('🛒 ¡Nuevo pedido!');
+        },
+
+        // Genera un beep con Web Audio API (sin archivo mp3)
+        _playBeep() {
+            if (!this._audioUnlocked || !this._audioCtx) {
+                console.warn('🔇 Audio aún no desbloqueado. Haz clic en la página primero.');
+                return;
+            }
+            try {
+                const ctx = this._audioCtx;
+                const now = ctx.currentTime;
+
+                // Dos tonos tipo notificación: primero agudo, luego más grave
+                [
+                    { freq: 880, start: 0,    dur: 0.15 },
+                    { freq: 660, start: 0.18, dur: 0.22 },
+                ].forEach(t => {
+                    const osc  = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.value = t.freq;
+                    gain.gain.setValueAtTime(0, now + t.start);
+                    gain.gain.linearRampToValueAtTime(0.35, now + t.start + 0.02);
+                    gain.gain.linearRampToValueAtTime(0, now + t.start + t.dur);
+                    osc.connect(gain).connect(ctx.destination);
+                    osc.start(now + t.start);
+                    osc.stop(now + t.start + t.dur + 0.05);
+                });
+            } catch (e) { console.warn('Error reproduciendo beep', e); }
         },
 
         _flashTitle(txt) {
@@ -823,7 +878,7 @@ function pedidosNotif() {
                 document.title = toggle ? txt : original;
                 toggle = !toggle;
             }, 800);
-            setTimeout(() => { clearInterval(int); document.title = original; }, 6000);
+            setTimeout(() => { clearInterval(int); document.title = original; }, 7000);
         },
     };
 }
