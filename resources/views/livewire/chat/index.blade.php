@@ -1,5 +1,5 @@
 <div class="h-[calc(100vh-5rem)] flex flex-col lg:flex-row bg-slate-100"
-     wire:poll.10s="refrescar">
+     wire:poll.2s="refrescar">
 
     @php $cfgBot = \App\Models\ConfiguracionBot::actual(); @endphp
 

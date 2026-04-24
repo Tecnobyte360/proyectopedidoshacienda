@@ -18,11 +18,10 @@ use Illuminate\Support\Facades\Log;
  */
 class ConversacionService
 {
-    /** Minutos sin actividad para considerar una conversación "cerrada" */
-    private const MINUTOS_INACTIVIDAD_PARA_CERRAR = 60 * 6;   // 6 horas
-
     /**
-     * Encuentra la conversación activa del cliente o crea una nueva.
+     * Encuentra la conversación del cliente (una sola por teléfono) o crea una nueva.
+     * Si existe cualquier conversación previa (activa o cerrada) para el teléfono,
+     * se reutiliza — nunca se crea una segunda conversación para el mismo número.
      */
     public function obtenerOCrearActiva(
         string $telefonoNormalizado,
@@ -30,28 +29,30 @@ class ConversacionService
         ?int $sedeId = null,
         ?int $connectionId = null
     ): ConversacionWhatsapp {
-        // Buscar la última activa
-        $activa = ConversacionWhatsapp::where('telefono_normalizado', $telefonoNormalizado)
-            ->where('estado', ConversacionWhatsapp::ESTADO_ACTIVA)
+        // Buscar la conversación más reciente del teléfono (cualquier estado no-archivada)
+        $conv = ConversacionWhatsapp::where('telefono_normalizado', $telefonoNormalizado)
+            ->where('estado', '!=', ConversacionWhatsapp::ESTADO_ARCHIVADA)
             ->orderByDesc('id')
             ->first();
 
-        if ($activa) {
-            // Si lleva mucho sin mensajes, la cerramos y abrimos nueva
-            if (
-                $activa->ultimo_mensaje_at &&
-                $activa->ultimo_mensaje_at->diffInMinutes(now()) > self::MINUTOS_INACTIVIDAD_PARA_CERRAR
-            ) {
-                $activa->update(['estado' => ConversacionWhatsapp::ESTADO_CERRADA]);
-                return $this->crearNueva($telefonoNormalizado, $clienteId, $sedeId, $connectionId);
+        if ($conv) {
+            $updates = [];
+
+            // Si estaba cerrada, la reactivamos
+            if ($conv->estado !== ConversacionWhatsapp::ESTADO_ACTIVA) {
+                $updates['estado'] = ConversacionWhatsapp::ESTADO_ACTIVA;
             }
 
             // Actualizar cliente_id si llegó después
-            if ($clienteId && !$activa->cliente_id) {
-                $activa->update(['cliente_id' => $clienteId]);
+            if ($clienteId && !$conv->cliente_id) {
+                $updates['cliente_id'] = $clienteId;
             }
 
-            return $activa;
+            if ($updates) {
+                $conv->update($updates);
+            }
+
+            return $conv;
         }
 
         return $this->crearNueva($telefonoNormalizado, $clienteId, $sedeId, $connectionId);

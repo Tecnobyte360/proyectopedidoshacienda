@@ -51,7 +51,9 @@ class TranscripcionAudioService
 
         try {
             // 1. Descargar el audio a un archivo temporal
-            $audioData = Http::timeout(30)->get($audioUrl);
+            //    withoutVerifying() porque el cert de wa-api.tecnobyteapp.com
+            //    a veces vence — es URL de proveedor confiable, no riesgo real.
+            $audioData = Http::timeout(30)->withoutVerifying()->get($audioUrl);
 
             if (!$audioData->successful()) {
                 Log::warning('🎤 No pude descargar el audio', [
