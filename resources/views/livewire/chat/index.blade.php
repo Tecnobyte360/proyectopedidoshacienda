@@ -276,14 +276,16 @@
                         </button>
                     </div>
 
-                    {{-- Botón adjuntar imagen --}}
-                    <template x-if="!recording && !preview">
-                        <label title="Adjuntar imagen"
-                               class="flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer">
-                            <i class="fa-solid fa-image"></i>
-                            <input type="file" wire:model="imagen" accept="image/*" class="hidden">
-                        </label>
-                    </template>
+                    {{-- Botón adjuntar imagen (fuera de x-if para que Livewire vea el wire:model) --}}
+                    <label x-show="!recording && !preview"
+                           title="Adjuntar imagen"
+                           class="flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer">
+                        <i class="fa-solid fa-image"
+                           wire:loading.remove wire:target="imagen"></i>
+                        <i class="fa-solid fa-circle-notch fa-spin"
+                           wire:loading wire:target="imagen"></i>
+                        <input type="file" wire:model="imagen" accept="image/*" class="hidden">
+                    </label>
 
                     {{-- Botón micrófono / detener / enviar audio --}}
                     <template x-if="!recording && !preview">
