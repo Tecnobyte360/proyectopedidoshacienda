@@ -75,7 +75,7 @@
                         ['name' => 'Zonas',         'icon' => 'fa-map-location-dot',    'route' => 'zonas.index',         'badge' => null, 'permission' => 'zonas.gestionar'],
                         ['name' => 'Reportes',      'icon' => 'fa-chart-line',          'route' => 'reportes.index',      'badge' => null, 'permission' => 'reportes.ver'],
                         ['name' => 'ANS Tiempos',   'icon' => 'fa-stopwatch',           'route' => 'ans.index',           'badge' => null, 'permission' => 'ans.gestionar'],
-                        ['name' => 'Bot WhatsApp',  'icon' => 'fa-robot',               'route' => 'configuracion.bot',   'badge' => null, 'permission' => 'bot.configurar'],
+                        ['name' => 'Bot WhatsApp',  'icon' => 'fa-robot',               'route' => 'configuracion.bot',   'badge' => null, 'permission' => 'bot.configurar', 'solo_super_admin' => true],
                         ['name' => 'Sedes',         'icon' => 'fa-shop',                'route' => 'sedes.index',         'badge' => null, 'permission' => 'sedes.gestionar'],
                     ],
                 ],
@@ -120,6 +120,10 @@
                 }
 
                 $items = array_values(array_filter($sec['items'], function ($it) use ($u) {
+                    // Items marcados solo_super_admin solo para el dueño de la plataforma
+                    if (!empty($it['solo_super_admin'])) {
+                        if (!$u || !$u->hasRole('super-admin')) return false;
+                    }
                     return !$u || empty($it['permission']) || $u->can($it['permission']);
                 }));
                 if (count($items) > 0) {

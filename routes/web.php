@@ -103,7 +103,9 @@ Route::middleware(['no_super_sin_imp'])->group(function () {
     Route::get('/despachos',     DespachosIndex::class)->middleware('permission:despachos.gestionar')->name('despachos.index');
     Route::get('/reportes',      ReportesIndex::class)->middleware('permission:reportes.ver')->name('reportes.index');
     Route::get('/ans-tiempos',   AnsIndex::class)->middleware('permission:ans.gestionar')->name('ans.index');
-    Route::get('/configuracion/bot', ConfiguracionBot::class)->middleware('permission:bot.configurar')->name('configuracion.bot');
+    Route::get('/configuracion/bot', ConfiguracionBot::class)
+        ->middleware(['permission:bot.configurar', 'role:super-admin'])
+        ->name('configuracion.bot');
     Route::get('/clientes',          ClientesIndex::class)->middleware('permission:clientes.ver')->name('clientes.index');
     Route::get('/conversaciones',    ConversacionesIndex::class)->middleware('permission:conversaciones.ver')->name('conversaciones.index');
     Route::get('/chat',              ChatIndex::class)->middleware('permission:chat.usar')->name('chat.index');
