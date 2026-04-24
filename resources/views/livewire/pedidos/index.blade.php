@@ -773,7 +773,7 @@ function pedidosNotif() {
         _idsConocidos: null,
 
         init() {
-            // Desbloquear audio al primer click del usuario
+            // Desbloquear audio al primer input del usuario
             const unlock = () => {
                 if (this._audioUnlocked) return;
                 try {
@@ -784,28 +784,44 @@ function pedidosNotif() {
                     console.log('🔓 Audio desbloqueado');
                 } catch (e) { console.warn('No se pudo inicializar audio', e); }
             };
-            document.addEventListener('click', unlock, { once: false });
-            document.addEventListener('keydown', unlock, { once: false });
+            document.addEventListener('click', unlock);
+            document.addEventListener('keydown', unlock);
 
-            // 1) Listener Livewire para el evento 'nuevo-pedido-en-vivo' dispatch desde onPedidoConfirmado
+            // 1) Listener Livewire (evento del server cuando llega pedido via Reverb)
             if (window.Livewire) {
                 Livewire.on('nuevo-pedido-en-vivo', (e) => {
                     const cliente = (e && e.cliente) || (Array.isArray(e) && e[0]?.cliente) || 'un cliente';
                     this.notificar(cliente);
+                    // El DOM aún no tiene el pedido nuevo. Esperamos al morph.
+                    setTimeout(() => this._detectarNuevos(), 300);
+                    setTimeout(() => this._detectarNuevos(), 1000);   // retry por si el morph tardó
                 });
             }
 
-            // 2) Fallback: si Reverb no conecta, detectamos pedidos nuevos comparando IDs tras cada render.
-            //    Guardamos el snapshot actual para no disparar el primer render.
-            this._idsConocidos = this._snapshotIds();
+            // 2) Snapshot inicial de IDs actuales (para no marcar como "nuevos" los que ya estaban)
+            setTimeout(() => {
+                this._idsConocidos = this._snapshotIds();
+                console.log('📋 IDs iniciales:', this._idsConocidos.size, 'pedidos');
+            }, 500);
 
+            // 3) Hook de Livewire en cada render para detectar nuevos IDs
             if (window.Livewire?.hook) {
-                Livewire.hook('morph.updated', () => {
-                    // Dar tiempo a que el DOM se estabilice
-                    setTimeout(() => this._detectarNuevos(), 50);
-                });
+                const onUpdate = () => setTimeout(() => this._detectarNuevos(), 100);
+                // Probar varios hooks para cubrir versiones de Livewire 3
+                try { Livewire.hook('morph.updated', onUpdate); } catch (_) {}
+                try { Livewire.hook('morphed',       onUpdate); } catch (_) {}
+                try { Livewire.hook('commit',        ({ succeed }) => succeed(onUpdate)); } catch (_) {}
             }
+
+            // 4) Observer DOM como red de seguridad absoluta
+            const observer = new MutationObserver(() => {
+                clearTimeout(this._obsTimeout);
+                this._obsTimeout = setTimeout(() => this._detectarNuevos(), 150);
+            });
+            observer.observe(document.body, { childList: true, subtree: true });
         },
+
+        _idsPorIluminar: new Set(),   // IDs que deben mostrar highlight durante X segundos
 
         _snapshotIds() {
             return new Set(
@@ -815,6 +831,10 @@ function pedidosNotif() {
         },
 
         _detectarNuevos() {
+            if (!this._idsConocidos) {
+                this._idsConocidos = this._snapshotIds();
+                return;
+            }
             const ahora = this._snapshotIds();
             const nuevos = [...ahora].filter(id => !this._idsConocidos.has(id));
             this._idsConocidos = ahora;
@@ -822,15 +842,33 @@ function pedidosNotif() {
             if (nuevos.length > 0) {
                 console.log('🛒 Detectados pedidos nuevos:', nuevos);
                 this.notificar('un cliente');
-                // Iluminar todos los nuevos (no solo el primero)
                 nuevos.forEach(id => {
-                    const fila = document.querySelector(`[data-pedido-id="${id}"]`);
-                    if (fila) {
-                        fila.classList.add('pedido-nuevo-highlight');
-                        setTimeout(() => fila.classList.remove('pedido-nuevo-highlight'), 6000);
-                    }
+                    this._idsPorIluminar.add(id);
+                    this._aplicarHighlight(id);
+                    // Quitar del set después de 6s
+                    setTimeout(() => {
+                        this._idsPorIluminar.delete(id);
+                        this._quitarHighlight(id);
+                    }, 6000);
                 });
             }
+
+            // Re-aplicar highlight a los que aún deben iluminar (en caso de que Livewire los haya re-renderizado)
+            this._idsPorIluminar.forEach(id => this._aplicarHighlight(id));
+        },
+
+        _aplicarHighlight(id) {
+            const filas = document.querySelectorAll(`[data-pedido-id="${id}"]`);
+            filas.forEach(f => {
+                if (!f.classList.contains('pedido-nuevo-highlight')) {
+                    f.classList.add('pedido-nuevo-highlight');
+                }
+            });
+        },
+
+        _quitarHighlight(id) {
+            const filas = document.querySelectorAll(`[data-pedido-id="${id}"]`);
+            filas.forEach(f => f.classList.remove('pedido-nuevo-highlight'));
         },
 
         notificar(cliente) {
