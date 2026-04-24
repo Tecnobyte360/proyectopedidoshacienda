@@ -223,7 +223,10 @@ class ChatWidgetController extends Controller
      */
     private function espejoConversacion(ChatWidget $widget, ChatWidgetSesion $sesion): ConversacionWhatsapp
     {
-        $telFake = 'web_' . $sesion->session_id;
+        // La columna telefono_normalizado tiene longitud limitada (≈20 chars).
+        // Usamos un hash CRC32 del session_id como identificador único corto.
+        $telFake = 'w' . substr(hash('crc32b', $sesion->session_id), 0, 8)   // 9 chars
+                 . dechex(abs(crc32($widget->token)) % 0xFFFF);              // +4 chars = 13 total
 
         $conv = ConversacionWhatsapp::where('telefono_normalizado', $telFake)->first();
         if ($conv) return $conv;
@@ -266,7 +269,8 @@ class ChatWidgetController extends Controller
 
         if (!$sessionId) return $this->cors(response()->json(['error' => 'session_id requerido'], 400), $request);
 
-        $telFake = 'web_' . $sessionId;
+        $telFake = 'w' . substr(hash('crc32b', $sessionId), 0, 8)
+                 . dechex(abs(crc32($token)) % 0xFFFF);
         $conv = ConversacionWhatsapp::where('telefono_normalizado', $telFake)->first();
 
         if (!$conv) {
