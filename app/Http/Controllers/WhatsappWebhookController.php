@@ -225,6 +225,23 @@ class WhatsappWebhookController extends Controller
             return response()->json(['status' => 'self_message_ignored']);
         }
 
+        // Deduplicación por messageId — debe ir ANTES de cualquier persist
+        // (usuario interno, modo humano, etc.) para evitar duplicados por retries.
+        if ($messageId) {
+            $alreadyProcessedKey = "processed_whatsapp_msg_{$messageId}";
+            $processingKey       = "processing_whatsapp_msg_{$messageId}";
+
+            if (Cache::has($alreadyProcessedKey)) {
+                Log::warning('⚠️ Mensaje duplicado ignorado (ya procesado, pre-checks)', compact('messageId', 'from'));
+                return response()->json(['status' => 'duplicate_ignored']);
+            }
+
+            if (!Cache::add($processingKey, true, now()->addSeconds(30))) {
+                Log::warning('⚠️ Mensaje duplicado ignorado (en proceso, pre-checks)', compact('messageId', 'from'));
+                return response()->json(['status' => 'duplicate_in_progress']);
+            }
+        }
+
         // 👥 Usuario INTERNO del negocio (staff/equipo) — se persiste el mensaje
         // pero el bot NO responde ni ejecuta tool-calls. Solo queda en el chat
         // marcado como conversación interna.
@@ -246,8 +263,14 @@ class WhatsappWebhookController extends Controller
                 app(\App\Services\ConversacionService::class)->agregarMensaje(
                     $conv,
                     \App\Models\MensajeWhatsapp::ROL_USER,
-                    $message !== '' ? $message : '(media)'
+                    $message !== '' ? $message : '(media)',
+                    $messageId ? ['mensaje_externo_id' => $messageId] : []
                 );
+
+                if ($messageId) {
+                    Cache::put($alreadyProcessedKey, true, now()->addMinutes(30));
+                    Cache::forget($processingKey);
+                }
             } catch (\Throwable $e) {
                 Log::warning('No se persistió mensaje de usuario interno: ' . $e->getMessage());
             }
@@ -259,20 +282,7 @@ class WhatsappWebhookController extends Controller
             return response()->json(['status' => 'internal_user_no_bot']);
         }
 
-        if ($messageId) {
-            $alreadyProcessedKey = "processed_whatsapp_msg_{$messageId}";
-            $processingKey       = "processing_whatsapp_msg_{$messageId}";
-
-            if (Cache::has($alreadyProcessedKey)) {
-                Log::warning('⚠️ Mensaje duplicado ignorado (ya procesado)', compact('messageId', 'from'));
-                return response()->json(['status' => 'duplicate_ignored']);
-            }
-
-            if (!Cache::add($processingKey, true, now()->addSeconds(30))) {
-                Log::warning('⚠️ Mensaje duplicado ignorado (en proceso)', compact('messageId', 'from'));
-                return response()->json(['status' => 'duplicate_in_progress']);
-            }
-        }
+        // (El chequeo de dedup ya se hizo arriba, antes de los flujos que persisten.)
 
         try {
             Log::info('✅ MENSAJE CLIENTE', compact('from', 'name', 'message', 'messageId', 'connectionId'));
