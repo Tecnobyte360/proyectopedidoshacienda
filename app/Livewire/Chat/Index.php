@@ -120,7 +120,13 @@ class Index extends Component
         [$bytesEnvio, $extEnvio] = $this->convertirAOggOpus($bytes, $ext);
 
         $nombreEnvio = 'voice_' . uniqid() . '.' . $extEnvio;
-        $messageId = $this->enviarAudioAWhatsapp($conv->telefono_normalizado, $bytesEnvio, $nombreEnvio, $conv->connection_id);
+        $connectionId = $this->resolverConnectionId($conv->connection_id);
+        if (!$connectionId) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => '⚠️ Este tenant no tiene conexión WhatsApp configurada.']);
+            return;
+        }
+        if (!$conv->connection_id) $conv->update(['connection_id' => $connectionId]);
+        $messageId = $this->enviarAudioAWhatsapp($conv->telefono_normalizado, $bytesEnvio, $nombreEnvio, $connectionId);
 
         if (!$messageId) {
             $this->dispatch('notify', ['type' => 'error', 'message' => '⚠️ No se pudo enviar el audio a WhatsApp.']);
@@ -337,7 +343,13 @@ class Index extends Component
         $mediaUrl = rtrim(config('app.url'), '/') . Storage::url($filename);
 
         $nombreEnvio = 'image_' . uniqid() . '.' . $extOrig;
-        $messageId = $this->enviarImagenAWhatsapp($conv->telefono_normalizado, $bytes, $nombreEnvio, $caption, $conv->connection_id);
+        $connectionId = $this->resolverConnectionId($conv->connection_id);
+        if (!$connectionId) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => '⚠️ Este tenant no tiene conexión WhatsApp configurada.']);
+            return;
+        }
+        if (!$conv->connection_id) $conv->update(['connection_id' => $connectionId]);
+        $messageId = $this->enviarImagenAWhatsapp($conv->telefono_normalizado, $bytes, $nombreEnvio, $caption, $connectionId);
 
         if (!$messageId) {
             $this->dispatch('notify', ['type' => 'error', 'message' => '⚠️ No se pudo enviar la imagen a WhatsApp.']);
@@ -433,6 +445,22 @@ class Index extends Component
         }
     }
 
+    /**
+     * Resuelve la connection_id a usar para enviar un mensaje.
+     * Prioridad:
+     *   1. La que ya tiene la conversación.
+     *   2. La primera connection_id registrada para el tenant actual.
+     * Si no hay ninguna, devuelve null y TecnoByteApp fallará con mensaje claro
+     * (mejor que usar la default de OTRO tenant).
+     */
+    private function resolverConnectionId($connectionIdActual = null): ?int
+    {
+        if ($connectionIdActual) return (int) $connectionIdActual;
+
+        $ids = app(\App\Services\WhatsappResolverService::class)->connectionIdsDelTenant();
+        return !empty($ids) ? (int) $ids[0] : null;
+    }
+
     public function abrirNuevoChat(): void
     {
         $this->nuevoChatModal   = true;
@@ -464,11 +492,21 @@ class Index extends Component
             return;
         }
 
-        // Resolver/crear cliente + conversación
-        $cliente = \App\Models\Cliente::encontrarOCrearPorTelefono($telefono, trim($this->nuevoChatNombre) ?: 'Cliente');
-        $conv = app(ConversacionService::class)->obtenerOCrearActiva($telefono, $cliente->id);
+        // Resolver connection_id del tenant actual ANTES de crear la conversación
+        $connectionId = $this->resolverConnectionId();
+        if (!$connectionId) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => '⚠️ Este tenant no tiene conexión WhatsApp configurada.']);
+            return;
+        }
 
-        $messageId = $this->enviarAWhatsapp($telefono, $texto, $conv->connection_id);
+        // Resolver/crear cliente + conversación (con connection_id del tenant)
+        $cliente = \App\Models\Cliente::encontrarOCrearPorTelefono($telefono, trim($this->nuevoChatNombre) ?: 'Cliente');
+        $conv = app(ConversacionService::class)->obtenerOCrearActiva($telefono, $cliente->id, null, $connectionId);
+
+        // Si la conversación ya existía pero sin connection_id, la actualizamos
+        if (!$conv->connection_id) $conv->update(['connection_id' => $connectionId]);
+
+        $messageId = $this->enviarAWhatsapp($telefono, $texto, $connectionId);
 
         if (!$messageId) {
             $this->dispatch('notify', ['type' => 'error', 'message' => '⚠️ No se pudo enviar el mensaje. Verifica que el número sí use WhatsApp.']);
@@ -507,8 +545,19 @@ class Index extends Component
         // ⚠️ NO se auto-activa modo humano. El bot SIGUE respondiendo al cliente.
         // Si quieres silenciar al bot, usa el botón "Tomar control" explícitamente.
 
+        // Resolver connection_id del tenant actual (evita enviar desde el número de otro tenant)
+        $connectionId = $this->resolverConnectionId($conv->connection_id);
+        if (!$connectionId) {
+            $this->dispatch('notify', [
+                'type'    => 'error',
+                'message' => '⚠️ Este tenant no tiene conexión WhatsApp configurada. Configúrala primero.',
+            ]);
+            return;
+        }
+        if (!$conv->connection_id) $conv->update(['connection_id' => $connectionId]);
+
         // Enviar a WhatsApp DIRECTO (sin pasar por controller)
-        $messageId = $this->enviarAWhatsapp($conv->telefono_normalizado, $texto, $conv->connection_id);
+        $messageId = $this->enviarAWhatsapp($conv->telefono_normalizado, $texto, $connectionId);
 
         if (!$messageId) {
             $this->dispatch('notify', [
