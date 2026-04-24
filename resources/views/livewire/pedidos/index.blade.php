@@ -1,4 +1,6 @@
-<div class="min-h-screen bg-slate-50" wire:poll.30s="refrescar">
+<div class="min-h-screen bg-slate-50" wire:poll.3s="refrescar"
+     x-data="pedidosNotif()"
+     x-init="init()">
 
     {{-- 🚀 BARRA FLOTANTE — aparece cuando hay pedidos seleccionados para despacho masivo --}}
     @php $cantSel = collect($seleccionadosMasivo)->filter()->count(); @endphp
@@ -715,5 +717,126 @@
 <style>
     .scrollbar-hide::-webkit-scrollbar { display: none; }
     .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+    /* Animación cuando llega un pedido nuevo — ring pulsante + shake */
+    @keyframes pedido-glow {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+        50%      { box-shadow: 0 0 0 12px rgba(16, 185, 129, 0); }
+    }
+    .pedido-nuevo-highlight {
+        animation: pedido-glow 1.5s ease-out 3;
+        background-color: rgba(209, 250, 229, 0.5) !important;
+    }
+
+    /* Toast de pedido nuevo */
+    @keyframes slide-in-right {
+        from { transform: translateX(400px); opacity: 0; }
+        to   { transform: translateX(0); opacity: 1; }
+    }
+    .toast-pedido-nuevo {
+        animation: slide-in-right 0.4s ease-out;
+    }
 </style>
+@endpush
+
+@push('scripts')
+<script>
+function pedidosNotif() {
+    return {
+        toast: null,
+        _audioUnlocked: false,
+        _primerosIds: null,
+
+        init() {
+            // Desbloquear audio al primer clic del usuario (navegadores lo exigen)
+            document.addEventListener('click', () => {
+                if (!this._audioUnlocked) {
+                    const a = document.getElementById('new-order-sound');
+                    if (a) a.play().then(() => { a.pause(); a.currentTime = 0; this._audioUnlocked = true; }).catch(() => {});
+                }
+            }, { once: false });
+
+            // Listener del evento Livewire que dispara onPedidoConfirmado
+            window.addEventListener('nuevo-pedido-en-vivo', (e) => {
+                this.notificar(e.detail?.cliente || 'un cliente');
+            });
+
+            // Fallback: detectar pedidos nuevos comparando la lista (para cuando Reverb no funciona pero poll sí)
+            this._trackPolling();
+        },
+
+        notificar(cliente) {
+            // 1. Sonido
+            this._playAudio();
+
+            // 2. Toast
+            this.toast = `🛒 Nuevo pedido de ${cliente}`;
+            setTimeout(() => { this.toast = null; }, 6000);
+
+            // 3. Highlight del primer pedido de la lista (se pinta por 4.5s)
+            setTimeout(() => {
+                const fila = document.querySelector('[data-pedido-id]');
+                if (fila) {
+                    fila.classList.add('pedido-nuevo-highlight');
+                    setTimeout(() => fila.classList.remove('pedido-nuevo-highlight'), 5000);
+                }
+            }, 100);
+
+            // 4. Title del tab pulsante
+            this._flashTitle('🛒 ¡Nuevo pedido!');
+        },
+
+        _playAudio() {
+            const a = document.getElementById('new-order-sound');
+            if (a && this._audioUnlocked) {
+                a.currentTime = 0;
+                a.play().catch(() => {});
+            }
+        },
+
+        _trackPolling() {
+            // Observa cambios en el DOM y si aparece un [data-pedido-id] nuevo, notifica.
+            const snapshot = () => {
+                const ids = Array.from(document.querySelectorAll('[data-pedido-id]'))
+                    .map(n => n.dataset.pedidoId);
+                return ids;
+            };
+
+            this._primerosIds = snapshot();
+
+            if (window.Livewire?.hook) {
+                Livewire.hook('morph.updated', () => {
+                    const nuevos = snapshot();
+                    if (this._primerosIds && nuevos.length > 0 && nuevos[0] !== this._primerosIds[0]) {
+                        // El top de la lista cambió → es un pedido nuevo
+                        this.notificar('un cliente');
+                    }
+                    this._primerosIds = nuevos;
+                });
+            }
+        },
+
+        _flashTitle(txt) {
+            const original = document.title;
+            let toggle = true;
+            const int = setInterval(() => {
+                document.title = toggle ? txt : original;
+                toggle = !toggle;
+            }, 800);
+            setTimeout(() => { clearInterval(int); document.title = original; }, 6000);
+        },
+    };
+}
+</script>
+
+<template x-if="toast">
+    <div class="toast-pedido-nuevo fixed top-6 right-6 z-[60] bg-emerald-500 text-white font-bold px-5 py-4 rounded-2xl shadow-2xl flex items-center gap-3 cursor-pointer"
+         @click="toast = null">
+        <i class="fa-solid fa-bag-shopping text-2xl"></i>
+        <div>
+            <p class="text-sm" x-text="toast"></p>
+            <p class="text-[11px] opacity-80">Clic para cerrar</p>
+        </div>
+    </div>
+</template>
 @endpush
