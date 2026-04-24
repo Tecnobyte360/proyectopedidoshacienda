@@ -332,7 +332,23 @@
                         </div>
 
                         {{-- Logo del tenant --}}
-                        <div class="md:col-span-2">
+                        <div class="md:col-span-2" x-data="{
+                            dataUrl: @entangle('logo_data_url').live,
+                            nombre:  @entangle('logo_nombre').live,
+                            error:   '',
+                            pick(e) {
+                                const file = e.target.files && e.target.files[0];
+                                if (!file) return;
+                                this.error = '';
+                                if (!file.type.startsWith('image/')) { this.error = 'No es una imagen válida.'; return; }
+                                if (file.size > 2 * 1024 * 1024) { this.error = 'Imagen muy grande (máx 2MB).'; return; }
+                                const reader = new FileReader();
+                                reader.onload = () => { this.dataUrl = reader.result; this.nombre = file.name; };
+                                reader.onerror = () => { this.error = 'No se pudo leer el archivo.'; };
+                                reader.readAsDataURL(file);
+                            },
+                            quitar() { this.dataUrl = null; this.nombre = null; this.error = ''; },
+                        }">
                             <label class="block text-sm font-medium text-slate-700 mb-1.5">
                                 <i class="fa-solid fa-image text-[#d68643]"></i> Logo del tenant
                                 <span class="text-xs text-slate-400 font-normal">(PNG/JPG/SVG/WebP, máx 2MB)</span>
@@ -341,34 +357,40 @@
                             <div class="flex items-center gap-4">
                                 {{-- Vista previa --}}
                                 <div class="h-20 w-20 rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 flex items-center justify-center overflow-hidden flex-shrink-0">
-                                    @if($logo_archivo)
-                                        <img src="{{ $logo_archivo->temporaryUrl() }}" class="h-full w-full object-contain" alt="preview">
-                                    @elseif($logo_url_actual)
+                                    <template x-if="dataUrl">
+                                        <img :src="dataUrl" class="h-full w-full object-contain" alt="preview">
+                                    </template>
+                                    <template x-if="!dataUrl && '{{ $logo_url_actual }}'">
                                         <img src="{{ $logo_url_actual }}" class="h-full w-full object-contain" alt="logo actual">
-                                    @else
+                                    </template>
+                                    <template x-if="!dataUrl && !'{{ $logo_url_actual }}'">
                                         <i class="fa-solid fa-image text-2xl text-slate-300"></i>
-                                    @endif
+                                    </template>
                                 </div>
 
                                 <div class="flex-1">
                                     <input type="file"
-                                           wire:model="logo_archivo"
-                                           accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                                           @change="pick($event)"
+                                           accept="image/png,image/jpeg,image/svg+xml,image/webp,image/gif"
                                            class="block w-full text-sm text-slate-700
                                                   file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0
                                                   file:text-sm file:font-semibold
                                                   file:bg-[#fbe9d7] file:text-[#a85f24] hover:file:bg-[#f5d4ad] cursor-pointer">
 
-                                    <div wire:loading wire:target="logo_archivo" class="text-xs text-sky-600 mt-1">
-                                        <i class="fa-solid fa-circle-notch fa-spin"></i> Subiendo...
+                                    <div x-show="nombre" x-cloak class="flex items-center gap-2 mt-2 text-xs">
+                                        <span class="text-emerald-600 font-semibold">
+                                            <i class="fa-solid fa-check-circle"></i>
+                                            <span x-text="nombre"></span>
+                                        </span>
+                                        <button type="button" @click="quitar()" class="text-rose-500 hover:text-rose-700">
+                                            <i class="fa-solid fa-xmark"></i> Quitar
+                                        </button>
                                     </div>
 
-                                    @error('logo_archivo')
-                                        <div class="text-xs text-rose-600 mt-1">{{ $message }}</div>
-                                    @enderror
+                                    <div x-show="error" x-cloak x-text="error" class="text-xs text-rose-600 mt-1"></div>
 
-                                    @if($logo_url_actual && !$logo_archivo)
-                                        <div class="text-xs text-slate-500 mt-1">
+                                    @if($logo_url_actual)
+                                        <div class="text-xs text-slate-500 mt-1" x-show="!dataUrl">
                                             Logo actual: <a href="{{ $logo_url_actual }}" target="_blank" class="text-[#a85f24] underline">ver</a>
                                         </div>
                                     @endif

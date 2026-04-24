@@ -45,7 +45,9 @@ class Index extends Component
     public string $color_primario      = '#d68643';
     public string $color_secundario    = '#a85f24';
     public ?string $logo_url_actual    = null;
-    public $logo_archivo               = null;  // Livewire file upload
+    public $logo_archivo               = null;  // (legacy) Livewire file upload
+    public ?string $logo_data_url      = null;  // data URL base64 (nuevo flujo, evita /livewire/upload-file 401)
+    public ?string $logo_nombre        = null;  // nombre original del archivo
     public string $openai_api_key      = '';    // Key propia del tenant (opcional — si vacía usa global)
     public ?string $trial_ends_at        = null;
     public ?string $subscription_ends_at = null;
@@ -93,7 +95,9 @@ class Index extends Component
             'contacto_telefono'   => 'nullable|string|max:30',
             'color_primario'      => 'nullable|string|max:10',
             'color_secundario'    => 'nullable|string|max:10',
-            'logo_archivo'        => 'nullable|image|mimes:png,jpg,jpeg,svg,webp|max:2048',
+            'logo_archivo'        => 'nullable',   // legacy, ya no se usa
+            'logo_data_url'       => 'nullable|string',
+            'logo_nombre'         => 'nullable|string|max:150',
             'openai_api_key'      => 'nullable|string|max:255',
             'trial_ends_at'       => 'nullable|date',
             'subscription_ends_at' => 'nullable|date',
@@ -230,22 +234,30 @@ class Index extends Component
             $data['logo_archivo']
         );
 
-        // Subida del logo (si vino archivo nuevo)
-        if ($this->logo_archivo) {
-            $slug = $data['slug'] ?? ($this->slug ?: 'tenant-' . ($this->editandoId ?? 'new'));
-            $ext  = $this->logo_archivo->getClientOriginalExtension();
-            $path = $this->logo_archivo->storeAs(
-                'tenants/logos',
-                "{$slug}-" . time() . ".{$ext}",
-                'public'
-            );
-            // URL pública /storage/tenants/logos/...
-            $data['logo_url'] = '/storage/' . $path;
+        // Subida del logo (si vino data URL base64 desde el input)
+        if ($this->logo_data_url && preg_match('/^data:(image\/[a-z0-9.+-]+);base64,(.+)$/i', $this->logo_data_url, $m)) {
+            $mime  = strtolower($m[1]);
+            $bytes = base64_decode($m[2], true);
 
-            // Borrar logo anterior si existía
-            if ($this->logo_url_actual && str_starts_with($this->logo_url_actual, '/storage/')) {
-                $oldPath = str_replace('/storage/', '', $this->logo_url_actual);
-                Storage::disk('public')->delete($oldPath);
+            if ($bytes !== false && strlen($bytes) > 50 && strlen($bytes) <= 2 * 1024 * 1024) {
+                $ext = match (true) {
+                    str_contains($mime, 'png')     => 'png',
+                    str_contains($mime, 'svg')     => 'svg',
+                    str_contains($mime, 'webp')    => 'webp',
+                    str_contains($mime, 'gif')     => 'gif',
+                    default                        => 'jpg',
+                };
+
+                $slug = $data['slug'] ?? ($this->slug ?: 'tenant-' . ($this->editandoId ?? 'new'));
+                $path = "tenants/logos/{$slug}-" . time() . ".{$ext}";
+                Storage::disk('public')->put($path, $bytes);
+                $data['logo_url'] = '/storage/' . $path;
+
+                // Borrar logo anterior si existía
+                if ($this->logo_url_actual && str_starts_with($this->logo_url_actual, '/storage/')) {
+                    $oldPath = str_replace('/storage/', '', $this->logo_url_actual);
+                    Storage::disk('public')->delete($oldPath);
+                }
             }
         }
 
