@@ -221,10 +221,10 @@
                         <button wire:click="listarTablas"
                                 wire:loading.attr="disabled"
                                 wire:target="listarTablas"
-                                class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-bold px-4 py-3 text-sm transition disabled:opacity-50 shadow">
-                            <i class="fa-solid fa-magnifying-glass" wire:loading.remove wire:target="listarTablas"></i>
+                                class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-4 py-3 text-sm transition disabled:opacity-50 border border-slate-200">
+                            <i class="fa-solid fa-magnifying-glass text-slate-500" wire:loading.remove wire:target="listarTablas"></i>
                             <i class="fa-solid fa-circle-notch fa-spin" wire:loading wire:target="listarTablas"></i>
-                            <span wire:loading.remove wire:target="listarTablas">🔍 Listar todas las tablas de la BD</span>
+                            <span wire:loading.remove wire:target="listarTablas">Listar todas las tablas de la BD</span>
                             <span wire:loading wire:target="listarTablas">Conectando...</span>
                         </button>
 
