@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Symfony\Component\Process\Process;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -105,12 +106,15 @@ class Index extends Component
         $filename = 'audios-out/audio_' . now()->format('Ymd_His') . '_' . uniqid() . '.' . $ext;
         Storage::disk('public')->put($filename, $bytes);
 
-        // URL pública para nuestro propio chat web (no la enviamos a TecnoByteApp,
-        // solo la guardamos en meta para reproducir en el Chat en vivo).
+        // URL pública para nuestro propio chat web (para reproducir en el Chat en vivo).
         $mediaUrl = rtrim(config('app.url'), '/') . Storage::url($filename);
 
-        $nombreEnvio = 'voice_' . uniqid() . '.' . $ext;
-        $sent = $this->enviarAudioAWhatsapp($conv->telefono_normalizado, $bytes, $nombreEnvio, $conv->connection_id);
+        // Convertir a .ogg/opus — WhatsApp solo reproduce nota de voz en ese formato.
+        // Si no está ffmpeg o la conversión falla, enviamos el archivo tal cual.
+        [$bytesEnvio, $extEnvio] = $this->convertirAOggOpus($bytes, $ext);
+
+        $nombreEnvio = 'voice_' . uniqid() . '.' . $extEnvio;
+        $sent = $this->enviarAudioAWhatsapp($conv->telefono_normalizado, $bytesEnvio, $nombreEnvio, $conv->connection_id);
 
         if (!$sent) {
             $this->dispatch('notify', ['type' => 'error', 'message' => '⚠️ No se pudo enviar el audio a WhatsApp.']);
@@ -140,6 +144,57 @@ class Index extends Component
 
         $this->dispatch('mensaje-enviado');
         $this->dispatch('notify', ['type' => 'success', 'message' => '✓ Audio enviado']);
+    }
+
+    /**
+     * Convierte el audio grabado en el navegador (webm/mp4/etc) a ogg/opus,
+     * que es el formato que WhatsApp acepta como voice note.
+     * Requiere ffmpeg instalado en el contenedor.
+     *
+     * @return array{0: string, 1: string} [bytesConvertidos, extension]
+     */
+    private function convertirAOggOpus(string $bytes, string $extOriginal): array
+    {
+        // Si ya es ogg no hace falta convertir
+        if ($extOriginal === 'ogg') {
+            return [$bytes, 'ogg'];
+        }
+
+        $tmpIn  = tempnam(sys_get_temp_dir(), 'wa_in_') . '.' . $extOriginal;
+        $tmpOut = tempnam(sys_get_temp_dir(), 'wa_out_') . '.ogg';
+
+        try {
+            file_put_contents($tmpIn, $bytes);
+
+            $process = new Process([
+                'ffmpeg', '-y',
+                '-i', $tmpIn,
+                '-c:a', 'libopus',
+                '-b:a', '64k',
+                '-vbr', 'on',
+                '-ar', '48000',
+                '-ac', '1',
+                $tmpOut,
+            ]);
+            $process->setTimeout(30);
+            $process->run();
+
+            if (!$process->isSuccessful() || !file_exists($tmpOut) || filesize($tmpOut) < 100) {
+                Log::warning('🎤 ffmpeg falló al convertir audio, enviando original', [
+                    'stderr' => substr($process->getErrorOutput(), 0, 500),
+                ]);
+                return [$bytes, $extOriginal];
+            }
+
+            $converted = file_get_contents($tmpOut);
+            return [$converted, 'ogg'];
+        } catch (\Throwable $e) {
+            Log::warning('🎤 Excepción al convertir audio: ' . $e->getMessage());
+            return [$bytes, $extOriginal];
+        } finally {
+            @unlink($tmpIn);
+            @unlink($tmpOut);
+        }
     }
 
     /**

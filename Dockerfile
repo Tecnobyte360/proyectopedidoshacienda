@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -y \
     unzip \
     zip \
     nano \
+    ffmpeg \
     libpng-dev \
     libjpeg62-turbo-dev \
     libfreetype6-dev \
