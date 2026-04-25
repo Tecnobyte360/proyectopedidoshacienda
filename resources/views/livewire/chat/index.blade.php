@@ -24,11 +24,18 @@
                     </h2>
                     <p class="text-xs text-white/80">Atiende clientes en tiempo real</p>
                 </div>
-                <button wire:click="abrirNuevoChat"
-                        title="Iniciar chat con un número nuevo"
-                        class="flex-shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-white/20 hover:bg-white/30 backdrop-blur px-3 py-2 text-xs font-semibold transition">
-                    <i class="fa-solid fa-pen-to-square"></i> Nuevo
-                </button>
+                <div class="flex items-center gap-2">
+                    <button wire:click="abrirEstadoModal"
+                            title="Publicar estado de WhatsApp"
+                            class="flex-shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-white/20 hover:bg-white/30 backdrop-blur px-3 py-2 text-xs font-semibold transition">
+                        <i class="fa-solid fa-circle-plus"></i> Estado
+                    </button>
+                    <button wire:click="abrirNuevoChat"
+                            title="Iniciar chat con un número nuevo"
+                            class="flex-shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-white/20 hover:bg-white/30 backdrop-blur px-3 py-2 text-xs font-semibold transition">
+                        <i class="fa-solid fa-pen-to-square"></i> Nuevo
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -739,6 +746,95 @@
                             class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#d68643] to-[#a85f24] hover:from-[#c97a36] hover:to-[#965520] px-4 py-2 text-sm font-bold text-white shadow-lg disabled:opacity-50">
                         <span wire:loading.remove wire:target="crearNuevoChat"><i class="fa-solid fa-paper-plane"></i> Enviar</span>
                         <span wire:loading wire:target="crearNuevoChat"><i class="fa-solid fa-circle-notch fa-spin"></i> Enviando...</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    {{-- ╔═══ MODAL: Publicar estado en WhatsApp ═══╗ --}}
+    @if($estadoModal)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+             x-data="{
+                preview: null,
+                mime: '',
+                filename: '',
+                dataUrl: '',
+                publicando: false,
+                handleFile(ev) {
+                    const f = ev.target.files[0];
+                    if (!f) return;
+                    if (f.size > 16 * 1024 * 1024) {
+                        alert('El archivo supera 16MB');
+                        ev.target.value = '';
+                        return;
+                    }
+                    this.mime = f.type;
+                    this.filename = f.name;
+                    const reader = new FileReader();
+                    reader.onload = e => {
+                        this.dataUrl = e.target.result;
+                        this.preview = e.target.result;
+                    };
+                    reader.readAsDataURL(f);
+                },
+                async publicar() {
+                    if (!this.dataUrl) { alert('Selecciona una imagen o video'); return; }
+                    this.publicando = true;
+                    await @this.call('publicarEstado', this.dataUrl, @this.estadoCaption);
+                    this.publicando = false;
+                }
+             }">
+            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" @click.stop>
+                <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-[#d68643] to-[#a85f24] text-white">
+                    <h3 class="text-base font-bold flex items-center gap-2">
+                        <i class="fa-solid fa-circle-plus"></i> Publicar estado de WhatsApp
+                    </h3>
+                    <button wire:click="cerrarEstadoModal" class="text-white/80 hover:text-white text-xl leading-none">&times;</button>
+                </div>
+
+                <div class="p-5 space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Imagen o video</label>
+                        <input type="file"
+                               accept="image/jpeg,image/png,image/webp,video/mp4"
+                               @change="handleFile($event)"
+                               class="block w-full text-sm text-slate-700 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-orange-50 file:text-[#a85f24] hover:file:bg-orange-100 cursor-pointer">
+                        <p class="text-[10px] text-slate-400 mt-1">JPG, PNG, WEBP o MP4. Máx 16MB.</p>
+
+                        <div x-show="preview" x-cloak class="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-2 flex items-center justify-center">
+                            <template x-if="mime.startsWith('image/')">
+                                <img :src="preview" alt="preview" class="max-h-48 rounded-lg">
+                            </template>
+                            <template x-if="mime.startsWith('video/')">
+                                <video :src="preview" controls class="max-h-48 rounded-lg"></video>
+                            </template>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Texto del estado (opcional)</label>
+                        <textarea wire:model="estadoCaption" rows="3" placeholder="Escribe algo para acompañar tu estado…"
+                                  maxlength="700"
+                                  class="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-[#d68643] focus:ring-2 focus:ring-amber-100"></textarea>
+                    </div>
+
+                    <div class="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-[11px] text-amber-800">
+                        <i class="fa-solid fa-circle-info"></i>
+                        El estado quedará visible 24h en el WhatsApp del número conectado.
+                    </div>
+                </div>
+
+                <div class="px-5 py-3 border-t border-slate-100 flex justify-end gap-2 bg-slate-50">
+                    <button wire:click="cerrarEstadoModal"
+                            class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                        Cancelar
+                    </button>
+                    <button @click="publicar()"
+                            :disabled="publicando || !dataUrl"
+                            class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#d68643] to-[#a85f24] hover:from-[#c97a36] hover:to-[#965520] px-4 py-2 text-sm font-bold text-white shadow-lg disabled:opacity-50">
+                        <span x-show="!publicando"><i class="fa-solid fa-paper-plane"></i> Publicar</span>
+                        <span x-show="publicando" x-cloak><i class="fa-solid fa-circle-notch fa-spin"></i> Publicando…</span>
                     </button>
                 </div>
             </div>

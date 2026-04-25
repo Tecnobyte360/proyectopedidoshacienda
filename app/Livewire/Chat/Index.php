@@ -28,6 +28,117 @@ class Index extends Component
     public string $nuevoChatNombre  = '';
     public string $nuevoChatMensaje = '';
 
+    // Modal "Publicar estado de WhatsApp" (POST /status de TecnoByteApp)
+    public bool   $estadoModal   = false;
+    public string $estadoCaption = '';
+
+    public function abrirEstadoModal(): void
+    {
+        $this->estadoModal   = true;
+        $this->estadoCaption = '';
+    }
+
+    public function cerrarEstadoModal(): void
+    {
+        $this->estadoModal   = false;
+        $this->estadoCaption = '';
+    }
+
+    /**
+     * Publica un estado en WhatsApp (Status/Stories) usando el endpoint
+     * POST /status de TecnoByteApp. Recibe la media como data URL base64
+     * (igual que enviarImagen) para evitar el upload-file 401 de Livewire.
+     */
+    public function publicarEstado(string $dataUrl, string $caption = ''): void
+    {
+        if (!str_starts_with($dataUrl, 'data:')) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Formato de archivo inválido.']);
+            return;
+        }
+
+        if (!preg_match('#^data:([^;]+);base64,(.+)$#', $dataUrl, $m)) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'No se pudo leer el archivo.']);
+            return;
+        }
+
+        $mime  = $m[1];
+        $bytes = base64_decode($m[2], true);
+        if ($bytes === false || $bytes === '') {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Archivo vacío o corrupto.']);
+            return;
+        }
+
+        // Tamaño máximo razonable: 16MB (límite común de WhatsApp)
+        if (strlen($bytes) > 16 * 1024 * 1024) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'El archivo supera 16MB.']);
+            return;
+        }
+
+        $ext = match (true) {
+            str_contains($mime, 'jpeg'), str_contains($mime, 'jpg') => 'jpg',
+            str_contains($mime, 'png')   => 'png',
+            str_contains($mime, 'webp')  => 'webp',
+            str_contains($mime, 'mp4')   => 'mp4',
+            str_contains($mime, 'video') => 'mp4',
+            default                      => 'bin',
+        };
+        $filename = 'status-' . now()->timestamp . '.' . $ext;
+
+        $caption = trim($caption !== '' ? $caption : $this->estadoCaption);
+
+        $resolver = app(\App\Services\WhatsappResolverService::class);
+        $cred     = $resolver->credenciales();
+        $endpoint = rtrim($cred['api_base_url'], '/') . '/status';
+
+        try {
+            $token = $this->obtenerTokenWhatsapp();
+            if (!$token) {
+                $this->dispatch('notify', ['type' => 'error', 'message' => 'Sin token de WhatsApp para este tenant.']);
+                return;
+            }
+
+            $payload = [];
+            if ($caption !== '') $payload['caption'] = $caption;
+
+            $makeRequest = function (string $useToken) use ($endpoint, $bytes, $filename, $payload) {
+                return Http::withoutVerifying()
+                    ->withToken($useToken)
+                    ->timeout(60)
+                    ->attach('medias', $bytes, $filename)
+                    ->post($endpoint, $payload);
+            };
+
+            $response = $makeRequest($token);
+
+            if ($response->status() === 401) {
+                Cache::forget($resolver->tokenCacheKey());
+                $newToken = $this->obtenerTokenWhatsapp();
+                if ($newToken) $response = $makeRequest($newToken);
+            }
+
+            if (!$response->successful()) {
+                Log::warning('Publicar estado WhatsApp falló', [
+                    'status' => $response->status(),
+                    'body'   => $response->body(),
+                ]);
+                $this->dispatch('notify', [
+                    'type'    => 'error',
+                    'message' => '❌ La API rechazó el estado (' . $response->status() . '). Revisa los logs.',
+                ]);
+                return;
+            }
+
+            $this->cerrarEstadoModal();
+            $this->dispatch('notify', [
+                'type'    => 'success',
+                'message' => '✅ Estado publicado en WhatsApp.',
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Excepción publicando estado WhatsApp: ' . $e->getMessage());
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Error: ' . $e->getMessage()]);
+        }
+    }
+
     public function seleccionar(int $id): void
     {
         $this->conversacionActivaId = $id;
