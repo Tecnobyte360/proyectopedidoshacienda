@@ -42,6 +42,9 @@ class Index extends Component
     // Precios por sede: ['sede_id' => ['precio'=>..., 'disponible'=>bool]]
     public array $preciosSedes = [];
 
+    // Cortes seleccionados (IDs) para el producto
+    public array $corteIds = [];
+
     protected function rules(): array
     {
         return [
@@ -73,10 +76,11 @@ class Index extends Component
 
     public function abrirModalEditar(int $id): void
     {
-        $producto = Producto::with('sedes')->findOrFail($id);
+        $producto = Producto::with(['sedes', 'cortes'])->findOrFail($id);
 
         $this->editandoId        = $producto->id;
         $this->categoria_id      = $producto->categoria_id;
+        $this->corteIds          = $producto->cortes->pluck('id')->map(fn ($x) => (int) $x)->all();
         $this->codigo            = (string) $producto->codigo;
         $this->nombre            = $producto->nombre;
         $this->descripcion       = (string) $producto->descripcion;
@@ -156,6 +160,13 @@ class Index extends Component
         }
         $producto->sedes()->sync($sync);
 
+        // Sincronizar cortes (con orden por posición seleccionada)
+        $syncCortes = [];
+        foreach ($this->corteIds as $idx => $cid) {
+            $syncCortes[(int) $cid] = ['orden' => $idx];
+        }
+        $producto->cortes()->sync($syncCortes);
+
         $this->cerrarModal();
 
         $this->dispatch('notify', [
@@ -220,6 +231,7 @@ class Index extends Component
         $this->destacado          = false;
         $this->orden              = 0;
         $this->preciosSedes       = [];
+        $this->corteIds           = [];
         $this->resetValidation();
     }
 
@@ -256,7 +268,9 @@ class Index extends Component
         $categorias = ProductoCategoria::orderBy('nombre')->get();
         $sedes      = Sede::orderBy('nombre')->get();
 
-        return view('livewire.productos.index', compact('productos', 'categorias', 'sedes'))
+        $cortes = \App\Models\Corte::where('activo', true)->orderBy('orden')->orderBy('nombre')->get();
+
+        return view('livewire.productos.index', compact('productos', 'categorias', 'sedes', 'cortes'))
             ->layout('layouts.app');
     }
 }

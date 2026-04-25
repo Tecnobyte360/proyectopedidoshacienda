@@ -462,6 +462,35 @@
                         @endif
                     </div>
 
+                    {{-- ✂️ CORTES DISPONIBLES PARA ESTE PRODUCTO --}}
+                    <div class="rounded-xl border border-slate-200 p-4">
+                        <h4 class="font-semibold text-slate-800 mb-3 flex items-center gap-2">
+                            <i class="fa-solid fa-scissors text-[#d68643]"></i> Cortes disponibles para este producto
+                        </h4>
+                        @if($cortes->isEmpty())
+                            <p class="text-xs text-slate-500">
+                                No hay cortes registrados.
+                                <a href="{{ route('cortes.index') }}" class="text-[#d68643] underline">Crear cortes →</a>
+                            </p>
+                        @else
+                            <p class="text-xs text-slate-500 mb-3">
+                                Marca los cortes que aplican para este producto. La IA los ofrecerá al cliente.
+                            </p>
+                            <div class="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-64 overflow-y-auto">
+                                @foreach($cortes as $corte)
+                                    <label class="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-50 hover:bg-amber-50 border border-slate-200 cursor-pointer transition">
+                                        <input type="checkbox" wire:model="corteIds" value="{{ $corte->id }}"
+                                               class="rounded text-[#d68643] focus:ring-[#d68643]">
+                                        <span class="text-sm text-slate-700 flex items-center gap-1">
+                                            <span class="text-base">{{ $corte->icono_emoji ?: '🔪' }}</span>
+                                            {{ $corte->nombre }}
+                                        </span>
+                                    </label>
+                                @endforeach
+                            </div>
+                        @endif
+                    </div>
+
                     <div class="grid grid-cols-3 gap-4">
                         <label class="inline-flex items-center gap-2">
                             <input type="checkbox" wire:model="activo" class="rounded border-slate-300 text-[#d68643]">
