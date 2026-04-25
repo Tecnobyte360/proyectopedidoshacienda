@@ -340,8 +340,7 @@
                 <div class="sb-avatar text-sm">{{ $iniciales ?: 'U' }}</div>
                 <div class="min-w-0 flex-1">
                     <div class="text-[13px] font-bold text-white truncate leading-tight">{{ $userName }}</div>
-                    <div class="text-[11px] truncate leading-tight" style="color: var(--sb-text-soft);">{{ $brandSub }}</div>
-                    <div class="text-[11px] font-medium truncate leading-tight mt-0.5" style="color: var(--brand-primary);">{{ $rolPrincipal }}</div>
+                    <div class="text-[11px] font-medium truncate leading-tight mt-1" style="color: var(--brand-primary);">{{ $rolPrincipal }}</div>
                 </div>
             </div>
         </div>
@@ -423,8 +422,7 @@
                 <div class="sb-avatar text-sm">{{ $iniciales ?: 'U' }}</div>
                 <div class="min-w-0 flex-1">
                     <div class="text-[13px] font-bold text-white truncate leading-tight">{{ $userName }}</div>
-                    <div class="text-[11px] truncate leading-tight" style="color: var(--sb-text-soft);">{{ $brandSub }}</div>
-                    <div class="text-[11px] font-medium truncate leading-tight mt-0.5" style="color: var(--brand-primary);">{{ $rolPrincipal }}</div>
+                    <div class="text-[11px] font-medium truncate leading-tight mt-1" style="color: var(--brand-primary);">{{ $rolPrincipal }}</div>
                 </div>
             </div>
         </div>
