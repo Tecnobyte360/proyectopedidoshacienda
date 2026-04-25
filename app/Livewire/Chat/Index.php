@@ -108,24 +108,24 @@ class Index extends Component
             $items = is_array($data) && isset($data[0]) ? $data : ($data['data'] ?? $data['statuses'] ?? []);
             $base  = rtrim($cred['api_base_url'], '/');
 
-            $this->estadosPublicados = collect($items)->map(function ($it) use ($base) {
-                $rel = $it['mediaUrl'] ?? $it['url'] ?? '';
-                // Si mediaUrl es relativa, la convertimos a absoluta
-                $abs = (preg_match('#^https?://#', (string) $rel))
+            $this->estadosPublicados = collect($items)->map(function ($it) {
+                $rel = (string) ($it['mediaUrl'] ?? $it['url'] ?? '');
+                // Si ya es URL absoluta y pública, la usamos. Si es solo el nombre
+                // del archivo, la pasamos por el proxy autenticado.
+                $abs = preg_match('#^https?://#', $rel)
                     ? $rel
-                    : ($rel ? "{$base}/uploads/{$rel}" : null);
+                    : ($rel ? route('whatsapp-status.media', ['filename' => basename($rel)]) : null);
 
                 return [
-                    'id'           => $it['id'] ?? null,
-                    'caption'      => trim((string) ($it['body'] ?? $it['caption'] ?? '')),
-                    'media_url'    => $abs,
-                    'media_url_alt' => $rel ? "{$base}/media/{$rel}" : null,  // fallback si /uploads no funciona
-                    'media_type'   => (string) ($it['mediaType'] ?? $it['type'] ?? ''),
-                    'es_video'     => str_starts_with((string) ($it['mediaType'] ?? ''), 'video/'),
-                    'expires_at'   => $it['expiresAt'] ?? null,
-                    'created_at'   => $it['createdAt'] ?? null,
-                    'phone'        => $it['whatsapp']['phoneNumber'] ?? '',
-                    'wa_name'      => $it['whatsapp']['name'] ?? '',
+                    'id'         => $it['id'] ?? null,
+                    'caption'    => trim((string) ($it['body'] ?? $it['caption'] ?? '')),
+                    'media_url'  => $abs,
+                    'media_type' => (string) ($it['mediaType'] ?? $it['type'] ?? ''),
+                    'es_video'   => str_starts_with((string) ($it['mediaType'] ?? ''), 'video/'),
+                    'expires_at' => $it['expiresAt'] ?? null,
+                    'created_at' => $it['createdAt'] ?? null,
+                    'phone'      => $it['whatsapp']['phoneNumber'] ?? '',
+                    'wa_name'    => $it['whatsapp']['name'] ?? '',
                 ];
             })->sortByDesc('created_at')->values()->all();
         } catch (\Throwable $e) {

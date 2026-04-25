@@ -885,9 +885,9 @@
                                 <div class="rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
                                     <div class="aspect-square bg-slate-100 flex items-center justify-center overflow-hidden">
                                         @if($est['es_video'])
-                                            <video src="{{ $est['media_url'] }}" controls class="w-full h-full object-cover" onerror="this.src='{{ $est['media_url_alt'] }}'"></video>
+                                            <video src="{{ $est['media_url'] }}" controls class="w-full h-full object-cover"></video>
                                         @else
-                                            <img src="{{ $est['media_url'] }}" alt="estado" class="w-full h-full object-cover" onerror="this.onerror=null;this.src='{{ $est['media_url_alt'] }}'">
+                                            <img src="{{ $est['media_url'] }}" alt="estado" loading="lazy" class="w-full h-full object-cover">
                                         @endif
                                     </div>
                                     <div class="px-2.5 py-2 space-y-1">

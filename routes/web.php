@@ -113,6 +113,11 @@ Route::middleware(['no_super_sin_imp'])->group(function () {
     Route::get('/clientes',          ClientesIndex::class)->middleware('permission:clientes.ver')->name('clientes.index');
     Route::get('/conversaciones',    ConversacionesIndex::class)->middleware('permission:conversaciones.ver')->name('conversaciones.index');
     Route::get('/chat',              ChatIndex::class)->middleware('permission:chat.usar')->name('chat.index');
+    // Proxy autenticado para servir las medias de los estados de WhatsApp
+    Route::get('/whatsapp-status/media/{filename}', \App\Http\Controllers\WhatsappStatusMediaController::class)
+        ->where('filename', '[\w\-\.]+')
+        ->middleware('permission:chat.usar')
+        ->name('whatsapp-status.media');
     Route::get('/alertas',           AlertasIndex::class)->middleware(['permission:alertas.ver', 'role:super-admin'])->name('alertas.index');
     Route::get('/felicitaciones',    FelicitacionesIndex::class)->middleware('permission:felicitaciones.ver')->name('felicitaciones.index');
     Route::get('/sedes',             SedesIndex::class)->middleware('permission:sedes.gestionar')->name('sedes.index');
