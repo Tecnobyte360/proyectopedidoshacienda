@@ -2,10 +2,10 @@
     <div class="w-full px-4 py-6 sm:px-6 sm:py-8 lg:px-8 space-y-6">
 
         {{-- HEADER --}}
-        <div class="rounded-2xl border border-[#fbe9d7] bg-gradient-to-r from-[#fbe9d7]/40 via-white to-white p-5 shadow-sm">
+        <div class="rounded-2xl border border-[#fbe9d7] bg-gradient-to-r from-brand-soft/40 via-white to-white p-5 shadow-sm">
             <div class="flex items-center justify-between gap-4">
                 <div class="flex items-center gap-4">
-                    <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#d68643] to-[#a85f24] text-white shadow-lg">
+                    <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-brand to-brand-secondary text-white shadow-lg">
                         <i class="fa-solid fa-user-shield text-xl"></i>
                     </div>
                     <div>
@@ -14,7 +14,7 @@
                     </div>
                 </div>
                 <button wire:click="abrirCrear"
-                        class="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-[#d68643] to-[#a85f24] hover:from-[#c97a36] hover:to-[#965520] text-white font-bold px-5 py-3 transition shadow-lg">
+                        class="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-brand to-brand-secondary hover:from-brand-dark hover:to-brand-dark text-white font-bold px-5 py-3 transition shadow-lg">
                     <i class="fa-solid fa-plus"></i> Nuevo usuario interno
                 </button>
             </div>
@@ -26,7 +26,7 @@
                 <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
                 <input type="text" wire:model.live.debounce.300ms="busqueda"
                        placeholder="Buscar por nombre, teléfono o cargo..."
-                       class="w-full rounded-xl border border-slate-200 bg-slate-50 pl-11 pr-4 py-3 text-sm focus:border-[#d68643] focus:bg-white focus:ring-2 focus:ring-amber-100">
+                       class="w-full rounded-xl border border-slate-200 bg-slate-50 pl-11 pr-4 py-3 text-sm focus:border-brand focus:bg-white focus:ring-2 focus:ring-amber-100">
             </div>
         </div>
 
@@ -107,9 +107,9 @@
              style="background: rgba(15,23,42,0.55); backdrop-filter: blur(4px);"
              wire:click.self="cerrarModal">
             <div class="w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden" @click.stop>
-                <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-[#fbe9d7]/40 via-white to-white">
+                <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-brand-soft/40 via-white to-white">
                     <div class="flex items-center gap-3">
-                        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#d68643] to-[#a85f24] text-white">
+                        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-brand to-brand-secondary text-white">
                             <i class="fa-solid {{ $editandoId ? 'fa-pen-to-square' : 'fa-plus' }}"></i>
                         </div>
                         <h3 class="font-bold text-slate-800">{{ $editandoId ? 'Editar usuario interno' : 'Nuevo usuario interno' }}</h3>
@@ -156,13 +156,13 @@
                                   class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"></textarea>
                     </div>
                     <label class="flex items-center gap-2 text-sm">
-                        <input type="checkbox" wire:model="activo" class="rounded text-[#d68643]">
+                        <input type="checkbox" wire:model="activo" class="rounded text-brand">
                         <span class="font-semibold text-slate-700">Activo</span>
                     </label>
                 </div>
                 <div class="px-5 py-3 border-t border-slate-100 flex justify-end gap-2 bg-slate-50">
                     <button wire:click="cerrarModal" class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancelar</button>
-                    <button wire:click="guardar" class="rounded-xl bg-gradient-to-r from-[#d68643] to-[#a85f24] hover:from-[#c97a36] hover:to-[#965520] px-5 py-2 text-sm font-bold text-white shadow-lg">
+                    <button wire:click="guardar" class="rounded-xl bg-gradient-to-r from-brand to-brand-secondary hover:from-brand-dark hover:to-brand-dark px-5 py-2 text-sm font-bold text-white shadow-lg">
                         <i class="fa-solid fa-floppy-disk"></i> Guardar
                     </button>
                 </div>

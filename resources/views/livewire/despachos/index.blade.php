@@ -9,7 +9,7 @@
 
         <div class="flex flex-wrap items-center gap-3">
             <select wire:model.live="sedeId"
-                    class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm shadow-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                    class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm shadow-sm focus:border-brand focus:ring-brand">
                 <option value="">Todas las sedes</option>
                 @foreach($sedes as $sede)
                     <option value="{{ $sede->id }}">{{ $sede->nombre }}</option>
@@ -20,10 +20,10 @@
 
     {{-- BARRA STICKY DE SELECCIÓN --}}
     @if($totalSelected > 0)
-        <div class="sticky top-20 z-30 mb-6 rounded-2xl border-2 border-[#d68643] bg-white shadow-2xl">
+        <div class="sticky top-20 z-30 mb-6 rounded-2xl border-2 border-brand bg-white shadow-2xl">
             <div class="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
                 <div class="flex items-center gap-4">
-                    <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-[#d68643] text-white text-lg font-bold">
+                    <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-brand text-white text-lg font-bold">
                         {{ $totalSelected }}
                     </div>
                     <div>
@@ -31,7 +31,7 @@
                             {{ $totalSelected }} pedido(s) seleccionado(s)
                         </div>
                         <div class="text-xs text-slate-500">
-                            Total: <span class="font-bold text-[#d68643]">${{ number_format($totalSelMonto, 0, ',', '.') }}</span>
+                            Total: <span class="font-bold text-brand">${{ number_format($totalSelMonto, 0, ',', '.') }}</span>
                         </div>
                     </div>
                 </div>
@@ -41,7 +41,7 @@
                         Cancelar
                     </button>
                     <button wire:click="abrirModalDespacho"
-                            class="rounded-xl bg-[#d68643] px-5 py-2.5 text-sm font-bold text-white shadow hover:bg-[#c97a36] transition">
+                            class="rounded-xl bg-brand px-5 py-2.5 text-sm font-bold text-white shadow hover:bg-brand-dark transition">
                         <i class="fa-solid fa-motorcycle mr-2"></i> Despachar selección
                     </button>
                 </div>
@@ -115,7 +115,7 @@
                     </h3>
                     <p class="text-xs text-slate-500">
                         <span>{{ count($ruta['paradas']) }} parada(s) · ~{{ $ruta['total_km'] }} km línea recta</span>
-                        <span id="ruta-info-osrm" class="text-[#d68643] font-semibold"></span>
+                        <span id="ruta-info-osrm" class="text-brand font-semibold"></span>
                         @if(count($ruta['paradas']) < $totalSelected)
                             <span class="text-amber-600 font-semibold">
                                 · {{ $totalSelected - count($ruta['paradas']) }} sin coordenadas
@@ -135,7 +135,7 @@
                     @if($domiciliarioSeleccionado)
                         <button type="button" wire:click="enviarRutaDomiciliario"
                                 wire:confirm="¿Enviar la ruta por WhatsApp al domiciliario seleccionado?"
-                                class="inline-flex items-center gap-2 rounded-xl bg-[#d68643] hover:bg-[#c97a36] text-white text-xs font-bold px-4 py-2 transition">
+                                class="inline-flex items-center gap-2 rounded-xl bg-brand hover:bg-brand-dark text-white text-xs font-bold px-4 py-2 transition">
                             <i class="fa-brands fa-whatsapp"></i>
                             Enviar ruta al domiciliario
                         </button>
@@ -364,7 +364,7 @@
 
                         <input type="checkbox"
                                wire:model.live="seleccionados.{{ $p->id }}"
-                               class="mt-1 h-5 w-5 rounded border-slate-300 text-[#d68643] focus:ring-[#d68643]">
+                               class="mt-1 h-5 w-5 rounded border-slate-300 text-brand focus:ring-brand">
 
                         <div class="flex-1 min-w-0">
                             <div class="flex items-start justify-between gap-3">
@@ -381,7 +381,7 @@
 
                                     <div class="flex flex-wrap items-center gap-3 text-xs text-slate-500 mt-1">
                                         @if($p->direccion)
-                                            <span><i class="fa-solid fa-location-dot text-[#d68643] mr-1"></i>{{ $p->direccion }}</span>
+                                            <span><i class="fa-solid fa-location-dot text-brand mr-1"></i>{{ $p->direccion }}</span>
                                         @endif
                                         @if($p->barrio)
                                             <span><i class="fa-solid fa-map-pin mr-1"></i>{{ $p->barrio }}</span>
@@ -416,7 +416,7 @@
                                 </div>
 
                                 <div class="text-right shrink-0">
-                                    <div class="text-lg font-extrabold text-[#d68643]">
+                                    <div class="text-lg font-extrabold text-brand">
                                         ${{ number_format($p->total, 0, ',', '.') }}
                                     </div>
                                     <div class="text-[10px] text-slate-400 uppercase">
@@ -581,7 +581,7 @@
                                         Domiciliario para esta zona:
                                     </label>
                                     <select wire:model="domiciliariosPorZona.{{ $keyGrupo }}"
-                                            class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                                            class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-brand focus:ring-brand">
                                         <option value="">— Selecciona un domiciliario —</option>
                                         @if($domsDeZona->isNotEmpty())
                                             <optgroup label="✓ Cubren esta zona">
@@ -654,11 +654,11 @@
                                     @endphp
 
                                     <label class="flex items-center gap-3 rounded-xl border-2 p-3 cursor-pointer transition hover:bg-slate-50
-                                                  {{ $domiciliarioSeleccionado === $dom->id ? 'border-[#d68643] bg-amber-50' : 'border-slate-200' }}">
+                                                  {{ $domiciliarioSeleccionado === $dom->id ? 'border-brand bg-amber-50' : 'border-slate-200' }}">
                                         <input type="radio" wire:model="domiciliarioSeleccionado" value="{{ $dom->id }}"
-                                               class="text-[#d68643] focus:ring-[#d68643]">
+                                               class="text-brand focus:ring-brand">
 
-                                        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#d68643] to-[#a85f24] text-white text-sm font-bold">
+                                        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-brand to-brand-secondary text-white text-sm font-bold">
                                             {{ strtoupper(substr($dom->nombre, 0, 1)) }}
                                         </div>
 
@@ -694,7 +694,7 @@
                                 <span class="text-xs text-slate-400 font-normal">— se guarda en el historial</span>
                             </label>
                             <input type="text" wire:model="notaDespacho" placeholder="Ej: Salida juntos, ruta optimizada"
-                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand">
                         </div>
 
                         <div class="flex justify-end gap-3 pt-4 border-t border-slate-100">
@@ -703,7 +703,7 @@
                                 Cancelar
                             </button>
                             <button type="submit"
-                                    class="rounded-xl bg-[#d68643] px-6 py-2.5 text-sm font-bold text-white shadow hover:bg-[#c97a36]">
+                                    class="rounded-xl bg-brand px-6 py-2.5 text-sm font-bold text-white shadow hover:bg-brand-dark">
                                 <i class="fa-solid fa-paper-plane mr-2"></i>
                                 Despachar {{ $totalSelected }} pedido(s)
                             </button>

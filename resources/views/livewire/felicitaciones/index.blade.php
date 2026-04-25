@@ -41,7 +41,7 @@
             <div>
                 <label class="block text-xs font-semibold text-slate-600 mb-1">Año</label>
                 <select wire:model.live="anio"
-                        class="w-full rounded-xl border-slate-200 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                        class="w-full rounded-xl border-slate-200 text-sm focus:border-brand focus:ring-brand">
                     @foreach($aniosDisponibles as $a)
                         <option value="{{ $a }}">{{ $a }}</option>
                     @endforeach
@@ -50,7 +50,7 @@
             <div>
                 <label class="block text-xs font-semibold text-slate-600 mb-1">Estado</label>
                 <select wire:model.live="filtroEstado"
-                        class="w-full rounded-xl border-slate-200 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                        class="w-full rounded-xl border-slate-200 text-sm focus:border-brand focus:ring-brand">
                     <option value="todas">Todos</option>
                     <option value="enviado">Enviados</option>
                     <option value="fallido">Fallidos</option>
@@ -60,7 +60,7 @@
             <div>
                 <label class="block text-xs font-semibold text-slate-600 mb-1">Origen</label>
                 <select wire:model.live="filtroOrigen"
-                        class="w-full rounded-xl border-slate-200 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                        class="w-full rounded-xl border-slate-200 text-sm focus:border-brand focus:ring-brand">
                     <option value="todos">Todos</option>
                     <option value="scheduled">Automático</option>
                     <option value="manual">Manual</option>
@@ -72,7 +72,7 @@
                     <i class="fa-brands fa-whatsapp"></i> Conexión
                 </label>
                 <select wire:model.live="filtroConexion"
-                        class="w-full rounded-xl border-slate-200 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                        class="w-full rounded-xl border-slate-200 text-sm focus:border-brand focus:ring-brand">
                     <option value="todas">Todas</option>
                     <option value="ninguna">Sin conexión asignada</option>
                     @foreach($conexionesUsadas as $c)
@@ -84,7 +84,7 @@
                 <label class="block text-xs font-semibold text-slate-600 mb-1">Buscar</label>
                 <input type="text" wire:model.live.debounce.400ms="busqueda"
                        placeholder="Nombre o teléfono..."
-                       class="w-full rounded-xl border-slate-200 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                       class="w-full rounded-xl border-slate-200 text-sm focus:border-brand focus:ring-brand">
             </div>
         </div>
     </div>

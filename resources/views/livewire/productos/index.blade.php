@@ -12,18 +12,18 @@
             <div class="inline-flex items-center rounded-xl bg-white p-1 shadow border border-slate-200">
                 <button wire:click="$set('vista', 'tabla')"
                         class="px-3 py-2 text-xs font-semibold rounded-lg transition
-                              {{ $vista === 'tabla' ? 'bg-[#d68643] text-white shadow' : 'text-slate-600 hover:bg-slate-50' }}">
+                              {{ $vista === 'tabla' ? 'bg-brand text-white shadow' : 'text-slate-600 hover:bg-slate-50' }}">
                     <i class="fa-solid fa-table-list mr-1.5"></i> Tabla
                 </button>
                 <button wire:click="$set('vista', 'grid')"
                         class="px-3 py-2 text-xs font-semibold rounded-lg transition
-                              {{ $vista === 'grid' ? 'bg-[#d68643] text-white shadow' : 'text-slate-600 hover:bg-slate-50' }}">
+                              {{ $vista === 'grid' ? 'bg-brand text-white shadow' : 'text-slate-600 hover:bg-slate-50' }}">
                     <i class="fa-solid fa-th-large mr-1.5"></i> Grid
                 </button>
             </div>
 
             <button wire:click="abrirModalCrear"
-                    class="rounded-2xl bg-[#d68643] px-5 py-3 text-white font-semibold shadow hover:bg-[#c97a36] transition">
+                    class="rounded-2xl bg-brand px-5 py-3 text-white font-semibold shadow hover:bg-brand-dark transition">
                 <i class="fa-solid fa-plus mr-2"></i> Nuevo producto
             </button>
         </div>
@@ -33,10 +33,10 @@
     <div class="mb-4 grid grid-cols-1 md:grid-cols-3 gap-3">
         <input type="text" wire:model.live.debounce.400ms="search"
                placeholder="Buscar por nombre o código..."
-               class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-[#d68643] focus:ring-[#d68643]">
+               class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-brand focus:ring-brand">
 
         <select wire:model.live="filtroCategoria"
-                class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-brand focus:ring-brand">
             <option value="">Todas las categorías</option>
             @foreach($categorias as $cat)
                 <option value="{{ $cat->id }}">{{ $cat->icono_emoji }} {{ $cat->nombre }}</option>
@@ -44,7 +44,7 @@
         </select>
 
         <select wire:model.live="filtroEstado"
-                class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-brand focus:ring-brand">
             <option value="todos">Todos los estados</option>
             <option value="activos">Solo activos</option>
             <option value="inactivos">Solo inactivos</option>
@@ -60,7 +60,7 @@
 
     <div class="mb-4 inline-flex items-center gap-4 rounded-full bg-white shadow border border-slate-200 px-4 py-2 text-xs">
         <span class="font-bold text-slate-800">
-            <i class="fa-solid fa-boxes-stacked text-[#d68643] mr-1"></i>
+            <i class="fa-solid fa-boxes-stacked text-brand mr-1"></i>
             {{ $totalProductos }} productos
         </span>
         <span class="text-slate-300">·</span>
@@ -150,7 +150,7 @@
                                 {{-- Sedes --}}
                                 <td class="px-3 py-3 align-middle text-center hidden lg:table-cell">
                                     <span class="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
-                                        <i class="fa-solid fa-store text-[10px] text-[#d68643]"></i>
+                                        <i class="fa-solid fa-store text-[10px] text-brand"></i>
                                         {{ $producto->sedes->count() }}
                                     </span>
                                 </td>
@@ -178,7 +178,7 @@
                                 <td class="px-3 py-3 align-middle">
                                     <div class="flex items-center justify-end gap-1">
                                         <button wire:click="abrirModalEditar({{ $producto->id }})"
-                                                class="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-[#d68643] transition"
+                                                class="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-brand transition"
                                                 title="Editar">
                                             <i class="fa-solid fa-pen-to-square text-sm"></i>
                                         </button>
@@ -242,7 +242,7 @@
 
                         <div class="mt-3 flex items-baseline justify-between">
                             <div>
-                                <div class="text-xl font-bold text-[#d68643]">${{ number_format($producto->precio_base, 0, ',', '.') }}</div>
+                                <div class="text-xl font-bold text-brand">${{ number_format($producto->precio_base, 0, ',', '.') }}</div>
                                 <div class="text-xs text-slate-400">por {{ $producto->unidad }}</div>
                             </div>
                             <div class="text-xs text-slate-500">
@@ -299,12 +299,12 @@
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-1">Código (SKU)</label>
                             <input type="text" wire:model="codigo"
-                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand">
                         </div>
                         <div class="md:col-span-2">
                             <label class="block text-sm font-medium text-slate-700 mb-1">Nombre *</label>
                             <input type="text" wire:model="nombre"
-                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand">
                             @error('nombre') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
                         </div>
                     </div>
@@ -313,7 +313,7 @@
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-1">Categoría</label>
                             <select wire:model="categoria_id"
-                                    class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                                    class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand">
                                 <option value="">Sin categoría</option>
                                 @foreach($categorias as $cat)
                                     <option value="{{ $cat->id }}">{{ $cat->icono_emoji }} {{ $cat->nombre }}</option>
@@ -323,7 +323,7 @@
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-1">Unidad *</label>
                             <select wire:model="unidad"
-                                    class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                                    class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand">
                                 <option value="unidad">Unidad</option>
                                 <option value="libra">Libra</option>
                                 <option value="kg">Kilogramo</option>
@@ -337,7 +337,7 @@
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-1">Precio base *</label>
                             <input type="number" step="0.01" wire:model="precio_base"
-                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand">
                             @error('precio_base') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
                         </div>
                     </div>
@@ -345,19 +345,19 @@
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1">Descripción corta</label>
                         <input type="text" wire:model="descripcion_corta" placeholder="Para el bot y tarjetas"
-                               class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                               class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand">
                     </div>
 
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1">Descripción larga</label>
                         <textarea wire:model="descripcion" rows="2"
-                                  class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]"></textarea>
+                                  class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand"></textarea>
                     </div>
 
                     {{-- IMAGEN: subir archivo o pegar URL --}}
                     <div class="rounded-xl border border-slate-200 p-4">
                         <h4 class="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
-                            <i class="fa-solid fa-camera text-[#d68643]"></i> Imagen del producto
+                            <i class="fa-solid fa-camera text-brand"></i> Imagen del producto
                         </h4>
 
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -399,7 +399,7 @@
                                     </label>
                                     <input type="file" wire:model="imagenFile"
                                            accept="image/jpeg,image/png,image/webp"
-                                           class="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs file:mr-3 file:rounded-lg file:border-0 file:bg-[#d68643] file:px-3 file:py-1.5 file:text-white file:font-semibold file:cursor-pointer">
+                                           class="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs file:mr-3 file:rounded-lg file:border-0 file:bg-brand file:px-3 file:py-1.5 file:text-white file:font-semibold file:cursor-pointer">
                                     @error('imagenFile') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
                                     <p class="text-[10px] text-slate-400 mt-1">JPG, PNG o WebP — máx 2 MB</p>
 
@@ -416,7 +416,7 @@
                                         <i class="fa-solid fa-link mr-1"></i> URL externa
                                     </label>
                                     <input type="url" wire:model="imagen_url" placeholder="https://..."
-                                           class="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs focus:border-[#d68643] focus:ring-[#d68643]">
+                                           class="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs focus:border-brand focus:ring-brand">
                                     <p class="text-[10px] text-slate-400 mt-1">Si subes archivo, este URL se ignora.</p>
                                 </div>
                             </div>
@@ -428,12 +428,12 @@
                             Palabras clave <span class="text-xs text-slate-400">(coma — para que el bot encuentre el producto)</span>
                         </label>
                         <input type="text" wire:model="palabrasClaveTexto" placeholder="pollo, pechuga, deshuesada"
-                               class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                               class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand">
                     </div>
 
                     <div class="rounded-xl border border-slate-200 p-4">
                         <h4 class="font-semibold text-slate-800 mb-3 flex items-center gap-2">
-                            <i class="fa-solid fa-store text-[#d68643]"></i> Precios y disponibilidad por sede
+                            <i class="fa-solid fa-store text-brand"></i> Precios y disponibilidad por sede
                         </h4>
                         @if(count($preciosSedes) === 0)
                             <p class="text-xs text-slate-400">No hay sedes registradas.</p>
@@ -447,12 +447,12 @@
                                             <input type="number" step="0.01"
                                                    wire:model="preciosSedes.{{ $sede->id }}.precio"
                                                    placeholder="Precio personalizado"
-                                                   class="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                                                   class="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm focus:border-brand focus:ring-brand">
                                         </div>
                                         <div class="col-span-3">
                                             <label class="inline-flex items-center gap-2 text-xs text-slate-700">
                                                 <input type="checkbox" wire:model="preciosSedes.{{ $sede->id }}.disponible"
-                                                       class="rounded border-slate-300 text-[#d68643]">
+                                                       class="rounded border-slate-300 text-brand">
                                                 Disponible
                                             </label>
                                         </div>
@@ -465,12 +465,12 @@
                     {{-- ✂️ CORTES DISPONIBLES PARA ESTE PRODUCTO --}}
                     <div class="rounded-xl border border-slate-200 p-4">
                         <h4 class="font-semibold text-slate-800 mb-3 flex items-center gap-2">
-                            <i class="fa-solid fa-scissors text-[#d68643]"></i> Cortes disponibles para este producto
+                            <i class="fa-solid fa-scissors text-brand"></i> Cortes disponibles para este producto
                         </h4>
                         @if($cortes->isEmpty())
                             <p class="text-xs text-slate-500">
                                 No hay cortes registrados.
-                                <a href="{{ route('cortes.index') }}" class="text-[#d68643] underline">Crear cortes →</a>
+                                <a href="{{ route('cortes.index') }}" class="text-brand underline">Crear cortes →</a>
                             </p>
                         @else
                             <p class="text-xs text-slate-500 mb-3">
@@ -480,7 +480,7 @@
                                 @foreach($cortes as $corte)
                                     <label class="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-50 hover:bg-amber-50 border border-slate-200 cursor-pointer transition">
                                         <input type="checkbox" wire:model="corteIds" value="{{ $corte->id }}"
-                                               class="rounded text-[#d68643] focus:ring-[#d68643]">
+                                               class="rounded text-brand focus:ring-brand">
                                         <span class="text-sm text-slate-700">{{ $corte->nombre }}</span>
                                     </label>
                                 @endforeach
@@ -490,17 +490,17 @@
 
                     <div class="grid grid-cols-3 gap-4">
                         <label class="inline-flex items-center gap-2">
-                            <input type="checkbox" wire:model="activo" class="rounded border-slate-300 text-[#d68643]">
+                            <input type="checkbox" wire:model="activo" class="rounded border-slate-300 text-brand">
                             <span class="text-sm text-slate-700">Activo</span>
                         </label>
                         <label class="inline-flex items-center gap-2">
-                            <input type="checkbox" wire:model="destacado" class="rounded border-slate-300 text-[#d68643]">
+                            <input type="checkbox" wire:model="destacado" class="rounded border-slate-300 text-brand">
                             <span class="text-sm text-slate-700">Destacado</span>
                         </label>
                         <div>
                             <label class="block text-xs font-medium text-slate-700 mb-1">Orden</label>
                             <input type="number" wire:model="orden" min="0"
-                                   class="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                                   class="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm focus:border-brand focus:ring-brand">
                         </div>
                     </div>
 
@@ -510,7 +510,7 @@
                             Cancelar
                         </button>
                         <button type="submit"
-                                class="rounded-xl bg-[#d68643] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#c97a36]">
+                                class="rounded-xl bg-brand px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-dark">
                             Guardar producto
                         </button>
                     </div>

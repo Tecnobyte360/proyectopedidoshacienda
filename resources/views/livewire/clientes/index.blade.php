@@ -8,7 +8,7 @@
         </div>
 
         <button wire:click="abrirModalCrear"
-                class="rounded-2xl bg-[#d68643] px-5 py-3 text-white font-semibold shadow hover:bg-[#c97a36] transition">
+                class="rounded-2xl bg-brand px-5 py-3 text-white font-semibold shadow hover:bg-brand-dark transition">
             <i class="fa-solid fa-user-plus mr-2"></i> Nuevo cliente
         </button>
     </div>
@@ -51,7 +51,7 @@
             </div>
         </div>
 
-        <div class="rounded-2xl bg-gradient-to-br from-[#d68643] to-[#a85f24] p-4 shadow text-white">
+        <div class="rounded-2xl bg-gradient-to-br from-brand to-brand-secondary p-4 shadow text-white">
             <div class="flex items-center gap-3">
                 <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20">
                     <i class="fa-solid fa-dollar-sign"></i>
@@ -68,10 +68,10 @@
     <div class="mb-4 grid grid-cols-1 md:grid-cols-3 gap-3">
         <input type="text" wire:model.live.debounce.400ms="search"
                placeholder="Buscar por nombre, teléfono, email, barrio..."
-               class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-[#d68643] focus:ring-[#d68643]">
+               class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-brand focus:ring-brand">
 
         <select wire:model.live="filtroEstado"
-                class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-brand focus:ring-brand">
             <option value="todos">Todos los estados</option>
             <option value="activos">Solo activos</option>
             <option value="inactivos">Solo inactivos</option>
@@ -80,7 +80,7 @@
         </select>
 
         <select wire:model.live="orden"
-                class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-brand focus:ring-brand">
             <option value="recientes">Más recientes</option>
             <option value="mayor_gasto">Mayor gasto</option>
             <option value="mas_pedidos">Más pedidos</option>
@@ -116,7 +116,7 @@
                         <tr class="hover:bg-amber-50/30 transition">
                             <td class="px-3 py-3">
                                 <div class="flex items-center gap-3">
-                                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#d68643] to-[#a85f24] text-white font-bold text-sm">
+                                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand to-brand-secondary text-white font-bold text-sm">
                                         {{ $iniciales ?: 'CL' }}
                                     </div>
                                     <div class="min-w-0 max-w-[180px]">
@@ -232,7 +232,7 @@
             <div class="w-full sm:max-w-3xl rounded-t-2xl sm:rounded-2xl bg-white shadow-2xl my-0 sm:my-8 max-h-[95vh] flex flex-col">
 
                 {{-- Header del perfil --}}
-                <div class="relative bg-gradient-to-br from-[#d68643] to-[#a85f24] text-white px-6 py-6 sm:rounded-t-2xl">
+                <div class="relative bg-gradient-to-br from-brand to-brand-secondary text-white px-6 py-6 sm:rounded-t-2xl">
                     <button wire:click="cerrarVer"
                             class="absolute top-4 right-4 flex h-8 w-8 items-center justify-center rounded-lg bg-white/20 hover:bg-white/30 transition">
                         <i class="fa-solid fa-xmark"></i>
@@ -335,7 +335,7 @@
                     {{-- Historial de pedidos --}}
                     <div>
                         <h4 class="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
-                            <i class="fa-solid fa-clock-rotate-left text-[#d68643]"></i>
+                            <i class="fa-solid fa-clock-rotate-left text-brand"></i>
                             Historial de pedidos ({{ $clienteVer->pedidos->count() }})
                         </h4>
 
@@ -393,7 +393,7 @@
                             Cerrar
                         </button>
                         <button wire:click="abrirModalEditar({{ $clienteVer->id }})"
-                                class="rounded-xl bg-[#d68643] px-4 py-2 text-sm font-bold text-white hover:bg-[#c97a36]">
+                                class="rounded-xl bg-brand px-4 py-2 text-sm font-bold text-white hover:bg-brand-dark">
                             <i class="fa-solid fa-pen-to-square mr-1"></i> Editar
                         </button>
                     </div>
@@ -424,7 +424,7 @@
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1">Nombre *</label>
                         <input type="text" wire:model="nombre"
-                               class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                               class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand">
                         @error('nombre') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
                     </div>
 
@@ -432,13 +432,13 @@
                         <label class="block text-sm font-medium text-slate-700 mb-1">Teléfono *</label>
                         <div class="flex gap-2">
                             <select wire:model="pais_codigo"
-                                    class="w-32 rounded-xl border border-slate-200 px-2 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                                    class="w-32 rounded-xl border border-slate-200 px-2 py-2.5 text-sm focus:border-brand focus:ring-brand">
                                 @foreach($paises as $p)
                                     <option value="{{ $p['codigo'] }}">{{ $p['flag'] }} {{ $p['codigo'] }}</option>
                                 @endforeach
                             </select>
                             <input type="tel" wire:model="telefono" inputmode="numeric" placeholder="3001234567"
-                                   class="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                                   class="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand">
                         </div>
                         @error('telefono') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
                     </div>
@@ -447,7 +447,7 @@
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-1">Email (opcional)</label>
                             <input type="email" wire:model="email"
-                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand">
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-1">
@@ -455,7 +455,7 @@
                                 <span class="text-xs text-slate-400 font-normal">(opcional)</span>
                             </label>
                             <input type="date" wire:model="fecha_nacimiento" max="{{ date('Y-m-d') }}"
-                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand">
                             @error('fecha_nacimiento') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
                         </div>
                     </div>
@@ -464,19 +464,19 @@
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-1">Dirección habitual</label>
                             <input type="text" wire:model="direccion_principal"
-                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand">
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-1">Barrio</label>
                             <input type="text" wire:model="barrio"
-                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand">
                         </div>
                     </div>
 
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1">Zona de cobertura</label>
                         <select wire:model="zona_cobertura_id"
-                                class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                                class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand">
                             <option value="">Sin asignar</option>
                             @foreach($zonas as $z)
                                 <option value="{{ $z->id }}">{{ $z->nombre }}</option>
@@ -491,11 +491,11 @@
                         </label>
                         <textarea wire:model="notas_internas" rows="3"
                                   placeholder="Ej: alérgico al maní, paga siempre en efectivo, prefiere la pechuga sin piel..."
-                                  class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]"></textarea>
+                                  class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand"></textarea>
                     </div>
 
                     <label class="inline-flex items-center gap-2">
-                        <input type="checkbox" wire:model="activo" class="rounded border-slate-300 text-[#d68643]">
+                        <input type="checkbox" wire:model="activo" class="rounded border-slate-300 text-brand">
                         <span class="text-sm text-slate-700">Cliente activo</span>
                     </label>
 
@@ -505,7 +505,7 @@
                             Cancelar
                         </button>
                         <button type="submit"
-                                class="rounded-xl bg-[#d68643] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#c97a36]">
+                                class="rounded-xl bg-brand px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-dark">
                             Guardar cliente
                         </button>
                     </div>

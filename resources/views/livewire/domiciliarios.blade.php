@@ -14,7 +14,7 @@
                 <i class="fa-solid fa-lock-open mr-2"></i> Liberar todos
             </button>
             <button wire:click="abrirModalCrear"
-                    class="rounded-2xl bg-[#d68643] px-5 py-3 text-white font-semibold shadow hover:bg-[#c97a36] transition">
+                    class="rounded-2xl bg-brand px-5 py-3 text-white font-semibold shadow hover:bg-brand-dark transition">
                 <i class="fa-solid fa-plus mr-2"></i> Nuevo domiciliario
             </button>
         </div>
@@ -83,7 +83,7 @@
         <input type="text"
                wire:model.live.debounce.400ms="buscar"
                placeholder="Buscar por nombre, teléfono, vehículo o placa..."
-               class="w-full md:w-96 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-[#d68643] focus:ring-[#d68643]">
+               class="w-full md:w-96 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-brand focus:ring-brand">
     </div>
 
     {{-- GRID DE DOMICILIARIOS --}}
@@ -108,7 +108,7 @@
             <div class="rounded-2xl bg-white shadow hover:shadow-lg transition overflow-hidden">
 
                 {{-- HEADER tarjeta --}}
-                <div class="relative bg-gradient-to-br from-[#d68643] to-[#a85f24] p-5 text-white">
+                <div class="relative bg-gradient-to-br from-brand to-brand-secondary p-5 text-white">
                     <div class="flex items-center gap-3">
                         <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 backdrop-blur text-2xl font-bold">
                             {{ strtoupper(substr($dom->nombre, 0, 1)) }}
@@ -155,7 +155,7 @@
 
                     @if($dom->telefono)
                         <a href="tel:{{ $dom->telefonoInternacional() }}"
-                           class="flex items-center gap-2 text-sm text-slate-600 hover:text-[#d68643] transition">
+                           class="flex items-center gap-2 text-sm text-slate-600 hover:text-brand transition">
                             <i class="fa-solid fa-phone text-xs text-slate-400"></i>
                             <span class="font-mono">{{ $dom->telefonoFormateado() }}</span>
                         </a>
@@ -221,7 +221,7 @@
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1">Nombre *</label>
                         <input type="text" wire:model="nombre"
-                               class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                               class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand">
                         @error('nombre') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
                     </div>
 
@@ -230,20 +230,20 @@
                         <label class="block text-sm font-medium text-slate-700 mb-1">Teléfono</label>
                         <div class="flex gap-2">
                             <select wire:model="pais_codigo"
-                                    class="w-32 rounded-xl border border-slate-200 px-2 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                                    class="w-32 rounded-xl border border-slate-200 px-2 py-2.5 text-sm focus:border-brand focus:ring-brand">
                                 @foreach($paises as $p)
                                     <option value="{{ $p['codigo'] }}">{{ $p['flag'] }} {{ $p['codigo'] }}</option>
                                 @endforeach
                             </select>
                             <input type="tel" wire:model="telefono" placeholder="3001234567" inputmode="numeric"
-                                   class="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                                   class="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand">
                         </div>
                     </div>
 
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1">Estado *</label>
                         <select wire:model="estado"
-                                class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                                class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand">
                             <option value="disponible">Disponible</option>
                             <option value="ocupado">Ocupado</option>
                             <option value="inactivo">Inactivo</option>
@@ -254,7 +254,7 @@
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-1">Vehículo</label>
                             <select wire:model="vehiculo"
-                                    class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                                    class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand">
                                 <option value="">Sin vehículo</option>
                                 <option value="Moto">Moto</option>
                                 <option value="Bicicleta">Bicicleta</option>
@@ -264,7 +264,7 @@
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-1">Placa</label>
                             <input type="text" wire:model="placa" placeholder="ABC123"
-                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643] uppercase">
+                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand uppercase">
                         </div>
                     </div>
 
@@ -272,7 +272,7 @@
                     <div class="rounded-xl border border-slate-200 p-4">
                         <div class="flex items-center justify-between mb-2">
                             <label class="block text-sm font-medium text-slate-700">
-                                <i class="fa-solid fa-map-location-dot text-[#d68643] mr-1"></i>
+                                <i class="fa-solid fa-map-location-dot text-brand mr-1"></i>
                                 Zonas que cubre
                             </label>
                             <span class="text-xs text-slate-400">{{ count($zonasIds) }} seleccionada(s)</span>
@@ -281,14 +281,14 @@
                         @if($zonasDisponibles->count() === 0)
                             <p class="text-xs text-slate-400 italic">
                                 No hay zonas activas. Crea zonas primero en
-                                <a href="{{ route('zonas.index') }}" class="text-[#d68643] underline">Zonas de cobertura</a>.
+                                <a href="{{ route('zonas.index') }}" class="text-brand underline">Zonas de cobertura</a>.
                             </p>
                         @else
                             <div class="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">
                                 @foreach($zonasDisponibles as $z)
                                     <label class="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 cursor-pointer hover:bg-slate-100 transition">
                                         <input type="checkbox" wire:model="zonasIds" value="{{ $z->id }}"
-                                               class="rounded border-slate-300 text-[#d68643]">
+                                               class="rounded border-slate-300 text-brand">
                                         <span class="h-2.5 w-2.5 rounded-full" style="background-color: {{ $z->color }}"></span>
                                         <span class="text-xs text-slate-700 truncate">{{ $z->nombre }}</span>
                                     </label>
@@ -298,7 +298,7 @@
                     </div>
 
                     <label class="inline-flex items-center gap-2">
-                        <input type="checkbox" wire:model="activo" class="rounded border-slate-300 text-[#d68643]">
+                        <input type="checkbox" wire:model="activo" class="rounded border-slate-300 text-brand">
                         <span class="text-sm text-slate-700">Domiciliario activo</span>
                     </label>
 
@@ -308,7 +308,7 @@
                             Cancelar
                         </button>
                         <button type="submit"
-                                class="rounded-xl bg-[#d68643] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#c97a36]">
+                                class="rounded-xl bg-brand px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-dark">
                             Guardar
                         </button>
                     </div>

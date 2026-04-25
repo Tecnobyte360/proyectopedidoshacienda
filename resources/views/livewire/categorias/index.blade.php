@@ -8,7 +8,7 @@
         </div>
 
         <button wire:click="abrirModalCrear"
-                class="rounded-2xl bg-[#d68643] px-5 py-3 text-white font-semibold shadow hover:bg-[#c97a36] transition">
+                class="rounded-2xl bg-brand px-5 py-3 text-white font-semibold shadow hover:bg-brand-dark transition">
             <i class="fa-solid fa-plus mr-2"></i> Nueva categoría
         </button>
     </div>
@@ -18,7 +18,7 @@
         <input type="text"
                wire:model.live.debounce.400ms="search"
                placeholder="Buscar categoría..."
-               class="w-full md:w-96 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-[#d68643] focus:ring-[#d68643]">
+               class="w-full md:w-96 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-brand focus:ring-brand">
     </div>
 
     {{-- TABLE --}}
@@ -112,21 +112,21 @@
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1">Nombre *</label>
                         <input type="text" wire:model="nombre"
-                               class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                               class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand">
                         @error('nombre') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
                     </div>
 
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1">Descripción</label>
                         <input type="text" wire:model="descripcion"
-                               class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                               class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand">
                     </div>
 
                     <div class="grid grid-cols-3 gap-4">
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-1">Emoji</label>
                             <input type="text" wire:model="icono_emoji" placeholder="🥩"
-                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-center text-2xl focus:border-[#d68643] focus:ring-[#d68643]">
+                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-center text-2xl focus:border-brand focus:ring-brand">
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-1">Color</label>
@@ -136,12 +136,12 @@
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-1">Orden</label>
                             <input type="number" wire:model="orden" min="0"
-                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand">
                         </div>
                     </div>
 
                     <label class="inline-flex items-center gap-2">
-                        <input type="checkbox" wire:model="activo" class="rounded border-slate-300 text-[#d68643]">
+                        <input type="checkbox" wire:model="activo" class="rounded border-slate-300 text-brand">
                         <span class="text-sm text-slate-700">Categoría activa</span>
                     </label>
 
@@ -151,7 +151,7 @@
                             Cancelar
                         </button>
                         <button type="submit"
-                                class="rounded-xl bg-[#d68643] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#c97a36]">
+                                class="rounded-xl bg-brand px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-dark">
                             Guardar
                         </button>
                     </div>

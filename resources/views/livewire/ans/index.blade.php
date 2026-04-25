@@ -8,7 +8,7 @@
         </div>
 
         <button wire:click="abrirModalCrear"
-                class="rounded-2xl bg-[#d68643] px-5 py-3 text-white font-semibold shadow hover:bg-[#c97a36] transition">
+                class="rounded-2xl bg-brand px-5 py-3 text-white font-semibold shadow hover:bg-brand-dark transition">
             <i class="fa-solid fa-plus mr-2"></i> Nuevo ANS
         </button>
     </div>
@@ -170,7 +170,7 @@
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-1">Estado *</label>
                             <select wire:model="estado"
-                                    class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                                    class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand">
                                 @foreach($estadosDisponibles as $key => $label)
                                     <option value="{{ $key }}">{{ $label }}</option>
                                 @endforeach
@@ -180,7 +180,7 @@
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-1">Nombre *</label>
                             <input type="text" wire:model="nombre" placeholder="Ej: Atención inicial"
-                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand">
                             @error('nombre') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
                         </div>
                     </div>
@@ -188,7 +188,7 @@
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1">Descripción</label>
                         <input type="text" wire:model="descripcion" placeholder="Para qué sirve este ANS"
-                               class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                               class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand">
                     </div>
 
                     {{-- Tiempos --}}
@@ -230,14 +230,14 @@
 
                     <div class="flex items-center gap-6">
                         <label class="inline-flex items-center gap-2">
-                            <input type="checkbox" wire:model="activo" class="rounded border-slate-300 text-[#d68643]">
+                            <input type="checkbox" wire:model="activo" class="rounded border-slate-300 text-brand">
                             <span class="text-sm text-slate-700">ANS activo</span>
                         </label>
 
                         <div class="flex items-center gap-2">
                             <label class="text-sm text-slate-700">Orden</label>
                             <input type="number" wire:model="orden" min="0"
-                                   class="w-20 rounded-lg border border-slate-200 px-3 py-1.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                                   class="w-20 rounded-lg border border-slate-200 px-3 py-1.5 text-sm focus:border-brand focus:ring-brand">
                         </div>
                     </div>
 
@@ -247,7 +247,7 @@
                             Cancelar
                         </button>
                         <button type="submit"
-                                class="rounded-xl bg-[#d68643] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#c97a36]">
+                                class="rounded-xl bg-brand px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-dark">
                             Guardar ANS
                         </button>
                     </div>

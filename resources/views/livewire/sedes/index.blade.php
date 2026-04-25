@@ -4,12 +4,12 @@
     <div class="flex flex-wrap items-center justify-between gap-4">
         <div>
             <h2 class="text-2xl font-extrabold text-slate-800 flex items-center gap-2">
-                <i class="fa-solid fa-shop text-[#d68643]"></i> Sedes
+                <i class="fa-solid fa-shop text-brand"></i> Sedes
             </h2>
             <p class="text-sm text-slate-500">Configura tus puntos de atención: dirección, coordenadas y horarios.</p>
         </div>
         <button wire:click="abrirModalCrear"
-                class="rounded-2xl bg-[#d68643] hover:bg-[#c97a36] text-white font-semibold px-5 py-2.5 transition shadow">
+                class="rounded-2xl bg-brand hover:bg-brand-dark text-white font-semibold px-5 py-2.5 transition shadow">
             <i class="fa-solid fa-plus mr-2"></i> Nueva sede
         </button>
     </div>
@@ -55,7 +55,7 @@
                     <div class="rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-600">
                         <div class="font-semibold text-slate-800 mb-1">{{ $hoyTxt }}</div>
                         <details class="text-[11px]">
-                            <summary class="cursor-pointer text-[#a85f24] hover:underline">Ver horarios completos</summary>
+                            <summary class="cursor-pointer text-brand-secondary hover:underline">Ver horarios completos</summary>
                             <div class="mt-2 space-y-0.5">
                                 @foreach($sede->horariosCompletos() as $key => $h)
                                     <div class="flex justify-between">
@@ -114,12 +114,12 @@
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-1">Nombre *</label>
                             <input type="text" wire:model="nombre" placeholder="Sede Bello Centro"
-                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand">
                             @error('nombre') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
                         </div>
                         <div class="flex items-center gap-2 mt-7">
                             <input type="checkbox" wire:model="activa" id="activa"
-                                   class="rounded border-slate-300 text-[#d68643]">
+                                   class="rounded border-slate-300 text-brand">
                             <label for="activa" class="text-sm text-slate-700">Sede activa</label>
                         </div>
                     </div>
@@ -128,7 +128,7 @@
                         <label class="block text-sm font-medium text-slate-700 mb-1">Dirección</label>
                         <div class="flex gap-2">
                             <input type="text" wire:model="direccion" placeholder="Calle 50 #55-20, Bello"
-                                   class="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                                   class="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand">
                             <button type="button" wire:click="geocodificarDireccion"
                                     wire:loading.attr="disabled"
                                     wire:target="geocodificarDireccion"
@@ -147,12 +147,12 @@
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-1">Latitud</label>
                             <input type="number" step="any" wire:model="latitud"
-                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-mono focus:border-[#d68643] focus:ring-[#d68643]">
+                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-mono focus:border-brand focus:ring-brand">
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-1">Longitud</label>
                             <input type="number" step="any" wire:model="longitud"
-                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-mono focus:border-[#d68643] focus:ring-[#d68643]">
+                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-mono focus:border-brand focus:ring-brand">
                         </div>
                     </div>
 
@@ -160,7 +160,7 @@
                     <div class="rounded-xl border-2 border-slate-200 overflow-hidden">
                         <div class="px-4 py-3 bg-slate-50 border-b border-slate-200">
                             <h4 class="font-bold text-slate-800 text-sm">
-                                <i class="fa-solid fa-clock text-[#d68643]"></i> Horarios de atención
+                                <i class="fa-solid fa-clock text-brand"></i> Horarios de atención
                             </h4>
                             <p class="text-xs text-slate-500">Configura el horario de cada día. Lo verá el bot al responder al cliente.</p>
                         </div>
@@ -206,7 +206,7 @@
                         </label>
                         <textarea wire:model="mensaje_cerrado" rows="2"
                                   placeholder="Ej: Estamos cerrados ahora. Te atendemos mañana desde las 8am 🙌"
-                                  class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]"></textarea>
+                                  class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand"></textarea>
                     </div>
 
                     <div class="flex justify-end gap-3 pt-4 border-t border-slate-100">
@@ -215,7 +215,7 @@
                             Cancelar
                         </button>
                         <button type="submit"
-                                class="rounded-xl bg-[#d68643] hover:bg-[#c97a36] px-6 py-2.5 text-sm font-bold text-white shadow">
+                                class="rounded-xl bg-brand hover:bg-brand-dark px-6 py-2.5 text-sm font-bold text-white shadow">
                             <i class="fa-solid fa-floppy-disk mr-1"></i>
                             {{ $editandoId ? 'Actualizar' : 'Crear sede' }}
                         </button>

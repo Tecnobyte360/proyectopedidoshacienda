@@ -12,18 +12,18 @@
             <div class="inline-flex items-center rounded-xl bg-white p-1 shadow border border-slate-200">
                 <button wire:click="$set('vista', 'lista')"
                         class="px-3 py-2 text-xs font-semibold rounded-lg transition
-                              {{ $vista === 'lista' ? 'bg-[#d68643] text-white shadow' : 'text-slate-600 hover:bg-slate-50' }}">
+                              {{ $vista === 'lista' ? 'bg-brand text-white shadow' : 'text-slate-600 hover:bg-slate-50' }}">
                     <i class="fa-solid fa-list mr-1.5"></i> Lista
                 </button>
                 <button wire:click="$set('vista', 'mapa')"
                         class="px-3 py-2 text-xs font-semibold rounded-lg transition
-                              {{ $vista === 'mapa' ? 'bg-[#d68643] text-white shadow' : 'text-slate-600 hover:bg-slate-50' }}">
+                              {{ $vista === 'mapa' ? 'bg-brand text-white shadow' : 'text-slate-600 hover:bg-slate-50' }}">
                     <i class="fa-solid fa-map-location-dot mr-1.5"></i> Mapa
                 </button>
             </div>
 
             <button wire:click="abrirModalCrear"
-                    class="rounded-2xl bg-[#d68643] px-5 py-3 text-white font-semibold shadow hover:bg-[#c97a36] transition">
+                    class="rounded-2xl bg-brand px-5 py-3 text-white font-semibold shadow hover:bg-brand-dark transition">
                 <i class="fa-solid fa-plus mr-2"></i> Nueva zona
             </button>
         </div>
@@ -33,10 +33,10 @@
     <div class="mb-4 grid grid-cols-1 md:grid-cols-3 gap-3">
         <input type="text" wire:model.live.debounce.400ms="search"
                placeholder="Buscar zona..."
-               class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-[#d68643] focus:ring-[#d68643]">
+               class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-brand focus:ring-brand">
 
         <select wire:model.live="filtroSedeId"
-                class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-brand focus:ring-brand">
             <option value="">Todas las sedes</option>
             @foreach($sedes as $sede)
                 <option value="{{ $sede->id }}">{{ $sede->nombre }}</option>
@@ -44,7 +44,7 @@
         </select>
 
         <select wire:model.live="filtroEstado"
-                class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-brand focus:ring-brand">
             <option value="todas">Todas</option>
             <option value="activas">Solo activas</option>
             <option value="inactivas">Solo inactivas</option>
@@ -69,7 +69,7 @@
                 </div>
                 <div class="bg-white px-5 py-3">
                     <div class="text-[10px] font-bold uppercase text-slate-500">Cobertura total</div>
-                    <div class="text-xl font-extrabold text-[#d68643]">{{ number_format($totalArea, 2, ',', '.') }} km²</div>
+                    <div class="text-xl font-extrabold text-brand">{{ number_format($totalArea, 2, ',', '.') }} km²</div>
                 </div>
                 <div class="bg-white px-5 py-3">
                     <div class="text-[10px] font-bold uppercase text-slate-500">Pedidos en zonas</div>
@@ -84,9 +84,9 @@
                 <label class="inline-flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" x-model="verPedidos"
                            @change="window.dispatchEvent(new CustomEvent('toggle-pedidos-mapa', { detail: verPedidos }))"
-                           class="rounded border-slate-300 text-[#d68643]">
+                           class="rounded border-slate-300 text-brand">
                     <span class="text-xs text-slate-700">
-                        <i class="fa-solid fa-location-dot text-[#d68643]"></i>
+                        <i class="fa-solid fa-location-dot text-brand"></i>
                         Pedidos activos ({{ $pedidosMapa->count() }})
                     </span>
                 </label>
@@ -106,7 +106,7 @@
                             <h3 class="font-bold text-lg">Aún no hay zonas dibujadas</h3>
                             <p class="text-sm text-white/80 mb-4">Crea una zona y dibuja su polígono en el mapa.</p>
                             <button wire:click="abrirModalCrear"
-                                    class="rounded-xl bg-[#d68643] px-5 py-2.5 text-sm font-bold hover:bg-[#c97a36] transition">
+                                    class="rounded-xl bg-brand px-5 py-2.5 text-sm font-bold hover:bg-brand-dark transition">
                                 <i class="fa-solid fa-plus mr-2"></i> Crear primera zona
                             </button>
                         </div>
@@ -200,18 +200,18 @@
 
                         <div class="flex items-center justify-between text-xs text-slate-500 mb-3 flex-wrap gap-2">
                             <div>
-                                <i class="fa-solid fa-truck mr-1 text-[#d68643]"></i>
+                                <i class="fa-solid fa-truck mr-1 text-brand"></i>
                                 ${{ number_format($zona->costo_envio, 0, ',', '.') }}
                             </div>
                             @if($zona->tiempo_estimado_min)
                                 <div>
-                                    <i class="fa-solid fa-clock mr-1 text-[#d68643]"></i>
+                                    <i class="fa-solid fa-clock mr-1 text-brand"></i>
                                     {{ $zona->tiempo_estimado_min }} min
                                 </div>
                             @endif
                             @if((float) $zona->pedido_minimo > 0)
                                 <div>
-                                    <i class="fa-solid fa-cart-shopping mr-1 text-[#d68643]"></i>
+                                    <i class="fa-solid fa-cart-shopping mr-1 text-brand"></i>
                                     mín ${{ number_format($zona->pedido_minimo, 0, ',', '.') }}
                                 </div>
                             @endif
@@ -266,7 +266,7 @@
                         <div class="md:col-span-2">
                             <label class="block text-sm font-medium text-slate-700 mb-1">Nombre *</label>
                             <input type="text" wire:model="nombre" placeholder="Ej: Zona Norte"
-                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand">
                             @error('nombre') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
                         </div>
                         <div>
@@ -279,7 +279,7 @@
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1">Descripción</label>
                         <input type="text" wire:model="descripcion" placeholder="Descripción breve"
-                               class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                               class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand">
                         @error('descripcion') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
                     </div>
 
@@ -302,7 +302,7 @@
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-1">Sede</label>
                             <select wire:model="sede_id"
-                                    class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                                    class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand">
                                 <option value="">Todas las sedes</option>
                                 @foreach($sedes as $sede)
                                     <option value="{{ $sede->id }}">{{ $sede->nombre }}</option>
@@ -313,7 +313,7 @@
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-1">Costo de envío</label>
                             <input type="number" step="100" wire:model="costo_envio" min="0"
-                                   class="w-full rounded-xl border px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643] @error('costo_envio') border-rose-300 @else border-slate-200 @enderror">
+                                   class="w-full rounded-xl border px-4 py-2.5 text-sm focus:border-brand focus:ring-brand @error('costo_envio') border-rose-300 @else border-slate-200 @enderror">
                             @error('costo_envio') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
                         </div>
                         <div>
@@ -322,27 +322,27 @@
                                 <span class="text-xs text-slate-400 font-normal">(0 = sin mínimo)</span>
                             </label>
                             <input type="number" step="1000" wire:model="pedido_minimo" min="0" placeholder="30000"
-                                   class="w-full rounded-xl border px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643] @error('pedido_minimo') border-rose-300 @else border-slate-200 @enderror">
+                                   class="w-full rounded-xl border px-4 py-2.5 text-sm focus:border-brand focus:ring-brand @error('pedido_minimo') border-rose-300 @else border-slate-200 @enderror">
                             @error('pedido_minimo') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-1">Tiempo estimado (min)</label>
                             <input type="number" wire:model="tiempo_estimado_min" min="1" placeholder="30"
-                                   class="w-full rounded-xl border px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643] @error('tiempo_estimado_min') border-rose-300 @else border-slate-200 @enderror">
+                                   class="w-full rounded-xl border px-4 py-2.5 text-sm focus:border-brand focus:ring-brand @error('tiempo_estimado_min') border-rose-300 @else border-slate-200 @enderror">
                             @error('tiempo_estimado_min') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
                         </div>
                     </div>
 
                     {{-- ╔═══ MAPA INTERACTIVO ═══╗ --}}
-                    <div class="rounded-xl border-2 border-[#d68643] bg-amber-50/30 p-4">
+                    <div class="rounded-xl border-2 border-brand bg-amber-50/30 p-4">
                         <div class="flex items-center justify-between mb-2">
                             <label class="block text-sm font-bold text-slate-800">
-                                <i class="fa-solid fa-draw-polygon text-[#d68643] mr-1"></i>
+                                <i class="fa-solid fa-draw-polygon text-brand mr-1"></i>
                                 Dibujar zona en el mapa
                             </label>
                             <span class="text-xs text-slate-500">
                                 @if($area_km2)
-                                    Área: <strong class="text-[#a85f24]">{{ number_format($area_km2, 2, ',', '.') }} km²</strong>
+                                    Área: <strong class="text-brand-secondary">{{ number_format($area_km2, 2, ',', '.') }} km²</strong>
                                 @else
                                     Click "Polígono" para empezar a dibujar
                                 @endif
@@ -360,7 +360,7 @@
                             {{-- Buscador Nominatim --}}
                             <div class="mb-3 rounded-xl bg-white border border-slate-200 p-3">
                                 <div class="flex items-center gap-2 mb-2">
-                                    <i class="fa-solid fa-magnifying-glass-location text-[#d68643]"></i>
+                                    <i class="fa-solid fa-magnifying-glass-location text-brand"></i>
                                     <label class="text-xs font-bold text-slate-700">
                                         Importar área de un lugar
                                     </label>
@@ -372,11 +372,11 @@
                                            x-model="busquedaTexto"
                                            @keydown.enter.prevent="buscarLugar()"
                                            placeholder="Ej: Bello, Antioquia"
-                                           class="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-[#d68643] focus:ring-2 focus:ring-amber-100">
+                                           class="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-brand focus:ring-2 focus:ring-amber-100">
                                     <button type="button"
                                             @click="buscarLugar()"
                                             :disabled="buscando"
-                                            class="rounded-xl bg-[#d68643] px-4 py-2 text-sm font-bold text-white hover:bg-[#c97a36] transition disabled:opacity-60 whitespace-nowrap">
+                                            class="rounded-xl bg-brand px-4 py-2 text-sm font-bold text-white hover:bg-brand-dark transition disabled:opacity-60 whitespace-nowrap">
                                         <span x-show="!buscando">
                                             <i class="fa-solid fa-magnifying-glass mr-1"></i> Buscar
                                         </span>
@@ -414,7 +414,7 @@
                                     Usa el ícono de polígono (arriba izquierda) para dibujar manualmente, o busca un lugar arriba.
                                 </span>
                                 <button type="button" @click="centrarEnColombia()"
-                                        class="text-[#d68643] hover:underline font-semibold">
+                                        class="text-brand hover:underline font-semibold">
                                     <i class="fa-solid fa-location-crosshairs"></i> Centrar
                                 </button>
                             </div>
@@ -431,7 +431,7 @@
                                     wire:click="autodetectarBarrios"
                                     wire:loading.attr="disabled"
                                     wire:target="autodetectarBarrios"
-                                    class="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-[#d68643] hover:bg-[#c97a36] text-white transition disabled:opacity-60 disabled:cursor-wait">
+                                    class="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-brand hover:bg-brand-dark text-white transition disabled:opacity-60 disabled:cursor-wait">
                                 <span wire:loading.remove wire:target="autodetectarBarrios">
                                     <i class="fa-solid fa-wand-magic-sparkles"></i>
                                     Auto-detectar
@@ -443,7 +443,7 @@
                             </button>
                         </div>
                         <textarea wire:model="barriosTexto" rows="6" placeholder="Niquía&#10;Belén&#10;Pajarito&#10;&#10;Dibuja un polígono arriba y presiona Auto-detectar para llenarlo automáticamente."
-                                  class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]"></textarea>
+                                  class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand"></textarea>
                         <p class="text-xs text-slate-500 mt-1">
                             <i class="fa-solid fa-info-circle"></i>
                             Auto-detectar busca los barrios en OpenStreetMap dentro del polígono dibujado.
@@ -453,14 +453,14 @@
 
                     <div class="flex items-center gap-6">
                         <label class="inline-flex items-center gap-2">
-                            <input type="checkbox" wire:model="activa" class="rounded border-slate-300 text-[#d68643]">
+                            <input type="checkbox" wire:model="activa" class="rounded border-slate-300 text-brand">
                             <span class="text-sm text-slate-700">Zona activa</span>
                         </label>
 
                         <div class="flex items-center gap-2">
                             <label class="text-sm text-slate-700">Orden</label>
                             <input type="number" wire:model="orden" min="0"
-                                   class="w-24 rounded-lg border border-slate-200 px-3 py-1.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                                   class="w-24 rounded-lg border border-slate-200 px-3 py-1.5 text-sm focus:border-brand focus:ring-brand">
                         </div>
                     </div>
 
@@ -470,7 +470,7 @@
                             Cancelar
                         </button>
                         <button type="submit"
-                                class="rounded-xl bg-[#d68643] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#c97a36]">
+                                class="rounded-xl bg-brand px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-dark">
                             Guardar zona
                         </button>
                     </div>

@@ -4,7 +4,7 @@
         {{-- El banner de impersonación ahora vive en el topbar (visible en TODAS las páginas) --}}
 
         {{-- HEADER --}}
-        <div class="rounded-2xl border border-[#fbe9d7] bg-gradient-to-r from-[#fbe9d7]/40 via-white to-white p-5 shadow-sm">
+        <div class="rounded-2xl border border-[#fbe9d7] bg-gradient-to-r from-brand-soft/40 via-white to-white p-5 shadow-sm">
             <div class="flex flex-wrap items-center justify-between gap-4">
                 <div class="flex items-center gap-4">
                     <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-violet-700 text-white shadow-lg">
@@ -22,7 +22,7 @@
                         <i class="fa-solid fa-plug"></i> Probar Hostinger
                     </button>
                     <button wire:click="nuevoTenant"
-                            class="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-[#d68643] to-[#a85f24] hover:from-[#c97a36] hover:to-[#965520] text-white font-bold px-5 py-3 transition shadow-lg">
+                            class="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-brand to-brand-secondary hover:from-brand-dark hover:to-brand-dark text-white font-bold px-5 py-3 transition shadow-lg">
                         <i class="fa-solid fa-plus"></i> Nuevo tenant
                     </button>
                 </div>
@@ -83,7 +83,7 @@
                 <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
                 <input type="text" wire:model.live.debounce.400ms="busqueda"
                        placeholder="Buscar por nombre, slug o email…"
-                       class="w-full rounded-xl border border-slate-200 bg-slate-50 pl-11 pr-4 py-3 text-sm focus:border-[#d68643] focus:bg-white focus:ring-2 focus:ring-[#d68643]/20">
+                       class="w-full rounded-xl border border-slate-200 bg-slate-50 pl-11 pr-4 py-3 text-sm focus:border-brand focus:bg-white focus:ring-2 focus:ring-brand/20">
             </div>
         </div>
 
@@ -187,7 +187,7 @@
                                 {{-- SUBDOMINIO --}}
                                 <td class="px-4 py-3">
                                     <a href="https://{{ $dominio }}" target="_blank"
-                                       class="text-xs text-[#a85f24] hover:underline font-medium inline-flex items-center gap-1">
+                                       class="text-xs text-brand-secondary hover:underline font-medium inline-flex items-center gap-1">
                                         <i class="fa-solid fa-globe text-[10px]"></i>
                                         {{ $dominio }}
                                         <i class="fa-solid fa-arrow-up-right-from-square text-[9px] opacity-60"></i>
@@ -269,9 +269,9 @@
          @click.self="$wire.cerrarModal()"
          @keydown.escape.window="$wire.modalAbierto && $wire.cerrarModal()">
         <div @click.stop class="w-full max-w-3xl rounded-2xl bg-white shadow-2xl my-8 overflow-hidden">
-                <div class="flex items-center justify-between px-6 py-5 bg-gradient-to-r from-[#fbe9d7]/40 via-white to-white border-b border-slate-100">
+                <div class="flex items-center justify-between px-6 py-5 bg-gradient-to-r from-brand-soft/40 via-white to-white border-b border-slate-100">
                     <div class="flex items-center gap-3">
-                        <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-[#d68643] to-[#a85f24] text-white shadow">
+                        <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-brand to-brand-secondary text-white shadow">
                             <i class="fa-solid {{ $editandoId ? 'fa-pen-to-square' : 'fa-plus' }}"></i>
                         </div>
                         <div>
@@ -291,7 +291,7 @@
                         <div class="md:col-span-2">
                             <label class="block text-sm font-medium text-slate-700 mb-1.5">Nombre de la empresa *</label>
                             <input type="text" wire:model="nombre" placeholder="Alimentos La Hacienda"
-                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-2 focus:ring-[#d68643]/20">
+                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-2 focus:ring-brand/20">
                             @error('nombre') <p class="text-xs text-rose-600 mt-1">{{ $message }}</p> @enderror
                         </div>
                         <div>
@@ -299,12 +299,12 @@
                                 Slug (subdominio) <span class="text-xs text-slate-400 font-normal">— se autogenera si vacío</span>
                             </label>
                             <input type="text" wire:model="slug" placeholder="la-hacienda"
-                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-mono focus:border-[#d68643] focus:ring-2 focus:ring-[#d68643]/20">
+                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-mono focus:border-brand focus:ring-2 focus:ring-brand/20">
                             @error('slug') <p class="text-xs text-rose-600 mt-1">{{ $message }}</p> @enderror
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-1.5">Plan *</label>
-                            <select wire:model="plan" class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-2 focus:ring-[#d68643]/20">
+                            <select wire:model="plan" class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-2 focus:ring-brand/20">
                                 <option value="basico">Básico</option>
                                 <option value="pro">Pro</option>
                                 <option value="empresa">Empresa</option>
@@ -312,15 +312,15 @@
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-1.5">Contacto nombre</label>
-                            <input type="text" wire:model="contacto_nombre" class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-2 focus:ring-[#d68643]/20">
+                            <input type="text" wire:model="contacto_nombre" class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-2 focus:ring-brand/20">
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-1.5">Contacto email</label>
-                            <input type="email" wire:model="contacto_email" class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-2 focus:ring-[#d68643]/20">
+                            <input type="email" wire:model="contacto_email" class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-2 focus:ring-brand/20">
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-1.5">Contacto teléfono</label>
-                            <input type="text" wire:model="contacto_telefono" class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-2 focus:ring-[#d68643]/20">
+                            <input type="text" wire:model="contacto_telefono" class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-2 focus:ring-brand/20">
                         </div>
                         {{-- Colores del tenant: se aplican a sidebar, login, gradientes, badges, etc. --}}
                         <div class="md:col-span-2">
@@ -341,7 +341,7 @@
                                         <input type="text" wire:model.live="color_primario"
                                                placeholder="#d68643"
                                                maxlength="7"
-                                               class="w-full mt-0.5 rounded-lg border border-slate-200 px-2 py-1 text-xs font-mono uppercase focus:border-[#d68643] focus:ring-1 focus:ring-[#d68643]/30">
+                                               class="w-full mt-0.5 rounded-lg border border-slate-200 px-2 py-1 text-xs font-mono uppercase focus:border-brand focus:ring-1 focus:ring-brand/30">
                                     </div>
                                 </div>
 
@@ -355,7 +355,7 @@
                                         <input type="text" wire:model.live="color_secundario"
                                                placeholder="#a85f24"
                                                maxlength="7"
-                                               class="w-full mt-0.5 rounded-lg border border-slate-200 px-2 py-1 text-xs font-mono uppercase focus:border-[#d68643] focus:ring-1 focus:ring-[#d68643]/30">
+                                               class="w-full mt-0.5 rounded-lg border border-slate-200 px-2 py-1 text-xs font-mono uppercase focus:border-brand focus:ring-1 focus:ring-brand/30">
                                     </div>
                                 </div>
                             </div>
@@ -430,7 +430,7 @@
                             quitar() { this.dataUrl = null; this.nombre = null; this.error = ''; },
                         }">
                             <label class="block text-sm font-medium text-slate-700 mb-1.5">
-                                <i class="fa-solid fa-image text-[#d68643]"></i> Logo del tenant
+                                <i class="fa-solid fa-image text-brand"></i> Logo del tenant
                                 <span class="text-xs text-slate-400 font-normal">(PNG/JPG/SVG/WebP, máx 2MB)</span>
                             </label>
 
@@ -455,7 +455,7 @@
                                            class="block w-full text-sm text-slate-700
                                                   file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0
                                                   file:text-sm file:font-semibold
-                                                  file:bg-[#fbe9d7] file:text-[#a85f24] hover:file:bg-[#f5d4ad] cursor-pointer">
+                                                  file:bg-brand-soft file:text-brand-secondary hover:file:bg-brand-soft-2 cursor-pointer">
 
                                     <div x-show="nombre" x-cloak class="flex items-center gap-2 mt-2 text-xs">
                                         <span class="text-emerald-600 font-semibold">
@@ -471,7 +471,7 @@
 
                                     @if($logo_url_actual)
                                         <div class="text-xs text-slate-500 mt-1" x-show="!dataUrl">
-                                            Logo actual: <a href="{{ $logo_url_actual }}" target="_blank" class="text-[#a85f24] underline">ver</a>
+                                            Logo actual: <a href="{{ $logo_url_actual }}" target="_blank" class="text-brand-secondary underline">ver</a>
                                         </div>
                                     @endif
                                 </div>
@@ -479,11 +479,11 @@
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-1.5">Trial vence</label>
-                            <input type="date" wire:model="trial_ends_at" class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-2 focus:ring-[#d68643]/20">
+                            <input type="date" wire:model="trial_ends_at" class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-2 focus:ring-brand/20">
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-1.5">Subscripción vence</label>
-                            <input type="date" wire:model="subscription_ends_at" class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-2 focus:ring-[#d68643]/20">
+                            <input type="date" wire:model="subscription_ends_at" class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-2 focus:ring-brand/20">
                         </div>
                     </div>
 
@@ -579,11 +579,11 @@
 
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1.5">Notas internas</label>
-                        <textarea wire:model="notas_internas" rows="2" class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-2 focus:ring-[#d68643]/20"></textarea>
+                        <textarea wire:model="notas_internas" rows="2" class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-2 focus:ring-brand/20"></textarea>
                     </div>
 
                     <label class="flex items-start gap-3 rounded-xl bg-slate-50 border border-slate-200 p-3 cursor-pointer">
-                        <input type="checkbox" wire:model="activo" class="mt-0.5 rounded border-slate-300 text-[#d68643]">
+                        <input type="checkbox" wire:model="activo" class="mt-0.5 rounded border-slate-300 text-brand">
                         <div>
                             <div class="text-sm font-semibold text-slate-800">Tenant activo</div>
                             <div class="text-xs text-slate-500">Si está inactivo, sus usuarios no pueden iniciar sesión.</div>
@@ -617,7 +617,7 @@
 
                     <div class="flex justify-end gap-3 pt-4 border-t border-slate-100">
                         <button type="button" wire:click="cerrarModal" class="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancelar</button>
-                        <button type="submit" class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#d68643] to-[#a85f24] hover:from-[#c97a36] hover:to-[#965520] px-6 py-2.5 text-sm font-bold text-white shadow-lg">
+                        <button type="submit" class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-brand to-brand-secondary hover:from-brand-dark hover:to-brand-dark px-6 py-2.5 text-sm font-bold text-white shadow-lg">
                             <i class="fa-solid fa-floppy-disk"></i>
                             {{ $editandoId ? 'Actualizar tenant' : 'Crear tenant' }}
                         </button>

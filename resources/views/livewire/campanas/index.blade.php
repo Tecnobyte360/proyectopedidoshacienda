@@ -1,10 +1,10 @@
 <div class="min-h-screen bg-slate-50">
     <div class="w-full px-4 py-6 sm:px-6 sm:py-8 lg:px-8 space-y-6">
 
-        <div class="rounded-2xl border border-[#fbe9d7] bg-gradient-to-r from-[#fbe9d7]/40 via-white to-white p-5 shadow-sm">
+        <div class="rounded-2xl border border-[#fbe9d7] bg-gradient-to-r from-brand-soft/40 via-white to-white p-5 shadow-sm">
             <div class="flex items-center justify-between gap-4">
                 <div class="flex items-center gap-4">
-                    <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#d68643] to-[#a85f24] text-white shadow-lg">
+                    <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-brand to-brand-secondary text-white shadow-lg">
                         <i class="fa-solid fa-bullhorn text-xl"></i>
                     </div>
                     <div>
@@ -13,7 +13,7 @@
                     </div>
                 </div>
                 <button wire:click="abrirCrear"
-                        class="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-[#d68643] to-[#a85f24] hover:from-[#c97a36] hover:to-[#965520] text-white font-bold px-5 py-3 transition shadow-lg">
+                        class="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-brand to-brand-secondary hover:from-brand-dark hover:to-brand-dark text-white font-bold px-5 py-3 transition shadow-lg">
                     <i class="fa-solid fa-plus"></i> Nueva campaña
                 </button>
             </div>
@@ -132,7 +132,7 @@
              style="background: rgba(15,23,42,0.55); backdrop-filter: blur(4px);"
              wire:click.self="cerrarModal">
             <div class="w-full max-w-3xl bg-white rounded-2xl shadow-2xl my-8 overflow-hidden" @click.stop>
-                <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-[#fbe9d7]/40 via-white to-white">
+                <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-brand-soft/40 via-white to-white">
                     <h3 class="font-bold text-slate-800">{{ $editandoId ? 'Editar' : 'Nueva' }} campaña</h3>
                     <button wire:click="cerrarModal" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
                 </div>
@@ -153,7 +153,7 @@
                     </div>
 
                     <div class="rounded-xl border-2 border-slate-200 p-4 space-y-3">
-                        <h4 class="font-bold text-slate-800 text-sm"><i class="fa-solid fa-users text-[#d68643]"></i> Audiencia</h4>
+                        <h4 class="font-bold text-slate-800 text-sm"><i class="fa-solid fa-users text-brand"></i> Audiencia</h4>
                         <select wire:model.live="audienciaTipo" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm">
                             <option value="todos">Todos los clientes activos</option>
                             <option value="zona">Por zona de cobertura</option>
@@ -232,7 +232,7 @@
                 </div>
                 <div class="px-5 py-3 border-t border-slate-100 flex justify-end gap-2 bg-slate-50">
                     <button wire:click="cerrarModal" class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancelar</button>
-                    <button wire:click="guardar" class="rounded-xl bg-gradient-to-r from-[#d68643] to-[#a85f24] hover:from-[#c97a36] hover:to-[#965520] px-5 py-2 text-sm font-bold text-white shadow-lg">
+                    <button wire:click="guardar" class="rounded-xl bg-gradient-to-r from-brand to-brand-secondary hover:from-brand-dark hover:to-brand-dark px-5 py-2 text-sm font-bold text-white shadow-lg">
                         <i class="fa-solid fa-floppy-disk"></i> Guardar
                     </button>
                 </div>

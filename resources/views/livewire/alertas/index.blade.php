@@ -62,7 +62,7 @@
             <div>
                 <label class="block text-xs font-semibold text-slate-600 mb-1">Estado</label>
                 <select wire:model.live="filtroEstado"
-                        class="w-full rounded-xl border-slate-200 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                        class="w-full rounded-xl border-slate-200 text-sm focus:border-brand focus:ring-brand">
                     <option value="no_resueltas">Sin resolver</option>
                     <option value="resueltas">Resueltas</option>
                     <option value="todas">Todas</option>
@@ -71,7 +71,7 @@
             <div>
                 <label class="block text-xs font-semibold text-slate-600 mb-1">Severidad</label>
                 <select wire:model.live="filtroSeveridad"
-                        class="w-full rounded-xl border-slate-200 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                        class="w-full rounded-xl border-slate-200 text-sm focus:border-brand focus:ring-brand">
                     <option value="todas">Todas</option>
                     <option value="critica">Crítica</option>
                     <option value="warning">Warning</option>
@@ -81,7 +81,7 @@
             <div>
                 <label class="block text-xs font-semibold text-slate-600 mb-1">Tipo</label>
                 <select wire:model.live="filtroTipo"
-                        class="w-full rounded-xl border-slate-200 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                        class="w-full rounded-xl border-slate-200 text-sm focus:border-brand focus:ring-brand">
                     @foreach($tipos as $valor => $etiqueta)
                         <option value="{{ $valor }}">{{ $etiqueta }}</option>
                     @endforeach
@@ -91,7 +91,7 @@
                 <label class="block text-xs font-semibold text-slate-600 mb-1">Buscar</label>
                 <input type="text" wire:model.live.debounce.400ms="busqueda"
                        placeholder="Título o mensaje..."
-                       class="w-full rounded-xl border-slate-200 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                       class="w-full rounded-xl border-slate-200 text-sm focus:border-brand focus:ring-brand">
             </div>
         </div>
     </div>

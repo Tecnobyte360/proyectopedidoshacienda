@@ -40,7 +40,7 @@
                     @endif
                 </p>
             </div>
-            <a href="{{ route('alertas.index') }}" class="text-xs font-semibold text-[#a85f24] hover:underline">
+            <a href="{{ route('alertas.index') }}" class="text-xs font-semibold text-brand-secondary hover:underline">
                 Ver todas
             </a>
         </div>
@@ -81,7 +81,7 @@
 
         @if($ultimas->isNotEmpty())
             <div class="border-t border-slate-100 bg-slate-50 px-4 py-2">
-                <a href="{{ route('alertas.index') }}" class="block text-center text-xs font-semibold text-slate-600 hover:text-[#a85f24]">
+                <a href="{{ route('alertas.index') }}" class="block text-center text-xs font-semibold text-slate-600 hover:text-brand-secondary">
                     Gestionar todas las alertas →
                 </a>
             </div>

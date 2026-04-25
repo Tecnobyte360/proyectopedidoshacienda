@@ -2,9 +2,9 @@
     <div class="w-full px-4 py-6 sm:px-6 sm:py-8 lg:px-8 space-y-6">
 
         {{-- HEADER --}}
-        <div class="rounded-2xl border border-[#fbe9d7] bg-gradient-to-r from-[#fbe9d7]/40 via-white to-white p-5 shadow-sm">
+        <div class="rounded-2xl border border-[#fbe9d7] bg-gradient-to-r from-brand-soft/40 via-white to-white p-5 shadow-sm">
             <div class="flex items-center gap-4">
-                <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#d68643] to-[#a85f24] text-white shadow-lg">
+                <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-brand to-brand-secondary text-white shadow-lg">
                     <i class="fa-solid fa-file-import text-xl"></i>
                 </div>
                 <div>
@@ -18,12 +18,12 @@
         <div class="inline-flex rounded-2xl bg-white border border-slate-200 p-1 shadow-sm">
             <button wire:click="setTipo('productos')"
                     class="px-5 py-2 rounded-xl text-sm font-semibold transition
-                           {{ $tipo === 'productos' ? 'bg-gradient-to-r from-[#d68643] to-[#a85f24] text-white shadow' : 'text-slate-600 hover:bg-slate-50' }}">
+                           {{ $tipo === 'productos' ? 'bg-gradient-to-r from-brand to-brand-secondary text-white shadow' : 'text-slate-600 hover:bg-slate-50' }}">
                 <i class="fa-solid fa-box mr-2"></i> Productos
             </button>
             <button wire:click="setTipo('categorias')"
                     class="px-5 py-2 rounded-xl text-sm font-semibold transition
-                           {{ $tipo === 'categorias' ? 'bg-gradient-to-r from-[#d68643] to-[#a85f24] text-white shadow' : 'text-slate-600 hover:bg-slate-50' }}">
+                           {{ $tipo === 'categorias' ? 'bg-gradient-to-r from-brand to-brand-secondary text-white shadow' : 'text-slate-600 hover:bg-slate-50' }}">
                 <i class="fa-solid fa-tags mr-2"></i> Categorías
             </button>
         </div>
@@ -32,7 +32,7 @@
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div class="lg:col-span-2 rounded-2xl bg-white border border-slate-200 p-5 shadow-sm">
                 <h3 class="font-bold text-slate-800 mb-2">
-                    <i class="fa-solid fa-circle-info text-[#d68643]"></i>
+                    <i class="fa-solid fa-circle-info text-brand"></i>
                     Formato del archivo — {{ ucfirst($tipo) }}
                 </h3>
                 @if($tipo === 'productos')
@@ -85,16 +85,16 @@
                  @dragover.prevent="dragOver = true"
                  @dragleave.prevent="dragOver = false"
                  @drop.prevent="handleDrop($event)"
-                 :class="dragOver ? 'border-[#d68643] bg-[#fbe9d7]/30' : ''">
+                 :class="dragOver ? 'border-brand bg-brand-soft/30' : ''">
 
                 <template x-if="!fileName">
                     <div>
-                        <div class="mx-auto w-16 h-16 bg-[#fbe9d7] rounded-2xl flex items-center justify-center mb-3">
-                            <i class="fa-solid fa-cloud-arrow-up text-2xl text-[#a85f24]"></i>
+                        <div class="mx-auto w-16 h-16 bg-brand-soft rounded-2xl flex items-center justify-center mb-3">
+                            <i class="fa-solid fa-cloud-arrow-up text-2xl text-brand-secondary"></i>
                         </div>
                         <p class="text-slate-700 font-semibold">Arrastra tu archivo aquí o haz clic para seleccionar</p>
                         <p class="text-xs text-slate-500 mt-1">CSV o XLSX — máximo 20 MB</p>
-                        <label class="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#d68643] hover:bg-[#c97a36] text-white font-semibold px-5 py-2.5 text-sm cursor-pointer transition">
+                        <label class="mt-4 inline-flex items-center gap-2 rounded-xl bg-brand hover:bg-brand-dark text-white font-semibold px-5 py-2.5 text-sm cursor-pointer transition">
                             <i class="fa-solid fa-folder-open"></i> Seleccionar archivo
                             <input type="file" accept=".csv,.xlsx,.xls" class="hidden" @change="handleFile($event)">
                         </label>
@@ -128,7 +128,7 @@
         @if($resumen)
             <div class="rounded-2xl bg-white border border-slate-200 p-5 shadow-sm">
                 <h3 class="font-bold text-slate-800 mb-3">
-                    <i class="fa-solid fa-chart-simple text-[#d68643]"></i> Resumen de la última importación
+                    <i class="fa-solid fa-chart-simple text-brand"></i> Resumen de la última importación
                 </h3>
                 <div class="grid grid-cols-3 gap-3">
                     <div class="rounded-xl bg-emerald-50 border border-emerald-200 p-4 text-center">

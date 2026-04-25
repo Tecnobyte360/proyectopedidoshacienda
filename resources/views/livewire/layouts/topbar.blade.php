@@ -134,7 +134,7 @@
             <div class="relative" x-data="{ open: false }" @click.outside="open = false">
                 <button @click="open = !open"
                         class="flex items-center gap-3 rounded-xl px-2 py-1.5 hover:bg-slate-100 transition">
-                    <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#d68643] to-[#a85f24] text-white text-sm font-bold shadow-sm">
+                    <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand to-brand-secondary text-white text-sm font-bold shadow-sm">
                         {{ $userIniciales }}
                     </div>
                     <div class="hidden md:block text-left">
@@ -158,7 +158,7 @@
 
                     <div class="px-4 py-3 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">
                         <div class="flex items-center gap-3">
-                            <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-[#d68643] to-[#a85f24] text-white font-bold">
+                            <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-brand to-brand-secondary text-white font-bold">
                                 {{ $userIniciales }}
                             </div>
                             <div class="min-w-0 flex-1">

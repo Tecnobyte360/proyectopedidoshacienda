@@ -204,7 +204,7 @@
                 </button>
                 <button type="button" @click="confirm()"
                         :class="{
-                            'bg-[#d68643] hover:bg-[#c97a36]': type === 'primary',
+                            'bg-brand hover:bg-brand-dark': type === 'primary',
                             'bg-rose-500 hover:bg-rose-600':    type === 'danger',
                             'bg-emerald-500 hover:bg-emerald-600': type === 'success',
                             'bg-blue-500 hover:bg-blue-600':    type === 'info',

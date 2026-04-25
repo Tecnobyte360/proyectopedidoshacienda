@@ -2,7 +2,7 @@
     <div class="w-full px-4 py-6 sm:px-6 sm:py-8 lg:px-8 space-y-6">
 
         {{-- HEADER --}}
-        <div class="rounded-2xl border border-[#fbe9d7] bg-gradient-to-r from-[#fbe9d7]/40 via-white to-white p-5 shadow-sm">
+        <div class="rounded-2xl border border-[#fbe9d7] bg-gradient-to-r from-brand-soft/40 via-white to-white p-5 shadow-sm">
             <div class="flex flex-wrap items-center justify-between gap-4">
                 <div class="flex items-center gap-4">
                     <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-700 text-white shadow-lg">
@@ -14,7 +14,7 @@
                     </div>
                 </div>
                 <button wire:click="abrirModalCrear"
-                        class="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-[#d68643] to-[#a85f24] hover:from-[#c97a36] hover:to-[#965520] text-white font-bold px-5 py-3 transition shadow-lg">
+                        class="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-brand to-brand-secondary hover:from-brand-dark hover:to-brand-dark text-white font-bold px-5 py-3 transition shadow-lg">
                     <i class="fa-solid fa-plus"></i> Nuevo plan
                 </button>
             </div>
@@ -119,7 +119,7 @@
              style="background: rgba(15,23,42,0.55); backdrop-filter: blur(4px);"
              wire:click.self="cerrarModal">
             <div class="w-full max-w-3xl rounded-2xl bg-white shadow-2xl my-8 overflow-hidden" @click.stop>
-                <div class="flex items-center justify-between px-6 py-5 bg-gradient-to-r from-[#fbe9d7]/40 via-white to-white border-b border-slate-100">
+                <div class="flex items-center justify-between px-6 py-5 bg-gradient-to-r from-brand-soft/40 via-white to-white border-b border-slate-100">
                     <div class="flex items-center gap-3">
                         <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 text-white shadow">
                             <i class="fa-solid fa-money-check-dollar"></i>
@@ -136,27 +136,27 @@
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-1.5">Código *</label>
                             <input type="text" wire:model="codigo" placeholder="basico"
-                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-mono focus:border-[#d68643] focus:ring-2 focus:ring-[#d68643]/20">
+                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-mono focus:border-brand focus:ring-2 focus:ring-brand/20">
                             @error('codigo') <p class="text-xs text-rose-600 mt-1">{{ $message }}</p> @enderror
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-1.5">Nombre *</label>
                             <input type="text" wire:model="nombre" placeholder="Plan Básico"
-                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-2 focus:ring-[#d68643]/20">
+                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-2 focus:ring-brand/20">
                         </div>
                         <div class="md:col-span-2">
                             <label class="block text-sm font-medium text-slate-700 mb-1.5">Descripción</label>
-                            <input type="text" wire:model="descripcion" class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-2 focus:ring-[#d68643]/20">
+                            <input type="text" wire:model="descripcion" class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-2 focus:ring-brand/20">
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-1.5">Precio mensual</label>
                             <input type="number" step="1000" wire:model="precio_mensual"
-                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-2 focus:ring-[#d68643]/20">
+                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-2 focus:ring-brand/20">
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-1.5">Precio anual</label>
                             <input type="number" step="1000" wire:model="precio_anual"
-                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-2 focus:ring-[#d68643]/20">
+                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-2 focus:ring-brand/20">
                         </div>
                     </div>
 
@@ -190,19 +190,19 @@
                         <h4 class="font-bold text-sm text-slate-800 mb-2">Features incluidas</h4>
                         <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
                             <label class="flex items-center gap-2 cursor-pointer text-sm">
-                                <input type="checkbox" wire:model="feature_whatsapp" class="rounded text-[#d68643]"> WhatsApp
+                                <input type="checkbox" wire:model="feature_whatsapp" class="rounded text-brand"> WhatsApp
                             </label>
                             <label class="flex items-center gap-2 cursor-pointer text-sm">
-                                <input type="checkbox" wire:model="feature_ia" class="rounded text-[#d68643]"> Bot IA
+                                <input type="checkbox" wire:model="feature_ia" class="rounded text-brand"> Bot IA
                             </label>
                             <label class="flex items-center gap-2 cursor-pointer text-sm">
-                                <input type="checkbox" wire:model="feature_reportes" class="rounded text-[#d68643]"> Reportes
+                                <input type="checkbox" wire:model="feature_reportes" class="rounded text-brand"> Reportes
                             </label>
                             <label class="flex items-center gap-2 cursor-pointer text-sm">
-                                <input type="checkbox" wire:model="feature_multi_sede" class="rounded text-[#d68643]"> Multi-sede
+                                <input type="checkbox" wire:model="feature_multi_sede" class="rounded text-brand"> Multi-sede
                             </label>
                             <label class="flex items-center gap-2 cursor-pointer text-sm">
-                                <input type="checkbox" wire:model="feature_api" class="rounded text-[#d68643]"> API REST
+                                <input type="checkbox" wire:model="feature_api" class="rounded text-brand"> API REST
                             </label>
                         </div>
                     </div>
@@ -213,16 +213,16 @@
                         </label>
                         <textarea wire:model="caracteristicas_extra_text" rows="5"
                                   placeholder="Hasta 3 sedes&#10;1.500 pedidos/mes&#10;Bot avanzado"
-                                  class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-2 focus:ring-[#d68643]/20"></textarea>
+                                  class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-2 focus:ring-brand/20"></textarea>
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                         <label class="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" wire:model="activo" class="rounded text-[#d68643]">
+                            <input type="checkbox" wire:model="activo" class="rounded text-brand">
                             <span class="text-sm">Plan activo</span>
                         </label>
                         <label class="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" wire:model="publico" class="rounded text-[#d68643]">
+                            <input type="checkbox" wire:model="publico" class="rounded text-brand">
                             <span class="text-sm">Visible públicamente</span>
                         </label>
                         <div>
@@ -233,7 +233,7 @@
 
                     <div class="flex justify-end gap-3 pt-4 border-t border-slate-100">
                         <button type="button" wire:click="cerrarModal" class="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancelar</button>
-                        <button type="submit" class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#d68643] to-[#a85f24] hover:from-[#c97a36] hover:to-[#965520] px-6 py-2.5 text-sm font-bold text-white shadow-lg">
+                        <button type="submit" class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-brand to-brand-secondary hover:from-brand-dark hover:to-brand-dark px-6 py-2.5 text-sm font-bold text-white shadow-lg">
                             <i class="fa-solid fa-floppy-disk"></i> {{ $editandoId ? 'Actualizar plan' : 'Crear plan' }}
                         </button>
                     </div>

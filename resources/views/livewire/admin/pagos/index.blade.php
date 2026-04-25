@@ -2,7 +2,7 @@
     <div class="w-full px-4 py-6 sm:px-6 sm:py-8 lg:px-8 space-y-6">
 
         {{-- HEADER --}}
-        <div class="rounded-2xl border border-[#fbe9d7] bg-gradient-to-r from-[#fbe9d7]/40 via-white to-white p-5 shadow-sm">
+        <div class="rounded-2xl border border-[#fbe9d7] bg-gradient-to-r from-brand-soft/40 via-white to-white p-5 shadow-sm">
             <div class="flex flex-wrap items-center justify-between gap-4">
                 <div class="flex items-center gap-4">
                     <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-700 text-white shadow-lg">
@@ -149,7 +149,7 @@
              style="background: rgba(15,23,42,0.55); backdrop-filter: blur(4px);"
              wire:click.self="cerrarModal">
             <div class="w-full max-w-2xl rounded-2xl bg-white shadow-2xl my-8 overflow-hidden" @click.stop>
-                <div class="flex items-center justify-between px-6 py-5 bg-gradient-to-r from-[#fbe9d7]/40 via-white to-white border-b border-slate-100">
+                <div class="flex items-center justify-between px-6 py-5 bg-gradient-to-r from-brand-soft/40 via-white to-white border-b border-slate-100">
                     <h3 class="text-lg font-extrabold text-slate-800">{{ $editandoId ? 'Editar pago' : 'Registrar nuevo pago' }}</h3>
                     <button wire:click="cerrarModal" class="flex h-9 w-9 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100">
                         <i class="fa-solid fa-xmark"></i>

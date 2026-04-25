@@ -9,7 +9,7 @@
 
         <div class="flex flex-wrap items-center gap-3">
             <select wire:model.live="sedeId"
-                    class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm shadow-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                    class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm shadow-sm focus:border-brand focus:ring-brand">
                 <option value="">Todas las sedes</option>
                 @foreach($sedes as $sede)
                     <option value="{{ $sede->id }}">{{ $sede->nombre }}</option>
@@ -20,7 +20,7 @@
                 @foreach(['hoy' => 'Hoy', 'semana' => '7 días', 'mes' => '30 días', 'trimestre' => '90 días'] as $key => $label)
                     <button wire:click="$set('rango', '{{ $key }}')"
                             class="px-4 py-2 text-xs font-semibold rounded-lg transition
-                                  {{ $rango === $key ? 'bg-[#d68643] text-white shadow' : 'text-slate-600 hover:bg-slate-100' }}">
+                                  {{ $rango === $key ? 'bg-brand text-white shadow' : 'text-slate-600 hover:bg-slate-100' }}">
                         {{ $label }}
                     </button>
                 @endforeach
@@ -33,7 +33,7 @@
     {{-- KPIS principales --}}
     <div class="mb-6 grid grid-cols-2 lg:grid-cols-4 gap-4">
 
-        <div class="rounded-2xl bg-gradient-to-br from-[#d68643] to-[#a85f24] p-5 text-white shadow-lg">
+        <div class="rounded-2xl bg-gradient-to-br from-brand to-brand-secondary p-5 text-white shadow-lg">
             <div class="flex items-center justify-between mb-3">
                 <span class="text-xs font-semibold uppercase tracking-wider opacity-80">Ingresos</span>
                 <i class="fa-solid fa-dollar-sign text-2xl opacity-60"></i>
@@ -145,7 +145,7 @@
                     <div>
                         <div class="flex items-center justify-between mb-1">
                             <div class="flex items-center gap-2 min-w-0 flex-1">
-                                <span class="flex h-5 w-5 items-center justify-center rounded-md bg-[#fbe9d7] text-[10px] font-bold text-[#a85f24]">
+                                <span class="flex h-5 w-5 items-center justify-center rounded-md bg-brand-soft text-[10px] font-bold text-brand-secondary">
                                     {{ $i + 1 }}
                                 </span>
                                 <span class="text-sm font-medium text-slate-700 truncate">{{ $prod['producto'] }}</span>
@@ -153,7 +153,7 @@
                             <span class="text-xs font-bold text-slate-800 ml-2">${{ number_format($prod['total'], 0, ',', '.') }}</span>
                         </div>
                         <div class="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
-                            <div class="h-full rounded-full bg-gradient-to-r from-[#d68643] to-[#a85f24]"
+                            <div class="h-full rounded-full bg-gradient-to-r from-brand to-brand-secondary"
                                  style="width: {{ ($prod['total'] / $maxTotal) * 100 }}%"></div>
                         </div>
                         <div class="text-[10px] text-slate-400 mt-0.5">{{ rtrim(rtrim(number_format($prod['cantidad'], 2, ',', '.'), '0'), ',') }} unidades</div>
@@ -175,7 +175,7 @@
             <div class="space-y-3">
                 @forelse($this->topDomiciliarios as $i => $dom)
                     <div class="flex items-center gap-3 rounded-xl bg-slate-50 p-3">
-                        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#d68643] to-[#a85f24] text-white font-bold">
+                        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-brand to-brand-secondary text-white font-bold">
                             {{ strtoupper(substr($dom['nombre'], 0, 1)) }}
                         </div>
                         <div class="flex-1 min-w-0">
@@ -208,7 +208,7 @@
                     <div>
                         <div class="flex items-center justify-between mb-1">
                             <div class="flex items-center gap-2">
-                                <i class="fa-solid fa-store text-xs text-[#d68643]"></i>
+                                <i class="fa-solid fa-store text-xs text-brand"></i>
                                 <span class="text-sm font-medium text-slate-700">{{ $sede['sede'] }}</span>
                             </div>
                             <span class="text-xs font-bold text-slate-800">${{ number_format($sede['ventas'], 0, ',', '.') }}</span>

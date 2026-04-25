@@ -2,10 +2,10 @@
     <div class="w-full px-4 py-6 sm:px-6 sm:py-8 lg:px-8 space-y-6">
 
         {{-- HEADER --}}
-        <div class="rounded-2xl border border-[#fbe9d7] bg-gradient-to-r from-[#fbe9d7]/40 via-white to-white p-5 shadow-sm">
+        <div class="rounded-2xl border border-[#fbe9d7] bg-gradient-to-r from-brand-soft/40 via-white to-white p-5 shadow-sm">
             <div class="flex items-center justify-between gap-4">
                 <div class="flex items-center gap-4">
-                    <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#d68643] to-[#a85f24] text-white shadow-lg">
+                    <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-brand to-brand-secondary text-white shadow-lg">
                         <i class="fa-solid fa-plug text-xl"></i>
                     </div>
                     <div>
@@ -14,7 +14,7 @@
                     </div>
                 </div>
                 <button wire:click="abrirCrear"
-                        class="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-[#d68643] to-[#a85f24] hover:from-[#c97a36] hover:to-[#965520] text-white font-bold px-5 py-3 transition shadow-lg">
+                        class="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-brand to-brand-secondary hover:from-brand-dark hover:to-brand-dark text-white font-bold px-5 py-3 transition shadow-lg">
                     <i class="fa-solid fa-plus"></i> Nueva integración
                 </button>
             </div>
@@ -128,9 +128,9 @@
              style="background: rgba(15,23,42,0.55); backdrop-filter: blur(4px);"
              wire:click.self="cerrarModal">
             <div class="w-full max-w-3xl bg-white rounded-2xl shadow-2xl my-8 overflow-hidden" @click.stop>
-                <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-[#fbe9d7]/40 via-white to-white">
+                <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-brand-soft/40 via-white to-white">
                     <div class="flex items-center gap-3">
-                        <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-[#d68643] to-[#a85f24] text-white">
+                        <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-brand to-brand-secondary text-white">
                             <i class="fa-solid {{ $editandoId ? 'fa-pen-to-square' : 'fa-plus' }}"></i>
                         </div>
                         <div>
@@ -151,7 +151,7 @@
                         <div>
                             <label class="block text-xs font-semibold text-slate-700 mb-1">Nombre *</label>
                             <input type="text" wire:model="nombre" placeholder="ERP Producción"
-                                   class="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-[#d68643] focus:ring-2 focus:ring-amber-100">
+                                   class="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-brand focus:ring-2 focus:ring-amber-100">
                             @error('nombre') <p class="text-xs text-rose-600 mt-1">{{ $message }}</p> @enderror
                         </div>
                         <div>
@@ -171,7 +171,7 @@
                         </div>
                         <div class="flex items-end">
                             <label class="flex items-center gap-2 text-sm">
-                                <input type="checkbox" wire:model="activo" class="rounded text-[#d68643]">
+                                <input type="checkbox" wire:model="activo" class="rounded text-brand">
                                 <span class="font-semibold text-slate-700">Integración activa</span>
                             </label>
                         </div>
@@ -179,7 +179,7 @@
 
                     {{-- Conexión --}}
                     <div class="rounded-xl border-2 border-slate-200 p-4 space-y-3">
-                        <h4 class="font-bold text-slate-800 text-sm"><i class="fa-solid fa-server text-[#d68643]"></i> Conexión</h4>
+                        <h4 class="font-bold text-slate-800 text-sm"><i class="fa-solid fa-server text-brand"></i> Conexión</h4>
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                             <div class="md:col-span-2">
                                 <label class="block text-xs font-semibold text-slate-700 mb-1">Host / IP *</label>
@@ -339,7 +339,7 @@
 
                     {{-- Query --}}
                     <div class="rounded-xl border-2 border-slate-200 p-4 space-y-2">
-                        <h4 class="font-bold text-slate-800 text-sm"><i class="fa-solid fa-code text-[#d68643]"></i> Query SQL</h4>
+                        <h4 class="font-bold text-slate-800 text-sm"><i class="fa-solid fa-code text-brand"></i> Query SQL</h4>
                         <p class="text-xs text-slate-500">
                             Usa alias (<code>AS codigo</code>, <code>AS nombre</code>, etc.) que coincidan con los campos destino, o configura el mapeo abajo.
                         </p>
@@ -350,7 +350,7 @@
                     {{-- Mapeo (solo productos) --}}
                     @if($entidad === 'productos')
                         <div class="rounded-xl border-2 border-slate-200 p-4">
-                            <h4 class="font-bold text-slate-800 text-sm mb-2"><i class="fa-solid fa-arrow-right-arrow-left text-[#d68643]"></i> Mapeo de columnas</h4>
+                            <h4 class="font-bold text-slate-800 text-sm mb-2"><i class="fa-solid fa-arrow-right-arrow-left text-brand"></i> Mapeo de columnas</h4>
                             <p class="text-xs text-slate-500 mb-3">Nombre de la columna del SELECT → campo del producto local.</p>
                             <div class="grid grid-cols-2 gap-3">
                                 @foreach(['codigo', 'nombre', 'categoria', 'precio_base', 'unidad', 'descripcion'] as $campo)
@@ -365,11 +365,11 @@
                     @endif
 
                     {{-- Test --}}
-                    <div class="rounded-xl border-2 border-dashed border-[#fbe9d7] bg-[#fbe9d7]/30 p-4">
+                    <div class="rounded-xl border-2 border-dashed border-[#fbe9d7] bg-brand-soft/30 p-4">
                         <button wire:click="probarConexion"
                                 wire:loading.attr="disabled"
                                 wire:target="probarConexion"
-                                class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#d68643] to-[#a85f24] hover:from-[#c97a36] hover:to-[#965520] text-white font-semibold px-5 py-2.5 text-sm transition disabled:opacity-50 shadow">
+                                class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-brand to-brand-secondary hover:from-brand-dark hover:to-brand-dark text-white font-semibold px-5 py-2.5 text-sm transition disabled:opacity-50 shadow">
                             <i class="fa-solid fa-vial" wire:loading.remove wire:target="probarConexion"></i>
                             <i class="fa-solid fa-circle-notch fa-spin" wire:loading wire:target="probarConexion"></i>
                             Probar conexión y query
@@ -415,7 +415,7 @@
                         Cancelar
                     </button>
                     <button wire:click="guardar"
-                            class="rounded-xl bg-gradient-to-r from-[#d68643] to-[#a85f24] hover:from-[#c97a36] hover:to-[#965520] px-5 py-2 text-sm font-bold text-white shadow-lg">
+                            class="rounded-xl bg-gradient-to-r from-brand to-brand-secondary hover:from-brand-dark hover:to-brand-dark px-5 py-2 text-sm font-bold text-white shadow-lg">
                         <i class="fa-solid fa-floppy-disk"></i> Guardar
                     </button>
                 </div>

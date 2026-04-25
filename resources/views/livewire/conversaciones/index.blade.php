@@ -44,7 +44,7 @@
             </div>
         </div>
 
-        <div class="rounded-2xl bg-gradient-to-br from-[#d68643] to-[#a85f24] p-4 shadow text-white">
+        <div class="rounded-2xl bg-gradient-to-br from-brand to-brand-secondary p-4 shadow text-white">
             <div class="flex items-center gap-3">
                 <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20">
                     <i class="fa-solid fa-message"></i>
@@ -61,7 +61,7 @@
     <div class="mb-4 grid grid-cols-1 md:grid-cols-3 gap-3">
         <input type="text" wire:model.live.debounce.400ms="search"
                placeholder="Buscar por nombre, teléfono..."
-               class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-[#d68643] focus:ring-[#d68643]">
+               class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-brand focus:ring-brand">
 
         <select wire:model.live="filtroEstado"
                 class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm">
@@ -93,7 +93,7 @@
             <div wire:click="ver({{ $c->id }})"
                  class="flex items-center gap-4 px-4 py-3 border-b border-slate-100 hover:bg-amber-50/30 cursor-pointer transition">
 
-                <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#d68643] to-[#a85f24] text-white font-bold text-sm">
+                <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand to-brand-secondary text-white font-bold text-sm">
                     {{ $iniciales ?: 'C' }}
                 </div>
 
@@ -169,7 +169,7 @@
             <div class="w-full sm:max-w-3xl rounded-t-2xl sm:rounded-2xl bg-white shadow-2xl my-0 sm:my-8 max-h-[95vh] flex flex-col">
 
                 {{-- Header --}}
-                <div class="bg-gradient-to-br from-[#d68643] to-[#a85f24] text-white px-6 py-4 sm:rounded-t-2xl flex items-center justify-between gap-4">
+                <div class="bg-gradient-to-br from-brand to-brand-secondary text-white px-6 py-4 sm:rounded-t-2xl flex items-center justify-between gap-4">
                     <div class="flex items-center gap-3 min-w-0">
                         <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20 backdrop-blur text-lg font-bold">
                             {{ $iniVer ?: 'C' }}

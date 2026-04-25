@@ -16,7 +16,7 @@
     <aside class="w-full lg:w-96 flex-shrink-0 bg-white border-r border-slate-200 flex flex-col">
 
         {{-- Header --}}
-        <div class="p-4 border-b border-slate-200 bg-gradient-to-br from-[#d68643] to-[#a85f24] text-white">
+        <div class="p-4 border-b border-slate-200 bg-gradient-to-br from-brand to-brand-secondary text-white">
             <div class="flex items-start justify-between gap-2">
                 <div>
                     <h2 class="text-lg font-bold flex items-center gap-2">
@@ -43,7 +43,7 @@
         <div class="p-3 border-b border-slate-200 space-y-2">
             <input type="text" wire:model.live.debounce.400ms="busqueda"
                    placeholder="Buscar cliente o teléfono..."
-                   class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                   class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-brand focus:ring-brand">
 
             <div class="flex gap-1">
                 @foreach([
@@ -55,7 +55,7 @@
                 ] as $key => [$label, $icon])
                     <button wire:click="$set('filtroEstado', '{{ $key }}')"
                             class="flex-1 rounded-lg px-2 py-1.5 text-xs font-semibold transition
-                                  {{ $filtroEstado === $key ? 'bg-[#d68643] text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200' }}">
+                                  {{ $filtroEstado === $key ? 'bg-brand text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200' }}">
                         <i class="fa-solid {{ $icon }} mr-0.5"></i> {{ $label }}
                     </button>
                 @endforeach
@@ -84,11 +84,11 @@
                                  class="h-12 w-12 rounded-full object-cover bg-slate-100"
                                  onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
                                  alt="avatar">
-                            <div class="h-12 w-12 rounded-full bg-gradient-to-br from-[#d68643] to-[#a85f24] text-white font-bold items-center justify-center" style="display:none;">
+                            <div class="h-12 w-12 rounded-full bg-gradient-to-br from-brand to-brand-secondary text-white font-bold items-center justify-center" style="display:none;">
                                 {{ $iniciales ?: 'C' }}
                             </div>
                         @else
-                            <div class="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-[#d68643] to-[#a85f24] text-white font-bold">
+                            <div class="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-brand to-brand-secondary text-white font-bold">
                                 {{ $iniciales ?: 'C' }}
                             </div>
                         @endif
@@ -159,7 +159,7 @@
                              class="h-10 w-10 rounded-full object-cover bg-slate-100 flex-shrink-0"
                              alt="avatar">
                     @else
-                        <div class="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-[#d68643] to-[#a85f24] text-white font-bold text-sm flex-shrink-0">
+                        <div class="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-brand to-brand-secondary text-white font-bold text-sm flex-shrink-0">
                             {{ $iniAct ?: 'C' }}
                         </div>
                     @endif
@@ -285,7 +285,7 @@
                         <img :src="imgDataUrl" class="h-20 w-20 rounded-lg object-cover border border-slate-200">
                         <div class="flex-1">
                             <input type="text" x-model="imgCaption" placeholder="Caption opcional..."
-                                   class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[#d68643] focus:ring-2 focus:ring-amber-100">
+                                   class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand focus:ring-2 focus:ring-amber-100">
                             <div class="flex items-center gap-2 mt-2">
                                 <button @click="sendImage()"
                                         :disabled="sendingImg"
@@ -314,7 +314,7 @@
                               rows="1"
                               x-show="!recording && !preview"
                               @keydown.enter.prevent="$wire.enviar()"
-                              class="flex-1 resize-none rounded-2xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-2 focus:ring-amber-100"></textarea>
+                              class="flex-1 resize-none rounded-2xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-2 focus:ring-amber-100"></textarea>
 
                     {{-- Indicador de grabación --}}
                     <div x-show="recording" x-cloak
@@ -373,7 +373,7 @@
                     {{-- Botón enviar texto --}}
                     <button type="submit"
                             x-show="!recording && !preview"
-                            class="flex h-11 w-11 items-center justify-center rounded-full bg-[#d68643] text-white shadow hover:bg-[#c97a36] transition">
+                            class="flex h-11 w-11 items-center justify-center rounded-full bg-brand text-white shadow hover:bg-brand-dark transition">
                         <i class="fa-solid fa-paper-plane"></i>
                     </button>
                 </form>
@@ -703,9 +703,9 @@
              style="background: rgba(15,23,42,0.55); backdrop-filter: blur(4px);"
              wire:click.self="cerrarNuevoChat">
             <div class="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden">
-                <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-[#fbe9d7]/40 via-white to-white">
+                <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-brand-soft/40 via-white to-white">
                     <div class="flex items-center gap-3">
-                        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#d68643] to-[#a85f24] text-white">
+                        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-brand to-brand-secondary text-white">
                             <i class="fa-solid fa-pen-to-square"></i>
                         </div>
                         <div>
@@ -721,18 +721,18 @@
                     <div>
                         <label class="block text-xs font-semibold text-slate-700 mb-1">Teléfono (con código país) *</label>
                         <input type="text" wire:model="nuevoChatTel" placeholder="573001234567"
-                               class="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-mono focus:border-[#d68643] focus:ring-2 focus:ring-amber-100">
+                               class="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-mono focus:border-brand focus:ring-2 focus:ring-amber-100">
                         <p class="text-[10px] text-slate-400 mt-1">Solo dígitos. Ej: 573001234567</p>
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-slate-700 mb-1">Nombre (opcional)</label>
                         <input type="text" wire:model="nuevoChatNombre" placeholder="Nombre del cliente"
-                               class="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-[#d68643] focus:ring-2 focus:ring-amber-100">
+                               class="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-brand focus:ring-2 focus:ring-amber-100">
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-slate-700 mb-1">Primer mensaje *</label>
                         <textarea wire:model="nuevoChatMensaje" rows="3" placeholder="Hola, ¿cómo estás?"
-                                  class="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-[#d68643] focus:ring-2 focus:ring-amber-100"></textarea>
+                                  class="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-brand focus:ring-2 focus:ring-amber-100"></textarea>
                     </div>
                 </div>
                 <div class="px-5 py-3 border-t border-slate-100 flex justify-end gap-2 bg-slate-50">
@@ -743,7 +743,7 @@
                     <button wire:click="crearNuevoChat"
                             wire:loading.attr="disabled"
                             wire:target="crearNuevoChat"
-                            class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#d68643] to-[#a85f24] hover:from-[#c97a36] hover:to-[#965520] px-4 py-2 text-sm font-bold text-white shadow-lg disabled:opacity-50">
+                            class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-brand to-brand-secondary hover:from-brand-dark hover:to-brand-dark px-4 py-2 text-sm font-bold text-white shadow-lg disabled:opacity-50">
                         <span wire:loading.remove wire:target="crearNuevoChat"><i class="fa-solid fa-paper-plane"></i> Enviar</span>
                         <span wire:loading wire:target="crearNuevoChat"><i class="fa-solid fa-circle-notch fa-spin"></i> Enviando...</span>
                     </button>
@@ -786,7 +786,7 @@
                 }
              }">
             <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" @click.stop>
-                <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-[#d68643] to-[#a85f24] text-white">
+                <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-brand to-brand-secondary text-white">
                     <h3 class="text-base font-bold flex items-center gap-2">
                         <i class="fa-brands fa-whatsapp"></i> Estados de WhatsApp
                     </h3>
@@ -797,12 +797,12 @@
                 <div class="flex border-b border-slate-200 bg-slate-50">
                     <button wire:click="cambiarTabEstado('publicar')"
                             class="flex-1 px-4 py-2.5 text-xs font-semibold transition
-                                @if($estadoTab==='publicar') text-[#a85f24] border-b-2 border-[#d68643] bg-white @else text-slate-500 hover:text-slate-700 @endif">
+                                @if($estadoTab==='publicar') text-brand-secondary border-b-2 border-brand bg-white @else text-slate-500 hover:text-slate-700 @endif">
                         <i class="fa-solid fa-circle-plus mr-1"></i> Publicar nuevo
                     </button>
                     <button wire:click="cambiarTabEstado('listar')"
                             class="flex-1 px-4 py-2.5 text-xs font-semibold transition
-                                @if($estadoTab==='listar') text-[#a85f24] border-b-2 border-[#d68643] bg-white @else text-slate-500 hover:text-slate-700 @endif">
+                                @if($estadoTab==='listar') text-brand-secondary border-b-2 border-brand bg-white @else text-slate-500 hover:text-slate-700 @endif">
                         <i class="fa-solid fa-list mr-1"></i> Mis estados
                     </button>
                 </div>
@@ -814,7 +814,7 @@
                         <input type="file"
                                accept="image/jpeg,image/png,image/webp,video/mp4"
                                @change="handleFile($event)"
-                               class="block w-full text-sm text-slate-700 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-orange-50 file:text-[#a85f24] hover:file:bg-orange-100 cursor-pointer">
+                               class="block w-full text-sm text-slate-700 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-orange-50 file:text-brand-secondary hover:file:bg-orange-100 cursor-pointer">
                         <p class="text-[10px] text-slate-400 mt-1">JPG, PNG, WEBP o MP4. Máx 16MB.</p>
 
                         <div x-show="preview" x-cloak class="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-2 flex items-center justify-center">
@@ -831,7 +831,7 @@
                         <label class="block text-xs font-semibold text-slate-700 mb-1">Texto del estado (opcional)</label>
                         <textarea wire:model="estadoCaption" rows="3" placeholder="Escribe algo para acompañar tu estado…"
                                   maxlength="700"
-                                  class="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-[#d68643] focus:ring-2 focus:ring-amber-100"></textarea>
+                                  class="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-brand focus:ring-2 focus:ring-amber-100"></textarea>
                     </div>
 
                     <div class="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-[11px] text-amber-800">
@@ -847,7 +847,7 @@
                     </button>
                     <button @click="publicar()"
                             :disabled="publicando || !dataUrl"
-                            class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#d68643] to-[#a85f24] hover:from-[#c97a36] hover:to-[#965520] px-4 py-2 text-sm font-bold text-white shadow-lg disabled:opacity-50">
+                            class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-brand to-brand-secondary hover:from-brand-dark hover:to-brand-dark px-4 py-2 text-sm font-bold text-white shadow-lg disabled:opacity-50">
                         <span x-show="!publicando"><i class="fa-solid fa-paper-plane"></i> Publicar</span>
                         <span x-show="publicando" x-cloak><i class="fa-solid fa-circle-notch fa-spin"></i> Publicando…</span>
                     </button>

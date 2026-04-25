@@ -7,13 +7,13 @@
     @if($cantSel > 0)
         <div class="fixed bottom-6 left-1/2 -translate-x-1/2 z-40">
             <div class="flex items-center gap-3 rounded-2xl bg-slate-900 text-white shadow-2xl px-5 py-3">
-                <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-[#d68643] font-bold">{{ $cantSel }}</span>
+                <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-brand font-bold">{{ $cantSel }}</span>
                 <span class="text-sm font-semibold">pedido(s) seleccionado(s)</span>
                 <button wire:click="limpiarSeleccionMasiva" class="ml-2 text-xs text-slate-400 hover:text-white">
                     Cancelar
                 </button>
                 <button wire:click="abrirModalMasivo"
-                        class="ml-2 inline-flex items-center gap-2 rounded-xl bg-[#d68643] hover:bg-[#c97a36] px-4 py-2 text-sm font-bold transition shadow">
+                        class="ml-2 inline-flex items-center gap-2 rounded-xl bg-brand hover:bg-brand-dark px-4 py-2 text-sm font-bold transition shadow">
                     <i class="fa-solid fa-motorcycle"></i>
                     Despachar selección
                 </button>
@@ -77,7 +77,7 @@
                             <div class="px-4 py-3 space-y-2">
                                 <label class="block text-xs font-semibold text-slate-600">Domiciliario:</label>
                                 <select wire:model="domiciliariosPorZonaMasivo.{{ $keyG }}"
-                                        class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                                        class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-brand focus:ring-brand">
                                     <option value="">— Selecciona —</option>
                                     @if($domsZona->isNotEmpty())
                                         <optgroup label="✓ Cubren esta zona">
@@ -428,7 +428,7 @@
                             <th class="px-3 py-3 w-10">
                                 <button type="button" wire:click="seleccionarTodosVisibles"
                                         title="Seleccionar todos los despachables visibles"
-                                        class="text-slate-400 hover:text-[#d68643] transition">
+                                        class="text-slate-400 hover:text-brand transition">
                                     <i class="fa-solid fa-check-double text-sm"></i>
                                 </button>
                             </th>
@@ -484,7 +484,7 @@
                                         <input type="checkbox"
                                                wire:click="toggleSeleccionMasiva({{ $pedido->id }})"
                                                @checked($estaSeleccionado)
-                                               class="rounded border-slate-300 text-[#d68643] focus:ring-[#d68643] cursor-pointer">
+                                               class="rounded border-slate-300 text-brand focus:ring-brand cursor-pointer">
                                     @endif
                                 </td>
 

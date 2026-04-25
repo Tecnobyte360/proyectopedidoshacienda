@@ -20,7 +20,7 @@
                 <div>
                     <label class="block text-sm font-medium text-slate-700 mb-1">Nombre de la asesora</label>
                     <input type="text" wire:model="nombre_asesora"
-                           class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                           class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand">
                     <p class="text-[11px] text-slate-400 mt-1">El bot se presentará con este nombre.</p>
                 </div>
 
@@ -30,7 +30,7 @@
                             <div class="text-sm font-medium text-slate-700">Bot activo</div>
                             <div class="text-[11px] text-slate-500">Si lo apagas, no responde a nadie</div>
                         </div>
-                        <input type="checkbox" wire:model="activo" class="rounded border-slate-300 text-[#d68643] h-5 w-5">
+                        <input type="checkbox" wire:model="activo" class="rounded border-slate-300 text-brand h-5 w-5">
                     </label>
                 </div>
             </div>
@@ -59,7 +59,7 @@
                         </div>
                     </div>
                     <input type="checkbox" wire:model.live="enviar_imagenes_productos"
-                           class="mt-1 rounded border-slate-300 text-[#d68643] h-6 w-6">
+                           class="mt-1 rounded border-slate-300 text-brand h-6 w-6">
                 </label>
 
                 @if($enviar_imagenes_productos)
@@ -69,7 +69,7 @@
                                 Máximo de imágenes por mensaje
                             </label>
                             <input type="number" wire:model="max_imagenes_por_mensaje" min="1" max="10"
-                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand">
                             <p class="text-[11px] text-slate-400 mt-1">Recomendado: 2-3 (no saturar al cliente).</p>
                         </div>
 
@@ -79,7 +79,7 @@
                                     <div class="text-sm font-medium text-slate-700">Mostrar destacados al saludar</div>
                                     <div class="text-[11px] text-slate-500">Envía 1-2 fotos al iniciar la charla</div>
                                 </div>
-                                <input type="checkbox" wire:model="enviar_imagen_destacados" class="rounded border-slate-300 text-[#d68643] h-5 w-5">
+                                <input type="checkbox" wire:model="enviar_imagen_destacados" class="rounded border-slate-300 text-brand h-5 w-5">
                             </label>
                         </div>
                     </div>
@@ -119,7 +119,7 @@
                     </div>
                 </div>
                 <input type="checkbox" wire:model.live="transcribir_audios"
-                       class="mt-1 rounded border-slate-300 text-[#d68643] h-6 w-6">
+                       class="mt-1 rounded border-slate-300 text-brand h-6 w-6">
             </label>
 
             <div class="mt-3 flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 p-3 text-xs text-amber-800">
@@ -158,7 +158,7 @@
                         </div>
                     </div>
                     <input type="checkbox" wire:model.live="agrupar_mensajes_activo"
-                           class="mt-1 rounded border-slate-300 text-[#d68643] h-6 w-6">
+                           class="mt-1 rounded border-slate-300 text-brand h-6 w-6">
                 </label>
 
                 @if($agrupar_mensajes_activo)
@@ -211,7 +211,7 @@
                 <div class="md:col-span-3">
                     <label class="block text-sm font-medium text-slate-700 mb-1">Modelo</label>
                     <select wire:model="modelo_openai"
-                            class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                            class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand">
                         @foreach($modelosDisponibles as $key => $label)
                             <option value="{{ $key }}">{{ $label }}</option>
                         @endforeach
@@ -234,13 +234,13 @@
                 <div>
                     <label class="block text-sm font-medium text-slate-700 mb-1">Max tokens por respuesta</label>
                     <input type="number" wire:model="max_tokens" min="100" max="4000" step="100"
-                           class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                           class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand">
                 </div>
 
                 <div class="flex items-end">
                     <label class="inline-flex items-center gap-3 cursor-pointer w-full justify-between rounded-xl border border-slate-200 px-4 py-2.5">
                         <span class="text-sm font-medium text-slate-700">Saludar con promos vigentes</span>
-                        <input type="checkbox" wire:model="saludar_con_promociones" class="rounded border-slate-300 text-[#d68643] h-5 w-5">
+                        <input type="checkbox" wire:model="saludar_con_promociones" class="rounded border-slate-300 text-brand h-5 w-5">
                     </label>
                 </div>
             </div>
@@ -264,7 +264,7 @@
                         <span class="text-sm font-semibold text-slate-700">Activar derivación</span>
                         <p class="text-[11px] text-slate-500">Expone la función a la IA.</p>
                     </div>
-                    <input type="checkbox" wire:model="derivacion_activa" class="rounded border-slate-300 text-[#d68643] h-5 w-5">
+                    <input type="checkbox" wire:model="derivacion_activa" class="rounded border-slate-300 text-brand h-5 w-5">
                 </label>
 
                 <label class="inline-flex items-center gap-3 cursor-pointer w-full justify-between rounded-xl border border-slate-200 px-4 py-2.5">
@@ -272,7 +272,7 @@
                         <span class="text-sm font-semibold text-slate-700">Red de seguridad</span>
                         <p class="text-[11px] text-slate-500">Si la IA dice "voy a derivar" sin hacerlo, derivamos nosotros.</p>
                     </div>
-                    <input type="checkbox" wire:model="derivacion_fallback_activa" class="rounded border-slate-300 text-[#d68643] h-5 w-5">
+                    <input type="checkbox" wire:model="derivacion_fallback_activa" class="rounded border-slate-300 text-brand h-5 w-5">
                 </label>
             </div>
 
@@ -282,7 +282,7 @@
                 </label>
                 <textarea wire:model="derivacion_instrucciones_ia" rows="10"
                           placeholder="Deja vacío para usar la plantilla por defecto."
-                          class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-mono leading-relaxed focus:border-[#d68643] focus:ring-[#d68643]"></textarea>
+                          class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-mono leading-relaxed focus:border-brand focus:ring-brand"></textarea>
                 <p class="text-[11px] text-slate-500 mt-1">
                     Este texto es el que define CUÁNDO y CÓMO la IA decide derivar. Edítalo para ajustar criterio (ej. ser más estricta o más permisiva).
                 </p>
@@ -295,7 +295,7 @@
                     </label>
                     <textarea wire:model="derivacion_frases_deteccion" rows="4"
                               placeholder="voy a derivar, voy a transferir, te paso con, ..."
-                              class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-mono focus:border-[#d68643] focus:ring-[#d68643]"></textarea>
+                              class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-mono focus:border-brand focus:ring-brand"></textarea>
                     <p class="text-[11px] text-slate-500 mt-1">
                         Si el texto del bot contiene alguna de estas (separadas por coma), asumimos que está "intentando derivar" y forzamos la derivación.
                     </p>
@@ -306,7 +306,7 @@
                         Departamento por defecto (fallback)
                     </label>
                     <select wire:model="derivacion_departamento_fallback_id"
-                            class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                            class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand">
                         <option value="">— Primer departamento activo —</option>
                         @foreach(\App\Models\Departamento::where('activo', true)->orderBy('nombre')->get() as $d)
                             <option value="{{ $d->id }}">{{ $d->icono_emoji }} {{ $d->nombre }}</option>
@@ -333,7 +333,7 @@
 
             <textarea wire:model="info_empresa" rows="6"
                       placeholder="Ej:&#10;Alimentos La Hacienda&#10;- Más de 25 años de experiencia.&#10;- Ubicada en Bello, Antioquia.&#10;- Calidad, frescura y servicio al cliente."
-                      class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-mono leading-relaxed focus:border-[#d68643] focus:ring-[#d68643]"></textarea>
+                      class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-mono leading-relaxed focus:border-brand focus:ring-brand"></textarea>
             <p class="text-[11px] text-slate-400 mt-1">
                 Describe brevemente: nombre, ubicación, años de experiencia, valores, servicios. La IA usará esto cuando el cliente pregunte por la empresa.
             </p>
@@ -411,7 +411,7 @@
 
             <textarea wire:model="frase_bienvenida" rows="2"
                       placeholder="Ej: ¡Hola! Bienvenido a La Hacienda 🥩 ¿qué te provoca hoy?"
-                      class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]"></textarea>
+                      class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand"></textarea>
             <p class="text-[11px] text-slate-400 mt-1">Si la dejas vacía, la IA improvisa el saludo según la hora y el cliente.</p>
         </section>
 
@@ -437,7 +437,7 @@
 • Si el cliente pregunta por la sede de Envigado, aclara que la atendemos solo los jueves.
 • Para pedidos sobre 500k ofrece siempre el 5% de descuento.
 • Usa la palabra 'parcero' de forma natural, es parte de nuestra marca."
-                      class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-mono leading-relaxed focus:border-[#d68643] focus:ring-[#d68643]"></textarea>
+                      class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-mono leading-relaxed focus:border-brand focus:ring-brand"></textarea>
             <div class="flex items-start gap-3 mt-2">
                 <p class="text-[11px] text-slate-500 flex-1">
                     💡 <strong>Cómo funciona:</strong> cuando el bot recibe un mensaje, primero carga el prompt base (o tu prompt personalizado si lo activaste abajo), y al final agrega estas instrucciones bajo el título "🔧 REGLAS ADICIONALES DE ESTE NEGOCIO". La IA las lee igual que el resto del prompt.
@@ -475,7 +475,7 @@
                     </div>
                 </div>
                 <input type="checkbox" wire:model.live="usar_prompt_personalizado"
-                       class="mt-1 rounded border-slate-300 text-[#d68643] h-6 w-6">
+                       class="mt-1 rounded border-slate-300 text-brand h-6 w-6">
             </label>
 
             @if($usar_prompt_personalizado)
@@ -484,7 +484,7 @@
                     <div class="lg:col-span-2">
                         <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
                             <label class="text-sm font-medium text-slate-700">
-                                <i class="fa-solid fa-pen-to-square text-[#d68643] mr-1"></i>
+                                <i class="fa-solid fa-pen-to-square text-brand mr-1"></i>
                                 Tu prompt
                             </label>
                             <div class="flex items-center gap-3">
@@ -497,7 +497,7 @@
                                             type: 'primary',
                                             onConfirm: () => $wire.cargarPlantillaPorDefecto(),
                                         })"
-                                        class="text-[11px] font-semibold text-[#d68643] hover:underline">
+                                        class="text-[11px] font-semibold text-brand hover:underline">
                                     <i class="fa-solid fa-rotate-left mr-1"></i> Cargar plantilla
                                 </button>
 
@@ -616,14 +616,14 @@
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1">Hora de envío</label>
                         <input type="time" wire:model="cumpleanos_hora"
-                               class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                               class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand">
                         <p class="text-xs text-slate-500 mt-1">Hora local (Bogotá). Se revisa cada minuto.</p>
                         @error('cumpleanos_hora') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1">Días de anticipación</label>
                         <select wire:model="cumpleanos_dias_anticipacion"
-                                class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                                class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand">
                             <option value="0">El mismo día</option>
                             <option value="1">1 día antes</option>
                             <option value="2">2 días antes</option>
@@ -635,7 +635,7 @@
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1">Reintentos si falla</label>
                         <select wire:model="cumpleanos_reintentos_max"
-                                class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                                class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand">
                             <option value="0">Sin reintentos</option>
                             <option value="1">1 reintento</option>
                             <option value="2">2 reintentos</option>
@@ -653,14 +653,14 @@
                             Ventana permitida — desde
                         </label>
                         <input type="time" wire:model="cumpleanos_ventana_desde"
-                               class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                               class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1">
                             Ventana permitida — hasta
                         </label>
                         <input type="time" wire:model="cumpleanos_ventana_hasta"
-                               class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                               class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand">
                     </div>
                 </div>
                 <p class="text-xs text-slate-500 -mt-2">
@@ -674,7 +674,7 @@
                         <i class="fa-solid fa-gift text-pink-500"></i> Vigencia del beneficio (envío gratis)
                     </label>
                     <input type="number" min="1" max="30" wire:model="cumpleanos_dias_vigencia_beneficio"
-                           class="w-40 rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                           class="w-40 rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand">
                     <span class="text-sm text-slate-600 ml-2">día(s) a partir del envío del mensaje</span>
                     <p class="text-xs text-slate-500 mt-1">
                         Cuando se envía la felicitación, se le otorga al cliente envío gratis por N días. Si pide en ese rango, el sistema aplica el descuento automáticamente.
@@ -688,7 +688,7 @@
                         Conexión de WhatsApp por defecto
                     </label>
                     <select wire:model="connection_id_default"
-                            class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-[#d68643]">
+                            class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand">
                         <option value="">— Automática (la que haya usado el cliente) —</option>
                         @foreach($conexionesDetectadas as $cid)
                             <option value="{{ $cid }}">WhatsApp #{{ $cid }}</option>
@@ -726,12 +726,12 @@
                     <div class="flex items-center justify-between mb-1">
                         <label class="block text-sm font-medium text-slate-700">Mensaje de felicitación</label>
                         <button type="button" wire:click="cargarPlantillaCumpleanosDefault"
-                                class="text-xs font-semibold text-[#a85f24] hover:underline">
+                                class="text-xs font-semibold text-brand-secondary hover:underline">
                             <i class="fa-solid fa-rotate-left mr-1"></i> Restaurar plantilla
                         </button>
                     </div>
                     <textarea wire:model="cumpleanos_mensaje" rows="8"
-                              class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-mono focus:border-[#d68643] focus:ring-[#d68643]"></textarea>
+                              class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-mono focus:border-brand focus:ring-brand"></textarea>
                     @error('cumpleanos_mensaje') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
                     <div class="mt-2 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-xs text-slate-600">
                         <strong class="text-slate-800">Variables disponibles:</strong>
@@ -817,7 +817,7 @@
 
                     <div class="mt-3 text-center">
                         <a href="{{ route('felicitaciones.index') }}"
-                           class="text-xs font-semibold text-[#a85f24] hover:underline">
+                           class="text-xs font-semibold text-brand-secondary hover:underline">
                             Ver historial completo de felicitaciones →
                         </a>
                     </div>
@@ -828,7 +828,7 @@
         {{-- BOTÓN GUARDAR --}}
         <div class="flex justify-end pt-4">
             <button type="submit"
-                    class="rounded-2xl bg-[#d68643] px-8 py-3 text-white font-bold shadow hover:bg-[#c97a36] transition">
+                    class="rounded-2xl bg-brand px-8 py-3 text-white font-bold shadow hover:bg-brand-dark transition">
                 <i class="fa-solid fa-floppy-disk mr-2"></i> Guardar configuración
             </button>
         </div>

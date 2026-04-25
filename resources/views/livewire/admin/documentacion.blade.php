@@ -2,7 +2,7 @@
     <div class="max-w-5xl mx-auto p-6 space-y-6">
 
         {{-- HERO --}}
-        <div class="rounded-3xl bg-gradient-to-br from-[#d68643] via-[#c97a36] to-[#a85f24] text-white p-8 shadow-xl">
+        <div class="rounded-3xl bg-gradient-to-br from-brand via-[#c97a36] to-brand-secondary text-white p-8 shadow-xl">
             <div class="flex items-start gap-4">
                 <div class="h-16 w-16 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center">
                     <i class="fa-solid fa-book-open text-3xl"></i>
@@ -23,34 +23,34 @@
         <div class="rounded-2xl bg-white border border-slate-200 p-6">
             <h2 class="text-sm font-bold uppercase text-slate-500 mb-3 tracking-widest">Índice</h2>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                <a href="#arquitectura"     class="text-[#a85f24] hover:underline font-medium"><i class="fa-solid fa-sitemap w-5"></i> 1. Arquitectura general</a>
-                <a href="#multitenant"      class="text-[#a85f24] hover:underline font-medium"><i class="fa-solid fa-building w-5"></i> 2. Sistema multi-tenant</a>
-                <a href="#subdominios"      class="text-[#a85f24] hover:underline font-medium"><i class="fa-solid fa-globe w-5"></i> 3. Automatización de subdominios</a>
-                <a href="#billing"          class="text-[#a85f24] hover:underline font-medium"><i class="fa-solid fa-money-bills w-5"></i> 4. Sistema de facturación</a>
-                <a href="#whatsapp"         class="text-[#a85f24] hover:underline font-medium"><i class="fa-brands fa-whatsapp w-5"></i> 5. WhatsApp por tenant</a>
-                <a href="#superadmin"       class="text-[#a85f24] hover:underline font-medium"><i class="fa-solid fa-shield-halved w-5"></i> 6. Super-admin & impersonación</a>
-                <a href="#ops"              class="text-[#a85f24] hover:underline font-medium"><i class="fa-solid fa-server w-5"></i> 7. Operaciones (VPS / Docker)</a>
-                <a href="#troubleshooting"  class="text-[#a85f24] hover:underline font-medium"><i class="fa-solid fa-stethoscope w-5"></i> 8. Troubleshooting</a>
+                <a href="#arquitectura"     class="text-brand-secondary hover:underline font-medium"><i class="fa-solid fa-sitemap w-5"></i> 1. Arquitectura general</a>
+                <a href="#multitenant"      class="text-brand-secondary hover:underline font-medium"><i class="fa-solid fa-building w-5"></i> 2. Sistema multi-tenant</a>
+                <a href="#subdominios"      class="text-brand-secondary hover:underline font-medium"><i class="fa-solid fa-globe w-5"></i> 3. Automatización de subdominios</a>
+                <a href="#billing"          class="text-brand-secondary hover:underline font-medium"><i class="fa-solid fa-money-bills w-5"></i> 4. Sistema de facturación</a>
+                <a href="#whatsapp"         class="text-brand-secondary hover:underline font-medium"><i class="fa-brands fa-whatsapp w-5"></i> 5. WhatsApp por tenant</a>
+                <a href="#superadmin"       class="text-brand-secondary hover:underline font-medium"><i class="fa-solid fa-shield-halved w-5"></i> 6. Super-admin & impersonación</a>
+                <a href="#ops"              class="text-brand-secondary hover:underline font-medium"><i class="fa-solid fa-server w-5"></i> 7. Operaciones (VPS / Docker)</a>
+                <a href="#troubleshooting"  class="text-brand-secondary hover:underline font-medium"><i class="fa-solid fa-stethoscope w-5"></i> 8. Troubleshooting</a>
             </div>
         </div>
 
         {{-- 1. ARQUITECTURA --}}
         <section id="arquitectura" class="rounded-2xl bg-white border border-slate-200 p-6 space-y-3">
             <h2 class="text-xl font-extrabold text-slate-800 flex items-center gap-2">
-                <span class="h-9 w-9 rounded-xl bg-gradient-to-br from-[#fbe9d7] to-[#f5d4ad] text-[#a85f24] flex items-center justify-center">
+                <span class="h-9 w-9 rounded-xl bg-gradient-to-br from-brand-soft to-brand-soft-2 text-brand-secondary flex items-center justify-center">
                     <i class="fa-solid fa-sitemap"></i>
                 </span>
                 1. Arquitectura general
             </h2>
             <p class="text-sm text-slate-600">
                 La plataforma es un <strong>SaaS multi-tenant single-database</strong>: una sola base de datos
-                MySQL, una sola instancia de Laravel, y todos los datos llevan una columna <code class="bg-slate-100 px-1 rounded text-[#a85f24]">tenant_id</code>
+                MySQL, una sola instancia de Laravel, y todos los datos llevan una columna <code class="bg-slate-100 px-1 rounded text-brand-secondary">tenant_id</code>
                 que los aísla automáticamente vía global scope.
             </p>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
                 <div class="rounded-xl bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200 p-4">
-                    <div class="text-xs font-bold uppercase text-[#a85f24] mb-2">Stack</div>
+                    <div class="text-xs font-bold uppercase text-brand-secondary mb-2">Stack</div>
                     <ul class="text-sm text-slate-700 space-y-1">
                         <li>• Laravel 12 + Livewire 3</li>
                         <li>• Tailwind v4</li>
@@ -62,7 +62,7 @@
                     </ul>
                 </div>
                 <div class="rounded-xl bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200 p-4">
-                    <div class="text-xs font-bold uppercase text-[#a85f24] mb-2">Componentes clave</div>
+                    <div class="text-xs font-bold uppercase text-brand-secondary mb-2">Componentes clave</div>
                     <ul class="text-sm text-slate-700 space-y-1">
                         <li>• <code class="bg-white px-1 rounded">App\Models\Tenant</code></li>
                         <li>• <code class="bg-white px-1 rounded">App\Services\TenantManager</code></li>
@@ -79,7 +79,7 @@
         {{-- 2. MULTI-TENANT --}}
         <section id="multitenant" class="rounded-2xl bg-white border border-slate-200 p-6 space-y-3">
             <h2 class="text-xl font-extrabold text-slate-800 flex items-center gap-2">
-                <span class="h-9 w-9 rounded-xl bg-gradient-to-br from-[#fbe9d7] to-[#f5d4ad] text-[#a85f24] flex items-center justify-center">
+                <span class="h-9 w-9 rounded-xl bg-gradient-to-br from-brand-soft to-brand-soft-2 text-brand-secondary flex items-center justify-center">
                     <i class="fa-solid fa-building"></i>
                 </span>
                 2. Sistema multi-tenant
@@ -87,7 +87,7 @@
 
             <h3 class="font-bold text-slate-700 mt-4">Cómo se identifica el tenant en cada request</h3>
             <p class="text-sm text-slate-600">
-                El middleware <code class="bg-slate-100 px-1 rounded text-[#a85f24]">SetCurrentTenant</code> resuelve el tenant en este orden:
+                El middleware <code class="bg-slate-100 px-1 rounded text-brand-secondary">SetCurrentTenant</code> resuelve el tenant en este orden:
             </p>
             <ol class="text-sm text-slate-600 list-decimal pl-6 space-y-1">
                 <li><strong>Subdominio</strong>: si el request viene a <code>la-hacienda.tecnobyte360.com</code>, busca <code>tenants.slug = 'la-hacienda'</code>.</li>
@@ -99,8 +99,8 @@
 
             <h3 class="font-bold text-slate-700 mt-4">Aislamiento de datos automático</h3>
             <p class="text-sm text-slate-600">
-                Los modelos con <code class="bg-slate-100 px-1 rounded text-[#a85f24]">use BelongsToTenant</code> aplican el global scope
-                <code class="bg-slate-100 px-1 rounded text-[#a85f24]">TenantScope</code> que filtra por <code>tenant_id</code> en TODA query
+                Los modelos con <code class="bg-slate-100 px-1 rounded text-brand-secondary">use BelongsToTenant</code> aplican el global scope
+                <code class="bg-slate-100 px-1 rounded text-brand-secondary">TenantScope</code> que filtra por <code>tenant_id</code> en TODA query
                 (Eloquent, relaciones, eager-loading). Si un dev se olvida de filtrar, el scope lo hace por él.
             </p>
             <pre class="bg-slate-900 text-orange-200 text-xs p-3 rounded-lg overflow-auto"><code>// app/Models/Pedido.php
@@ -119,7 +119,7 @@ class Pedido extends Model
 
             <h3 class="font-bold text-slate-700 mt-4">Migración de datos legacy</h3>
             <p class="text-sm text-slate-600">
-                El seeder <code class="bg-slate-100 px-1 rounded text-[#a85f24]">MultiTenantSetupSeeder</code> crea el Tenant #1
+                El seeder <code class="bg-slate-100 px-1 rounded text-brand-secondary">MultiTenantSetupSeeder</code> crea el Tenant #1
                 ("Alimentos La Hacienda") y reasigna todos los registros sin <code>tenant_id</code> a ese tenant.
                 Crea también el super-admin: <code>super@tecnobyte360.com</code> / <code>superadmin123</code>.
             </p>
@@ -128,7 +128,7 @@ class Pedido extends Model
         {{-- 3. SUBDOMINIOS --}}
         <section id="subdominios" class="rounded-2xl bg-white border border-slate-200 p-6 space-y-3">
             <h2 class="text-xl font-extrabold text-slate-800 flex items-center gap-2">
-                <span class="h-9 w-9 rounded-xl bg-gradient-to-br from-[#fbe9d7] to-[#f5d4ad] text-[#a85f24] flex items-center justify-center">
+                <span class="h-9 w-9 rounded-xl bg-gradient-to-br from-brand-soft to-brand-soft-2 text-brand-secondary flex items-center justify-center">
                     <i class="fa-solid fa-globe"></i>
                 </span>
                 3. Automatización de subdominios (1 click)
@@ -141,7 +141,7 @@ class Pedido extends Model
 
             <div class="space-y-3 mt-3">
                 <div class="rounded-xl border border-orange-200 bg-gradient-to-r from-orange-50 to-amber-50 p-4">
-                    <div class="text-sm font-bold text-[#a85f24] mb-1">PASO 1 — DNS en Hostinger</div>
+                    <div class="text-sm font-bold text-brand-secondary mb-1">PASO 1 — DNS en Hostinger</div>
                     <p class="text-xs text-slate-700">
                         <code class="bg-white px-1 rounded">App\Services\HostingerDnsService</code> usa la API DNS de
                         Hostinger (<code>https://developers.hostinger.com/api/dns/v1</code>) para crear un registro A
@@ -150,7 +150,7 @@ class Pedido extends Model
                 </div>
 
                 <div class="rounded-xl border border-orange-200 bg-gradient-to-r from-orange-50 to-amber-50 p-4">
-                    <div class="text-sm font-bold text-[#a85f24] mb-1">PASO 2 — Generación de Nginx config</div>
+                    <div class="text-sm font-bold text-brand-secondary mb-1">PASO 2 — Generación de Nginx config</div>
                     <p class="text-xs text-slate-700">
                         El comando <code class="bg-white px-1 rounded">tenants:setup-subdominio</code> toma el template
                         <code>resources/nginx/tenant.conf.stub</code>, reemplaza los placeholders de DOMINIO y SLUG,
@@ -160,7 +160,7 @@ class Pedido extends Model
                 </div>
 
                 <div class="rounded-xl border border-orange-200 bg-gradient-to-r from-orange-50 to-amber-50 p-4">
-                    <div class="text-sm font-bold text-[#a85f24] mb-1">PASO 3 — Watcher reactivo en el host</div>
+                    <div class="text-sm font-bold text-brand-secondary mb-1">PASO 3 — Watcher reactivo en el host</div>
                     <p class="text-xs text-slate-700">
                         El servicio systemd <code class="bg-white px-1 rounded">tenant-subdomain-watcher.service</code>
                         usa <code>inotifywait</code> para detectar el <code>.pending</code> al instante. Llama a
@@ -178,7 +178,7 @@ class Pedido extends Model
 
             <h3 class="font-bold text-slate-700 mt-4">Polling reactivo en el modal</h3>
             <p class="text-sm text-slate-600">
-                Mientras el watcher procesa en el host, el modal de Livewire usa <code class="bg-slate-100 px-1 rounded text-[#a85f24]">wire:poll.2s</code>
+                Mientras el watcher procesa en el host, el modal de Livewire usa <code class="bg-slate-100 px-1 rounded text-brand-secondary">wire:poll.2s</code>
                 para chequear cada 2 segundos si apareció el <code>.done</code> o <code>.error</code>, y actualiza el
                 stepper visual sin recargar.
             </p>
@@ -186,7 +186,7 @@ class Pedido extends Model
             <h3 class="font-bold text-slate-700 mt-4">⚠️ Reglas de slug</h3>
             <p class="text-sm text-slate-600">
                 Let's Encrypt rechaza guion bajo, espacios y mayúsculas en subdominios. El modelo Tenant fuerza
-                <strong>kebab-case</strong> (solo a-z, 0-9, guion medio) vía <code class="bg-slate-100 px-1 rounded text-[#a85f24]">Tenant::normalizarSlug()</code>
+                <strong>kebab-case</strong> (solo a-z, 0-9, guion medio) vía <code class="bg-slate-100 px-1 rounded text-brand-secondary">Tenant::normalizarSlug()</code>
                 en el evento <code>saving</code>.
             </p>
 
@@ -201,7 +201,7 @@ CERTBOT_EMAIL=comercial@tecnobyte360.com</code></pre>
         {{-- 4. BILLING --}}
         <section id="billing" class="rounded-2xl bg-white border border-slate-200 p-6 space-y-3">
             <h2 class="text-xl font-extrabold text-slate-800 flex items-center gap-2">
-                <span class="h-9 w-9 rounded-xl bg-gradient-to-br from-[#fbe9d7] to-[#f5d4ad] text-[#a85f24] flex items-center justify-center">
+                <span class="h-9 w-9 rounded-xl bg-gradient-to-br from-brand-soft to-brand-soft-2 text-brand-secondary flex items-center justify-center">
                     <i class="fa-solid fa-money-bills"></i>
                 </span>
                 4. Sistema de facturación
@@ -209,9 +209,9 @@ CERTBOT_EMAIL=comercial@tecnobyte360.com</code></pre>
 
             <h3 class="font-bold text-slate-700 mt-2">Modelos</h3>
             <ul class="text-sm text-slate-600 space-y-1">
-                <li><code class="bg-slate-100 px-1 rounded text-[#a85f24]">Plan</code> — Catálogo de planes (basico/pro/empresa) con precio mensual y anual, límites (max_pedidos_mes, max_usuarios) y features (whatsapp/ia/reportes/multi_sede/api).</li>
-                <li><code class="bg-slate-100 px-1 rounded text-[#a85f24]">Suscripcion</code> — Relación tenant-plan con estado (activa/en_trial/suspendida/cancelada/expirada), ciclo (mensual/anual), fecha_inicio, fecha_fin.</li>
-                <li><code class="bg-slate-100 px-1 rounded text-[#a85f24]">Pago</code> — Registro manual de pagos con método (efectivo/transferencia/nequi/daviplata/tarjeta), referencia y comprobante_url.</li>
+                <li><code class="bg-slate-100 px-1 rounded text-brand-secondary">Plan</code> — Catálogo de planes (basico/pro/empresa) con precio mensual y anual, límites (max_pedidos_mes, max_usuarios) y features (whatsapp/ia/reportes/multi_sede/api).</li>
+                <li><code class="bg-slate-100 px-1 rounded text-brand-secondary">Suscripcion</code> — Relación tenant-plan con estado (activa/en_trial/suspendida/cancelada/expirada), ciclo (mensual/anual), fecha_inicio, fecha_fin.</li>
+                <li><code class="bg-slate-100 px-1 rounded text-brand-secondary">Pago</code> — Registro manual de pagos con método (efectivo/transferencia/nequi/daviplata/tarjeta), referencia y comprobante_url.</li>
             </ul>
 
             <h3 class="font-bold text-slate-700 mt-4">Flujo típico</h3>
@@ -233,14 +233,14 @@ CERTBOT_EMAIL=comercial@tecnobyte360.com</code></pre>
         {{-- 5. WHATSAPP --}}
         <section id="whatsapp" class="rounded-2xl bg-white border border-slate-200 p-6 space-y-3">
             <h2 class="text-xl font-extrabold text-slate-800 flex items-center gap-2">
-                <span class="h-9 w-9 rounded-xl bg-gradient-to-br from-[#fbe9d7] to-[#f5d4ad] text-[#a85f24] flex items-center justify-center">
+                <span class="h-9 w-9 rounded-xl bg-gradient-to-br from-brand-soft to-brand-soft-2 text-brand-secondary flex items-center justify-center">
                     <i class="fa-brands fa-whatsapp"></i>
                 </span>
                 5. WhatsApp por tenant
             </h2>
             <p class="text-sm text-slate-600">
                 Cada tenant tiene sus <strong>propias credenciales TecnoByteApp</strong> guardadas en la columna JSON
-                <code class="bg-slate-100 px-1 rounded text-[#a85f24]">tenants.whatsapp_config</code>:
+                <code class="bg-slate-100 px-1 rounded text-brand-secondary">tenants.whatsapp_config</code>:
             </p>
             <pre class="bg-slate-900 text-orange-200 text-xs p-3 rounded-lg overflow-auto"><code>{
   "email": "cliente@empresa.com",
@@ -249,7 +249,7 @@ CERTBOT_EMAIL=comercial@tecnobyte360.com</code></pre>
   "connection_ids": [15, 28]
 }</code></pre>
             <p class="text-sm text-slate-600">
-                <code class="bg-slate-100 px-1 rounded text-[#a85f24]">WhatsappResolverService</code> mantiene un mapa cacheado
+                <code class="bg-slate-100 px-1 rounded text-brand-secondary">WhatsappResolverService</code> mantiene un mapa cacheado
                 <code>connection_id → tenant_id</code> (TTL 5 min) para que cuando llega un webhook de TecnoByteApp,
                 el sistema sepa a qué tenant pertenece sin ambigüedad.
             </p>
@@ -258,7 +258,7 @@ CERTBOT_EMAIL=comercial@tecnobyte360.com</code></pre>
         {{-- 6. SUPER-ADMIN --}}
         <section id="superadmin" class="rounded-2xl bg-white border border-slate-200 p-6 space-y-3">
             <h2 class="text-xl font-extrabold text-slate-800 flex items-center gap-2">
-                <span class="h-9 w-9 rounded-xl bg-gradient-to-br from-[#fbe9d7] to-[#f5d4ad] text-[#a85f24] flex items-center justify-center">
+                <span class="h-9 w-9 rounded-xl bg-gradient-to-br from-brand-soft to-brand-soft-2 text-brand-secondary flex items-center justify-center">
                     <i class="fa-solid fa-shield-halved"></i>
                 </span>
                 6. Super-admin & impersonación
@@ -277,7 +277,7 @@ CERTBOT_EMAIL=comercial@tecnobyte360.com</code></pre>
 
             <h3 class="font-bold text-slate-700 mt-3">Bloqueo de rutas operativas</h3>
             <p class="text-sm text-slate-600">
-                El middleware <code class="bg-slate-100 px-1 rounded text-[#a85f24]">no_super_sin_imp</code>
+                El middleware <code class="bg-slate-100 px-1 rounded text-brand-secondary">no_super_sin_imp</code>
                 (<code>BloquearSuperAdminSinImpersonar</code>) impide que el super-admin entre a /pedidos, /clientes,
                 /productos, etc. SIN antes elegir "Ver como" un tenant. Esto evita ver datos mezclados.
             </p>
@@ -286,7 +286,7 @@ CERTBOT_EMAIL=comercial@tecnobyte360.com</code></pre>
         {{-- 7. OPERACIONES --}}
         <section id="ops" class="rounded-2xl bg-white border border-slate-200 p-6 space-y-3">
             <h2 class="text-xl font-extrabold text-slate-800 flex items-center gap-2">
-                <span class="h-9 w-9 rounded-xl bg-gradient-to-br from-[#fbe9d7] to-[#f5d4ad] text-[#a85f24] flex items-center justify-center">
+                <span class="h-9 w-9 rounded-xl bg-gradient-to-br from-brand-soft to-brand-soft-2 text-brand-secondary flex items-center justify-center">
                     <i class="fa-solid fa-server"></i>
                 </span>
                 7. Operaciones (VPS / Docker)
@@ -303,10 +303,10 @@ CERTBOT_EMAIL=comercial@tecnobyte360.com</code></pre>
 
             <h3 class="font-bold text-slate-700 mt-3">Contenedores Docker</h3>
             <ul class="text-sm text-slate-600 space-y-1">
-                <li><code class="bg-slate-100 px-1 rounded text-[#a85f24]">pedidos_hacienda_app</code> → Laravel (puerto host 8088)</li>
-                <li><code class="bg-slate-100 px-1 rounded text-[#a85f24]">pedidos_hacienda_reverb</code> → WebSockets (puerto host 8092)</li>
-                <li><code class="bg-slate-100 px-1 rounded text-[#a85f24]">pedidos_hacienda_scheduler</code> → cron de Laravel</li>
-                <li><code class="bg-slate-100 px-1 rounded text-[#a85f24]">pedidos_hacienda_db</code> → MySQL 8</li>
+                <li><code class="bg-slate-100 px-1 rounded text-brand-secondary">pedidos_hacienda_app</code> → Laravel (puerto host 8088)</li>
+                <li><code class="bg-slate-100 px-1 rounded text-brand-secondary">pedidos_hacienda_reverb</code> → WebSockets (puerto host 8092)</li>
+                <li><code class="bg-slate-100 px-1 rounded text-brand-secondary">pedidos_hacienda_scheduler</code> → cron de Laravel</li>
+                <li><code class="bg-slate-100 px-1 rounded text-brand-secondary">pedidos_hacienda_db</code> → MySQL 8</li>
             </ul>
 
             <h3 class="font-bold text-slate-700 mt-3">Servicio systemd del watcher</h3>
@@ -347,7 +347,7 @@ docker compose exec pedidos_hacienda_app php artisan view:cache</code></pre>
         {{-- 8. TROUBLESHOOTING --}}
         <section id="troubleshooting" class="rounded-2xl bg-white border border-slate-200 p-6 space-y-3">
             <h2 class="text-xl font-extrabold text-slate-800 flex items-center gap-2">
-                <span class="h-9 w-9 rounded-xl bg-gradient-to-br from-[#fbe9d7] to-[#f5d4ad] text-[#a85f24] flex items-center justify-center">
+                <span class="h-9 w-9 rounded-xl bg-gradient-to-br from-brand-soft to-brand-soft-2 text-brand-secondary flex items-center justify-center">
                     <i class="fa-solid fa-stethoscope"></i>
                 </span>
                 8. Troubleshooting

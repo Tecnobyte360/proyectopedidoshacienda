@@ -54,6 +54,48 @@
     }
 }
 
+/* ───── Brand color utilities ─────
+   Usan CSS vars inyectadas por el layout desde el tenant actual.
+   Permiten reemplazar todos los colores hardcoded (#d68643, etc.)
+   por clases que se adaptan al tenant. */
+.bg-brand            { background-color: var(--brand-primary) !important; }
+.bg-brand-secondary  { background-color: var(--brand-secondary) !important; }
+.bg-brand-soft       { background-color: var(--brand-soft) !important; }
+.bg-brand-soft-2     { background-color: var(--brand-soft-2) !important; }
+.bg-brand-dark       { background-color: var(--brand-dark) !important; }
+
+.text-brand            { color: var(--brand-primary) !important; }
+.text-brand-secondary  { color: var(--brand-secondary) !important; }
+.text-brand-dark       { color: var(--brand-dark) !important; }
+
+.border-brand            { border-color: var(--brand-primary) !important; }
+.border-brand-secondary  { border-color: var(--brand-secondary) !important; }
+
+.ring-brand                  { --tw-ring-color: var(--brand-primary) !important; }
+.focus\:ring-brand:focus     { --tw-ring-color: var(--brand-primary) !important; }
+.focus\:border-brand:focus   { border-color: var(--brand-primary) !important; }
+
+.from-brand          { --tw-gradient-from: var(--brand-primary) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, transparent); }
+.from-brand-soft     { --tw-gradient-from: var(--brand-soft) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, transparent); }
+.to-brand            { --tw-gradient-to: var(--brand-primary) !important; }
+.to-brand-secondary  { --tw-gradient-to: var(--brand-secondary) !important; }
+.to-brand-soft-2     { --tw-gradient-to: var(--brand-soft-2) !important; }
+
+.hover\:bg-brand:hover           { background-color: var(--brand-primary) !important; }
+.hover\:bg-brand-dark:hover      { background-color: var(--brand-dark) !important; }
+.hover\:bg-brand-secondary:hover { background-color: var(--brand-secondary) !important; }
+.hover\:from-brand-dark:hover    { --tw-gradient-from: var(--brand-dark) !important; }
+.hover\:to-brand-dark:hover      { --tw-gradient-to: var(--brand-dark) !important; }
+
+/* Tints con opacidad — para fondos suaves de badges, focus rings */
+.bg-brand\/5    { background-color: color-mix(in srgb, var(--brand-primary)  5%, transparent) !important; }
+.bg-brand\/10   { background-color: color-mix(in srgb, var(--brand-primary) 10%, transparent) !important; }
+.bg-brand\/15   { background-color: color-mix(in srgb, var(--brand-primary) 15%, transparent) !important; }
+.bg-brand\/20   { background-color: color-mix(in srgb, var(--brand-primary) 20%, transparent) !important; }
+.bg-brand\/30   { background-color: color-mix(in srgb, var(--brand-primary) 30%, transparent) !important; }
+.focus\:ring-brand\/20:focus { --tw-ring-color: color-mix(in srgb, var(--brand-primary) 20%, transparent) !important; }
+.focus\:ring-brand\/30:focus { --tw-ring-color: color-mix(in srgb, var(--brand-primary) 30%, transparent) !important; }
+
 @keyframes newOrderPulse {
     0% {
         background-color: rgba(251, 191, 36, 0.22);

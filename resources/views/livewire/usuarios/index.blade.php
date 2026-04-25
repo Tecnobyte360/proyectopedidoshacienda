@@ -2,10 +2,10 @@
     <div class="w-full px-4 py-6 sm:px-6 sm:py-8 lg:px-8 space-y-6">
 
         {{-- HEADER GRANDE --}}
-        <div class="rounded-2xl border border-[#fbe9d7] bg-gradient-to-r from-[#fbe9d7]/40 via-white to-white p-5 shadow-sm">
+        <div class="rounded-2xl border border-[#fbe9d7] bg-gradient-to-r from-brand-soft/40 via-white to-white p-5 shadow-sm">
             <div class="flex flex-wrap items-center justify-between gap-4">
                 <div class="flex items-center gap-4">
-                    <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#d68643] to-[#a85f24] text-white shadow-lg">
+                    <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-brand to-brand-secondary text-white shadow-lg">
                         <i class="fa-solid fa-users-gear text-xl"></i>
                     </div>
                     <div>
@@ -15,7 +15,7 @@
                 </div>
                 @can('usuarios.crear')
                     <button wire:click="abrirModalCrear"
-                            class="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-[#d68643] to-[#a85f24] hover:from-[#c97a36] hover:to-[#965520] text-white font-bold px-5 py-3 transition shadow-lg">
+                            class="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-brand to-brand-secondary hover:from-brand-dark hover:to-brand-dark text-white font-bold px-5 py-3 transition shadow-lg">
                         <i class="fa-solid fa-user-plus"></i> Nuevo usuario
                     </button>
                 @endcan
@@ -79,7 +79,7 @@
                 <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
                 <input type="text" wire:model.live.debounce.400ms="busqueda"
                        placeholder="Buscar por nombre o email…"
-                       class="w-full rounded-xl border border-slate-200 bg-slate-50 pl-11 pr-4 py-3 text-sm focus:border-[#d68643] focus:bg-white focus:ring-2 focus:ring-[#d68643]/20">
+                       class="w-full rounded-xl border border-slate-200 bg-slate-50 pl-11 pr-4 py-3 text-sm focus:border-brand focus:bg-white focus:ring-2 focus:ring-brand/20">
             </div>
         </div>
 
@@ -112,14 +112,14 @@
                                 <tr class="transition hover:bg-amber-50/30 {{ $esYo ? 'bg-amber-50/40' : '' }}">
                                     <td class="px-4 py-3.5">
                                         <div class="flex items-center gap-3">
-                                            <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#d68643] to-[#a85f24] text-white text-sm font-bold shadow-sm">
+                                            <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand to-brand-secondary text-white text-sm font-bold shadow-sm">
                                                 {{ $u->iniciales() ?: 'US' }}
                                             </div>
                                             <div class="min-w-0">
                                                 <div class="flex items-center gap-2">
                                                     <span class="font-bold text-slate-800 truncate">{{ $u->name }}</span>
                                                     @if($esYo)
-                                                        <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[#fbe9d7] text-[#a85f24] uppercase">Tú</span>
+                                                        <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-brand-soft text-brand-secondary uppercase">Tú</span>
                                                     @endif
                                                 </div>
                                                 <div class="text-xs text-slate-500 truncate">{{ $u->email }}</div>
@@ -144,7 +144,7 @@
                                     <td class="px-4 py-3.5 hidden md:table-cell">
                                         @if($u->sede)
                                             <span class="inline-flex items-center gap-1 text-xs text-slate-600">
-                                                <i class="fa-solid fa-shop text-[#d68643]"></i>
+                                                <i class="fa-solid fa-shop text-brand"></i>
                                                 {{ $u->sede->nombre }}
                                             </span>
                                         @else
@@ -174,7 +174,7 @@
                                         @can('usuarios.editar')
                                             <button wire:click="abrirModalEditar({{ $u->id }})"
                                                     title="Editar"
-                                                    class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 hover:bg-[#fbe9d7] hover:text-[#a85f24] text-slate-600 transition">
+                                                    class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 hover:bg-brand-soft hover:text-brand-secondary text-slate-600 transition">
                                                 <i class="fa-solid fa-pen-to-square text-xs"></i>
                                             </button>
                                             @if(!$esYo)
@@ -213,9 +213,9 @@
              wire:click.self="cerrarModal">
             <div class="w-full max-w-2xl rounded-2xl bg-white shadow-2xl my-8 overflow-hidden" @click.stop>
                 {{-- Header del modal con gradiente brand --}}
-                <div class="flex items-center justify-between px-6 py-5 bg-gradient-to-r from-[#fbe9d7]/40 via-white to-white border-b border-slate-100">
+                <div class="flex items-center justify-between px-6 py-5 bg-gradient-to-r from-brand-soft/40 via-white to-white border-b border-slate-100">
                     <div class="flex items-center gap-3">
-                        <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-[#d68643] to-[#a85f24] text-white shadow">
+                        <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-brand to-brand-secondary text-white shadow">
                             <i class="fa-solid {{ $editandoId ? 'fa-pen-to-square' : 'fa-user-plus' }}"></i>
                         </div>
                         <div>
@@ -236,24 +236,24 @@
                         <div class="md:col-span-2">
                             <label class="block text-sm font-medium text-slate-700 mb-1.5">Nombre completo *</label>
                             <input type="text" wire:model="name" placeholder="Stiven Madrid"
-                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-2 focus:ring-[#d68643]/20">
+                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-2 focus:ring-brand/20">
                             @error('name') <p class="text-xs text-rose-600 mt-1">{{ $message }}</p> @enderror
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-1.5">Email *</label>
                             <input type="email" wire:model="email" placeholder="usuario@hacienda.com"
-                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-2 focus:ring-[#d68643]/20">
+                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-2 focus:ring-brand/20">
                             @error('email') <p class="text-xs text-rose-600 mt-1">{{ $message }}</p> @enderror
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-1.5">Teléfono</label>
                             <input type="text" wire:model="telefono" placeholder="3001234567"
-                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-2 focus:ring-[#d68643]/20">
+                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-2 focus:ring-brand/20">
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-1.5">Sede asignada</label>
                             <select wire:model="sede_id"
-                                    class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-2 focus:ring-[#d68643]/20">
+                                    class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-2 focus:ring-brand/20">
                                 <option value="">— Sin sede asignada —</option>
                                 @foreach($sedes as $s)
                                     <option value="{{ $s->id }}">{{ $s->nombre }}</option>
@@ -263,7 +263,7 @@
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-1.5">Rol *</label>
                             <select wire:model="rol"
-                                    class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-2 focus:ring-[#d68643]/20">
+                                    class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-2 focus:ring-brand/20">
                                 <option value="">— Selecciona rol —</option>
                                 @foreach($roles as $r)
                                     <option value="{{ $r->name }}">{{ ucfirst($r->name) }}</option>
@@ -276,7 +276,7 @@
                                 Contraseña {{ $editandoId ? '(deja vacío para no cambiar)' : '*' }}
                             </label>
                             <input type="password" wire:model="password" placeholder="••••••••"
-                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-2 focus:ring-[#d68643]/20">
+                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-2 focus:ring-brand/20">
                             @error('password') <p class="text-xs text-rose-600 mt-1">{{ $message }}</p> @enderror
                             @if(!$editandoId)
                                 <p class="text-xs text-slate-500 mt-1">Mínimo 6 caracteres</p>
@@ -286,7 +286,7 @@
 
                     <label class="flex items-start gap-3 rounded-xl bg-slate-50 border border-slate-200 p-3 cursor-pointer">
                         <input type="checkbox" wire:model="activo"
-                               class="mt-0.5 rounded border-slate-300 text-[#d68643] focus:ring-[#d68643]">
+                               class="mt-0.5 rounded border-slate-300 text-brand focus:ring-brand">
                         <div>
                             <div class="text-sm font-semibold text-slate-800">Usuario activo</div>
                             <div class="text-xs text-slate-500">Podrá iniciar sesión en la plataforma. Desactívalo en lugar de eliminarlo si solo quieres bloquear acceso temporalmente.</div>
@@ -299,7 +299,7 @@
                             Cancelar
                         </button>
                         <button type="submit"
-                                class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#d68643] to-[#a85f24] hover:from-[#c97a36] hover:to-[#965520] px-6 py-2.5 text-sm font-bold text-white shadow-lg transition">
+                                class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-brand to-brand-secondary hover:from-brand-dark hover:to-brand-dark px-6 py-2.5 text-sm font-bold text-white shadow-lg transition">
                             <i class="fa-solid fa-floppy-disk"></i>
                             {{ $editandoId ? 'Actualizar usuario' : 'Crear usuario' }}
                         </button>
