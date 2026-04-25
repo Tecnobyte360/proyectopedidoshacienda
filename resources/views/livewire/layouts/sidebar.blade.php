@@ -1,11 +1,26 @@
 <div>
     @php
         $tenantActivo = app(\App\Services\TenantManager::class)->current();
-        $primario  = $tenantActivo?->color_primario   ?: '#d68643';
-        $secundario= $tenantActivo?->color_secundario ?: '#a85f24';
-        $brandName = $tenantActivo?->nombre ?: 'TecnoByte360';
-        $brandSub  = $tenantActivo ? 'Panel del cliente' : 'Plataforma SaaS';
-        $brandLogo = $tenantActivo?->logo_url;
+
+        if ($tenantActivo) {
+            $primario   = $tenantActivo->color_primario   ?: '#d68643';
+            $secundario = $tenantActivo->color_secundario ?: '#a85f24';
+            $brandName  = $tenantActivo->nombre;
+            $brandSub   = 'Panel del cliente';
+            $brandLogo  = $tenantActivo->logo_url;
+        } else {
+            try {
+                $cfgP = \App\Models\ConfiguracionPlataforma::actual();
+                $primario   = $cfgP->color_primario   ?: '#d68643';
+                $secundario = $cfgP->color_secundario ?: '#a85f24';
+                $brandName  = $cfgP->nombre  ?: 'TecnoByte360';
+                $brandSub   = $cfgP->subtitulo ?: 'Plataforma SaaS';
+                $brandLogo  = $cfgP->logo_url;
+            } catch (\Throwable $e) {
+                $primario = '#d68643'; $secundario = '#a85f24';
+                $brandName = 'TecnoByte360'; $brandSub = 'Plataforma SaaS'; $brandLogo = null;
+            }
+        }
 
         $u = auth()->user();
         $userName = $u?->name ?: 'Usuario';
@@ -84,7 +99,8 @@
                     ['name' => 'Planes',        'icon' => 'fa-money-check-dollar', 'route' => 'admin.planes.index',        'badge' => null, 'permission' => 'planes.gestionar'],
                     ['name' => 'Suscripciones', 'icon' => 'fa-receipt',            'route' => 'admin.suscripciones.index', 'badge' => null, 'permission' => 'suscripciones.gestionar'],
                     ['name' => 'Pagos',         'icon' => 'fa-money-bills',        'route' => 'admin.pagos.index',         'badge' => null, 'permission' => 'pagos.gestionar'],
-                    ['name' => 'Documentación', 'icon' => 'fa-book-open',          'route' => 'admin.documentacion',       'badge' => null, 'permission' => 'tenants.gestionar'],
+                    ['name' => 'Documentación',         'icon' => 'fa-book-open',  'route' => 'admin.documentacion',          'badge' => null, 'permission' => 'tenants.gestionar'],
+                    ['name' => 'Branding plataforma',   'icon' => 'fa-palette',    'route' => 'admin.configuracion-plataforma','badge' => null, 'permission' => 'tenants.gestionar'],
                 ],
             ],
         ];

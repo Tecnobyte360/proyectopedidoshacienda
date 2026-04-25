@@ -25,6 +25,7 @@
         'admin.suscripciones.index'  => ['Suscripciones',   'Gestión de planes contratados por tenant',  'fa-receipt'],
         'admin.pagos.index'          => ['Pagos',           'Historial y registro manual de pagos',      'fa-money-bills'],
         'admin.documentacion'        => ['Documentación',   'Cómo funciona la plataforma SaaS',          'fa-book-open'],
+        'admin.configuracion-plataforma' => ['Branding plataforma', 'Nombre, logo y colores de TecnoByte360', 'fa-palette'],
         'pedidos.seguimiento'  => ['Seguimiento',    'Estado del pedido',                          'fa-route'],
     ];
 

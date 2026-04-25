@@ -65,8 +65,19 @@
 
     @php
         $tenantBrand = app(\App\Services\TenantManager::class)->current();
-        $brandPrim = $tenantBrand?->color_primario   ?: '#d68643';
-        $brandSec  = $tenantBrand?->color_secundario ?: '#a85f24';
+        if ($tenantBrand) {
+            $brandPrim = $tenantBrand->color_primario   ?: '#d68643';
+            $brandSec  = $tenantBrand->color_secundario ?: '#a85f24';
+        } else {
+            try {
+                $platformCfg = \App\Models\ConfiguracionPlataforma::actual();
+                $brandPrim = $platformCfg->color_primario   ?: '#d68643';
+                $brandSec  = $platformCfg->color_secundario ?: '#a85f24';
+            } catch (\Throwable $e) {
+                $brandPrim = '#d68643';
+                $brandSec  = '#a85f24';
+            }
+        }
     @endphp
 
     <style>
