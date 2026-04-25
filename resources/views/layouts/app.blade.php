@@ -83,7 +83,7 @@
     <livewire:layouts.topbar />
 
     {{-- CONTENIDO --}}
-    <main class="min-h-screen pt-20 lg:pl-64 transition-all duration-300">
+    <main class="min-h-screen pt-16 lg:pl-64 transition-all duration-300">
         {{ $slot }}
     </main>
 

@@ -1,180 +1,318 @@
 <div>
-    {{-- Wrapper Livewire requiere UN solo root element --}}
-
     @php
-        // 🎨 Branding dinámico: si hay tenant activo, usar sus colores y logo
         $tenantActivo = app(\App\Services\TenantManager::class)->current();
-        $bgFrom    = $tenantActivo?->color_primario   ?: '#c97a36';
-        $bgTo      = $tenantActivo?->color_secundario ?: '#a85f24';
+        $primario  = $tenantActivo?->color_primario   ?: '#d68643';
+        $secundario= $tenantActivo?->color_secundario ?: '#a85f24';
         $brandName = $tenantActivo?->nombre ?: 'TecnoByte360';
         $brandSub  = $tenantActivo ? 'Panel del cliente' : 'Plataforma SaaS';
         $brandLogo = $tenantActivo?->logo_url;
+
+        $u = auth()->user();
+        $userName = $u?->name ?: 'Usuario';
+        $iniciales = collect(explode(' ', trim($userName)))
+            ->filter()
+            ->take(2)
+            ->map(fn ($s) => mb_strtoupper(mb_substr($s, 0, 1)))
+            ->join('');
+        $rolPrincipal = $u && method_exists($u, 'getRoleNames')
+            ? ($u->getRoleNames()->first() ?: 'Miembro')
+            : 'Miembro';
+        $rolPrincipal = ucfirst(str_replace('-', ' ', (string) $rolPrincipal));
+
+        $current = request()->route()?->getName();
+        $enSubdominioTenant = $tenantActivo !== null;
+        $esSuperAdmin = $u && $u->tenant_id === null && $u->hasRole('super-admin');
+        $estaImpersonando = session()->has('tenant_imitado_id');
+        $verSoloAdmin = $esSuperAdmin && !$estaImpersonando;
+
+        $sectionsRaw = [
+            [
+                'title' => 'Principal',
+                'items' => [
+                    ['name' => 'Pedidos',      'icon' => 'fa-bag-shopping', 'route' => 'pedidos.index',      'badge' => null,  'permission' => 'pedidos.ver'],
+                    ['name' => 'Chat en vivo', 'icon' => 'fa-headset',      'route' => 'chat.index',         'badge' => null,  'permission' => 'chat.usar'],
+                    ['name' => 'Despachos',    'icon' => 'fa-paper-plane',  'route' => 'despachos.index',    'badge' => null,  'permission' => 'despachos.gestionar'],
+                ],
+            ],
+            [
+                'title' => 'Catálogo',
+                'items' => [
+                    ['name' => 'Productos',     'icon' => 'fa-box',          'route' => 'productos.index',     'badge' => null, 'permission' => 'productos.ver'],
+                    ['name' => 'Categorías',    'icon' => 'fa-layer-group',  'route' => 'categorias.index',    'badge' => null, 'permission' => 'categorias.gestionar'],
+                    ['name' => 'Cortes',        'icon' => 'fa-scissors',     'route' => 'cortes.index',        'badge' => null, 'permission' => 'productos.ver'],
+                    ['name' => 'Promociones',   'icon' => 'fa-tags',         'route' => 'promociones.index',   'badge' => null, 'permission' => 'promociones.gestionar'],
+                    ['name' => 'Importaciones', 'icon' => 'fa-file-import',  'route' => 'importaciones.index', 'badge' => null, 'permission' => 'productos.ver'],
+                    ['name' => 'Integraciones', 'icon' => 'fa-plug',         'route' => 'integraciones.index', 'badge' => null, 'permission' => 'productos.ver', 'solo_super_admin' => true],
+                ],
+            ],
+            [
+                'title' => 'Operaciones',
+                'items' => [
+                    ['name' => 'Clientes',          'icon' => 'fa-users',              'route' => 'clientes.index',         'badge' => null, 'permission' => 'clientes.ver'],
+                    ['name' => 'Conversaciones',    'icon' => 'fa-comments',           'route' => 'conversaciones.index',   'badge' => null, 'permission' => 'conversaciones.ver'],
+                    ['name' => 'Usuarios internos', 'icon' => 'fa-user-shield',        'route' => 'usuarios-internos.index','badge' => null, 'permission' => 'conversaciones.ver'],
+                    ['name' => 'Departamentos',     'icon' => 'fa-building-user',      'route' => 'departamentos.index',    'badge' => null, 'permission' => 'conversaciones.ver'],
+                    ['name' => 'Campañas WhatsApp', 'icon' => 'fa-bullhorn',           'route' => 'campanas.index',         'badge' => null, 'permission' => 'conversaciones.ver'],
+                    ['name' => 'Widgets de Chat',   'icon' => 'fa-code',               'route' => 'chat-widgets.index',     'badge' => null, 'permission' => 'conversaciones.ver', 'solo_super_admin' => true],
+                    ['name' => 'Domiciliarios',     'icon' => 'fa-motorcycle',         'route' => 'domiciliarios.index',    'badge' => null, 'permission' => 'domiciliarios.gestionar'],
+                    ['name' => 'Zonas',             'icon' => 'fa-map-location-dot',   'route' => 'zonas.index',            'badge' => null, 'permission' => 'zonas.gestionar'],
+                    ['name' => 'Reportes',          'icon' => 'fa-chart-line',         'route' => 'reportes.index',         'badge' => null, 'permission' => 'reportes.ver'],
+                    ['name' => 'ANS Tiempos',       'icon' => 'fa-stopwatch',          'route' => 'ans.index',              'badge' => null, 'permission' => 'ans.gestionar'],
+                    ['name' => 'Bot WhatsApp',      'icon' => 'fa-robot',              'route' => 'configuracion.bot',      'badge' => null, 'permission' => 'bot.configurar', 'solo_super_admin' => true],
+                    ['name' => 'Sedes',             'icon' => 'fa-shop',               'route' => 'sedes.index',            'badge' => null, 'permission' => 'sedes.gestionar'],
+                ],
+            ],
+            [
+                'title' => 'Sistema',
+                'items' => [
+                    ['name' => 'Alertas del bot', 'icon' => 'fa-triangle-exclamation', 'route' => 'alertas.index',
+                        'badge' => (\Schema::hasTable('bot_alertas')
+                            ? (\App\Models\BotAlerta::where('resuelta', false)->count() ?: null)
+                            : null),
+                        'permission' => 'alertas.ver', 'solo_super_admin' => true],
+                    ['name' => 'Felicitaciones', 'icon' => 'fa-cake-candles', 'route' => 'felicitaciones.index', 'badge' => null, 'permission' => 'felicitaciones.ver'],
+                    ['name' => 'Usuarios',       'icon' => 'fa-users-gear',   'route' => 'usuarios.index',       'badge' => null, 'permission' => 'usuarios.ver'],
+                    ...($enSubdominioTenant ? [] : [
+                        ['name' => 'Roles y permisos','icon' => 'fa-shield-halved','route' => 'roles.index', 'badge' => null, 'permission' => 'roles.gestionar'],
+                    ]),
+                ],
+            ],
+            [
+                'title' => 'Super Admin',
+                'items' => [
+                    ['name' => 'Tenants',       'icon' => 'fa-building',           'route' => 'admin.tenants.index',       'badge' => null, 'permission' => 'tenants.gestionar'],
+                    ['name' => 'Planes',        'icon' => 'fa-money-check-dollar', 'route' => 'admin.planes.index',        'badge' => null, 'permission' => 'planes.gestionar'],
+                    ['name' => 'Suscripciones', 'icon' => 'fa-receipt',            'route' => 'admin.suscripciones.index', 'badge' => null, 'permission' => 'suscripciones.gestionar'],
+                    ['name' => 'Pagos',         'icon' => 'fa-money-bills',        'route' => 'admin.pagos.index',         'badge' => null, 'permission' => 'pagos.gestionar'],
+                    ['name' => 'Documentación', 'icon' => 'fa-book-open',          'route' => 'admin.documentacion',       'badge' => null, 'permission' => 'tenants.gestionar'],
+                ],
+            ],
+        ];
+
+        $sections = [];
+        foreach ($sectionsRaw as $sec) {
+            if ($sec['title'] === 'Super Admin' && $enSubdominioTenant) continue;
+            if ($verSoloAdmin && $sec['title'] !== 'Super Admin') continue;
+
+            $items = array_values(array_filter($sec['items'], function ($it) use ($u) {
+                if (!empty($it['solo_super_admin'])) {
+                    if (!$u || !$u->hasRole('super-admin')) return false;
+                }
+                return !$u || empty($it['permission']) || $u->can($it['permission']);
+            }));
+            if (count($items) > 0) {
+                $sec['items'] = $items;
+                $sections[] = $sec;
+            }
+        }
     @endphp
 
-    <aside class="app-sidebar fixed inset-y-0 left-0 z-40 hidden lg:flex w-64 flex-col text-white shadow-2xl"
-           style="background: linear-gradient(to bottom, {{ $bgFrom }}, {{ $bgTo }});">
+    <style>
+        /* Sidebar dark — variables locales (no contaminan el resto de la app) */
+        .app-sidebar {
+            --sb-bg:        #0e0f12;
+            --sb-bg-2:      #16181d;
+            --sb-line:      rgba(255,255,255,0.06);
+            --sb-text:      rgba(255,255,255,0.62);
+            --sb-text-soft: rgba(255,255,255,0.42);
+            --sb-text-strong: #ffffff;
+            --sb-hover:     rgba(255,255,255,0.05);
+            --sb-active:    rgba(255,255,255,0.08);
+            --brand-primary: {{ $primario }};
+            --brand-secondary: {{ $secundario }};
 
-        {{-- LOGO / BRAND --}}
-        <div class="flex h-20 items-center gap-3 border-b border-white/10 px-5">
-            <div class="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/15 shadow-lg backdrop-blur overflow-hidden flex-shrink-0">
+            background: linear-gradient(180deg, var(--sb-bg) 0%, var(--sb-bg-2) 100%);
+            color: var(--sb-text);
+        }
+        .sb-brand {
+            color: var(--brand-primary);
+            font-weight: 800;
+            letter-spacing: -0.018em;
+        }
+        .sb-collapse-btn {
+            background: rgba(255,255,255,0.05);
+            color: var(--sb-text);
+            transition: all 0.15s ease;
+        }
+        .sb-collapse-btn:hover { background: rgba(255,255,255,0.10); color: var(--sb-text-strong); }
+
+        .sb-user-card {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--sb-line);
+            border-radius: 0.875rem;
+        }
+        .sb-avatar {
+            width: 2.625rem;
+            height: 2.625rem;
+            border-radius: 999px;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 700; color: white;
+            background: linear-gradient(135deg, var(--brand-primary), var(--brand-secondary));
+            flex-shrink: 0;
+        }
+        .sb-search {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid transparent;
+            color: var(--sb-text);
+            transition: all 0.15s ease;
+        }
+        .sb-search::placeholder { color: var(--sb-text-soft); }
+        .sb-search:focus {
+            background: rgba(255,255,255,0.06);
+            border-color: rgba(255,255,255,0.10);
+            outline: none;
+        }
+        .sb-section-title {
+            font-size: 0.6875rem;        /* 11px */
+            font-weight: 600;
+            color: var(--sb-text-soft);
+            letter-spacing: 0.04em;
+            text-transform: capitalize;
+            padding: 0 0.875rem;
+            margin-bottom: 0.375rem;
+        }
+        .sb-item {
+            display: flex; align-items: center; gap: 0.75rem;
+            padding: 0.5rem 0.875rem;
+            border-radius: 0.625rem;
+            color: var(--sb-text);
+            font-size: 0.8125rem;        /* 13px — compacto */
+            font-weight: 500;
+            transition: all 0.12s ease;
+            position: relative;
+            text-decoration: none;
+        }
+        .sb-item:hover {
+            background: var(--sb-hover);
+            color: var(--sb-text-strong);
+        }
+        .sb-item .sb-icon {
+            width: 1.125rem;
+            text-align: center;
+            font-size: 0.875rem;
+            color: var(--sb-text-soft);
+            transition: color 0.12s ease;
+        }
+        .sb-item:hover .sb-icon { color: var(--sb-text-strong); }
+
+        .sb-item.is-active {
+            background: var(--sb-active);
+            color: var(--sb-text-strong);
+        }
+        .sb-item.is-active::before {
+            content: '';
+            position: absolute;
+            left: 0; top: 50%; transform: translateY(-50%);
+            width: 3px; height: 60%;
+            background: var(--brand-primary);
+            border-radius: 0 3px 3px 0;
+        }
+        .sb-item.is-active .sb-icon { color: var(--brand-primary); }
+
+        .sb-badge {
+            margin-left: auto;
+            background: var(--brand-primary);
+            color: white;
+            font-size: 0.625rem;
+            font-weight: 700;
+            padding: 0.0625rem 0.4375rem;
+            border-radius: 999px;
+            min-width: 1.25rem;
+            text-align: center;
+        }
+        .sb-chevron {
+            margin-left: auto;
+            font-size: 0.625rem;
+            color: var(--sb-text-soft);
+        }
+
+        .sb-footer-item {
+            display: flex; align-items: center; gap: 0.625rem;
+            padding: 0.5rem 0.625rem;
+            border-radius: 0.625rem;
+            color: var(--sb-text);
+            font-size: 0.8125rem;
+            transition: all 0.12s ease;
+        }
+        .sb-footer-item:hover { background: var(--sb-hover); color: var(--sb-text-strong); }
+
+        /* Cuando body.sidebar-collapsed está activo */
+        body.sidebar-collapsed .app-sidebar {
+            width: 4.5rem;
+        }
+        body.sidebar-collapsed .app-sidebar .sb-collapsible { display: none; }
+        body.sidebar-collapsed .app-sidebar .sb-item { justify-content: center; padding: 0.625rem; }
+        body.sidebar-collapsed .app-sidebar .sb-section-title { display: none; }
+        body.sidebar-collapsed main { padding-left: 4.5rem !important; }
+
+        /* Custom scrollbar */
+        .app-sidebar nav::-webkit-scrollbar { width: 6px; }
+        .app-sidebar nav::-webkit-scrollbar-track { background: transparent; }
+        .app-sidebar nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
+        .app-sidebar nav::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.16); }
+    </style>
+
+    {{-- ╔═══ SIDEBAR DESKTOP ═══╗ --}}
+    <aside class="app-sidebar fixed inset-y-0 left-0 z-40 hidden lg:flex w-64 flex-col"
+           x-data="{ q: '' }">
+
+        {{-- HEADER: brand + collapse --}}
+        <div class="flex items-center justify-between px-5 pt-5 pb-3">
+            <div class="flex items-center gap-2.5 min-w-0">
                 @if($brandLogo)
-                    <img src="{{ $brandLogo }}" alt="logo" class="h-full w-full object-contain">
-                @else
-                    <i class="fa-solid fa-utensils text-lg text-white"></i>
+                    <img src="{{ $brandLogo }}" alt="logo" class="h-8 w-8 rounded-lg object-contain bg-white/5 p-1 flex-shrink-0">
                 @endif
+                <span class="sb-brand text-base truncate">{{ $brandName }}</span>
             </div>
-            <div class="min-w-0">
-                <div class="truncate text-sm font-extrabold leading-tight">{{ $brandName }}</div>
-                <div class="truncate text-xs font-medium text-white/70 leading-tight">{{ $brandSub }}</div>
+            <button onclick="document.body.classList.toggle('sidebar-collapsed')"
+                    class="sb-collapse-btn h-7 w-7 inline-flex items-center justify-center rounded-lg flex-shrink-0"
+                    title="Colapsar sidebar">
+                <i class="fa-solid fa-angles-left text-[11px]"></i>
+            </button>
+        </div>
+
+        {{-- USER CARD --}}
+        <div class="px-4 sb-collapsible">
+            <div class="sb-user-card flex items-center gap-3 p-3">
+                <div class="sb-avatar text-sm">{{ $iniciales ?: 'U' }}</div>
+                <div class="min-w-0 flex-1">
+                    <div class="text-[13px] font-bold text-white truncate leading-tight">{{ $userName }}</div>
+                    <div class="text-[11px] truncate leading-tight" style="color: var(--sb-text-soft);">{{ $brandSub }}</div>
+                    <div class="text-[11px] font-medium truncate leading-tight mt-0.5" style="color: var(--brand-primary);">{{ $rolPrincipal }}</div>
+                </div>
             </div>
         </div>
 
-        @php
-            $current = request()->route()?->getName();
-            $u = auth()->user();
-            // 🔒 Si estamos en un subdominio de tenant, NUNCA mostrar la sección Super Admin,
-            // aunque el usuario logueado sea super-admin (caso raro de seguridad).
-            $enSubdominioTenant = $tenantActivo !== null;
-
-            // 🌟 SUPER-ADMIN: si está sin impersonar, NO ve secciones operativas
-            // (Pedidos, Chat, Productos, etc). Solo ve sección "Super Admin".
-            // Cuando hace "Ver como" (impersonación), sí ve los menús del tenant.
-            $esSuperAdmin = $u && $u->tenant_id === null && $u->hasRole('super-admin');
-            $estaImpersonando = session()->has('tenant_imitado_id');
-            $verSoloAdmin = $esSuperAdmin && !$estaImpersonando;
-
-            // Cada item incluye 'permission' — el sidebar lo filtra automáticamente.
-            $sectionsRaw = [
-                [
-                    'title' => 'Principal',
-                    'items' => [
-                        ['name' => 'Pedidos',      'icon' => 'fa-bag-shopping', 'route' => 'pedidos.index',      'badge' => null,  'permission' => 'pedidos.ver'],
-                        ['name' => 'Chat en vivo', 'icon' => 'fa-headset',      'route' => 'chat.index',         'badge' => null,  'permission' => 'chat.usar'],
-                        ['name' => 'Despachos',    'icon' => 'fa-paper-plane',  'route' => 'despachos.index',    'badge' => null,  'permission' => 'despachos.gestionar'],
-                    ],
-                ],
-                [
-                    'title' => 'Catálogo',
-                    'items' => [
-                        ['name' => 'Productos',     'icon' => 'fa-box',          'route' => 'productos.index',     'badge' => null, 'permission' => 'productos.ver'],
-                        ['name' => 'Categorías',    'icon' => 'fa-layer-group',  'route' => 'categorias.index',    'badge' => null, 'permission' => 'categorias.gestionar'],
-                        ['name' => 'Cortes',        'icon' => 'fa-scissors',     'route' => 'cortes.index',        'badge' => null, 'permission' => 'productos.ver'],
-                        ['name' => 'Promociones',   'icon' => 'fa-tags',         'route' => 'promociones.index',   'badge' => null, 'permission' => 'promociones.gestionar'],
-                        ['name' => 'Importaciones', 'icon' => 'fa-file-import',  'route' => 'importaciones.index', 'badge' => null, 'permission' => 'productos.ver'],
-                        ['name' => 'Integraciones', 'icon' => 'fa-plug',         'route' => 'integraciones.index', 'badge' => null, 'permission' => 'productos.ver', 'solo_super_admin' => true],
-                    ],
-                ],
-                [
-                    'title' => 'Operaciones',
-                    'items' => [
-                        ['name' => 'Clientes',       'icon' => 'fa-users',              'route' => 'clientes.index',      'badge' => null, 'permission' => 'clientes.ver'],
-                        ['name' => 'Conversaciones',    'icon' => 'fa-comments',       'route' => 'conversaciones.index',   'badge' => null, 'permission' => 'conversaciones.ver'],
-                        ['name' => 'Usuarios internos', 'icon' => 'fa-user-shield',    'route' => 'usuarios-internos.index','badge' => null, 'permission' => 'conversaciones.ver'],
-                        ['name' => 'Departamentos',     'icon' => 'fa-building-user',  'route' => 'departamentos.index',    'badge' => null, 'permission' => 'conversaciones.ver'],
-                        ['name' => 'Campañas WhatsApp', 'icon' => 'fa-bullhorn',       'route' => 'campanas.index',         'badge' => null, 'permission' => 'conversaciones.ver'],
-                        ['name' => 'Widgets de Chat',   'icon' => 'fa-code',           'route' => 'chat-widgets.index',     'badge' => null, 'permission' => 'conversaciones.ver', 'solo_super_admin' => true],
-                        ['name' => 'Domiciliarios', 'icon' => 'fa-motorcycle',          'route' => 'domiciliarios.index', 'badge' => null, 'permission' => 'domiciliarios.gestionar'],
-                        ['name' => 'Zonas',         'icon' => 'fa-map-location-dot',    'route' => 'zonas.index',         'badge' => null, 'permission' => 'zonas.gestionar'],
-                        ['name' => 'Reportes',      'icon' => 'fa-chart-line',          'route' => 'reportes.index',      'badge' => null, 'permission' => 'reportes.ver'],
-                        ['name' => 'ANS Tiempos',   'icon' => 'fa-stopwatch',           'route' => 'ans.index',           'badge' => null, 'permission' => 'ans.gestionar'],
-                        ['name' => 'Bot WhatsApp',  'icon' => 'fa-robot',               'route' => 'configuracion.bot',   'badge' => null, 'permission' => 'bot.configurar', 'solo_super_admin' => true],
-                        ['name' => 'Sedes',         'icon' => 'fa-shop',                'route' => 'sedes.index',         'badge' => null, 'permission' => 'sedes.gestionar'],
-                    ],
-                ],
-                [
-                    'title' => 'Sistema',
-                    'items' => [
-                        ['name' => 'Alertas del bot', 'icon' => 'fa-triangle-exclamation', 'route' => 'alertas.index',
-                            'badge' => (\Schema::hasTable('bot_alertas')
-                                ? (\App\Models\BotAlerta::where('resuelta', false)->count() ?: null)
-                                : null),
-                            'permission' => 'alertas.ver', 'solo_super_admin' => true],
-                        ['name' => 'Felicitaciones', 'icon' => 'fa-cake-candles', 'route' => 'felicitaciones.index', 'badge' => null, 'permission' => 'felicitaciones.ver'],
-                        ['name' => 'Usuarios',       'icon' => 'fa-users-gear',   'route' => 'usuarios.index',       'badge' => null, 'permission' => 'usuarios.ver'],
-                        // Roles globales — solo visible desde dominio principal (NO en subdominios de tenant)
-                        ...($enSubdominioTenant ? [] : [
-                            ['name' => 'Roles y permisos','icon' => 'fa-shield-halved','route' => 'roles.index', 'badge' => null, 'permission' => 'roles.gestionar'],
-                        ]),
-                    ],
-                ],
-                [
-                    'title' => '⭐ Super Admin',
-                    'items' => [
-                        ['name' => 'Tenants',       'icon' => 'fa-building',           'route' => 'admin.tenants.index',       'badge' => null, 'permission' => 'tenants.gestionar'],
-                        ['name' => 'Planes',        'icon' => 'fa-money-check-dollar', 'route' => 'admin.planes.index',        'badge' => null, 'permission' => 'planes.gestionar'],
-                        ['name' => 'Suscripciones', 'icon' => 'fa-receipt',            'route' => 'admin.suscripciones.index', 'badge' => null, 'permission' => 'suscripciones.gestionar'],
-                        ['name' => 'Pagos',         'icon' => 'fa-money-bills',        'route' => 'admin.pagos.index',         'badge' => null, 'permission' => 'pagos.gestionar'],
-                        ['name' => 'Documentación', 'icon' => 'fa-book-open',          'route' => 'admin.documentacion',       'badge' => null, 'permission' => 'tenants.gestionar'],
-                    ],
-                ],
-            ];
-
-            // Filtrar items por permisos del usuario y secciones vacías
-            $sections = [];
-            foreach ($sectionsRaw as $sec) {
-                // 🔒 Sección Super Admin SOLO en el dominio principal (NUNCA en subdominios de cliente)
-                if ($sec['title'] === '⭐ Super Admin' && $enSubdominioTenant) {
-                    continue;
-                }
-                // Si es super-admin sin impersonar, SOLO mostrar la sección "Super Admin"
-                if ($verSoloAdmin && $sec['title'] !== '⭐ Super Admin') {
-                    continue;
-                }
-
-                $items = array_values(array_filter($sec['items'], function ($it) use ($u) {
-                    // Items marcados solo_super_admin solo para el dueño de la plataforma
-                    if (!empty($it['solo_super_admin'])) {
-                        if (!$u || !$u->hasRole('super-admin')) return false;
-                    }
-                    return !$u || empty($it['permission']) || $u->can($it['permission']);
-                }));
-                if (count($items) > 0) {
-                    $sec['items'] = $items;
-                    $sections[] = $sec;
-                }
-            }
-        @endphp
+        {{-- SEARCH --}}
+        <div class="px-4 mt-3 sb-collapsible">
+            <div class="relative">
+                <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-[12px]" style="color: var(--sb-text-soft);"></i>
+                <input type="text" x-model="q" placeholder="Buscar…"
+                       class="sb-search w-full rounded-xl pl-9 pr-3 py-2 text-[13px]">
+            </div>
+        </div>
 
         {{-- NAV --}}
-        <nav class="flex-1 overflow-y-auto px-3 py-5 space-y-6">
+        <nav class="flex-1 overflow-y-auto px-3 py-4 space-y-5 mt-1">
             @foreach($sections as $section)
-                <div>
-                    <div class="px-3 mb-2 text-[11px] font-bold uppercase tracking-widest text-white/50">
-                        {{ $section['title'] }}
-                    </div>
-
-                    <div class="space-y-1">
+                <div x-show="q === '' || '{{ mb_strtolower($section['title']) }}'.includes(q.toLowerCase()) || [{!! collect($section['items'])->map(fn($i) => "'" . mb_strtolower($i['name']) . "'")->join(',') !!}].some(n => n.includes(q.toLowerCase()))">
+                    <div class="sb-section-title sb-collapsible">{{ $section['title'] }}</div>
+                    <div class="space-y-0.5">
                         @foreach($section['items'] as $item)
                             @php
                                 $isActive = $item['route'] && $current === $item['route'];
                                 $href     = $item['route'] ? route($item['route']) : '#';
-                                $disabled = !$item['route'];
                             @endphp
-
                             <a href="{{ $href }}"
-                               @if($disabled) onclick="event.preventDefault()" @endif
-                               class="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition
-                                      {{ $isActive
-                                          ? 'bg-white text-[#a85f24] shadow-lg'
-                                          : ($disabled
-                                              ? 'text-white/40 cursor-not-allowed'
-                                              : 'text-white/80 hover:bg-white/15 hover:text-white') }}">
-
-                                <span class="flex h-8 w-8 items-center justify-center rounded-lg
-                                             {{ $isActive ? 'bg-[#fbe9d7] text-[#a85f24]' : 'bg-white/10 group-hover:bg-white/20' }}">
-                                    <i class="fa-solid {{ $item['icon'] }} text-sm"></i>
-                                </span>
-
-                                <span class="flex-1 truncate">{{ $item['name'] }}</span>
-
+                               x-show="q === '' || '{{ mb_strtolower($item['name']) }}'.includes(q.toLowerCase())"
+                               class="sb-item {{ $isActive ? 'is-active' : '' }}"
+                               title="{{ $item['name'] }}">
+                                <i class="fa-solid {{ $item['icon'] }} sb-icon"></i>
+                                <span class="sb-collapsible flex-1 truncate">{{ $item['name'] }}</span>
                                 @if($item['badge'])
-                                    <span class="rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-bold uppercase">
-                                        {{ $item['badge'] }}
-                                    </span>
-                                @endif
-
-                                @if($isActive)
-                                    <i class="fa-solid fa-chevron-right text-xs text-[#a85f24]"></i>
+                                    <span class="sb-badge sb-collapsible">{{ $item['badge'] }}</span>
+                                @elseif($isActive)
+                                    <i class="fa-solid fa-chevron-right sb-chevron sb-collapsible"></i>
                                 @endif
                             </a>
                         @endforeach
@@ -184,69 +322,77 @@
         </nav>
 
         {{-- FOOTER --}}
-        <div class="border-t border-white/10 p-3">
-            <a href="#"
-               class="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-white/80 hover:bg-white/15 hover:text-white transition">
-                <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 group-hover:bg-white/20">
-                    <i class="fa-solid fa-gear text-sm"></i>
-                </span>
-                <span>Configuración</span>
-            </a>
+        <div class="border-t px-3 py-3 space-y-1" style="border-color: var(--sb-line);">
+            <form method="POST" action="{{ route('logout') }}">
+                @csrf
+                <button type="submit" class="sb-footer-item w-full text-left">
+                    <i class="fa-solid fa-arrow-right-from-bracket sb-icon"></i>
+                    <span class="sb-collapsible">Cerrar sesión</span>
+                </button>
+            </form>
         </div>
     </aside>
 
-    {{-- DRAWER MOBILE — visible solo cuando se activa con el botón hamburguesa --}}
-    <aside id="mobile-sidebar"
-           class="fixed inset-y-0 left-0 z-50 w-64 transform -translate-x-full transition-transform duration-300
-                  flex flex-col text-white shadow-2xl lg:hidden"
-           style="background: linear-gradient(to bottom, {{ $bgFrom }}, {{ $bgTo }});">
-
-        <div class="flex h-20 items-center justify-between border-b border-white/10 px-5">
-            <div class="flex items-center gap-3">
-                <div class="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/15 overflow-hidden">
-                    @if($brandLogo)
-                        <img src="{{ $brandLogo }}" alt="logo" class="h-full w-full object-contain">
-                    @else
-                        <i class="fa-solid fa-utensils text-lg"></i>
-                    @endif
-                </div>
-                <div class="min-w-0">
-                    <div class="text-sm font-extrabold leading-tight">{{ $brandName }}</div>
-                    <div class="text-xs font-medium text-white/70 leading-tight">{{ $brandSub }}</div>
-                </div>
+    {{-- ╔═══ MOBILE DRAWER ═══╗ --}}
+    <aside id="mobile-sidebar" class="app-sidebar fixed inset-y-0 left-0 z-50 w-72 transform -translate-x-full transition-transform duration-300 flex flex-col lg:hidden">
+        <div class="flex items-center justify-between px-5 pt-5 pb-3">
+            <div class="flex items-center gap-2.5 min-w-0">
+                @if($brandLogo)
+                    <img src="{{ $brandLogo }}" alt="logo" class="h-8 w-8 rounded-lg object-contain bg-white/5 p-1">
+                @endif
+                <span class="sb-brand text-base truncate">{{ $brandName }}</span>
             </div>
             <button onclick="document.getElementById('mobile-sidebar').classList.add('-translate-x-full'); document.getElementById('mobile-backdrop').classList.add('hidden');"
-                    class="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15 hover:bg-white/25 transition">
-                <i class="fa-solid fa-xmark"></i>
+                    class="sb-collapse-btn h-7 w-7 inline-flex items-center justify-center rounded-lg">
+                <i class="fa-solid fa-xmark text-xs"></i>
             </button>
         </div>
 
-        <nav class="flex-1 overflow-y-auto px-3 py-5 space-y-6">
+        <div class="px-4">
+            <div class="sb-user-card flex items-center gap-3 p-3">
+                <div class="sb-avatar text-sm">{{ $iniciales ?: 'U' }}</div>
+                <div class="min-w-0 flex-1">
+                    <div class="text-[13px] font-bold text-white truncate leading-tight">{{ $userName }}</div>
+                    <div class="text-[11px] truncate leading-tight" style="color: var(--sb-text-soft);">{{ $brandSub }}</div>
+                    <div class="text-[11px] font-medium truncate leading-tight mt-0.5" style="color: var(--brand-primary);">{{ $rolPrincipal }}</div>
+                </div>
+            </div>
+        </div>
+
+        <nav class="flex-1 overflow-y-auto px-3 py-4 space-y-5 mt-3">
             @foreach($sections as $section)
                 <div>
-                    <div class="px-3 mb-2 text-[11px] font-bold uppercase tracking-widest text-white/50">
-                        {{ $section['title'] }}
-                    </div>
-                    <div class="space-y-1">
+                    <div class="sb-section-title">{{ $section['title'] }}</div>
+                    <div class="space-y-0.5">
                         @foreach($section['items'] as $item)
                             @php
                                 $isActive = $item['route'] && $current === $item['route'];
                                 $href     = $item['route'] ? route($item['route']) : '#';
                             @endphp
-                            <a href="{{ $href }}"
-                               class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition
-                                      {{ $isActive ? 'bg-white text-[#a85f24] shadow' : 'text-white/80 hover:bg-white/15' }}">
-                                <i class="fa-solid {{ $item['icon'] }} w-6 text-center"></i>
-                                <span>{{ $item['name'] }}</span>
+                            <a href="{{ $href }}" class="sb-item {{ $isActive ? 'is-active' : '' }}">
+                                <i class="fa-solid {{ $item['icon'] }} sb-icon"></i>
+                                <span class="flex-1 truncate">{{ $item['name'] }}</span>
+                                @if($item['badge'])
+                                    <span class="sb-badge">{{ $item['badge'] }}</span>
+                                @endif
                             </a>
                         @endforeach
                     </div>
                 </div>
             @endforeach
         </nav>
+
+        <div class="border-t px-3 py-3" style="border-color: var(--sb-line);">
+            <form method="POST" action="{{ route('logout') }}">
+                @csrf
+                <button type="submit" class="sb-footer-item w-full text-left">
+                    <i class="fa-solid fa-arrow-right-from-bracket sb-icon"></i>
+                    <span>Cerrar sesión</span>
+                </button>
+            </form>
+        </div>
     </aside>
 
-    {{-- BACKDROP MOBILE --}}
     <div id="mobile-backdrop"
          onclick="document.getElementById('mobile-sidebar').classList.add('-translate-x-full'); this.classList.add('hidden');"
          class="hidden fixed inset-0 z-40 bg-black/50 lg:hidden"></div>

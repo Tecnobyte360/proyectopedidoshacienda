@@ -94,6 +94,12 @@
     background: linear-gradient(to bottom, #f97316, #fbbf24);
 }
 
+/* Sidebar colapsado: ajusta topbar y main */
+@media (min-width: 1024px) {
+    body.sidebar-collapsed .app-topbar { left: 4.5rem !important; }
+    body.sidebar-collapsed main        { padding-left: 4.5rem !important; }
+}
+
 /* ─────────────────────────────────────────────────────────────────────────
    HIGHLIGHT de pedidos recién llegados en tiempo real.
    Se aplica a elementos con data-pedido-id incluidos en el Set de recientes.

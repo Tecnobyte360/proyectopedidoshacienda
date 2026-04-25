@@ -39,24 +39,24 @@
         : null;
 @endphp
 
-<header class="app-topbar fixed top-0 right-0 left-0 lg:left-64 z-30 h-20 border-b border-slate-200 bg-white/90 backdrop-blur-lg shadow-sm">
-    <div class="flex h-full items-center justify-between px-4 lg:px-8 gap-4">
+<header class="app-topbar fixed top-0 right-0 left-0 lg:left-64 z-30 h-16 border-b border-slate-200/70 bg-white/85 backdrop-blur-xl">
+    <div class="flex h-full items-center justify-between px-4 lg:px-6 gap-4">
 
         {{-- IZQUIERDA: hamburguesa móvil + título --}}
-        <div class="flex items-center gap-4 min-w-0">
+        <div class="flex items-center gap-3 min-w-0">
 
             {{-- Botón hamburguesa solo en móvil/tablet --}}
             <button onclick="document.getElementById('mobile-sidebar').classList.remove('-translate-x-full'); document.getElementById('mobile-backdrop').classList.remove('hidden');"
-                    class="lg:hidden flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 transition">
-                <i class="fa-solid fa-bars"></i>
+                    class="lg:hidden flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition">
+                <i class="fa-solid fa-bars text-sm"></i>
             </button>
 
-            <div class="flex items-center gap-3 min-w-0">
-                <div class="hidden md:flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-[#fbe9d7] to-[#f5d4ad] text-[#a85f24] shadow-sm">
-                    <i class="fa-solid {{ $icono }} text-lg"></i>
+            <div class="flex items-center gap-2.5 min-w-0">
+                <div class="hidden md:flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#fbe9d7] to-[#f5d4ad] text-[#a85f24]">
+                    <i class="fa-solid {{ $icono }} text-sm"></i>
                 </div>
                 <div class="min-w-0">
-                    <h1 class="text-lg md:text-xl font-extrabold text-slate-800 leading-tight truncate">
+                    <h1 class="text-[15px] md:text-base font-bold text-slate-900 leading-tight truncate tracking-tight">
                         {{ $titulo }}
                     </h1>
                     <p class="hidden sm:block text-xs text-slate-500 truncate">{{ $subtitulo }}</p>
