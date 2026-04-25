@@ -437,6 +437,79 @@
         </div>
     @endforelse
 
+    {{-- 🛵 PEDIDOS EN RUTA AGRUPADOS POR DOMICILIARIO --}}
+    @if(isset($porDomiciliario) && $porDomiciliario->isNotEmpty())
+        <div class="mt-8">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 text-blue-600">
+                    <i class="fa-solid fa-motorcycle"></i>
+                </div>
+                <div>
+                    <h2 class="text-xl font-extrabold text-slate-800">Pedidos en ruta por domiciliario</h2>
+                    <p class="text-xs text-slate-500">{{ $porDomiciliario->count() }} domiciliario(s) activo(s) · {{ $porDomiciliario->sum('cantidad') }} pedido(s) en ruta</p>
+                </div>
+            </div>
+
+            <div class="space-y-4">
+                @foreach($porDomiciliario as $info)
+                    @php
+                        $d = $info['domiciliario'];
+                        $iniciales = collect(explode(' ', trim($d?->nombre ?? '?')))
+                            ->filter()->take(2)->map(fn($p)=>mb_substr($p,0,1))->implode('');
+                    @endphp
+                    <div class="rounded-2xl bg-white border border-slate-200 shadow-sm overflow-hidden">
+                        {{-- Header del domiciliario --}}
+                        <div class="px-5 py-4 bg-gradient-to-r from-blue-50 to-white border-b border-slate-100 flex items-center gap-4">
+                            <div class="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-700 text-white font-extrabold">
+                                {{ $iniciales ?: '?' }}
+                            </div>
+                            <div class="flex-1">
+                                <h3 class="font-bold text-slate-800">{{ $d?->nombre ?? 'Sin asignar' }}</h3>
+                                <p class="text-xs text-slate-500">
+                                    @if($d?->telefono) <i class="fa-solid fa-phone"></i> {{ $d->telefono }} @endif
+                                    @if($d?->vehiculo) · <i class="fa-solid fa-{{ $d->vehiculo === 'moto' ? 'motorcycle' : 'car' }}"></i> {{ ucfirst($d->vehiculo) }} @endif
+                                </p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-xs text-slate-500">{{ $info['cantidad'] }} {{ $info['cantidad'] === 1 ? 'pedido' : 'pedidos' }}</p>
+                                <p class="text-lg font-extrabold text-slate-800">${{ number_format($info['total'], 0, ',', '.') }}</p>
+                            </div>
+                        </div>
+
+                        {{-- Lista de pedidos --}}
+                        <div class="divide-y divide-slate-100">
+                            @foreach($info['pedidos'] as $p)
+                                <div class="px-5 py-3 flex items-center gap-4 hover:bg-slate-50 transition">
+                                    <div class="flex-shrink-0 px-3 py-1 rounded-lg bg-slate-100 text-xs font-mono font-bold">
+                                        #{{ $p->id }}
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <p class="text-sm font-semibold text-slate-800 truncate">{{ $p->cliente_nombre }}</p>
+                                        <p class="text-xs text-slate-500 truncate">
+                                            <i class="fa-solid fa-location-dot"></i>
+                                            {{ $p->direccion ?: 'Sin dirección' }}
+                                            @if($p->zonaCobertura) · <span class="text-emerald-600">{{ $p->zonaCobertura->nombre }}</span> @endif
+                                        </p>
+                                    </div>
+                                    <div class="text-xs text-slate-500 flex-shrink-0">
+                                        <i class="fa-solid fa-phone"></i> {{ $p->telefono }}
+                                    </div>
+                                    <div class="text-right flex-shrink-0">
+                                        <p class="text-sm font-bold text-slate-800">${{ number_format($p->total, 0, ',', '.') }}</p>
+                                        <p class="text-[10px] uppercase font-bold tracking-wider"
+                                           style="color: {{ $p->estado === 'despachado' ? '#3b82f6' : '#10b981' }}">
+                                            {{ $p->estado }}
+                                        </p>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    @endif
+
     {{-- MODAL DE DESPACHO --}}
     @if($modalAbierto)
         @php

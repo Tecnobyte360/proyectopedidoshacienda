@@ -188,12 +188,6 @@
                         </button>
                     @endif
 
-                    @if($conversacionActiva->cliente?->whatsappUrl())
-                        <a href="{{ $conversacionActiva->cliente->whatsappUrl() }}" target="_blank"
-                           class="rounded-xl bg-green-500 px-3 py-2 text-xs font-bold text-white hover:bg-green-600 transition" title="Abrir en WhatsApp">
-                            <i class="fa-brands fa-whatsapp"></i>
-                        </a>
-                    @endif
                 </div>
             </div>
 

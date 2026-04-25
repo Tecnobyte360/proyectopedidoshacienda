@@ -585,13 +585,36 @@ class Index extends Component
         $totalSelected   = count(array_filter($this->seleccionados));
         $totalSelMonto   = Pedido::whereIn('id', collect($this->seleccionados)->filter()->keys())->sum('total');
 
+        // ── Pedidos en ruta agrupados por domiciliario (despachados, no entregados aún) ──
+        $enRutaQuery = Pedido::query()
+            ->with(['domiciliario', 'zonaCobertura', 'sede', 'detalles'])
+            ->whereNotNull('domiciliario_id')
+            ->whereIn('estado', [
+                Pedido::ESTADO_DESPACHADO ?? 'despachado',
+                'en_camino', 'repartidor_en_camino',
+            ])
+            ->when($this->sedeId, fn ($q) => $q->where('sede_id', $this->sedeId))
+            ->orderBy('domiciliario_id')
+            ->orderBy('fecha_pedido');
+
+        $pedidosEnRuta = $enRutaQuery->get();
+        $porDomiciliario = $pedidosEnRuta->groupBy('domiciliario_id')->map(function ($grupo) {
+            return [
+                'domiciliario' => $grupo->first()->domiciliario,
+                'pedidos'      => $grupo,
+                'total'        => $grupo->sum('total'),
+                'cantidad'     => $grupo->count(),
+            ];
+        });
+
         return view('livewire.despachos.index', compact(
             'agrupados',
             'sedes',
             'domiciliarios',
             'totalPedidos',
             'totalSelected',
-            'totalSelMonto'
+            'totalSelMonto',
+            'porDomiciliario'
         ))->layout('layouts.app');
     }
 }
