@@ -70,6 +70,8 @@
         }
         [x-cloak] { display: none !important; }
     </style>
+
+    @stack('styles')
 </head>
 <body>
 
@@ -98,5 +100,6 @@
     </footer>
 
     @livewireScripts
+    @stack('scripts')
 </body>
 </html>
