@@ -585,13 +585,14 @@ class Index extends Component
         $totalSelected   = count(array_filter($this->seleccionados));
         $totalSelMonto   = Pedido::whereIn('id', collect($this->seleccionados)->filter()->keys())->sum('total');
 
-        // ── Pedidos en ruta agrupados por domiciliario (despachados, no entregados aún) ──
+        // ── Pedidos en ruta agrupados por domiciliario ──
+        // Pedidos asignados a un domiciliario que aún no han sido entregados ni cancelados.
         $enRutaQuery = Pedido::query()
             ->with(['domiciliario', 'zonaCobertura', 'sede', 'detalles'])
             ->whereNotNull('domiciliario_id')
-            ->whereIn('estado', [
-                Pedido::ESTADO_DESPACHADO ?? 'despachado',
-                'en_camino', 'repartidor_en_camino',
+            ->whereNotIn('estado', [
+                Pedido::ESTADO_ENTREGADO,
+                Pedido::ESTADO_CANCELADO,
             ])
             ->when($this->sedeId, fn ($q) => $q->where('sede_id', $this->sedeId))
             ->orderBy('domiciliario_id')
