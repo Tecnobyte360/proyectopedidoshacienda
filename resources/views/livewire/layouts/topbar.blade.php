@@ -64,37 +64,58 @@
             </div>
         </div>
 
-        {{-- DERECHA: búsqueda + acciones + perfil --}}
+        {{-- DERECHA: switcher de empresa + perfil --}}
         <div class="flex items-center gap-2 md:gap-3">
 
-            {{-- Búsqueda global (hidden en móvil) --}}
-            <div class="hidden lg:block relative">
-                <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-sm text-slate-400"></i>
-                <input type="text"
-                       placeholder="Buscar..."
-                       class="w-64 rounded-xl border border-slate-200 bg-slate-50 pl-11 pr-4 py-2.5 text-sm placeholder:text-slate-400 focus:border-[#d68643] focus:bg-white focus:ring-1 focus:ring-[#d68643] transition">
-            </div>
-
-            {{-- WhatsApp Status --}}
-            <button class="relative flex h-10 w-10 items-center justify-center rounded-xl bg-green-50 text-green-600 hover:bg-green-100 transition"
-                    title="Conexión WhatsApp">
-                <i class="fa-brands fa-whatsapp text-lg"></i>
-                <span class="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-white"></span>
-            </button>
-
-            {{-- Alertas del bot (campana con dropdown) --}}
-            <livewire:alertas.badge />
-
-            {{-- 🎭 Botón compacto: salir de impersonación --}}
+            {{-- 🎭 Switcher de empresa (solo super-admin impersonando) --}}
             @if($tenantImitado)
-                <button type="button"
-                        onclick="window.salirDeImpersonacion(this)"
-                        data-csrf="{{ csrf_token() }}"
-                        title="Estás viendo como '{{ $tenantImitado->nombre }}'. Click para volver al super-admin."
-                        class="inline-flex items-center gap-2 rounded-xl bg-amber-100 text-amber-800 hover:bg-amber-200 font-semibold px-3 py-2 text-sm transition border border-amber-300 cursor-pointer">
-                    <i class="fa-solid fa-mask"></i>
-                    <span class="hidden md:inline">Salir de "{{ \Illuminate\Support\Str::limit($tenantImitado->nombre, 15) }}"</span>
-                </button>
+                <div class="relative" x-data="{ open: false }" @click.outside="open = false">
+                    <button @click="open = !open"
+                            class="inline-flex items-center gap-3 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 px-3 py-2 transition shadow-sm">
+                        @if($tenantImitado->logo_url)
+                            <img src="{{ $tenantImitado->logo_url }}" alt="" class="h-8 w-8 rounded-lg object-cover">
+                        @else
+                            <div class="h-8 w-8 rounded-lg flex items-center justify-center text-white font-bold text-xs"
+                                 style="background: linear-gradient(135deg, {{ $tenantImitado->color_primario ?: '#d68643' }}, {{ $tenantImitado->color_secundario ?: '#a85f24' }});">
+                                {{ mb_substr($tenantImitado->nombre, 0, 1) }}
+                            </div>
+                        @endif
+                        <div class="hidden md:block text-left">
+                            <div class="text-[10px] uppercase tracking-wide text-slate-500 font-bold">Viendo como</div>
+                            <div class="text-sm font-bold text-slate-800 leading-tight truncate max-w-[160px]">{{ $tenantImitado->nombre }}</div>
+                        </div>
+                        <i class="fa-solid fa-chevron-down text-[10px] text-slate-400"></i>
+                    </button>
+
+                    <div x-show="open" x-cloak
+                         x-transition:enter="transition ease-out duration-150"
+                         x-transition:enter-start="opacity-0 -translate-y-2"
+                         x-transition:enter-end="opacity-100 translate-y-0"
+                         class="absolute right-0 mt-2 w-72 rounded-2xl border border-slate-200 bg-white shadow-2xl z-50 overflow-hidden"
+                         style="display: none;">
+
+                        <div class="px-4 py-3 bg-gradient-to-r from-amber-50 to-white border-b border-slate-100">
+                            <p class="text-[10px] uppercase font-bold text-amber-700 tracking-wider">
+                                <i class="fa-solid fa-mask"></i> Modo impersonación
+                            </p>
+                            <p class="text-xs text-slate-600 mt-0.5">Estás operando como esta empresa.</p>
+                        </div>
+
+                        <a href="{{ route('admin.tenants.index') }}"
+                           class="flex items-center gap-3 px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 transition">
+                            <i class="fa-solid fa-shuffle text-violet-500 w-5"></i>
+                            <span class="flex-1">Cambiar a otra empresa</span>
+                        </a>
+
+                        <button type="button"
+                                onclick="window.salirDeImpersonacion(this)"
+                                data-csrf="{{ csrf_token() }}"
+                                class="w-full flex items-center gap-3 px-4 py-3 text-sm text-rose-600 hover:bg-rose-50 border-t border-slate-100 text-left">
+                            <i class="fa-solid fa-arrow-left-long text-rose-500 w-5"></i>
+                            <span class="flex-1">Volver al super-admin</span>
+                        </button>
+                    </div>
+                </div>
             @endif
 
             {{-- Separador --}}
