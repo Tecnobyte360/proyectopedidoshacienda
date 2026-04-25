@@ -49,6 +49,7 @@ class SeguimientoPedido extends Component
     {
         return view('livewire.pedidos.seguimiento-pedido', [
             'historial' => $this->pedido->historialEstados()->orderBy('fecha_evento')->get(),
-        ])->layout('layouts.app');
+            'pedido'    => $this->pedido,
+        ])->layout('layouts.public');
     }
 }
