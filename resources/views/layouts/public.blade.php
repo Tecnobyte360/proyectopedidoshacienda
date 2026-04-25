@@ -12,43 +12,88 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @livewireStyles
 
-    <style>
-        body { font-family: 'Inter', sans-serif; }
-        [x-cloak] { display: none !important; }
-    </style>
-</head>
-<body class="min-h-screen bg-gradient-to-br from-[#fbe9d7]/30 via-white to-[#f5d4ad]/20">
-
-    {{-- Brand del tenant en la cabecera (si lo conocemos) --}}
     @php
         $tenant = isset($pedido) && $pedido?->tenant_id
             ? \App\Models\Tenant::withoutGlobalScopes()->find($pedido->tenant_id)
             : null;
+        $primario   = $tenant?->color_primario   ?: '#d68643';
+        $secundario = $tenant?->color_secundario ?: '#a85f24';
     @endphp
 
-    <header class="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-30">
-        <div class="max-w-3xl mx-auto px-4 py-4 flex items-center gap-3">
+    <style>
+        :root {
+            --brand-primary:   {{ $primario }};
+            --brand-secondary: {{ $secundario }};
+        }
+        html, body { margin: 0; padding: 0; }
+        body {
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+            color: #1e293b;
+            background:
+                linear-gradient(135deg,
+                    color-mix(in srgb, var(--brand-primary) 14%, white) 0%,
+                    #ffffff 50%,
+                    color-mix(in srgb, var(--brand-secondary) 12%, white) 100%);
+        }
+        .public-header {
+            position: sticky;
+            top: 0;
+            z-index: 30;
+            background: rgba(255,255,255,0.88);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .public-container { max-width: 48rem; margin: 0 auto; padding-left: 1rem; padding-right: 1rem; }
+        .public-row { display: flex; align-items: center; gap: 0.75rem; }
+        .public-pad-y { padding-top: 1rem; padding-bottom: 1rem; }
+        .brand-badge {
+            height: 2.5rem; width: 2.5rem; border-radius: 0.75rem;
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-size: 1.125rem; flex-shrink: 0;
+            background: linear-gradient(135deg, var(--brand-primary), var(--brand-secondary));
+        }
+        .brand-logo {
+            height: 2.5rem; width: 2.5rem; border-radius: 0.75rem; object-fit: contain;
+            background: #fff; border: 1px solid #f1f5f9; flex-shrink: 0;
+        }
+        .public-title {
+            font-weight: 800; color: #1e293b; margin: 0;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .public-subtitle { font-size: 0.75rem; color: #64748b; margin: 0; }
+        .public-main { padding-top: 1.5rem; padding-bottom: 1.5rem; }
+        .public-footer {
+            padding-top: 1.5rem; padding-bottom: 1.5rem;
+            text-align: center; font-size: 0.75rem; color: #94a3b8;
+        }
+        [x-cloak] { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <header class="public-header">
+        <div class="public-container public-row public-pad-y">
             @if($tenant?->logo_url)
-                <img src="{{ $tenant->logo_url }}" alt="{{ $tenant->nombre }}" class="h-10 w-10 rounded-xl object-contain bg-white border border-slate-100">
+                <img src="{{ $tenant->logo_url }}" alt="{{ $tenant->nombre }}" class="brand-logo">
             @else
-                <div class="h-10 w-10 rounded-xl flex items-center justify-center text-white text-lg"
-                     style="background: linear-gradient(135deg, {{ $tenant?->color_primario ?: '#d68643' }}, {{ $tenant?->color_secundario ?: '#a85f24' }});">
+                <div class="brand-badge">
                     <i class="fa-solid fa-bag-shopping"></i>
                 </div>
             @endif
-            <div class="flex-1 min-w-0">
-                <h1 class="font-extrabold text-slate-800 truncate">{{ $tenant?->nombre ?? 'Seguimiento de pedido' }}</h1>
-                <p class="text-xs text-slate-500">Estado de tu pedido en tiempo real</p>
+            <div style="flex:1; min-width:0;">
+                <h1 class="public-title">{{ $tenant?->nombre ?? 'Seguimiento de pedido' }}</h1>
+                <p class="public-subtitle">Estado de tu pedido en tiempo real</p>
             </div>
         </div>
     </header>
 
-    {{-- Contenido principal --}}
-    <main class="max-w-3xl mx-auto px-4 py-6">
+    <main class="public-container public-main">
         {{ $slot }}
     </main>
 
-    <footer class="max-w-3xl mx-auto px-4 py-6 text-center text-xs text-slate-400">
+    <footer class="public-container public-footer">
         © {{ date('Y') }} {{ $tenant?->nombre ?? 'TecnoByte360' }} · Powered by TecnoByte360
     </footer>
 
