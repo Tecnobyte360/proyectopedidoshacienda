@@ -386,28 +386,114 @@
                                 </div>
                             </div>
 
-                            {{-- Presets rápidos --}}
-                            <div class="mt-3">
-                                <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Presets</div>
-                                <div class="flex flex-wrap gap-1.5">
-                                    @foreach([
-                                        ['Naranja Hacienda', '#d68643', '#a85f24'],
-                                        ['Marrón Café',      '#a05a2c', '#7d4421'],
-                                        ['Verde fresco',     '#10b981', '#047857'],
-                                        ['Azul océano',      '#2563eb', '#1e40af'],
-                                        ['Rosa coral',       '#f43f5e', '#be123c'],
-                                        ['Violeta',          '#8b5cf6', '#6d28d9'],
-                                        ['Amarillo sol',     '#f59e0b', '#b45309'],
-                                        ['Slate elegante',   '#475569', '#1e293b'],
-                                    ] as [$nombrePreset, $p, $s])
-                                        <button type="button"
-                                                @click="$wire.set('color_primario', '{{ $p }}'); $wire.set('color_secundario', '{{ $s }}');"
-                                                title="{{ $nombrePreset }}"
-                                                class="h-8 w-12 rounded-md border-2 border-white shadow ring-1 ring-slate-200 hover:ring-2 hover:ring-slate-400 transition"
-                                                style="background: linear-gradient(135deg, {{ $p }}, {{ $s }});">
-                                        </button>
+                            {{-- Presets agrupados por familia de color --}}
+                            @php
+                                $presetsAgrupados = [
+                                    'Cálidos / Tierra' => [
+                                        ['Naranja Hacienda',   '#d68643', '#a85f24'],
+                                        ['Marrón Café',        '#a05a2c', '#7d4421'],
+                                        ['Cobre',              '#c2693e', '#8e4a26'],
+                                        ['Terracota',          '#c1502a', '#92381b'],
+                                        ['Mostaza',            '#ca8a04', '#854d0e'],
+                                        ['Caramelo',           '#b45309', '#78350f'],
+                                        ['Bronce',             '#92400e', '#451a03'],
+                                        ['Tabaco',             '#78350f', '#451a03'],
+                                    ],
+                                    'Rojos / Rosas' => [
+                                        ['Rojo cereza',        '#dc2626', '#991b1b'],
+                                        ['Rojo vino',          '#9f1239', '#4c0519'],
+                                        ['Coral',              '#f43f5e', '#be123c'],
+                                        ['Rosa fucsia',        '#ec4899', '#9d174d'],
+                                        ['Rosa pastel',        '#f472b6', '#be185d'],
+                                        ['Magenta',            '#c026d3', '#86198f'],
+                                        ['Salmón',             '#f87171', '#b91c1c'],
+                                        ['Frambuesa',          '#e11d48', '#881337'],
+                                    ],
+                                    'Naranjas / Amarillos' => [
+                                        ['Naranja vibrante',   '#f97316', '#c2410c'],
+                                        ['Mandarina',          '#fb923c', '#c2410c'],
+                                        ['Amarillo sol',       '#f59e0b', '#b45309'],
+                                        ['Dorado',             '#eab308', '#854d0e'],
+                                        ['Limón',              '#fbbf24', '#a16207'],
+                                        ['Melocotón',          '#fb923c', '#9a3412'],
+                                        ['Albaricoque',        '#fdba74', '#c2410c'],
+                                        ['Mango',              '#f59e0b', '#92400e'],
+                                    ],
+                                    'Verdes' => [
+                                        ['Verde esmeralda',    '#10b981', '#047857'],
+                                        ['Verde menta',        '#34d399', '#059669'],
+                                        ['Verde lima',         '#84cc16', '#3f6212'],
+                                        ['Verde bosque',       '#15803d', '#14532d'],
+                                        ['Verde oliva',        '#65a30d', '#365314'],
+                                        ['Verde mar',          '#0d9488', '#115e59'],
+                                        ['Aguacate',           '#3f6212', '#1a2e05'],
+                                        ['Pino',               '#166534', '#052e16'],
+                                    ],
+                                    'Azules' => [
+                                        ['Azul océano',        '#2563eb', '#1e40af'],
+                                        ['Azul real',          '#1d4ed8', '#1e3a8a'],
+                                        ['Azul cielo',         '#0ea5e9', '#0369a1'],
+                                        ['Cian',               '#06b6d4', '#0e7490'],
+                                        ['Turquesa',           '#14b8a6', '#0f766e'],
+                                        ['Azul medianoche',    '#1e3a8a', '#0c1e4d'],
+                                        ['Azul celeste',       '#38bdf8', '#075985'],
+                                        ['Marino',             '#1e40af', '#172554'],
+                                    ],
+                                    'Violetas / Púrpuras' => [
+                                        ['Violeta',            '#8b5cf6', '#6d28d9'],
+                                        ['Lavanda',            '#a78bfa', '#7c3aed'],
+                                        ['Púrpura',            '#a855f7', '#7e22ce'],
+                                        ['Índigo',             '#6366f1', '#4338ca'],
+                                        ['Berenjena',          '#7e22ce', '#3b0764'],
+                                        ['Lila',               '#c084fc', '#9333ea'],
+                                        ['Uva',                '#7c3aed', '#3b0764'],
+                                        ['Púrpura real',       '#6b21a8', '#3b0764'],
+                                    ],
+                                    'Neutros / Sobrios' => [
+                                        ['Slate elegante',     '#475569', '#1e293b'],
+                                        ['Grafito',            '#374151', '#111827'],
+                                        ['Carbón',             '#1f2937', '#030712'],
+                                        ['Plata',              '#94a3b8', '#475569'],
+                                        ['Niebla',             '#64748b', '#334155'],
+                                        ['Pizarra',            '#52525b', '#18181b'],
+                                        ['Topo',               '#78716c', '#292524'],
+                                        ['Antracita',          '#27272a', '#09090b'],
+                                    ],
+                                ];
+                            @endphp
+
+                            <div class="mt-4">
+                                <div class="flex items-center justify-between mb-2">
+                                    <div class="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                                        <i class="fa-solid fa-swatchbook"></i> Presets de colores
+                                    </div>
+                                    <span class="text-[10px] text-slate-400">{{ collect($presetsAgrupados)->flatten(1)->count() }} combinaciones</span>
+                                </div>
+
+                                <div class="rounded-xl border border-slate-200 bg-slate-50 max-h-72 overflow-y-auto">
+                                    @foreach($presetsAgrupados as $grupo => $items)
+                                        <div class="border-b last:border-b-0 border-slate-200 p-3">
+                                            <div class="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">{{ $grupo }}</div>
+                                            <div class="grid grid-cols-8 gap-1.5">
+                                                @foreach($items as [$nombrePreset, $p, $s])
+                                                    <button type="button"
+                                                            @click="$wire.set('color_primario', '{{ $p }}'); $wire.set('color_secundario', '{{ $s }}');"
+                                                            title="{{ $nombrePreset }} ({{ $p }} → {{ $s }})"
+                                                            class="group relative h-9 rounded-md border-2 border-white shadow-sm ring-1 ring-slate-200 hover:ring-2 hover:ring-slate-500 hover:scale-110 transition-all"
+                                                            style="background: linear-gradient(135deg, {{ $p }}, {{ $s }});">
+                                                        @if($color_primario === $p && $color_secundario === $s)
+                                                            <i class="fa-solid fa-check absolute inset-0 m-auto text-white text-xs drop-shadow"></i>
+                                                        @endif
+                                                    </button>
+                                                @endforeach
+                                            </div>
+                                        </div>
                                     @endforeach
                                 </div>
+                                <p class="text-[10px] text-slate-400 mt-1.5">
+                                    <i class="fa-solid fa-circle-info"></i>
+                                    Click en cualquier swatch lo aplica a los colores arriba. También puedes usar los pickers o pegar un hex personalizado.
+                                </p>
                             </div>
                         </div>
 
