@@ -29,19 +29,111 @@ class Index extends Component
     public string $nuevoChatMensaje = '';
 
     // Modal "Publicar estado de WhatsApp" (POST /status de TecnoByteApp)
-    public bool   $estadoModal   = false;
-    public string $estadoCaption = '';
+    public bool   $estadoModal       = false;
+    public string $estadoCaption     = '';
+    public string $estadoTab         = 'publicar';   // publicar | listar
+    public array  $estadosPublicados = [];
+    public bool   $cargandoEstados   = false;
+    public ?string $estadosError     = null;
 
     public function abrirEstadoModal(): void
     {
-        $this->estadoModal   = true;
-        $this->estadoCaption = '';
+        $this->estadoModal       = true;
+        $this->estadoCaption     = '';
+        $this->estadoTab         = 'publicar';
+        $this->estadosError      = null;
     }
 
     public function cerrarEstadoModal(): void
     {
         $this->estadoModal   = false;
         $this->estadoCaption = '';
+    }
+
+    public function cambiarTabEstado(string $tab): void
+    {
+        $this->estadoTab = $tab;
+        if ($tab === 'listar') {
+            $this->cargarEstadosPublicados();
+        }
+    }
+
+    /**
+     * GET /status — lista los estados publicados en el WhatsApp del tenant.
+     */
+    public function cargarEstadosPublicados(): void
+    {
+        $this->cargandoEstados = true;
+        $this->estadosError    = null;
+        $this->estadosPublicados = [];
+
+        try {
+            $token = $this->obtenerTokenWhatsapp();
+            if (!$token) {
+                $this->estadosError = 'Sin token de WhatsApp para este tenant.';
+                return;
+            }
+
+            $resolver = app(\App\Services\WhatsappResolverService::class);
+            $cred     = $resolver->credenciales();
+            $endpoint = rtrim($cred['api_base_url'], '/') . '/status';
+
+            $connId = $this->resolverConnectionId();
+            $query  = $connId ? ['whatsappId' => $connId] : [];
+
+            $resp = Http::withoutVerifying()
+                ->withToken($token)
+                ->timeout(20)
+                ->get($endpoint, $query);
+
+            if ($resp->status() === 401) {
+                Cache::forget($resolver->tokenCacheKey());
+                $newToken = $this->obtenerTokenWhatsapp();
+                if ($newToken) {
+                    $resp = Http::withoutVerifying()
+                        ->withToken($newToken)
+                        ->timeout(20)
+                        ->get($endpoint, $query);
+                }
+            }
+
+            if (!$resp->successful()) {
+                $this->estadosError = "API ({$resp->status()}): " . mb_substr($resp->body(), 0, 200);
+                Log::warning('GET /status falló', ['status' => $resp->status(), 'body' => $resp->body()]);
+                return;
+            }
+
+            $data = $resp->json();
+            // La API devuelve un array directo de estados.
+            $items = is_array($data) && isset($data[0]) ? $data : ($data['data'] ?? $data['statuses'] ?? []);
+            $base  = rtrim($cred['api_base_url'], '/');
+
+            $this->estadosPublicados = collect($items)->map(function ($it) use ($base) {
+                $rel = $it['mediaUrl'] ?? $it['url'] ?? '';
+                // Si mediaUrl es relativa, la convertimos a absoluta
+                $abs = (preg_match('#^https?://#', (string) $rel))
+                    ? $rel
+                    : ($rel ? "{$base}/uploads/{$rel}" : null);
+
+                return [
+                    'id'           => $it['id'] ?? null,
+                    'caption'      => trim((string) ($it['body'] ?? $it['caption'] ?? '')),
+                    'media_url'    => $abs,
+                    'media_url_alt' => $rel ? "{$base}/media/{$rel}" : null,  // fallback si /uploads no funciona
+                    'media_type'   => (string) ($it['mediaType'] ?? $it['type'] ?? ''),
+                    'es_video'     => str_starts_with((string) ($it['mediaType'] ?? ''), 'video/'),
+                    'expires_at'   => $it['expiresAt'] ?? null,
+                    'created_at'   => $it['createdAt'] ?? null,
+                    'phone'        => $it['whatsapp']['phoneNumber'] ?? '',
+                    'wa_name'      => $it['whatsapp']['name'] ?? '',
+                ];
+            })->sortByDesc('created_at')->values()->all();
+        } catch (\Throwable $e) {
+            Log::error('Excepción listando estados WhatsApp: ' . $e->getMessage());
+            $this->estadosError = 'Error: ' . $e->getMessage();
+        } finally {
+            $this->cargandoEstados = false;
+        }
     }
 
     /**
