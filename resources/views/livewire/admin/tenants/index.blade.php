@@ -322,13 +322,93 @@
                             <label class="block text-sm font-medium text-slate-700 mb-1.5">Contacto teléfono</label>
                             <input type="text" wire:model="contacto_telefono" class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#d68643] focus:ring-2 focus:ring-[#d68643]/20">
                         </div>
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1.5">Color primario</label>
-                            <input type="color" wire:model="color_primario" class="w-full h-11 rounded-xl border-slate-200">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1.5">Color secundario</label>
-                            <input type="color" wire:model="color_secundario" class="w-full h-11 rounded-xl border-slate-200">
+                        {{-- Colores del tenant: se aplican a sidebar, login, gradientes, badges, etc. --}}
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-semibold text-slate-700 mb-2">
+                                <i class="fa-solid fa-palette text-slate-400 mr-1"></i>
+                                Colores del tenant
+                            </label>
+                            <p class="text-[11px] text-slate-500 mb-3">Estos colores se aplican al sidebar, login, gradientes y elementos de marca de toda la plataforma.</p>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {{-- Primario --}}
+                                <div class="flex items-center gap-3 p-3 rounded-xl border border-slate-200 bg-slate-50">
+                                    <input type="color" wire:model.live="color_primario"
+                                           class="h-12 w-12 rounded-lg border border-slate-200 cursor-pointer"
+                                           style="padding: 2px;">
+                                    <div class="flex-1 min-w-0">
+                                        <div class="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">Primario</div>
+                                        <input type="text" wire:model.live="color_primario"
+                                               placeholder="#d68643"
+                                               maxlength="7"
+                                               class="w-full mt-0.5 rounded-lg border border-slate-200 px-2 py-1 text-xs font-mono uppercase focus:border-[#d68643] focus:ring-1 focus:ring-[#d68643]/30">
+                                    </div>
+                                </div>
+
+                                {{-- Secundario --}}
+                                <div class="flex items-center gap-3 p-3 rounded-xl border border-slate-200 bg-slate-50">
+                                    <input type="color" wire:model.live="color_secundario"
+                                           class="h-12 w-12 rounded-lg border border-slate-200 cursor-pointer"
+                                           style="padding: 2px;">
+                                    <div class="flex-1 min-w-0">
+                                        <div class="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">Secundario</div>
+                                        <input type="text" wire:model.live="color_secundario"
+                                               placeholder="#a85f24"
+                                               maxlength="7"
+                                               class="w-full mt-0.5 rounded-lg border border-slate-200 px-2 py-1 text-xs font-mono uppercase focus:border-[#d68643] focus:ring-1 focus:ring-[#d68643]/30">
+                                    </div>
+                                </div>
+                            </div>
+
+                            {{-- Preview en vivo --}}
+                            <div class="mt-3 rounded-xl border border-slate-200 overflow-hidden">
+                                <div class="text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 bg-slate-100 text-slate-500">
+                                    Vista previa
+                                </div>
+                                <div class="p-4 flex items-center gap-3"
+                                     style="background: linear-gradient(135deg,
+                                        color-mix(in srgb, {{ $color_primario ?? '#d68643' }} 15%, white),
+                                        #ffffff 60%,
+                                        color-mix(in srgb, {{ $color_secundario ?? '#a85f24' }} 12%, white));">
+                                    <div class="flex h-12 w-12 items-center justify-center rounded-xl text-white shadow-md flex-shrink-0"
+                                         style="background: linear-gradient(135deg, {{ $color_primario ?? '#d68643' }}, {{ $color_secundario ?? '#a85f24' }});">
+                                        <i class="fa-solid fa-utensils"></i>
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="text-sm font-bold" style="color: {{ $color_primario ?? '#d68643' }};">{{ $nombre ?: 'Nombre tenant' }}</div>
+                                        <div class="text-[11px] text-slate-500">Así se ve la cabecera con tus colores</div>
+                                    </div>
+                                    <button type="button"
+                                            class="rounded-lg px-3 py-1.5 text-xs font-bold text-white shadow"
+                                            style="background: linear-gradient(135deg, {{ $color_primario ?? '#d68643' }}, {{ $color_secundario ?? '#a85f24' }});">
+                                        Botón
+                                    </button>
+                                </div>
+                            </div>
+
+                            {{-- Presets rápidos --}}
+                            <div class="mt-3">
+                                <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Presets</div>
+                                <div class="flex flex-wrap gap-1.5">
+                                    @foreach([
+                                        ['Naranja Hacienda', '#d68643', '#a85f24'],
+                                        ['Marrón Café',      '#a05a2c', '#7d4421'],
+                                        ['Verde fresco',     '#10b981', '#047857'],
+                                        ['Azul océano',      '#2563eb', '#1e40af'],
+                                        ['Rosa coral',       '#f43f5e', '#be123c'],
+                                        ['Violeta',          '#8b5cf6', '#6d28d9'],
+                                        ['Amarillo sol',     '#f59e0b', '#b45309'],
+                                        ['Slate elegante',   '#475569', '#1e293b'],
+                                    ] as [$nombrePreset, $p, $s])
+                                        <button type="button"
+                                                @click="$wire.set('color_primario', '{{ $p }}'); $wire.set('color_secundario', '{{ $s }}');"
+                                                title="{{ $nombrePreset }}"
+                                                class="h-8 w-12 rounded-md border-2 border-white shadow ring-1 ring-slate-200 hover:ring-2 hover:ring-slate-400 transition"
+                                                style="background: linear-gradient(135deg, {{ $p }}, {{ $s }});">
+                                        </button>
+                                    @endforeach
+                                </div>
+                            </div>
                         </div>
 
                         {{-- Logo del tenant --}}

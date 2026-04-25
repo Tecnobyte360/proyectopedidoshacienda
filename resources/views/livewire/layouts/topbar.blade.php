@@ -52,7 +52,8 @@
             </button>
 
             <div class="flex items-center gap-2.5 min-w-0">
-                <div class="hidden md:flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#fbe9d7] to-[#f5d4ad] text-[#a85f24]">
+                <div class="hidden md:flex h-9 w-9 items-center justify-center rounded-xl"
+                     style="background: linear-gradient(135deg, var(--brand-soft), var(--brand-soft-2)); color: var(--brand-secondary);">
                     <i class="fa-solid {{ $icono }} text-sm"></i>
                 </div>
                 <div class="min-w-0">

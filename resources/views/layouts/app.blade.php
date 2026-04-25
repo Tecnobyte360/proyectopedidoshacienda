@@ -63,7 +63,20 @@
         body.is-fullscreen #btn-exit-fullscreen { display: flex !important; }
     </style>
 
+    @php
+        $tenantBrand = app(\App\Services\TenantManager::class)->current();
+        $brandPrim = $tenantBrand?->color_primario   ?: '#d68643';
+        $brandSec  = $tenantBrand?->color_secundario ?: '#a85f24';
+    @endphp
+
     <style>
+        :root {
+            --brand-primary:   {{ $brandPrim }};
+            --brand-secondary: {{ $brandSec }};
+            --brand-soft:      color-mix(in srgb, var(--brand-primary) 12%, #ffffff);
+            --brand-soft-2:    color-mix(in srgb, var(--brand-primary) 22%, #ffffff);
+            --brand-dark:      color-mix(in srgb, var(--brand-primary) 80%, #000000);
+        }
         html,
         body {
             font-family: 'Plus Jakarta Sans', sans-serif;
