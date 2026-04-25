@@ -693,8 +693,29 @@ class WhatsappWebhookController extends Controller
 
         $systemPrompt = $this->getSystemPrompt($pedidosInfo, $this->infoEmpresa(), $nombreParaPrompt, $ansInfo, $sedeId);
 
+        // ── NOTA DE RECHAZO RECIENTE DE COBERTURA ────────────────────────
+        // Si en los últimos 15 min rechazamos una dirección por cobertura,
+        // inyectamos un system con regla dura para que la IA no repita el
+        // mismo intento ni el mismo texto literal en bucle.
+        $extraSystem = [];
+        $tenantIdNota = app(\App\Services\TenantManager::class)->id() ?? 'none';
+        $rechazoIndexKey = "wa_rechazo_cobertura_idx_t{$tenantIdNota}_{$telefonoNorm}";
+        $ultimoRechazo = Cache::get($rechazoIndexKey);
+        if (is_array($ultimoRechazo) && !empty($ultimoRechazo['direccion'])) {
+            $extraSystem[] = [
+                'role'    => 'system',
+                'content' => "🚫 La dirección \"{$ultimoRechazo['direccion']}\" fue rechazada por cobertura hace pocos minutos.\n"
+                    . "REGLAS DURAS:\n"
+                    . "1) NO llames `confirmar_pedido` mientras la dirección sea esa o equivalente.\n"
+                    . "2) Si el cliente insiste sin cambiar dirección, ofrece *recoger en sede* o pídele otra dirección/barrio cercano.\n"
+                    . "3) NO repitas literalmente el mismo mensaje de rechazo dos veces seguidas: varía el texto.\n"
+                    . "4) Si saluda otra vez (\"hola\", \"buenas\"), respóndele cordial y vuelve a la pregunta de la dirección — NO al rechazo de nuevo.",
+            ];
+        }
+
         $messages = array_merge(
             [['role' => 'system', 'content' => $systemPrompt]],
+            $extraSystem,
             $conversationHistory
         );
 
@@ -892,7 +913,9 @@ class WhatsappWebhookController extends Controller
                 $name,
                 $conversationHistory,
                 $cacheKey,
-                $connectionId
+                $connectionId,
+                $conversacion,
+                $convService
             );
         }
 
@@ -1902,7 +1925,9 @@ class WhatsappWebhookController extends Controller
     string $name,
     array $conversationHistory,
     string $cacheKey,
-    ?string $connectionId = null
+    ?string $connectionId = null,
+    ?\App\Models\ConversacionWhatsapp $conversacion = null,
+    ?\App\Services\ConversacionService $convService = null
 ): string {
     try {
         $telNorm = $this->normalizarTelefono($from);
@@ -2007,18 +2032,79 @@ class WhatsappWebhookController extends Controller
             Cache::forget($confirmKey);   // liberar el lock de deduplicación
             DB::rollBack();
 
-            $mensaje = "Uy, esa dirección me queda fuera de la zona de cobertura 😔\n\n"
-                . "Pero el pedido te lo puedo dejar listo para que lo recojas en la sede, o "
-                . "si tienes otra dirección cercana me la pasas y vuelvo a revisar 🙌";
+            // ── ANTI-FLOOD ───────────────────────────────────────────────
+            // Si ya rechazamos esta misma dirección hace poco, no repetimos
+            // el mismo texto: variamos el mensaje y NO volvemos a registrar
+            // el mismo assistant en el historial. Esto rompe el bucle donde
+            // la IA reintenta confirmar_pedido con la misma dirección.
+            $tenantIdFlood = app(\App\Services\TenantManager::class)->id() ?? 'none';
+            $direccionKey  = mb_strtolower(trim($direccion . '|' . $barrio));
+            $rechazoKey    = "wa_rechazo_cobertura_t{$tenantIdFlood}_" . md5($telNorm . '|' . $direccionKey);
+            $yaRechazada   = Cache::has($rechazoKey);
+
+            if ($yaRechazada) {
+                $mensaje = "Sigo sin cobertura para esa dirección 😅. Pásame *otra dirección o barrio cercano*, "
+                    . "o dime si prefieres *recoger en la sede*. Sin una dirección válida no puedo cerrar el pedido.";
+            } else {
+                $mensaje = "Uy, esa dirección me queda fuera de la zona de cobertura 😔\n\n"
+                    . "Pero el pedido te lo puedo dejar listo para que lo recojas en la sede, o "
+                    . "si tienes otra dirección cercana me la pasas y vuelvo a revisar 🙌";
+            }
+
+            Cache::put($rechazoKey, true, now()->addMinutes(15));
+
+            // Index para que el siguiente turno de la IA reciba la nota
+            // de rechazo en el system message (rompe el bucle de reintento).
+            $rechazoIndexKey = "wa_rechazo_cobertura_idx_t{$tenantIdFlood}_{$telNorm}";
+            Cache::put($rechazoIndexKey, [
+                'direccion' => trim($direccion . ($barrio ? " ({$barrio})" : '')),
+                'ts'        => now()->timestamp,
+            ], now()->addMinutes(15));
 
             Log::warning('🚫 Pedido rechazado — fuera de cobertura', [
-                'from'      => $from,
-                'direccion' => $direccion,
-                'barrio'    => $barrio,
+                'from'           => $from,
+                'direccion'      => $direccion,
+                'barrio'         => $barrio,
+                'ya_rechazada'   => $yaRechazada,
             ]);
 
+            // ── INSTRUCCIÓN AL MODELO PARA ROMPER EL BUCLE ───────────────
+            // Inyectamos un mensaje de sistema con regla dura: NO volver a
+            // llamar confirmar_pedido hasta que el cliente envíe una
+            // dirección/barrio distinto al que acabamos de rechazar.
+            $direccionRechazada = trim($direccion . ($barrio ? " ({$barrio})" : ''));
+            $conversationHistory[] = [
+                'role'    => 'system',
+                'content' => "🚫 DIRECCIÓN RECHAZADA POR COBERTURA: \"{$direccionRechazada}\".\n"
+                    . "REGLA DURA: NO vuelvas a llamar la función `confirmar_pedido` hasta que el cliente "
+                    . "envíe una dirección o barrio DIFERENTE al rechazado. Si insiste, repite la opción "
+                    . "*recoger en sede* o pide nueva dirección. NO repitas literalmente el mismo mensaje "
+                    . "de rechazo dos veces seguidas.",
+            ];
             $conversationHistory[] = ['role' => 'assistant', 'content' => $mensaje];
             Cache::put($cacheKey, $conversationHistory, now()->addMinutes(45));
+
+            // ── PERSISTIR EN BD para que aparezca en Chat en vivo ────────
+            if ($conversacion && $convService) {
+                try {
+                    $convService->agregarMensaje(
+                        $conversacion,
+                        \App\Models\MensajeWhatsapp::ROL_ASSISTANT,
+                        $mensaje,
+                        [
+                            'tipo' => 'tool_call',
+                            'meta' => [
+                                'tool'      => 'confirmar_pedido',
+                                'resultado' => 'rechazado_cobertura',
+                                'direccion' => $direccion,
+                                'barrio'    => $barrio,
+                            ],
+                        ]
+                    );
+                } catch (\Throwable $e) {
+                    Log::warning('No se pudo persistir mensaje de rechazo: ' . $e->getMessage());
+                }
+            }
 
             return $mensaje;
         }
