@@ -108,18 +108,23 @@
     @endphp
 
     <style>
-        /* Sidebar dark — variables locales (no contaminan el resto de la app) */
+        /* Sidebar — toma el color del tenant para sentirse parte de su marca.
+           El fondo es un tinte oscuro del color primario, no negro puro,
+           más amable a la vista en sesiones largas. */
         .app-sidebar {
-            --sb-bg:        #0e0f12;
-            --sb-bg-2:      #16181d;
-            --sb-line:      rgba(255,255,255,0.06);
-            --sb-text:      rgba(255,255,255,0.62);
-            --sb-text-soft: rgba(255,255,255,0.42);
-            --sb-text-strong: #ffffff;
-            --sb-hover:     rgba(255,255,255,0.05);
-            --sb-active:    rgba(255,255,255,0.08);
-            --brand-primary: {{ $primario }};
+            --brand-primary:   {{ $primario }};
             --brand-secondary: {{ $secundario }};
+
+            /* Fondo: 88% slate + 12% del color del tenant → dark suave con tinte */
+            --sb-bg:   color-mix(in srgb, var(--brand-primary) 12%, #1f242c);
+            --sb-bg-2: color-mix(in srgb, var(--brand-secondary) 8%, #2a3038);
+
+            --sb-line:      rgba(255,255,255,0.07);
+            --sb-text:      rgba(255,255,255,0.72);
+            --sb-text-soft: rgba(255,255,255,0.50);
+            --sb-text-strong: #ffffff;
+            --sb-hover:     rgba(255,255,255,0.06);
+            --sb-active:    color-mix(in srgb, var(--brand-primary) 22%, transparent);
 
             background: linear-gradient(180deg, var(--sb-bg) 0%, var(--sb-bg-2) 100%);
             color: var(--sb-text);
@@ -239,14 +244,16 @@
         .sb-item.is-active {
             background: var(--sb-active);
             color: var(--sb-text-strong);
+            font-weight: 600;
         }
         .sb-item.is-active::before {
             content: '';
             position: absolute;
             left: 0; top: 50%; transform: translateY(-50%);
-            width: 3px; height: 60%;
+            width: 3px; height: 70%;
             background: var(--brand-primary);
             border-radius: 0 3px 3px 0;
+            box-shadow: 0 0 12px color-mix(in srgb, var(--brand-primary) 60%, transparent);
         }
         .sb-item.is-active .sb-icon { color: var(--brand-primary); }
 
