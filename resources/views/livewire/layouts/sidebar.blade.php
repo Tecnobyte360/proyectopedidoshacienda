@@ -124,10 +124,51 @@
             background: linear-gradient(180deg, var(--sb-bg) 0%, var(--sb-bg-2) 100%);
             color: var(--sb-text);
         }
+        .sb-brand-block {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.625rem;
+            padding: 0.5rem 0.5rem 0;
+        }
+        .sb-brand-logo {
+            width: 4.5rem;            /* 72px — protagonista */
+            height: 4.5rem;
+            border-radius: 1.125rem;  /* 18px */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg,
+                color-mix(in srgb, var(--brand-primary) 22%, #ffffff15) 0%,
+                color-mix(in srgb, var(--brand-secondary) 22%, #ffffff10) 100%);
+            border: 1px solid rgba(255,255,255,0.10);
+            padding: 0.5rem;
+            flex-shrink: 0;
+            box-shadow: 0 6px 20px -6px rgba(0,0,0,0.55),
+                        inset 0 1px 0 rgba(255,255,255,0.10);
+        }
         .sb-brand {
             color: var(--brand-primary);
             font-weight: 800;
             letter-spacing: -0.018em;
+            font-size: 0.95rem;
+            text-align: center;
+            line-height: 1.2;
+            max-width: 100%;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .sb-brand-sub {
+            font-size: 0.6875rem;
+            color: var(--sb-text-soft);
+            text-align: center;
+            font-weight: 500;
+            letter-spacing: 0.02em;
+        }
+        body.sidebar-collapsed #sb-collapsed-logo { display: flex !important; }
+        body.sidebar-collapsed #sb-collapsed-logo .sb-brand-logo {
+            width: 2.5rem; height: 2.5rem; border-radius: 0.75rem; padding: 0.25rem;
         }
         .sb-collapse-btn {
             background: rgba(255,255,255,0.05);
@@ -256,19 +297,41 @@
     <aside class="app-sidebar fixed inset-y-0 left-0 z-40 hidden lg:flex w-64 flex-col"
            x-data="{ q: '' }">
 
-        {{-- HEADER: brand + collapse --}}
-        <div class="flex items-center justify-between px-5 pt-5 pb-3">
-            <div class="flex items-center gap-2.5 min-w-0">
-                @if($brandLogo)
-                    <img src="{{ $brandLogo }}" alt="logo" class="h-8 w-8 rounded-lg object-contain bg-white/5 p-1 flex-shrink-0">
-                @endif
-                <span class="sb-brand text-base truncate">{{ $brandName }}</span>
-            </div>
+        {{-- HEADER: collapse arriba a la derecha --}}
+        <div class="flex items-center justify-end px-4 pt-3 pb-1 sb-collapsible">
             <button onclick="document.body.classList.toggle('sidebar-collapsed')"
-                    class="sb-collapse-btn h-7 w-7 inline-flex items-center justify-center rounded-lg flex-shrink-0"
+                    class="sb-collapse-btn h-7 w-7 inline-flex items-center justify-center rounded-lg"
                     title="Colapsar sidebar">
                 <i class="fa-solid fa-angles-left text-[11px]"></i>
             </button>
+        </div>
+
+        {{-- BRAND: logo arriba grande, nombre y sub debajo --}}
+        <div class="sb-brand-block sb-collapsible">
+            <div class="sb-brand-logo">
+                @if($brandLogo)
+                    <img src="{{ $brandLogo }}" alt="{{ $brandName }}" class="h-full w-full object-contain rounded-xl">
+                @else
+                    <span class="text-2xl font-extrabold text-white">
+                        {{ mb_strtoupper(mb_substr($brandName, 0, 1)) }}
+                    </span>
+                @endif
+            </div>
+            <div class="flex flex-col items-center gap-0.5">
+                <span class="sb-brand">{{ $brandName }}</span>
+                <span class="sb-brand-sub">{{ $brandSub }}</span>
+            </div>
+        </div>
+
+        {{-- Mini logo cuando está colapsado --}}
+        <div class="hidden flex-col items-center pt-3 pb-2" id="sb-collapsed-logo">
+            <div class="sb-brand-logo">
+                @if($brandLogo)
+                    <img src="{{ $brandLogo }}" alt="{{ $brandName }}" class="h-full w-full object-contain rounded-lg">
+                @else
+                    <span class="text-base font-extrabold text-white">{{ mb_strtoupper(mb_substr($brandName, 0, 1)) }}</span>
+                @endif
+            </div>
         </div>
 
         {{-- USER CARD --}}
@@ -335,17 +398,24 @@
 
     {{-- ╔═══ MOBILE DRAWER ═══╗ --}}
     <aside id="mobile-sidebar" class="app-sidebar fixed inset-y-0 left-0 z-50 w-72 transform -translate-x-full transition-transform duration-300 flex flex-col lg:hidden">
-        <div class="flex items-center justify-between px-5 pt-5 pb-3">
-            <div class="flex items-center gap-2.5 min-w-0">
-                @if($brandLogo)
-                    <img src="{{ $brandLogo }}" alt="logo" class="h-8 w-8 rounded-lg object-contain bg-white/5 p-1">
-                @endif
-                <span class="sb-brand text-base truncate">{{ $brandName }}</span>
-            </div>
+        <div class="flex items-center justify-end px-4 pt-3 pb-1">
             <button onclick="document.getElementById('mobile-sidebar').classList.add('-translate-x-full'); document.getElementById('mobile-backdrop').classList.add('hidden');"
                     class="sb-collapse-btn h-7 w-7 inline-flex items-center justify-center rounded-lg">
                 <i class="fa-solid fa-xmark text-xs"></i>
             </button>
+        </div>
+        <div class="sb-brand-block">
+            <div class="sb-brand-logo">
+                @if($brandLogo)
+                    <img src="{{ $brandLogo }}" alt="{{ $brandName }}" class="h-full w-full object-contain rounded-xl">
+                @else
+                    <span class="text-2xl font-extrabold text-white">{{ mb_strtoupper(mb_substr($brandName, 0, 1)) }}</span>
+                @endif
+            </div>
+            <div class="flex flex-col items-center gap-0.5">
+                <span class="sb-brand">{{ $brandName }}</span>
+                <span class="sb-brand-sub">{{ $brandSub }}</span>
+            </div>
         </div>
 
         <div class="px-4">
