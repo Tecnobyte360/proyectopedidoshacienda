@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Services\WhatsappResolverService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -22,6 +23,18 @@ class WhatsappStatusMonitor extends Component
     private string $cacheEstadoAnterior = 'whatsapp_monitor_estado_anterior';
     private string $cacheAlertaDesconexion = 'alerta_whatsapp_desconexion_enviada';
 
+    /** Devuelve el servicio resolver con credenciales/connection_ids del tenant actual. */
+    private function resolver(): WhatsappResolverService
+    {
+        return app(WhatsappResolverService::class);
+    }
+
+    /** URL base de la API WhatsApp del tenant actual. */
+    private function apiBaseUrl(): string
+    {
+        return rtrim($this->resolver()->credenciales()['api_base_url'] ?? 'https://wa-api.tecnobyteapp.com:1422', '/');
+    }
+
     public function mount(): void
     {
         $this->verificarEstado();
@@ -33,17 +46,19 @@ class WhatsappStatusMonitor extends Component
             $token = $this->obtenerTokenForzado();
 
             if (!$token) {
-                $this->setEstado('error', 'Sin token — verifica credenciales en .env');
+                $this->setEstado('error', 'Sin credenciales WhatsApp para este tenant — edítalo y agrega email/password de TecnoByteApp');
                 return;
             }
+
+            $apiBase = $this->apiBaseUrl();
 
             $response = Http::withoutVerifying()
                 ->withToken($token)
                 ->timeout(15)
-                ->get('https://wa-api.tecnobyteapp.com:1422/whatsapp/');
+                ->get("{$apiBase}/whatsapp/");
 
             if ($response->status() === 401) {
-                Cache::forget('whatsapp_api_token');
+                Cache::forget($this->resolver()->tokenCacheKey());
                 $token = $this->loginWhatsapp(force: true);
 
                 if (!$token) {
@@ -54,7 +69,7 @@ class WhatsappStatusMonitor extends Component
                 $response = Http::withoutVerifying()
                     ->withToken($token)
                     ->timeout(15)
-                    ->get('https://wa-api.tecnobyteapp.com:1422/whatsapp/');
+                    ->get("{$apiBase}/whatsapp/");
             }
 
             if ($response->failed()) {
@@ -75,10 +90,23 @@ class WhatsappStatusMonitor extends Component
             }
 
             // ── Conexión correspondiente al TENANT actual ────────────────
-            // Preferimos ConfiguracionBot::connection_id_default. Si la
-            // lectura falla (p.ej. permisos de caché en producción) o no
-            // está configurada, hacemos fallback al primer isDefault del
-            // listado para no bloquear la UI.
+            // 1) Filtrar el listado a SOLO las connection_ids del tenant
+            //    (configurado en tenants.whatsapp_config.connection_ids).
+            // 2) Si tiene varias, preferir la de ConfiguracionBot::connection_id_default
+            //    o la que esté CONNECTED+isDefault. Si no, la primera del tenant.
+            $idsTenant = $this->resolver()->connectionIdsDelTenant();
+
+            if (!empty($idsTenant)) {
+                $whatsapps = $whatsapps->filter(
+                    fn ($w) => in_array((int) ($w['id'] ?? 0), $idsTenant, true)
+                )->values();
+            }
+
+            if ($whatsapps->isEmpty()) {
+                $this->setEstado('error', 'Este tenant no tiene conexiones asignadas. Agrega los connection_ids al tenant.');
+                return;
+            }
+
             $tenantConnId = null;
             try {
                 $tenantConnId = (int) (\App\Models\ConfiguracionBot::actual()->connection_id_default ?? 0) ?: null;
@@ -92,16 +120,10 @@ class WhatsappStatusMonitor extends Component
             }
 
             if (!$conexion) {
-                // Fallback: primera con isDefault y CONNECTED, o primera con isDefault, o la primera
                 $conexion = $whatsapps->first(
                     fn ($w) => strtoupper($w['status'] ?? '') === 'CONNECTED' && (bool) ($w['isDefault'] ?? false)
                 ) ?? $whatsapps->first(fn ($w) => !empty($w['isDefault']))
                   ?? $whatsapps->first();
-            }
-
-            if (!$conexion) {
-                $this->setEstado('error', 'Sin conexión disponible para este tenant');
-                return;
             }
 
             $estadoApi = strtoupper($conexion['status'] ?? 'UNKNOWN');
@@ -249,7 +271,8 @@ class WhatsappStatusMonitor extends Component
             $ok = false;
             foreach ($candidatos as [$verb, $path]) {
                 $req = Http::withoutVerifying()->withToken($token)->timeout(20);
-                $resp = $verb === 'POST' ? $req->post("https://wa-api.tecnobyteapp.com:1422{$path}") : $req->get("https://wa-api.tecnobyteapp.com:1422{$path}");
+                $apiBase = $this->apiBaseUrl();
+                $resp = $verb === 'POST' ? $req->post("{$apiBase}{$path}") : $req->get("{$apiBase}{$path}");
                 Log::info('🔁 forzarReconexion intento', ['path' => $path, 'status' => $resp->status()]);
                 if ($resp->successful()) { $ok = true; break; }
             }
@@ -323,7 +346,7 @@ class WhatsappStatusMonitor extends Component
             $response = Http::withoutVerifying()
                 ->withToken($token)
                 ->timeout(20)
-                ->get("https://wa-api.tecnobyteapp.com:1422/whatsapp/{$this->connectionId}");
+                ->get($this->apiBaseUrl() . "/whatsapp/{$this->connectionId}");
 
             Log::info('🔄 Refresco QR - detalle conexión', [
                 'connectionId' => $this->connectionId,
@@ -344,7 +367,7 @@ class WhatsappStatusMonitor extends Component
             $retry = Http::withoutVerifying()
                 ->withToken($token)
                 ->timeout(20)
-                ->get('https://wa-api.tecnobyteapp.com:1422/whatsapp/');
+                ->get($this->apiBaseUrl() . '/whatsapp/');
 
             Log::info('🔁 Reconsulta listado WA para QR', [
                 'status' => $retry->status(),
@@ -380,7 +403,7 @@ class WhatsappStatusMonitor extends Component
 
     private function loginWhatsapp(bool $force = false): ?string
     {
-        $cacheKey = 'whatsapp_api_token';
+        $cacheKey = $this->resolver()->tokenCacheKey();
 
         if ($force) {
             Cache::forget($cacheKey);
@@ -389,17 +412,20 @@ class WhatsappStatusMonitor extends Component
         }
 
         try {
-            $email = env('WHATSAPP_API_EMAIL');
-            $password = env('WHATSAPP_API_PASSWORD');
+            $cred = $this->resolver()->credenciales();
+            $email = $cred['email'] ?? null;
+            $password = $cred['password'] ?? null;
 
             if (!$email || !$password) {
-                Log::error('❌ Monitor WA: WHATSAPP_API_EMAIL o WHATSAPP_API_PASSWORD no definidos en .env');
+                Log::error('❌ Monitor WA: tenant sin credenciales TecnoByteApp y .env tampoco las tiene');
                 return null;
             }
 
+            $apiBase = $this->apiBaseUrl();
+
             $response = Http::withoutVerifying()
                 ->timeout(15)
-                ->post('https://wa-api.tecnobyteapp.com:1422/auth/login', [
+                ->post("{$apiBase}/auth/login", [
                     'email'    => $email,
                     'password' => $password,
                 ]);
