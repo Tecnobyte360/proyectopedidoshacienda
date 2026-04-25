@@ -62,7 +62,7 @@ class Producto extends Model
         return $this->belongsToMany(Corte::class, 'producto_corte')
             ->withPivot('orden')
             ->withTimestamps()
-            ->orderBy('pivot_orden');
+            ->orderBy('producto_corte.orden');
     }
 
     public function promociones(): BelongsToMany
