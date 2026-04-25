@@ -313,38 +313,8 @@
 
     {{-- Alpine ya viene incluido en Livewire 3 — NO cargar el CDN aparte (duplicaría y rompería wire:click) --}}
 
-    {{-- AUDIO nuevo pedido — FUERA de cualquier componente Livewire para que no se reemplace en re-renders --}}
-    <audio id="new-order-sound" preload="auto">
-        <source src="{{ asset('sounds/new-order.mp3') }}" type="audio/mpeg">
-    </audio>
-
-    <script>
-
-        let audioUnlocked = false;
-
-        document.addEventListener('click', function () {
-            if (!audioUnlocked) {
-                const audio = document.getElementById('new-order-sound');
-                if (audio) {
-                    audio.play().then(() => {
-                        audio.pause();
-                        audio.currentTime = 0;
-                        audioUnlocked = true;
-                    }).catch(() => {});
-                }
-            }
-        });
-
-        document.addEventListener('livewire:initialized', () => {
-            Livewire.on('pedidoActualizado', () => {
-                const audio = document.getElementById('new-order-sound');
-                if (audio && audioUnlocked) {
-                    audio.currentTime = 0;
-                    audio.play().catch(() => {});
-                }
-            });
-        });
-    </script>
+    {{-- El sonido de "nuevo pedido" ahora se genera con Web Audio API en
+         /livewire/pedidos/index.blade.php (sin dependencia de archivos mp3). --}}
 
     @stack('scripts')
 </body>

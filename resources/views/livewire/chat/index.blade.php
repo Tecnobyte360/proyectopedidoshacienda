@@ -658,10 +658,22 @@
                     .listen('.mensaje.nuevo', (e) => {
                         console.log('💬 Mensaje nuevo en chat:', e);
 
-                        // Sonido si es del cliente
+                        // Sonido si es del cliente — beep generado con Web Audio API
                         if (e.rol === 'user') {
-                            const audio = document.getElementById('new-order-sound');
-                            if (audio) { audio.currentTime = 0; audio.play().catch(()=>{}); }
+                            try {
+                                const Ctx = window.AudioContext || window.webkitAudioContext;
+                                const ctx = new Ctx();
+                                const now = ctx.currentTime;
+                                [{f:880,s:0,d:.12},{f:660,s:.15,d:.18}].forEach(t => {
+                                    const o = ctx.createOscillator(), g = ctx.createGain();
+                                    o.type = 'sine'; o.frequency.value = t.f;
+                                    g.gain.setValueAtTime(0, now+t.s);
+                                    g.gain.linearRampToValueAtTime(.3, now+t.s+.02);
+                                    g.gain.linearRampToValueAtTime(0, now+t.s+t.d);
+                                    o.connect(g).connect(ctx.destination);
+                                    o.start(now+t.s); o.stop(now+t.s+t.d+.05);
+                                });
+                            } catch(_) {}
                         }
 
                         // Refrescar el componente Livewire
