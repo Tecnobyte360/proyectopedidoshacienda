@@ -2415,14 +2415,54 @@ class WhatsappWebhookController extends Controller
 
     private function construirResumenAns(): string
     {
-        $crear     = $this->obtenerAnsMinutos('crear') ?? 'No definido';
-        $adicionar = $this->obtenerAnsMinutos('adicionar') ?? 'No definido';
-        $cancelar  = $this->obtenerAnsMinutos('cancelar') ?? 'No definido';
+        // Lee TODAS las reglas activas de ans_pedidos para el tenant actual
+        // (gestionadas desde /ans). Cada regla incluye:
+        //   - acción (crear, adicionar, cancelar, cambiar_direccion, etc.)
+        //   - tiempo_minutos (ventana en la que se permite la acción)
+        //   - descripcion (texto rico que el bot puede usar literal con el cliente)
+        try {
+            $reglas = \App\Models\AnsPedido::where('activo', true)
+                ->orderBy('id')
+                ->get();
+        } catch (\Throwable $e) {
+            \Log::warning('No se pudieron leer ANS para el bot: ' . $e->getMessage());
+            return '(Sin reglas ANS configuradas — pregunta al equipo si dudas)';
+        }
 
-        return "ANS DEL SISTEMA:\n"
-            . "- Crear pedido: {$crear} minuto(s)\n"
-            . "- Adicionar pedido: {$adicionar} minuto(s)\n"
-            . "- Cancelar pedido: {$cancelar} minuto(s)";
+        if ($reglas->isEmpty()) {
+            return "REGLAS ANS:\n"
+                . "(No hay reglas configuradas. Si el cliente pide cancelar/modificar/agregar a un pedido existente, "
+                . "explícale que un asesor lo revisará y deriva al departamento correspondiente.)";
+        }
+
+        $lineas = ["📋 REGLAS ANS — TIEMPOS Y CONDICIONES PARA ACCIONES SOBRE PEDIDOS:"];
+        $lineas[] = "";
+        $lineas[] = "Estas son las reglas EXACTAS que debes respetar y comunicar al cliente:";
+        $lineas[] = "";
+
+        foreach ($reglas as $r) {
+            $accionTitulo = ucfirst(str_replace('_', ' ', $r->accion));
+            $minutos = $r->tiempo_minutos ?? null;
+            $alerta  = $r->tiempo_alerta ?? null;
+            $descripcion = trim((string) $r->descripcion);
+
+            $lineas[] = "▸ **{$accionTitulo}** — ventana: " . ($minutos !== null ? "{$minutos} minutos" : 'sin definir');
+            if ($alerta !== null && $alerta > 0) {
+                $lineas[] = "   (avisar al cliente cuando queden ≤ {$alerta} min)";
+            }
+            if ($descripcion !== '') {
+                $lineas[] = "   Detalle: {$descripcion}";
+            }
+            $lineas[] = "";
+        }
+
+        $lineas[] = "INSTRUCCIONES PARA TI (el bot):";
+        $lineas[] = "1) Si el cliente pide una acción que está en la lista, verifica el tiempo transcurrido desde fecha_pedido del pedido en cuestión.";
+        $lineas[] = "2) Si está DENTRO de la ventana → procede con la herramienta correspondiente.";
+        $lineas[] = "3) Si está FUERA de la ventana → explica con cariño que el tiempo expiró y por qué (lee la descripción de la regla).";
+        $lineas[] = "4) Si el cliente insiste → deriva al departamento correspondiente (no inventes excepciones).";
+
+        return implode("\n", $lineas);
     }
 
     /*

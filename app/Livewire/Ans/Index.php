@@ -2,11 +2,14 @@
 
 namespace App\Livewire\Ans;
 
+use App\Models\AnsPedido;
 use App\Models\AnsTiempoPedido;
 use Livewire\Component;
 
 class Index extends Component
 {
+    public string $tab = 'sla';   // sla | bot
+
     public bool $modalAbierto = false;
     public ?int $editandoId   = null;
 
@@ -23,6 +26,27 @@ class Index extends Component
         'nuevo'                 => 'Nuevo (atención inicial)',
         'en_preparacion'        => 'En preparación',
         'repartidor_en_camino'  => 'Repartidor en camino',
+    ];
+
+    /* ── REGLAS DEL BOT (AnsPedido) ───────────────────────── */
+    public bool   $modalBot = false;
+    public ?int   $editandoBotId = null;
+    public string $bot_accion         = 'cancelar';
+    public int    $bot_tiempo_minutos = 10;
+    public int    $bot_tiempo_alerta  = 0;
+    public string $bot_descripcion    = '';
+    public bool   $bot_activo         = true;
+
+    /** Acciones predefinidas + permite añadir libres */
+    public array $accionesBot = [
+        'crear'              => 'Crear pedido nuevo',
+        'adicionar'          => 'Adicionar productos al pedido',
+        'cancelar'           => 'Cancelar pedido',
+        'cambiar_direccion'  => 'Cambiar dirección de entrega',
+        'cambiar_hora'       => 'Cambiar hora de entrega',
+        'cambiar_pago'       => 'Cambiar método de pago',
+        'devolucion'         => 'Devolución / reembolso',
+        'reclamacion'        => 'Reclamación / queja',
     ];
 
     protected function rules(): array
@@ -121,11 +145,90 @@ class Index extends Component
         $this->resetValidation();
     }
 
+    /* ── CRUD reglas del bot ───────────────────────────────── */
+
+    public function abrirModalBotCrear(): void
+    {
+        $this->resetCamposBot();
+        $this->modalBot = true;
+    }
+
+    public function abrirModalBotEditar(int $id): void
+    {
+        $r = AnsPedido::findOrFail($id);
+        $this->editandoBotId       = $r->id;
+        $this->bot_accion          = (string) $r->accion;
+        $this->bot_tiempo_minutos  = (int) $r->tiempo_minutos;
+        $this->bot_tiempo_alerta   = (int) ($r->tiempo_alerta ?? 0);
+        $this->bot_descripcion     = (string) ($r->descripcion ?? '');
+        $this->bot_activo          = (bool) $r->activo;
+        $this->modalBot = true;
+    }
+
+    public function cerrarModalBot(): void
+    {
+        $this->modalBot = false;
+        $this->resetCamposBot();
+    }
+
+    public function guardarBot(): void
+    {
+        $data = $this->validate([
+            'bot_accion'          => 'required|string|max:60',
+            'bot_tiempo_minutos'  => 'required|integer|min:0|max:43200',
+            'bot_tiempo_alerta'   => 'nullable|integer|min:0|max:43200',
+            'bot_descripcion'     => 'nullable|string|max:1000',
+            'bot_activo'          => 'boolean',
+        ]);
+
+        AnsPedido::updateOrCreate(
+            ['id' => $this->editandoBotId],
+            [
+                'accion'          => $data['bot_accion'],
+                'tiempo_minutos'  => $data['bot_tiempo_minutos'],
+                'tiempo_alerta'   => $data['bot_tiempo_alerta'] ?: null,
+                'descripcion'     => $data['bot_descripcion'] ?: null,
+                'activo'          => $data['bot_activo'],
+            ]
+        );
+
+        $this->cerrarModalBot();
+        $this->dispatch('notify', [
+            'type'    => 'success',
+            'message' => $this->editandoBotId ? 'Regla del bot actualizada.' : 'Regla del bot creada.',
+        ]);
+    }
+
+    public function toggleBotActivo(int $id): void
+    {
+        $r = AnsPedido::findOrFail($id);
+        $r->activo = !$r->activo;
+        $r->save();
+    }
+
+    public function eliminarBot(int $id): void
+    {
+        AnsPedido::findOrFail($id)->delete();
+        $this->dispatch('notify', ['type' => 'success', 'message' => 'Regla eliminada.']);
+    }
+
+    private function resetCamposBot(): void
+    {
+        $this->editandoBotId       = null;
+        $this->bot_accion          = 'cancelar';
+        $this->bot_tiempo_minutos  = 10;
+        $this->bot_tiempo_alerta   = 0;
+        $this->bot_descripcion     = '';
+        $this->bot_activo          = true;
+        $this->resetValidation();
+    }
+
     public function render()
     {
-        $ans = AnsTiempoPedido::orderBy('orden')->orderBy('estado')->get();
+        $ans       = AnsTiempoPedido::orderBy('orden')->orderBy('estado')->get();
+        $reglasBot = AnsPedido::orderBy('id')->get();
 
-        return view('livewire.ans.index', compact('ans'))
+        return view('livewire.ans.index', compact('ans', 'reglasBot'))
             ->layout('layouts.app');
     }
 }
