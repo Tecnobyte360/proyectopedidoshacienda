@@ -9,9 +9,14 @@ use App\Models\ZonaCobertura;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 class Index extends Component
 {
+    use WithPagination;
+
+    protected $paginationTheme = 'tailwind';
+
     public ?int $sedeId = null;
     public ?int $zonaSeleccionada = null;
 
@@ -598,7 +603,19 @@ class Index extends Component
             ->orderBy('domiciliario_id')
             ->orderBy('fecha_pedido');
 
-        $pedidosEnRuta = $enRutaQuery->get();
+        // Paginar por domiciliario (5 por página). Cada domiciliario muestra todos sus pedidos.
+        $domiciliariosPag = (clone $enRutaQuery)
+            ->select('domiciliario_id', DB::raw('COUNT(*) as cant'), DB::raw('SUM(total) as monto'))
+            ->groupBy('domiciliario_id')
+            ->orderBy('domiciliario_id')
+            ->paginate(5, ['*'], 'pageDom');
+
+        $idsDom = collect($domiciliariosPag->items())->pluck('domiciliario_id')->all();
+
+        $pedidosEnRuta = $idsDom
+            ? (clone $enRutaQuery)->whereIn('domiciliario_id', $idsDom)->get()
+            : collect();
+
         $porDomiciliario = $pedidosEnRuta->groupBy('domiciliario_id')->map(function ($grupo) {
             return [
                 'domiciliario' => $grupo->first()->domiciliario,
@@ -615,7 +632,8 @@ class Index extends Component
             'totalPedidos',
             'totalSelected',
             'totalSelMonto',
-            'porDomiciliario'
+            'porDomiciliario',
+            'domiciliariosPag'
         ))->layout('layouts.app');
     }
 }

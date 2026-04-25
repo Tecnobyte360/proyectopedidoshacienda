@@ -450,6 +450,10 @@
                 </div>
             </div>
 
+            @if(isset($domiciliariosPag) && $domiciliariosPag->hasPages())
+                <div class="mb-3">{{ $domiciliariosPag->links() }}</div>
+            @endif
+
             <div class="space-y-4">
                 @foreach($porDomiciliario as $info)
                     @php
