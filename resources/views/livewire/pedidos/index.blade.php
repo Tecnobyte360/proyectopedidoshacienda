@@ -177,17 +177,18 @@
 
         {{-- HEADER --}}
         <div class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-            <div class="h-1 bg-gradient-to-r from-orange-400 via-orange-500 to-orange-600"></div>
+            <div class="h-1" style="background: linear-gradient(to right, var(--brand-primary), var(--brand-secondary));"></div>
 
             <div class="flex flex-col gap-4 p-4 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
                 <div class="flex min-w-0 items-center gap-3 sm:gap-4">
-                    <div class="flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-400 to-orange-600 text-white shadow-md">
+                    <div class="flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-2xl text-white shadow-md"
+                         style="background: linear-gradient(135deg, var(--brand-primary), var(--brand-secondary));">
                         <i class="fa-solid fa-bag-shopping text-base sm:text-lg"></i>
                     </div>
 
                     <div class="min-w-0">
-                        <div class="inline-flex items-center gap-2 rounded-full bg-orange-50 px-2.5 py-1 text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-orange-600 ring-1 ring-orange-100">
-                            <span class="h-1.5 w-1.5 rounded-full bg-orange-500 animate-pulse"></span>
+                        <div class="inline-flex items-center gap-2 rounded-full bg-brand-soft px-2.5 py-1 text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-brand-secondary ring-1 ring-brand/20">
+                            <span class="h-1.5 w-1.5 rounded-full bg-brand animate-pulse"></span>
                             En tiempo real
                         </div>
                         <h2 class="mt-1.5 text-lg sm:text-xl md:text-2xl font-bold tracking-tight text-slate-800">
@@ -205,7 +206,7 @@
                     <button type="button"
                             onclick="window.toggleFullscreen && window.toggleFullscreen()"
                             title="Pantalla completa (ESC para salir)"
-                            class="shrink-0 flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-orange-600 transition shadow-sm">
+                            class="shrink-0 flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-brand transition shadow-sm">
                         <i class="fa-solid fa-expand"></i>
                     </button>
                 </div>
@@ -279,7 +280,7 @@
                 <div class="relative w-full lg:w-56 shrink-0">
                     <i class="fa-solid fa-location-dot absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
                     <select wire:model.live="zona"
-                            class="h-10 w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-10 text-sm font-medium text-slate-700 focus:border-orange-400 focus:bg-white focus:ring-2 focus:ring-orange-100">
+                            class="h-10 w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-10 text-sm font-medium text-slate-700 focus:border-brand focus:bg-white focus:ring-2 focus:ring-brand/20">
                         <option value="todas">Todas las zonas</option>
                         @foreach($zonasDisponibles as $z)
                             <option value="{{ $z->id }}">{{ $z->nombre }}</option>
