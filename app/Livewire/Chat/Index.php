@@ -100,33 +100,76 @@ class Index extends Component
             $payload = [];
             if ($caption !== '') $payload['caption'] = $caption;
 
-            $makeRequest = function (string $useToken) use ($endpoint, $bytes, $filename, $payload) {
+            // Algunos endpoints de TecnoByteApp requieren whatsappId
+            $connId = $this->resolverConnectionId();
+            if ($connId) $payload['whatsappId'] = $connId;
+
+            // El endpoint /status de TecnoByteApp suele aceptar el archivo como
+            // "medias" (con s). Algunos despliegues usan "media" o "file".
+            // Probamos en orden y nos quedamos con el que NO devuelva 400.
+            $intentos = ['medias', 'media', 'file'];
+            $response = null;
+            $campoUsado = null;
+
+            $hacerLlamada = function (string $useToken, string $campo) use ($endpoint, $bytes, $filename, $payload) {
                 return Http::withoutVerifying()
                     ->withToken($useToken)
                     ->timeout(60)
-                    ->attach('medias', $bytes, $filename)
+                    ->attach($campo, $bytes, $filename)
                     ->post($endpoint, $payload);
             };
 
-            $response = $makeRequest($token);
+            foreach ($intentos as $campo) {
+                $resp = $hacerLlamada($token, $campo);
 
-            if ($response->status() === 401) {
-                Cache::forget($resolver->tokenCacheKey());
-                $newToken = $this->obtenerTokenWhatsapp();
-                if ($newToken) $response = $makeRequest($newToken);
+                if ($resp->status() === 401) {
+                    Cache::forget($resolver->tokenCacheKey());
+                    $newToken = $this->obtenerTokenWhatsapp();
+                    if ($newToken) {
+                        $token = $newToken;
+                        $resp  = $hacerLlamada($newToken, $campo);
+                    }
+                }
+
+                Log::info('Status WhatsApp intento', [
+                    'campo'  => $campo,
+                    'status' => $resp->status(),
+                    'body'   => mb_substr((string) $resp->body(), 0, 500),
+                ]);
+
+                if ($resp->successful()) {
+                    $response   = $resp;
+                    $campoUsado = $campo;
+                    break;
+                }
+
+                // Si el error NO es 400, no tiene sentido intentar con otro campo
+                if ($resp->status() !== 400) {
+                    $response = $resp;
+                    break;
+                }
+
+                $response = $resp;
             }
 
-            if (!$response->successful()) {
+            if (!$response || !$response->successful()) {
                 Log::warning('Publicar estado WhatsApp falló', [
-                    'status' => $response->status(),
-                    'body'   => $response->body(),
+                    'status'   => $response?->status(),
+                    'body'     => $response?->body(),
+                    'endpoint' => $endpoint,
+                    'mime'     => $mime,
+                    'filename' => $filename,
+                    'caption_len' => strlen($caption),
+                    'intentos' => $intentos,
                 ]);
                 $this->dispatch('notify', [
                     'type'    => 'error',
-                    'message' => '❌ La API rechazó el estado (' . $response->status() . '). Revisa los logs.',
+                    'message' => '❌ La API rechazó el estado (' . ($response?->status() ?: 'sin respuesta') . '). Revisa los logs.',
                 ]);
                 return;
             }
+
+            Log::info('✅ Estado WhatsApp publicado', ['campo_usado' => $campoUsado, 'endpoint' => $endpoint]);
 
             $this->cerrarEstadoModal();
             $this->dispatch('notify', [
