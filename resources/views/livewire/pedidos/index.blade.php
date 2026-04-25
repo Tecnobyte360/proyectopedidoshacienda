@@ -822,38 +822,45 @@ function pedidosNotif() {
         },
 
         _idsPorIluminar: new Set(),   // IDs que deben mostrar highlight durante X segundos
+        _maxIdConocido: 0,             // Mayor ID visto hasta ahora — solo importa si CRECE
 
         _snapshotIds() {
-            return new Set(
-                Array.from(document.querySelectorAll('[data-pedido-id]'))
-                    .map(n => n.dataset.pedidoId)
-            );
+            return Array.from(document.querySelectorAll('[data-pedido-id]'))
+                .map(n => parseInt(n.dataset.pedidoId, 10))
+                .filter(n => !isNaN(n));
         },
 
         _detectarNuevos() {
-            if (!this._idsConocidos) {
-                this._idsConocidos = this._snapshotIds();
+            const ids = this._snapshotIds();
+            if (ids.length === 0) return;
+
+            const maxAhora = Math.max(...ids);
+
+            // Primera ejecución: solo registramos baseline, NO notificamos.
+            if (this._maxIdConocido === 0) {
+                this._maxIdConocido = maxAhora;
                 return;
             }
-            const ahora = this._snapshotIds();
-            const nuevos = [...ahora].filter(id => !this._idsConocidos.has(id));
-            this._idsConocidos = ahora;
 
-            if (nuevos.length > 0) {
-                console.log('🛒 Detectados pedidos nuevos:', nuevos);
+            // Solo notificamos cuando aparece un ID MAYOR al máximo conocido.
+            // Esto evita falsos positivos al cambiar de filtro o al recargar
+            // (donde aparecen IDs que existían pero no estaban en pantalla).
+            if (maxAhora > this._maxIdConocido) {
+                const realmenteNuevos = ids.filter(id => id > this._maxIdConocido);
+                console.log('🛒 Pedidos NUEVOS detectados:', realmenteNuevos);
                 this.notificar('un cliente');
-                nuevos.forEach(id => {
-                    this._idsPorIluminar.add(id);
+                realmenteNuevos.forEach(id => {
+                    this._idsPorIluminar.add(String(id));
                     this._aplicarHighlight(id);
-                    // Quitar del set después de 6s
                     setTimeout(() => {
-                        this._idsPorIluminar.delete(id);
+                        this._idsPorIluminar.delete(String(id));
                         this._quitarHighlight(id);
                     }, 6000);
                 });
+                this._maxIdConocido = maxAhora;
             }
 
-            // Re-aplicar highlight a los que aún deben iluminar (en caso de que Livewire los haya re-renderizado)
+            // Re-aplicar highlight a los que aún deben iluminar
             this._idsPorIluminar.forEach(id => this._aplicarHighlight(id));
         },
 

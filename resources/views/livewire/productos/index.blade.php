@@ -481,10 +481,7 @@
                                     <label class="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-50 hover:bg-amber-50 border border-slate-200 cursor-pointer transition">
                                         <input type="checkbox" wire:model="corteIds" value="{{ $corte->id }}"
                                                class="rounded text-[#d68643] focus:ring-[#d68643]">
-                                        <span class="text-sm text-slate-700 flex items-center gap-1">
-                                            <span class="text-base">{{ $corte->icono_emoji ?: '🔪' }}</span>
-                                            {{ $corte->nombre }}
-                                        </span>
+                                        <span class="text-sm text-slate-700">{{ $corte->nombre }}</span>
                                     </label>
                                 @endforeach
                             </div>
