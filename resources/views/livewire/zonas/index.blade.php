@@ -521,7 +521,7 @@
                 }).addTo(this.zonasLayer);
 
                 polygon.bindPopup(`
-                    <div style="font-family: Inter, sans-serif; min-width: 180px;">
+                    <div style="font-family: 'Plus Jakarta Sans', sans-serif; min-width: 180px;">
                         <div style="font-weight: 700; color: ${z.color}; margin-bottom: 4px;">${z.nombre}</div>
                         ${z.sede ? `<div style="font-size: 11px; color: #64748b;">📍 ${z.sede}</div>` : ''}
                         <div style="margin-top: 8px; display: flex; gap: 12px; font-size: 11px;">
@@ -579,7 +579,7 @@
                 const marker = L.marker([p.lat, p.lng], { icon }).addTo(this.pedidosLayer);
 
                 marker.bindPopup(`
-                    <div style="font-family: Inter, sans-serif; min-width: 200px;">
+                    <div style="font-family: 'Plus Jakarta Sans', sans-serif; min-width: 200px;">
                         <div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:4px;">
                             <strong style="color:#1e293b;">#${String(p.id).padStart(3, '0')} ${p.cliente}</strong>
                             <span style="background: ${cfg.bg}; color: white; padding: 2px 8px; border-radius: 999px; font-size: 10px; text-transform: uppercase;">

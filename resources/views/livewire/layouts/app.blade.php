@@ -12,7 +12,9 @@
     <meta name="reverb-port"   content="{{ env('REVERB_PUBLIC_PORT', '') }}">
     <meta name="reverb-scheme" content="{{ env('REVERB_PUBLIC_SCHEME', '') }}">
 
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 
     {{-- Leaflet + plugins (mapas para zonas) --}}
@@ -63,7 +65,7 @@
     <style>
         html,
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: 'Plus Jakarta Sans', sans-serif;
             background: #f7f7f9;
             margin: 0;
         }
@@ -190,7 +192,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
     <style>
-        .swal2-popup { border-radius: 20px !important; padding: 1.75rem !important; font-family: 'Inter', system-ui, sans-serif !important; }
+        .swal2-popup { border-radius: 20px !important; padding: 1.75rem !important; font-family: 'Plus Jakarta Sans', system-ui, sans-serif !important; }
         .swal2-title { font-size: 1.15rem !important; font-weight: 800 !important; color: #1e293b !important; }
         .swal2-html-container { font-size: 0.9rem !important; color: #475569 !important; }
         .swal2-toast { box-shadow: 0 10px 40px rgba(15, 23, 42, 0.15) !important; border-radius: 16px !important; }

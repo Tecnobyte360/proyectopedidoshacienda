@@ -11,7 +11,9 @@
     <meta name="reverb-port"   content="{{ env('REVERB_PUBLIC_PORT', '') }}">
     <meta name="reverb-scheme" content="{{ env('REVERB_PUBLIC_SCHEME', '') }}">
 
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -32,7 +34,7 @@
         }
         html, body { margin: 0; padding: 0; }
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: 'Plus Jakarta Sans', sans-serif;
             min-height: 100vh;
             color: #1e293b;
             background:
