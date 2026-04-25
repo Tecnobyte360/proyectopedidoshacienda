@@ -61,9 +61,14 @@ class BotCatalogoService
     public function zonasActivas(?int $sedeId = null): Collection
     {
         $tenantId = app(\App\Services\TenantManager::class)->id() ?? 'none';
-        return Cache::remember("bot_zonas_activas_t{$tenantId}_" . ($sedeId ?? 'all'), 120, function () use ($sedeId) {
+        $config = \App\Models\ConfiguracionBot::actual();
+        $zonasFiltro = collect($config->bot_zonas_ids ?? [])->filter()->map(fn ($v) => (int) $v)->values()->all();
+        $filtroKey = empty($zonasFiltro) ? 'todas' : md5(implode(',', $zonasFiltro));
+
+        return Cache::remember("bot_zonas_activas_t{$tenantId}_" . ($sedeId ?? 'all') . "_{$filtroKey}", 120, function () use ($sedeId, $zonasFiltro) {
             return ZonaCobertura::with('barrios')
                 ->where('activa', true)
+                ->when(!empty($zonasFiltro), fn ($q) => $q->whereIn('id', $zonasFiltro))
                 ->when($sedeId, fn ($q) => $q->where(function ($qq) use ($sedeId) {
                     $qq->where('sede_id', $sedeId)->orWhereNull('sede_id');
                 }))

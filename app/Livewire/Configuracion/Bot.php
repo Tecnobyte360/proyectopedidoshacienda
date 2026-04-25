@@ -41,6 +41,9 @@ class Bot extends Component
     // Instrucciones extra (se SUMAN al prompt, no reemplazan)
     public string $instrucciones_extra       = '';
 
+    // Zonas de cobertura con las que opera el bot (vacío = todas las activas)
+    public array $bot_zonas_ids = [];
+
     // Felicitaciones de cumpleaños
     public bool   $cumpleanos_activo             = true;
     public string $cumpleanos_hora               = '09:00';
@@ -92,6 +95,12 @@ class Bot extends Component
         $this->usar_prompt_personalizado = (bool) ($cfg->usar_prompt_personalizado ?? false);
         $this->system_prompt             = (string) ($cfg->system_prompt ?? '');
         $this->instrucciones_extra       = (string) ($cfg->instrucciones_extra ?? '');
+
+        $this->bot_zonas_ids = collect($cfg->bot_zonas_ids ?? [])
+            ->filter()
+            ->map(fn ($v) => (int) $v)
+            ->values()
+            ->all();
 
         $this->cumpleanos_activo  = (bool) ($cfg->cumpleanos_activo ?? true);
         $this->cumpleanos_hora    = (string) ($cfg->cumpleanos_hora ?: '09:00');
@@ -346,6 +355,8 @@ class Bot extends Component
             'usar_prompt_personalizado' => 'boolean',
             'system_prompt'             => 'nullable|string|max:20000',
             'instrucciones_extra'       => 'nullable|string|max:20000',
+            'bot_zonas_ids'             => 'array',
+            'bot_zonas_ids.*'           => 'integer|exists:zonas_cobertura,id',
             'cumpleanos_activo'            => 'boolean',
             'cumpleanos_hora'              => 'nullable|string|regex:/^\d{2}:\d{2}$/',
             'cumpleanos_mensaje'           => 'nullable|string|max:2000',
@@ -387,8 +398,19 @@ class Bot extends Component
             unset($data['cumpleanos_dias_semana_arr']);
         }
 
+        // Normalizar zonas: vacío = todas
+        $data['bot_zonas_ids'] = collect($data['bot_zonas_ids'] ?? [])
+            ->filter()
+            ->map(fn ($v) => (int) $v)
+            ->unique()
+            ->values()
+            ->all();
+
         $cfg = ConfiguracionBot::actual();
         $cfg->update($data);
+
+        // Limpiar caché del catálogo (zonas formateadas) para que refresque
+        app(\App\Services\BotCatalogoService::class)->limpiarCache();
 
         $this->dispatch('notify', [
             'type'    => 'success',
@@ -409,9 +431,16 @@ class Bot extends Component
             ->values()
             ->toArray();
 
+        $zonasDisponibles = \App\Models\ZonaCobertura::with('sede:id,nombre')
+            ->where('activa', true)
+            ->orderBy('orden')
+            ->orderBy('nombre')
+            ->get(['id', 'nombre', 'sede_id', 'orden']);
+
         return view('livewire.configuracion.bot', [
             'variablesDisponibles' => BotPromptService::variablesDisponibles(),
             'conexionesDetectadas' => $conexionesDetectadas,
+            'zonasDisponibles'     => $zonasDisponibles,
         ])->layout('layouts.app');
     }
 }

@@ -563,7 +563,8 @@ class Index extends Component
         }
 
         // Domiciliarios disponibles (filtrados por zona si aplica)
-        $domiciliarios = Domiciliario::where('activo', true)
+        $domiciliarios = Domiciliario::with('zonas')
+            ->where('activo', true)
             ->orderByRaw("CASE estado WHEN 'disponible' THEN 0 WHEN 'ocupado' THEN 1 ELSE 2 END")
             ->orderBy('nombre')
             ->get();
@@ -577,10 +578,9 @@ class Index extends Component
 
             if ($zonasDePedidosSeleccionados->count() === 1) {
                 $zonaUnica = $zonasDePedidosSeleccionados->first();
-                $domiciliarios = $domiciliarios->map(function ($d) use ($zonaUnica) {
+                $domiciliarios->each(function ($d) use ($zonaUnica) {
                     $d->cubre_zona = $d->zonas->contains('id', $zonaUnica);
-                    return $d;
-                })->loadMissing('zonas');
+                });
             }
         }
 

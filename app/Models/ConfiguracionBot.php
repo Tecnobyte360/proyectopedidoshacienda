@@ -38,6 +38,7 @@ class ConfiguracionBot extends Model
         'usar_prompt_personalizado',
         'system_prompt',
         'instrucciones_extra',
+        'bot_zonas_ids',
         'activo',
         'cumpleanos_activo',
         'cumpleanos_hora',
@@ -68,6 +69,7 @@ class ConfiguracionBot extends Model
         'temperatura'                  => 'float',
         'max_tokens'                => 'integer',
         'max_imagenes_por_mensaje'  => 'integer',
+        'bot_zonas_ids'             => 'array',
     ];
 
     /** Instrucciones IA por defecto para derivación automática a departamento */

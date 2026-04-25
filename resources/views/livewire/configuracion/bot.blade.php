@@ -339,6 +339,67 @@
             </p>
         </section>
 
+        {{-- ZONAS DE COBERTURA DEL BOT --}}
+        <section class="rounded-2xl bg-white shadow border border-slate-200 p-6">
+            <div class="flex items-center gap-2 mb-4">
+                <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-50 text-sky-600">
+                    <i class="fa-solid fa-map-location-dot"></i>
+                </span>
+                <div class="flex-1">
+                    <h3 class="text-lg font-bold text-slate-800">Zonas de cobertura del bot</h3>
+                    <p class="text-xs text-slate-500">
+                        Selecciona las zonas con las que el bot debe trabajar para validar cobertura
+                        e inyectarlas en la variable <code class="bg-slate-100 px-1 rounded">{zonas}</code> del prompt.
+                        Si no seleccionas ninguna, se usan <strong>todas las activas</strong>.
+                    </p>
+                </div>
+            </div>
+
+            @if($zonasDisponibles->isEmpty())
+                <div class="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800">
+                    No hay zonas activas configuradas para este tenant.
+                    <a href="{{ url('/zonas-cobertura') }}" class="underline font-medium">Crea o activa zonas</a> primero.
+                </div>
+            @else
+                <div class="flex items-center gap-2 mb-3">
+                    <button type="button"
+                            wire:click="$set('bot_zonas_ids', {{ json_encode($zonasDisponibles->pluck('id')->all()) }})"
+                            class="text-xs px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700">
+                        <i class="fa-solid fa-check-double mr-1"></i> Seleccionar todas
+                    </button>
+                    <button type="button"
+                            wire:click="$set('bot_zonas_ids', [])"
+                            class="text-xs px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700">
+                        <i class="fa-solid fa-eraser mr-1"></i> Limpiar (usar todas)
+                    </button>
+                    <span class="text-xs text-slate-500 ml-auto">
+                        {{ count($bot_zonas_ids) }} de {{ $zonasDisponibles->count() }} seleccionadas
+                    </span>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-96 overflow-y-auto pr-1">
+                    @foreach($zonasDisponibles as $z)
+                        <label class="flex items-start gap-2 px-3 py-2 rounded-xl border border-slate-200 hover:border-sky-300 hover:bg-sky-50/30 cursor-pointer transition">
+                            <input type="checkbox"
+                                   value="{{ $z->id }}"
+                                   wire:model="bot_zonas_ids"
+                                   class="mt-0.5 rounded border-slate-300 text-sky-600 focus:ring-sky-500 h-4 w-4">
+                            <div class="flex-1 min-w-0">
+                                <div class="text-sm font-medium text-slate-800 truncate">{{ $z->nombre }}</div>
+                                @if($z->sede)
+                                    <div class="text-[11px] text-slate-500 truncate">
+                                        <i class="fa-solid fa-store text-[10px]"></i> {{ $z->sede->nombre }}
+                                    </div>
+                                @else
+                                    <div class="text-[11px] text-slate-400">Todas las sedes</div>
+                                @endif
+                            </div>
+                        </label>
+                    @endforeach
+                </div>
+            @endif
+        </section>
+
         {{-- BIENVENIDA --}}
         <section class="rounded-2xl bg-white shadow border border-slate-200 p-6">
             <div class="flex items-center gap-2 mb-4">
