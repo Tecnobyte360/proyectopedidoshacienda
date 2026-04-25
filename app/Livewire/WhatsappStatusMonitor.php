@@ -74,13 +74,28 @@ class WhatsappStatusMonitor extends Component
                 return;
             }
 
-            $conexion = $whatsapps->first(
-                fn ($w) =>
-                    strtoupper($w['status'] ?? '') === 'CONNECTED'
-                    && (bool) ($w['isDefault'] ?? false)
-            ) ?? $whatsapps->first(
-                fn ($w) => !empty($w['isDefault'])
-            ) ?? $whatsapps->first();
+            // ── Conexión correspondiente al TENANT actual ────────────────
+            // Multi-tenant: ConfiguracionBot::connection_id_default define
+            // qué conexión de TecnoByteApp pertenece a este tenant. Si no
+            // está configurada, no podemos saber qué QR mostrar.
+            $tenantConnId = null;
+            try {
+                $tenantConnId = (int) (\App\Models\ConfiguracionBot::actual()->connection_id_default ?? 0) ?: null;
+            } catch (\Throwable $e) {
+                Log::warning('WA monitor: no se pudo leer connection_id_default: ' . $e->getMessage());
+            }
+
+            if (!$tenantConnId) {
+                $this->setEstado('error', 'Conecta primero la cuenta en /configuracion/bot → "Conexión por defecto"');
+                return;
+            }
+
+            $conexion = $whatsapps->firstWhere('id', $tenantConnId);
+
+            if (!$conexion) {
+                $this->setEstado('error', "La conexión #{$tenantConnId} no existe en TecnoByteApp. Revisa la configuración del bot.");
+                return;
+            }
 
             $estadoApi = strtoupper($conexion['status'] ?? 'UNKNOWN');
 
@@ -197,6 +212,55 @@ class WhatsappStatusMonitor extends Component
 
         $this->enviarAlertaSiNecesario($estadoApi);
         Cache::put($this->cacheEstadoAnterior, $estadoApi, now()->addHours(2));
+    }
+
+    /**
+     * Fuerza la regeneración del QR cerrando sesión en TecnoByteApp.
+     * Útil cuando la sesión está "pegada" y la API no devuelve QR nuevo.
+     */
+    public function forzarReconexion(): void
+    {
+        if (!$this->connectionId) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'No hay conexión asignada a este tenant.']);
+            return;
+        }
+
+        try {
+            $token = $this->obtenerTokenForzado();
+            if (!$token) {
+                $this->dispatch('notify', ['type' => 'error', 'message' => 'No se pudo autenticar contra la API de WhatsApp.']);
+                return;
+            }
+
+            // Intentamos varios endpoints conocidos del wrapper whatsapp-web.js
+            $candidatos = [
+                ['POST', "/whatsapp/{$this->connectionId}/logout"],
+                ['POST', "/whatsapp/{$this->connectionId}/disconnect"],
+                ['POST', "/whatsapp/{$this->connectionId}/restart"],
+            ];
+
+            $ok = false;
+            foreach ($candidatos as [$verb, $path]) {
+                $req = Http::withoutVerifying()->withToken($token)->timeout(20);
+                $resp = $verb === 'POST' ? $req->post("https://wa-api.tecnobyteapp.com:1422{$path}") : $req->get("https://wa-api.tecnobyteapp.com:1422{$path}");
+                Log::info('🔁 forzarReconexion intento', ['path' => $path, 'status' => $resp->status()]);
+                if ($resp->successful()) { $ok = true; break; }
+            }
+
+            if (!$ok) {
+                $this->dispatch('notify', ['type' => 'warning', 'message' => 'La API no aceptó la reconexión forzada. Espera 30s y reintenta.']);
+                return;
+            }
+
+            // Esperar un momento y refrescar
+            usleep(1500000);
+            $this->verificarEstado();
+
+            $this->dispatch('notify', ['type' => 'success', 'message' => 'Reconexión forzada. Espera el nuevo QR…']);
+        } catch (\Throwable $e) {
+            Log::error('❌ forzarReconexion: ' . $e->getMessage());
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Error: ' . $e->getMessage()]);
+        }
     }
 
     public function solicitarNuevoQr(): void

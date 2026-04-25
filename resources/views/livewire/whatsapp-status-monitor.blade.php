@@ -100,6 +100,20 @@
                 </button>
             @endif
 
+            @if ($status === 'connected')
+                <button
+                    wire:click="forzarReconexion"
+                    wire:loading.attr="disabled"
+                    wire:target="forzarReconexion"
+                    onclick="return confirm('¿Forzar reconexión? Se cerrará la sesión actual y deberás escanear un nuevo QR.')"
+                    type="button"
+                    class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-600 shadow-sm transition hover:bg-rose-100 disabled:opacity-50">
+                    <i class="fa-solid fa-power-off text-[11px]" wire:loading.class="fa-spin" wire:target="forzarReconexion"></i>
+                    <span wire:loading.remove wire:target="forzarReconexion">Forzar reconexión</span>
+                    <span wire:loading wire:target="forzarReconexion">Cerrando…</span>
+                </button>
+            @endif
+
             @if (in_array($status, ['disconnected', 'error', 'qrcode', 'pairing', 'timeout', 'not_connected']))
                 <button
                     wire:click="solicitarNuevoQr"
