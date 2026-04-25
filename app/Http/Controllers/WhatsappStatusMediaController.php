@@ -30,12 +30,21 @@ class WhatsappStatusMediaController extends Controller
      * responda 200.
      */
     private const PATH_CANDIDATES = [
+        '/public/{file}',
         '/uploads/{file}',
         '/media/{file}',
         '/files/{file}',
+        '/static/{file}',
         '/public/uploads/{file}',
+        '/public/media/{file}',
+        '/public/status/{file}',
+        '/status/media/{file}',
+        '/status/{file}',
         '/whatsapp/media/{file}',
+        '/whatsapp/files/{file}',
         '/api/media/{file}',
+        '/api/files/{file}',
+        '/api/public/{file}',
     ];
 
     public function __invoke(Request $request, string $filename)
@@ -80,36 +89,44 @@ class WhatsappStatusMediaController extends Controller
         $token = $this->obtenerToken($resolver);
         if (!$token) return [null, null];
 
+        $intentos = [];
+
         foreach (self::PATH_CANDIDATES as $template) {
             $path = str_replace('{file}', $filename, $template);
             $url  = $base . $path;
 
             try {
-                $resp = Http::withoutVerifying()->withToken($token)->timeout(30)->get($url);
+                // Probamos primero CON token y, si da 401 o 403, también SIN token
+                // (puede que la ruta sea pública)
+                $resp = Http::withoutVerifying()->withToken($token)->timeout(15)->get($url);
 
-                // Si el primer intento da 401, refrescamos token una vez
                 if ($resp->status() === 401) {
                     Cache::forget($resolver->tokenCacheKey());
                     $token = $this->obtenerToken($resolver);
-                    if (!$token) return [null, null];
-                    $resp = Http::withoutVerifying()->withToken($token)->timeout(30)->get($url);
+                    if ($token) $resp = Http::withoutVerifying()->withToken($token)->timeout(15)->get($url);
                 }
 
-                if ($resp->successful()) {
-                    $body = $resp->body();
-                    // Algunos servers devuelven 200 con HTML "no encontrado". Validar.
-                    $mime = $resp->header('Content-Type') ?: '';
-                    if (str_contains($mime, 'image/') || str_contains($mime, 'video/') || str_contains($mime, 'octet-stream')) {
-                        Log::info('WA status media: descargada', ['url' => $url, 'mime' => $mime, 'size' => strlen($body)]);
-                        return [$body, $mime];
-                    }
+                if (in_array($resp->status(), [401, 403])) {
+                    $resp = Http::withoutVerifying()->timeout(15)->get($url);
+                }
+
+                $mime = (string) $resp->header('Content-Type');
+                $intentos[$path] = $resp->status() . ' (' . mb_strimwidth($mime, 0, 30, '…') . ')';
+
+                if ($resp->successful() && (str_contains($mime, 'image/') || str_contains($mime, 'video/') || $mime === 'application/octet-stream')) {
+                    Log::info('✅ WA status media descargada', ['url' => $url, 'mime' => $mime, 'size' => strlen($resp->body())]);
+                    return [$resp->body(), $mime];
                 }
             } catch (\Throwable $e) {
-                Log::warning('WA status media: error en candidato', ['url' => $url, 'err' => $e->getMessage()]);
+                $intentos[$path] = 'EXC ' . mb_strimwidth($e->getMessage(), 0, 50);
             }
         }
 
-        Log::warning('WA status media: ningún candidato funcionó', ['filename' => $filename, 'base' => $base]);
+        Log::warning('WA status media: ningún candidato funcionó', [
+            'filename' => $filename,
+            'base'     => $base,
+            'intentos' => $intentos,
+        ]);
         return [null, null];
     }
 
