@@ -604,7 +604,11 @@ class Index extends Component
             ->orderBy('fecha_pedido');
 
         // Paginar por domiciliario (5 por página). Cada domiciliario muestra todos sus pedidos.
+        // reorder() limpia los orderBy heredados del clone — necesario para
+        // que MySQL en modo only_full_group_by no reclame por `fecha_pedido`
+        // al agrupar por `domiciliario_id`.
         $domiciliariosPag = (clone $enRutaQuery)
+            ->reorder()
             ->select('domiciliario_id', DB::raw('COUNT(*) as cant'), DB::raw('SUM(total) as monto'))
             ->groupBy('domiciliario_id')
             ->orderBy('domiciliario_id')
