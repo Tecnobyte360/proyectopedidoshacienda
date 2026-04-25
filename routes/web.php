@@ -9,6 +9,7 @@ use App\Livewire\Productos\Index as ProductosIndex;
 use App\Livewire\Categorias\Index as CategoriasIndex;
 use App\Livewire\Importaciones\Index as ImportacionesIndex;
 use App\Livewire\Cortes\Index as CortesIndex;
+use App\Livewire\Campanas\Index as CampanasIndex;
 use App\Livewire\Integraciones\Index as IntegracionesIndex;
 use App\Livewire\UsuariosInternos\Index as UsuariosInternosIndex;
 use App\Livewire\Departamentos\Index as DepartamentosIndex;
@@ -76,6 +77,7 @@ Route::middleware(['no_super_sin_imp'])->group(function () {
     Route::get('/productos',     ProductosIndex::class)->middleware('permission:productos.ver')->name('productos.index');
     Route::get('/categorias',    CategoriasIndex::class)->middleware('permission:categorias.gestionar')->name('categorias.index');
     Route::get('/cortes',        CortesIndex::class)->middleware('permission:productos.ver')->name('cortes.index');
+    Route::get('/campanas',      CampanasIndex::class)->middleware('permission:conversaciones.ver')->name('campanas.index');
     Route::get('/importaciones', ImportacionesIndex::class)->middleware('permission:productos.ver')->name('importaciones.index');
     Route::get('/integraciones', IntegracionesIndex::class)->middleware(['permission:productos.ver', 'role:super-admin'])->name('integraciones.index');
     Route::get('/usuarios-internos', UsuariosInternosIndex::class)->middleware('permission:conversaciones.ver')->name('usuarios-internos.index');

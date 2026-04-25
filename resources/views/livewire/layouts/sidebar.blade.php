@@ -71,6 +71,7 @@
                         ['name' => 'Conversaciones',    'icon' => 'fa-comments',       'route' => 'conversaciones.index',   'badge' => null, 'permission' => 'conversaciones.ver'],
                         ['name' => 'Usuarios internos', 'icon' => 'fa-user-shield',    'route' => 'usuarios-internos.index','badge' => null, 'permission' => 'conversaciones.ver'],
                         ['name' => 'Departamentos',     'icon' => 'fa-building-user',  'route' => 'departamentos.index',    'badge' => null, 'permission' => 'conversaciones.ver'],
+                        ['name' => 'Campañas WhatsApp', 'icon' => 'fa-bullhorn',       'route' => 'campanas.index',         'badge' => null, 'permission' => 'conversaciones.ver'],
                         ['name' => 'Widgets de Chat',   'icon' => 'fa-code',           'route' => 'chat-widgets.index',     'badge' => null, 'permission' => 'conversaciones.ver', 'solo_super_admin' => true],
                         ['name' => 'Domiciliarios', 'icon' => 'fa-motorcycle',          'route' => 'domiciliarios.index', 'badge' => null, 'permission' => 'domiciliarios.gestionar'],
                         ['name' => 'Zonas',         'icon' => 'fa-map-location-dot',    'route' => 'zonas.index',         'badge' => null, 'permission' => 'zonas.gestionar'],

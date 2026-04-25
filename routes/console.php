@@ -25,6 +25,13 @@ Schedule::command('tenants:suspender-vencidos')
     ->withoutOverlapping()
     ->runInBackground();
 
+// 📨 Procesar campañas WhatsApp en lotes con throttle anti-baneo
+Schedule::command('campanas:procesar')
+    ->everyMinute()
+    ->timezone('America/Bogota')
+    ->withoutOverlapping(10)
+    ->runInBackground();
+
 Schedule::command('clientes:felicitar-cumpleanos')
     ->everyMinute()
     ->timezone('America/Bogota')
