@@ -34,8 +34,8 @@ return new class extends Migration {
         });
 
         // Agregar corte al detalle del pedido (cuál se seleccionó)
-        Schema::table('detalle_pedidos', function (Blueprint $table) {
-            if (!Schema::hasColumn('detalle_pedidos', 'corte_nombre')) {
+        Schema::table('detalles_pedido', function (Blueprint $table) {
+            if (!Schema::hasColumn('detalles_pedido', 'corte_nombre')) {
                 $table->string('corte_nombre', 80)->nullable()->after('unidad');
             }
         });
@@ -43,8 +43,8 @@ return new class extends Migration {
 
     public function down(): void
     {
-        Schema::table('detalle_pedidos', function (Blueprint $table) {
-            if (Schema::hasColumn('detalle_pedidos', 'corte_nombre')) {
+        Schema::table('detalles_pedido', function (Blueprint $table) {
+            if (Schema::hasColumn('detalles_pedido', 'corte_nombre')) {
                 $table->dropColumn('corte_nombre');
             }
         });
