@@ -334,19 +334,8 @@
             </div>
         </div>
 
-        {{-- USER CARD --}}
-        <div class="px-4 sb-collapsible">
-            <div class="sb-user-card flex items-center gap-3 p-3">
-                <div class="sb-avatar text-sm">{{ $iniciales ?: 'U' }}</div>
-                <div class="min-w-0 flex-1">
-                    <div class="text-[13px] font-bold text-white truncate leading-tight">{{ $userName }}</div>
-                    <div class="text-[11px] font-medium truncate leading-tight mt-1" style="color: var(--brand-primary);">{{ $rolPrincipal }}</div>
-                </div>
-            </div>
-        </div>
-
         {{-- SEARCH --}}
-        <div class="px-4 mt-3 sb-collapsible">
+        <div class="px-4 mt-4 sb-collapsible">
             <div class="relative">
                 <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-[12px]" style="color: var(--sb-text-soft);"></i>
                 <input type="text" x-model="q" placeholder="Buscar…"
@@ -417,17 +406,7 @@
             </div>
         </div>
 
-        <div class="px-4">
-            <div class="sb-user-card flex items-center gap-3 p-3">
-                <div class="sb-avatar text-sm">{{ $iniciales ?: 'U' }}</div>
-                <div class="min-w-0 flex-1">
-                    <div class="text-[13px] font-bold text-white truncate leading-tight">{{ $userName }}</div>
-                    <div class="text-[11px] font-medium truncate leading-tight mt-1" style="color: var(--brand-primary);">{{ $rolPrincipal }}</div>
-                </div>
-            </div>
-        </div>
-
-        <nav class="flex-1 overflow-y-auto px-3 py-4 space-y-5 mt-3">
+        <nav class="flex-1 overflow-y-auto px-3 py-4 space-y-5 mt-4">
             @foreach($sections as $section)
                 <div>
                     <div class="sb-section-title">{{ $section['title'] }}</div>
