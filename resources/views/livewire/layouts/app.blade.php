@@ -82,8 +82,25 @@
     <livewire:layouts.topbar />
 
     {{-- CONTENIDO --}}
+    @php
+        // Rutas que ya tienen layout full-bleed propio (chat de altura completa,
+        // dashboards con header gradient, vista pública). En esas no envolvemos
+        // en card para no romper su diseño.
+        $rutaActual = request()->route()?->getName();
+        $rutasFullBleed = ['chat.index', 'pedidos.index', 'pedidos.seguimiento'];
+        $aplicarCard = $rutaActual && !in_array($rutaActual, $rutasFullBleed, true);
+    @endphp
+
     <main class="min-h-screen pt-16 lg:pl-64 transition-all duration-300">
-        {{ $slot }}
+        @if($aplicarCard)
+            <div class="px-4 py-5 lg:px-6 lg:py-6">
+                <div class="page-shell bg-white rounded-2xl border border-slate-200/70 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.06)] p-4 lg:p-6 min-h-[calc(100vh-7.5rem)]">
+                    {{ $slot }}
+                </div>
+            </div>
+        @else
+            {{ $slot }}
+        @endif
     </main>
 
     {{-- BOTÓN FLOTANTE PARA SALIR DE FULLSCREEN (controlado por body class) --}}
