@@ -75,9 +75,10 @@ class WhatsappStatusMonitor extends Component
             }
 
             // ── Conexión correspondiente al TENANT actual ────────────────
-            // Multi-tenant: ConfiguracionBot::connection_id_default define
-            // qué conexión de TecnoByteApp pertenece a este tenant. Si no
-            // está configurada, no podemos saber qué QR mostrar.
+            // Preferimos ConfiguracionBot::connection_id_default. Si la
+            // lectura falla (p.ej. permisos de caché en producción) o no
+            // está configurada, hacemos fallback al primer isDefault del
+            // listado para no bloquear la UI.
             $tenantConnId = null;
             try {
                 $tenantConnId = (int) (\App\Models\ConfiguracionBot::actual()->connection_id_default ?? 0) ?: null;
@@ -85,15 +86,21 @@ class WhatsappStatusMonitor extends Component
                 Log::warning('WA monitor: no se pudo leer connection_id_default: ' . $e->getMessage());
             }
 
-            if (!$tenantConnId) {
-                $this->setEstado('error', 'Conecta primero la cuenta en /configuracion/bot → "Conexión por defecto"');
-                return;
+            $conexion = null;
+            if ($tenantConnId) {
+                $conexion = $whatsapps->firstWhere('id', $tenantConnId);
             }
 
-            $conexion = $whatsapps->firstWhere('id', $tenantConnId);
+            if (!$conexion) {
+                // Fallback: primera con isDefault y CONNECTED, o primera con isDefault, o la primera
+                $conexion = $whatsapps->first(
+                    fn ($w) => strtoupper($w['status'] ?? '') === 'CONNECTED' && (bool) ($w['isDefault'] ?? false)
+                ) ?? $whatsapps->first(fn ($w) => !empty($w['isDefault']))
+                  ?? $whatsapps->first();
+            }
 
             if (!$conexion) {
-                $this->setEstado('error', "La conexión #{$tenantConnId} no existe en TecnoByteApp. Revisa la configuración del bot.");
+                $this->setEstado('error', 'Sin conexión disponible para este tenant');
                 return;
             }
 
