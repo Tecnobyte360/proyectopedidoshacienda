@@ -20,6 +20,9 @@ class Sede extends Model
         'horarios',
         'mensaje_cerrado',
         'activa',
+        'whatsapp_connection_id',
+        'whatsapp_id',
+        'whatsapp_telefono',
     ];
 
     protected $casts = [
@@ -27,7 +30,20 @@ class Sede extends Model
         'longitud' => 'float',
         'activa'   => 'boolean',
         'horarios' => 'array',
+        'whatsapp_connection_id' => 'integer',
+        'whatsapp_id'            => 'integer',
     ];
+
+    /**
+     * Busca la sede que tiene asignado el connection_id recibido
+     * (para rutear conversaciones entrantes al lugar correcto).
+     */
+    public static function porConnectionId(int $connectionId): ?self
+    {
+        return self::where('whatsapp_connection_id', $connectionId)
+            ->orWhere('whatsapp_id', $connectionId)
+            ->first();
+    }
 
     public const DIAS_SEMANA = [
         'lunes'     => 'Lunes',

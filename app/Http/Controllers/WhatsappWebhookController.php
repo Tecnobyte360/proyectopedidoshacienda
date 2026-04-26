@@ -1063,11 +1063,19 @@ class WhatsappWebhookController extends Controller
     }
     /**
      * Obtiene el ID de la sede asociada a la conexión.
-     * Por ahora usa la primera sede activa como fallback. Si más adelante
-     * cada conexión tiene su sede, basta con agregar la lógica aquí.
+     * Estrategia:
+     *   1. Buscar una sede que tenga whatsapp_connection_id == connectionId.
+     *   2. Si no hay match, usar la primera sede activa del tenant (fallback legacy).
      */
     private function obtenerSedeIdDesdeConexion(?string $connectionId): ?int
     {
+        if ($connectionId) {
+            $sede = Sede::porConnectionId((int) $connectionId);
+            if ($sede) {
+                return $sede->id;
+            }
+        }
+
         $tenantId = app(\App\Services\TenantManager::class)->id() ?? 'none';
         return Cache::remember("default_sede_id_t{$tenantId}", now()->addMinutes(10), function () {
             return Sede::query()->orderBy('id')->value('id');

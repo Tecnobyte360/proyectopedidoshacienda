@@ -288,12 +288,19 @@ MSG;
             . "🔐 *{$token}*\n\n"
             . "¡Ya casi llega! 🙌";
 
+        // Si la sede tiene su propio WhatsApp asignado, prevalece.
+        $sedeWa = $this->sede_id
+            ? \App\Models\Sede::find($this->sede_id)?->whatsapp_connection_id
+            : null;
+
+        $whatsappId = $sedeWa ?: ($this->whatsapp_id ?: $this->connection_id);
+
         // TecnoByteApp usa solo 'whatsappId'. NO 'connectionId' (causa
         // ERR_SENDING_WAPP_MSG en algunas versiones del wrapper).
         $payload = [
             'number'     => $this->normalizarTelefono($telefono),
             'body'       => $mensaje,
-            'whatsappId' => (int) ($this->whatsapp_id ?: $this->connection_id),
+            'whatsappId' => (int) $whatsappId,
         ];
 
         try {
@@ -363,8 +370,15 @@ MSG;
             return;
         }
 
-        $connectionId = $this->connection_id;
-        $whatsappId   = $this->whatsapp_id ?: $this->connection_id;
+        // Si la sede del pedido tiene su propio WhatsApp asignado, prevalece
+        // sobre el que se guardó al crear el pedido (la sede pudo cambiarse).
+        $sedeWa = null;
+        if ($this->sede_id) {
+            $sedeWa = \App\Models\Sede::find($this->sede_id)?->whatsapp_connection_id;
+        }
+
+        $connectionId = $sedeWa ?: $this->connection_id;
+        $whatsappId   = $sedeWa ?: ($this->whatsapp_id ?: $this->connection_id);
 
         if (!$connectionId) {
             Log::warning('⚠️ Pedido sin connection_id para notificar', [

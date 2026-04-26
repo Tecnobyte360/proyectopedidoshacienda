@@ -17,6 +17,9 @@ class Index extends Component
     public ?float  $longitud        = null;
     public bool    $activa          = true;
     public string  $mensaje_cerrado = '';
+    public ?int    $whatsapp_connection_id = null;
+    public ?int    $whatsapp_id            = null;
+    public string  $whatsapp_telefono      = '';
 
     /** Array editable: [dia_key => ['abierto'=>bool, 'abre'=>'HH:MM', 'cierra'=>'HH:MM']] */
     public array $horarios = [];
@@ -31,6 +34,9 @@ class Index extends Component
             'activa'          => 'boolean',
             'mensaje_cerrado' => 'nullable|string|max:500',
             'horarios'        => 'array',
+            'whatsapp_connection_id' => 'nullable|integer',
+            'whatsapp_id'            => 'nullable|integer',
+            'whatsapp_telefono'      => 'nullable|string|max:32',
         ];
     }
 
@@ -56,6 +62,9 @@ class Index extends Component
         $this->longitud        = $sede->longitud;
         $this->activa          = (bool) $sede->activa;
         $this->mensaje_cerrado = (string) $sede->mensaje_cerrado;
+        $this->whatsapp_connection_id = $sede->whatsapp_connection_id;
+        $this->whatsapp_id            = $sede->whatsapp_id;
+        $this->whatsapp_telefono      = (string) $sede->whatsapp_telefono;
 
         // Cargar horarios existentes o defaults
         $existentes = $sede->horarios ?? [];
@@ -142,6 +151,9 @@ class Index extends Component
         $this->longitud        = null;
         $this->activa          = true;
         $this->mensaje_cerrado = '';
+        $this->whatsapp_connection_id = null;
+        $this->whatsapp_id            = null;
+        $this->whatsapp_telefono      = '';
 
         // Defaults: L-V 8a8, S 9a4, D cerrado
         $this->horarios = [];
@@ -156,9 +168,52 @@ class Index extends Component
         $this->resetValidation();
     }
 
+    /**
+     * Lista de conexiones WhatsApp disponibles para asignar a una sede.
+     * Consulta la API para obtener nombre/teléfono de cada conexión.
+     */
+    public function conexionesDisponibles(): array
+    {
+        try {
+            $tenant = app(\App\Services\TenantManager::class)->current();
+            $resolver = app(\App\Services\WhatsappResolverService::class);
+            $token = $resolver->token();
+
+            if (!$token) return [];
+
+            $resp = \Illuminate\Support\Facades\Http::withoutVerifying()
+                ->withToken($token)
+                ->timeout(15)
+                ->get(rtrim(config('app.whatsapp_api_base', 'https://wa-api.tecnobyteapp.com:1422'), '/') . '/whatsapp/');
+
+            if ($resp->failed()) return [];
+
+            $idsTenant = $resolver->connectionIdsDelTenant($tenant);
+            $whatsapps = collect($resp->json('whatsapps', []));
+
+            return $whatsapps
+                ->filter(function ($w) use ($idsTenant) {
+                    if (empty($idsTenant)) return true;
+                    return in_array((int) ($w['id'] ?? 0), $idsTenant, true);
+                })
+                ->map(fn ($w) => [
+                    'id'       => (int) ($w['id'] ?? 0),
+                    'name'     => $w['name'] ?? ('Conexión ' . ($w['id'] ?? '')),
+                    'number'   => $w['number'] ?? null,
+                    'status'   => $w['status'] ?? 'UNKNOWN',
+                ])
+                ->values()
+                ->toArray();
+        } catch (\Throwable $e) {
+            \Log::warning('No se pudieron cargar conexiones para sedes: ' . $e->getMessage());
+            return [];
+        }
+    }
+
     public function render()
     {
         $sedes = Sede::orderBy('nombre')->get();
-        return view('livewire.sedes.index', compact('sedes'))->layout('layouts.app');
+        $conexiones = $this->modalAbierto ? $this->conexionesDisponibles() : [];
+        return view('livewire.sedes.index', compact('sedes', 'conexiones'))->layout('layouts.app');
     }
 }

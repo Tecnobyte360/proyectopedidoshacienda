@@ -52,6 +52,23 @@
                         </div>
                     </div>
 
+                    @if($sede->whatsapp_connection_id || $sede->whatsapp_telefono)
+                        <div class="rounded-xl bg-emerald-50 border border-emerald-100 px-3 py-2 text-xs">
+                            <div class="flex items-center gap-2 text-emerald-700 font-semibold">
+                                <i class="fa-brands fa-whatsapp"></i>
+                                {{ $sede->whatsapp_telefono ?: 'Conexión #' . $sede->whatsapp_connection_id }}
+                            </div>
+                            @if($sede->whatsapp_connection_id)
+                                <div class="text-[10px] text-emerald-600 mt-0.5">Conexión asignada: #{{ $sede->whatsapp_connection_id }}</div>
+                            @endif
+                        </div>
+                    @else
+                        <div class="rounded-xl bg-slate-50 border border-dashed border-slate-200 px-3 py-2 text-xs text-slate-500">
+                            <i class="fa-brands fa-whatsapp opacity-50 mr-1"></i>
+                            Sin WhatsApp asignado <span class="text-slate-400">(usa el del tenant por defecto)</span>
+                        </div>
+                    @endif
+
                     <div class="rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-600">
                         <div class="font-semibold text-slate-800 mb-1">{{ $hoyTxt }}</div>
                         <details class="text-[11px]">
@@ -207,6 +224,53 @@
                         <textarea wire:model="mensaje_cerrado" rows="2"
                                   placeholder="Ej: Estamos cerrados ahora. Te atendemos mañana desde las 8am 🙌"
                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand"></textarea>
+                    </div>
+
+                    {{-- ═════════ WhatsApp de la sede ═════════ --}}
+                    <div class="rounded-xl border border-emerald-100 bg-emerald-50/40 p-4">
+                        <div class="flex items-center gap-2 mb-3">
+                            <i class="fa-brands fa-whatsapp text-emerald-600"></i>
+                            <span class="text-sm font-semibold text-slate-800">WhatsApp de esta sede</span>
+                        </div>
+                        <p class="text-xs text-slate-500 mb-3">
+                            Selecciona qué número de WhatsApp atiende los pedidos de esta sede.
+                            Los mensajes que entren a ese número se asignarán automáticamente aquí,
+                            y las notificaciones (preparación, en camino, encuesta) se enviarán desde él.
+                        </p>
+
+                        @if(empty($conexiones))
+                            <div class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                                <i class="fa-solid fa-triangle-exclamation mr-1"></i>
+                                No hay conexiones de WhatsApp disponibles. Configúralas primero en el módulo
+                                de Configuración de WhatsApp del tenant.
+                            </div>
+                        @else
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-600 mb-1">Conexión WhatsApp</label>
+                                    <select wire:model="whatsapp_connection_id"
+                                            wire:change="$set('whatsapp_id', $event.target.value)"
+                                            class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand bg-white">
+                                        <option value="">— Sin asignar —</option>
+                                        @foreach($conexiones as $c)
+                                            <option value="{{ $c['id'] }}">
+                                                #{{ $c['id'] }} · {{ $c['name'] }}
+                                                @if($c['number']) ({{ $c['number'] }}) @endif
+                                                · {{ $c['status'] }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-600 mb-1">
+                                        Teléfono visible <span class="text-slate-400 font-normal">(opcional)</span>
+                                    </label>
+                                    <input type="text" wire:model="whatsapp_telefono"
+                                           placeholder="+57 305 399 9848"
+                                           class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand">
+                                </div>
+                            </div>
+                        @endif
                     </div>
 
                     <div class="flex justify-end gap-3 pt-4 border-t border-slate-100">

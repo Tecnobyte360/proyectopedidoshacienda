@@ -46,10 +46,29 @@ class EnviarEncuestaEntrega implements ShouldQueue
         }
 
         $connectionId = null;
+
+        // Preferir el connection_id de la sede del pedido (cada sede tiene su WhatsApp).
         try {
-            $ids = app(\App\Services\WhatsappResolverService::class)->connectionIdsValidos($tenant);
-            $connectionId = $ids[0] ?? null;
+            $pedido = $encuesta->pedido;
+            if ($pedido) {
+                if ($pedido->connection_id) {
+                    $connectionId = (int) $pedido->connection_id;
+                } elseif ($pedido->sede_id) {
+                    $sede = \App\Models\Sede::find($pedido->sede_id);
+                    if ($sede && $sede->whatsapp_connection_id) {
+                        $connectionId = (int) $sede->whatsapp_connection_id;
+                    }
+                }
+            }
         } catch (\Throwable $e) { /* ignorar */ }
+
+        // Fallback al primer connection válido del tenant
+        if (!$connectionId) {
+            try {
+                $ids = app(\App\Services\WhatsappResolverService::class)->connectionIdsValidos($tenant);
+                $connectionId = $ids[0] ?? null;
+            } catch (\Throwable $e) { /* ignorar */ }
+        }
 
         $ok = $wa->enviarTexto(
             $this->telefono,
