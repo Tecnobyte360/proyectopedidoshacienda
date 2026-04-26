@@ -55,12 +55,33 @@ class WompiWebhookController extends Controller
             return response()->json(['ok' => false, 'reason' => 'sin_reference'], 200);
         }
 
-        // Buscar el pedido por la referencia
+        // Buscar el pedido por la referencia (lookup primario)
         $query = Pedido::withoutGlobalScopes()->where('wompi_reference', $reference);
         if ($tenant) {
             $query->where('tenant_id', $tenant->id);
         }
         $pedido = $query->first();
+
+        // Fallback: si la reference no matchea (porque rotó después del pago),
+        // extraer el pedido_id de la reference. Formato: PED-{tenant}-{pedido_id}-{ts}-{rand}
+        if (!$pedido && preg_match('/^PED-\d+-(\d+)-/', $reference, $m)) {
+            $pedidoId = (int) $m[1];
+            $fb = Pedido::withoutGlobalScopes()->where('id', $pedidoId);
+            if ($tenant) $fb->where('tenant_id', $tenant->id);
+            $pedido = $fb->first();
+
+            if ($pedido) {
+                Log::info('Wompi webhook: pedido recuperado via parse de reference', [
+                    'reference'        => $reference,
+                    'pedido_id'        => $pedido->id,
+                    'reference_actual' => $pedido->wompi_reference,
+                ]);
+                // Restaurar la reference recibida en el pedido para que el webhook
+                // posterior (si lo hay) pueda matchear y para tener trazabilidad.
+                $pedido->wompi_reference = $reference;
+                $pedido->saveQuietly();
+            }
+        }
 
         if (!$pedido) {
             Log::warning('Wompi webhook: pedido no encontrado', compact('reference', 'slug'));
