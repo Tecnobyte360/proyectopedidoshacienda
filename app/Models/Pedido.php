@@ -453,7 +453,7 @@ class Pedido extends Model
     private function postWhatsappSend(string $token, array $payload)
     {
         $cred = $this->whatsappCredencialesDelTenant();
-        $endpoint = rtrim($cred['api_base_url'], '/') . '/api/messages/messages/send-by-number';
+        $endpoint = rtrim($cred['api_base_url'], '/') . '/api/messages/send';
         return Http::withoutVerifying()
             ->withToken($token)
             ->timeout(20)
