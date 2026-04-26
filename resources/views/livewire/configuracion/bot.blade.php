@@ -590,6 +590,53 @@
         {{-- ─────────────────────────────────────────────────────────────
              🎂 FELICITACIONES DE CUMPLEAÑOS
              ───────────────────────────────────────────────────────────── --}}
+        {{-- ENCUESTA POST-ENTREGA --}}
+        <section class="rounded-2xl bg-white border border-slate-200 p-6 shadow-sm">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600 text-xl">
+                    <i class="fa-solid fa-star-half-stroke"></i>
+                </div>
+                <div>
+                    <h3 class="font-bold text-slate-800">Encuesta post-entrega</h3>
+                    <p class="text-xs text-slate-500">
+                        Cuando un pedido se marca como ENTREGADO, el cliente recibe un mensaje de WhatsApp con un link para calificar el proceso y al domiciliario.
+                        Ver respuestas en
+                        <a href="{{ route('encuestas.index') }}" class="text-amber-700 underline font-medium">/encuestas</a>.
+                    </p>
+                </div>
+            </div>
+
+            <div class="space-y-4">
+                <label class="flex items-start gap-3 cursor-pointer">
+                    <input type="checkbox" wire:model="encuesta_activa"
+                           class="mt-1 rounded border-slate-300 text-amber-500 focus:ring-amber-400">
+                    <div>
+                        <div class="text-sm font-semibold text-slate-800">Enviar encuesta automáticamente</div>
+                        <div class="text-xs text-slate-500">Al pasar el pedido a estado "Entregado".</div>
+                    </div>
+                </label>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Esperar antes de enviar (minutos)</label>
+                        <input type="number" wire:model="encuesta_delay_minutos" min="0" max="1440"
+                               class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-amber-400 focus:ring-2 focus:ring-amber-100">
+                        <p class="text-[11px] text-slate-500 mt-1">0 = inmediato. Recomendado: 10–30 min para que el cliente termine de comer.</p>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Mensaje de encuesta (plantilla)</label>
+                    <textarea wire:model="encuesta_mensaje" rows="6" maxlength="2000"
+                              placeholder="Si lo dejas vacío, se usa una plantilla por defecto."
+                              class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-amber-400 focus:ring-2 focus:ring-amber-100"></textarea>
+                    <p class="text-[11px] text-slate-500 mt-1">
+                        Variables disponibles: <code>{nombre}</code>, <code>{nombre_completo}</code>, <code>{domiciliario}</code>, <code>{pedido}</code>, <code>{url}</code> (link a la encuesta).
+                    </p>
+                </div>
+            </div>
+        </section>
+
         <section class="rounded-2xl bg-white border border-slate-200 p-6 shadow-sm">
             <div class="flex items-center gap-3 mb-4">
                 <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-pink-50 text-pink-600 text-xl">

@@ -17,6 +17,7 @@
         'chat.index'           => ['Chat en vivo',   'Atiende clientes en tiempo real',            'fa-headset'],
         'alertas.index'        => ['Alertas del bot','Errores operativos: OpenAI, WhatsApp',       'fa-triangle-exclamation'],
         'felicitaciones.index' => ['Felicitaciones',  'Historial de felicitaciones de cumpleaños',  'fa-cake-candles'],
+        'encuestas.index'      => ['Encuestas',       'Calificaciones del proceso y domiciliarios', 'fa-star-half-stroke'],
         'sedes.index'          => ['Sedes',           'Puntos de atención y horarios',              'fa-shop'],
         'usuarios.index'       => ['Usuarios',        'Cuentas de acceso a la plataforma',          'fa-users-gear'],
         'roles.index'          => ['Roles y permisos','Define qué puede hacer cada rol',            'fa-shield-halved'],

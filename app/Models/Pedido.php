@@ -143,6 +143,12 @@ class Pedido extends Model
 
     if ($nuevoEstado === self::ESTADO_ENTREGADO) {
         $this->fecha_entregado = now();
+        // Programar envío de encuesta tras la entrega (si está activa para el tenant)
+        try {
+            $this->programarEncuestaEntrega();
+        } catch (\Throwable $e) {
+            \Log::warning('No se pudo programar encuesta: ' . $e->getMessage());
+        }
     }
 
     if ($nuevoEstado === self::ESTADO_CANCELADO) {
@@ -197,6 +203,67 @@ class Pedido extends Model
         $this->token_entrega = $token;
         $this->saveQuietly(); // sin disparar observers ni eventos
         return $token;
+    }
+
+    /**
+     * Crea encuesta post-entrega y envía al cliente un mensaje WhatsApp con
+     * link al formulario público. Configurable por tenant en
+     * configuracion_bot (encuesta_activa, encuesta_delay_minutos,
+     * encuesta_mensaje).
+     */
+    public function programarEncuestaEntrega(): void
+    {
+        $cfg = \App\Models\ConfiguracionBot::actual();
+        if (!($cfg->encuesta_activa ?? true)) return;
+
+        // Evitar duplicados
+        if (\App\Models\EncuestaPedido::where('pedido_id', $this->id)->exists()) {
+            return;
+        }
+
+        $telefono = $this->telefono_whatsapp ?: $this->telefono_contacto ?: $this->telefono;
+        if (!$telefono) {
+            \Log::warning('Encuesta no enviada: pedido sin teléfono', ['pedido_id' => $this->id]);
+            return;
+        }
+
+        $encuesta = \App\Models\EncuestaPedido::create([
+            'tenant_id'        => $this->tenant_id,
+            'pedido_id'        => $this->id,
+            'domiciliario_id'  => $this->domiciliario_id,
+        ]);
+
+        $url = $encuesta->urlPublica();
+        $primerNombre = trim(explode(' ', (string) $this->cliente_nombre)[0] ?: 'cliente');
+        $domiciliario = $this->domiciliario_id ? \App\Models\Domiciliario::find($this->domiciliario_id) : null;
+        $nombreDom = $domiciliario?->nombre ?? 'el domiciliario';
+
+        $plantilla = trim((string) ($cfg->encuesta_mensaje ?? '')) ?: <<<MSG
+¡Hola {nombre}! 🌟
+
+Esperamos que hayas disfrutado tu pedido. Tu opinión nos ayuda a mejorar.
+
+¿Podrías ayudarnos contestando una breve encuesta sobre la entrega y la atención de {domiciliario}? 🙏
+
+👉 {url}
+
+¡Solo toma 30 segundos! Gracias 🤍
+MSG;
+
+        $mensaje = strtr($plantilla, [
+            '{nombre}'       => $primerNombre,
+            '{nombre_completo}' => $this->cliente_nombre ?: '',
+            '{domiciliario}' => $nombreDom,
+            '{url}'          => $url,
+            '{pedido}'       => '#' . $this->id,
+        ]);
+
+        // Envío diferido: encolar tras N minutos para no enviar inmediato
+        $delay = (int) ($cfg->encuesta_delay_minutos ?? 15);
+        \Illuminate\Support\Facades\Bus::dispatch(
+            (new \App\Jobs\EnviarEncuestaEntrega($encuesta->id, $telefono, $mensaje))
+                ->delay(now()->addMinutes(max(0, $delay)))
+        );
     }
 
     public function notificarTokenEntrega(string $token): void

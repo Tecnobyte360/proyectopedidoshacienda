@@ -27,6 +27,7 @@ use App\Livewire\Conversaciones\Index as ConversacionesIndex;
 use App\Livewire\Chat\Index as ChatIndex;
 use App\Livewire\Alertas\Index as AlertasIndex;
 use App\Livewire\Felicitaciones\Index as FelicitacionesIndex;
+use App\Livewire\Encuestas\Index as EncuestasIndex;
 use App\Livewire\Sedes\Index as SedesIndex;
 use App\Livewire\Usuarios\Index as UsuariosIndex;
 use App\Livewire\Roles\Index as RolesIndex;
@@ -121,6 +122,7 @@ Route::middleware(['no_super_sin_imp'])->group(function () {
         ->name('whatsapp-status.media');
     Route::get('/alertas',           AlertasIndex::class)->middleware(['permission:alertas.ver', 'role:super-admin'])->name('alertas.index');
     Route::get('/felicitaciones',    FelicitacionesIndex::class)->middleware('permission:felicitaciones.ver')->name('felicitaciones.index');
+    Route::get('/encuestas',         EncuestasIndex::class)->middleware('permission:reportes.ver')->name('encuestas.index');
     Route::get('/sedes',             SedesIndex::class)->middleware('permission:sedes.gestionar')->name('sedes.index');
     Route::get('/usuarios',          UsuariosIndex::class)->middleware('permission:usuarios.ver')->name('usuarios.index');
     // Roles ya NO se gestionan por tenant — los roles son globales
@@ -162,6 +164,11 @@ Route::middleware(['solo_principal'])->group(function () {
 
 Route::get('/seguimiento-pedido/{codigo}', SeguimientoPedido::class)
     ->name('pedidos.seguimiento');
+
+// Encuesta pública post-entrega (sin auth — el cliente la abre desde su WhatsApp)
+Route::get('/encuesta/{token}', \App\Livewire\Encuestas\Responder::class)
+    ->where('token', '[\w\-]+')
+    ->name('encuesta.responder');
 
 Route::get('/test-broadcast', function () {
 

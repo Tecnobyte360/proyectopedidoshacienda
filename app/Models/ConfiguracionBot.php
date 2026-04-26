@@ -50,6 +50,9 @@ class ConfiguracionBot extends Model
         'cumpleanos_dias_semana',
         'connection_id_default',
         'cumpleanos_dias_vigencia_beneficio',
+        'encuesta_activa',
+        'encuesta_delay_minutos',
+        'encuesta_mensaje',
     ];
 
     protected $casts = [
@@ -70,6 +73,8 @@ class ConfiguracionBot extends Model
         'max_tokens'                => 'integer',
         'max_imagenes_por_mensaje'  => 'integer',
         'bot_zonas_ids'             => 'array',
+        'encuesta_activa'           => 'boolean',
+        'encuesta_delay_minutos'    => 'integer',
     ];
 
     /** Instrucciones IA por defecto para derivación automática a departamento */

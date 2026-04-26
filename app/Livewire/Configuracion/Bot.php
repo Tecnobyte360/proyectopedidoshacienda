@@ -61,6 +61,11 @@ class Bot extends Component
     // Días que dura el beneficio de envío gratis después de la felicitación
     public int    $cumpleanos_dias_vigencia_beneficio     = 3;
 
+    // Encuesta post-entrega
+    public bool   $encuesta_activa          = true;
+    public int    $encuesta_delay_minutos   = 15;
+    public string $encuesta_mensaje         = '';
+
     public array $modelosDisponibles = [
         'gpt-4o-mini' => 'GPT-4o mini (rápido, económico)',
         'gpt-4o'      => 'GPT-4o (más natural, más caro)',
@@ -123,6 +128,10 @@ class Bot extends Component
             : null;
 
         $this->cumpleanos_dias_vigencia_beneficio = (int) ($cfg->cumpleanos_dias_vigencia_beneficio ?? 3);
+
+        $this->encuesta_activa        = (bool) ($cfg->encuesta_activa ?? true);
+        $this->encuesta_delay_minutos = (int) ($cfg->encuesta_delay_minutos ?? 15);
+        $this->encuesta_mensaje       = (string) ($cfg->encuesta_mensaje ?? '');
     }
 
     public function cargarPlantillaCumpleanosDefault(): void
@@ -367,6 +376,9 @@ class Bot extends Component
             'cumpleanos_dias_semana_arr'   => 'array|size:7',
             'connection_id_default'                 => 'nullable|integer',
             'cumpleanos_dias_vigencia_beneficio'    => 'integer|min:1|max:30',
+            'encuesta_activa'                       => 'boolean',
+            'encuesta_delay_minutos'                => 'integer|min:0|max:1440',
+            'encuesta_mensaje'                      => 'nullable|string|max:2000',
         ];
     }
 
