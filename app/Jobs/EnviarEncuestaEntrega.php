@@ -46,28 +46,52 @@ class EnviarEncuestaEntrega implements ShouldQueue
         }
 
         $connectionId = null;
+        $idsValidos = [];
 
-        // Preferir el connection_id de la sede del pedido (cada sede tiene su WhatsApp).
+        // 1. Obtener TODAS las conexiones válidas vivas del tenant (auto-recupera orphans)
+        try {
+            $idsValidos = app(\App\Services\WhatsappResolverService::class)->connectionIdsValidos($tenant);
+        } catch (\Throwable $e) {
+            Log::warning('No se pudo obtener connectionIdsValidos: ' . $e->getMessage());
+        }
+
+        // 2. Preferir el connection_id del pedido o de la sede SI ESTÁ EN LA LISTA VÁLIDA
         try {
             $pedido = $encuesta->pedido;
             if ($pedido) {
-                if ($pedido->connection_id) {
+                if ($pedido->connection_id && in_array((int) $pedido->connection_id, $idsValidos, true)) {
                     $connectionId = (int) $pedido->connection_id;
                 } elseif ($pedido->sede_id) {
                     $sede = \App\Models\Sede::find($pedido->sede_id);
-                    if ($sede && $sede->whatsapp_connection_id) {
+                    if ($sede && $sede->whatsapp_connection_id && in_array((int) $sede->whatsapp_connection_id, $idsValidos, true)) {
                         $connectionId = (int) $sede->whatsapp_connection_id;
                     }
                 }
             }
         } catch (\Throwable $e) { /* ignorar */ }
 
-        // Fallback al primer connection válido del tenant
-        if (!$connectionId) {
+        // 3. Si el del pedido/sede ya no es válido, usar el primer válido disponible
+        if (!$connectionId && !empty($idsValidos)) {
+            $connectionId = $idsValidos[0];
+            Log::info('Encuesta: connection_id del pedido es orphan, usando alternativo', [
+                'pedido_connection_id' => $pedido->connection_id ?? null,
+                'connection_id_usado'  => $connectionId,
+            ]);
+
+            // Auto-curar el pedido para futuras notificaciones
             try {
-                $ids = app(\App\Services\WhatsappResolverService::class)->connectionIdsValidos($tenant);
-                $connectionId = $ids[0] ?? null;
-            } catch (\Throwable $e) { /* ignorar */ }
+                if ($pedido && $pedido->connection_id !== $connectionId) {
+                    $pedido->update(['connection_id' => $connectionId, 'whatsapp_id' => $connectionId]);
+                }
+            } catch (\Throwable $e) {}
+        }
+
+        if (!$connectionId) {
+            Log::error('Encuesta: NO HAY connection_ids válidos en el tenant', [
+                'tenant_id' => $tenant?->id,
+                'encuesta_id' => $encuesta->id,
+            ]);
+            throw new \RuntimeException('No hay conexión WhatsApp válida en este tenant — escanea el QR.');
         }
 
         $ok = $wa->enviarTexto(
