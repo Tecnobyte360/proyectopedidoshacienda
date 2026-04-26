@@ -168,6 +168,19 @@ class Pedido extends Model
         usuarioId: $usuarioId
     );
 
+    // 🛵 Auto-asignación de domiciliario (si está activado en /configuracion/bot)
+    // Se dispara cuando el pedido entra al estado configurado por el tenant.
+    try {
+        $cfgBot = \App\Models\ConfiguracionBot::actual();
+        $estadoTrigger = (string) ($cfgBot->asignar_en_estado ?: self::ESTADO_EN_PREPARACION);
+        if (($cfgBot->auto_asignar_domiciliario ?? false) && $nuevoEstado === $estadoTrigger) {
+            app(\App\Services\AsignacionDomiciliarioService::class)->asignar($this);
+            $this->refresh(); // recargar domiciliario_id si se asignó
+        }
+    } catch (\Throwable $e) {
+        \Log::warning('Auto-asignación de domiciliario falló: ' . $e->getMessage());
+    }
+
     $this->notificarClienteCambioEstado();
 
     // La encuesta se programa DESPUÉS de notificar la entrega para que

@@ -21,6 +21,7 @@
                     'prompt'     => ['Prompt de la IA',        'fa-code',              'text-rose-600 bg-rose-50'],
                     'encuesta'   => ['Encuesta post-entrega',  'fa-star-half-stroke',  'text-amber-600 bg-amber-50'],
                     'pagos'      => ['Pagos en línea',         'fa-credit-card',       'text-violet-600 bg-violet-50'],
+                    'despachos'  => ['Despachos / Domiciliarios','fa-motorcycle',      'text-orange-600 bg-orange-50'],
                     'cumple'     => ['Felicitaciones',         'fa-cake-candles',      'text-pink-600 bg-pink-50'],
                 ];
             @endphp
@@ -865,6 +866,102 @@
                         <a href="{{ route('pagos.index') }}" class="underline font-bold">/pagos</a>
                         y al cliente le llega un WhatsApp de confirmación automáticamente.
                     </div>
+                </div>
+            @endif
+        </section>
+
+        {{-- ╔═══ DESPACHOS / DOMICILIARIOS ═══╗ --}}
+        <section x-show="tab === 'despachos'" x-cloak class="rounded-2xl bg-white border border-slate-200 p-6 shadow-sm">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-50 text-orange-600 text-xl">
+                    <i class="fa-solid fa-motorcycle"></i>
+                </div>
+                <div>
+                    <h3 class="font-bold text-slate-800">Asignación de domiciliarios</h3>
+                    <p class="text-xs text-slate-500">
+                        Decide si los pedidos se asignan automáticamente a un domiciliario
+                        o si tu operador los asigna manualmente desde
+                        <a href="{{ route('despachos.index') }}" class="text-orange-700 underline">/despachos</a>.
+                    </p>
+                </div>
+            </div>
+
+            {{-- Toggle principal --}}
+            <label class="flex items-start gap-3 cursor-pointer rounded-xl border-2 p-4 transition mb-4
+                          {{ $auto_asignar_domiciliario ? 'border-orange-300 bg-orange-50/40' : 'border-slate-200 bg-white' }}">
+                <input type="checkbox" wire:model.live="auto_asignar_domiciliario"
+                       class="mt-1 rounded border-slate-300 text-orange-600 h-5 w-5">
+                <div class="flex-1">
+                    <div class="text-sm font-bold text-slate-800 mb-1">
+                        🛵 Asignar domiciliario automáticamente
+                    </div>
+                    <div class="text-xs text-slate-600 leading-relaxed">
+                        Si está activo, cuando el pedido entra al estado configurado abajo,
+                        el sistema selecciona automáticamente al domiciliario más adecuado
+                        según el criterio elegido. Tu operador puede sobreescribir la
+                        asignación desde /despachos si lo necesita.
+                    </div>
+                </div>
+            </label>
+
+            @if($auto_asignar_domiciliario)
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 ml-2 pl-4 border-l-2 border-orange-200">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Criterio de asignación</label>
+                        <select wire:model="criterio_asignacion"
+                                class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-orange-400 focus:ring-2 focus:ring-orange-100 bg-white">
+                            <option value="balanceado">⚖️ Balanceado por carga (recomendado)</option>
+                            <option value="rotacion">🔄 Rotación (round-robin)</option>
+                            <option value="cercania">📍 Cercanía al cliente</option>
+                        </select>
+                        <div class="mt-2 text-[11px] text-slate-500 space-y-1">
+                            <p><strong>Balanceado:</strong> al que tenga MENOS pedidos en curso. Reparte la carga equitativamente.</p>
+                            <p><strong>Rotación:</strong> al que lleva más tiempo sin recibir pedido. Justo en frecuencia.</p>
+                            <p><strong>Cercanía:</strong> al más cercano (requiere coordenadas; si faltan, usa balanceado).</p>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Cuándo asignar</label>
+                        <select wire:model="asignar_en_estado"
+                                class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-orange-400 focus:ring-2 focus:ring-orange-100 bg-white">
+                            <option value="nuevo">Al confirmar el pedido (estado "Nuevo")</option>
+                            <option value="en_preparacion">Cuando pasa a "En preparación" (recomendado)</option>
+                            <option value="repartidor_en_camino">Cuando pasa a "En camino"</option>
+                        </select>
+                        <p class="mt-2 text-[11px] text-slate-500">
+                            "En preparación" es lo común — para cuando esté listo el pedido,
+                            el domiciliario ya está asignado y avisado.
+                        </p>
+                    </div>
+                </div>
+
+                {{-- Info de domiciliarios actuales --}}
+                @php
+                    $domis = \App\Models\Domiciliario::where('activo', true)->get();
+                    $totalDomis = $domis->count();
+                    $disponibles = $domis->whereIn('estado', ['disponible', 'en_ruta'])->count();
+                @endphp
+
+                <div class="mt-4 rounded-xl bg-blue-50 border border-blue-100 px-4 py-3 text-xs text-blue-800 flex items-start gap-2">
+                    <i class="fa-solid fa-circle-info mt-0.5"></i>
+                    <div>
+                        <strong>Estado actual:</strong>
+                        {{ $totalDomis }} domiciliario(s) activo(s),
+                        <strong>{{ $disponibles }}</strong> disponible(s) para asignación.
+                        @if($disponibles === 0)
+                            <span class="text-amber-700 font-bold">⚠️ Sin domiciliarios disponibles los pedidos quedan sin asignar (el operador deberá hacerlo manualmente).</span>
+                        @endif
+                        Gestiona tu equipo en
+                        <a href="{{ route('domiciliarios.index') }}" class="underline font-bold">/domiciliarios</a>.
+                    </div>
+                </div>
+            @else
+                <div class="rounded-xl bg-slate-50 border border-slate-200 p-4 text-sm text-slate-600">
+                    <i class="fa-solid fa-hand-pointer text-slate-400 mr-2"></i>
+                    Asignación <strong>manual</strong> activa. Los pedidos llegan a
+                    <a href="{{ route('despachos.index') }}" class="text-brand-secondary underline">/despachos</a>
+                    y tu operador escoge a qué domiciliario asignarlos.
                 </div>
             @endif
         </section>

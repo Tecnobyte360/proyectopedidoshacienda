@@ -54,6 +54,9 @@ class ConfiguracionBot extends Model
         'encuesta_delay_minutos',
         'encuesta_mensaje',
         'enviar_link_pago',
+        'auto_asignar_domiciliario',
+        'criterio_asignacion',
+        'asignar_en_estado',
     ];
 
     protected $casts = [
@@ -77,6 +80,7 @@ class ConfiguracionBot extends Model
         'encuesta_activa'           => 'boolean',
         'encuesta_delay_minutos'    => 'integer',
         'enviar_link_pago'          => 'boolean',
+        'auto_asignar_domiciliario' => 'boolean',
     ];
 
     /** Instrucciones IA por defecto para derivación automática a departamento */

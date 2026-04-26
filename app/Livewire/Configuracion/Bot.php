@@ -69,6 +69,11 @@ class Bot extends Component
     // Pagos en línea (Wompi)
     public bool   $enviar_link_pago         = true;
 
+    // Auto-asignación de domiciliarios
+    public bool   $auto_asignar_domiciliario = false;
+    public string $criterio_asignacion       = 'balanceado';
+    public string $asignar_en_estado         = 'en_preparacion';
+
     // Editor de prompt por bloques
     public bool  $vistaPorBloques = true;
     public array $bloquesPrompt   = [];   // [{titulo, contenido}]
@@ -140,6 +145,9 @@ class Bot extends Component
         $this->encuesta_delay_minutos = (int) ($cfg->encuesta_delay_minutos ?? 15);
         $this->encuesta_mensaje       = (string) ($cfg->encuesta_mensaje ?? '');
         $this->enviar_link_pago       = (bool) ($cfg->enviar_link_pago ?? true);
+        $this->auto_asignar_domiciliario = (bool) ($cfg->auto_asignar_domiciliario ?? false);
+        $this->criterio_asignacion       = (string) ($cfg->criterio_asignacion ?: 'balanceado');
+        $this->asignar_en_estado         = (string) ($cfg->asignar_en_estado ?: 'en_preparacion');
 
         // Parsear el system_prompt en bloques editables
         $this->bloquesPrompt = $this->parsearBloques($this->system_prompt);
@@ -511,6 +519,9 @@ class Bot extends Component
             'encuesta_delay_minutos'                => 'integer|min:0|max:1440',
             'encuesta_mensaje'                      => 'nullable|string|max:2000',
             'enviar_link_pago'                      => 'boolean',
+            'auto_asignar_domiciliario'             => 'boolean',
+            'criterio_asignacion'                   => 'nullable|in:balanceado,cercania,rotacion',
+            'asignar_en_estado'                     => 'nullable|in:nuevo,en_preparacion,repartidor_en_camino',
         ];
     }
 
