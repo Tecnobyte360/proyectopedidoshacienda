@@ -21,7 +21,7 @@ use Illuminate\Support\Facades\Log;
 class WhatsappSenderService
 {
     private const ENDPOINT_LOGIN_PATH = '/auth/login';
-    private const ENDPOINT_SEND_PATH  = '/api/messages/send-by-number';
+    private const ENDPOINT_SEND_PATH  = '/api/messages/messages/send-by-number';
 
     public function enviarTexto(
         string $telefono,
