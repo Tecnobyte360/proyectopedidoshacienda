@@ -716,27 +716,62 @@ class WhatsappWebhookController extends Controller
         // ── ALERTA DE SEDE CERRADA ──────────────────────────────────────
         // Si la sede que atiende a este cliente está cerrada AHORA, inyectamos
         // un system DURO al inicio para que la IA NO inicie toma de pedido.
-        // Esto refuerza la regla del prompt — algunos modelos la ignoran si
-        // queda en medio del prompt largo.
+        // El template usa las MISMAS variables dinámicas que el resto del prompt
+        // ({cliente_primer_nombre}, {sede_estado_actual}, {horarios_sedes},
+        // {nombre_asesora}, etc.) y se resuelve con BotPromptService::renderizar.
         try {
             $sedeActual = $sedeId ? \App\Models\Sede::find($sedeId) : \App\Models\Sede::query()->first();
             if ($sedeActual && !$sedeActual->estaAbierta()) {
-                $proximo = $sedeActual->proximaApertura() ?: 'cuando abramos';
-                $hoyTxt  = $sedeActual->horarioHoyTexto();
+                $promptService = app(BotPromptService::class);
+                $contextoCierre = $promptService->construirContexto(
+                    $nombreParaPrompt,
+                    $sedeId,
+                    $this->infoEmpresa(),
+                    $pedidosInfo,
+                    $ansInfo
+                );
+
+                // Variable adicional específica de esta alerta
+                $contextoCierre['proxima_apertura'] = $sedeActual->proximaApertura() ?: 'cuando abramos';
+
+                $template = <<<'TXT'
+⛔ ALERTA CRÍTICA — SEDE CERRADA AHORA ⛔
+
+Estado de la sede: {sede_estado_actual}
+Próxima apertura: {proxima_apertura}
+
+Horarios completos:
+{horarios_sedes}
+
+REGLAS OBLIGATORIAS PARA ESTA CONVERSACIÓN (no negociables):
+
+1. Eres {nombre_asesora}. NO inicies toma de pedido. Aunque el cliente diga
+   "quiero pedir", "para un pedido", "hola" o cualquier saludo, tu PRIMERA
+   respuesta debe avisarle con calidez que estamos cerrados.
+
+2. NUNCA llames la función `confirmar_pedido` mientras estemos cerrados —
+   el sistema lo rechaza igual y queda mal con el cliente.
+
+3. NO listes catálogo, NO preguntes "¿qué te gustaría?", NO sigas el flujo
+   normal de pedido. Solo informa el cierre y la próxima apertura.
+
+4. Responde con calidez paisa — varía el texto, no copies literal. Ejemplo
+   de tono (adáptalo a la conversación, no lo repitas idéntico):
+
+   "Ay {cliente_primer_nombre}, ahorita estamos cerrados 🙏.
+    Te atendemos {proxima_apertura} y con gusto te despachamos.
+    ¿Te aviso apenas abramos?"
+
+5. Si el cliente insiste en dejar el pedido listo, dile amablemente que
+   escriba apenas abramos para confirmárselo bien — no lo registres.
+
+6. Si pregunta el horario completo, usa los datos del bloque "Horarios
+   completos" de arriba — NUNCA inventes horarios distintos.
+TXT;
+
                 $extraSystem[] = [
                     'role'    => 'system',
-                    'content' => "⛔ ALERTA CRÍTICA — SEDE CERRADA AHORA ⛔\n\n"
-                        . "Sede: {$sedeActual->nombre}\n"
-                        . "Estado: {$hoyTxt}\n"
-                        . "Próxima apertura: {$proximo}\n\n"
-                        . "REGLAS OBLIGATORIAS PARA ESTA CONVERSACIÓN:\n"
-                        . "1. NO inicies toma de pedido. Aunque el cliente diga \"quiero pedir\" / \"para un pedido\" / \"hola\", "
-                        .    "tu PRIMERA respuesta debe avisarle que estamos cerrados.\n"
-                        . "2. NUNCA llames la función `confirmar_pedido` mientras estemos cerrados — el sistema lo rechaza.\n"
-                        . "3. NO listes catálogo, NO preguntes \"¿qué te gustaría?\", NO sigas el flujo normal.\n"
-                        . "4. Responde con calidez paisa — algo así (varía el texto):\n"
-                        . "   \"Ay {$nombreParaPrompt}, ahorita estamos cerrados 🙏. Te atendemos {$proximo} y con gusto te despachamos. ¿Te aviso apenas abramos?\"\n"
-                        . "5. Si el cliente igual quiere dejar el pedido listo: dile que escriba apenas abramos para confirmárselo bien.",
+                    'content' => $promptService->renderizar($template, $contextoCierre),
                 ];
             }
         } catch (\Throwable $e) {
@@ -2061,32 +2096,39 @@ class WhatsappWebhookController extends Controller
 
         // ── VALIDACIÓN DE HORARIO DE LA SEDE ──────────────────────────────
         // Si la sede que va a despachar el pedido está CERRADA AHORA, no
-        // permitimos registrar. Esto blinda contra que la IA confirme
-        // pedidos en domingos/horas no laborables aunque el cliente insista.
+        // permitimos registrar. Mensaje al cliente usa variables dinámicas
+        // resueltas por BotPromptService (mismo motor del prompt principal).
         if ($sede && !$sede->estaAbierta()) {
             Cache::forget($confirmKey);
             DB::rollBack();
 
-            $hoyTxt    = $sede->horarioHoyTexto();
-            $msgCerrad = trim((string) $sede->mensaje_cerrado);
-            $proximo   = $sede->proximaApertura();
+            $promptService = app(BotPromptService::class);
+            $contexto = $promptService->construirContexto(
+                $name,
+                $sede->id,
+                $this->infoEmpresa(),
+                '',
+                ''
+            );
+            $contexto['proxima_apertura'] = $sede->proximaApertura() ?: 'cuando abramos';
+            $contexto['mensaje_cerrado_sede'] = trim((string) $sede->mensaje_cerrado);
 
-            $base = "Ay {$name}, en este momento estamos cerrados 🙏\n\n";
-            $base .= "📍 *{$sede->nombre}*\n";
-            $base .= "🕐 {$hoyTxt}\n";
-            if ($proximo) {
-                $base .= "👉 Te atendemos {$proximo}.\n";
-            }
-            if ($msgCerrad !== '') {
-                $base .= "\n{$msgCerrad}";
-            }
+            $tieneMsgPersonalizado = $contexto['mensaje_cerrado_sede'] !== '';
+            $template = $tieneMsgPersonalizado
+                ? "Ay {cliente_primer_nombre}, en este momento estamos cerrados 🙏\n\n"
+                . "🕐 {sede_estado_actual}\n"
+                . "👉 Te atendemos {proxima_apertura}.\n\n"
+                . "{mensaje_cerrado_sede}"
+                : "Ay {cliente_primer_nombre}, en este momento estamos cerrados 🙏\n\n"
+                . "🕐 {sede_estado_actual}\n"
+                . "👉 Te atendemos {proxima_apertura}.";
 
             Log::info('⛔ Pedido rechazado por sede cerrada', [
                 'sede'   => $sede->nombre,
                 'pedido' => $orderData,
             ]);
 
-            return $base;
+            return $promptService->renderizar($template, $contexto);
         }
 
         // ── VALIDACIÓN ESTRICTA de cobertura ───────────────────────────────
