@@ -713,6 +713,36 @@ class WhatsappWebhookController extends Controller
             ];
         }
 
+        // ── ALERTA DE SEDE CERRADA ──────────────────────────────────────
+        // Si la sede que atiende a este cliente está cerrada AHORA, inyectamos
+        // un system DURO al inicio para que la IA NO inicie toma de pedido.
+        // Esto refuerza la regla del prompt — algunos modelos la ignoran si
+        // queda en medio del prompt largo.
+        try {
+            $sedeActual = $sedeId ? \App\Models\Sede::find($sedeId) : \App\Models\Sede::query()->first();
+            if ($sedeActual && !$sedeActual->estaAbierta()) {
+                $proximo = $sedeActual->proximaApertura() ?: 'cuando abramos';
+                $hoyTxt  = $sedeActual->horarioHoyTexto();
+                $extraSystem[] = [
+                    'role'    => 'system',
+                    'content' => "⛔ ALERTA CRÍTICA — SEDE CERRADA AHORA ⛔\n\n"
+                        . "Sede: {$sedeActual->nombre}\n"
+                        . "Estado: {$hoyTxt}\n"
+                        . "Próxima apertura: {$proximo}\n\n"
+                        . "REGLAS OBLIGATORIAS PARA ESTA CONVERSACIÓN:\n"
+                        . "1. NO inicies toma de pedido. Aunque el cliente diga \"quiero pedir\" / \"para un pedido\" / \"hola\", "
+                        .    "tu PRIMERA respuesta debe avisarle que estamos cerrados.\n"
+                        . "2. NUNCA llames la función `confirmar_pedido` mientras estemos cerrados — el sistema lo rechaza.\n"
+                        . "3. NO listes catálogo, NO preguntes \"¿qué te gustaría?\", NO sigas el flujo normal.\n"
+                        . "4. Responde con calidez paisa — algo así (varía el texto):\n"
+                        . "   \"Ay {$nombreParaPrompt}, ahorita estamos cerrados 🙏. Te atendemos {$proximo} y con gusto te despachamos. ¿Te aviso apenas abramos?\"\n"
+                        . "5. Si el cliente igual quiere dejar el pedido listo: dile que escriba apenas abramos para confirmárselo bien.",
+                ];
+            }
+        } catch (\Throwable $e) {
+            \Log::warning('No se pudo inyectar alerta de sede cerrada: ' . $e->getMessage());
+        }
+
         $messages = array_merge(
             [['role' => 'system', 'content' => $systemPrompt]],
             $extraSystem,
