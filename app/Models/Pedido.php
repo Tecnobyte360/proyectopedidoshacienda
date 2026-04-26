@@ -101,6 +101,21 @@ class Pedido extends Model
                 titulo: 'Pedido recibido',
                 descripcion: 'Tu pedido fue recibido correctamente y está pendiente de gestión.'
             );
+
+            // 🛵 Auto-asignación de domiciliario al CREAR (si el estado del pedido
+            // ya es el configurado para disparar). Ej: bot crea con estado='nuevo'
+            // y el tenant configuró asignar_en_estado='nuevo'.
+            try {
+                $cfgBot = \App\Models\ConfiguracionBot::actual();
+                $estadoTrigger = (string) ($cfgBot->asignar_en_estado ?: self::ESTADO_EN_PREPARACION);
+                if (($cfgBot->auto_asignar_domiciliario ?? false)
+                    && $pedido->estado === $estadoTrigger
+                    && !$pedido->domiciliario_id) {
+                    app(\App\Services\AsignacionDomiciliarioService::class)->asignar($pedido);
+                }
+            } catch (\Throwable $e) {
+                \Log::warning('Auto-asignacion (created) fallo: ' . $e->getMessage());
+            }
         });
     }
 
@@ -153,6 +168,20 @@ class Pedido extends Model
         $this->fecha_entregado = now();
     }
 
+    // 🛵 Auto-asignación al cambiar de estado (configurable)
+    try {
+        $cfgBot = \App\Models\ConfiguracionBot::actual();
+        $estadoTrigger = (string) ($cfgBot->asignar_en_estado ?: self::ESTADO_EN_PREPARACION);
+        if (($cfgBot->auto_asignar_domiciliario ?? false)
+            && $nuevoEstado === $estadoTrigger
+            && !$this->domiciliario_id) {
+            app(\App\Services\AsignacionDomiciliarioService::class)->asignar($this);
+            $this->refresh();
+        }
+    } catch (\Throwable $e) {
+        \Log::warning('Auto-asignacion (cambiarEstado) fallo: ' . $e->getMessage());
+    }
+
     // 🛵 Liberar al domiciliario al entregar/cancelar si NO le quedan más
     // pedidos activos. Lo deja 'disponible' para que pueda recibir nuevos.
     if (in_array($nuevoEstado, [self::ESTADO_ENTREGADO, self::ESTADO_CANCELADO], true) && $this->domiciliario_id) {
@@ -191,19 +220,6 @@ class Pedido extends Model
         usuario: $usuario,
         usuarioId: $usuarioId
     );
-
-    // 🛵 Auto-asignación de domiciliario (si está activado en /configuracion/bot)
-    // Se dispara cuando el pedido entra al estado configurado por el tenant.
-    try {
-        $cfgBot = \App\Models\ConfiguracionBot::actual();
-        $estadoTrigger = (string) ($cfgBot->asignar_en_estado ?: self::ESTADO_EN_PREPARACION);
-        if (($cfgBot->auto_asignar_domiciliario ?? false) && $nuevoEstado === $estadoTrigger) {
-            app(\App\Services\AsignacionDomiciliarioService::class)->asignar($this);
-            $this->refresh(); // recargar domiciliario_id si se asignó
-        }
-    } catch (\Throwable $e) {
-        \Log::warning('Auto-asignación de domiciliario falló: ' . $e->getMessage());
-    }
 
     $this->notificarClienteCambioEstado();
 
