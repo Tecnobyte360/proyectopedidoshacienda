@@ -709,9 +709,23 @@ class Index extends Component
      */
     private function resolverConnectionId($connectionIdActual = null): ?int
     {
-        if ($connectionIdActual) return (int) $connectionIdActual;
-
         $ids = app(\App\Services\WhatsappResolverService::class)->connectionIdsDelTenant();
+
+        // Si la conversación tiene un connection_id, validamos que esté en
+        // la lista del tenant. Si NO está (caso típico: conexión antigua que
+        // ya no existe en TecnoByteApp tras un recreo), usamos el primero
+        // válido del tenant en lugar de mandar a un id huérfano.
+        if ($connectionIdActual) {
+            $cid = (int) $connectionIdActual;
+            if (in_array($cid, $ids, true)) {
+                return $cid;
+            }
+            \Log::warning('connection_id de la conversación no pertenece al tenant — usando el primero válido', [
+                'cid_invalido' => $cid,
+                'ids_tenant'   => $ids,
+            ]);
+        }
+
         return !empty($ids) ? (int) $ids[0] : null;
     }
 
