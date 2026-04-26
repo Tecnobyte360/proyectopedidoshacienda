@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Models\Tenant;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Resuelve credenciales WhatsApp + conexión por tenant.
@@ -101,6 +103,128 @@ class WhatsappResolverService
         $tenant = $tenant ?: app(TenantManager::class)->current();
         $config = $tenant?->whatsapp_config ?? [];
         return array_map('intval', $config['connection_ids'] ?? []);
+    }
+
+    /**
+     * Obtiene un token JWT válido para llamar la API de TecnoByteApp.
+     *
+     * Flujo:
+     *   1. Token cacheado válido → devolver.
+     *   2. Refresh-token cacheado → POST /auth/refresh_token (liviano, NO
+     *      invalida la sesión, evita rate-limit).
+     *   3. Login fresh → guarda token (15 min) + refresh-token cookie (7 días).
+     *
+     * Mutex con Cache::lock para evitar que dos procesos hagan login en
+     * paralelo (eso invalida sesiones mutuamente en TecnoByteApp).
+     *
+     * Centralizado aquí para que TODOS los callers (Chat, Monitor, Webhook,
+     * StatusMedia) usen el mismo flujo y no machaquen /auth/login.
+     */
+    public function token(?Tenant $tenant = null, bool $forzarFresh = false): ?string
+    {
+        $cred = $this->credenciales($tenant);
+        if (empty($cred['email']) || empty($cred['password'])) {
+            return null;
+        }
+
+        $cacheKey   = $this->tokenCacheKey($tenant);
+        $refreshKey = $cacheKey . '_refresh';
+        $base       = rtrim($cred['api_base_url'], '/');
+
+        // 1) Token cacheado válido
+        if (!$forzarFresh) {
+            $cached = Cache::get($cacheKey);
+            if (is_string($cached) && $cached !== '') return $cached;
+        }
+
+        // Mutex: solo un proceso a la vez puede hacer login/refresh para esta key
+        $lock = Cache::lock($cacheKey . '_lock', 10);
+        try {
+            if (!$lock->block(8)) {
+                Log::warning('No se obtuvo lock de token, devuelvo cache actual');
+                return Cache::get($cacheKey);
+            }
+
+            // Re-chequeo dentro del lock — quizás otro proceso ya lo refrescó
+            if (!$forzarFresh) {
+                $cached = Cache::get($cacheKey);
+                if (is_string($cached) && $cached !== '') return $cached;
+            }
+
+            // 2) Refresh con cookie jrt
+            $jrt = Cache::get($refreshKey);
+            if (is_string($jrt) && $jrt !== '' && !$forzarFresh) {
+                try {
+                    $resp = Http::withoutVerifying()
+                        ->withHeaders(['Cookie' => "jrt={$jrt}"])
+                        ->timeout(15)
+                        ->post("{$base}/auth/refresh_token");
+
+                    if ($resp->successful() && $token = $resp->json('token')) {
+                        Cache::put($cacheKey, $token, now()->addMinutes(13));
+                        $this->guardarRefreshDeCookies($resp, $refreshKey);
+                        Log::info('🔁 token refrescado', ['cache_key' => $cacheKey]);
+                        return $token;
+                    }
+                    Log::warning('refresh_token rechazado, cayendo a login', [
+                        'status' => $resp->status(),
+                    ]);
+                } catch (\Throwable $e) {
+                    Log::warning('refresh_token excepción: ' . $e->getMessage());
+                }
+                Cache::forget($refreshKey);
+            }
+
+            // 3) Login fresh (último recurso)
+            try {
+                $resp = Http::withoutVerifying()
+                    ->timeout(15)
+                    ->post("{$base}/auth/login", [
+                        'email'    => $cred['email'],
+                        'password' => $cred['password'],
+                    ]);
+
+                $token = $resp->successful() ? $resp->json('token') : null;
+                if (is_string($token) && $token !== '') {
+                    Cache::put($cacheKey, $token, now()->addMinutes(13));
+                    $this->guardarRefreshDeCookies($resp, $refreshKey);
+                    Log::info('✅ login OK', ['cache_key' => $cacheKey]);
+                    return $token;
+                }
+
+                Log::error('🔴 login falló', [
+                    'cache_key' => $cacheKey,
+                    'status'    => $resp->status(),
+                    'body'      => mb_strimwidth((string) $resp->body(), 0, 300),
+                ]);
+                return null;
+            } catch (\Throwable $e) {
+                Log::error('🔴 login excepción: ' . $e->getMessage());
+                return null;
+            }
+        } finally {
+            optional($lock)->release();
+        }
+    }
+
+    /** Extrae cookie jrt de la respuesta y la cachea */
+    private function guardarRefreshDeCookies($response, string $refreshKey): void
+    {
+        try {
+            foreach ($response->cookies()->toArray() as $c) {
+                if (($c['Name'] ?? '') === 'jrt' && !empty($c['Value'])) {
+                    Cache::put($refreshKey, $c['Value'], now()->addDays(7));
+                    return;
+                }
+            }
+        } catch (\Throwable $e) { /* ignorar */ }
+    }
+
+    /** Invalida el token cacheado (llamar cuando se detecta 401 ERR_SESSION_EXPIRED) */
+    public function invalidarToken(?Tenant $tenant = null): void
+    {
+        $cacheKey = $this->tokenCacheKey($tenant);
+        Cache::forget($cacheKey);
     }
 
     /**

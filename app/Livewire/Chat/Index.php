@@ -961,105 +961,12 @@ class Index extends Component
      * Obtiene el token cacheado o hace login a TecnoByteApp.
      */
     /**
-     * Obtiene el token. Flujo:
-     *   1. Si hay token cacheado → devolverlo.
-     *   2. Si hay refresh-token cacheado → POST /auth/refresh_token (liviano).
-     *   3. Si todo falla → POST /auth/login (último recurso, guarda ambos).
-     *
-     * Cachea token (corto TTL) + refresh-token (largo TTL).
+     * Obtiene el token JWT del API. Delega al WhatsappResolverService que
+     * centraliza login/refresh con mutex y caché compartida.
      */
     private function obtenerTokenWhatsapp(bool $forzarFresh = false): ?string
     {
-        $resolver = app(\App\Services\WhatsappResolverService::class);
-        $cred = $resolver->credenciales();
-        $cacheKey = $resolver->tokenCacheKey();
-        $refreshKey = $cacheKey . '_refresh';
-        $tenantId = app(\App\Services\TenantManager::class)->id() ?? 'global';
-
-        if (empty($cred['email']) || empty($cred['password'])) {
-            Log::error('🔴 Tenant sin credenciales WhatsApp', [
-                'tenant_id' => $tenantId,
-                'tiene_email' => !empty($cred['email']),
-                'tiene_pass'  => !empty($cred['password']),
-            ]);
-            return null;
-        }
-
-        // 1) Token cacheado válido
-        if (!$forzarFresh) {
-            $cached = Cache::get($cacheKey);
-            if (is_string($cached) && $cached !== '') return $cached;
-        }
-
-        $base = rtrim($cred['api_base_url'], '/');
-
-        // 2) Intentar refresh con el JWT Refresh Token (cookie jrt)
-        $jrt = Cache::get($refreshKey);
-        if (is_string($jrt) && $jrt !== '' && !$forzarFresh) {
-            try {
-                $resp = Http::withoutVerifying()
-                    ->withHeaders(['Cookie' => "jrt={$jrt}"])
-                    ->timeout(15)
-                    ->post("{$base}/auth/refresh_token");
-
-                if ($resp->successful() && $token = $resp->json('token')) {
-                    Cache::put($cacheKey, $token, now()->addMinutes(15));
-                    // Renovar refresh si vino uno nuevo
-                    foreach ($resp->cookies()->toArray() as $c) {
-                        if (($c['Name'] ?? '') === 'jrt' && !empty($c['Value'])) {
-                            Cache::put($refreshKey, $c['Value'], now()->addDays(7));
-                            break;
-                        }
-                    }
-                    Log::info('🔁 Token WA refrescado vía refresh_token', ['tenant_id' => $tenantId]);
-                    return $token;
-                }
-                Log::warning('⚠️ refresh_token rechazado, haciendo login fresh', [
-                    'tenant_id' => $tenantId,
-                    'status'    => $resp->status(),
-                ]);
-            } catch (\Throwable $e) {
-                Log::warning('refresh_token excepción: ' . $e->getMessage());
-            }
-            // Si refresh falló, limpiar y caer al login
-            Cache::forget($refreshKey);
-        }
-
-        // 3) Login completo (último recurso)
-        try {
-            $resp = Http::withoutVerifying()
-                ->timeout(15)
-                ->post("{$base}/auth/login", [
-                    'email'    => $cred['email'],
-                    'password' => $cred['password'],
-                ]);
-
-            $token = $resp->successful() ? $resp->json('token') : null;
-            if (is_string($token) && $token !== '') {
-                Cache::put($cacheKey, $token, now()->addMinutes(15));
-
-                // Guardar refresh token de la cookie jrt para próximos refresh
-                foreach ($resp->cookies()->toArray() as $c) {
-                    if (($c['Name'] ?? '') === 'jrt' && !empty($c['Value'])) {
-                        Cache::put($refreshKey, $c['Value'], now()->addDays(7));
-                        break;
-                    }
-                }
-
-                Log::info('✅ Login WA OK', ['tenant_id' => $tenantId]);
-                return $token;
-            }
-
-            Log::error('🔴 Login WhatsApp falló', [
-                'tenant_id' => $tenantId,
-                'status'    => $resp->status(),
-                'body'      => mb_strimwidth((string) $resp->body(), 0, 400),
-            ]);
-            return null;
-        } catch (\Throwable $e) {
-            Log::error('🔴 Login WA excepción', ['tenant_id' => $tenantId, 'error' => $e->getMessage()]);
-            return null;
-        }
+        return app(\App\Services\WhatsappResolverService::class)->token(null, $forzarFresh);
     }
 
     /**

@@ -412,10 +412,16 @@ class WhatsappStatusMonitor extends Component
 
     private function obtenerTokenForzado(): ?string
     {
-        return Cache::get('whatsapp_api_token') ?? $this->loginWhatsapp();
+        // Delega al resolver centralizado que maneja login + refresh + mutex.
+        return $this->resolver()->token(null, false);
     }
 
     private function loginWhatsapp(bool $force = false): ?string
+    {
+        return $this->resolver()->token(null, $force);
+    }
+
+    private function _loginWhatsappLegacy_NOT_USED(bool $force = false): ?string
     {
         $cacheKey = $this->resolver()->tokenCacheKey();
 
