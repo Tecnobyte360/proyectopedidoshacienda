@@ -261,30 +261,26 @@ class WhatsappStatusMonitor extends Component
                 return;
             }
 
-            // El endpoint real es /whatsappsession/{id} (sin barra entre "whatsapp"
-            // y "session"). DELETE cierra la sesión actual, POST/PUT inicia
-            // sesión nueva y genera QR. Probamos en orden hasta que uno responda.
+            // El endpoint /whatsappsession/{id} es sensible:
+            //   - DELETE borra la sesión COMPLETA (puede eliminar la conexión)
+            //   - POST/PUT inicia/reinicia (regenera QR sin borrar)
+            // NO usamos DELETE — es destructivo. Solo POST → PUT → GET.
             $apiBase = $this->apiBaseUrl();
             $base    = "{$apiBase}/whatsappsession/{$this->connectionId}";
 
             $intentos = [
-                // Cerrar sesión actual (forzar regenerar QR)
-                ['DELETE', $base, null],
-                // Iniciar / reiniciar sesión
-                ['POST',   $base, null],
-                ['PUT',    $base, null],
-                // Variantes con / sin slash
-                ['GET',    $base, null],
+                ['POST', $base, null],
+                ['PUT',  $base, null],
+                ['GET',  $base, null],
             ];
 
             $ok = false;
             foreach ($intentos as [$verb, $url, $body]) {
                 $req = Http::withoutVerifying()->withToken($token)->timeout(20);
                 $resp = match (strtoupper($verb)) {
-                    'DELETE' => $req->delete($url),
-                    'POST'   => $req->post($url, $body ?? []),
-                    'PUT'    => $req->put($url, $body ?? []),
-                    default  => $req->get($url),
+                    'POST' => $req->post($url, $body ?? []),
+                    'PUT'  => $req->put($url, $body ?? []),
+                    default => $req->get($url),
                 };
                 Log::info('🔁 forzarReconexion intento', [
                     'verb'   => $verb,
