@@ -487,7 +487,7 @@ class Index extends Component
 
             $resolver = app(\App\Services\WhatsappResolverService::class);
             $cred = $resolver->credenciales();
-            $endpointSend = rtrim($cred['api_base_url'], '/') . '/api/messages/send';
+            $endpointSend = rtrim($cred['api_base_url'], '/') . '/api/messages/send-by-number';
 
             $makeRequest = function (string $useToken) use ($endpointSend, $telefono, $bytes, $filename, $connectionId) {
                 $req = Http::withoutVerifying()
@@ -651,7 +651,7 @@ class Index extends Component
 
             $resolver = app(\App\Services\WhatsappResolverService::class);
             $cred = $resolver->credenciales();
-            $endpointSend = rtrim($cred['api_base_url'], '/') . '/api/messages/send';
+            $endpointSend = rtrim($cred['api_base_url'], '/') . '/api/messages/send-by-number';
 
             Log::info('🖼️ ENVIANDO IMAGEN WHATSAPP', [
                 'phone'    => $telefono,
@@ -943,7 +943,7 @@ class Index extends Component
 
             $resolver = app(\App\Services\WhatsappResolverService::class);
             $cred = $resolver->credenciales();
-            $endpointSend = rtrim($cred['api_base_url'], '/') . '/api/messages/send';
+            $endpointSend = rtrim($cred['api_base_url'], '/') . '/api/messages/send-by-number';
 
             $response = Http::withoutVerifying()
                 ->withToken($token)
