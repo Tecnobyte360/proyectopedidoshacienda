@@ -55,8 +55,12 @@ class WompiWebhookController extends Controller
             return response()->json(['ok' => false, 'reason' => 'sin_reference'], 200);
         }
 
-        // Buscar el pedido por la referencia (lookup primario)
-        $query = Pedido::withoutGlobalScopes()->where('wompi_reference', $reference);
+        // Buscar el pedido por la referencia actual o por historial
+        $query = Pedido::withoutGlobalScopes()
+            ->where(function ($q) use ($reference) {
+                $q->where('wompi_reference', $reference)
+                  ->orWhereJsonContains('wompi_referencias_historial', $reference);
+            });
         if ($tenant) {
             $query->where('tenant_id', $tenant->id);
         }

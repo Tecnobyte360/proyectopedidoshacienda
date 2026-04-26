@@ -64,6 +64,15 @@ class WompiService
             || in_array($pedido->estado_pago, ['rechazado', 'fallido'], true);
 
         if ($necesitaRotar) {
+            // Guardar la reference anterior en el historial antes de sobrescribir
+            $historial = is_array($pedido->wompi_referencias_historial)
+                ? $pedido->wompi_referencias_historial
+                : [];
+            if (!empty($pedido->wompi_reference) && !in_array($pedido->wompi_reference, $historial, true)) {
+                $historial[] = $pedido->wompi_reference;
+            }
+            $pedido->wompi_referencias_historial = $historial;
+
             $pedido->wompi_reference      = $this->generarReferencia($pedido);
             $pedido->wompi_transaction_id = null;       // limpiar tx anterior
             $pedido->pago_metodo          = null;
@@ -202,16 +211,61 @@ class WompiService
      */
     public function sincronizarPedido(Pedido $pedido): array
     {
-        if (empty($pedido->wompi_reference)) {
+        // Construir lista de TODAS las referencias que ha tenido este pedido:
+        // la actual + el historial. Probaremos en orden hasta encontrar una con tx.
+        $referencias = [];
+        if (!empty($pedido->wompi_reference)) {
+            $referencias[] = $pedido->wompi_reference;
+        }
+        if (is_array($pedido->wompi_referencias_historial)) {
+            foreach ($pedido->wompi_referencias_historial as $ref) {
+                if ($ref && !in_array($ref, $referencias, true)) {
+                    $referencias[] = $ref;
+                }
+            }
+        }
+
+        if (empty($referencias)) {
             return ['ok' => false, 'estado' => null, 'mensaje' => 'El pedido no tiene reference de Wompi.'];
         }
 
-        $tx = $this->consultarPorReferencia($pedido->wompi_reference);
+        $tx = null;
+        $referenciaUsada = null;
+        $candidatos = []; // todas las txs encontradas, para elegir la mejor
 
-        // Si no encuentra, intentar buscar también referencias viejas que puedan
-        // matchear al pedido por id (si la reference rotó después del pago).
-        if (!$tx) {
-            return ['ok' => false, 'estado' => null, 'mensaje' => 'Wompi no devolvió transacciones para esta referencia.'];
+        foreach ($referencias as $ref) {
+            $candidato = $this->consultarPorReferencia($ref);
+            if ($candidato) {
+                $candidatos[] = ['ref' => $ref, 'tx' => $candidato];
+            }
+        }
+
+        if (empty($candidatos)) {
+            return ['ok' => false, 'estado' => null, 'mensaje' => 'Wompi no devolvió transacciones para ninguna de las referencias del pedido (' . count($referencias) . ' probadas).'];
+        }
+
+        // Preferir transacción APROBADA si existe, sino la más reciente
+        usort($candidatos, function ($a, $b) {
+            $sa = $a['tx']['status'] ?? '';
+            $sb = $b['tx']['status'] ?? '';
+            if ($sa === 'APPROVED' && $sb !== 'APPROVED') return -1;
+            if ($sb === 'APPROVED' && $sa !== 'APPROVED') return 1;
+            return strcmp($b['tx']['created_at'] ?? '', $a['tx']['created_at'] ?? '');
+        });
+
+        $tx = $candidatos[0]['tx'];
+        $referenciaUsada = $candidatos[0]['ref'];
+
+        // Si la reference que matcheó es del historial, restaurarla como actual
+        if ($referenciaUsada !== $pedido->wompi_reference) {
+            $historial = is_array($pedido->wompi_referencias_historial)
+                ? $pedido->wompi_referencias_historial
+                : [];
+            if (!empty($pedido->wompi_reference) && !in_array($pedido->wompi_reference, $historial, true)) {
+                $historial[] = $pedido->wompi_reference;
+            }
+            $pedido->wompi_referencias_historial = array_values(array_filter($historial, fn ($r) => $r !== $referenciaUsada));
+            $pedido->wompi_reference = $referenciaUsada;
         }
 
         $status = (string) ($tx['status'] ?? '');
