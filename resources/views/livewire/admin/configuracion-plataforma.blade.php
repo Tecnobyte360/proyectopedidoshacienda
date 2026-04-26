@@ -256,6 +256,106 @@
             </div>
         </section>
 
+        {{-- GESTOR DE CONEXIONES --}}
+        <section class="rounded-2xl bg-white shadow-sm border border-slate-200 p-5">
+            <div class="flex items-center gap-2 mb-3">
+                <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+                    <i class="fa-solid fa-plug"></i>
+                </span>
+                <div class="flex-1">
+                    <h3 class="text-base font-bold text-slate-800">Conexiones WhatsApp</h3>
+                    <p class="text-xs text-slate-500">
+                        Lista de números WhatsApp en TecnoByteApp y a qué tenant los asignaste.
+                        Tú gestionas esto, los tenants solo usan lo que les asignas.
+                    </p>
+                </div>
+                <button type="button" wire:click="$refresh"
+                        class="text-xs px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold">
+                    <i class="fa-solid fa-rotate-right"></i> Refrescar
+                </button>
+            </div>
+
+            @if(empty($conexiones))
+                <div class="rounded-lg bg-slate-50 border border-slate-200 px-3 py-6 text-sm text-slate-500 text-center">
+                    @if(empty($whatsapp_admin_email) || empty($whatsapp_admin_password))
+                        <i class="fa-solid fa-circle-info"></i> Configura primero el email/password del superadmin TecnoByteApp arriba y guarda.
+                    @else
+                        <i class="fa-solid fa-circle-exclamation"></i> No se pudieron listar conexiones. Verifica que las credenciales sean correctas.
+                    @endif
+                </div>
+            @else
+                <div class="overflow-x-auto rounded-xl border border-slate-200">
+                    <table class="w-full text-sm">
+                        <thead class="bg-slate-50 border-b border-slate-200">
+                            <tr class="text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                                <th class="px-3 py-2.5">ID</th>
+                                <th class="px-3 py-2.5">Conexión</th>
+                                <th class="px-3 py-2.5">Estado</th>
+                                <th class="px-3 py-2.5">Asignar a tenant</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            @foreach($conexiones as $c)
+                                <tr class="hover:bg-slate-50/80">
+                                    <td class="px-3 py-2.5 font-mono text-xs text-slate-600">#{{ $c['id'] }}</td>
+                                    <td class="px-3 py-2.5">
+                                        <div class="flex items-center gap-2">
+                                            <i class="fa-brands fa-whatsapp text-emerald-500"></i>
+                                            <div class="min-w-0">
+                                                <div class="font-semibold text-slate-800 text-[13px] truncate">{{ $c['name'] ?: 'Sin nombre' }}</div>
+                                                <div class="text-[11px] text-slate-500">
+                                                    {{ $c['phoneNumber'] ?: '(sin número)' }}
+                                                    @if($c['isDefault']) <span class="ml-1 text-amber-600 font-bold">★ Default</span> @endif
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-3 py-2.5">
+                                        @php
+                                            $colores = match($c['status']) {
+                                                'CONNECTED'   => 'bg-emerald-100 text-emerald-700',
+                                                'PAIRING','QRCODE','OPENING' => 'bg-amber-100 text-amber-700',
+                                                'TIMEOUT','DISCONNECTED','NOT_CONNECTED' => 'bg-rose-100 text-rose-700',
+                                                default       => 'bg-slate-100 text-slate-600',
+                                            };
+                                        @endphp
+                                        <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold {{ $colores }}">
+                                            <span class="w-1.5 h-1.5 rounded-full bg-current"></span>
+                                            {{ $c['status'] }}
+                                        </span>
+                                    </td>
+                                    <td class="px-3 py-2.5">
+                                        <select
+                                            class="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs focus:border-brand focus:ring-2 focus:ring-brand/20"
+                                            onchange="@this.call('asignarConexion', {{ $c['id'] }}, this.value === '' ? null : parseInt(this.value))">
+                                            <option value="">— Sin asignar —</option>
+                                            @foreach($tenants as $t)
+                                                <option value="{{ $t->id }}"
+                                                    {{ ($c['asignadoA']['id'] ?? null) == $t->id ? 'selected' : '' }}>
+                                                    {{ $t->nombre }}
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                        @if($c['asignadoA'])
+                                            <div class="text-[10px] text-emerald-600 mt-0.5">
+                                                ✓ {{ $c['asignadoA']['nombre'] }}
+                                            </div>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="mt-3 rounded-lg bg-blue-50 border border-blue-200 px-3 py-2 text-[11px] text-blue-800">
+                    <i class="fa-solid fa-lightbulb"></i>
+                    <strong>Tip:</strong> Si una conexión está QRCODE/DISCONNECTED, ve al panel de TecnoByteApp y reconéctala.
+                    Cada conexión solo puede estar asignada a UN tenant a la vez.
+                </div>
+            @endif
+        </section>
+
         {{-- CONTACTO / SOPORTE --}}
         <section class="rounded-2xl bg-white shadow-sm border border-slate-200 p-5">
             <div class="flex items-center gap-2 mb-4">

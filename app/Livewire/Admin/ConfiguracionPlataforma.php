@@ -113,8 +113,127 @@ class ConfiguracionPlataforma extends Component
         ]);
     }
 
+    /**
+     * Lista las conexiones disponibles en TecnoByteApp y a qué tenant
+     * están asignadas (si alguna). Útil para que el superadmin gestione
+     * todo desde un solo lugar.
+     */
+    public function getConexionesProperty(): array
+    {
+        try {
+            $resolver = app(\App\Services\WhatsappResolverService::class);
+            // El superadmin usa siempre las credenciales de la plataforma,
+            // sin pasar por ningún tenant. Forzamos eso temporal con null.
+            $cred = [
+                'email'        => $this->whatsapp_admin_email,
+                'password'     => $this->whatsapp_admin_password,
+                'api_base_url' => $this->whatsapp_api_base_url ?: 'https://wa-api.tecnobyteapp.com:1422',
+            ];
+
+            if (empty($cred['email']) || empty($cred['password'])) return [];
+
+            $base = rtrim($cred['api_base_url'], '/');
+            $login = \Illuminate\Support\Facades\Http::withoutVerifying()->timeout(10)
+                ->post("{$base}/auth/login", [
+                    'email' => $cred['email'], 'password' => $cred['password']
+                ]);
+
+            if (!$login->successful() || !$login->json('token')) return [];
+            $token = $login->json('token');
+
+            $lst = \Illuminate\Support\Facades\Http::withoutVerifying()->withToken($token)->timeout(10)
+                ->get("{$base}/whatsapp/");
+            if (!$lst->successful()) return [];
+
+            // Mapa connection_id → tenant
+            $tenants = \App\Services\TenantManager::class
+                ? app(\App\Services\TenantManager::class)->withoutTenant(
+                    fn() => \App\Models\Tenant::where('activo', true)->get(['id','nombre','slug','whatsapp_config'])
+                  )
+                : collect();
+
+            $mapaIds = [];
+            foreach ($tenants as $t) {
+                foreach (($t->whatsapp_config['connection_ids'] ?? []) as $cid) {
+                    $mapaIds[(int) $cid] = ['id' => $t->id, 'nombre' => $t->nombre, 'slug' => $t->slug];
+                }
+            }
+
+            $conns = collect($lst->json('whatsapps', []))->map(function ($w) use ($mapaIds) {
+                $id = (int) $w['id'];
+                return [
+                    'id'           => $id,
+                    'name'         => $w['name'] ?? '',
+                    'phoneNumber'  => $w['phoneNumber'] ?? '',
+                    'profileName'  => $w['profileName'] ?? '',
+                    'status'       => strtoupper($w['status'] ?? '???'),
+                    'isDefault'    => (bool) ($w['isDefault'] ?? false),
+                    'asignadoA'    => $mapaIds[$id] ?? null,
+                ];
+            })->values()->all();
+
+            return $conns;
+        } catch (\Throwable $e) {
+            \Log::warning('No se pudo listar conexiones plataforma: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    public function getTenantsProperty()
+    {
+        return app(\App\Services\TenantManager::class)->withoutTenant(
+            fn() => \App\Models\Tenant::where('activo', true)->orderBy('nombre')->get(['id','nombre','slug','whatsapp_config'])
+        );
+    }
+
+    /**
+     * Asigna (o desasigna) una conexión a un tenant.
+     * - Si $tenantId es 0 / vacío → quita la conexión de cualquier tenant.
+     * - Si $tenantId tiene valor → quita de cualquier otro tenant primero,
+     *   y la añade a connection_ids del tenant indicado.
+     */
+    public function asignarConexion(int $connectionId, ?int $tenantId): void
+    {
+        app(\App\Services\TenantManager::class)->withoutTenant(function () use ($connectionId, $tenantId) {
+            $tenants = \App\Models\Tenant::all();
+
+            foreach ($tenants as $t) {
+                $cfg = $t->whatsapp_config ?? [];
+                $ids = collect($cfg['connection_ids'] ?? [])->map(fn ($x) => (int) $x);
+
+                if ($tenantId && (int) $t->id === (int) $tenantId) {
+                    // Añadir si no estaba
+                    if (!$ids->contains($connectionId)) {
+                        $ids->push($connectionId);
+                        $cfg['connection_ids'] = $ids->unique()->values()->all();
+                        $t->whatsapp_config = $cfg;
+                        $t->save();
+                    }
+                } else {
+                    // Quitar de cualquier otro tenant que la tenga
+                    if ($ids->contains($connectionId)) {
+                        $cfg['connection_ids'] = $ids->reject(fn ($x) => $x === $connectionId)->values()->all();
+                        $t->whatsapp_config = $cfg;
+                        $t->save();
+                    }
+                }
+            }
+        });
+
+        \Cache::forget('wa_connection_to_tenant_map');
+        $this->dispatch('notify', [
+            'type' => 'success',
+            'message' => $tenantId
+                ? "✓ Conexión #{$connectionId} asignada al tenant."
+                : "✓ Conexión #{$connectionId} desasignada.",
+        ]);
+    }
+
     public function render()
     {
-        return view('livewire.admin.configuracion-plataforma')->layout('layouts.app');
+        return view('livewire.admin.configuracion-plataforma', [
+            'conexiones' => $this->conexiones,
+            'tenants'    => $this->tenants,
+        ])->layout('layouts.app');
     }
 }

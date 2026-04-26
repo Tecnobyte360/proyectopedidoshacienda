@@ -694,33 +694,20 @@
                         </div>
                     </div>
 
-                    {{-- 📱 WhatsApp del tenant --}}
+                    {{-- 📱 WhatsApp del tenant — solo connection_ids visible.
+                         Las credenciales TecnoByteApp se gestionan centralizado
+                         en /admin/configuracion-plataforma. --}}
                     <div class="rounded-xl border-2 border-emerald-200 bg-emerald-50/40 p-4 space-y-3">
                         <div class="flex items-center gap-2">
                             <i class="fa-brands fa-whatsapp text-emerald-600 text-xl"></i>
-                            <div>
-                                <h4 class="font-bold text-slate-800 text-sm">WhatsApp (TecnoByteApp)</h4>
-                                <p class="text-xs text-slate-500">Credenciales propias del tenant. Si están vacías, usa las del .env (sandbox).</p>
+                            <div class="flex-1">
+                                <h4 class="font-bold text-slate-800 text-sm">WhatsApp del tenant</h4>
+                                <p class="text-xs text-slate-500">
+                                    Asigna a este tenant las conexiones que usará.
+                                    Las credenciales TecnoByteApp se gestionan en
+                                    <a href="{{ route('admin.configuracion-plataforma') }}" class="text-emerald-700 underline font-medium">Branding plataforma</a>.
+                                </p>
                             </div>
-                        </div>
-
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-700 mb-1">Email TecnoByteApp</label>
-                                <input type="email" wire:model="whatsapp_email" placeholder="cliente@email.com"
-                                       class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-700 mb-1">Password TecnoByteApp</label>
-                                <input type="password" wire:model="whatsapp_password" placeholder="••••••••"
-                                       class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100">
-                            </div>
-                        </div>
-
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1">API URL <span class="text-slate-400 font-normal">(default: TecnoByteApp)</span></label>
-                            <input type="text" wire:model="whatsapp_api_base_url" placeholder="https://wa-api.tecnobyteapp.com:1422"
-                                   class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-mono focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100">
                         </div>
 
                         <div>
@@ -728,13 +715,44 @@
                                 Connection IDs de TecnoByteApp <span class="text-rose-500">*</span>
                                 <span class="text-slate-400 font-normal">(separadas por coma)</span>
                             </label>
-                            <input type="text" wire:model="whatsapp_connection_ids" placeholder="15, 28, 42"
+                            <input type="text" wire:model="whatsapp_connection_ids" placeholder="19, 28"
                                    class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-mono focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100">
                             <p class="text-[11px] text-slate-500 mt-1">
                                 <i class="fa-solid fa-circle-info"></i>
-                                Estos IDs identifican qué números de WhatsApp pertenecen a este tenant. Cuando llegue un webhook con un connection_id, el sistema lo dirige al tenant correcto automáticamente.
+                                Identifican qué números WhatsApp usa este tenant. Los IDs los ves en TecnoByteApp → Conexiones.
                             </p>
                         </div>
+
+                        {{-- Override avanzado (oculto por defecto) — solo si un tenant TIENE su propia cuenta TecnoByteApp aparte del superadmin --}}
+                        <details class="text-xs">
+                            <summary class="cursor-pointer text-slate-600 hover:text-slate-800 font-medium">
+                                <i class="fa-solid fa-cog"></i> Avanzado: cuenta TecnoByteApp propia (opcional)
+                            </summary>
+                            <div class="mt-3 p-3 rounded-lg bg-white border border-slate-200 space-y-3">
+                                <p class="text-[11px] text-slate-500">
+                                    Solo úsalo si este tenant tiene una cuenta TecnoByteApp distinta a la del superadmin.
+                                    Por defecto se usa la cuenta configurada en
+                                    <a href="{{ route('admin.configuracion-plataforma') }}" class="underline">Branding plataforma</a>.
+                                </p>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-xs font-semibold text-slate-700 mb-1">Email TecnoByteApp</label>
+                                        <input type="email" wire:model="whatsapp_email" placeholder="(usar plataforma)"
+                                               class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-semibold text-slate-700 mb-1">Password TecnoByteApp</label>
+                                        <input type="password" wire:model="whatsapp_password" placeholder="(usar plataforma)"
+                                               class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-700 mb-1">API URL</label>
+                                    <input type="text" wire:model="whatsapp_api_base_url" placeholder="(usar plataforma)"
+                                           class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-mono focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100">
+                                </div>
+                            </div>
+                        </details>
                     </div>
 
                     <div>
