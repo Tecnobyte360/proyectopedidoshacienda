@@ -110,7 +110,7 @@ Route::middleware(['no_super_sin_imp'])->group(function () {
     Route::get('/reportes',      ReportesIndex::class)->middleware('permission:reportes.ver')->name('reportes.index');
     Route::get('/ans-tiempos',   AnsIndex::class)->middleware('permission:ans.gestionar')->name('ans.index');
     Route::get('/configuracion/bot', ConfiguracionBot::class)
-        ->middleware(['permission:bot.configurar', 'role:super-admin'])
+        ->middleware('permission:bot.configurar')
         ->name('configuracion.bot');
     Route::get('/pagos', \App\Livewire\Pagos\Index::class)
         ->middleware('permission:reportes.ver')
