@@ -1052,12 +1052,34 @@ class Index extends Component
                  . 'Verifica conectividad / cert SSL: ' . $e->getMessage();
         }
 
-        // Login OK → entonces el envío falla por otra razón.
-        // Revisar logs (Log::warning "Envío WhatsApp manual falló").
-        return 'El login funcionó pero TecnoByteApp rechazó el envío del mensaje. '
-             . 'Posibles causas: WhatsApp del tenant desconectado (escanea QR en /pedidos), '
-             . 'connection_id ' . implode(',', $ids) . ' no pertenece a este usuario, '
-             . 'o número del cliente bloqueado. Revisa storage/logs/laravel.log.';
+        // Login OK → entonces el envío falla por otra razón. Probamos el listado
+        // de WhatsApps para detectar específicamente ERR_SESSION_EXPIRED (QR
+        // desvinculado), QRCODE pendiente, etc.
+        try {
+            $token = $resp->json('token');
+            $listado = Http::withoutVerifying()->withToken($token)->timeout(10)
+                ->get(rtrim($cred['api_base_url'], '/') . '/whatsapp/');
+
+            if ($listado->successful()) {
+                $whatsapps = collect($listado->json('whatsapps', []));
+                $miConexion = $whatsapps->firstWhere('id', (int) $ids[0]);
+
+                if ($miConexion) {
+                    $estado = strtoupper($miConexion['status'] ?? '');
+                    $phone  = $miConexion['phoneNumber'] ?? '(sin número)';
+
+                    if ($estado !== 'CONNECTED') {
+                        return "📱 El WhatsApp del tenant está '{$estado}' (número {$phone}). "
+                             . 'Hay que escanear el QR de nuevo. Ve a /pedidos → arriba a la derecha → "Forzar reconexión" o "Nuevo QR".';
+                    }
+                }
+            }
+        } catch (\Throwable $e) { /* ignorar y caer al genérico */ }
+
+        return '⚠️ El WhatsApp del tenant está conectado en login pero TecnoByteApp rechazó el envío. '
+             . 'Si te aparece ERR_SESSION_EXPIRED en logs, escanea el QR de nuevo en /pedidos. '
+             . 'Otras causas: connection_id ' . implode(',', $ids) . ' no pertenece a este usuario, '
+             . 'o número del cliente bloqueado.';
     }
 
     public function render()
