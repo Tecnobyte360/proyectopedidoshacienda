@@ -96,13 +96,103 @@ class WhatsappResolverService
     }
 
     /**
-     * Lista de connection_ids que pertenecen a un tenant.
+     * Lista de connection_ids que pertenecen a un tenant (de la BD).
      */
     public function connectionIdsDelTenant(?Tenant $tenant = null): array
     {
         $tenant = $tenant ?: app(TenantManager::class)->current();
         $config = $tenant?->whatsapp_config ?? [];
         return array_map('intval', $config['connection_ids'] ?? []);
+    }
+
+    /**
+     * Lista de connection_ids del tenant que REALMENTE EXISTEN en TecnoByteApp
+     * y están CONNECTED. Filtra automáticamente los huérfanos (ej. ids viejos
+     * que ya no están porque se eliminó la conexión y se recreó con otro id).
+     *
+     * Cachea el resultado 30s para no machacar la API en cada envío.
+     * Si encuentra cambios (huérfanos o nuevos), AUTO-actualiza
+     * tenants.whatsapp_config.connection_ids.
+     */
+    public function connectionIdsValidos(?Tenant $tenant = null): array
+    {
+        $tenant = $tenant ?: app(TenantManager::class)->current();
+        if (!$tenant) return [];
+
+        $cacheKey = "wa_valid_conn_ids_t{$tenant->id}";
+        $cached   = Cache::get($cacheKey);
+        if (is_array($cached)) return $cached;
+
+        $idsGuardados = $this->connectionIdsDelTenant($tenant);
+        if (empty($idsGuardados)) return [];
+
+        // Pedir el listado actual de TecnoByteApp con el token del tenant
+        $token = $this->token($tenant);
+        if (!$token) return $idsGuardados; // si no podemos validar, devolver lo guardado
+
+        try {
+            $cred = $this->credenciales($tenant);
+            $base = rtrim($cred['api_base_url'], '/');
+            $resp = Http::withoutVerifying()->withToken($token)->timeout(10)->get("{$base}/whatsapp/");
+
+            if (!$resp->successful()) return $idsGuardados;
+
+            $whatsapps = collect($resp->json('whatsapps', []));
+
+            // IDs reales en TecnoByteApp (cualquier estado)
+            $idsReales = $whatsapps->pluck('id')->map(fn ($x) => (int) $x)->all();
+
+            // IDs CONNECTED — preferidos para enviar
+            $idsConnected = $whatsapps
+                ->filter(fn ($w) => strtoupper($w['status'] ?? '') === 'CONNECTED')
+                ->pluck('id')->map(fn ($x) => (int) $x)->all();
+
+            // Filtrar guardados: solo los que existen Y están CONNECTED
+            $idsValidos = array_values(array_intersect($idsGuardados, $idsConnected));
+
+            // Si NO hay válidos pero hay alguna conexión CONNECTED del usuario,
+            // tomarla automáticamente (caso típico: id se recreó con otro número).
+            if (empty($idsValidos) && !empty($idsConnected)) {
+                $idsValidos = $idsConnected;
+                Log::warning('🔄 Auto-actualizando connection_ids del tenant', [
+                    'tenant_id' => $tenant->id,
+                    'guardados_huerfanos' => $idsGuardados,
+                    'reasignados'         => $idsValidos,
+                ]);
+
+                // AUTO-actualizar BD si los guardados quedaron huérfanos
+                $this->actualizarConnectionIds($tenant, $idsValidos);
+            }
+
+            Cache::put($cacheKey, $idsValidos, now()->addSeconds(30));
+            return $idsValidos;
+        } catch (\Throwable $e) {
+            Log::warning('No se pudieron validar conexiones del tenant: ' . $e->getMessage());
+            return $idsGuardados;
+        }
+    }
+
+    /**
+     * Actualiza connection_ids del tenant (sin pasar por el TenantScope).
+     */
+    public function actualizarConnectionIds(Tenant $tenant, array $ids): void
+    {
+        app(TenantManager::class)->withoutTenant(function () use ($tenant, $ids) {
+            $cfg = $tenant->whatsapp_config ?? [];
+            $cfg['connection_ids'] = array_values(array_unique(array_map('intval', $ids)));
+            $tenant->whatsapp_config = $cfg;
+            $tenant->save();
+        });
+
+        // También migrar conversaciones huérfanas al nuevo id (la primera válida)
+        if (!empty($ids)) {
+            try {
+                $nuevoId = $ids[0];
+                \App\Models\ConversacionWhatsapp::where('tenant_id', $tenant->id)
+                    ->whereNotIn('connection_id', $ids)
+                    ->update(['connection_id' => $nuevoId]);
+            } catch (\Throwable $e) { /* ignorar */ }
+        }
     }
 
     /**

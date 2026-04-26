@@ -709,20 +709,20 @@ class Index extends Component
      */
     private function resolverConnectionId($connectionIdActual = null): ?int
     {
-        $ids = app(\App\Services\WhatsappResolverService::class)->connectionIdsDelTenant();
+        // connectionIdsValidos() consulta TecnoByteApp y filtra solo los IDs
+        // que EXISTEN y están CONNECTED. Auto-descarta huérfanos (ej. id viejo
+        // tras recrear QR) y actualiza la BD del tenant + migra conversaciones
+        // sin intervención manual.
+        $ids = app(\App\Services\WhatsappResolverService::class)->connectionIdsValidos();
 
-        // Si la conversación tiene un connection_id, validamos que esté en
-        // la lista del tenant. Si NO está (caso típico: conexión antigua que
-        // ya no existe en TecnoByteApp tras un recreo), usamos el primero
-        // válido del tenant en lugar de mandar a un id huérfano.
         if ($connectionIdActual) {
             $cid = (int) $connectionIdActual;
             if (in_array($cid, $ids, true)) {
                 return $cid;
             }
-            \Log::warning('connection_id de la conversación no pertenece al tenant — usando el primero válido', [
+            \Log::warning('connection_id de la conversación huérfano — auto-corrigiendo', [
                 'cid_invalido' => $cid,
-                'ids_tenant'   => $ids,
+                'ids_validos'  => $ids,
             ]);
         }
 
@@ -954,7 +954,7 @@ class Index extends Component
                 return $response->json('messageId') ?: 'sent-' . uniqid();
             }
 
-            // Reintento con refresh de token
+            // Reintento con refresh de token (401 = JWT expirado)
             if ($response->status() === 401) {
                 Cache::forget($resolver->tokenCacheKey());
                 $newToken = $this->obtenerTokenWhatsapp();
@@ -963,6 +963,28 @@ class Index extends Component
                         ->withToken($newToken)
                         ->timeout(20)
                         ->post($endpointSend, $payload);
+                    if ($retry->successful()) {
+                        return $retry->json('messageId') ?: 'sent-' . uniqid();
+                    }
+                }
+            }
+
+            // ── AUTO-RECOVERY: si la API responde ERR_NO_WAPP_FOUND, el id
+            // está huérfano. Refrescamos validados (que actualiza la BD) y
+            // reintentamos con el id correcto. Cero intervención manual.
+            $bodyTxt = (string) $response->body();
+            if (str_contains($bodyTxt, 'ERR_NO_WAPP_FOUND') || $response->status() === 404) {
+                Cache::forget("wa_valid_conn_ids_t" . (app(\App\Services\TenantManager::class)->id() ?? 'g'));
+                $idsValidos = $resolver->connectionIdsValidos();
+                $nuevoId = $idsValidos[0] ?? null;
+
+                if ($nuevoId && $nuevoId !== (int) ($payload['whatsappId'] ?? 0)) {
+                    Log::info('🔄 Reintentando con connection_id auto-corregido', [
+                        'antes'   => $payload['whatsappId'] ?? null,
+                        'despues' => $nuevoId,
+                    ]);
+                    $payload['whatsappId'] = $nuevoId;
+                    $retry = Http::withoutVerifying()->withToken($token)->timeout(20)->post($endpointSend, $payload);
                     if ($retry->successful()) {
                         return $retry->json('messageId') ?: 'sent-' . uniqid();
                     }
