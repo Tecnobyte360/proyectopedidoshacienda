@@ -23,9 +23,19 @@ Route::get('/whatsapp-webhook', function () {
 
 Route::post('/whatsapp-webhook', [WhatsappWebhookController::class, 'receive']);
 
-// Wompi: receptor de eventos de pagos. Validación de firma adentro del controller.
-Route::post('/wompi/webhook', [\App\Http\Controllers\WompiWebhookController::class, 'recibir'])
+// Wompi: receptor de eventos de pagos POR TENANT (slug en la URL).
+// Cada tenant configura en su panel de Wompi:
+//   https://{APP_URL}/api/wompi/webhook/{slug}
+// Eso permite identificar el tenant SIN depender de la reference, validar la
+// firma con su events_secret y aislar errores entre comercios.
+Route::post('/wompi/webhook/{slug}', [\App\Http\Controllers\WompiWebhookController::class, 'recibir'])
+    ->where('slug', '[a-z0-9-]+')
     ->name('wompi.webhook');
+
+// Compatibilidad: ruta legacy sin slug (por si algún tenant ya la configuró asi).
+// El controller resuelve el tenant via wompi_reference del pedido.
+Route::post('/wompi/webhook', [\App\Http\Controllers\WompiWebhookController::class, 'recibir'])
+    ->name('wompi.webhook.legacy');
 
 // Endpoints de intervención humana (chat en vivo del admin)
 Route::post('/chat/enviar-manual',   [WhatsappWebhookController::class, 'enviarMensajeManual']);

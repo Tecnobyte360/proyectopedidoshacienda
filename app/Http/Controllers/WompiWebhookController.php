@@ -23,7 +23,7 @@ use Illuminate\Support\Facades\Log;
  */
 class WompiWebhookController extends Controller
 {
-    public function recibir(Request $request)
+    public function recibir(Request $request, ?string $slug = null)
     {
         $payload = $request->all();
 
@@ -40,21 +40,38 @@ class WompiWebhookController extends Controller
         $txId      = (string) ($tx['id'] ?? '');
         $metodo    = (string) ($tx['payment_method_type'] ?? '');
 
+        // Resolver tenant: 1° por slug en URL, 2° fallback por wompi_reference del pedido.
+        $tenant = null;
+        if ($slug) {
+            $tenant = Tenant::withoutGlobalScopes()->where('slug', $slug)->first();
+            if (!$tenant) {
+                Log::warning('Wompi webhook: tenant slug no encontrado', compact('slug'));
+                return response()->json(['ok' => false, 'reason' => 'tenant_slug_no_encontrado'], 200);
+            }
+        }
+
         if ($reference === '') {
             Log::warning('Wompi webhook: sin reference', ['tx' => $tx]);
             return response()->json(['ok' => false, 'reason' => 'sin_reference'], 200);
         }
 
-        // Buscar el pedido por la referencia (ignora scope multi-tenant para encontrar el dueño)
-        $pedido = Pedido::withoutGlobalScopes()->where('wompi_reference', $reference)->first();
+        // Buscar el pedido por la referencia
+        $query = Pedido::withoutGlobalScopes()->where('wompi_reference', $reference);
+        if ($tenant) {
+            $query->where('tenant_id', $tenant->id);
+        }
+        $pedido = $query->first();
 
         if (!$pedido) {
-            Log::warning('Wompi webhook: pedido no encontrado', compact('reference'));
+            Log::warning('Wompi webhook: pedido no encontrado', compact('reference', 'slug'));
             return response()->json(['ok' => false, 'reason' => 'pedido_no_encontrado'], 200);
         }
 
-        // Cargar el tenant del pedido y validar la firma con su events_secret
-        $tenant = Tenant::withoutGlobalScopes()->find($pedido->tenant_id);
+        // Si entró por la ruta legacy sin slug, ahora resolvemos el tenant via pedido
+        if (!$tenant) {
+            $tenant = Tenant::withoutGlobalScopes()->find($pedido->tenant_id);
+        }
+
         if (!$tenant) {
             Log::warning('Wompi webhook: tenant no encontrado', ['pedido_id' => $pedido->id]);
             return response()->json(['ok' => false, 'reason' => 'tenant_no_encontrado'], 200);

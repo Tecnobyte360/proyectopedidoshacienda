@@ -902,6 +902,43 @@
                                 @error('wompi_integrity_secret') <p class="text-xs text-rose-600 mt-1">{{ $message }}</p> @enderror
                             </div>
                         </div>
+
+                        {{-- 🌐 URL del webhook por tenant --}}
+                        @if($slug)
+                            @php
+                                $webhookUrl = url('/api/wompi/webhook/' . $slug);
+                            @endphp
+                            <div class="rounded-xl bg-white border-2 border-violet-300 p-3"
+                                 x-data="{ copiado: false }">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <i class="fa-solid fa-link text-violet-600"></i>
+                                    <span class="text-xs font-bold text-slate-800">URL de eventos para Wompi</span>
+                                </div>
+                                <p class="text-[11px] text-slate-600 mb-2">
+                                    Pega esta URL en tu panel de Wompi en
+                                    <a href="https://comercios.wompi.co" target="_blank" class="text-violet-700 underline font-semibold">comercios.wompi.co</a>
+                                    → <strong>Configuración</strong> → <strong>Eventos</strong> → <strong>URL del webhook</strong>.
+                                    Es única para este tenant y se genera automáticamente.
+                                </p>
+                                <div class="flex items-center gap-2">
+                                    <input type="text" readonly value="{{ $webhookUrl }}"
+                                           id="wompi-webhook-url-{{ $slug }}"
+                                           class="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-mono text-slate-700"
+                                           onclick="this.select()">
+                                    <button type="button"
+                                            @click="navigator.clipboard.writeText('{{ $webhookUrl }}'); copiado = true; setTimeout(() => copiado = false, 1500)"
+                                            class="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold px-3 py-2 transition flex-shrink-0">
+                                        <template x-if="!copiado"><span><i class="fa-solid fa-copy"></i> Copiar</span></template>
+                                        <template x-if="copiado"><span><i class="fa-solid fa-check"></i> ¡Copiado!</span></template>
+                                    </button>
+                                </div>
+                            </div>
+                        @else
+                            <div class="rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-[11px] text-amber-800">
+                                <i class="fa-solid fa-triangle-exclamation"></i>
+                                Guarda primero el tenant para ver la URL del webhook (depende del slug).
+                            </div>
+                        @endif
                     </div>
 
                     <div>
