@@ -875,8 +875,31 @@ class Index extends Component
     /**
      * Envía un mensaje a WhatsApp directamente vía TecnoByteApp.
      */
+    /**
+     * Verifica que el connection_id que se va a usar pertenece al usuario
+     * autenticado en TecnoByteApp. Si no, devuelve un mensaje específico.
+     */
+    private function debugEnvio(string $telefono, $connectionId): void
+    {
+        $resolver = app(\App\Services\WhatsappResolverService::class);
+        $cred = $resolver->credenciales();
+        $tenantId = app(\App\Services\TenantManager::class)->id() ?? 'null';
+        $ids = $resolver->connectionIdsDelTenant();
+
+        Log::info('🔎 DEBUG envio chat', [
+            'tenant_actual'       => $tenantId,
+            'email_usado'         => $cred['email'] ?? '???',
+            'api_base_url'        => $cred['api_base_url'] ?? '???',
+            'connectionIdsTenant' => $ids,
+            'connection_id_usado' => $connectionId,
+            'telefono'            => $telefono,
+            'cache_key'           => $resolver->tokenCacheKey(),
+        ]);
+    }
+
     private function enviarAWhatsapp(string $telefono, string $mensaje, $connectionId = null): ?string
     {
+        $this->debugEnvio($telefono, $connectionId);
         try {
             $token = $this->obtenerTokenWhatsapp();
             if (!$token) {
