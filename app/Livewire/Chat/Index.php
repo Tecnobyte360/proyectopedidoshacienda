@@ -1034,9 +1034,30 @@ class Index extends Component
                  . 'Ve a /admin/tenants → Editar → "Connection IDs de TecnoByteApp".';
         }
 
-        // Si llegamos aquí, las credenciales existen pero el login falló (token null).
-        return 'Las credenciales WhatsApp del tenant fueron rechazadas por TecnoByteApp. '
-             . 'Verifica email/password en /admin/tenants → Editar.';
+        // Las credenciales existen e ids también — probamos el login en VIVO
+        // para distinguir si falla el login o falla el send.
+        try {
+            $url = rtrim($cred['api_base_url'], '/') . '/auth/login';
+            $resp = Http::withoutVerifying()->timeout(10)->post($url, [
+                'email'    => $cred['email'],
+                'password' => $cred['password'],
+            ]);
+
+            if (!$resp->successful() || !$resp->json('token')) {
+                return 'Las credenciales WhatsApp del tenant fueron rechazadas por TecnoByteApp '
+                     . '(status ' . $resp->status() . '). Verifica email/password en /admin/tenants → Editar.';
+            }
+        } catch (\Throwable $e) {
+            return 'No se pudo contactar TecnoByteApp (' . $cred['api_base_url'] . '). '
+                 . 'Verifica conectividad / cert SSL: ' . $e->getMessage();
+        }
+
+        // Login OK → entonces el envío falla por otra razón.
+        // Revisar logs (Log::warning "Envío WhatsApp manual falló").
+        return 'El login funcionó pero TecnoByteApp rechazó el envío del mensaje. '
+             . 'Posibles causas: WhatsApp del tenant desconectado (escanea QR en /pedidos), '
+             . 'connection_id ' . implode(',', $ids) . ' no pertenece a este usuario, '
+             . 'o número del cliente bloqueado. Revisa storage/logs/laravel.log.';
     }
 
     public function render()
