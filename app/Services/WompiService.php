@@ -39,7 +39,7 @@ class WompiService
      *
      * Devuelve null si el tenant no tiene Wompi configurado.
      */
-    public function urlPago(Pedido $pedido): ?string
+    public function urlPago(Pedido $pedido, bool $forzarRotacion = false): ?string
     {
         $tenant = $this->tenantActual();
         if (!$tenant || !$tenant->tieneWompi()) return null;
@@ -47,9 +47,21 @@ class WompiService
         $cred = $tenant->wompiCredenciales();
         if (!$cred) return null;
 
-        // Asegurar reference única y persistente
-        if (empty($pedido->wompi_reference)) {
-            $pedido->wompi_reference = $this->generarReferencia($pedido);
+        // Decidir si la reference debe rotar:
+        //  - Vacía → primera vez.
+        //  - Forzado externamente (boton "Nuevo link").
+        //  - Ya hubo transacción previa (Wompi rechazaria reusar) → wompi_transaction_id seteado.
+        //  - Pago rechazado/fallido → necesita nuevo intento.
+        $necesitaRotar = $forzarRotacion
+            || empty($pedido->wompi_reference)
+            || !empty($pedido->wompi_transaction_id)
+            || in_array($pedido->estado_pago, ['rechazado', 'fallido'], true);
+
+        if ($necesitaRotar) {
+            $pedido->wompi_reference      = $this->generarReferencia($pedido);
+            $pedido->wompi_transaction_id = null;       // limpiar tx anterior
+            $pedido->pago_metodo          = null;
+            $pedido->estado_pago          = 'pendiente';
             $pedido->saveQuietly();
         }
 
@@ -150,7 +162,8 @@ class WompiService
     private function generarReferencia(Pedido $pedido): string
     {
         $tenantId = $pedido->tenant_id ?: 'x';
-        return "PED-{$tenantId}-{$pedido->id}-" . strtoupper(Str::random(6));
+        $ts = now()->format('YmdHis');
+        return "PED-{$tenantId}-{$pedido->id}-{$ts}-" . strtoupper(Str::random(4));
     }
 
     /**

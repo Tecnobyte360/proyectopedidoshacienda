@@ -178,12 +178,19 @@
                                         <i class="fa-solid fa-eye text-xs"></i>
                                     </a>
                                 @endif
-                                @if($p->estado_pago === 'pendiente')
+                                @if(in_array($p->estado_pago, ['pendiente', 'rechazado', 'fallido']))
                                     <a href="{{ $p->urlPagoWompi() }}" target="_blank"
                                        class="inline-flex items-center justify-center h-8 px-3 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-[11px] font-bold ml-1"
                                        title="Abrir link de pago">
                                         💳 Pagar
                                     </a>
+                                    <button type="button"
+                                            wire:click="regenerarLink({{ $p->id }})"
+                                            wire:confirm="Generar una nueva referencia de pago? Esto invalida el link anterior."
+                                            class="inline-flex items-center justify-center h-8 w-8 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-700 ml-1"
+                                            title="Generar nuevo link (rotar referencia)">
+                                        <i class="fa-solid fa-rotate text-xs"></i>
+                                    </button>
                                 @endif
                             </td>
                         </tr>

@@ -22,6 +22,35 @@ class Index extends Component
         // dispara render
     }
 
+    /**
+     * Genera un link de pago nuevo (rotando la reference) para un pedido.
+     * Útil cuando un intento previo fue abandonado o rechazado y Wompi
+     * no permite reusar la misma reference.
+     */
+    public function regenerarLink(int $pedidoId): void
+    {
+        $pedido = Pedido::find($pedidoId);
+        if (!$pedido) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Pedido no encontrado.']);
+            return;
+        }
+
+        $url = app(\App\Services\WompiService::class)->urlPago($pedido, forzarRotacion: true);
+
+        if (!$url) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Wompi no está configurado para este tenant.']);
+            return;
+        }
+
+        $this->dispatch('notify', [
+            'type'    => 'success',
+            'message' => '✅ Link de pago regenerado. Nueva referencia: ' . $pedido->fresh()->wompi_reference,
+        ]);
+
+        // Forzar refresh
+        $this->dispatch('$refresh');
+    }
+
     protected function queryString(): array
     {
         return [
