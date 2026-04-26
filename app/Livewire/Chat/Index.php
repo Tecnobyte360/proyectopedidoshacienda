@@ -977,33 +977,42 @@ class Index extends Component
             return null;
         }
 
-        return Cache::remember($cacheKey, 1200, function () use ($cred, $tenantId) {
-            try {
-                $endpoint = rtrim($cred['api_base_url'], '/') . '/auth/login';
-                $resp = Http::withoutVerifying()
-                    ->timeout(15)
-                    ->post($endpoint, [
-                        'email'    => $cred['email'],
-                        'password' => $cred['password'],
-                    ]);
+        // ── Cache manual: SOLO cachea si hay token. NO cachea null/vacío.
+        // Esto evita que un fallo transitorio (timeout, 5xx) deje el token
+        // bloqueado durante todo el TTL.
+        $cached = Cache::get($cacheKey);
+        if (is_string($cached) && $cached !== '') {
+            return $cached;
+        }
 
-                if ($resp->successful() && $resp->json('token')) {
-                    return $resp->json('token');
-                }
-
-                Log::error('🔴 Login WhatsApp falló', [
-                    'tenant_id'    => $tenantId,
-                    'status'       => $resp->status(),
-                    'body'         => mb_strimwidth((string) $resp->body(), 0, 400),
-                    'endpoint'     => $endpoint,
-                    'email_usado'  => mb_substr($cred['email'], 0, 3) . '…@' . explode('@', $cred['email'])[1] ?? '',
+        try {
+            $endpoint = rtrim($cred['api_base_url'], '/') . '/auth/login';
+            $resp = Http::withoutVerifying()
+                ->timeout(15)
+                ->post($endpoint, [
+                    'email'    => $cred['email'],
+                    'password' => $cred['password'],
                 ]);
-                return null;
-            } catch (\Throwable $e) {
-                Log::error('🔴 Login WA excepción', ['tenant_id' => $tenantId, 'error' => $e->getMessage()]);
-                return null;
+
+            $token = $resp->successful() ? $resp->json('token') : null;
+
+            if (is_string($token) && $token !== '') {
+                Cache::put($cacheKey, $token, now()->addMinutes(20));
+                Log::info('✅ Token WA refrescado', ['tenant_id' => $tenantId]);
+                return $token;
             }
-        });
+
+            Log::error('🔴 Login WhatsApp falló', [
+                'tenant_id' => $tenantId,
+                'status'    => $resp->status(),
+                'body'      => mb_strimwidth((string) $resp->body(), 0, 400),
+                'endpoint'  => $endpoint,
+            ]);
+            return null;
+        } catch (\Throwable $e) {
+            Log::error('🔴 Login WA excepción', ['tenant_id' => $tenantId, 'error' => $e->getMessage()]);
+            return null;
+        }
     }
 
     /**
