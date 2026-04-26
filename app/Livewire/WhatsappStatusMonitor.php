@@ -261,19 +261,25 @@ class WhatsappStatusMonitor extends Component
                 return;
             }
 
-            // Intentamos varios endpoints conocidos del wrapper whatsapp-web.js
-            $candidatos = [
-                ['POST', "/whatsapp/{$this->connectionId}/logout"],
-                ['POST', "/whatsapp/{$this->connectionId}/disconnect"],
-                ['POST', "/whatsapp/{$this->connectionId}/restart"],
+            // TecnoByteApp expone CRUD: PUT /whatsapp/{id} con campo `status` editable.
+            // Probamos varios valores posibles que disparen reconexión + QR fresh.
+            $apiBase = $this->apiBaseUrl();
+            $url = "{$apiBase}/whatsapp/{$this->connectionId}";
+            $intentos = [
+                ['status' => 'DISCONNECTED'],
+                ['status' => 'PAIRING'],
+                ['status' => 'OPENING'],
+                ['status' => 'qrcode'],
             ];
 
             $ok = false;
-            foreach ($candidatos as [$verb, $path]) {
-                $req = Http::withoutVerifying()->withToken($token)->timeout(20);
-                $apiBase = $this->apiBaseUrl();
-                $resp = $verb === 'POST' ? $req->post("{$apiBase}{$path}") : $req->get("{$apiBase}{$path}");
-                Log::info('🔁 forzarReconexion intento', ['path' => $path, 'status' => $resp->status()]);
+            foreach ($intentos as $body) {
+                $resp = Http::withoutVerifying()->withToken($token)->timeout(20)->put($url, $body);
+                Log::info('🔁 forzarReconexion intento', [
+                    'body'   => $body,
+                    'status' => $resp->status(),
+                    'resp'   => mb_strimwidth((string) $resp->body(), 0, 200),
+                ]);
                 if ($resp->successful()) { $ok = true; break; }
             }
 
