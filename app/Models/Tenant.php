@@ -223,7 +223,11 @@ class Tenant extends Model
      */
     public function wompiCredenciales(): ?array
     {
-        $cfg = $this->wompi_config;
+        try {
+            $cfg = $this->wompi_config;
+        } catch (\Throwable $e) {
+            return null; // columna no existe o no se pudo descifrar
+        }
         if (!is_array($cfg)) return null;
 
         $publica    = trim((string) ($cfg['public_key'] ?? ''));

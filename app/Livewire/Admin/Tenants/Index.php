@@ -437,24 +437,29 @@ class Index extends Component
             ]);
         }
 
-        // Wompi config
-        $wPub   = trim($this->wompi_public_key);
-        $wPriv  = trim($this->wompi_private_key);
-        $wEv    = trim($this->wompi_events_secret);
-        $wInt   = trim($this->wompi_integrity_secret);
-        $data['wompi_modo'] = in_array($this->wompi_modo, ['sandbox', 'produccion'], true)
-            ? $this->wompi_modo
-            : 'sandbox';
+        // Wompi config — solo si las columnas existen (la migración se debe haber corrido)
+        if (\Illuminate\Support\Facades\Schema::hasColumn('tenants', 'wompi_config')) {
+            $wPub   = trim($this->wompi_public_key);
+            $wPriv  = trim($this->wompi_private_key);
+            $wEv    = trim($this->wompi_events_secret);
+            $wInt   = trim($this->wompi_integrity_secret);
 
-        if ($wPub || $wPriv || $wEv || $wInt) {
-            $data['wompi_config'] = array_filter([
-                'public_key'       => $wPub ?: null,
-                'private_key'      => $wPriv ?: null,
-                'events_secret'    => $wEv ?: null,
-                'integrity_secret' => $wInt ?: null,
-            ]);
-        } else {
-            $data['wompi_config'] = null;
+            if (\Illuminate\Support\Facades\Schema::hasColumn('tenants', 'wompi_modo')) {
+                $data['wompi_modo'] = in_array($this->wompi_modo, ['sandbox', 'produccion'], true)
+                    ? $this->wompi_modo
+                    : 'sandbox';
+            }
+
+            if ($wPub || $wPriv || $wEv || $wInt) {
+                $data['wompi_config'] = array_filter([
+                    'public_key'       => $wPub ?: null,
+                    'private_key'      => $wPriv ?: null,
+                    'events_secret'    => $wEv ?: null,
+                    'integrity_secret' => $wInt ?: null,
+                ]);
+            } else {
+                $data['wompi_config'] = null;
+            }
         }
 
         $tenant = Tenant::updateOrCreate(['id' => $this->editandoId], $data);
