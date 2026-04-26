@@ -143,12 +143,6 @@ class Pedido extends Model
 
     if ($nuevoEstado === self::ESTADO_ENTREGADO) {
         $this->fecha_entregado = now();
-        // Programar envío de encuesta tras la entrega (si está activa para el tenant)
-        try {
-            $this->programarEncuestaEntrega();
-        } catch (\Throwable $e) {
-            \Log::warning('No se pudo programar encuesta: ' . $e->getMessage());
-        }
     }
 
     if ($nuevoEstado === self::ESTADO_CANCELADO) {
@@ -167,6 +161,16 @@ class Pedido extends Model
     );
 
     $this->notificarClienteCambioEstado();
+
+    // La encuesta se programa DESPUÉS de notificar la entrega para que
+    // el cliente reciba primero el "fue entregado" y luego la encuesta.
+    if ($nuevoEstado === self::ESTADO_ENTREGADO) {
+        try {
+            $this->programarEncuestaEntrega();
+        } catch (\Throwable $e) {
+            \Log::warning('No se pudo programar encuesta: ' . $e->getMessage());
+        }
+    }
 
     $this->load(['sede', 'detalles', 'historialEstados']);
 
@@ -239,15 +243,13 @@ class Pedido extends Model
         $nombreDom = $domiciliario?->nombre ?? 'el domiciliario';
 
         $plantilla = trim((string) ($cfg->encuesta_mensaje ?? '')) ?: <<<MSG
-¡Hola {nombre}! 🌟
+{nombre}, esperamos que hayas disfrutado tu pedido 🍽️
 
-Esperamos que hayas disfrutado tu pedido. Tu opinión nos ayuda a mejorar.
-
-¿Podrías ayudarnos contestando una breve encuesta sobre la entrega y la atención de {domiciliario}? 🙏
+¿Nos cuentas cómo estuvo todo? Es solo una preguntica corta sobre la entrega y la atención de {domiciliario} 🙏
 
 👉 {url}
 
-¡Solo toma 30 segundos! Gracias 🤍
+Tu opinión nos ayuda muchísimo. ¡Gracias! 🤍
 MSG;
 
         $mensaje = strtr($plantilla, [
@@ -258,11 +260,12 @@ MSG;
             '{pedido}'       => '#' . $this->id,
         ]);
 
-        // Envío diferido: encolar tras N minutos para no enviar inmediato
-        $delay = (int) ($cfg->encuesta_delay_minutos ?? 15);
+        // Envío diferido: mínimo 1 minuto para que el "fue entregado" llegue antes.
+        $delayMin = (int) ($cfg->encuesta_delay_minutos ?? 15);
+        $delaySegundos = max(60, $delayMin * 60);
         \Illuminate\Support\Facades\Bus::dispatch(
             (new \App\Jobs\EnviarEncuestaEntrega($encuesta->id, $telefono, $mensaje))
-                ->delay(now()->addMinutes(max(0, $delay)))
+                ->delay(now()->addSeconds($delaySegundos))
         );
     }
 
@@ -277,11 +280,13 @@ MSG;
             return;
         }
 
-        $mensaje = "🛵 ¡Hola {$this->cliente_nombre}!\n\n"
-            . "Tu pedido #{$this->id} ya va en camino 🚀\n\n"
-            . "🔐 *Tu código de verificación de entrega es:*\n\n"
-            . "        *{$token}*\n\n"
-            . "Dáselo al domiciliario cuando llegue para confirmar la entrega.";
+        $primerNombre = trim(explode(' ', (string) $this->cliente_nombre)[0] ?: '');
+        $saludo = $primerNombre !== '' ? "{$primerNombre}, " : '';
+
+        $mensaje = "{$saludo}tu pedido ya va en camino 🛵💨\n\n"
+            . "Cuando llegue el domiciliario, dile este código para confirmar la entrega:\n\n"
+            . "🔐 *{$token}*\n\n"
+            . "¡Ya casi llega! 🙌";
 
         // TecnoByteApp usa solo 'whatsappId'. NO 'connectionId' (causa
         // ERR_SENDING_WAPP_MSG en algunas versiones del wrapper).
@@ -370,21 +375,27 @@ MSG;
             return;
         }
 
+        $primerNombre = trim(explode(' ', (string) $this->cliente_nombre)[0] ?: '');
+        $saludo = $primerNombre !== '' ? "{$primerNombre}, " : '';
+
         $mensaje = match ($this->estado) {
             self::ESTADO_EN_PREPARACION =>
-            "👨‍🍳 ¡Hola {$this->cliente_nombre}!\n\nTu pedido #{$this->id} ya está en preparación 🥩🔥",
+            "{$saludo}ya estamos preparando tu pedido 👨‍🍳🔥\n"
+                . "Te aviso apenas salga para tu casa.",
 
             // 👇 Ya no notifica aquí — lo hace notificarTokenEntrega con el token incluido
             self::ESTADO_REPARTIDOR_EN_CAMINO => null,
 
             self::ESTADO_ENTREGADO =>
-            "✅ ¡Hola {$this->cliente_nombre}!\n\nTu pedido #{$this->id} fue entregado.\nGracias por tu compra 🙌",
+            "Listo {$primerNombre} ✅\n"
+                . "Tu pedido ya quedó entregado. ¡Gracias por confiar en nosotros! 🙌\n\n"
+                . "En un momento te paso una encuesta cortica para saber cómo estuvo todo.",
 
             self::ESTADO_CANCELADO =>
-            "❌ Hola {$this->cliente_nombre}\n\nTu pedido #{$this->id} fue cancelado.\nSi tienes dudas escríbenos.",
+            "Hola {$primerNombre}, tu pedido fue cancelado.\n"
+                . "Si necesitas ayuda o quieres pedir otra cosa, aquí estoy 🙏",
 
-            default =>
-            "📦 Hola {$this->cliente_nombre}\n\nTu pedido #{$this->id} ha sido actualizado.",
+            default => null,
         };
 
         // Si el estado no tiene mensaje (como repartidor_en_camino), salir sin enviar
