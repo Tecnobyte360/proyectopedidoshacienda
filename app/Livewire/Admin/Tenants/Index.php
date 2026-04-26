@@ -269,6 +269,33 @@ class Index extends Component
             }
 
             $this->whatsapp_conexiones_disponibles = $conexiones;
+
+            // ── AUTO-ASIGNAR conexión activa si los ids guardados están huérfanos
+            $idsGuardados = collect(explode(',', (string) $this->whatsapp_connection_ids))
+                ->map(fn ($s) => (int) trim($s))
+                ->filter()
+                ->values()
+                ->all();
+
+            $idsExistentes = collect($conexiones)->pluck('id')->all();
+            $idsConnected  = collect($conexiones)
+                ->filter(fn ($c) => $c['status'] === 'CONNECTED')
+                ->pluck('id')
+                ->all();
+
+            // Si los guardados están todos huérfanos (ninguno existe en el listado real)
+            // y hay alguna conexión CONNECTED → auto-marcarla.
+            $guardadosValidos = array_intersect($idsGuardados, $idsExistentes);
+            if (empty($guardadosValidos) && !empty($idsConnected)) {
+                $this->whatsapp_connection_ids = (string) $idsConnected[0];
+                $this->dispatch('notify', [
+                    'type'    => 'info',
+                    'message' => "🔄 Conexión activa #{$idsConnected[0]} auto-asignada (las anteriores estaban huérfanas).",
+                ]);
+            } elseif (empty($idsGuardados) && !empty($idsConnected)) {
+                // Tenant nuevo sin ids — asignar la primera CONNECTED
+                $this->whatsapp_connection_ids = (string) $idsConnected[0];
+            }
         } catch (\Throwable $e) {
             $this->error_conexiones = 'Error: ' . $e->getMessage();
         } finally {
