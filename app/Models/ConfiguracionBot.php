@@ -53,6 +53,7 @@ class ConfiguracionBot extends Model
         'encuesta_activa',
         'encuesta_delay_minutos',
         'encuesta_mensaje',
+        'enviar_link_pago',
     ];
 
     protected $casts = [
@@ -75,6 +76,7 @@ class ConfiguracionBot extends Model
         'bot_zonas_ids'             => 'array',
         'encuesta_activa'           => 'boolean',
         'encuesta_delay_minutos'    => 'integer',
+        'enviar_link_pago'          => 'boolean',
     ];
 
     /** Instrucciones IA por defecto para derivación automática a departamento */

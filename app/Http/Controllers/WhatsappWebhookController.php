@@ -2501,11 +2501,15 @@ TXT;
             $lineas[] = "💵 *Total:* $" . number_format($total, 0, ',', '.');
         }
 
-        // 💳 Link de pago Wompi (si el tenant tiene Wompi configurado)
+        // 💳 Link de pago Wompi — solo si el tenant tiene Wompi configurado Y
+        // el toggle 'enviar_link_pago' está activo en la configuración del bot.
         $linkPago = null;
-        try {
-            $linkPago = $pedido->urlPagoWompi();
-        } catch (\Throwable $e) { /* ignorar */ }
+        $cfgBot = \App\Models\ConfiguracionBot::actual();
+        if ($cfgBot->enviar_link_pago ?? true) {
+            try {
+                $linkPago = $pedido->urlPagoWompi();
+            } catch (\Throwable $e) { /* ignorar */ }
+        }
 
         if ($linkPago) {
             $lineas[] = '';

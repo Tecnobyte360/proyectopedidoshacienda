@@ -66,6 +66,9 @@ class Bot extends Component
     public int    $encuesta_delay_minutos   = 15;
     public string $encuesta_mensaje         = '';
 
+    // Pagos en línea (Wompi)
+    public bool   $enviar_link_pago         = true;
+
     // Editor de prompt por bloques
     public bool  $vistaPorBloques = true;
     public array $bloquesPrompt   = [];   // [{titulo, contenido}]
@@ -136,6 +139,7 @@ class Bot extends Component
         $this->encuesta_activa        = (bool) ($cfg->encuesta_activa ?? true);
         $this->encuesta_delay_minutos = (int) ($cfg->encuesta_delay_minutos ?? 15);
         $this->encuesta_mensaje       = (string) ($cfg->encuesta_mensaje ?? '');
+        $this->enviar_link_pago       = (bool) ($cfg->enviar_link_pago ?? true);
 
         // Parsear el system_prompt en bloques editables
         $this->bloquesPrompt = $this->parsearBloques($this->system_prompt);
@@ -506,6 +510,7 @@ class Bot extends Component
             'encuesta_activa'                       => 'boolean',
             'encuesta_delay_minutos'                => 'integer|min:0|max:1440',
             'encuesta_mensaje'                      => 'nullable|string|max:2000',
+            'enviar_link_pago'                      => 'boolean',
         ];
     }
 

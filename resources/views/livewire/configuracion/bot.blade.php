@@ -20,6 +20,7 @@
                     'zonas'      => ['Zonas de cobertura',     'fa-map-location-dot',  'text-sky-600 bg-sky-50'],
                     'prompt'     => ['Prompt de la IA',        'fa-code',              'text-rose-600 bg-rose-50'],
                     'encuesta'   => ['Encuesta post-entrega',  'fa-star-half-stroke',  'text-amber-600 bg-amber-50'],
+                    'pagos'      => ['Pagos en línea',         'fa-credit-card',       'text-violet-600 bg-violet-50'],
                     'cumple'     => ['Felicitaciones',         'fa-cake-candles',      'text-pink-600 bg-pink-50'],
                 ];
             @endphp
@@ -805,6 +806,67 @@
                     </p>
                 </div>
             </div>
+        </section>
+
+        {{-- ╔═══ PAGOS EN LINEA (WOMPI) ═══╗ --}}
+        <section x-show="tab === 'pagos'" x-cloak class="rounded-2xl bg-white border border-slate-200 p-6 shadow-sm">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-50 text-violet-600 text-xl">
+                    <i class="fa-solid fa-credit-card"></i>
+                </div>
+                <div>
+                    <h3 class="font-bold text-slate-800">Pagos en línea por WhatsApp</h3>
+                    <p class="text-xs text-slate-500">
+                        Controla si el bot incluye un link de pago Wompi cuando el pedido se confirma.
+                        Las llaves de Wompi se configuran por tenant en
+                        <a href="{{ route('admin.tenants.index') }}" class="text-violet-700 underline">admin → tenants</a>.
+                    </p>
+                </div>
+            </div>
+
+            <label class="flex items-start gap-3 cursor-pointer rounded-xl border-2 p-4 transition
+                          {{ $enviar_link_pago ? 'border-violet-300 bg-violet-50/40' : 'border-slate-200 bg-white' }}">
+                <input type="checkbox" wire:model="enviar_link_pago"
+                       class="mt-1 rounded border-slate-300 text-violet-600 h-5 w-5">
+                <div class="flex-1">
+                    <div class="text-sm font-bold text-slate-800 mb-1">
+                        💳 Enviar link de pago al confirmar el pedido
+                    </div>
+                    <div class="text-xs text-slate-600 leading-relaxed">
+                        Si está activo, después del resumen del pedido, el bot agrega:
+                        <em>"💳 Paga ahora con tarjeta, Nequi o PSE: {link de Wompi}"</em>.
+                        El cliente puede pagar online o seguir con pago contra entrega.
+                        Si lo desactivas, el bot solo confirma el pedido sin link.
+                    </div>
+                </div>
+            </label>
+
+            @php
+                $tenantActual = app(\App\Services\TenantManager::class)->current();
+                $tieneWompi = $tenantActual?->tieneWompi() ?? false;
+            @endphp
+
+            @if(!$tieneWompi)
+                <div class="mt-4 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-xs text-amber-800 flex items-start gap-2">
+                    <i class="fa-solid fa-triangle-exclamation mt-0.5"></i>
+                    <div>
+                        <strong>Wompi no está configurado para este tenant.</strong>
+                        Aunque marques este check, el link no se enviará hasta que el super-admin
+                        registre las llaves de Wompi. Pídele que las configure en
+                        <em>Admin → Tenants → editar tenant → bloque "Pasarela de pagos · Wompi"</em>.
+                    </div>
+                </div>
+            @else
+                <div class="mt-4 rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3 text-xs text-emerald-800 flex items-start gap-2">
+                    <i class="fa-solid fa-circle-check mt-0.5"></i>
+                    <div>
+                        Wompi configurado en modo <strong>{{ ucfirst($tenantActual->wompi_modo ?: 'sandbox') }}</strong>.
+                        Los pagos aprobados se ven en
+                        <a href="{{ route('pagos.index') }}" class="underline font-bold">/pagos</a>
+                        y al cliente le llega un WhatsApp de confirmación automáticamente.
+                    </div>
+                </div>
+            @endif
         </section>
 
         <section x-show="tab === 'cumple'" x-cloak class="rounded-2xl bg-white border border-slate-200 p-6 shadow-sm">
