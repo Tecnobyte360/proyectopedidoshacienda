@@ -261,22 +261,34 @@ class WhatsappStatusMonitor extends Component
                 return;
             }
 
-            // TecnoByteApp expone CRUD: PUT /whatsapp/{id} con campo `status` editable.
-            // Probamos varios valores posibles que disparen reconexión + QR fresh.
+            // El endpoint real es /whatsappsession/{id} (sin barra entre "whatsapp"
+            // y "session"). DELETE cierra la sesión actual, POST/PUT inicia
+            // sesión nueva y genera QR. Probamos en orden hasta que uno responda.
             $apiBase = $this->apiBaseUrl();
-            $url = "{$apiBase}/whatsapp/{$this->connectionId}";
+            $base    = "{$apiBase}/whatsappsession/{$this->connectionId}";
+
             $intentos = [
-                ['status' => 'DISCONNECTED'],
-                ['status' => 'PAIRING'],
-                ['status' => 'OPENING'],
-                ['status' => 'qrcode'],
+                // Cerrar sesión actual (forzar regenerar QR)
+                ['DELETE', $base, null],
+                // Iniciar / reiniciar sesión
+                ['POST',   $base, null],
+                ['PUT',    $base, null],
+                // Variantes con / sin slash
+                ['GET',    $base, null],
             ];
 
             $ok = false;
-            foreach ($intentos as $body) {
-                $resp = Http::withoutVerifying()->withToken($token)->timeout(20)->put($url, $body);
+            foreach ($intentos as [$verb, $url, $body]) {
+                $req = Http::withoutVerifying()->withToken($token)->timeout(20);
+                $resp = match (strtoupper($verb)) {
+                    'DELETE' => $req->delete($url),
+                    'POST'   => $req->post($url, $body ?? []),
+                    'PUT'    => $req->put($url, $body ?? []),
+                    default  => $req->get($url),
+                };
                 Log::info('🔁 forzarReconexion intento', [
-                    'body'   => $body,
+                    'verb'   => $verb,
+                    'url'    => $url,
                     'status' => $resp->status(),
                     'resp'   => mb_strimwidth((string) $resp->body(), 0, 200),
                 ]);
