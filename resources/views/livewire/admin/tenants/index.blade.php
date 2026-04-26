@@ -694,65 +694,129 @@
                         </div>
                     </div>
 
-                    {{-- 📱 WhatsApp del tenant — solo connection_ids visible.
-                         Las credenciales TecnoByteApp se gestionan centralizado
-                         en /admin/configuracion-plataforma. --}}
+                    {{-- 📱 WhatsApp del tenant: cada tenant tiene su PROPIA cuenta
+                         TecnoByteApp + sus connection_ids. El sistema usa estas
+                         credenciales para autenticarse y enviar/recibir mensajes
+                         en nombre de este tenant. --}}
                     <div class="rounded-xl border-2 border-emerald-200 bg-emerald-50/40 p-4 space-y-3">
                         <div class="flex items-center gap-2">
                             <i class="fa-brands fa-whatsapp text-emerald-600 text-xl"></i>
                             <div class="flex-1">
-                                <h4 class="font-bold text-slate-800 text-sm">WhatsApp del tenant</h4>
+                                <h4 class="font-bold text-slate-800 text-sm">WhatsApp (TecnoByteApp)</h4>
                                 <p class="text-xs text-slate-500">
-                                    Asigna a este tenant las conexiones que usará.
-                                    Las credenciales TecnoByteApp se gestionan en
-                                    <a href="{{ route('admin.configuracion-plataforma') }}" class="text-emerald-700 underline font-medium">Branding plataforma</a>.
+                                    Cuenta propia de este tenant en TecnoByteApp + IDs de las conexiones
+                                    que tiene asignadas.
                                 </p>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">
+                                    Email TecnoByteApp <span class="text-rose-500">*</span>
+                                </label>
+                                <input type="email" wire:model="whatsapp_email" placeholder="cliente@email.com"
+                                       class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">
+                                    Password TecnoByteApp <span class="text-rose-500">*</span>
+                                </label>
+                                <input type="password" wire:model="whatsapp_password" placeholder="••••••••"
+                                       class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100">
                             </div>
                         </div>
 
                         <div>
                             <label class="block text-xs font-semibold text-slate-700 mb-1">
-                                Connection IDs de TecnoByteApp <span class="text-rose-500">*</span>
-                                <span class="text-slate-400 font-normal">(separadas por coma)</span>
+                                API URL <span class="text-slate-400 font-normal">(default: TecnoByteApp)</span>
                             </label>
-                            <input type="text" wire:model="whatsapp_connection_ids" placeholder="19, 28"
+                            <input type="text" wire:model="whatsapp_api_base_url" placeholder="https://wa-api.tecnobyteapp.com:1422"
                                    class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-mono focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100">
-                            <p class="text-[11px] text-slate-500 mt-1">
-                                <i class="fa-solid fa-circle-info"></i>
-                                Identifican qué números WhatsApp usa este tenant. Los IDs los ves en TecnoByteApp → Conexiones.
-                            </p>
                         </div>
 
-                        {{-- Override avanzado (oculto por defecto) — solo si un tenant TIENE su propia cuenta TecnoByteApp aparte del superadmin --}}
-                        <details class="text-xs">
-                            <summary class="cursor-pointer text-slate-600 hover:text-slate-800 font-medium">
-                                <i class="fa-solid fa-cog"></i> Avanzado: cuenta TecnoByteApp propia (opcional)
-                            </summary>
-                            <div class="mt-3 p-3 rounded-lg bg-white border border-slate-200 space-y-3">
-                                <p class="text-[11px] text-slate-500">
-                                    Solo úsalo si este tenant tiene una cuenta TecnoByteApp distinta a la del superadmin.
-                                    Por defecto se usa la cuenta configurada en
-                                    <a href="{{ route('admin.configuracion-plataforma') }}" class="underline">Branding plataforma</a>.
-                                </p>
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                    <div>
-                                        <label class="block text-xs font-semibold text-slate-700 mb-1">Email TecnoByteApp</label>
-                                        <input type="email" wire:model="whatsapp_email" placeholder="(usar plataforma)"
-                                               class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100">
-                                    </div>
-                                    <div>
-                                        <label class="block text-xs font-semibold text-slate-700 mb-1">Password TecnoByteApp</label>
-                                        <input type="password" wire:model="whatsapp_password" placeholder="(usar plataforma)"
-                                               class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100">
-                                    </div>
-                                </div>
-                                <div>
-                                    <label class="block text-xs font-semibold text-slate-700 mb-1">API URL</label>
-                                    <input type="text" wire:model="whatsapp_api_base_url" placeholder="(usar plataforma)"
-                                           class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-mono focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100">
-                                </div>
+                        <div x-data="{
+                                ids: @entangle('whatsapp_connection_ids'),
+                                toggle(id) {
+                                    let arr = (this.ids || '').split(',').map(s => s.trim()).filter(Boolean);
+                                    const idx = arr.indexOf(String(id));
+                                    if (idx === -1) arr.push(String(id));
+                                    else arr.splice(idx, 1);
+                                    this.ids = arr.join(', ');
+                                },
+                                isChecked(id) {
+                                    return (this.ids || '').split(',').map(s => s.trim()).includes(String(id));
+                                },
+                            }">
+                            <div class="flex items-center justify-between mb-1">
+                                <label class="text-xs font-semibold text-slate-700">
+                                    Conexiones WhatsApp <span class="text-rose-500">*</span>
+                                </label>
+                                <button type="button"
+                                        wire:click="cargarConexionesTecnobyte"
+                                        wire:loading.attr="disabled"
+                                        wire:target="cargarConexionesTecnobyte"
+                                        class="inline-flex items-center gap-1.5 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-700 px-2.5 py-1 text-[11px] font-semibold transition disabled:opacity-50">
+                                    <i class="fa-solid fa-rotate-right" wire:loading.class="fa-spin" wire:target="cargarConexionesTecnobyte"></i>
+                                    <span wire:loading.remove wire:target="cargarConexionesTecnobyte">Cargar conexiones</span>
+                                    <span wire:loading wire:target="cargarConexionesTecnobyte">Cargando…</span>
+                                </button>
                             </div>
-                        </details>
+
+                            @if($error_conexiones)
+                                <div class="rounded-lg bg-rose-50 border border-rose-200 px-3 py-2 text-xs text-rose-700 mb-2">
+                                    <i class="fa-solid fa-triangle-exclamation"></i> {{ $error_conexiones }}
+                                </div>
+                            @endif
+
+                            @if(!empty($whatsapp_conexiones_disponibles))
+                                <div class="rounded-xl border border-slate-200 bg-white max-h-56 overflow-y-auto">
+                                    @foreach($whatsapp_conexiones_disponibles as $c)
+                                        @php
+                                            $bgEstado = match($c['status']) {
+                                                'CONNECTED' => 'bg-emerald-100 text-emerald-700',
+                                                'PAIRING','QRCODE','OPENING' => 'bg-amber-100 text-amber-700',
+                                                'TIMEOUT','DISCONNECTED','NOT_CONNECTED' => 'bg-rose-100 text-rose-700',
+                                                default => 'bg-slate-100 text-slate-600',
+                                            };
+                                        @endphp
+                                        <label class="flex items-center gap-3 px-3 py-2.5 border-b last:border-b-0 border-slate-100 hover:bg-slate-50 cursor-pointer">
+                                            <input type="checkbox"
+                                                   :checked="isChecked({{ $c['id'] }})"
+                                                   @change="toggle({{ $c['id'] }})"
+                                                   class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 h-4 w-4">
+                                            <div class="flex-1 min-w-0">
+                                                <div class="flex items-center gap-2">
+                                                    <span class="font-mono text-xs text-slate-500">#{{ $c['id'] }}</span>
+                                                    <span class="font-semibold text-sm text-slate-800 truncate">{{ $c['name'] ?: 'Sin nombre' }}</span>
+                                                    @if($c['isDefault'])
+                                                        <span class="text-[10px] text-amber-600 font-bold">★</span>
+                                                    @endif
+                                                </div>
+                                                <div class="text-[11px] text-slate-500">{{ $c['phoneNumber'] ?: '(sin número)' }}</div>
+                                            </div>
+                                            <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold {{ $bgEstado }}">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-current"></span>
+                                                {{ $c['status'] }}
+                                            </span>
+                                        </label>
+                                    @endforeach
+                                </div>
+                                <p class="text-[11px] text-slate-500 mt-1.5">
+                                    <i class="fa-solid fa-circle-info"></i>
+                                    Marca las conexiones que pertenecen a este tenant.
+                                    Seleccionados: <strong x-text="(ids || '').split(',').filter(Boolean).length || 0"></strong>
+                                </p>
+                            @else
+                                <input type="text" wire:model="whatsapp_connection_ids" placeholder="19, 28"
+                                       class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-mono focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100">
+                                <p class="text-[11px] text-slate-500 mt-1">
+                                    <i class="fa-solid fa-circle-info"></i>
+                                    Llena email + password arriba y click en "Cargar conexiones" para verlas como checkboxes.
+                                    O escribe los IDs separados por coma manualmente.
+                                </p>
+                            @endif
+                        </div>
                     </div>
 
                     <div>

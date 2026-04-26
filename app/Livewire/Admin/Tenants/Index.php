@@ -59,6 +59,9 @@ class Index extends Component
     // WhatsApp por tenant
     public string $whatsapp_email           = '';
     public string $whatsapp_password        = '';
+    public array  $whatsapp_conexiones_disponibles = [];   // [{id, name, status, phoneNumber}]
+    public bool   $cargando_conexiones      = false;
+    public ?string $error_conexiones        = null;
     public string $whatsapp_api_base_url    = 'https://wa-api.tecnobyteapp.com:1422';
     public string $whatsapp_connection_ids  = '';   // CSV: "15, 28, 42"
 
@@ -175,6 +178,13 @@ class Index extends Component
         $this->whatsapp_api_base_url   = (string) ($waConfig['api_base_url'] ?? 'https://wa-api.tecnobyteapp.com:1422');
         $this->whatsapp_connection_ids = implode(', ', $waConfig['connection_ids'] ?? []);
 
+        // Auto-cargar conexiones disponibles si ya hay credenciales
+        $this->whatsapp_conexiones_disponibles = [];
+        $this->error_conexiones = null;
+        if ($this->whatsapp_email && $this->whatsapp_password) {
+            $this->cargarConexionesTecnobyte();
+        }
+
         $this->crear_admin_inicial = false;
         $this->admin_nombre = '';
         $this->admin_email = '';
@@ -195,6 +205,75 @@ class Index extends Component
     public function updatedSlug(): void
     {
         $this->slug = Tenant::normalizarSlug($this->slug);
+    }
+
+    /**
+     * Carga las conexiones de TecnoByteApp usando email/password actuales
+     * del modal. Las muestra como checkboxes para que el superadmin
+     * marque cuáles pertenecen al tenant.
+     */
+    public function cargarConexionesTecnobyte(): void
+    {
+        $this->cargando_conexiones = true;
+        $this->error_conexiones = null;
+        $this->whatsapp_conexiones_disponibles = [];
+
+        $email    = trim($this->whatsapp_email);
+        $password = trim($this->whatsapp_password);
+        $apiBase  = trim($this->whatsapp_api_base_url) ?: 'https://wa-api.tecnobyteapp.com:1422';
+
+        if (!$email || !$password) {
+            $this->error_conexiones = 'Llena Email y Password antes de cargar conexiones.';
+            $this->cargando_conexiones = false;
+            return;
+        }
+
+        try {
+            $base = rtrim($apiBase, '/');
+            $login = \Illuminate\Support\Facades\Http::withoutVerifying()
+                ->timeout(10)
+                ->post("{$base}/auth/login", [
+                    'email'    => $email,
+                    'password' => $password,
+                ]);
+
+            if (!$login->successful() || !$login->json('token')) {
+                $this->error_conexiones = 'Credenciales rechazadas por TecnoByteApp ('
+                    . $login->status() . '). Verifica email/password.';
+                $this->cargando_conexiones = false;
+                return;
+            }
+
+            $token = $login->json('token');
+            $lst = \Illuminate\Support\Facades\Http::withoutVerifying()
+                ->withToken($token)
+                ->timeout(10)
+                ->get("{$base}/whatsapp/");
+
+            if (!$lst->successful()) {
+                $this->error_conexiones = 'No se pudieron listar las conexiones.';
+                $this->cargando_conexiones = false;
+                return;
+            }
+
+            $conexiones = collect($lst->json('whatsapps', []))->map(fn ($w) => [
+                'id'          => (int) $w['id'],
+                'name'        => $w['name'] ?? '',
+                'phoneNumber' => $w['phoneNumber'] ?? '',
+                'status'      => strtoupper($w['status'] ?? '???'),
+                'isDefault'   => (bool) ($w['isDefault'] ?? false),
+            ])->sortBy('id')->values()->all();
+
+            if (empty($conexiones)) {
+                $this->error_conexiones = 'Esa cuenta no tiene conexiones aún. Crea una desde el panel TecnoByteApp.';
+            }
+
+            $this->whatsapp_conexiones_disponibles = $conexiones;
+        } catch (\Throwable $e) {
+            $this->error_conexiones = 'Error: ' . $e->getMessage();
+        } finally {
+            $this->cargando_conexiones = false;
+        }
     }
 
     public function guardar(): void
@@ -631,6 +710,9 @@ class Index extends Component
         $this->whatsapp_password        = '';
         $this->whatsapp_api_base_url    = 'https://wa-api.tecnobyteapp.com:1422';
         $this->whatsapp_connection_ids  = '';
+        $this->whatsapp_conexiones_disponibles = [];
+        $this->error_conexiones = null;
+        $this->cargando_conexiones = false;
         $this->crear_admin_inicial  = true;
         $this->admin_nombre         = '';
         $this->admin_email          = '';
