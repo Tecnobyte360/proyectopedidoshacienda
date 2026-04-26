@@ -68,6 +68,26 @@ services:
       APP_ENV: production
       APP_DEBUG: "false"
 
+  # Queue Worker: procesa jobs en cola de forma continua.
+  # Maneja: encuestas post-entrega, notificaciones Wompi, jobs delayed, etc.
+  # restart: unless-stopped garantiza que si el worker muere, vuelve solo.
+  # --max-time=3600 hace que se reinicie cada hora para evitar memory leaks.
+  pedidos_hacienda_queue:
+    build: .
+    container_name: pedidos_hacienda_queue
+    restart: unless-stopped
+    command: php artisan queue:work --tries=3 --timeout=90 --sleep=3 --max-jobs=1000 --max-time=3600
+    volumes:
+      - ./:/var/www/html
+    depends_on:
+      - pedidos_hacienda_db
+      - pedidos_hacienda_app
+    networks:
+      - pedidos_hacienda_net
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+
   pedidos_hacienda_db:
     image: mysql:8.0
     container_name: pedidos_hacienda_db

@@ -32,14 +32,8 @@ Schedule::command('campanas:procesar')
     ->withoutOverlapping(10)
     ->runInBackground();
 
-// 🔁 Procesar la cola de jobs cada minuto (encuestas, jobs delayed, etc.)
-// --stop-when-empty: procesa lo que haya y sale. Así no necesitamos un
-// contenedor queue:work permanente — el scheduler lo dispara siempre.
-// withoutOverlapping evita 2 workers simultáneos pisándose.
-Schedule::command('queue:work --stop-when-empty --tries=3 --timeout=90 --sleep=1')
-    ->everyMinute()
-    ->withoutOverlapping(5)
-    ->runInBackground();
+// La cola la procesa el contenedor pedidos_hacienda_queue (queue:work
+// permanente). No duplicar aquí — los jobs los maneja ese worker.
 
 Schedule::command('clientes:felicitar-cumpleanos')
     ->everyMinute()
