@@ -215,6 +215,47 @@
             </div>
         </section>
 
+        {{-- WHATSAPP / TECNOBYTEAPP --}}
+        <section class="rounded-2xl bg-white shadow-sm border border-slate-200 p-5">
+            <div class="flex items-center gap-2 mb-3">
+                <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+                    <i class="fa-brands fa-whatsapp"></i>
+                </span>
+                <div class="flex-1">
+                    <h3 class="text-base font-bold text-slate-800">Cuenta superadmin de TecnoByteApp</h3>
+                    <p class="text-xs text-slate-500">
+                        Credenciales del SuperAdmin que administra todas las conexiones WhatsApp de los tenants.
+                        Si un tenant tiene su propia cuenta TecnoByteApp, las suyas tienen prioridad.
+                    </p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Email TecnoByteApp</label>
+                    <input type="email" wire:model="whatsapp_admin_email" placeholder="superadmin@tudominio.com"
+                           class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-brand focus:ring-2 focus:ring-brand/20">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Password TecnoByteApp</label>
+                    <input type="password" wire:model="whatsapp_admin_password" placeholder="••••••••"
+                           class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-brand focus:ring-2 focus:ring-brand/20">
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">API URL</label>
+                    <input type="text" wire:model="whatsapp_api_base_url" placeholder="https://wa-api.tecnobyteapp.com:1422"
+                           class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-mono focus:border-brand focus:ring-2 focus:ring-brand/20">
+                </div>
+            </div>
+
+            <div class="mt-3 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-[11px] text-amber-800">
+                <i class="fa-solid fa-circle-info"></i>
+                Estas credenciales se usan para autenticar las llamadas a TecnoByteApp en nombre de cualquier tenant
+                que no tenga sus propias credenciales. Cada tenant solo necesita su <code>connection_id</code>.
+                Las credenciales NO se muestran en el modal de tenant (más seguro).
+            </div>
+        </section>
+
         {{-- CONTACTO / SOPORTE --}}
         <section class="rounded-2xl bg-white shadow-sm border border-slate-200 p-5">
             <div class="flex items-center gap-2 mb-4">

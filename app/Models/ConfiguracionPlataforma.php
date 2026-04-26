@@ -28,6 +28,13 @@ class ConfiguracionPlataforma extends Model
         'email_soporte',
         'telefono_soporte',
         'sitio_web',
+        'whatsapp_admin_email',
+        'whatsapp_admin_password',
+        'whatsapp_api_base_url',
+    ];
+
+    protected $hidden = [
+        'whatsapp_admin_password',
     ];
 
     /** Cache la fila para no leerla en cada request */

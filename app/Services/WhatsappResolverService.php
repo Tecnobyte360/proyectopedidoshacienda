@@ -21,27 +21,76 @@ use Illuminate\Support\Facades\Cache;
  */
 class WhatsappResolverService
 {
-    /** Credenciales del tenant actual (o fallback) */
+    /**
+     * Credenciales con jerarquía:
+     *   1. Tenant.whatsapp_config (si tiene email+password) → tiene su propia cuenta
+     *   2. ConfiguracionPlataforma.whatsapp_admin_* → superadmin centralizado (típico)
+     *   3. .env WHATSAPP_API_EMAIL/PASSWORD → último recurso (legacy)
+     */
     public function credenciales(?Tenant $tenant = null): array
     {
         $tenant = $tenant ?: app(TenantManager::class)->current();
         $config = $tenant?->whatsapp_config ?? [];
 
+        // Si el tenant tiene email+password propios, los usa (overrides totales)
+        if (!empty($config['email']) && !empty($config['password'])) {
+            return [
+                'email'        => $config['email'],
+                'password'     => $config['password'],
+                'api_base_url' => $config['api_base_url']
+                                  ?? $this->plataformaApiBaseUrl()
+                                  ?? 'https://wa-api.tecnobyteapp.com:1422',
+            ];
+        }
+
+        // Fallback al superadmin centralizado en ConfiguracionPlataforma
+        try {
+            $cfg = \App\Models\ConfiguracionPlataforma::actual();
+            if (!empty($cfg->whatsapp_admin_email) && !empty($cfg->whatsapp_admin_password)) {
+                return [
+                    'email'        => $cfg->whatsapp_admin_email,
+                    'password'     => $cfg->whatsapp_admin_password,
+                    'api_base_url' => $config['api_base_url']
+                                      ?? ($cfg->whatsapp_api_base_url ?: 'https://wa-api.tecnobyteapp.com:1422'),
+                ];
+            }
+        } catch (\Throwable $e) {
+            // Sin tabla aún o error de lectura → caer a env
+        }
+
+        // Último recurso: .env
         return [
-            'email'        => $config['email']        ?? env('WHATSAPP_API_EMAIL'),
-            'password'     => $config['password']     ?? env('WHATSAPP_API_PASSWORD'),
-            'api_base_url' => $config['api_base_url'] ?? 'https://wa-api.tecnobyteapp.com:1422',
+            'email'        => env('WHATSAPP_API_EMAIL'),
+            'password'     => env('WHATSAPP_API_PASSWORD'),
+            'api_base_url' => $config['api_base_url']
+                              ?? 'https://wa-api.tecnobyteapp.com:1422',
         ];
     }
 
+    private function plataformaApiBaseUrl(): ?string
+    {
+        try {
+            return \App\Models\ConfiguracionPlataforma::actual()->whatsapp_api_base_url ?: null;
+        } catch (\Throwable $e) { return null; }
+    }
+
     /**
-     * Cache key del token WhatsApp por tenant.
-     * Cada tenant tiene su propio token cacheado.
+     * Cache key del token WhatsApp por tenant. Si el tenant usa las credenciales
+     * de la plataforma (caso típico), el token CACHEADO es el mismo para todos
+     * los tenants — usamos una sola key compartida en ese caso.
      */
     public function tokenCacheKey(?Tenant $tenant = null): string
     {
         $tenant = $tenant ?: app(TenantManager::class)->current();
-        return 'whatsapp_api_token_t' . ($tenant?->id ?? 'global');
+        $config = $tenant?->whatsapp_config ?? [];
+
+        // Si el tenant tiene email propio, key específica
+        if (!empty($config['email'])) {
+            return 'whatsapp_api_token_t' . ($tenant?->id ?? 'global');
+        }
+
+        // Si usa el superadmin centralizado, key compartida (más eficiente)
+        return 'whatsapp_api_token_platform';
     }
 
     /**
