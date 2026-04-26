@@ -81,6 +81,10 @@ class FlujoBotExecutor
             case 'trigger':
                 return $this->seguir($flujo, $nodoId, 'output_1', $contexto, $visitados);
 
+            case 'trigger_primer_msg':
+                if (!$this->esPrimerMensaje($contexto)) return null;
+                return $this->seguir($flujo, $nodoId, 'output_1', $contexto, $visitados);
+
             case 'cond_palabras':
                 $puerto = $this->cumplePalabras($contexto['mensaje'] ?? '', $data) ? 'output_1' : 'output_2';
                 return $this->seguir($flujo, $nodoId, $puerto, $contexto, $visitados);
@@ -93,16 +97,53 @@ class FlujoBotExecutor
                 $puerto = $this->cumpleHorario($contexto['sede_id'] ?? null, $data) ? 'output_1' : 'output_2';
                 return $this->seguir($flujo, $nodoId, $puerto, $contexto, $visitados);
 
+            case 'cond_dia_semana':
+                $puerto = $this->cumpleDiaSemana($data) ? 'output_1' : 'output_2';
+                return $this->seguir($flujo, $nodoId, $puerto, $contexto, $visitados);
+
             case 'cond_cliente':
                 $puerto = $this->cumpleCliente($contexto['cliente'] ?? null, $data) ? 'output_1' : 'output_2';
                 return $this->seguir($flujo, $nodoId, $puerto, $contexto, $visitados);
+
+            case 'cond_tiene_pedido':
+                $puerto = $this->cumpleTienePedido($contexto['cliente'] ?? null, $data) ? 'output_1' : 'output_2';
+                return $this->seguir($flujo, $nodoId, $puerto, $contexto, $visitados);
+
+            case 'cond_zona':
+                $puerto = $this->cumpleZona($contexto['cliente'] ?? null, $data) ? 'output_1' : 'output_2';
+                return $this->seguir($flujo, $nodoId, $puerto, $contexto, $visitados);
+
+            case 'accion_validar_cobertura':
+                return $this->ejecutarValidarCobertura($flujo, $nodoId, $data, $contexto, $visitados);
+
+            case 'accion_consultar_pedidos':
+                $reply = $this->ejecutarConsultarPedidos($contexto, (int) ($data['limite'] ?? 3));
+                return ['handled' => true, 'reply' => $reply, 'short_circuit' => true];
+
+            case 'accion_ans':
+                $reply = $this->ejecutarAns($contexto, (string) ($data['accion'] ?? ''));
+                return $reply !== null
+                    ? ['handled' => true, 'reply' => $reply, 'short_circuit' => true]
+                    : $this->seguir($flujo, $nodoId, 'output_1', $contexto, $visitados);
+
+            case 'accion_imagen_producto':
+                $this->ejecutarEnviarImagen($contexto, $data);
+                return $this->seguir($flujo, $nodoId, 'output_1', $contexto, $visitados)
+                    ?? ['handled' => true, 'reply' => null, 'short_circuit' => true];
+
+            case 'accion_pasar_ia':
+                // No corta el flujo del bot: solo guarda contexto extra para inyectar
+                $extra = trim((string) ($data['contexto_extra'] ?? ''));
+                if ($extra !== '') {
+                    $this->guardarContextoExtra($contexto, $extra);
+                }
+                return ['handled' => false, 'reply' => null, 'short_circuit' => false];
 
             case 'accion_derivar':
                 return $this->ejecutarDerivar($data, $contexto);
 
             case 'accion_mensaje':
                 $reply = $this->renderizarMensaje((string) ($data['mensaje'] ?? ''), $contexto);
-                // Si tiene siguiente (raro), seguimos; si no, retornamos directo
                 $next = $flujo->nodosSiguientes($nodoId, 'output_1');
                 if (!empty($next)) {
                     return $this->recorrer($flujo, (int) $next[0]['id'], $contexto, $visitados) ?? [
@@ -117,7 +158,6 @@ class FlujoBotExecutor
                     ?? ['handled' => false, 'reply' => null, 'short_circuit' => false];
 
             case 'accion_esperar':
-                // TODO: encolar job de seguimiento. Por ahora seguimos al siguiente.
                 return $this->seguir($flujo, $nodoId, 'output_1', $contexto, $visitados);
 
             case 'fin':
@@ -126,6 +166,218 @@ class FlujoBotExecutor
             default:
                 return null;
         }
+    }
+
+    /* ─── Nuevos evaluadores ─── */
+
+    private function esPrimerMensaje(array $contexto): bool
+    {
+        $conv = $contexto['conversacion'] ?? null;
+        if (!($conv instanceof ConversacionWhatsapp)) return false;
+        // Si solo hay 1 mensaje (el actual del cliente), es el primero.
+        try {
+            return (int) $conv->mensajes()->count() <= 1;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    private function cumpleDiaSemana(array $data): bool
+    {
+        $dias = $data['dias'] ?? [];
+        if (!is_array($dias) || empty($dias)) return false;
+        $hoyDow = (int) now('America/Bogota')->dayOfWeek; // 0=Dom..6=Sab
+        return in_array($hoyDow, array_map('intval', $dias), true);
+    }
+
+    private function cumpleTienePedido($cliente, array $data): bool
+    {
+        if (!$cliente) return false;
+        $tieneActivo = false;
+        try {
+            $tieneActivo = \App\Models\Pedido::where('cliente_id', $cliente->id)
+                ->whereNotIn('estado', ['entregado', 'cancelado'])
+                ->exists();
+        } catch (\Throwable $e) {
+            return false;
+        }
+        return ($data['tipo'] ?? 'con_pedido') === 'sin_pedido' ? !$tieneActivo : $tieneActivo;
+    }
+
+    private function cumpleZona($cliente, array $data): bool
+    {
+        if (!$cliente) return false;
+        $zonaId = (int) ($data['zona_id'] ?? 0);
+        $zonaCliente = (int) ($cliente->zona_cobertura_id ?? 0);
+
+        if ($zonaId === 0) {
+            // "Cualquier zona cubierta"
+            return $zonaCliente > 0;
+        }
+        return $zonaCliente === $zonaId;
+    }
+
+    /* ─── Nuevas acciones ─── */
+
+    private function ejecutarValidarCobertura(FlujoBot $flujo, int $nodoId, array $data, array $contexto, array $visitados): ?array
+    {
+        $modo = (string) ($data['modo'] ?? 'auto');
+
+        if ($modo === 'preguntar') {
+            $msg = trim((string) ($data['mensaje_pregunta'] ?? ''))
+                ?: 'Cuéntame en qué barrio estás para validar el envío 🙌';
+            return ['handled' => true, 'reply' => $this->renderizarMensaje($msg, $contexto), 'short_circuit' => true];
+        }
+
+        // Modo auto: intenta extraer dirección/barrio del mensaje
+        $mensaje = (string) ($contexto['mensaje'] ?? '');
+        $barrio  = $this->extraerBarrio($mensaje);
+
+        if ($barrio === '') {
+            // No hay info suficiente, salir por NO
+            return $this->seguir($flujo, $nodoId, 'output_2', $contexto, $visitados);
+        }
+
+        $sedeId = $contexto['sede_id'] ?? null;
+        $zona = \App\Models\ZonaCobertura::resolverPorBarrio($barrio, $sedeId);
+
+        $puerto = $zona ? 'output_1' : 'output_2';
+        return $this->seguir($flujo, $nodoId, $puerto, $contexto, $visitados);
+    }
+
+    private function extraerBarrio(string $mensaje): string
+    {
+        // Heurística simple: busca después de "vivo en", "estoy en", "barrio"
+        $msg = mb_strtolower($mensaje);
+        foreach (['vivo en ', 'estoy en ', 'barrio ', 'soy de '] as $marca) {
+            $pos = mb_strpos($msg, $marca);
+            if ($pos !== false) {
+                $rest = mb_substr($msg, $pos + mb_strlen($marca));
+                $rest = preg_replace('/[,.!?].*/', '', $rest);
+                return trim($rest);
+            }
+        }
+        return '';
+    }
+
+    private function ejecutarConsultarPedidos(array $contexto, int $limite = 3): string
+    {
+        $cliente = $contexto['cliente'] ?? null;
+        if (!$cliente) {
+            return 'No encontré tu información — ¿me ayudas con tu nombre y dirección?';
+        }
+
+        try {
+            $pedidos = \App\Models\Pedido::where('cliente_id', $cliente->id)
+                ->orderByDesc('id')
+                ->limit(max(1, min(10, $limite)))
+                ->get(['id', 'estado', 'total', 'created_at']);
+        } catch (\Throwable $e) {
+            return 'No pude consultar tu historial en este momento, intenta más tarde 🙏';
+        }
+
+        if ($pedidos->isEmpty()) {
+            return 'Aún no tienes pedidos con nosotros — ¿qué te gustaría pedir hoy?';
+        }
+
+        $primerNombre = trim(explode(' ', (string) $cliente->nombre)[0] ?: 'cliente');
+        $lineas = ["Aquí tienes tus últimos pedidos, {$primerNombre} 🙌\n"];
+        foreach ($pedidos as $p) {
+            $estado = ucfirst(str_replace('_', ' ', (string) $p->estado));
+            $total  = '$' . number_format((float) $p->total, 0, ',', '.');
+            $fecha  = optional($p->created_at)->format('d/m/Y');
+            $lineas[] = "📦 *Pedido #{$p->id}* — {$estado} · {$total} · {$fecha}";
+        }
+        $lineas[] = "\n¿Te ayudo con algo de uno de estos o quieres pedir algo nuevo?";
+        return implode("\n", $lineas);
+    }
+
+    private function ejecutarAns(array $contexto, string $accion): ?string
+    {
+        if ($accion === '') return null;
+
+        $cliente = $contexto['cliente'] ?? null;
+        if (!$cliente) return null;
+
+        $regla = \App\Models\AnsPedido::where('accion', $accion)->where('activo', true)->first();
+        if (!$regla) return null;
+
+        try {
+            $ultimoPedido = \App\Models\Pedido::where('cliente_id', $cliente->id)
+                ->whereNotIn('estado', ['entregado', 'cancelado'])
+                ->orderByDesc('id')
+                ->first();
+        } catch (\Throwable $e) {
+            return null;
+        }
+
+        if (!$ultimoPedido) {
+            return "No tienes ningún pedido activo para {$accion}.";
+        }
+
+        $minutosTranscurridos = (int) round($ultimoPedido->fecha_pedido->diffInSeconds(now()) / 60);
+        $minutosPermitidos    = (int) ($regla->tiempo_minutos ?? 0);
+
+        if ($minutosTranscurridos > $minutosPermitidos) {
+            return "Ya pasaron {$minutosTranscurridos} min desde tu pedido #{$ultimoPedido->id} y nuestra ventana para {$accion} es de {$minutosPermitidos} min 🙏. "
+                . "Te paso con un asesor para ver qué podemos hacer.";
+        }
+
+        $restantes = $minutosPermitidos - $minutosTranscurridos;
+        return "Sí podemos {$accion} tu pedido #{$ultimoPedido->id} — te quedan {$restantes} min. "
+            . "Cuéntame qué necesitas exactamente.";
+    }
+
+    private function ejecutarEnviarImagen(array $contexto, array $data): void
+    {
+        $productoId = (int) ($data['producto_id'] ?? 0);
+        if (!$productoId) return;
+
+        $producto = \App\Models\Producto::find($productoId);
+        if (!$producto) return;
+
+        $url = method_exists($producto, 'urlImagen') ? $producto->urlImagen() : null;
+        if (!$url) return;
+
+        $caption = $data['caption'] ?? sprintf("*%s*\n💵 $%s/%s",
+            $producto->nombre,
+            number_format((float) $producto->precio_base, 0, ',', '.'),
+            $producto->unidad
+        );
+
+        try {
+            $sender = app(WhatsappSenderService::class);
+            $conv = $contexto['conversacion'] ?? null;
+            $connectionId = $conv?->connection_id;
+            $from = $contexto['from'] ?? '';
+            if ($from) {
+                $sender->enviarImagen($from, $url, $caption, $connectionId);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Flujo: fallo enviar imagen producto: ' . $e->getMessage());
+        }
+    }
+
+    private function guardarContextoExtra(array $contexto, string $extra): void
+    {
+        $conv = $contexto['conversacion'] ?? null;
+        if (!($conv instanceof ConversacionWhatsapp)) return;
+
+        $tenantId = app(\App\Services\TenantManager::class)->id() ?? 'none';
+        $key = "flujo_contexto_extra_t{$tenantId}_conv{$conv->id}";
+        \Illuminate\Support\Facades\Cache::put($key, $extra, now()->addMinutes(30));
+    }
+
+    /**
+     * Lee el contexto extra del flujo (si existe) para inyectarlo en el prompt
+     * de la IA en el mismo turno o el siguiente.
+     */
+    public static function leerContextoExtra(int $conversacionId): ?string
+    {
+        $tenantId = app(\App\Services\TenantManager::class)->id() ?? 'none';
+        $key = "flujo_contexto_extra_t{$tenantId}_conv{$conversacionId}";
+        $extra = \Illuminate\Support\Facades\Cache::pull($key); // pull = read + delete
+        return $extra ?: null;
     }
 
     private function seguir(FlujoBot $flujo, int $nodoId, string $puerto, array $contexto, array $visitados): ?array

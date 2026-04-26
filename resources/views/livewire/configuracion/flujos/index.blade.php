@@ -5,10 +5,19 @@
             <h2 class="text-3xl font-extrabold text-slate-800">Flujos de conversación</h2>
             <p class="text-sm text-slate-500">Diseña cómo el bot encadena departamentos, condiciones y acciones de forma visual.</p>
         </div>
-        <button wire:click="nuevo"
-                class="inline-flex items-center gap-2 rounded-2xl bg-brand hover:bg-brand-dark text-white font-bold px-5 py-2.5 shadow transition">
-            <i class="fa-solid fa-plus"></i> Nuevo flujo
-        </button>
+        <div class="flex items-center gap-2">
+            @if($flujos->isNotEmpty())
+                <button wire:click="instalarPlantillas"
+                        wire:confirm="¿Instalar los flujos de ejemplo? Solo se crean los que no existan ya."
+                        class="inline-flex items-center gap-2 rounded-2xl bg-violet-50 hover:bg-violet-100 text-violet-700 font-bold px-4 py-2.5 transition border border-violet-200">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Instalar plantillas
+                </button>
+            @endif
+            <button wire:click="nuevo"
+                    class="inline-flex items-center gap-2 rounded-2xl bg-brand hover:bg-brand-dark text-white font-bold px-5 py-2.5 shadow transition">
+                <i class="fa-solid fa-plus"></i> Nuevo flujo
+            </button>
+        </div>
     </div>
 
     {{-- LISTA DE FLUJOS --}}
@@ -16,10 +25,18 @@
         <div class="rounded-2xl border-2 border-dashed border-slate-200 bg-white p-10 text-center">
             <i class="fa-solid fa-diagram-project text-5xl text-slate-300 mb-4"></i>
             <h3 class="text-lg font-bold text-slate-700 mb-1">Aún no tienes flujos</h3>
-            <p class="text-sm text-slate-500 mb-4">Crea tu primer flujo para enrutar conversaciones automáticamente.</p>
-            <button wire:click="nuevo" class="inline-flex items-center gap-2 rounded-xl bg-brand hover:bg-brand-dark text-white font-semibold px-5 py-2.5">
-                <i class="fa-solid fa-plus"></i> Crear primer flujo
-            </button>
+            <p class="text-sm text-slate-500 mb-4">Empieza con plantillas listas o crea uno desde cero.</p>
+            <div class="flex items-center justify-center gap-2 flex-wrap">
+                <button wire:click="instalarPlantillas"
+                        wire:confirm="Se crearán 5 flujos típicos (sede cerrada, cliente molesto, mayorista, empleo, reclamos). ¿Continuar?"
+                        class="inline-flex items-center gap-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold px-5 py-2.5 shadow transition">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Instalar 5 flujos de ejemplo
+                </button>
+                <button wire:click="nuevo" class="inline-flex items-center gap-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold px-5 py-2.5">
+                    <i class="fa-solid fa-plus"></i> Crear desde cero
+                </button>
+            </div>
+            <p class="text-[11px] text-slate-400 mt-4">Las plantillas se instalan ACTIVAS y cubren los casos más comunes. Puedes editarlas o desactivarlas después.</p>
         </div>
     @else
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -134,16 +151,29 @@
 
                         @php
                             $bloques = [
-                                ['Inicio', 'trigger', 'fa-play', 'bg-emerald-100 text-emerald-700', 'Punto de entrada'],
-                                ['Si contiene…', 'cond_palabras', 'fa-keyboard', 'bg-cyan-100 text-cyan-700', 'Detecta palabras clave'],
-                                ['Intención IA', 'cond_intencion', 'fa-brain', 'bg-violet-100 text-violet-700', 'IA analiza intención'],
-                                ['Horario sede', 'cond_horario', 'fa-clock', 'bg-amber-100 text-amber-700', 'Sede abierta o cerrada'],
-                                ['Cliente nuevo', 'cond_cliente', 'fa-user-plus', 'bg-blue-100 text-blue-700', 'Primera vez vs recurrente'],
-                                ['Derivar', 'accion_derivar', 'fa-headset', 'bg-rose-100 text-rose-700', 'Pasa a un departamento'],
-                                ['Mensaje', 'accion_mensaje', 'fa-comment', 'bg-pink-100 text-pink-700', 'Responde texto fijo'],
-                                ['Etiquetar', 'accion_etiquetar', 'fa-tag', 'bg-slate-200 text-slate-700', 'Marca la conversación'],
-                                ['Esperar', 'accion_esperar', 'fa-hourglass-half', 'bg-orange-100 text-orange-700', 'Espera N min sin respuesta'],
-                                ['Fin', 'fin', 'fa-flag-checkered', 'bg-slate-700 text-white', 'Termina el flujo'],
+                                // ─── Triggers ───
+                                ['Inicio',           'trigger',                 'fa-play',           'bg-emerald-100 text-emerald-700', 'Punto de entrada'],
+                                ['Primer mensaje',   'trigger_primer_msg',      'fa-door-open',      'bg-emerald-100 text-emerald-700', 'Solo en primer mensaje'],
+                                // ─── Condiciones ───
+                                ['Si contiene…',     'cond_palabras',           'fa-keyboard',       'bg-cyan-100 text-cyan-700',       'Palabras clave en texto'],
+                                ['Intención IA',     'cond_intencion',          'fa-brain',          'bg-violet-100 text-violet-700',   'IA analiza intención'],
+                                ['Horario sede',     'cond_horario',            'fa-clock',          'bg-amber-100 text-amber-700',     'Sede abierta o cerrada'],
+                                ['Día de la semana', 'cond_dia_semana',         'fa-calendar-day',   'bg-amber-100 text-amber-700',     'Lunes/Martes/etc.'],
+                                ['Cliente nuevo',    'cond_cliente',            'fa-user-plus',      'bg-blue-100 text-blue-700',       'Primera vez vs recurrente'],
+                                ['Tiene pedido',     'cond_tiene_pedido',       'fa-bag-shopping',   'bg-blue-100 text-blue-700',       'Tiene pedido activo'],
+                                ['Zona cubierta',    'cond_zona',               'fa-map-pin',        'bg-sky-100 text-sky-700',         'Cliente en zona X'],
+                                // ─── Acciones de bot ───
+                                ['Validar cobertura','accion_validar_cobertura','fa-map-location-dot','bg-sky-100 text-sky-700',        'Valida la dirección'],
+                                ['Consultar pedidos','accion_consultar_pedidos','fa-list-check',     'bg-blue-100 text-blue-700',       'Muestra últimos pedidos'],
+                                ['Aplicar ANS',      'accion_ans',              'fa-stopwatch',      'bg-amber-100 text-amber-700',     'Reglas de tiempos'],
+                                ['Enviar imagen',    'accion_imagen_producto',  'fa-image',          'bg-pink-100 text-pink-700',       'Foto de producto'],
+                                ['Continuar con IA', 'accion_pasar_ia',         'fa-robot',          'bg-violet-100 text-violet-700',   'Deja seguir al bot'],
+                                // ─── Acciones generales ───
+                                ['Derivar',          'accion_derivar',          'fa-headset',        'bg-rose-100 text-rose-700',       'Pasa a un departamento'],
+                                ['Mensaje',          'accion_mensaje',          'fa-comment',        'bg-pink-100 text-pink-700',       'Responde texto fijo'],
+                                ['Etiquetar',        'accion_etiquetar',        'fa-tag',            'bg-slate-200 text-slate-700',     'Marca la conversación'],
+                                ['Esperar',          'accion_esperar',          'fa-hourglass-half', 'bg-orange-100 text-orange-700',   'Espera N min sin respuesta'],
+                                ['Fin',              'fin',                     'fa-flag-checkered', 'bg-slate-700 text-white',         'Termina el flujo'],
                             ];
                         @endphp
 
@@ -248,18 +278,31 @@
                 window.__flujoEditorInited = true;
 
                 const departamentos = @json($departamentos->map(fn($d)=>['id'=>$d->id,'nombre'=>$d->nombre])->all());
+                const sedes         = @json($sedes->map(fn($s)=>['id'=>$s->id,'nombre'=>$s->nombre])->all());
+                const zonas         = @json($zonas->map(fn($z)=>['id'=>$z->id,'nombre'=>$z->nombre])->all());
+                const productos     = @json($productos->map(fn($p)=>['id'=>$p->id,'codigo'=>$p->codigo,'nombre'=>$p->nombre])->all());
+                const ansAcciones   = @json($ans->map(fn($a)=>['accion'=>$a->accion,'minutos'=>$a->tiempo_minutos])->all());
 
                 const TIPOS = {
-                    trigger:          { color: '#10b981', icon: 'fa-play',           bg:'#d1fae5', label:'Inicio',       in:0, out:1 },
-                    cond_palabras:    { color: '#06b6d4', icon: 'fa-keyboard',       bg:'#cffafe', label:'Si contiene',  in:1, out:2 },
-                    cond_intencion:   { color: '#8b5cf6', icon: 'fa-brain',          bg:'#ede9fe', label:'Intención IA', in:1, out:2 },
-                    cond_horario:     { color: '#f59e0b', icon: 'fa-clock',          bg:'#fef3c7', label:'Horario sede', in:1, out:2 },
-                    cond_cliente:     { color: '#3b82f6', icon: 'fa-user-plus',      bg:'#dbeafe', label:'Cliente nuevo',in:1, out:2 },
-                    accion_derivar:   { color: '#f43f5e', icon: 'fa-headset',        bg:'#ffe4e6', label:'Derivar',      in:1, out:1 },
-                    accion_mensaje:   { color: '#ec4899', icon: 'fa-comment',        bg:'#fce7f3', label:'Mensaje',      in:1, out:1 },
-                    accion_etiquetar: { color: '#475569', icon: 'fa-tag',            bg:'#e2e8f0', label:'Etiquetar',    in:1, out:1 },
-                    accion_esperar:   { color: '#ea580c', icon: 'fa-hourglass-half', bg:'#ffedd5', label:'Esperar',      in:1, out:1 },
-                    fin:              { color: '#1e293b', icon: 'fa-flag-checkered', bg:'#cbd5e1', label:'Fin',          in:1, out:0 },
+                    trigger:                  { color:'#10b981', icon:'fa-play',            bg:'#d1fae5', label:'Inicio',          in:0, out:1 },
+                    trigger_primer_msg:       { color:'#10b981', icon:'fa-door-open',       bg:'#d1fae5', label:'Primer mensaje',  in:0, out:1 },
+                    cond_palabras:            { color:'#06b6d4', icon:'fa-keyboard',        bg:'#cffafe', label:'Si contiene',     in:1, out:2 },
+                    cond_intencion:           { color:'#8b5cf6', icon:'fa-brain',           bg:'#ede9fe', label:'Intención IA',    in:1, out:2 },
+                    cond_horario:             { color:'#f59e0b', icon:'fa-clock',           bg:'#fef3c7', label:'Horario sede',    in:1, out:2 },
+                    cond_dia_semana:          { color:'#f59e0b', icon:'fa-calendar-day',    bg:'#fef3c7', label:'Día semana',      in:1, out:2 },
+                    cond_cliente:             { color:'#3b82f6', icon:'fa-user-plus',       bg:'#dbeafe', label:'Cliente nuevo',   in:1, out:2 },
+                    cond_tiene_pedido:        { color:'#3b82f6', icon:'fa-bag-shopping',    bg:'#dbeafe', label:'Tiene pedido',    in:1, out:2 },
+                    cond_zona:                { color:'#0ea5e9', icon:'fa-map-pin',         bg:'#e0f2fe', label:'Zona cubierta',   in:1, out:2 },
+                    accion_validar_cobertura: { color:'#0ea5e9', icon:'fa-map-location-dot',bg:'#e0f2fe', label:'Validar cobertura',in:1, out:2 },
+                    accion_consultar_pedidos: { color:'#3b82f6', icon:'fa-list-check',      bg:'#dbeafe', label:'Consultar pedidos',in:1, out:1 },
+                    accion_ans:               { color:'#f59e0b', icon:'fa-stopwatch',       bg:'#fef3c7', label:'Aplicar ANS',     in:1, out:1 },
+                    accion_imagen_producto:   { color:'#ec4899', icon:'fa-image',           bg:'#fce7f3', label:'Enviar imagen',   in:1, out:1 },
+                    accion_pasar_ia:          { color:'#8b5cf6', icon:'fa-robot',           bg:'#ede9fe', label:'Continuar con IA',in:1, out:0 },
+                    accion_derivar:           { color:'#f43f5e', icon:'fa-headset',         bg:'#ffe4e6', label:'Derivar',         in:1, out:1 },
+                    accion_mensaje:           { color:'#ec4899', icon:'fa-comment',         bg:'#fce7f3', label:'Mensaje',         in:1, out:1 },
+                    accion_etiquetar:         { color:'#475569', icon:'fa-tag',             bg:'#e2e8f0', label:'Etiquetar',       in:1, out:1 },
+                    accion_esperar:           { color:'#ea580c', icon:'fa-hourglass-half',  bg:'#ffedd5', label:'Esperar',         in:1, out:1 },
+                    fin:                      { color:'#1e293b', icon:'fa-flag-checkered',  bg:'#cbd5e1', label:'Fin',             in:1, out:0 },
                 };
 
                 let editor = null;
@@ -285,18 +328,34 @@
 
                 function subtituloNodo(tipo, data) {
                     if (!data) return '—';
+                    const diasNombres = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
                     switch (tipo) {
-                        case 'cond_palabras':    return data.palabras ? `Palabras: ${data.palabras}` : 'Define palabras…';
-                        case 'cond_intencion':   return data.intencion ? `Intención: ${data.intencion}` : 'Define intención…';
-                        case 'cond_horario':     return data.estado || 'abierta';
-                        case 'cond_cliente':     return data.tipo === 'recurrente' ? 'Si es recurrente' : 'Si es nuevo';
+                        case 'cond_palabras':       return data.palabras ? `Palabras: ${data.palabras}` : 'Define palabras…';
+                        case 'cond_intencion':      return data.intencion ? `Intención: ${data.intencion}` : 'Define intención…';
+                        case 'cond_horario':        return `Si ${data.estado || 'abierta'}`;
+                        case 'cond_dia_semana':     return Array.isArray(data.dias) && data.dias.length ? data.dias.map(d => diasNombres[d]).join(', ') : 'Selecciona días…';
+                        case 'cond_cliente':        return data.tipo === 'recurrente' ? 'Si es recurrente' : 'Si es nuevo';
+                        case 'cond_tiene_pedido':   return data.tipo === 'sin_pedido' ? 'Si NO tiene pedido' : 'Si tiene pedido activo';
+                        case 'cond_zona': {
+                            const z = zonas.find(x => x.id === Number(data.zona_id));
+                            return z ? `Si está en ${z.nombre}` : 'Elige zona…';
+                        }
+                        case 'accion_validar_cobertura': return data.modo === 'auto' ? 'Detecta dirección del mensaje' : 'Pregunta dirección al cliente';
+                        case 'accion_consultar_pedidos': return `Muestra últimos ${data.limite || 3}`;
+                        case 'accion_ans':          return data.accion ? `Verifica ANS de ${data.accion}` : 'Define acción ANS…';
+                        case 'accion_imagen_producto': {
+                            const p = productos.find(x => x.id === Number(data.producto_id));
+                            return p ? `📸 ${p.nombre}` : 'Elige producto…';
+                        }
+                        case 'accion_pasar_ia':     return data.contexto_extra ? 'Con contexto extra' : 'Continúa con la IA';
                         case 'accion_derivar': {
                             const d = departamentos.find(x => x.id === Number(data.departamento_id));
                             return d ? `→ ${d.nombre}` : 'Elige departamento…';
                         }
-                        case 'accion_mensaje':   return data.mensaje ? `"${data.mensaje.slice(0,40)}…"` : 'Define mensaje…';
-                        case 'accion_etiquetar': return data.etiqueta ? `#${data.etiqueta}` : 'Define etiqueta…';
-                        case 'accion_esperar':   return data.minutos ? `Esperar ${data.minutos} min` : 'Define tiempo…';
+                        case 'accion_mensaje':      return data.mensaje ? `"${data.mensaje.slice(0,40)}…"` : 'Define mensaje…';
+                        case 'accion_etiquetar':    return data.etiqueta ? `#${data.etiqueta}` : 'Define etiqueta…';
+                        case 'accion_esperar':      return data.minutos ? `Esperar ${data.minutos} min` : 'Define tiempo…';
+                        case 'trigger_primer_msg':  return 'Solo en primer mensaje';
                         default: return data.descripcion || '';
                     }
                 }
@@ -450,11 +509,122 @@
                                 </div>
                             `;
                             break;
+
+                        case 'cond_dia_semana': {
+                            const diasArr = Array.isArray(data.dias) ? data.dias.map(Number) : [];
+                            const dias = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+                            html += `<div>
+                                <label class="block text-[10px] uppercase font-bold text-slate-500 mb-1">Sale por SÍ los días marcados</label>
+                                <div class="flex flex-wrap gap-1.5" id="dias-semana-${nodeId}">`;
+                            dias.forEach((d, i) => {
+                                const checked = diasArr.includes(i);
+                                html += `<label class="inline-flex items-center gap-1 cursor-pointer rounded-md border ${checked ? 'border-amber-400 bg-amber-50' : 'border-slate-200'} px-2 py-1 text-[11px]">
+                                    <input type="checkbox" data-dia="${i}" ${checked ? 'checked' : ''}>
+                                    ${d.slice(0,3)}
+                                </label>`;
+                            });
+                            html += `</div></div>`;
+                            break;
+                        }
+
+                        case 'cond_tiene_pedido':
+                            html += `<div>
+                                <label class="block text-[10px] uppercase font-bold text-slate-500 mb-1">Sale por SÍ si el cliente…</label>
+                                <select data-key="tipo" class="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs">
+                                    <option value="con_pedido" ${data.tipo !== 'sin_pedido' ? 'selected' : ''}>TIENE pedido activo (no entregado/cancelado)</option>
+                                    <option value="sin_pedido" ${data.tipo === 'sin_pedido' ? 'selected' : ''}>NO tiene pedido activo</option>
+                                </select>
+                            </div>`;
+                            break;
+
+                        case 'cond_zona': {
+                            const optsZ = zonas.map(z => `<option value="${z.id}" ${Number(data.zona_id) === z.id ? 'selected' : ''}>${escape(z.nombre)}</option>`).join('');
+                            html += `<div>
+                                <label class="block text-[10px] uppercase font-bold text-slate-500 mb-1">Zona en la que debe estar el cliente</label>
+                                <select data-key="zona_id" class="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs">
+                                    <option value="">— Cualquier zona cubierta —</option>
+                                    ${optsZ}
+                                </select>
+                                <p class="text-[10px] text-slate-400 mt-1">Usa la última dirección del cliente (de su perfil o pedidos previos).</p>
+                            </div>`;
+                            break;
+                        }
+
+                        case 'accion_validar_cobertura':
+                            html += `<div>
+                                <label class="block text-[10px] uppercase font-bold text-slate-500 mb-1">Modo</label>
+                                <select data-key="modo" class="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs">
+                                    <option value="auto" ${data.modo !== 'preguntar' ? 'selected' : ''}>Detectar dirección del mensaje</option>
+                                    <option value="preguntar" ${data.modo === 'preguntar' ? 'selected' : ''}>Pedir dirección al cliente</option>
+                                </select>
+                                <p class="text-[10px] text-slate-400 mt-1">Salidas: <strong>SÍ</strong> = cubierta · <strong>NO</strong> = fuera de zona.</p>
+                            </div>
+                            <div>
+                                <label class="block text-[10px] uppercase font-bold text-slate-500 mb-1">Mensaje si pregunta (modo "preguntar")</label>
+                                <textarea data-key="mensaje_pregunta" rows="2"
+                                          placeholder="Cuéntame en qué barrio estás para validar el envío 🙌"
+                                          class="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs">${escape(data.mensaje_pregunta || '')}</textarea>
+                            </div>`;
+                            break;
+
+                        case 'accion_consultar_pedidos':
+                            html += `<div>
+                                <label class="block text-[10px] uppercase font-bold text-slate-500 mb-1">Cuántos pedidos mostrar</label>
+                                <input type="number" min="1" max="10" value="${Number(data.limite) || 3}" data-key="limite"
+                                       class="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs">
+                                <p class="text-[10px] text-slate-400 mt-1">Responde al cliente con su historial de pedidos en formato lista.</p>
+                            </div>`;
+                            break;
+
+                        case 'accion_ans': {
+                            const optsA = ansAcciones.map(a => `<option value="${escape(a.accion)}" ${data.accion === a.accion ? 'selected' : ''}>${escape(a.accion)} (${a.minutos} min)</option>`).join('');
+                            html += `<div>
+                                <label class="block text-[10px] uppercase font-bold text-slate-500 mb-1">Acción ANS a verificar</label>
+                                <select data-key="accion" class="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs">
+                                    <option value="">— Elige —</option>
+                                    ${optsA}
+                                </select>
+                                <p class="text-[10px] text-slate-400 mt-1">Si la ventana ANS no permite la acción, el flujo responde con un mensaje informando.</p>
+                            </div>`;
+                            break;
+                        }
+
+                        case 'accion_imagen_producto': {
+                            const optsP = productos.map(p => `<option value="${p.id}" ${Number(data.producto_id) === p.id ? 'selected' : ''}>${escape((p.codigo ? p.codigo + ' · ' : '') + p.nombre)}</option>`).join('');
+                            html += `<div>
+                                <label class="block text-[10px] uppercase font-bold text-slate-500 mb-1">Producto a enviar</label>
+                                <select data-key="producto_id" class="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs">
+                                    <option value="">— Elige —</option>
+                                    ${optsP}
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[10px] uppercase font-bold text-slate-500 mb-1">Caption (opcional)</label>
+                                <input type="text" value="${escape(data.caption || '')}" data-key="caption"
+                                       placeholder="Mira qué frescas 😍"
+                                       class="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs">
+                            </div>`;
+                            break;
+                        }
+
+                        case 'accion_pasar_ia':
+                            html += `<div>
+                                <label class="block text-[10px] uppercase font-bold text-slate-500 mb-1">Contexto extra para la IA (opcional)</label>
+                                <textarea data-key="contexto_extra" rows="4"
+                                          placeholder="Ej: este cliente ya preguntó por mayoristas. Si retoma el tema, ofrécele descuento del 5%."
+                                          class="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs">${escape(data.contexto_extra || '')}</textarea>
+                                <p class="text-[10px] text-slate-400 mt-1">Se inyecta como mensaje de sistema antes de pasarle el control a la IA. NO interrumpe la conversación.</p>
+                            </div>`;
+                            break;
+
+                        case 'trigger_primer_msg':
+                            html += `<p class="text-xs text-slate-500">Este disparador solo activa el flujo en el <strong>primer mensaje</strong> de una conversación nueva. Útil para saludos personalizados.</p>`;
+                            break;
                     }
                     html += `</div>`;
                     cont.innerHTML = html;
 
-                    // Bind inputs
+                    // Bind inputs simples
                     cont.querySelectorAll('[data-key]').forEach(el => {
                         el.addEventListener('input', () => {
                             const key = el.dataset.key;
@@ -465,6 +635,22 @@
                             refrescarNodo(nodeId);
                         });
                     });
+
+                    // Bind checkboxes de días de la semana
+                    const diasContainer = cont.querySelector(`#dias-semana-${nodeId}`);
+                    if (diasContainer) {
+                        diasContainer.querySelectorAll('input[data-dia]').forEach(cb => {
+                            cb.addEventListener('change', () => {
+                                const node = editor.getNodeFromId(nodeId);
+                                const sel = Array.from(diasContainer.querySelectorAll('input[data-dia]:checked'))
+                                    .map(c => Number(c.dataset.dia));
+                                node.data.dias = sel;
+                                editor.updateNodeDataFromId(nodeId, node.data);
+                                refrescarNodo(nodeId);
+                                renderInspector(nodeId); // re-pinta para reflejar checked en chips
+                            });
+                        });
+                    }
                 }
 
                 function init() {

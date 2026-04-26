@@ -711,6 +711,16 @@ class WhatsappWebhookController extends Controller
             \Log::warning('FlujoBotExecutor falló, continuando con flujo normal: ' . $e->getMessage());
         }
 
+        // ── Si un nodo "Continuar con IA" dejó contexto extra, inyectarlo ──
+        $extraFlujo = \App\Services\FlujoBotExecutor::leerContextoExtra($conversacion->id);
+        if ($extraFlujo) {
+            // Se inyectará abajo en $extraSystem
+            $extraSystemFlujo = [
+                'role'    => 'system',
+                'content' => "🔀 Contexto inyectado por flujo:\n\n" . $extraFlujo,
+            ];
+        }
+
         // ── HISTORIAL: leer de BD (últimos 20 mensajes user/assistant) ───────
         $conversationHistory = $conversacion->fresh()->historialParaIA(20);
 
@@ -728,6 +738,9 @@ class WhatsappWebhookController extends Controller
         // inyectamos un system con regla dura para que la IA no repita el
         // mismo intento ni el mismo texto literal en bucle.
         $extraSystem = [];
+        if (isset($extraSystemFlujo)) {
+            $extraSystem[] = $extraSystemFlujo;
+        }
         $tenantIdNota = app(\App\Services\TenantManager::class)->id() ?? 'none';
         $rechazoIndexKey = "wa_rechazo_cobertura_idx_t{$tenantIdNota}_{$telefonoNorm}";
         $ultimoRechazo = Cache::get($rechazoIndexKey);
