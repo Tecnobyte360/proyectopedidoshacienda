@@ -47,6 +47,12 @@ class WompiService
         $cred = $tenant->wompiCredenciales();
         if (!$cred) return null;
 
+        // Si el pedido ya está pagado, NO rotar bajo ninguna circunstancia.
+        // Devolvemos null para que la UI no muestre botón de pagar ni regenere link.
+        if ($pedido->estado_pago === 'aprobado') {
+            return null;
+        }
+
         // Decidir si la reference debe rotar:
         //  - Vacía → primera vez.
         //  - Forzado externamente (boton "Nuevo link").
@@ -61,6 +67,7 @@ class WompiService
             $pedido->wompi_reference      = $this->generarReferencia($pedido);
             $pedido->wompi_transaction_id = null;       // limpiar tx anterior
             $pedido->pago_metodo          = null;
+            // Solo resetear estado si NO está aprobado (ya validado arriba)
             $pedido->estado_pago          = 'pendiente';
             $pedido->saveQuietly();
         }
