@@ -63,6 +63,20 @@ class EncuestaPedido extends Model
 
     public function urlPublica(): string
     {
-        return url("/encuesta/{$this->token}");
+        $path = "/encuesta/{$this->token}";
+
+        $tenant = $this->tenant_id
+            ? app(\App\Services\TenantManager::class)->withoutTenant(
+                fn () => Tenant::find($this->tenant_id)
+              )
+            : null;
+
+        if ($tenant && !empty($tenant->slug)) {
+            $base = config('app.tenant_base_domain', 'tecnobyte360.com');
+            $scheme = parse_url(config('app.url'), PHP_URL_SCHEME) ?: 'https';
+            return "{$scheme}://{$tenant->slug}.{$base}{$path}";
+        }
+
+        return url($path);
     }
 }
