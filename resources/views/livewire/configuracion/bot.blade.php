@@ -825,40 +825,79 @@
                 </div>
             </div>
 
-            <div class="space-y-3">
+            <div class="space-y-3" x-data="{ abierto: '' }">
                 @php
                     $notifs = [
-                        ['notif_en_preparacion_activa', '👨‍🍳 En preparación', 'fa-fire', 'bg-amber-50 border-amber-200', 'Cuando el pedido pasa a "en preparación".', '"Stiven, ya estamos preparando tu pedido 👨‍🍳🔥 Te aviso apenas salga..."'],
-                        ['notif_en_camino_activa', '🛵 En camino + código', 'fa-motorcycle', 'bg-violet-50 border-violet-200', 'Cuando sale el domiciliario, incluye el código de entrega.', '"Stiven, tu pedido va en camino 🛵 Cuando llegue el domiciliario, dile este código: 🔐 1312"'],
-                        ['notif_entregado_activa', '✅ Pedido entregado', 'fa-circle-check', 'bg-emerald-50 border-emerald-200', 'Cuando se marca como entregado.', '"Listo Stiven ✅ Tu pedido quedó entregado. ¡Gracias por confiar!"'],
-                        ['notif_pago_aprobado_activa', '💳 Pago aprobado (Wompi)', 'fa-circle-dollar-to-slot', 'bg-blue-50 border-blue-200', 'Cuando el webhook de Wompi confirma el pago.', '"✅ Stiven, recibimos tu pago de $X 🙌 Tu pedido ya quedó pagado..."'],
-                        ['notif_pago_rechazado_activa', '❌ Pago rechazado (Wompi)', 'fa-circle-xmark', 'bg-rose-50 border-rose-200', 'Cuando el pago falla, con link para reintentar.', '"Hola Stiven, tu pago no se pudo procesar 🙏 Puedes intentar de nuevo aquí: link"'],
+                        ['en_preparacion', '👨‍🍳 En preparación', 'fa-fire', 'amber',  'Cuando el pedido pasa a "en preparación".'],
+                        ['en_camino',      '🛵 En camino + código', 'fa-motorcycle', 'violet', 'Cuando sale el domiciliario.'],
+                        ['entregado',      '✅ Pedido entregado', 'fa-circle-check', 'emerald', 'Cuando se marca como entregado.'],
+                        ['pago_aprobado',  '💳 Pago aprobado (Wompi)', 'fa-circle-dollar-to-slot', 'blue',  'Cuando el webhook de Wompi confirma.'],
+                        ['pago_rechazado', '❌ Pago rechazado (Wompi)', 'fa-circle-xmark', 'rose',  'Cuando el pago falla.'],
                     ];
                 @endphp
 
-                @foreach($notifs as [$key, $titulo, $icon, $color, $cuando, $ejemplo])
-                    <label class="flex items-start gap-3 cursor-pointer rounded-xl border-2 p-4 transition
-                                  {{ $$key ? str_replace('bg-', 'border-', explode(' ', $color)[0]) . ' ' . $color : 'border-slate-200 bg-white hover:bg-slate-50' }}">
-                        <input type="checkbox" wire:model="{{ $key }}"
-                               class="mt-1 rounded border-slate-300 h-5 w-5 text-amber-600">
-                        <div class="flex-1 min-w-0">
-                            <div class="flex items-center gap-2 mb-1">
-                                <i class="fa-solid {{ $icon }} text-slate-500"></i>
-                                <span class="text-sm font-bold text-slate-800">{{ $titulo }}</span>
-                                @if($$key)
-                                    <span class="ml-auto text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">ACTIVO</span>
-                                @else
-                                    <span class="ml-auto text-[10px] font-bold text-slate-500 bg-slate-200 px-2 py-0.5 rounded-full">DESACTIVADO</span>
+                @foreach($notifs as [$slug, $titulo, $icon, $color, $cuando])
+                    @php
+                        $keyActivo  = "notif_{$slug}_activa";
+                        $keyMensaje = "notif_{$slug}_mensaje";
+                        $keyDelay   = "notif_{$slug}_delay";
+                        $valActivo  = $$keyActivo;
+                        $valDelay   = $$keyDelay;
+                    @endphp
+                    <div class="rounded-xl border-2 transition overflow-hidden
+                                {{ $valActivo ? "border-{$color}-300 bg-{$color}-50/40" : 'border-slate-200 bg-white' }}">
+                        {{-- Header: toggle + título + delay + expandir --}}
+                        <div class="flex items-center gap-3 p-4">
+                            <input type="checkbox" wire:model.live="{{ $keyActivo }}"
+                                   class="rounded border-slate-300 h-5 w-5 text-{{ $color }}-600">
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center gap-2">
+                                    <i class="fa-solid {{ $icon }} text-slate-500"></i>
+                                    <span class="text-sm font-bold text-slate-800">{{ $titulo }}</span>
+                                    @if($valActivo)
+                                        <span class="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">ACTIVO</span>
+                                    @else
+                                        <span class="text-[10px] font-bold text-slate-500 bg-slate-200 px-2 py-0.5 rounded-full">OFF</span>
+                                    @endif
+                                </div>
+                                <div class="text-[11px] text-slate-500 mt-0.5">{{ $cuando }}</div>
+                            </div>
+
+                            <div class="flex items-center gap-2 flex-shrink-0">
+                                @if($valDelay > 0)
+                                    <span class="text-[10px] font-bold bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">
+                                        <i class="fa-solid fa-clock"></i> {{ $valDelay }}s
+                                    </span>
                                 @endif
-                            </div>
-                            <div class="text-xs text-slate-600 mb-1">
-                                <strong>Cuándo:</strong> {{ $cuando }}
-                            </div>
-                            <div class="text-[11px] text-slate-500 italic">
-                                {{ $ejemplo }}
+                                <button type="button" @click="abierto = (abierto === '{{ $slug }}' ? '' : '{{ $slug }}')"
+                                        class="rounded-lg bg-slate-100 hover:bg-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700">
+                                    <i class="fa-solid" :class="abierto === '{{ $slug }}' ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+                                    Editar
+                                </button>
                             </div>
                         </div>
-                    </label>
+
+                        {{-- Cuerpo expandible: textarea + delay --}}
+                        <div x-show="abierto === '{{ $slug }}'" x-cloak class="border-t border-slate-200 bg-white p-4 space-y-3">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-1">📝 Plantilla del mensaje</label>
+                                <textarea wire:model.lazy="{{ $keyMensaje }}" rows="5"
+                                          class="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-mono leading-relaxed focus:border-{{ $color }}-400 focus:ring-1 focus:ring-{{ $color }}-100"
+                                          placeholder="Escribe el mensaje que recibirá el cliente..."></textarea>
+                                <p class="text-[10px] text-slate-500 mt-1">
+                                    Variables: <code>{nombre}</code> <code>{nombre_completo}</code> <code>{pedido}</code> <code>{total}</code> <code>{token}</code> <code>{direccion}</code> <code>{barrio}</code> <code>{link_pago}</code> <code>{link_seguimiento}</code>
+                                </p>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-1">⏱️ Demora antes de enviar (segundos)</label>
+                                <input type="number" wire:model.lazy="{{ $keyDelay }}" min="0" max="86400"
+                                       class="w-32 rounded-lg border border-slate-200 px-3 py-2 text-xs">
+                                <p class="text-[10px] text-slate-500 mt-1">
+                                    0 = inmediato. Útil para "reordenar": ej. pago aprobado con 0s, encuesta con 120s, etc. Máx 86400 (24h).
+                                </p>
+                            </div>
+                        </div>
+                    </div>
                 @endforeach
             </div>
 

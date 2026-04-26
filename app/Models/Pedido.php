@@ -332,15 +332,14 @@ MSG;
 
     public function notificarTokenEntrega(string $token): void
     {
-        // Respetar el toggle configurado por el tenant
-        try {
-            $cfgBot = \App\Models\ConfiguracionBot::actual();
-            if (!($cfgBot->notif_en_camino_activa ?? true)) {
-                Log::info('Notificación "en camino" omitida — desactivada en config', ['pedido_id' => $this->id]);
-                return;
-            }
-        } catch (\Throwable $e) { /* en caso de error, dejamos pasar */ }
+        // Guardar el token para que renderizarPlantilla lo lea
+        $this->token_entrega = $token;
 
+        // Delegar a la lógica configurable (toggle + plantilla + delay)
+        $this->enviarNotificacionConfigurable('en_camino', ['token' => $token]);
+        return;
+
+        // Lógica antigua (no se ejecuta — queda solo por compat por si algo la llama directo)
         $telefono = $this->telefono_whatsapp ?: $this->telefono_contacto ?: $this->telefono;
 
         if (!$telefono || !$this->connection_id) {
@@ -430,21 +429,19 @@ MSG;
 
     public function notificarClienteCambioEstado(): void
     {
-        // Respetar los toggles configurados por el tenant en /configuracion/bot
-        try {
-            $cfgBot = \App\Models\ConfiguracionBot::actual();
-            $mapa = [
-                self::ESTADO_EN_PREPARACION       => 'notif_en_preparacion_activa',
-                self::ESTADO_REPARTIDOR_EN_CAMINO => 'notif_en_camino_activa',
-                self::ESTADO_ENTREGADO            => 'notif_entregado_activa',
-            ];
-            $flag = $mapa[$this->estado] ?? null;
-            if ($flag && !($cfgBot->{$flag} ?? true)) {
-                Log::info("Notificación '{$this->estado}' omitida — desactivada en config", ['pedido_id' => $this->id]);
-                return;
-            }
-        } catch (\Throwable $e) { /* en caso de error de config, dejamos pasar */ }
+        // Mapear estado → tipo de notificación configurable
+        $tipoMap = [
+            self::ESTADO_EN_PREPARACION       => 'en_preparacion',
+            self::ESTADO_ENTREGADO            => 'entregado',
+            // EN_CAMINO se maneja en notificarTokenEntrega porque necesita el token
+        ];
 
+        if (isset($tipoMap[$this->estado])) {
+            $this->enviarNotificacionConfigurable($tipoMap[$this->estado]);
+            return;
+        }
+
+        // Para estados no mapeados (cancelado, etc.), seguir con la lógica vieja
         $telefono = $this->telefono_whatsapp ?: $this->telefono_contacto ?: $this->telefono;
 
         if (!$telefono) {
@@ -893,6 +890,93 @@ MSG;
         } catch (\Throwable $e) {
             \Log::warning('No se pudo generar urlPagoWompi: ' . $e->getMessage());
             return null;
+        }
+    }
+
+    /**
+     * Construye un mensaje desde una plantilla, sustituyendo variables.
+     * Variables disponibles: {nombre}, {nombre_completo}, {pedido}, {total},
+     * {token}, {direccion}, {barrio}, {link_pago}, {link_seguimiento}.
+     */
+    public function renderizarPlantilla(string $plantilla, array $extras = []): string
+    {
+        $primerNombre = trim(explode(' ', (string) $this->cliente_nombre)[0] ?: 'cliente');
+        $vars = array_merge([
+            'nombre'            => $primerNombre,
+            'nombre_completo'   => $this->cliente_nombre ?: '',
+            'pedido'            => $this->id,
+            'total'             => '$' . number_format((float) $this->total, 0, ',', '.'),
+            'token'             => $this->token_entrega ?? '',
+            'direccion'         => $this->direccion ?? '',
+            'barrio'            => $this->barrio ?? '',
+            'link_pago'         => $this->urlPagoWompi() ?? '',
+            'link_seguimiento'  => $this->url_seguimiento ?? '',
+        ], $extras);
+
+        $reemplazos = [];
+        foreach ($vars as $k => $v) {
+            $reemplazos['{' . $k . '}'] = (string) $v;
+        }
+        return strtr($plantilla, $reemplazos);
+    }
+
+    /**
+     * Envía o encola una notificación al cliente respetando los toggles
+     * y delays configurados por el tenant.
+     *
+     * @param string $tipo Uno de: en_preparacion, en_camino, entregado, pago_aprobado, pago_rechazado.
+     * @param array $extras Variables adicionales para la plantilla (ej. ['token' => '1234'])
+     */
+    public function enviarNotificacionConfigurable(string $tipo, array $extras = []): void
+    {
+        $cfg = \App\Models\ConfiguracionBot::actual();
+
+        $keyActivo  = "notif_{$tipo}_activa";
+        $keyMsg     = "notif_{$tipo}_mensaje";
+        $keyDelay   = "notif_{$tipo}_delay";
+
+        if (!($cfg->{$keyActivo} ?? true)) {
+            \Log::info("Notificación '{$tipo}' omitida (toggle off)", ['pedido_id' => $this->id]);
+            return;
+        }
+
+        $plantilla = trim((string) ($cfg->{$keyMsg} ?? ''));
+        if ($plantilla === '') {
+            $plantilla = \App\Models\ConfiguracionBot::NOTIF_DEFAULTS[$tipo] ?? '';
+        }
+        if ($plantilla === '') return;
+
+        $mensaje  = $this->renderizarPlantilla($plantilla, $extras);
+        $telefono = $this->telefono_whatsapp ?: $this->telefono_contacto ?: $this->telefono;
+        if (!$telefono) return;
+
+        // connection_id: prefiere sede, sino el del pedido
+        $connectionId = null;
+        if ($this->sede_id) {
+            $connectionId = \App\Models\Sede::find($this->sede_id)?->whatsapp_connection_id;
+        }
+        $connectionId = $connectionId ?: $this->connection_id;
+
+        $delay = (int) ($cfg->{$keyDelay} ?? 0);
+
+        $job = new \App\Jobs\EnviarNotificacionPedido(
+            tenantId: (int) $this->tenant_id,
+            telefono: $telefono,
+            mensaje: $mensaje,
+            connectionId: $connectionId,
+            tipo: $tipo,
+            pedidoId: $this->id,
+        );
+
+        if ($delay > 0) {
+            \Illuminate\Support\Facades\Bus::dispatch($job->delay(now()->addSeconds($delay)));
+        } else {
+            // Enviar inmediato (síncrono via WhatsappSenderService directo)
+            try {
+                $job->handle(app(\App\Services\WhatsappSenderService::class));
+            } catch (\Throwable $e) {
+                \Log::warning("Notif {$tipo} fallo inmediato: " . $e->getMessage());
+            }
         }
     }
 

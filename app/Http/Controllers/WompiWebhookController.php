@@ -153,15 +153,14 @@ class WompiWebhookController extends Controller
 
     private function notificarPagoAprobado(Pedido $pedido, Tenant $tenant): void
     {
-        // Respetar toggle configurado por el tenant
-        try {
-            $cfgBot = \App\Models\ConfiguracionBot::actual();
-            if (!($cfgBot->notif_pago_aprobado_activa ?? true)) {
-                Log::info('Notificación pago aprobado omitida — desactivada en config', ['pedido_id' => $pedido->id]);
-                return;
-            }
-        } catch (\Throwable $e) { /* dejamos pasar */ }
+        // Activar contexto del tenant para que ConfiguracionBot::actual() lo lea
+        try { app(\App\Services\TenantManager::class)->set($tenant); } catch (\Throwable $e) {}
 
+        // Delegar a la lógica configurable (toggle + plantilla + delay)
+        $pedido->enviarNotificacionConfigurable('pago_aprobado');
+        return;
+
+        // Lógica antigua (no se ejecuta)
         $telefono = $pedido->telefono_whatsapp ?: $pedido->telefono_contacto ?: $pedido->telefono;
         if (!$telefono) return;
 
@@ -185,15 +184,12 @@ class WompiWebhookController extends Controller
 
     private function notificarPagoFallido(Pedido $pedido, Tenant $tenant): void
     {
-        // Respetar toggle configurado por el tenant
-        try {
-            $cfgBot = \App\Models\ConfiguracionBot::actual();
-            if (!($cfgBot->notif_pago_rechazado_activa ?? true)) {
-                Log::info('Notificación pago rechazado omitida — desactivada en config', ['pedido_id' => $pedido->id]);
-                return;
-            }
-        } catch (\Throwable $e) { /* dejamos pasar */ }
+        try { app(\App\Services\TenantManager::class)->set($tenant); } catch (\Throwable $e) {}
 
+        $pedido->enviarNotificacionConfigurable('pago_rechazado');
+        return;
+
+        // Lógica antigua (no se ejecuta)
         $telefono = $pedido->telefono_whatsapp ?: $pedido->telefono_contacto ?: $pedido->telefono;
         if (!$telefono) return;
 

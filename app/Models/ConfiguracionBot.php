@@ -62,6 +62,25 @@ class ConfiguracionBot extends Model
         'notif_entregado_activa',
         'notif_pago_aprobado_activa',
         'notif_pago_rechazado_activa',
+        'notif_en_preparacion_mensaje',
+        'notif_en_camino_mensaje',
+        'notif_entregado_mensaje',
+        'notif_pago_aprobado_mensaje',
+        'notif_pago_rechazado_mensaje',
+        'notif_en_preparacion_delay',
+        'notif_en_camino_delay',
+        'notif_entregado_delay',
+        'notif_pago_aprobado_delay',
+        'notif_pago_rechazado_delay',
+    ];
+
+    /** Plantillas por defecto si el tenant no las personaliza. */
+    public const NOTIF_DEFAULTS = [
+        'en_preparacion'  => "{nombre}, ya estamos preparando tu pedido 👨‍🍳🔥\nTe aviso apenas salga para tu casa.",
+        'en_camino'       => "{nombre}, tu pedido ya va en camino 🛵💨\n\nCuando llegue el domiciliario, dile este código para confirmar la entrega:\n\n🔐 *{token}*\n\n¡Ya casi llega! 🙌",
+        'entregado'       => "Listo {nombre} ✅\nTu pedido ya quedó entregado. ¡Gracias por confiar en nosotros! 🙌\n\nEn un momento te paso una encuesta cortica para saber cómo estuvo todo.",
+        'pago_aprobado'   => "✅ {nombre}, recibimos tu pago de {total} 🙌\n\nTu pedido #{pedido} ya quedó *pagado*. Procedemos a prepararlo y te avisamos cuando salga 🛵💨",
+        'pago_rechazado'  => "Hola {nombre}, tu pago no se pudo procesar 🙏.\n\nTu pedido #{pedido} sigue activo. Puedes intentar de nuevo aquí:\n{link_pago}\n\nO escríbenos si prefieres pagar contra entrega.",
     ];
 
     protected $casts = [

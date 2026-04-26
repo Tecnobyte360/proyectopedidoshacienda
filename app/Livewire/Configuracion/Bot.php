@@ -76,6 +76,19 @@ class Bot extends Component
     public bool   $notif_pago_aprobado_activa  = true;
     public bool   $notif_pago_rechazado_activa = true;
 
+    // Plantillas + delays editables por tipo
+    public string $notif_en_preparacion_mensaje = '';
+    public string $notif_en_camino_mensaje      = '';
+    public string $notif_entregado_mensaje      = '';
+    public string $notif_pago_aprobado_mensaje  = '';
+    public string $notif_pago_rechazado_mensaje = '';
+
+    public int $notif_en_preparacion_delay = 0;
+    public int $notif_en_camino_delay      = 0;
+    public int $notif_entregado_delay      = 0;
+    public int $notif_pago_aprobado_delay  = 0;
+    public int $notif_pago_rechazado_delay = 0;
+
     // Auto-asignación de domiciliarios
     public bool   $auto_asignar_domiciliario = false;
     public string $criterio_asignacion       = 'balanceado';
@@ -157,6 +170,19 @@ class Bot extends Component
         $this->notif_entregado_activa      = (bool) ($cfg->notif_entregado_activa ?? true);
         $this->notif_pago_aprobado_activa  = (bool) ($cfg->notif_pago_aprobado_activa ?? true);
         $this->notif_pago_rechazado_activa = (bool) ($cfg->notif_pago_rechazado_activa ?? true);
+
+        $D = ConfiguracionBot::NOTIF_DEFAULTS;
+        $this->notif_en_preparacion_mensaje = (string) ($cfg->notif_en_preparacion_mensaje ?: $D['en_preparacion']);
+        $this->notif_en_camino_mensaje      = (string) ($cfg->notif_en_camino_mensaje      ?: $D['en_camino']);
+        $this->notif_entregado_mensaje      = (string) ($cfg->notif_entregado_mensaje      ?: $D['entregado']);
+        $this->notif_pago_aprobado_mensaje  = (string) ($cfg->notif_pago_aprobado_mensaje  ?: $D['pago_aprobado']);
+        $this->notif_pago_rechazado_mensaje = (string) ($cfg->notif_pago_rechazado_mensaje ?: $D['pago_rechazado']);
+
+        $this->notif_en_preparacion_delay = (int) ($cfg->notif_en_preparacion_delay ?? 0);
+        $this->notif_en_camino_delay      = (int) ($cfg->notif_en_camino_delay ?? 0);
+        $this->notif_entregado_delay      = (int) ($cfg->notif_entregado_delay ?? 0);
+        $this->notif_pago_aprobado_delay  = (int) ($cfg->notif_pago_aprobado_delay ?? 0);
+        $this->notif_pago_rechazado_delay = (int) ($cfg->notif_pago_rechazado_delay ?? 0);
         $this->auto_asignar_domiciliario = (bool) ($cfg->auto_asignar_domiciliario ?? false);
         $this->criterio_asignacion       = (string) ($cfg->criterio_asignacion ?: 'balanceado');
         $this->asignar_en_estado         = (string) ($cfg->asignar_en_estado ?: 'en_preparacion');
@@ -536,6 +562,16 @@ class Bot extends Component
             'notif_entregado_activa'                => 'boolean',
             'notif_pago_aprobado_activa'            => 'boolean',
             'notif_pago_rechazado_activa'           => 'boolean',
+            'notif_en_preparacion_mensaje'          => 'nullable|string|max:2000',
+            'notif_en_camino_mensaje'               => 'nullable|string|max:2000',
+            'notif_entregado_mensaje'               => 'nullable|string|max:2000',
+            'notif_pago_aprobado_mensaje'           => 'nullable|string|max:2000',
+            'notif_pago_rechazado_mensaje'          => 'nullable|string|max:2000',
+            'notif_en_preparacion_delay'            => 'integer|min:0|max:86400',
+            'notif_en_camino_delay'                 => 'integer|min:0|max:86400',
+            'notif_entregado_delay'                 => 'integer|min:0|max:86400',
+            'notif_pago_aprobado_delay'             => 'integer|min:0|max:86400',
+            'notif_pago_rechazado_delay'            => 'integer|min:0|max:86400',
             'auto_asignar_domiciliario'             => 'boolean',
             'criterio_asignacion'                   => 'nullable|in:balanceado,cercania,rotacion',
             'asignar_en_estado'                     => 'nullable|in:nuevo,en_preparacion,repartidor_en_camino',
