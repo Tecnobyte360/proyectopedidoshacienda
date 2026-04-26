@@ -114,69 +114,105 @@ class ConfiguracionPlataforma extends Component
     }
 
     /**
-     * Lista las conexiones disponibles en TecnoByteApp y a qué tenant
-     * están asignadas (si alguna). Útil para que el superadmin gestione
-     * todo desde un solo lugar.
+     * Lista TODAS las conexiones de TODOS los tenants + del superadmin,
+     * unificando en una tabla. Cada tenant tiene su propia cuenta en
+     * TecnoByteApp y solo ve SUS conexiones, así que iteramos por cada
+     * conjunto de credenciales (superadmin + tenants con cuenta propia)
+     * y unificamos.
      */
     public function getConexionesProperty(): array
     {
-        try {
-            $resolver = app(\App\Services\WhatsappResolverService::class);
-            // El superadmin usa siempre las credenciales de la plataforma,
-            // sin pasar por ningún tenant. Forzamos eso temporal con null.
-            $cred = [
-                'email'        => $this->whatsapp_admin_email,
-                'password'     => $this->whatsapp_admin_password,
-                'api_base_url' => $this->whatsapp_api_base_url ?: 'https://wa-api.tecnobyteapp.com:1422',
+        $apiBase = rtrim($this->whatsapp_api_base_url ?: 'https://wa-api.tecnobyteapp.com:1422', '/');
+
+        // Recolectar TODOS los pares email/password disponibles para listar
+        $credenciales = [];
+
+        // 1) Credenciales del superadmin (si están configuradas)
+        if (!empty($this->whatsapp_admin_email) && !empty($this->whatsapp_admin_password)) {
+            $credenciales['superadmin'] = [
+                'email'    => $this->whatsapp_admin_email,
+                'password' => $this->whatsapp_admin_password,
+                'tag'      => 'Superadmin plataforma',
+                'tenant_id' => null,
             ];
+        }
 
-            if (empty($cred['email']) || empty($cred['password'])) return [];
+        // 2) Credenciales propias de cada tenant
+        $tenants = app(\App\Services\TenantManager::class)->withoutTenant(
+            fn () => \App\Models\Tenant::where('activo', true)
+                        ->orderBy('nombre')
+                        ->get(['id','nombre','slug','whatsapp_config'])
+        );
 
-            $base = rtrim($cred['api_base_url'], '/');
-            $login = \Illuminate\Support\Facades\Http::withoutVerifying()->timeout(10)
-                ->post("{$base}/auth/login", [
-                    'email' => $cred['email'], 'password' => $cred['password']
-                ]);
-
-            if (!$login->successful() || !$login->json('token')) return [];
-            $token = $login->json('token');
-
-            $lst = \Illuminate\Support\Facades\Http::withoutVerifying()->withToken($token)->timeout(10)
-                ->get("{$base}/whatsapp/");
-            if (!$lst->successful()) return [];
-
-            // Mapa connection_id → tenant
-            $tenants = \App\Services\TenantManager::class
-                ? app(\App\Services\TenantManager::class)->withoutTenant(
-                    fn() => \App\Models\Tenant::where('activo', true)->get(['id','nombre','slug','whatsapp_config'])
-                  )
-                : collect();
-
-            $mapaIds = [];
-            foreach ($tenants as $t) {
-                foreach (($t->whatsapp_config['connection_ids'] ?? []) as $cid) {
-                    $mapaIds[(int) $cid] = ['id' => $t->id, 'nombre' => $t->nombre, 'slug' => $t->slug];
-                }
+        $mapaIdsTenant = [];   // connection_id → tenant
+        foreach ($tenants as $t) {
+            $cfg = $t->whatsapp_config ?? [];
+            foreach (($cfg['connection_ids'] ?? []) as $cid) {
+                $mapaIdsTenant[(int) $cid] = ['id' => $t->id, 'nombre' => $t->nombre, 'slug' => $t->slug];
             }
 
-            $conns = collect($lst->json('whatsapps', []))->map(function ($w) use ($mapaIds) {
-                $id = (int) $w['id'];
-                return [
-                    'id'           => $id,
-                    'name'         => $w['name'] ?? '',
-                    'phoneNumber'  => $w['phoneNumber'] ?? '',
-                    'profileName'  => $w['profileName'] ?? '',
-                    'status'       => strtoupper($w['status'] ?? '???'),
-                    'isDefault'    => (bool) ($w['isDefault'] ?? false),
-                    'asignadoA'    => $mapaIds[$id] ?? null,
+            if (!empty($cfg['email']) && !empty($cfg['password'])) {
+                $key = "tenant_{$t->id}";
+                $credenciales[$key] = [
+                    'email'     => $cfg['email'],
+                    'password'  => $cfg['password'],
+                    'tag'       => $t->nombre,
+                    'tenant_id' => $t->id,
                 ];
-            })->values()->all();
-
-            return $conns;
-        } catch (\Throwable $e) {
-            \Log::warning('No se pudo listar conexiones plataforma: ' . $e->getMessage());
-            return [];
+            }
         }
+
+        if (empty($credenciales)) return [];
+
+        // Hacer login + listar con cada par de credenciales y unificar
+        $todas = [];   // id → conexion
+        foreach ($credenciales as $key => $cred) {
+            try {
+                $login = \Illuminate\Support\Facades\Http::withoutVerifying()->timeout(8)
+                    ->post("{$apiBase}/auth/login", [
+                        'email' => $cred['email'], 'password' => $cred['password']
+                    ]);
+
+                if (!$login->successful() || !$login->json('token')) continue;
+
+                $token = $login->json('token');
+                $lst = \Illuminate\Support\Facades\Http::withoutVerifying()->withToken($token)->timeout(8)
+                    ->get("{$apiBase}/whatsapp/");
+
+                if (!$lst->successful()) continue;
+
+                foreach ($lst->json('whatsapps', []) as $w) {
+                    $id = (int) ($w['id'] ?? 0);
+                    if (!$id) continue;
+
+                    // Si ya estaba registrada por otro usuario, solo añadimos su tag
+                    if (isset($todas[$id])) {
+                        $todas[$id]['vistoPor'][] = $cred['tag'];
+                        continue;
+                    }
+
+                    $todas[$id] = [
+                        'id'           => $id,
+                        'name'         => $w['name'] ?? '',
+                        'phoneNumber'  => $w['phoneNumber'] ?? '',
+                        'profileName'  => $w['profileName'] ?? '',
+                        'status'       => strtoupper($w['status'] ?? '???'),
+                        'isDefault'    => (bool) ($w['isDefault'] ?? false),
+                        'ownerId'      => $w['ownerId'] ?? null,
+                        'vistoPor'     => [$cred['tag']],
+                        'asignadoA'    => $mapaIdsTenant[$id] ?? null,
+                    ];
+                }
+            } catch (\Throwable $e) {
+                \Log::warning("No se pudo listar conexiones de {$key}: " . $e->getMessage());
+            }
+        }
+
+        // Ordenar: primero las asignadas, luego por id
+        return collect($todas)
+            ->sortBy(fn ($c) => $c['asignadoA'] ? "0_{$c['id']}" : "1_{$c['id']}")
+            ->values()
+            ->all();
     }
 
     public function getTenantsProperty()

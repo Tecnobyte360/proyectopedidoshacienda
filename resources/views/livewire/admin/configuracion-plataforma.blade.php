@@ -284,6 +284,10 @@
                     @endif
                 </div>
             @else
+                <p class="text-xs text-slate-500 mb-2">
+                    <i class="fa-solid fa-eye"></i> Total: <strong>{{ count($conexiones) }}</strong> conexión(es) listadas — incluye conexiones del superadmin y de cada tenant con cuenta propia.
+                </p>
+
                 <div class="overflow-x-auto rounded-xl border border-slate-200">
                     <table class="w-full text-sm">
                         <thead class="bg-slate-50 border-b border-slate-200">
@@ -291,13 +295,19 @@
                                 <th class="px-3 py-2.5">ID</th>
                                 <th class="px-3 py-2.5">Conexión</th>
                                 <th class="px-3 py-2.5">Estado</th>
+                                <th class="px-3 py-2.5">Visto por</th>
                                 <th class="px-3 py-2.5">Asignar a tenant</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
                             @foreach($conexiones as $c)
                                 <tr class="hover:bg-slate-50/80">
-                                    <td class="px-3 py-2.5 font-mono text-xs text-slate-600">#{{ $c['id'] }}</td>
+                                    <td class="px-3 py-2.5 font-mono text-xs text-slate-600">
+                                        #{{ $c['id'] }}
+                                        @if($c['ownerId'])
+                                            <div class="text-[10px] text-slate-400">owner {{ $c['ownerId'] }}</div>
+                                        @endif
+                                    </td>
                                     <td class="px-3 py-2.5">
                                         <div class="flex items-center gap-2">
                                             <i class="fa-brands fa-whatsapp text-emerald-500"></i>
@@ -325,6 +335,15 @@
                                         </span>
                                     </td>
                                     <td class="px-3 py-2.5">
+                                        <div class="flex flex-wrap gap-1">
+                                            @foreach($c['vistoPor'] ?? [] as $tag)
+                                                <span class="inline-block rounded-full bg-slate-100 text-slate-600 text-[10px] px-2 py-0.5">
+                                                    {{ $tag }}
+                                                </span>
+                                            @endforeach
+                                        </div>
+                                    </td>
+                                    <td class="px-3 py-2.5">
                                         <select
                                             class="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs focus:border-brand focus:ring-2 focus:ring-brand/20"
                                             onchange="@this.call('asignarConexion', {{ $c['id'] }}, this.value === '' ? null : parseInt(this.value))">
@@ -337,7 +356,7 @@
                                             @endforeach
                                         </select>
                                         @if($c['asignadoA'])
-                                            <div class="text-[10px] text-emerald-600 mt-0.5">
+                                            <div class="text-[10px] text-emerald-600 mt-0.5 truncate">
                                                 ✓ {{ $c['asignadoA']['nombre'] }}
                                             </div>
                                         @endif
