@@ -69,6 +69,13 @@ class Bot extends Component
     // Pagos en línea (Wompi)
     public bool   $enviar_link_pago         = true;
 
+    // Toggles de notificaciones al cliente
+    public bool   $notif_en_preparacion_activa = true;
+    public bool   $notif_en_camino_activa      = true;
+    public bool   $notif_entregado_activa      = true;
+    public bool   $notif_pago_aprobado_activa  = true;
+    public bool   $notif_pago_rechazado_activa = true;
+
     // Auto-asignación de domiciliarios
     public bool   $auto_asignar_domiciliario = false;
     public string $criterio_asignacion       = 'balanceado';
@@ -145,6 +152,11 @@ class Bot extends Component
         $this->encuesta_delay_minutos = (int) ($cfg->encuesta_delay_minutos ?? 15);
         $this->encuesta_mensaje       = (string) ($cfg->encuesta_mensaje ?? '');
         $this->enviar_link_pago       = (bool) ($cfg->enviar_link_pago ?? true);
+        $this->notif_en_preparacion_activa = (bool) ($cfg->notif_en_preparacion_activa ?? true);
+        $this->notif_en_camino_activa      = (bool) ($cfg->notif_en_camino_activa ?? true);
+        $this->notif_entregado_activa      = (bool) ($cfg->notif_entregado_activa ?? true);
+        $this->notif_pago_aprobado_activa  = (bool) ($cfg->notif_pago_aprobado_activa ?? true);
+        $this->notif_pago_rechazado_activa = (bool) ($cfg->notif_pago_rechazado_activa ?? true);
         $this->auto_asignar_domiciliario = (bool) ($cfg->auto_asignar_domiciliario ?? false);
         $this->criterio_asignacion       = (string) ($cfg->criterio_asignacion ?: 'balanceado');
         $this->asignar_en_estado         = (string) ($cfg->asignar_en_estado ?: 'en_preparacion');
@@ -519,6 +531,11 @@ class Bot extends Component
             'encuesta_delay_minutos'                => 'integer|min:0|max:1440',
             'encuesta_mensaje'                      => 'nullable|string|max:2000',
             'enviar_link_pago'                      => 'boolean',
+            'notif_en_preparacion_activa'           => 'boolean',
+            'notif_en_camino_activa'                => 'boolean',
+            'notif_entregado_activa'                => 'boolean',
+            'notif_pago_aprobado_activa'            => 'boolean',
+            'notif_pago_rechazado_activa'           => 'boolean',
             'auto_asignar_domiciliario'             => 'boolean',
             'criterio_asignacion'                   => 'nullable|in:balanceado,cercania,rotacion',
             'asignar_en_estado'                     => 'nullable|in:nuevo,en_preparacion,repartidor_en_camino',

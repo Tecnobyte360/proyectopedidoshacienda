@@ -57,6 +57,11 @@ class ConfiguracionBot extends Model
         'auto_asignar_domiciliario',
         'criterio_asignacion',
         'asignar_en_estado',
+        'notif_en_preparacion_activa',
+        'notif_en_camino_activa',
+        'notif_entregado_activa',
+        'notif_pago_aprobado_activa',
+        'notif_pago_rechazado_activa',
     ];
 
     protected $casts = [
@@ -81,6 +86,11 @@ class ConfiguracionBot extends Model
         'encuesta_delay_minutos'    => 'integer',
         'enviar_link_pago'          => 'boolean',
         'auto_asignar_domiciliario' => 'boolean',
+        'notif_en_preparacion_activa' => 'boolean',
+        'notif_en_camino_activa'      => 'boolean',
+        'notif_entregado_activa'      => 'boolean',
+        'notif_pago_aprobado_activa'  => 'boolean',
+        'notif_pago_rechazado_activa' => 'boolean',
     ];
 
     /** Instrucciones IA por defecto para derivación automática a departamento */

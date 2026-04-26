@@ -20,6 +20,7 @@
                     'zonas'      => ['Zonas de cobertura',     'fa-map-location-dot',  'text-sky-600 bg-sky-50'],
                     'prompt'     => ['Prompt de la IA',        'fa-code',              'text-rose-600 bg-rose-50'],
                     'encuesta'   => ['Encuesta post-entrega',  'fa-star-half-stroke',  'text-amber-600 bg-amber-50'],
+                    'notificaciones' => ['Notificaciones cliente', 'fa-bell',           'text-amber-600 bg-amber-50'],
                     'pagos'      => ['Pagos en línea',         'fa-credit-card',       'text-violet-600 bg-violet-50'],
                     'despachos'  => ['Despachos / Domiciliarios','fa-motorcycle',      'text-orange-600 bg-orange-50'],
                     'cumple'     => ['Felicitaciones',         'fa-cake-candles',      'text-pink-600 bg-pink-50'],
@@ -805,6 +806,68 @@
                     <p class="text-[11px] text-slate-500 mt-1">
                         Variables disponibles: <code>{nombre}</code>, <code>{nombre_completo}</code>, <code>{domiciliario}</code>, <code>{pedido}</code>, <code>{url}</code> (link a la encuesta).
                     </p>
+                </div>
+            </div>
+        </section>
+
+        {{-- ╔═══ NOTIFICACIONES AL CLIENTE ═══╗ --}}
+        <section x-show="tab === 'notificaciones'" x-cloak class="rounded-2xl bg-white border border-slate-200 p-6 shadow-sm">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600 text-xl">
+                    <i class="fa-solid fa-bell"></i>
+                </div>
+                <div>
+                    <h3 class="font-bold text-slate-800">Notificaciones al cliente por WhatsApp</h3>
+                    <p class="text-xs text-slate-500">
+                        Activa o desactiva cada mensaje que el cliente recibe durante el ciclo del pedido.
+                        Si lo desactivas, el bot omite ese mensaje automáticamente.
+                    </p>
+                </div>
+            </div>
+
+            <div class="space-y-3">
+                @php
+                    $notifs = [
+                        ['notif_en_preparacion_activa', '👨‍🍳 En preparación', 'fa-fire', 'bg-amber-50 border-amber-200', 'Cuando el pedido pasa a "en preparación".', '"Stiven, ya estamos preparando tu pedido 👨‍🍳🔥 Te aviso apenas salga..."'],
+                        ['notif_en_camino_activa', '🛵 En camino + código', 'fa-motorcycle', 'bg-violet-50 border-violet-200', 'Cuando sale el domiciliario, incluye el código de entrega.', '"Stiven, tu pedido va en camino 🛵 Cuando llegue el domiciliario, dile este código: 🔐 1312"'],
+                        ['notif_entregado_activa', '✅ Pedido entregado', 'fa-circle-check', 'bg-emerald-50 border-emerald-200', 'Cuando se marca como entregado.', '"Listo Stiven ✅ Tu pedido quedó entregado. ¡Gracias por confiar!"'],
+                        ['notif_pago_aprobado_activa', '💳 Pago aprobado (Wompi)', 'fa-circle-dollar-to-slot', 'bg-blue-50 border-blue-200', 'Cuando el webhook de Wompi confirma el pago.', '"✅ Stiven, recibimos tu pago de $X 🙌 Tu pedido ya quedó pagado..."'],
+                        ['notif_pago_rechazado_activa', '❌ Pago rechazado (Wompi)', 'fa-circle-xmark', 'bg-rose-50 border-rose-200', 'Cuando el pago falla, con link para reintentar.', '"Hola Stiven, tu pago no se pudo procesar 🙏 Puedes intentar de nuevo aquí: link"'],
+                    ];
+                @endphp
+
+                @foreach($notifs as [$key, $titulo, $icon, $color, $cuando, $ejemplo])
+                    <label class="flex items-start gap-3 cursor-pointer rounded-xl border-2 p-4 transition
+                                  {{ $$key ? str_replace('bg-', 'border-', explode(' ', $color)[0]) . ' ' . $color : 'border-slate-200 bg-white hover:bg-slate-50' }}">
+                        <input type="checkbox" wire:model="{{ $key }}"
+                               class="mt-1 rounded border-slate-300 h-5 w-5 text-amber-600">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2 mb-1">
+                                <i class="fa-solid {{ $icon }} text-slate-500"></i>
+                                <span class="text-sm font-bold text-slate-800">{{ $titulo }}</span>
+                                @if($$key)
+                                    <span class="ml-auto text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">ACTIVO</span>
+                                @else
+                                    <span class="ml-auto text-[10px] font-bold text-slate-500 bg-slate-200 px-2 py-0.5 rounded-full">DESACTIVADO</span>
+                                @endif
+                            </div>
+                            <div class="text-xs text-slate-600 mb-1">
+                                <strong>Cuándo:</strong> {{ $cuando }}
+                            </div>
+                            <div class="text-[11px] text-slate-500 italic">
+                                {{ $ejemplo }}
+                            </div>
+                        </div>
+                    </label>
+                @endforeach
+            </div>
+
+            <div class="mt-4 rounded-xl bg-blue-50 border border-blue-100 p-3 text-xs text-blue-800 flex items-start gap-2">
+                <i class="fa-solid fa-circle-info mt-0.5"></i>
+                <div>
+                    <strong>Tip:</strong> el mensaje del bot al confirmar el pedido (con resumen + total + link de pago) es parte
+                    del flujo conversacional y no se controla aquí — siempre se envía. La encuesta post-entrega tiene
+                    su propio toggle en la pestaña "Encuesta post-entrega".
                 </div>
             </div>
         </section>

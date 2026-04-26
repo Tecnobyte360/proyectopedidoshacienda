@@ -332,6 +332,15 @@ MSG;
 
     public function notificarTokenEntrega(string $token): void
     {
+        // Respetar el toggle configurado por el tenant
+        try {
+            $cfgBot = \App\Models\ConfiguracionBot::actual();
+            if (!($cfgBot->notif_en_camino_activa ?? true)) {
+                Log::info('Notificación "en camino" omitida — desactivada en config', ['pedido_id' => $this->id]);
+                return;
+            }
+        } catch (\Throwable $e) { /* en caso de error, dejamos pasar */ }
+
         $telefono = $this->telefono_whatsapp ?: $this->telefono_contacto ?: $this->telefono;
 
         if (!$telefono || !$this->connection_id) {
@@ -421,6 +430,21 @@ MSG;
 
     public function notificarClienteCambioEstado(): void
     {
+        // Respetar los toggles configurados por el tenant en /configuracion/bot
+        try {
+            $cfgBot = \App\Models\ConfiguracionBot::actual();
+            $mapa = [
+                self::ESTADO_EN_PREPARACION       => 'notif_en_preparacion_activa',
+                self::ESTADO_REPARTIDOR_EN_CAMINO => 'notif_en_camino_activa',
+                self::ESTADO_ENTREGADO            => 'notif_entregado_activa',
+            ];
+            $flag = $mapa[$this->estado] ?? null;
+            if ($flag && !($cfgBot->{$flag} ?? true)) {
+                Log::info("Notificación '{$this->estado}' omitida — desactivada en config", ['pedido_id' => $this->id]);
+                return;
+            }
+        } catch (\Throwable $e) { /* en caso de error de config, dejamos pasar */ }
+
         $telefono = $this->telefono_whatsapp ?: $this->telefono_contacto ?: $this->telefono;
 
         if (!$telefono) {
