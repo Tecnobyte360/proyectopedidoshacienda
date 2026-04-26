@@ -839,9 +839,10 @@ class Index extends Component
         $messageId = $this->enviarAWhatsapp($conv->telefono_normalizado, $texto, $connectionId);
 
         if (!$messageId) {
+            $causa = $this->diagnosticarFalloEnvio() ?? 'Revisa el token WhatsApp del tenant.';
             $this->dispatch('notify', [
                 'type'    => 'error',
-                'message' => '⚠️ No se pudo enviar el mensaje a WhatsApp. Revisa el token.',
+                'message' => '⚠️ No se pudo enviar: ' . $causa,
             ]);
             return;
         }
@@ -964,12 +965,19 @@ class Index extends Component
         $resolver = app(\App\Services\WhatsappResolverService::class);
         $cred = $resolver->credenciales();
         $cacheKey = $resolver->tokenCacheKey();
+        $tenantId = app(\App\Services\TenantManager::class)->id() ?? 'global';
 
         if (empty($cred['email']) || empty($cred['password'])) {
+            Log::error('🔴 Tenant sin credenciales WhatsApp', [
+                'tenant_id'    => $tenantId,
+                'api_base_url' => $cred['api_base_url'] ?? null,
+                'tiene_email'  => !empty($cred['email']),
+                'tiene_pass'   => !empty($cred['password']),
+            ]);
             return null;
         }
 
-        return Cache::remember($cacheKey, 1200, function () use ($cred) {
+        return Cache::remember($cacheKey, 1200, function () use ($cred, $tenantId) {
             try {
                 $endpoint = rtrim($cred['api_base_url'], '/') . '/auth/login';
                 $resp = Http::withoutVerifying()
@@ -979,15 +987,47 @@ class Index extends Component
                         'password' => $cred['password'],
                     ]);
 
-                if ($resp->successful()) {
+                if ($resp->successful() && $resp->json('token')) {
                     return $resp->json('token');
                 }
+
+                Log::error('🔴 Login WhatsApp falló', [
+                    'tenant_id'    => $tenantId,
+                    'status'       => $resp->status(),
+                    'body'         => mb_strimwidth((string) $resp->body(), 0, 400),
+                    'endpoint'     => $endpoint,
+                    'email_usado'  => mb_substr($cred['email'], 0, 3) . '…@' . explode('@', $cred['email'])[1] ?? '',
+                ]);
                 return null;
             } catch (\Throwable $e) {
-                Log::error('Login WA falló: ' . $e->getMessage());
+                Log::error('🔴 Login WA excepción', ['tenant_id' => $tenantId, 'error' => $e->getMessage()]);
                 return null;
             }
         });
+    }
+
+    /**
+     * Diagnóstico para mensajes de error claros al operador.
+     * Devuelve null si todo OK, o un string con la causa exacta.
+     */
+    private function diagnosticarFalloEnvio(): ?string
+    {
+        $resolver = app(\App\Services\WhatsappResolverService::class);
+        $cred = $resolver->credenciales();
+        $ids  = $resolver->connectionIdsDelTenant();
+
+        if (empty($cred['email']) || empty($cred['password'])) {
+            return 'Este tenant no tiene credenciales TecnoByteApp configuradas. '
+                 . 'Ve a /admin/tenants → Editar → "WhatsApp (TecnoByteApp)" y agrega email + password.';
+        }
+        if (empty($ids)) {
+            return 'Este tenant no tiene connection_ids asignados. '
+                 . 'Ve a /admin/tenants → Editar → "Connection IDs de TecnoByteApp".';
+        }
+
+        // Si llegamos aquí, las credenciales existen pero el login falló (token null).
+        return 'Las credenciales WhatsApp del tenant fueron rechazadas por TecnoByteApp. '
+             . 'Verifica email/password en /admin/tenants → Editar.';
     }
 
     public function render()
