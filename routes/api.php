@@ -23,6 +23,10 @@ Route::get('/whatsapp-webhook', function () {
 
 Route::post('/whatsapp-webhook', [WhatsappWebhookController::class, 'receive']);
 
+// Wompi: receptor de eventos de pagos. Validación de firma adentro del controller.
+Route::post('/wompi/webhook', [\App\Http\Controllers\WompiWebhookController::class, 'recibir'])
+    ->name('wompi.webhook');
+
 // Endpoints de intervención humana (chat en vivo del admin)
 Route::post('/chat/enviar-manual',   [WhatsappWebhookController::class, 'enviarMensajeManual']);
 Route::post('/chat/tomar-control',   [WhatsappWebhookController::class, 'tomarControl']);

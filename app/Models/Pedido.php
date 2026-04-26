@@ -57,6 +57,11 @@ class Pedido extends Model
         'domiciliario_id',
         'fecha_asignacion_domiciliario',
         'fecha_salida_domiciliario',
+        'estado_pago',
+        'wompi_reference',
+        'wompi_transaction_id',
+        'pago_metodo',
+        'pagado_at',
     ];
 
     protected $casts = [
@@ -64,6 +69,7 @@ class Pedido extends Model
         'fecha_estado'    => 'datetime',
         'fecha_entregado' => 'datetime',
         'fecha_cancelado' => 'datetime',
+        'pagado_at'       => 'datetime',
         'total'           => 'decimal:2',
         'empresa_id'      => 'integer',
         'connection_id'   => 'integer',
@@ -798,4 +804,20 @@ MSG;
             'ans_nombre'            => $ans->nombre,
         ];
     }
+
+    /* ─── PAGO (Wompi) ──────────────────────────────────────────────── */
+
+    public function urlPagoWompi(): ?string
+    {
+        try {
+            return app(\App\Services\WompiService::class)->urlPago($this);
+        } catch (\Throwable $e) {
+            \Log::warning('No se pudo generar urlPagoWompi: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    public function pagoAprobado(): bool { return $this->estado_pago === 'aprobado'; }
+    public function pagoPendiente(): bool { return in_array($this->estado_pago, ['pendiente', null], true); }
+    public function pagoRechazado(): bool { return in_array($this->estado_pago, ['rechazado', 'fallido'], true); }
 }

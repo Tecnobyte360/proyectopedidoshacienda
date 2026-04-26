@@ -2501,6 +2501,19 @@ TXT;
             $lineas[] = "💵 *Total:* $" . number_format($total, 0, ',', '.');
         }
 
+        // 💳 Link de pago Wompi (si el tenant tiene Wompi configurado)
+        $linkPago = null;
+        try {
+            $linkPago = $pedido->urlPagoWompi();
+        } catch (\Throwable $e) { /* ignorar */ }
+
+        if ($linkPago) {
+            $lineas[] = '';
+            $lineas[] = "💳 *Paga ahora con tarjeta, Nequi o PSE:*";
+            $lineas[] = $linkPago;
+            $lineas[] = "(También puedes pagar contra entrega)";
+        }
+
         $lineas[] = '';
         $lineas[] = "🔎 Puedes seguir tu pedido aquí:";
         $lineas[] = $pedido->url_seguimiento;

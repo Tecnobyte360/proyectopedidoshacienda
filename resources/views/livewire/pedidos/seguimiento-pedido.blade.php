@@ -88,6 +88,58 @@
             </div>
         </div>
 
+        {{-- ╔═══ Estado de pago Wompi ═══╗ --}}
+        @php
+            $linkPago = $pedido->urlPagoWompi();
+            $estadoPago = $pedido->estado_pago ?? 'pendiente';
+        @endphp
+        @if ($linkPago || $estadoPago !== 'pendiente')
+            <div class="glass" style="background: linear-gradient(135deg, #ede9fe, #f3e8ff); padding: 18px 22px; border-radius: 18px; margin-bottom: 16px; border: 1px solid #c4b5fd;">
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+                    <div style="display:flex; align-items:center; gap:12px; min-width:0; flex: 1;">
+                        <div style="width:44px; height:44px; border-radius:12px; background:#7c3aed; color:white; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0;">
+                            @if ($estadoPago === 'aprobado')
+                                ✅
+                            @elseif (in_array($estadoPago, ['rechazado', 'fallido']))
+                                ❌
+                            @else
+                                💳
+                            @endif
+                        </div>
+                        <div style="min-width:0;">
+                            <div style="font-weight:800; color:#5b21b6; font-size:15px;">
+                                @if ($estadoPago === 'aprobado')
+                                    Pago confirmado
+                                @elseif ($estadoPago === 'rechazado')
+                                    Pago rechazado
+                                @elseif ($estadoPago === 'fallido')
+                                    Pago fallido — intenta de nuevo
+                                @elseif ($estadoPago === 'reembolsado')
+                                    Pago reembolsado
+                                @else
+                                    Pago en línea con Wompi
+                                @endif
+                            </div>
+                            <div style="font-size:12px; color:#6d28d9; margin-top:2px;">
+                                @if ($estadoPago === 'aprobado')
+                                    Recibimos tu pago el {{ optional($pedido->pagado_at)->format('d/m/Y h:i a') }}.
+                                @else
+                                    Paga con tarjeta, Nequi, PSE o Bancolombia. Procesamiento seguro.
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+
+                    @if ($linkPago && !in_array($estadoPago, ['aprobado', 'reembolsado']))
+                        <a href="{{ $linkPago }}" target="_blank" rel="noopener"
+                           style="display:inline-flex; align-items:center; gap:8px; background:#7c3aed; color:white; font-weight:700; padding:10px 20px; border-radius:12px; text-decoration:none; font-size:14px; box-shadow:0 4px 12px rgba(124,58,237,0.35); flex-shrink:0;">
+                            💳 Pagar ahora
+                        </a>
+                    @endif
+                </div>
+            </div>
+        @endif
+
         @if ($estadoActual !== 'cancelado')
             <div class="glass progress-section progress-dark">
                 <p class="section-title">Progreso del pedido</p>
