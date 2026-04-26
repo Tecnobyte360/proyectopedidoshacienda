@@ -274,9 +274,6 @@
 
         <script>
             (function() {
-                if (window.__flujoEditorInited) return;
-                window.__flujoEditorInited = true;
-
                 const departamentos = @json($departamentos->map(fn($d)=>['id'=>$d->id,'nombre'=>$d->nombre])->all());
                 const sedes         = @json($sedes->map(fn($s)=>['id'=>$s->id,'nombre'=>$s->nombre])->all());
                 const zonas         = @json($zonas->map(fn($z)=>['id'=>$z->id,'nombre'=>$z->nombre])->all());
@@ -305,8 +302,9 @@
                     fin:                      { color:'#1e293b', icon:'fa-flag-checkered',  bg:'#cbd5e1', label:'Fin',             in:1, out:0 },
                 };
 
-                let editor = null;
+                let editor = window.flujoEditor || null;
                 let nodoSeleccionado = null;
+                const grafoInicial = @json($grafo);
 
                 function htmlNodo(tipo, label, data) {
                     const T = TIPOS[tipo] || TIPOS.fin;
@@ -659,59 +657,109 @@
                         return;
                     }
                     const container = document.getElementById('drawflow');
-                    if (!container) return;
+                    if (!container) {
+                        // Modal aún no en DOM — reintentar
+                        setTimeout(init, 100);
+                        return;
+                    }
 
-                    editor = new Drawflow(container);
-                    editor.reroute = true;
-                    editor.start();
-                    window.flujoEditor = editor;
+                    // Si ya hay un editor previo apuntando a un container distinto,
+                    // descartarlo (modal anterior cerrado).
+                    if (editor && editor.container !== container) {
+                        editor = null;
+                    }
 
-                    // Drag-and-drop desde toolbox
-                    document.querySelectorAll('.drag-node').forEach(el => {
-                        el.addEventListener('dragstart', e => {
-                            e.dataTransfer.setData('tipo', el.dataset.tipo);
+                    const yaInicializado = container.dataset.flujoBound === '1';
+
+                    if (!editor) {
+                        editor = new Drawflow(container);
+                        editor.reroute = true;
+                        editor.start();
+                        window.flujoEditor = editor;
+                    }
+
+                    if (!yaInicializado) {
+                        container.dataset.flujoBound = '1';
+
+                        // Drag-and-drop desde toolbox (solo una vez por container)
+                        document.querySelectorAll('.drag-node').forEach(el => {
+                            el.addEventListener('dragstart', e => {
+                                e.dataTransfer.setData('tipo', el.dataset.tipo);
+                            });
                         });
-                    });
-                    container.addEventListener('dragover', e => e.preventDefault());
-                    container.addEventListener('drop', e => {
-                        e.preventDefault();
-                        const tipo = e.dataTransfer.getData('tipo');
-                        if (!tipo) return;
-                        const rect = container.getBoundingClientRect();
-                        const zoom = editor.zoom;
-                        const x = (e.clientX - rect.left) / zoom - editor.canvas_x / zoom;
-                        const y = (e.clientY - rect.top) / zoom - editor.canvas_y / zoom;
-                        addNodo(tipo, x, y);
-                    });
+                        container.addEventListener('dragover', e => e.preventDefault());
+                        container.addEventListener('drop', e => {
+                            e.preventDefault();
+                            const tipo = e.dataTransfer.getData('tipo');
+                            if (!tipo) return;
+                            const rect = container.getBoundingClientRect();
+                            const zoom = editor.zoom;
+                            const x = (e.clientX - rect.left) / zoom - editor.canvas_x / zoom;
+                            const y = (e.clientY - rect.top) / zoom - editor.canvas_y / zoom;
+                            addNodo(tipo, x, y);
+                        });
 
-                    // Click sobre nodo → inspector
-                    editor.on('nodeSelected', id => {
-                        nodoSeleccionado = id;
-                        renderInspector(id);
-                    });
-                    editor.on('nodeUnselected', () => {
-                        nodoSeleccionado = null;
-                        renderInspector(null);
-                    });
-                    editor.on('nodeRemoved', () => {
-                        nodoSeleccionado = null;
-                        renderInspector(null);
-                    });
+                        // Click sobre nodo → inspector
+                        editor.on('nodeSelected', id => {
+                            nodoSeleccionado = id;
+                            renderInspector(id);
+                        });
+                        editor.on('nodeUnselected', () => {
+                            nodoSeleccionado = null;
+                            renderInspector(null);
+                        });
+                        editor.on('nodeRemoved', () => {
+                            nodoSeleccionado = null;
+                            renderInspector(null);
+                        });
+                    }
 
-                    cargarGrafo(@json($grafo));
+                    cargarGrafo(grafoInicial);
                 }
 
                 function cargarGrafo(grafo) {
                     if (!editor) return;
-                    if (grafo && grafo.drawflow && Object.keys(grafo.drawflow.Home?.data || {}).length > 0) {
-                        editor.import(grafo);
-                        // Re-render HTML de cada nodo (porque al importar se pierden los handlers visuales)
-                        Object.keys(grafo.drawflow.Home.data).forEach(id => refrescarNodo(Number(id)));
-                    } else {
-                        editor.clear();
-                        // Insertar nodo de inicio por defecto
+                    editor.clear();
+
+                    const data = (grafo && grafo.drawflow && grafo.drawflow.Home && grafo.drawflow.Home.data) || {};
+                    const ids  = Object.keys(data);
+
+                    if (ids.length === 0) {
                         addNodo('trigger', 60, 60);
+                        return;
                     }
+
+                    // Recrear nodos via API oficial (genera html y handlers correctamente)
+                    const idMap = {};
+                    ids.forEach(oldId => {
+                        const n = data[oldId];
+                        const tipo = n?.data?.tipo || n?.name || 'fin';
+                        const x    = Number(n?.pos_x) || 80;
+                        const y    = Number(n?.pos_y) || 80;
+                        const newId = addNodo(tipo, x, y, n?.data || {});
+                        idMap[oldId] = newId;
+                    });
+
+                    // Reconstruir conexiones desde los outputs originales
+                    ids.forEach(oldId => {
+                        const n = data[oldId];
+                        const outputs = n?.outputs || {};
+                        Object.keys(outputs).forEach(outName => {
+                            const conns = outputs[outName]?.connections || [];
+                            conns.forEach(c => {
+                                const sourceId = idMap[oldId];
+                                const targetId = idMap[String(c.node)];
+                                const inputName = c.output || 'input_1';
+                                if (sourceId && targetId) {
+                                    try {
+                                        editor.addConnection(sourceId, targetId, outName, inputName);
+                                    } catch (e) {
+                                        console.warn('No se pudo crear conexión', { sourceId, targetId, outName, inputName, err: e });
+                                    }
+                                }
+                            });
+                        });
+                    });
                 }
 
                 window.borrarNodo = function(id) {
@@ -726,16 +774,28 @@
                     @this.call('guardar', grafo);
                 };
 
-                document.addEventListener('livewire:initialized', () => {
+                function arrancar() {
                     init();
-                    Livewire.on('flujo-cargado', payload => {
-                        const grafo = payload.grafo || (payload[0] && payload[0].grafo);
-                        cargarGrafo(grafo);
-                    });
-                });
+                    if (window.Livewire) {
+                        // Limpiar listeners viejos para no duplicar
+                        Livewire.on('flujo-cargado', payload => {
+                            const grafo = payload?.grafo || (Array.isArray(payload) && payload[0]?.grafo);
+                            // Esperar a que el editor esté listo
+                            const tryLoad = () => {
+                                if (editor) cargarGrafo(grafo);
+                                else setTimeout(tryLoad, 50);
+                            };
+                            tryLoad();
+                        });
+                    }
+                }
 
-                // Si ya está livewire inicializado al insertar el modal
-                if (window.Livewire) init();
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', arrancar);
+                } else {
+                    arrancar();
+                }
+                document.addEventListener('livewire:initialized', arrancar);
             })();
         </script>
     @endif
