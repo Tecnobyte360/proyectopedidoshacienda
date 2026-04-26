@@ -27,6 +27,40 @@ class Index extends Component
      * Útil cuando un intento previo fue abandonado o rechazado y Wompi
      * no permite reusar la misma reference.
      */
+    /**
+     * Consulta el estado real en la API de Wompi y actualiza el pedido.
+     * Útil cuando un webhook se perdió o llegó tarde.
+     */
+    public function sincronizarConWompi(int $pedidoId): void
+    {
+        $pedido = Pedido::find($pedidoId);
+        if (!$pedido) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Pedido no encontrado.']);
+            return;
+        }
+
+        $r = app(\App\Services\WompiService::class)->sincronizarPedido($pedido);
+
+        if (!$r['ok']) {
+            $this->dispatch('notify', ['type' => 'warning', 'message' => $r['mensaje']]);
+            return;
+        }
+
+        $iconos = [
+            'aprobado' => '✅',
+            'rechazado' => '❌',
+            'fallido'  => '⚠️',
+            'pendiente' => '⏳',
+            'reembolsado' => '↩️',
+        ];
+        $icono = $iconos[$r['estado']] ?? 'ℹ️';
+
+        $this->dispatch('notify', [
+            'type'    => $r['estado'] === 'aprobado' ? 'success' : 'info',
+            'message' => "{$icono} {$r['mensaje']}",
+        ]);
+    }
+
     public function regenerarLink(int $pedidoId): void
     {
         $pedido = Pedido::find($pedidoId);

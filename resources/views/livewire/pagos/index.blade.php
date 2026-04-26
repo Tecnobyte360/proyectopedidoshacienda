@@ -178,6 +178,22 @@
                                         <i class="fa-solid fa-eye text-xs"></i>
                                     </a>
                                 @endif
+                                @if($p->wompi_reference)
+                                    <button type="button"
+                                            wire:click="sincronizarConWompi({{ $p->id }})"
+                                            wire:loading.attr="disabled"
+                                            wire:target="sincronizarConWompi({{ $p->id }})"
+                                            class="inline-flex items-center justify-center h-8 w-8 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-700 ml-1 disabled:opacity-50"
+                                            title="Sincronizar estado con Wompi (usar cuando el webhook no llegó)">
+                                        <span wire:loading.remove wire:target="sincronizarConWompi({{ $p->id }})">
+                                            <i class="fa-solid fa-arrows-rotate text-xs"></i>
+                                        </span>
+                                        <span wire:loading wire:target="sincronizarConWompi({{ $p->id }})">
+                                            <i class="fa-solid fa-spinner fa-spin text-xs"></i>
+                                        </span>
+                                    </button>
+                                @endif
+
                                 @if(in_array($p->estado_pago, ['pendiente', 'rechazado', 'fallido']))
                                     <a href="{{ $p->urlPagoWompi() }}" target="_blank"
                                        class="inline-flex items-center justify-center h-8 px-3 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-[11px] font-bold ml-1"

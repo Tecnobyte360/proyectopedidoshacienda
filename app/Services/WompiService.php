@@ -152,6 +152,88 @@ class WompiService
     }
 
     /**
+     * Consulta a la API de Wompi por la referencia y devuelve la transacción
+     * más reciente. Usa la private_key del tenant.
+     *
+     * Devuelve null si no hay credenciales o no se encuentra.
+     */
+    public function consultarPorReferencia(string $reference): ?array
+    {
+        $tenant = $this->tenantActual();
+        if (!$tenant) return null;
+
+        $cred = $tenant->wompiCredenciales();
+        if (!$cred || empty($cred['private_key'])) return null;
+
+        $base = ($cred['modo'] === 'produccion')
+            ? 'https://production.wompi.co/v1'
+            : 'https://sandbox.wompi.co/v1';
+
+        try {
+            $resp = \Illuminate\Support\Facades\Http::withToken($cred['private_key'])
+                ->timeout(15)
+                ->get("{$base}/transactions", ['reference' => $reference]);
+
+            if (!$resp->successful()) {
+                \Log::warning('Wompi consultarPorReferencia: respuesta no OK', [
+                    'status' => $resp->status(),
+                    'body'   => $resp->body(),
+                ]);
+                return null;
+            }
+
+            $items = (array) $resp->json('data', []);
+            if (empty($items)) return null;
+
+            // Tomar la más reciente (Wompi suele devolverlas ordenadas, pero ordenamos por created_at)
+            usort($items, fn ($a, $b) => strcmp($b['created_at'] ?? '', $a['created_at'] ?? ''));
+            return $items[0];
+        } catch (\Throwable $e) {
+            \Log::warning('Wompi consultarPorReferencia: excepción ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Sincroniza el estado del pedido con Wompi consultando su API.
+     * Útil como fallback cuando los webhooks no llegaron.
+     *
+     * Devuelve ['ok' => bool, 'estado' => str|null, 'mensaje' => str].
+     */
+    public function sincronizarPedido(Pedido $pedido): array
+    {
+        if (empty($pedido->wompi_reference)) {
+            return ['ok' => false, 'estado' => null, 'mensaje' => 'El pedido no tiene reference de Wompi.'];
+        }
+
+        $tx = $this->consultarPorReferencia($pedido->wompi_reference);
+
+        // Si no encuentra, intentar buscar también referencias viejas que puedan
+        // matchear al pedido por id (si la reference rotó después del pago).
+        if (!$tx) {
+            return ['ok' => false, 'estado' => null, 'mensaje' => 'Wompi no devolvió transacciones para esta referencia.'];
+        }
+
+        $status = (string) ($tx['status'] ?? '');
+        $estadoInterno = $this->mapearEstadoTransaccion($status);
+
+        $pedido->estado_pago         = $estadoInterno;
+        $pedido->wompi_transaction_id = (string) ($tx['id'] ?? $pedido->wompi_transaction_id);
+        $pedido->pago_metodo         = (string) ($tx['payment_method_type'] ?? $pedido->pago_metodo);
+        if ($estadoInterno === 'aprobado' && empty($pedido->pagado_at)) {
+            $pedido->pagado_at = now();
+        }
+        $pedido->saveQuietly();
+
+        return [
+            'ok'      => true,
+            'estado'  => $estadoInterno,
+            'mensaje' => "Estado sincronizado: {$estadoInterno} (Wompi: {$status})",
+            'tx'      => $tx,
+        ];
+    }
+
+    /**
      * Mapea el estado Wompi al estado_pago interno del pedido.
      */
     public function mapearEstadoTransaccion(?string $estadoWompi): string
