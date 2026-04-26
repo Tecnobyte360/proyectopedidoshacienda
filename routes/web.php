@@ -112,6 +112,10 @@ Route::middleware(['no_super_sin_imp'])->group(function () {
     Route::get('/configuracion/bot', ConfiguracionBot::class)
         ->middleware('permission:bot.configurar')
         ->name('configuracion.bot');
+
+    Route::get('/rutas', \App\Livewire\Rutas\Index::class)
+        ->middleware('permission:despachos.gestionar')
+        ->name('rutas.index');
     Route::get('/pagos', \App\Livewire\Pagos\Index::class)
         ->middleware('permission:reportes.ver')
         ->name('pagos.index');

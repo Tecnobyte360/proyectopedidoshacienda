@@ -72,6 +72,7 @@
                     ['name' => 'Domiciliarios',     'icon' => 'fa-motorcycle',         'route' => 'domiciliarios.index',    'badge' => null, 'permission' => 'domiciliarios.gestionar'],
                     ['name' => 'Zonas',             'icon' => 'fa-map-location-dot',   'route' => 'zonas.index',            'badge' => null, 'permission' => 'zonas.gestionar'],
                     ['name' => 'Reportes',          'icon' => 'fa-chart-line',         'route' => 'reportes.index',         'badge' => null, 'permission' => 'reportes.ver'],
+                    ['name' => 'Rutas',             'icon' => 'fa-route',              'route' => 'rutas.index',            'badge' => null, 'permission' => 'despachos.gestionar'],
                     ['name' => 'Encuestas',         'icon' => 'fa-star-half-stroke',   'route' => 'encuestas.index',        'badge' => null, 'permission' => 'reportes.ver'],
                     ['name' => 'Pagos',             'icon' => 'fa-credit-card',        'route' => 'pagos.index',            'badge' => null, 'permission' => 'reportes.ver'],
                     ['name' => 'ANS Tiempos',       'icon' => 'fa-stopwatch',          'route' => 'ans.index',              'badge' => null, 'permission' => 'ans.gestionar'],

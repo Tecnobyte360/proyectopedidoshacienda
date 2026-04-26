@@ -13,6 +13,7 @@
         'ans.index'            => ['ANS Tiempos',    'Configuración de tiempos por estado',        'fa-stopwatch'],
         'configuracion.bot'    => ['Bot WhatsApp',   'Comportamiento de la asesora IA',            'fa-robot'],
         'pagos.index'          => ['Pagos',          'Transacciones de Wompi',                     'fa-credit-card'],
+        'rutas.index'          => ['Rutas',          'Pedidos asignados con ruta optimizada',      'fa-route'],
         'clientes.index'       => ['Clientes',       'Quién compra, qué compra, cuánto compra',    'fa-users'],
         'conversaciones.index' => ['Conversaciones', 'Historial de cada chat con el bot',          'fa-comments'],
         'chat.index'           => ['Chat en vivo',   'Atiende clientes en tiempo real',            'fa-headset'],
