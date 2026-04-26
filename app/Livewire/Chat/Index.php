@@ -931,13 +931,14 @@ class Index extends Component
                 return null;
             }
 
+            // TecnoByteApp solo usa 'whatsappId'. NO mandar 'connectionId',
+            // confunde al wrapper y devuelve ERR_SENDING_WAPP_MSG.
             $payload = [
                 'number' => $telefono,
                 'body'   => $mensaje,
             ];
             if ($connectionId) {
-                $payload['whatsappId']   = (int) $connectionId;
-                $payload['connectionId'] = (int) $connectionId;
+                $payload['whatsappId'] = (int) $connectionId;
             }
 
             $resolver = app(\App\Services\WhatsappResolverService::class);

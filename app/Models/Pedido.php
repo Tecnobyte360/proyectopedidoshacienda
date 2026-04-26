@@ -216,11 +216,12 @@ class Pedido extends Model
             . "        *{$token}*\n\n"
             . "Dáselo al domiciliario cuando llegue para confirmar la entrega.";
 
+        // TecnoByteApp usa solo 'whatsappId'. NO 'connectionId' (causa
+        // ERR_SENDING_WAPP_MSG en algunas versiones del wrapper).
         $payload = [
-            'number'       => $this->normalizarTelefono($telefono),
-            'body'         => $mensaje,
-            'connectionId' => (int) $this->connection_id,
-            'whatsappId'   => (int) ($this->whatsapp_id ?: $this->connection_id),
+            'number'     => $this->normalizarTelefono($telefono),
+            'body'       => $mensaje,
+            'whatsappId' => (int) ($this->whatsapp_id ?: $this->connection_id),
         ];
 
         try {
@@ -331,11 +332,11 @@ class Pedido extends Model
         // Si en algún estado específico quisieras incluirlo (ej. al entregar),
         // puedes concatenarlo condicionalmente.
 
+        // TecnoByteApp usa solo 'whatsappId'. NO 'connectionId'.
         $payload = [
-            'number'       => $this->normalizarTelefono($telefono),
-            'body'         => $mensaje,
-            'connectionId' => (int) $connectionId,
-            'whatsappId'   => (int) $whatsappId,
+            'number'     => $this->normalizarTelefono($telefono),
+            'body'       => $mensaje,
+            'whatsappId' => (int) $whatsappId,
         ];
 
         Log::info('📤 Enviando notificación de pedido a WhatsApp', [

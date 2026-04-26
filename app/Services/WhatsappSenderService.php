@@ -43,13 +43,13 @@ class WhatsappSenderService
             return false;
         }
 
+        // TecnoByteApp usa 'whatsappId'. NO 'connectionId' (causa ERR_SENDING_WAPP_MSG).
         $payload = [
             'number' => $telefono,
             'body'   => $mensaje,
         ];
         if ($connectionId) {
-            $payload['whatsappId']   = $connectionId;
-            $payload['connectionId'] = $connectionId;
+            $payload['whatsappId'] = $connectionId;
         }
 
         $endpointSend = rtrim($cred['api_base_url'], '/') . self::ENDPOINT_SEND_PATH;
