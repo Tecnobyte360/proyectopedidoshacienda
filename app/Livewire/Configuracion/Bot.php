@@ -66,6 +66,10 @@ class Bot extends Component
     public int    $encuesta_delay_minutos   = 15;
     public string $encuesta_mensaje         = '';
 
+    // Editor de prompt por bloques
+    public bool  $vistaPorBloques = true;
+    public array $bloquesPrompt   = [];   // [{titulo, contenido}]
+
     public array $modelosDisponibles = [
         'gpt-4o-mini' => 'GPT-4o mini (rápido, económico)',
         'gpt-4o'      => 'GPT-4o (más natural, más caro)',
@@ -132,6 +136,129 @@ class Bot extends Component
         $this->encuesta_activa        = (bool) ($cfg->encuesta_activa ?? true);
         $this->encuesta_delay_minutos = (int) ($cfg->encuesta_delay_minutos ?? 15);
         $this->encuesta_mensaje       = (string) ($cfg->encuesta_mensaje ?? '');
+
+        // Parsear el system_prompt en bloques editables
+        $this->bloquesPrompt = $this->parsearBloques($this->system_prompt);
+    }
+
+    /**
+     * Convierte el prompt plano en un array de bloques separados por
+     * encabezados "# TÍTULO". Cada bloque queda como
+     *   ['titulo' => 'IDENTIDAD', 'contenido' => 'Eres ...']
+     * Las líneas decorativas (═══) se ignoran.
+     */
+    public function parsearBloques(string $prompt): array
+    {
+        if (trim($prompt) === '') {
+            return [
+                ['titulo' => 'IDENTIDAD',         'contenido' => ''],
+                ['titulo' => 'CONTEXTO',          'contenido' => '{empresa}'],
+                ['titulo' => 'CATÁLOGO',          'contenido' => '{catalogo}'],
+                ['titulo' => 'PROMOCIONES',       'contenido' => '{promociones}'],
+                ['titulo' => 'HORARIOS Y ZONAS',  'contenido' => "Estado: {sede_estado_actual}\n{horarios_sedes}\n\n{zonas}"],
+                ['titulo' => 'ANS',               'contenido' => '{ans}'],
+                ['titulo' => 'REGLAS',            'contenido' => ''],
+            ];
+        }
+
+        // Eliminar líneas decorativas (═══)
+        $limpio = preg_replace('/^[═─━_]{3,}\s*$/m', '', $prompt);
+
+        $bloques = [];
+        $cursor = ['titulo' => 'GENERAL', 'contenido' => ''];
+        $primero = true;
+
+        foreach (explode("\n", $limpio) as $linea) {
+            // Detecta encabezado tipo "# TÍTULO" o "## TÍTULO"
+            if (preg_match('/^#{1,3}\s+(.+?)\s*$/', $linea, $m)) {
+                if (!$primero || trim($cursor['contenido']) !== '') {
+                    $cursor['contenido'] = trim($cursor['contenido']);
+                    $bloques[] = $cursor;
+                }
+                $cursor = ['titulo' => trim($m[1]), 'contenido' => ''];
+                $primero = false;
+                continue;
+            }
+            $cursor['contenido'] .= $linea . "\n";
+        }
+        $cursor['contenido'] = trim($cursor['contenido']);
+        if ($cursor['contenido'] !== '' || trim($cursor['titulo']) !== 'GENERAL') {
+            $bloques[] = $cursor;
+        }
+
+        return $bloques;
+    }
+
+    /**
+     * Concatena los bloques en un prompt plano con los separadores
+     * y encabezados que la IA espera.
+     */
+    public function serializarBloques(array $bloques): string
+    {
+        $partes = [];
+        foreach ($bloques as $b) {
+            $titulo    = trim($b['titulo'] ?? '');
+            $contenido = trim($b['contenido'] ?? '');
+            if ($titulo === '' && $contenido === '') continue;
+
+            $sep = str_repeat('═', 79);
+            if ($titulo !== '') {
+                $partes[] = "# {$titulo}";
+            }
+            if ($contenido !== '') {
+                $partes[] = $contenido;
+            }
+            $partes[] = $sep;
+        }
+
+        // Quitar último separador
+        if (end($partes) === str_repeat('═', 79)) array_pop($partes);
+
+        return implode("\n\n", $partes);
+    }
+
+    /* ─── Acciones de bloques ─── */
+    public function agregarBloque(): void
+    {
+        $this->bloquesPrompt[] = ['titulo' => 'NUEVA SECCIÓN', 'contenido' => ''];
+    }
+
+    public function eliminarBloque(int $idx): void
+    {
+        unset($this->bloquesPrompt[$idx]);
+        $this->bloquesPrompt = array_values($this->bloquesPrompt);
+    }
+
+    public function moverBloque(int $idx, int $delta): void
+    {
+        $nuevoIdx = $idx + $delta;
+        if (!isset($this->bloquesPrompt[$idx]) || !isset($this->bloquesPrompt[$nuevoIdx])) return;
+        [$this->bloquesPrompt[$idx], $this->bloquesPrompt[$nuevoIdx]] =
+            [$this->bloquesPrompt[$nuevoIdx], $this->bloquesPrompt[$idx]];
+    }
+
+    public function sincronizarBloquesAPrompt(): void
+    {
+        $this->system_prompt = $this->serializarBloques($this->bloquesPrompt);
+    }
+
+    public function sincronizarPromptABloques(): void
+    {
+        $this->bloquesPrompt = $this->parsearBloques($this->system_prompt);
+    }
+
+    /** Cambia a vista por bloques sincronizando el prompt actual */
+    public function activarVistaBloques(): void
+    {
+        $this->bloquesPrompt = $this->parsearBloques($this->system_prompt);
+        $this->vistaPorBloques = true;
+    }
+
+    /** Cambia a vista plana sincronizando los bloques actuales */
+    public function activarVistaPlana(): void
+    {
+        $this->system_prompt = $this->serializarBloques($this->bloquesPrompt);
+        $this->vistaPorBloques = false;
     }
 
     public function cargarPlantillaCumpleanosDefault(): void
@@ -398,6 +525,11 @@ class Bot extends Component
 
     public function guardar(): void
     {
+        // Si está en vista por bloques, regenerar el system_prompt antes de validar
+        if ($this->vistaPorBloques) {
+            $this->system_prompt = $this->serializarBloques($this->bloquesPrompt);
+        }
+
         $data = $this->validate();
 
         // Convertir array de booleans a string '1010111'

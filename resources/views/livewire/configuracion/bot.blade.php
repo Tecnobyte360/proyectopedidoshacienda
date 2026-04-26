@@ -517,19 +517,149 @@
                             </div>
                         </div>
 
-                        <textarea wire:model="system_prompt" rows="22"
-                                  placeholder="Escribe tu prompt aquí, usando {variables} del panel derecho..."
-                                  class="w-full rounded-xl border border-slate-200 px-4 py-3 text-xs font-mono leading-relaxed focus:border-rose-400 focus:ring-2 focus:ring-rose-100"
-                                  spellcheck="false"></textarea>
+                        {{-- Toggle vista bloques / vista plana --}}
+                        <div class="flex items-center gap-2 mb-3 p-2 rounded-xl bg-slate-100">
+                            <button type="button" wire:click="$set('vistaPorBloques', true); $call('sincronizarPromptABloques')"
+                                    class="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition
+                                        {{ $vistaPorBloques ? 'bg-white text-slate-800 shadow' : 'text-slate-500 hover:text-slate-700' }}">
+                                <i class="fa-solid fa-layer-group"></i> Por bloques
+                            </button>
+                            <button type="button" wire:click="$set('vistaPorBloques', false); $call('sincronizarBloquesAPrompt')"
+                                    class="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition
+                                        {{ !$vistaPorBloques ? 'bg-white text-slate-800 shadow' : 'text-slate-500 hover:text-slate-700' }}">
+                                <i class="fa-solid fa-code"></i> Vista plana
+                            </button>
+                        </div>
+
+                        @if($vistaPorBloques)
+                            {{-- ╔═══ EDITOR POR BLOQUES ═══╗ --}}
+                            <div class="space-y-2" x-data="{ abierto: 0 }">
+                                @foreach($bloquesPrompt as $idx => $bloque)
+                                    @php
+                                        // Pre-formato del contenido para resaltar variables {xxx}
+                                        $contenidoHtml = preg_replace(
+                                            '/\{([a-z_]+)\}/i',
+                                            '<span class="bloque-var">$0</span>',
+                                            e($bloque['contenido'] ?? '')
+                                        );
+                                        $iconos = [
+                                            'IDENTIDAD' => 'fa-user-tie',
+                                            'CONTEXTO' => 'fa-circle-info',
+                                            'EMPRESA' => 'fa-building',
+                                            'CATÁLOGO' => 'fa-box',
+                                            'PROMOCIONES' => 'fa-tags',
+                                            'HORARIOS' => 'fa-clock',
+                                            'HORARIOS Y ZONAS' => 'fa-clock',
+                                            'ZONAS' => 'fa-map-location-dot',
+                                            'ZONAS DE COBERTURA' => 'fa-map-location-dot',
+                                            'ANS' => 'fa-stopwatch',
+                                            'REGLAS' => 'fa-shield-halved',
+                                            'REGLAS BÁSICAS' => 'fa-shield-halved',
+                                        ];
+                                        $tituloUp = mb_strtoupper(trim($bloque['titulo'] ?? ''));
+                                        $icono = $iconos[$tituloUp] ?? 'fa-puzzle-piece';
+                                    @endphp
+
+                                    <div class="rounded-xl border border-slate-200 bg-white overflow-hidden" wire:key="bloque-{{ $idx }}">
+                                        {{-- Header del bloque --}}
+                                        <div class="flex items-center gap-2 px-3 py-2 bg-slate-50 border-b border-slate-100">
+                                            <button type="button" @click="abierto = (abierto === {{ $idx }} ? -1 : {{ $idx }})"
+                                                    class="w-5 h-5 rounded text-slate-400 hover:text-slate-700 transition">
+                                                <i class="fa-solid fa-chevron-down text-[11px] transition" :class="abierto === {{ $idx }} ? 'rotate-180' : ''"></i>
+                                            </button>
+
+                                            <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-purple-50 text-purple-600 flex-shrink-0">
+                                                <i class="fa-solid {{ $icono }} text-xs"></i>
+                                            </span>
+
+                                            <input type="text"
+                                                   wire:model.lazy="bloquesPrompt.{{ $idx }}.titulo"
+                                                   class="flex-1 bg-transparent border-0 text-sm font-bold text-slate-800 focus:outline-none focus:ring-0 px-0">
+
+                                            {{-- Acciones --}}
+                                            <button type="button" wire:click="moverBloque({{ $idx }}, -1)" title="Subir"
+                                                    class="text-slate-400 hover:text-slate-700 px-1.5 py-1 rounded transition disabled:opacity-30"
+                                                    @if($idx === 0) disabled @endif>
+                                                <i class="fa-solid fa-arrow-up text-xs"></i>
+                                            </button>
+                                            <button type="button" wire:click="moverBloque({{ $idx }}, 1)" title="Bajar"
+                                                    class="text-slate-400 hover:text-slate-700 px-1.5 py-1 rounded transition disabled:opacity-30"
+                                                    @if($idx === count($bloquesPrompt) - 1) disabled @endif>
+                                                <i class="fa-solid fa-arrow-down text-xs"></i>
+                                            </button>
+                                            <button type="button"
+                                                    @click.prevent="$dispatch('confirm-show', { message: 'Eliminar bloque {{ $bloque['titulo'] }}?', type: 'danger', onConfirm: () => $wire.eliminarBloque({{ $idx }}) })"
+                                                    title="Eliminar"
+                                                    class="text-rose-400 hover:text-rose-600 px-1.5 py-1 rounded transition">
+                                                <i class="fa-solid fa-trash text-xs"></i>
+                                            </button>
+                                        </div>
+
+                                        {{-- Cuerpo del bloque (contraído por defecto excepto el activo) --}}
+                                        <div x-show="abierto === {{ $idx }}" x-collapse>
+                                            <div class="p-3">
+                                                <textarea wire:model.lazy="bloquesPrompt.{{ $idx }}.contenido"
+                                                          rows="6"
+                                                          placeholder="Contenido del bloque…"
+                                                          class="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-mono leading-relaxed focus:border-purple-400 focus:ring-1 focus:ring-purple-100 bloque-textarea"
+                                                          spellcheck="false"></textarea>
+                                                <div class="text-[10px] text-slate-400 mt-1.5 flex items-center justify-between">
+                                                    <span>{{ strlen($bloque['contenido'] ?? '') }} chars</span>
+                                                    <span class="text-purple-600">
+                                                        <i class="fa-solid fa-circle-info"></i> Las {variables} se reemplazan automáticamente al enviar al cliente.
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {{-- Preview compacto cuando está cerrado --}}
+                                        <div x-show="abierto !== {{ $idx }}" class="px-3 py-2">
+                                            <div class="text-[11px] text-slate-500 line-clamp-2 bloque-preview">
+                                                {!! $contenidoHtml ?: '<span class="text-slate-300 italic">(vacío)</span>' !!}
+                                            </div>
+                                        </div>
+                                    </div>
+                                @endforeach
+
+                                <button type="button" wire:click="agregarBloque"
+                                        class="w-full rounded-xl border-2 border-dashed border-slate-300 hover:border-purple-400 hover:bg-purple-50/30 px-4 py-3 text-sm font-semibold text-slate-500 hover:text-purple-700 transition">
+                                    <i class="fa-solid fa-plus mr-1"></i> Añadir bloque
+                                </button>
+                            </div>
+
+                            <style>
+                                .bloque-var {
+                                    background: linear-gradient(135deg, #ede9fe, #ddd6fe);
+                                    color: #6d28d9;
+                                    padding: 1px 5px;
+                                    border-radius: 4px;
+                                    font-family: ui-monospace, monospace;
+                                    font-size: 0.92em;
+                                    font-weight: 600;
+                                    border: 1px solid #c4b5fd;
+                                }
+                                .bloque-textarea { tab-size: 2; }
+                            </style>
+                        @else
+                            {{-- ╔═══ VISTA PLANA (textarea original) ═══╗ --}}
+                            <textarea wire:model="system_prompt" rows="22"
+                                      placeholder="Escribe tu prompt aquí, usando {variables} del panel derecho..."
+                                      class="w-full rounded-xl border border-slate-200 px-4 py-3 text-xs font-mono leading-relaxed focus:border-rose-400 focus:ring-2 focus:ring-rose-100"
+                                      spellcheck="false"></textarea>
+                        @endif
 
                         @error('system_prompt')
                             <p class="text-xs text-red-600 mt-1">{{ $message }}</p>
                         @enderror
 
-                        <div class="text-[10px] text-slate-400 mt-1 flex items-center gap-3">
+                        <div class="text-[10px] text-slate-400 mt-2 flex items-center gap-3">
                             <span>{{ strlen($system_prompt) }} / 20.000 caracteres</span>
                             <span>·</span>
                             <span>~{{ ceil(strlen($system_prompt) / 4) }} tokens estimados</span>
+                            @if($vistaPorBloques)
+                                <span>·</span>
+                                <span>{{ count($bloquesPrompt) }} bloques</span>
+                            @endif
                         </div>
                     </div>
 
