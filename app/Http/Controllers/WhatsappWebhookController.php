@@ -2029,6 +2029,36 @@ class WhatsappWebhookController extends Controller
             }
         }
 
+        // ── VALIDACIÓN DE HORARIO DE LA SEDE ──────────────────────────────
+        // Si la sede que va a despachar el pedido está CERRADA AHORA, no
+        // permitimos registrar. Esto blinda contra que la IA confirme
+        // pedidos en domingos/horas no laborables aunque el cliente insista.
+        if ($sede && !$sede->estaAbierta()) {
+            Cache::forget($confirmKey);
+            DB::rollBack();
+
+            $hoyTxt    = $sede->horarioHoyTexto();
+            $msgCerrad = trim((string) $sede->mensaje_cerrado);
+            $proximo   = $sede->proximaApertura();
+
+            $base = "Ay {$name}, en este momento estamos cerrados 🙏\n\n";
+            $base .= "📍 *{$sede->nombre}*\n";
+            $base .= "🕐 {$hoyTxt}\n";
+            if ($proximo) {
+                $base .= "👉 Te atendemos {$proximo}.\n";
+            }
+            if ($msgCerrad !== '') {
+                $base .= "\n{$msgCerrad}";
+            }
+
+            Log::info('⛔ Pedido rechazado por sede cerrada', [
+                'sede'   => $sede->nombre,
+                'pedido' => $orderData,
+            ]);
+
+            return $base;
+        }
+
         // ── VALIDACIÓN ESTRICTA de cobertura ───────────────────────────────
         // Regla: si el cliente dio dirección/barrio para domicilio pero no
         // coincide con ninguna zona activa → se rechaza el pedido.

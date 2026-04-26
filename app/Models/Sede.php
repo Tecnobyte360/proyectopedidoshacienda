@@ -109,6 +109,39 @@ class Sede extends Model
     }
 
     /**
+     * Devuelve el próximo momento en que la sede abrirá, en texto humano.
+     * Ej: "mañana lunes a las 8:00" o "el sábado a las 9:00".
+     * Devuelve null si la sede no abre ningún día (raro).
+     */
+    public function proximaApertura(?Carbon $desde = null): ?string
+    {
+        $desde = $desde ?: Carbon::now('America/Bogota');
+        $todos = $this->horariosCompletos();
+
+        // Si hoy abre y aún no ha pasado la hora de apertura, devolver eso.
+        $hoyKey = self::CARBON_A_DIA[$desde->dayOfWeek] ?? 'lunes';
+        $hoyConf = $todos[$hoyKey] ?? null;
+        if ($hoyConf && $hoyConf['abierto']) {
+            $abreHoy = Carbon::parse($desde->format('Y-m-d') . ' ' . $hoyConf['abre'], 'America/Bogota');
+            if ($desde->lt($abreHoy)) {
+                return "hoy a las {$hoyConf['abre']}";
+            }
+        }
+
+        // Buscar en los próximos 7 días el siguiente que esté abierto.
+        for ($i = 1; $i <= 7; $i++) {
+            $futuro = $desde->copy()->addDays($i);
+            $dKey = self::CARBON_A_DIA[$futuro->dayOfWeek] ?? 'lunes';
+            $conf = $todos[$dKey] ?? null;
+            if ($conf && $conf['abierto']) {
+                $etiqueta = $i === 1 ? 'mañana' : ('el ' . ($conf['label'] ?? $dKey));
+                return mb_strtolower($etiqueta) . " a las {$conf['abre']}";
+            }
+        }
+        return null;
+    }
+
+    /**
      * Devuelve un texto humano del horario de hoy.
      * Ej: "Hoy abierto 8:00 - 18:00" o "Hoy cerrado".
      */
