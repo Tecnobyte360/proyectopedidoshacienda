@@ -24,7 +24,7 @@
     <div class="mb-6 grid grid-cols-2 lg:grid-cols-4 gap-4">
 
         <div class="rounded-2xl p-5 text-white shadow-lg"
-             style="background: linear-gradient(135deg, var(--brand, #7c3aed), var(--brand-secondary, #a855f7));">
+             style="background: linear-gradient(135deg, var(--brand-primary, #7c3aed), var(--brand-secondary, #a855f7));">
             <div class="flex items-center justify-between mb-3">
                 <span class="text-xs font-semibold uppercase tracking-wider opacity-80">Cobrado</span>
                 <i class="fa-solid fa-circle-check text-2xl opacity-60"></i>
