@@ -4,6 +4,26 @@
         <p class="text-sm text-slate-500">Calificaciones del proceso y de los domiciliarios desde el cliente.</p>
     </div>
 
+    {{-- Alerta de encuestas sin enviar (probable queue worker caído) --}}
+    @if($estadisticas['sin_enviar'] > 0)
+        <div class="mb-4 rounded-xl bg-rose-50 border-2 border-rose-300 p-4 flex items-start gap-3">
+            <i class="fa-solid fa-triangle-exclamation text-rose-600 text-2xl mt-0.5"></i>
+            <div class="flex-1">
+                <div class="font-bold text-rose-800">{{ $estadisticas['sin_enviar'] }} encuesta(s) sin enviar</div>
+                <p class="text-xs text-rose-700 mt-1">
+                    Hay encuestas creadas pero el WhatsApp nunca salió. Esto suele pasar si el
+                    <strong>queue worker</strong> no está corriendo. En el servidor ejecuta:
+                </p>
+                <code class="inline-block mt-2 rounded bg-rose-900 text-rose-100 px-2 py-1 text-[11px]">docker exec -d pedidos_hacienda_app php artisan queue:work --tries=3 --timeout=60</code>
+                <p class="text-xs text-rose-700 mt-2">
+                    Mientras tanto, puedes
+                    <button wire:click="$set('filtro', 'sin_enviar')" class="underline font-bold">filtrar las pendientes</button>
+                    y reenviarlas manualmente con el botón verde de cada fila.
+                </p>
+            </div>
+        </div>
+    @endif
+
     {{-- KPIs --}}
     <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
         <div class="rounded-xl bg-white border border-slate-200 p-4">
@@ -36,7 +56,9 @@
     <div class="rounded-xl bg-white border border-slate-200 p-3 mb-5 flex flex-wrap gap-2 items-center">
         @foreach([
             'todas'       => 'Todas',
-            'completadas' => 'Respondidas',
+            'sin_enviar'  => '🔴 Sin enviar',
+            'enviadas_no_respondidas' => '📤 Enviadas (sin responder)',
+            'completadas' => '✅ Respondidas',
             'pendientes'  => 'Pendientes',
             'bajas'       => '⚠ Bajas (≤3)',
         ] as $key => $label)
@@ -72,6 +94,8 @@
                         <th class="px-3 py-2.5">Recomienda</th>
                         <th class="px-3 py-2.5">Comentarios</th>
                         <th class="px-3 py-2.5">Estado</th>
+                        <th class="px-3 py-2.5">Fecha envío</th>
+                        <th class="px-3 py-2.5 text-center">Acciones</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100">
@@ -133,14 +157,40 @@
                                         <i class="fa-brands fa-whatsapp"></i> Enviada
                                     </span>
                                 @else
-                                    <span class="inline-flex items-center gap-1 rounded-full bg-slate-100 text-slate-600 px-2 py-0.5 text-[10px] font-bold">
-                                        <i class="fa-solid fa-clock"></i> Pendiente
+                                    <span class="inline-flex items-center gap-1 rounded-full bg-rose-100 text-rose-700 px-2 py-0.5 text-[10px] font-bold">
+                                        <i class="fa-solid fa-clock"></i> Sin enviar
                                     </span>
                                 @endif
                             </td>
+                            <td class="px-3 py-2.5 text-[11px] text-slate-500">
+                                @if($e->enviada_at)
+                                    <div title="{{ $e->enviada_at->format('d/m/Y H:i:s') }}">
+                                        <i class="fa-solid fa-paper-plane text-blue-400"></i>
+                                        {{ $e->enviada_at->diffForHumans() }}
+                                    </div>
+                                @else
+                                    <span class="text-rose-600 font-bold">⚠ NO ENVIADA</span>
+                                    <div class="text-[10px] text-slate-400">creada {{ $e->created_at?->diffForHumans() }}</div>
+                                @endif
+                            </td>
+                            <td class="px-3 py-2.5 text-center">
+                                <button wire:click="reenviarEncuesta({{ $e->id }})"
+                                        wire:confirm="¿Reenviar la encuesta a este cliente por WhatsApp?"
+                                        wire:loading.attr="disabled"
+                                        wire:target="reenviarEncuesta({{ $e->id }})"
+                                        class="inline-flex items-center justify-center h-8 px-3 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[11px] font-bold transition disabled:opacity-50"
+                                        title="Reenviar por WhatsApp">
+                                    <span wire:loading.remove wire:target="reenviarEncuesta({{ $e->id }})">
+                                        <i class="fa-brands fa-whatsapp"></i> Reenviar
+                                    </span>
+                                    <span wire:loading wire:target="reenviarEncuesta({{ $e->id }})">
+                                        <i class="fa-solid fa-spinner fa-spin"></i>
+                                    </span>
+                                </button>
+                            </td>
                         </tr>
                     @empty
-                        <tr><td colspan="7" class="px-4 py-12 text-center text-slate-400">
+                        <tr><td colspan="9" class="px-4 py-12 text-center text-slate-400">
                             <i class="fa-solid fa-clipboard-list text-3xl mb-2"></i>
                             <p>No hay encuestas con este filtro</p>
                         </td></tr>
