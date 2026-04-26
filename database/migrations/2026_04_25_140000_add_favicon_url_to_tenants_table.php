@@ -1,0 +1,26 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        if (!Schema::hasColumn('tenants', 'favicon_url')) {
+            Schema::table('tenants', function (Blueprint $table) {
+                $table->string('favicon_url')->nullable()->after('logo_url');
+            });
+        }
+    }
+
+    public function down(): void
+    {
+        if (Schema::hasColumn('tenants', 'favicon_url')) {
+            Schema::table('tenants', function (Blueprint $table) {
+                $table->dropColumn('favicon_url');
+            });
+        }
+    }
+};

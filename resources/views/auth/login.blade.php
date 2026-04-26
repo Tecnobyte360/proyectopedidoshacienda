@@ -7,6 +7,18 @@
         ? $tenantBranding->color_primario . '22'
         : '#fbe9d7';
     $emailDomain = $tenantBranding?->slug ? $tenantBranding->slug . '.com' : 'empresa.com';
+
+    $platformCfg = null;
+    try { $platformCfg = \App\Models\ConfiguracionPlataforma::actual(); } catch (\Throwable $e) {}
+    $faviconUrl = $tenantBranding?->favicon_url ?: ($platformCfg->favicon_url ?? null);
+    if (!$faviconUrl) {
+        $inicial = mb_strtoupper(mb_substr($brandName, 0, 1));
+        $svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">'
+             . '<rect width="64" height="64" rx="14" fill="' . htmlspecialchars($colorPrim) . '"/>'
+             . '<text x="50%" y="50%" font-family="system-ui,sans-serif" font-size="34" font-weight="800" fill="white" '
+             . 'text-anchor="middle" dominant-baseline="central">' . htmlspecialchars($inicial) . '</text></svg>';
+        $faviconUrl = 'data:image/svg+xml;base64,' . base64_encode($svg);
+    }
 @endphp
 <!DOCTYPE html>
 <html lang="es">
@@ -15,6 +27,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Iniciar sesión | {{ $brandName }}</title>
     <meta name="csrf-token" content="{{ csrf_token() }}">
+
+    <link rel="icon" type="image/png" href="{{ $faviconUrl }}">
+    <link rel="apple-touch-icon" href="{{ $faviconUrl }}">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

@@ -48,6 +48,9 @@ class Index extends Component
     public $logo_archivo               = null;  // (legacy) Livewire file upload
     public ?string $logo_data_url      = null;  // data URL base64 (nuevo flujo, evita /livewire/upload-file 401)
     public ?string $logo_nombre        = null;  // nombre original del archivo
+    public ?string $favicon_url_actual = null;
+    public ?string $favicon_data_url   = null;
+    public ?string $favicon_nombre     = null;
     public string $openai_api_key      = '';    // Key propia del tenant (opcional — si vacía usa global)
     public ?string $trial_ends_at        = null;
     public ?string $subscription_ends_at = null;
@@ -158,6 +161,8 @@ class Index extends Component
         $this->color_secundario     = (string) ($t->color_secundario ?: '#a85f24');
         $this->logo_url_actual      = $t->logo_url;
         $this->logo_archivo         = null;
+        $this->favicon_url_actual   = $t->favicon_url ?? null;
+        $this->favicon_data_url     = null;
         $this->openai_api_key       = (string) ($t->openai_api_key ?? '');
         $this->trial_ends_at        = $t->trial_ends_at?->format('Y-m-d');
         $this->subscription_ends_at = $t->subscription_ends_at?->format('Y-m-d');
@@ -256,6 +261,34 @@ class Index extends Component
                 // Borrar logo anterior si existía
                 if ($this->logo_url_actual && str_starts_with($this->logo_url_actual, '/storage/')) {
                     $oldPath = str_replace('/storage/', '', $this->logo_url_actual);
+                    Storage::disk('public')->delete($oldPath);
+                }
+            }
+        }
+
+        // Subida del favicon (mismo patrón base64)
+        if ($this->favicon_data_url && preg_match('/^data:(image\/[a-z0-9.+-]+);base64,(.+)$/i', $this->favicon_data_url, $m)) {
+            $mime  = strtolower($m[1]);
+            $bytes = base64_decode($m[2], true);
+
+            if ($bytes !== false && strlen($bytes) > 30 && strlen($bytes) <= 1 * 1024 * 1024) {
+                $ext = match (true) {
+                    str_contains($mime, 'png')         => 'png',
+                    str_contains($mime, 'svg')         => 'svg',
+                    str_contains($mime, 'webp')        => 'webp',
+                    str_contains($mime, 'icon'),
+                    str_contains($mime, 'x-icon'),
+                    str_contains($mime, 'vnd.microsoft.icon') => 'ico',
+                    default                            => 'png',
+                };
+
+                $slug = $data['slug'] ?? ($this->slug ?: 'tenant-' . ($this->editandoId ?? 'new'));
+                $path = "tenants/favicons/{$slug}-" . time() . ".{$ext}";
+                Storage::disk('public')->put($path, $bytes);
+                $data['favicon_url'] = '/storage/' . $path;
+
+                if ($this->favicon_url_actual && str_starts_with($this->favicon_url_actual, '/storage/')) {
+                    $oldPath = str_replace('/storage/', '', $this->favicon_url_actual);
                     Storage::disk('public')->delete($oldPath);
                 }
             }
@@ -587,6 +620,9 @@ class Index extends Component
         $this->color_secundario     = '#a85f24';
         $this->logo_url_actual      = null;
         $this->logo_archivo         = null;
+        $this->favicon_url_actual   = null;
+        $this->favicon_data_url     = null;
+        $this->favicon_nombre       = null;
         $this->openai_api_key       = '';
         $this->trial_ends_at        = null;
         $this->subscription_ends_at = null;

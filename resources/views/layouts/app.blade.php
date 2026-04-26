@@ -65,20 +65,33 @@
 
     @php
         $tenantBrand = app(\App\Services\TenantManager::class)->current();
+        $platformCfg = null;
+        try { $platformCfg = \App\Models\ConfiguracionPlataforma::actual(); } catch (\Throwable $e) {}
+
         if ($tenantBrand) {
-            $brandPrim = $tenantBrand->color_primario   ?: '#d68643';
-            $brandSec  = $tenantBrand->color_secundario ?: '#a85f24';
+            $brandPrim  = $tenantBrand->color_primario   ?: '#d68643';
+            $brandSec   = $tenantBrand->color_secundario ?: '#a85f24';
+            $faviconUrl = $tenantBrand->favicon_url ?: ($platformCfg->favicon_url ?? null);
+            $tabTitle   = $tenantBrand->nombre;
         } else {
-            try {
-                $platformCfg = \App\Models\ConfiguracionPlataforma::actual();
-                $brandPrim = $platformCfg->color_primario   ?: '#d68643';
-                $brandSec  = $platformCfg->color_secundario ?: '#a85f24';
-            } catch (\Throwable $e) {
-                $brandPrim = '#d68643';
-                $brandSec  = '#a85f24';
-            }
+            $brandPrim  = $platformCfg->color_primario   ?? '#d68643';
+            $brandSec   = $platformCfg->color_secundario ?? '#a85f24';
+            $faviconUrl = $platformCfg->favicon_url ?? null;
+            $tabTitle   = $platformCfg->nombre ?? 'TecnoByte360';
+        }
+
+        if (!$faviconUrl) {
+            $inicial = mb_strtoupper(mb_substr($tabTitle, 0, 1));
+            $svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">'
+                 . '<rect width="64" height="64" rx="14" fill="' . htmlspecialchars($brandPrim) . '"/>'
+                 . '<text x="50%" y="50%" font-family="system-ui,sans-serif" font-size="34" font-weight="800" fill="white" '
+                 . 'text-anchor="middle" dominant-baseline="central">' . htmlspecialchars($inicial) . '</text></svg>';
+            $faviconUrl = 'data:image/svg+xml;base64,' . base64_encode($svg);
         }
     @endphp
+
+    <link rel="icon" type="image/png" href="{{ $faviconUrl }}">
+    <link rel="apple-touch-icon" href="{{ $faviconUrl }}">
 
     <style>
         :root {

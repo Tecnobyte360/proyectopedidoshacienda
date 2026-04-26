@@ -17,6 +17,7 @@ class Tenant extends Model
         'nombre',
         'slug',
         'logo_url',
+        'favicon_url',
         'plan',
         'activo',
         'trial_ends_at',

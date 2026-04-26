@@ -563,6 +563,80 @@
                                 </div>
                             </div>
                         </div>
+
+                        {{-- Favicon del tenant --}}
+                        <div class="md:col-span-2" x-data="{
+                            dataUrl: @entangle('favicon_data_url').live,
+                            nombre:  @entangle('favicon_nombre').live,
+                            error:   '',
+                            pick(e) {
+                                const file = e.target.files && e.target.files[0];
+                                if (!file) return;
+                                this.error = '';
+                                if (!file.type.startsWith('image/') && !file.name.toLowerCase().endsWith('.ico')) {
+                                    this.error = 'No es una imagen válida.'; return;
+                                }
+                                if (file.size > 1 * 1024 * 1024) { this.error = 'Favicon muy grande (máx 1MB).'; return; }
+                                const reader = new FileReader();
+                                reader.onload = () => { this.dataUrl = reader.result; this.nombre = file.name; };
+                                reader.onerror = () => { this.error = 'No se pudo leer el archivo.'; };
+                                reader.readAsDataURL(file);
+                            },
+                            quitar() { this.dataUrl = null; this.nombre = null; this.error = ''; },
+                        }">
+                            <label class="block text-sm font-medium text-slate-700 mb-1.5">
+                                <i class="fa-solid fa-globe text-brand"></i> Favicon del tenant
+                                <span class="text-xs text-slate-400 font-normal">(ICO/PNG/SVG, ideal 32×32 o 64×64, máx 1MB)</span>
+                            </label>
+
+                            <div class="flex items-center gap-4">
+                                <div class="h-12 w-12 rounded-lg border-2 border-dashed border-slate-300 bg-slate-50 flex items-center justify-center overflow-hidden flex-shrink-0">
+                                    <template x-if="dataUrl">
+                                        <img :src="dataUrl" class="h-full w-full object-contain" alt="preview">
+                                    </template>
+                                    <template x-if="!dataUrl && '{{ $favicon_url_actual }}'">
+                                        <img src="{{ $favicon_url_actual }}" class="h-full w-full object-contain" alt="favicon actual">
+                                    </template>
+                                    <template x-if="!dataUrl && !'{{ $favicon_url_actual }}'">
+                                        <i class="fa-solid fa-globe text-lg text-slate-300"></i>
+                                    </template>
+                                </div>
+
+                                <div class="flex-1">
+                                    <input type="file"
+                                           @change="pick($event)"
+                                           accept="image/png,image/svg+xml,image/x-icon,image/vnd.microsoft.icon,.ico"
+                                           class="block w-full text-sm text-slate-700
+                                                  file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0
+                                                  file:text-sm file:font-semibold
+                                                  file:bg-brand-soft file:text-brand-secondary hover:file:bg-brand-soft-2 cursor-pointer">
+
+                                    <div x-show="nombre" x-cloak class="flex items-center gap-2 mt-2 text-xs">
+                                        <span class="text-emerald-600 font-semibold">
+                                            <i class="fa-solid fa-check-circle"></i>
+                                            <span x-text="nombre"></span>
+                                        </span>
+                                        <button type="button" @click="quitar()" class="text-rose-500 hover:text-rose-700">
+                                            <i class="fa-solid fa-xmark"></i> Quitar
+                                        </button>
+                                    </div>
+
+                                    <div x-show="error" x-cloak x-text="error" class="text-xs text-rose-600 mt-1"></div>
+
+                                    <p class="text-[11px] text-slate-400 mt-1.5">
+                                        <i class="fa-solid fa-circle-info"></i>
+                                        El favicon aparece en la pestaña del navegador. Si no subes uno, se usa el de la plataforma.
+                                    </p>
+
+                                    @if($favicon_url_actual)
+                                        <div class="text-xs text-slate-500 mt-1" x-show="!dataUrl">
+                                            Favicon actual: <a href="{{ $favicon_url_actual }}" target="_blank" class="text-brand-secondary underline">ver</a>
+                                        </div>
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
+
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-1.5">Trial vence</label>
                             <input type="date" wire:model="trial_ends_at" class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-2 focus:ring-brand/20">

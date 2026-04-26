@@ -6,6 +6,27 @@
     <title>{{ $title ?? 'Seguimiento del pedido' }}</title>
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
+    @php
+        $tenantPub = isset($pedido) && $pedido?->tenant_id
+            ? \App\Models\Tenant::withoutGlobalScopes()->find($pedido->tenant_id)
+            : null;
+        $platformPub = null;
+        try { $platformPub = \App\Models\ConfiguracionPlataforma::actual(); } catch (\Throwable $e) {}
+        $faviconPub = $tenantPub?->favicon_url ?: ($platformPub->favicon_url ?? null);
+        if (!$faviconPub) {
+            $colP = $tenantPub?->color_primario ?: ($platformPub->color_primario ?? '#d68643');
+            $nbP  = $tenantPub?->nombre ?: ($platformPub->nombre ?? 'TecnoByte360');
+            $iniP = mb_strtoupper(mb_substr($nbP, 0, 1));
+            $svgP = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">'
+                  . '<rect width="64" height="64" rx="14" fill="' . htmlspecialchars($colP) . '"/>'
+                  . '<text x="50%" y="50%" font-family="system-ui,sans-serif" font-size="34" font-weight="800" fill="white" '
+                  . 'text-anchor="middle" dominant-baseline="central">' . htmlspecialchars($iniP) . '</text></svg>';
+            $faviconPub = 'data:image/svg+xml;base64,' . base64_encode($svgP);
+        }
+    @endphp
+    <link rel="icon" type="image/png" href="{{ $faviconPub }}">
+    <link rel="apple-touch-icon" href="{{ $faviconPub }}">
+
     {{-- Config de Reverb (auto-detección en app.js, estos meta override en producción si hace falta) --}}
     <meta name="reverb-host"   content="{{ env('REVERB_PUBLIC_HOST', '') }}">
     <meta name="reverb-port"   content="{{ env('REVERB_PUBLIC_PORT', '') }}">
