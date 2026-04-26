@@ -681,6 +681,36 @@ class WhatsappWebhookController extends Controller
             $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_USER, $message);
         }
 
+        // ── FLUJOS VISUALES: dar primer chance a los flujos definidos en /flujos ──
+        // Si un flujo activo coincide con el mensaje actual (palabras, intención,
+        // horario, cliente nuevo/recurrente), su acción corta el flujo normal del
+        // bot y persistimos la respuesta como mensaje del assistant.
+        try {
+            $resultadoFlujo = app(\App\Services\FlujoBotExecutor::class)->ejecutarFlujosActivos([
+                'mensaje'      => $message,
+                'cliente'      => $cliente,
+                'conversacion' => $conversacion,
+                'sede_id'      => $sedeId,
+                'name'         => $name,
+                'from'         => $from,
+            ]);
+
+            if ($resultadoFlujo && ($resultadoFlujo['short_circuit'] ?? false)) {
+                $reply = (string) ($resultadoFlujo['reply'] ?? '');
+                if ($reply !== '') {
+                    $convService->agregarMensaje(
+                        $conversacion,
+                        \App\Models\MensajeWhatsapp::ROL_ASSISTANT,
+                        $reply,
+                        ['tipo' => 'tool_call', 'meta' => ['origen' => 'flujo_visual']]
+                    );
+                }
+                return $reply;
+            }
+        } catch (\Throwable $e) {
+            \Log::warning('FlujoBotExecutor falló, continuando con flujo normal: ' . $e->getMessage());
+        }
+
         // ── HISTORIAL: leer de BD (últimos 20 mensajes user/assistant) ───────
         $conversationHistory = $conversacion->fresh()->historialParaIA(20);
 

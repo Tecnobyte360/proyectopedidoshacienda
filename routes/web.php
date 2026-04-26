@@ -112,6 +112,9 @@ Route::middleware(['no_super_sin_imp'])->group(function () {
     Route::get('/configuracion/bot', ConfiguracionBot::class)
         ->middleware(['permission:bot.configurar', 'role:super-admin'])
         ->name('configuracion.bot');
+    Route::get('/configuracion/flujos', \App\Livewire\Configuracion\Flujos\Index::class)
+        ->middleware(['permission:bot.configurar', 'role:super-admin'])
+        ->name('configuracion.flujos');
     Route::get('/clientes',          ClientesIndex::class)->middleware('permission:clientes.ver')->name('clientes.index');
     Route::get('/conversaciones',    ConversacionesIndex::class)->middleware('permission:conversaciones.ver')->name('conversaciones.index');
     Route::get('/chat',              ChatIndex::class)->middleware('permission:chat.usar')->name('chat.index');

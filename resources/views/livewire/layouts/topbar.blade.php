@@ -12,6 +12,7 @@
         'reportes.index'       => ['Reportes',       'Métricas de ventas y operaciones',           'fa-chart-line'],
         'ans.index'            => ['ANS Tiempos',    'Configuración de tiempos por estado',        'fa-stopwatch'],
         'configuracion.bot'    => ['Bot WhatsApp',   'Comportamiento de la asesora IA',            'fa-robot'],
+        'configuracion.flujos' => ['Flujos del bot', 'Editor visual de conversaciones',            'fa-diagram-project'],
         'clientes.index'       => ['Clientes',       'Quién compra, qué compra, cuánto compra',    'fa-users'],
         'conversaciones.index' => ['Conversaciones', 'Historial de cada chat con el bot',          'fa-comments'],
         'chat.index'           => ['Chat en vivo',   'Atiende clientes en tiempo real',            'fa-headset'],

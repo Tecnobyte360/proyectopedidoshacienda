@@ -75,6 +75,7 @@
                     ['name' => 'Encuestas',         'icon' => 'fa-star-half-stroke',   'route' => 'encuestas.index',        'badge' => null, 'permission' => 'reportes.ver'],
                     ['name' => 'ANS Tiempos',       'icon' => 'fa-stopwatch',          'route' => 'ans.index',              'badge' => null, 'permission' => 'ans.gestionar'],
                     ['name' => 'Bot WhatsApp',      'icon' => 'fa-robot',              'route' => 'configuracion.bot',      'badge' => null, 'permission' => 'bot.configurar', 'solo_super_admin' => true],
+                    ['name' => 'Flujos del bot',    'icon' => 'fa-diagram-project',    'route' => 'configuracion.flujos',   'badge' => null, 'permission' => 'bot.configurar', 'solo_super_admin' => true],
                     ['name' => 'Sedes',             'icon' => 'fa-shop',               'route' => 'sedes.index',            'badge' => null, 'permission' => 'sedes.gestionar'],
                 ],
             ],
