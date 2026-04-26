@@ -153,6 +153,30 @@ class Pedido extends Model
         $this->fecha_entregado = now();
     }
 
+    // 🛵 Liberar al domiciliario al entregar/cancelar si NO le quedan más
+    // pedidos activos. Lo deja 'disponible' para que pueda recibir nuevos.
+    if (in_array($nuevoEstado, [self::ESTADO_ENTREGADO, self::ESTADO_CANCELADO], true) && $this->domiciliario_id) {
+        try {
+            $domi = \App\Models\Domiciliario::find($this->domiciliario_id);
+            if ($domi) {
+                $pendientes = self::where('domiciliario_id', $domi->id)
+                    ->where('id', '!=', $this->id)
+                    ->whereNotIn('estado', [self::ESTADO_ENTREGADO, self::ESTADO_CANCELADO])
+                    ->count();
+                if ($pendientes === 0 && $domi->estado !== \App\Models\Domiciliario::ESTADO_DISPONIBLE) {
+                    $domi->update(['estado' => \App\Models\Domiciliario::ESTADO_DISPONIBLE]);
+                    \Log::info('🛵 Domiciliario liberado automáticamente', [
+                        'domi_id' => $domi->id,
+                        'pedido_id' => $this->id,
+                        'evento' => $nuevoEstado,
+                    ]);
+                }
+            }
+        } catch (\Throwable $e) {
+            \Log::warning('No se pudo liberar domiciliario: ' . $e->getMessage());
+        }
+    }
+
     if ($nuevoEstado === self::ESTADO_CANCELADO) {
         $this->fecha_cancelado = now();
     }

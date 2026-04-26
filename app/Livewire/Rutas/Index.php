@@ -49,6 +49,54 @@ class Index extends Component
         $this->dispatch('notify', ['type' => 'info', 'message' => 'Pedido liberado.']);
     }
 
+    /**
+     * Auto-asigna domiciliarios a TODOS los pedidos sin asignar usando el
+     * criterio configurado. Útil cuando hay pedidos huérfanos o cuando el
+     * tenant acaba de activar la auto-asignación y quiere retroactiva.
+     */
+    public function autoAsignarPendientes(): void
+    {
+        $sinAsignar = Pedido::query()
+            ->whereNull('domiciliario_id')
+            ->whereIn('estado', [Pedido::ESTADO_NUEVO, Pedido::ESTADO_EN_PREPARACION])
+            ->get();
+
+        if ($sinAsignar->isEmpty()) {
+            $this->dispatch('notify', ['type' => 'info', 'message' => 'No hay pedidos sin asignar.']);
+            return;
+        }
+
+        $service = app(\App\Services\AsignacionDomiciliarioService::class);
+        $asignados = 0;
+        $sinDomis = 0;
+
+        foreach ($sinAsignar as $pedido) {
+            // Forzar asignación temporal incluso si el toggle está off
+            $cfg = \App\Models\ConfiguracionBot::actual();
+            $original = $cfg->auto_asignar_domiciliario;
+            $cfg->auto_asignar_domiciliario = true;
+            // No persistir el cambio del toggle
+            $r = $service->asignar($pedido);
+            $cfg->auto_asignar_domiciliario = $original;
+
+            if ($r) {
+                $asignados++;
+            } else {
+                $sinDomis++;
+            }
+        }
+
+        $msg = "✅ {$asignados} pedido(s) asignados.";
+        if ($sinDomis > 0) {
+            $msg .= " {$sinDomis} sin asignar (no hay domiciliarios disponibles).";
+        }
+
+        $this->dispatch('notify', [
+            'type'    => $asignados > 0 ? 'success' : 'warning',
+            'message' => $msg,
+        ]);
+    }
+
     public function render()
     {
         $domiciliarios = Domiciliario::query()

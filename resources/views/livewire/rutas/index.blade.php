@@ -231,6 +231,20 @@
                         Pedidos sin asignar
                         <span class="ml-auto text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-extrabold">{{ $sinAsignar->count() }}</span>
                     </h3>
+                    @if($sinAsignar->count() > 0)
+                        <button wire:click="autoAsignarPendientes"
+                                wire:confirm="¿Auto-asignar todos los pedidos pendientes al domiciliario con menos carga?"
+                                wire:loading.attr="disabled"
+                                wire:target="autoAsignarPendientes"
+                                class="mt-2 w-full inline-flex items-center justify-center gap-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-3 py-2 transition disabled:opacity-50">
+                            <span wire:loading.remove wire:target="autoAsignarPendientes">
+                                <i class="fa-solid fa-wand-magic-sparkles"></i> Auto-asignar todos
+                            </span>
+                            <span wire:loading wire:target="autoAsignarPendientes">
+                                <i class="fa-solid fa-spinner fa-spin"></i> Asignando...
+                            </span>
+                        </button>
+                    @endif
                 </div>
                 <div class="max-h-[600px] overflow-y-auto">
                     @forelse($sinAsignar as $p)

@@ -78,9 +78,11 @@ class AsignacionDomiciliarioService
      */
     private function porBalanceo(): ?Domiciliario
     {
+        // Cualquier domiciliario activo es candidato — no importa su estado.
+        // El balanceo se basa en CARGA REAL (pedidos en curso), no en el flag
+        // de estado que puede quedar pegado. Así el con menos pedidos siempre gana.
         return Domiciliario::query()
             ->where('activo', true)
-            ->whereIn('estado', [Domiciliario::ESTADO_DISPONIBLE, Domiciliario::ESTADO_EN_RUTA])
             ->withCount(['pedidos as carga_actual' => function ($q) {
                 $q->whereNotIn('estado', [
                     Pedido::ESTADO_ENTREGADO,
@@ -113,10 +115,9 @@ class AsignacionDomiciliarioService
     {
         // Domiciliarios activos ordenados por la última vez que recibieron pedido
         // (los que NUNCA recibieron salen primero, luego los que más tiempo llevan
-        // sin recibir).
+        // sin recibir). Sin filtrar por estado — la carga manda.
         $domis = Domiciliario::query()
             ->where('activo', true)
-            ->whereIn('estado', [Domiciliario::ESTADO_DISPONIBLE, Domiciliario::ESTADO_EN_RUTA])
             ->get();
 
         if ($domis->isEmpty()) return null;
