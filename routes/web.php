@@ -173,6 +173,11 @@ Route::get('/encuesta/{token}', \App\Livewire\Encuestas\Responder::class)
     ->where('token', '[\w\-]+')
     ->name('encuesta.responder');
 
+// Portal del domiciliario (sin auth — accede con su token único desde el celular)
+Route::get('/d/{token}', \App\Livewire\Domiciliarios\Portal::class)
+    ->where('token', '[\w\-]+')
+    ->name('domiciliario.portal');
+
 Route::get('/test-broadcast', function () {
 
     $sede = Sede::first();

@@ -22,10 +22,17 @@ class Domiciliario extends Model
         'vehiculo',
         'estado',
         'activo',
+        'token_acceso',
+        'lat_actual',
+        'lng_actual',
+        'ubicacion_actualizada_at',
     ];
 
     protected $casts = [
-        'activo' => 'boolean',
+        'activo'                   => 'boolean',
+        'lat_actual'               => 'float',
+        'lng_actual'               => 'float',
+        'ubicacion_actualizada_at' => 'datetime',
     ];
 
     public const ESTADO_DISPONIBLE = 'disponible';
@@ -42,7 +49,30 @@ class Domiciliario extends Model
             if ($d->activo === null) {
                 $d->activo = true;
             }
+            if (empty($d->token_acceso)) {
+                $d->token_acceso = (string) \Illuminate\Support\Str::uuid();
+            }
         });
+    }
+
+    /**
+     * URL del portal personal del domiciliario (sin auth, basado en token).
+     * El domiciliario lo abre en su celular y ve sus pedidos en tiempo real.
+     */
+    public function urlPortal(): string
+    {
+        $path = "/d/{$this->token_acceso}";
+        $tenant = $this->tenant_id
+            ? app(\App\Services\TenantManager::class)->withoutTenant(
+                fn () => \App\Models\Tenant::find($this->tenant_id)
+              )
+            : null;
+        if ($tenant && !empty($tenant->slug)) {
+            $base = config('app.tenant_base_domain', 'tecnobyte360.com');
+            $scheme = parse_url(config('app.url'), PHP_URL_SCHEME) ?: 'https';
+            return "{$scheme}://{$tenant->slug}.{$base}{$path}";
+        }
+        return url($path);
     }
 
     public const PAISES = [

@@ -178,16 +178,57 @@
                         </div>
                     @endif
 
-                    <div class="flex items-center gap-2 pt-2 border-t border-slate-100">
+                    {{-- Stats rápidos: pedidos activos del domiciliario --}}
+                    @php
+                        $activos = \App\Models\Pedido::where('domiciliario_id', $dom->id)
+                            ->whereNotIn('estado', ['entregado', 'cancelado'])
+                            ->count();
+                        $entregadosHoy = \App\Models\Pedido::where('domiciliario_id', $dom->id)
+                            ->whereDate('fecha_entregado', now()->toDateString())
+                            ->count();
+                    @endphp
+                    <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 text-center">
+                        <div>
+                            <div class="text-[10px] text-slate-500 uppercase tracking-wider font-bold">En curso</div>
+                            <div class="text-lg font-extrabold {{ $activos > 0 ? 'text-amber-600' : 'text-slate-400' }}">
+                                <i class="fa-solid fa-clock-rotate-left text-xs mr-1"></i>{{ $activos }}
+                            </div>
+                        </div>
+                        <div>
+                            <div class="text-[10px] text-slate-500 uppercase tracking-wider font-bold">Hoy</div>
+                            <div class="text-lg font-extrabold text-emerald-600">
+                                <i class="fa-solid fa-circle-check text-xs mr-1"></i>{{ $entregadosHoy }}
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- Acciones --}}
+                    <div class="grid grid-cols-2 gap-2 pt-2">
                         <button wire:click="abrirModalEditar({{ $dom->id }})"
-                                class="flex-1 rounded-lg bg-slate-100 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-200 transition">
+                                class="rounded-lg bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-200 transition">
                             <i class="fa-solid fa-pen-to-square mr-1"></i> Editar
                         </button>
+
+                        <a href="{{ $dom->urlPortal() }}" target="_blank"
+                           class="rounded-lg bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 hover:bg-blue-100 transition text-center"
+                           title="Abrir portal del domiciliario">
+                            <i class="fa-solid fa-arrow-up-right-from-square mr-1"></i> Portal
+                        </a>
+                    </div>
+
+                    <div class="flex items-center gap-2 pt-1"
+                         x-data="{ copiado: false }">
+                        <button @click="navigator.clipboard.writeText('{{ $dom->urlPortal() }}'); copiado = true; setTimeout(() => copiado = false, 1500)"
+                                class="flex-1 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-600 text-xs font-bold px-3 py-2 transition">
+                            <span x-show="!copiado"><i class="fa-solid fa-link mr-1"></i> Copiar link portal</span>
+                            <span x-show="copiado" x-cloak class="text-emerald-600"><i class="fa-solid fa-check mr-1"></i> ¡Copiado!</span>
+                        </button>
+
                         @if($dom->whatsappUrl())
-                            <a href="{{ $dom->whatsappUrl() }}"
+                            <a href="{{ $dom->whatsappUrl() }}?text={{ urlencode('Hola ' . explode(' ', $dom->nombre)[0] . ', este es tu portal personal para ver tus pedidos asignados:%0A' . $dom->urlPortal() . '%0AGuárdalo en tu pantalla de inicio 📱') }}"
                                target="_blank"
-                               class="rounded-lg bg-green-50 p-2 text-green-600 hover:bg-green-100 transition"
-                               title="WhatsApp">
+                               class="rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-600 px-3 py-2 transition"
+                               title="Enviar link por WhatsApp">
                                 <i class="fa-brands fa-whatsapp"></i>
                             </a>
                         @endif
