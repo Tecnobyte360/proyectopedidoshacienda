@@ -56,6 +56,13 @@ class Index extends Component
     public ?string $subscription_ends_at = null;
     public string $notas_internas      = '';
 
+    // Wompi (pagos) por tenant
+    public string $wompi_modo               = 'sandbox';
+    public string $wompi_public_key         = '';
+    public string $wompi_private_key        = '';
+    public string $wompi_events_secret      = '';
+    public string $wompi_integrity_secret   = '';
+
     // WhatsApp por tenant
     public string $whatsapp_email           = '';
     public string $whatsapp_password        = '';
@@ -113,6 +120,12 @@ class Index extends Component
             'whatsapp_password'      => 'nullable|string|max:150',
             'whatsapp_api_base_url'  => 'nullable|string|max:200',
             'whatsapp_connection_ids' => 'nullable|string|max:500',
+
+            'wompi_modo'             => 'nullable|in:sandbox,produccion',
+            'wompi_public_key'       => 'nullable|string|max:255',
+            'wompi_private_key'      => 'nullable|string|max:255',
+            'wompi_events_secret'    => 'nullable|string|max:255',
+            'wompi_integrity_secret' => 'nullable|string|max:255',
 
             'crear_admin_inicial' => 'boolean',
             'admin_nombre'        => 'required_if:crear_admin_inicial,true|nullable|string|max:120',
@@ -177,6 +190,14 @@ class Index extends Component
         $this->whatsapp_password       = (string) ($waConfig['password'] ?? '');
         $this->whatsapp_api_base_url   = (string) ($waConfig['api_base_url'] ?? 'https://wa-api.tecnobyteapp.com:1422');
         $this->whatsapp_connection_ids = implode(', ', $waConfig['connection_ids'] ?? []);
+
+        // Wompi config
+        $wompi = $t->wompi_config ?? [];
+        $this->wompi_modo             = (string) ($t->wompi_modo ?: 'sandbox');
+        $this->wompi_public_key       = (string) ($wompi['public_key'] ?? '');
+        $this->wompi_private_key      = (string) ($wompi['private_key'] ?? '');
+        $this->wompi_events_secret    = (string) ($wompi['events_secret'] ?? '');
+        $this->wompi_integrity_secret = (string) ($wompi['integrity_secret'] ?? '');
 
         // Auto-cargar conexiones disponibles si ya hay credenciales
         $this->whatsapp_conexiones_disponibles = [];
@@ -414,6 +435,26 @@ class Index extends Component
                 'api_base_url'   => $waApi ?: null,
                 'connection_ids' => $ids ?: null,
             ]);
+        }
+
+        // Wompi config
+        $wPub   = trim($this->wompi_public_key);
+        $wPriv  = trim($this->wompi_private_key);
+        $wEv    = trim($this->wompi_events_secret);
+        $wInt   = trim($this->wompi_integrity_secret);
+        $data['wompi_modo'] = in_array($this->wompi_modo, ['sandbox', 'produccion'], true)
+            ? $this->wompi_modo
+            : 'sandbox';
+
+        if ($wPub || $wPriv || $wEv || $wInt) {
+            $data['wompi_config'] = array_filter([
+                'public_key'       => $wPub ?: null,
+                'private_key'      => $wPriv ?: null,
+                'events_secret'    => $wEv ?: null,
+                'integrity_secret' => $wInt ?: null,
+            ]);
+        } else {
+            $data['wompi_config'] = null;
         }
 
         $tenant = Tenant::updateOrCreate(['id' => $this->editandoId], $data);
@@ -740,6 +781,11 @@ class Index extends Component
         $this->whatsapp_conexiones_disponibles = [];
         $this->error_conexiones = null;
         $this->cargando_conexiones = false;
+        $this->wompi_modo             = 'sandbox';
+        $this->wompi_public_key       = '';
+        $this->wompi_private_key      = '';
+        $this->wompi_events_secret    = '';
+        $this->wompi_integrity_secret = '';
         $this->crear_admin_inicial  = true;
         $this->admin_nombre         = '';
         $this->admin_email          = '';

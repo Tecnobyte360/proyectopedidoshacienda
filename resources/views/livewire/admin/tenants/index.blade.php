@@ -819,6 +819,91 @@
                         </div>
                     </div>
 
+                    {{-- 💳 Wompi por tenant (pagos en línea) --}}
+                    <div class="rounded-xl border border-violet-200 bg-violet-50/40 p-4 space-y-3">
+                        <div class="flex items-center gap-2 mb-1">
+                            <i class="fa-solid fa-credit-card text-violet-600 text-xl"></i>
+                            <div class="flex-1">
+                                <h4 class="font-bold text-slate-800 text-sm">Pasarela de pagos · Wompi</h4>
+                                <p class="text-[11px] text-slate-500">
+                                    Cada tenant cobra a su propia cuenta de Wompi. Las llaves se guardan cifradas.
+                                    <a href="https://docs.wompi.co/docs/colombia/inicio-rapido/" target="_blank"
+                                       class="text-violet-700 underline">Cómo obtenerlas en Wompi</a>.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">Modo</label>
+                                <select wire:model="wompi_modo"
+                                        class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-violet-400 focus:ring-2 focus:ring-violet-100 bg-white">
+                                    <option value="sandbox">Sandbox (pruebas)</option>
+                                    <option value="produccion">Producción (real)</option>
+                                </select>
+                            </div>
+                            <div class="flex items-end">
+                                @if($wompi_public_key || $wompi_integrity_secret)
+                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 text-emerald-700 px-3 py-1 text-[11px] font-bold">
+                                        <i class="fa-solid fa-circle-check"></i> Wompi configurado
+                                    </span>
+                                @else
+                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-slate-200 text-slate-600 px-3 py-1 text-[11px] font-bold">
+                                        <i class="fa-solid fa-circle"></i> Sin configurar
+                                    </span>
+                                @endif
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">
+                                    Llave pública <span class="text-slate-400 font-normal">(public_key)</span>
+                                </label>
+                                <input type="text" wire:model="wompi_public_key"
+                                       placeholder="pub_test_... / pub_prod_..."
+                                       autocomplete="off" spellcheck="false"
+                                       class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-mono focus:border-violet-400 focus:ring-2 focus:ring-violet-100">
+                                @error('wompi_public_key') <p class="text-xs text-rose-600 mt-1">{{ $message }}</p> @enderror
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">
+                                    Llave privada <span class="text-slate-400 font-normal">(private_key)</span>
+                                </label>
+                                <input type="password" wire:model="wompi_private_key"
+                                       placeholder="prv_test_... / prv_prod_..."
+                                       autocomplete="off" spellcheck="false"
+                                       class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-mono focus:border-violet-400 focus:ring-2 focus:ring-violet-100">
+                                @error('wompi_private_key') <p class="text-xs text-rose-600 mt-1">{{ $message }}</p> @enderror
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">
+                                    Secreto de eventos <span class="text-slate-400 font-normal">(events_secret)</span>
+                                </label>
+                                <input type="password" wire:model="wompi_events_secret"
+                                       placeholder="prod_events_... / test_events_..."
+                                       autocomplete="off" spellcheck="false"
+                                       class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-mono focus:border-violet-400 focus:ring-2 focus:ring-violet-100">
+                                <p class="text-[10px] text-slate-500 mt-1">Se usa para validar la firma de los webhooks de Wompi.</p>
+                                @error('wompi_events_secret') <p class="text-xs text-rose-600 mt-1">{{ $message }}</p> @enderror
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">
+                                    Secreto de integridad <span class="text-slate-400 font-normal">(integrity_secret)</span>
+                                </label>
+                                <input type="password" wire:model="wompi_integrity_secret"
+                                       placeholder="prod_integrity_... / test_integrity_..."
+                                       autocomplete="off" spellcheck="false"
+                                       class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-mono focus:border-violet-400 focus:ring-2 focus:ring-violet-100">
+                                <p class="text-[10px] text-slate-500 mt-1">Para firmar transacciones generadas por la plataforma.</p>
+                                @error('wompi_integrity_secret') <p class="text-xs text-rose-600 mt-1">{{ $message }}</p> @enderror
+                            </div>
+                        </div>
+                    </div>
+
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1.5">Notas internas</label>
                         <textarea wire:model="notas_internas" rows="2" class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-2 focus:ring-brand/20"></textarea>

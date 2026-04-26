@@ -29,6 +29,8 @@ class Tenant extends Model
         'color_secundario',
         'openai_api_key',
         'whatsapp_config',
+        'wompi_config',
+        'wompi_modo',
         'notas_internas',
     ];
 
@@ -37,14 +39,16 @@ class Tenant extends Model
         'trial_ends_at'        => 'date',
         'subscription_ends_at' => 'date',
         'whatsapp_config'      => 'array',
-        // 🔐 Cast tolerante: al leer intenta descifrar; si falla (legacy plaintext)
-        //    devuelve el valor tal cual. Al escribir, siempre cifra.
+        // 🔐 wompi_config se cifra como JSON. Las 4 llaves de Wompi viven aquí
+        //    para no exponer cada una como columna independiente.
+        'wompi_config'         => 'encrypted:array',
         'openai_api_key'       => \App\Casts\EncryptedTolerante::class,
     ];
 
     protected $hidden = [
         'openai_api_key',
         'whatsapp_config',
+        'wompi_config',
     ];
 
     public const PLAN_BASICO  = 'basico';
@@ -209,5 +213,39 @@ class Tenant extends Model
         }
         $global = trim((string) env('OPENAI_API_KEY'));
         return $global !== '' ? $global : null;
+    }
+
+    /* ─── WOMPI (pagos) ──────────────────────────────────────────────── */
+
+    /**
+     * Retorna las 4 llaves de Wompi del tenant como array.
+     * Si no hay nada configurado devuelve null.
+     */
+    public function wompiCredenciales(): ?array
+    {
+        $cfg = $this->wompi_config;
+        if (!is_array($cfg)) return null;
+
+        $publica    = trim((string) ($cfg['public_key'] ?? ''));
+        $privada    = trim((string) ($cfg['private_key'] ?? ''));
+        $eventos    = trim((string) ($cfg['events_secret'] ?? ''));
+        $integridad = trim((string) ($cfg['integrity_secret'] ?? ''));
+
+        if ($publica === '' && $privada === '') return null;
+
+        return [
+            'public_key'       => $publica,
+            'private_key'      => $privada,
+            'events_secret'    => $eventos,
+            'integrity_secret' => $integridad,
+            'modo'             => $this->wompi_modo ?: 'sandbox',
+        ];
+    }
+
+    /** ¿El tenant tiene Wompi configurado y listo para cobrar? */
+    public function tieneWompi(): bool
+    {
+        $c = $this->wompiCredenciales();
+        return $c !== null && $c['public_key'] !== '' && $c['integrity_secret'] !== '';
     }
 }
