@@ -73,6 +73,7 @@
                     ['name' => 'Zonas',             'icon' => 'fa-map-location-dot',   'route' => 'zonas.index',            'badge' => null, 'permission' => 'zonas.gestionar'],
                     ['name' => 'Reportes',          'icon' => 'fa-chart-line',         'route' => 'reportes.index',         'badge' => null, 'permission' => 'reportes.ver'],
                     ['name' => 'Encuestas',         'icon' => 'fa-star-half-stroke',   'route' => 'encuestas.index',        'badge' => null, 'permission' => 'reportes.ver'],
+                    ['name' => 'Pagos',             'icon' => 'fa-credit-card',        'route' => 'pagos.index',            'badge' => null, 'permission' => 'reportes.ver'],
                     ['name' => 'ANS Tiempos',       'icon' => 'fa-stopwatch',          'route' => 'ans.index',              'badge' => null, 'permission' => 'ans.gestionar'],
                     ['name' => 'Bot WhatsApp',      'icon' => 'fa-robot',              'route' => 'configuracion.bot',      'badge' => null, 'permission' => 'bot.configurar', 'solo_super_admin' => true],
                     ['name' => 'Sedes',             'icon' => 'fa-shop',               'route' => 'sedes.index',            'badge' => null, 'permission' => 'sedes.gestionar'],
