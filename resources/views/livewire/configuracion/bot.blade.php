@@ -1,14 +1,54 @@
-<div class="px-6 lg:px-10 py-8 max-w-4xl mx-auto">
+<div class="px-4 lg:px-8 py-6"
+     x-data="{ tab: window.localStorage.getItem('bot_cfg_tab') || 'general' }"
+     x-init="$watch('tab', v => window.localStorage.setItem('bot_cfg_tab', v))">
 
     <div class="mb-6">
         <h2 class="text-3xl font-extrabold text-slate-800">Configuración del bot</h2>
-        <p class="text-sm text-slate-500">Ajusta el comportamiento de Sofía y la IA.</p>
+        <p class="text-sm text-slate-500">Ajusta el comportamiento de la asesora IA.</p>
     </div>
 
-    <form wire:submit.prevent="guardar" class="space-y-6">
+    <form wire:submit.prevent="guardar" class="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6 items-start">
+
+        {{-- ╔═══ SIDEBAR DE NAVEGACIÓN ═══╗ --}}
+        <aside class="lg:sticky lg:top-24 self-start space-y-1 rounded-2xl bg-white border border-slate-200 p-2 shadow-sm">
+            @php
+                $tabs = [
+                    'general'    => ['Identidad y empresa',    'fa-user-tie',          'text-blue-600 bg-blue-50'],
+                    'ia'         => ['Motor de IA',            'fa-brain',             'text-emerald-600 bg-emerald-50'],
+                    'mensajes'   => ['Mensajes y media',       'fa-comments',          'text-cyan-600 bg-cyan-50'],
+                    'derivacion' => ['Derivación a humanos',   'fa-headset',           'text-violet-600 bg-violet-50'],
+                    'zonas'      => ['Zonas de cobertura',     'fa-map-location-dot',  'text-sky-600 bg-sky-50'],
+                    'prompt'     => ['Prompt de la IA',        'fa-code',              'text-rose-600 bg-rose-50'],
+                    'encuesta'   => ['Encuesta post-entrega',  'fa-star-half-stroke',  'text-amber-600 bg-amber-50'],
+                    'cumple'     => ['Felicitaciones',         'fa-cake-candles',      'text-pink-600 bg-pink-50'],
+                ];
+            @endphp
+
+            @foreach($tabs as $key => [$label, $icon, $color])
+                <button type="button"
+                        @click="tab = '{{ $key }}'"
+                        :class="tab === '{{ $key }}' ? 'bg-slate-100 text-slate-900' : 'text-slate-600 hover:bg-slate-50'"
+                        class="w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition text-left">
+                    <span class="flex h-8 w-8 items-center justify-center rounded-lg {{ $color }} flex-shrink-0">
+                        <i class="fa-solid {{ $icon }} text-xs"></i>
+                    </span>
+                    <span class="flex-1 truncate">{{ $label }}</span>
+                </button>
+            @endforeach
+
+            <div class="pt-2 mt-2 border-t border-slate-100">
+                <button type="submit"
+                        class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-brand hover:bg-brand-dark px-4 py-2.5 text-sm font-bold text-white shadow transition">
+                    <i class="fa-solid fa-floppy-disk"></i> Guardar todo
+                </button>
+            </div>
+        </aside>
+
+        {{-- ╔═══ ÁREA DE CONTENIDO ═══╗ --}}
+        <div class="space-y-6 min-w-0">
 
         {{-- IDENTIDAD --}}
-        <section class="rounded-2xl bg-white shadow border border-slate-200 p-6">
+        <section x-show="tab === 'general'" x-cloak class="rounded-2xl bg-white shadow border border-slate-200 p-6">
             <div class="flex items-center gap-2 mb-4">
                 <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
                     <i class="fa-solid fa-user-tie"></i>
@@ -37,7 +77,7 @@
         </section>
 
         {{-- ENVÍO DE IMÁGENES --}}
-        <section class="rounded-2xl bg-white shadow border border-slate-200 p-6">
+        <section x-show="tab === 'mensajes'" x-cloak class="rounded-2xl bg-white shadow border border-slate-200 p-6">
             <div class="flex items-center gap-2 mb-4">
                 <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
                     <i class="fa-solid fa-camera"></i>
@@ -97,7 +137,7 @@
         </section>
 
         {{-- ╔═══ TRANSCRIPCIÓN DE AUDIOS (WHISPER) ═══╗ --}}
-        <section class="rounded-2xl bg-white shadow border border-slate-200 p-6">
+        <section x-show="tab === 'mensajes'" x-cloak class="rounded-2xl bg-white shadow border border-slate-200 p-6">
             <div class="flex items-center gap-2 mb-4">
                 <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
                     <i class="fa-solid fa-microphone"></i>
@@ -133,7 +173,7 @@
         </section>
 
         {{-- ╔═══ AGRUPACIÓN DE MENSAJES (DEBOUNCE) ═══╗ --}}
-        <section class="rounded-2xl bg-white shadow border border-slate-200 p-6">
+        <section x-show="tab === 'mensajes'" x-cloak class="rounded-2xl bg-white shadow border border-slate-200 p-6">
             <div class="flex items-center gap-2 mb-4">
                 <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-50 text-cyan-600">
                     <i class="fa-solid fa-comments"></i>
@@ -199,7 +239,7 @@
         </section>
 
         {{-- MOTOR IA --}}
-        <section class="rounded-2xl bg-white shadow border border-slate-200 p-6">
+        <section x-show="tab === 'ia'" x-cloak class="rounded-2xl bg-white shadow border border-slate-200 p-6">
             <div class="flex items-center gap-2 mb-4">
                 <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
                     <i class="fa-solid fa-brain"></i>
@@ -247,7 +287,7 @@
         </section>
 
         {{-- DERIVACIÓN AUTOMÁTICA POR IA --}}
-        <section class="rounded-2xl bg-white shadow border border-slate-200 p-6">
+        <section x-show="tab === 'derivacion'" x-cloak class="rounded-2xl bg-white shadow border border-slate-200 p-6">
             <div class="flex items-center gap-2 mb-4">
                 <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
                     <i class="fa-solid fa-headset"></i>
@@ -320,7 +360,7 @@
         </section>
 
         {{-- INFO EMPRESA --}}
-        <section class="rounded-2xl bg-white shadow border border-slate-200 p-6">
+        <section x-show="tab === 'general'" x-cloak class="rounded-2xl bg-white shadow border border-slate-200 p-6">
             <div class="flex items-center gap-2 mb-4">
                 <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-50 text-orange-600">
                     <i class="fa-solid fa-building"></i>
@@ -340,7 +380,7 @@
         </section>
 
         {{-- ZONAS DE COBERTURA DEL BOT --}}
-        <section class="rounded-2xl bg-white shadow border border-slate-200 p-6">
+        <section x-show="tab === 'zonas'" x-cloak class="rounded-2xl bg-white shadow border border-slate-200 p-6">
             <div class="flex items-center gap-2 mb-4">
                 <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-50 text-sky-600">
                     <i class="fa-solid fa-map-location-dot"></i>
@@ -401,7 +441,7 @@
         </section>
 
         {{-- BIENVENIDA --}}
-        <section class="rounded-2xl bg-white shadow border border-slate-200 p-6">
+        <section x-show="tab === 'general'" x-cloak class="rounded-2xl bg-white shadow border border-slate-200 p-6">
             <div class="flex items-center gap-2 mb-4">
                 <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
                     <i class="fa-solid fa-message"></i>
@@ -417,7 +457,7 @@
 
         {{-- ╔═══ EDITOR DE PROMPT PERSONALIZADO ═══╗ --}}
         {{-- INSTRUCCIONES EXTRA (se SUMAN al prompt, no reemplazan) --}}
-        <section class="rounded-2xl bg-white shadow border border-slate-200 p-6">
+        <section x-show="tab === 'prompt'" x-cloak class="rounded-2xl bg-white shadow border border-slate-200 p-6">
             <div class="flex items-center gap-2 mb-4">
                 <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
                     <i class="fa-solid fa-plus-minus"></i>
@@ -452,7 +492,7 @@
             @enderror
         </section>
 
-        <section class="rounded-2xl bg-white shadow border border-slate-200 p-6">
+        <section x-show="tab === 'prompt'" x-cloak class="rounded-2xl bg-white shadow border border-slate-200 p-6">
             <div class="flex items-center gap-2 mb-4">
                 <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-rose-50 text-rose-600">
                     <i class="fa-solid fa-code"></i>
@@ -721,7 +761,7 @@
              🎂 FELICITACIONES DE CUMPLEAÑOS
              ───────────────────────────────────────────────────────────── --}}
         {{-- ENCUESTA POST-ENTREGA --}}
-        <section class="rounded-2xl bg-white border border-slate-200 p-6 shadow-sm">
+        <section x-show="tab === 'encuesta'" x-cloak class="rounded-2xl bg-white border border-slate-200 p-6 shadow-sm">
             <div class="flex items-center gap-3 mb-4">
                 <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600 text-xl">
                     <i class="fa-solid fa-star-half-stroke"></i>
@@ -767,7 +807,7 @@
             </div>
         </section>
 
-        <section class="rounded-2xl bg-white border border-slate-200 p-6 shadow-sm">
+        <section x-show="tab === 'cumple'" x-cloak class="rounded-2xl bg-white border border-slate-200 p-6 shadow-sm">
             <div class="flex items-center gap-3 mb-4">
                 <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-pink-50 text-pink-600 text-xl">
                     <i class="fa-solid fa-cake-candles"></i>
@@ -1002,12 +1042,14 @@
             </div>
         </section>
 
-        {{-- BOTÓN GUARDAR --}}
+        {{-- BOTÓN GUARDAR (también en el sidebar) --}}
         <div class="flex justify-end pt-4">
             <button type="submit"
                     class="rounded-2xl bg-brand px-8 py-3 text-white font-bold shadow hover:bg-brand-dark transition">
                 <i class="fa-solid fa-floppy-disk mr-2"></i> Guardar configuración
             </button>
         </div>
+
+        </div>{{-- /área de contenido --}}
     </form>
 </div>
