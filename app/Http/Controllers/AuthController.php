@@ -10,13 +10,62 @@ class AuthController extends Controller
     public function showLogin()
     {
         if (Auth::check()) {
-            return redirect()->intended('/pedidos');
+            return redirect()->intended($this->rutaInicialPara(Auth::user()));
         }
 
         // Resolver tenant por subdominio para branding dinámico
         $tenant = $this->resolverTenantLogin();
 
         return view('auth.login', ['tenantBranding' => $tenant]);
+    }
+
+    /**
+     * Devuelve la ruta de inicio más adecuada según los permisos del usuario.
+     * Cada usuario aterriza en la página más útil para SU rol.
+     *
+     * Prioridad:
+     *   1. Super-admin → /admin/tenants (panel de plataforma)
+     *   2. Domiciliario sin acceso de admin → /rutas (sus pedidos asignados)
+     *   3. Operador / cajero / gerente / admin → /pedidos (gestión)
+     *   4. Solo chat → /chat
+     *   5. Solo reportes → /reportes
+     *   6. Fallback → /pedidos
+     */
+    private function rutaInicialPara(\App\Models\User $user): string
+    {
+        // 1. Super-admin
+        try {
+            if ($user->hasRole('super-admin')) {
+                return '/admin/tenants';
+            }
+        } catch (\Throwable $e) { /* ignorar */ }
+
+        // 2. Si SOLO tiene rol "domiciliario" → portal de rutas
+        try {
+            $roles = $user->getRoleNames();
+            if ($roles->count() === 1 && $roles->first() === 'domiciliario') {
+                return '/rutas';
+            }
+        } catch (\Throwable $e) {}
+
+        // 3. Lista de rutas en orden de prioridad: la primera que tenga permiso gana
+        $rutasPorPermiso = [
+            'pedidos.ver'        => '/pedidos',
+            'despachos.gestionar'=> '/rutas',
+            'chat.usar'          => '/chat',
+            'reportes.ver'       => '/reportes',
+            'productos.ver'      => '/productos',
+            'usuarios.ver'       => '/usuarios',
+        ];
+
+        foreach ($rutasPorPermiso as $perm => $ruta) {
+            if ($user->can($perm)) {
+                return $ruta;
+            }
+        }
+
+        // 4. Fallback
+        return '/pedidos';
     }
 
     /**
@@ -61,7 +110,7 @@ class AuthController extends Controller
         $user = Auth::user();
         $user->update(['ultimo_login_at' => now()]);
 
-        return redirect()->intended('/pedidos');
+        return redirect()->intended($this->rutaInicialPara($user));
     }
 
     public function logout(Request $request)
