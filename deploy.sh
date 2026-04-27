@@ -59,7 +59,9 @@ fi
 
 # ─── Paso 1: Descartar cambios locales en assets ───────────────────────────
 step "1/8  Descartando cambios locales del server en public/build/"
-git checkout public/build/ 2>/dev/null || warn "Nada que descartar en public/build/"
+git checkout public/build/ 2>/dev/null || warn "Nada que descartar en public/build/ (tracked)"
+# Borrar archivos sin trackear que también chocan con el merge
+rm -f public/build/assets/app-*.css public/build/assets/app-*.js 2>/dev/null || true
 ok "Listo"
 
 # ─── Paso 2: Pull del repo ─────────────────────────────────────────────────
@@ -106,12 +108,22 @@ ok "Cache recompilado"
 step "7/8  Verificando enlace storage:link"
 docker exec "$CONTAINER_APP" php artisan storage:link 2>/dev/null || ok "Ya existe"
 
-# ─── Paso 8: Reiniciar Reverb ──────────────────────────────────────────────
-step "8/8  Reiniciando Reverb (WebSockets)"
+# ─── Paso 8: Reiniciar Reverb + Queue Worker + Scheduler ───────────────────
+step "8/8  Reiniciando Reverb, Queue Worker y Scheduler"
 if docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_REVERB}$"; then
     docker restart "$CONTAINER_REVERB" > /dev/null && ok "Reverb reiniciado"
 else
     warn "Container Reverb no encontrado — saltando"
+fi
+if docker ps --format '{{.Names}}' | grep -q "^pedidos_hacienda_queue$"; then
+    docker restart pedidos_hacienda_queue > /dev/null && ok "Queue worker reiniciado (toma código nuevo)"
+else
+    warn "Container pedidos_hacienda_queue no encontrado — saltando"
+fi
+if docker ps --format '{{.Names}}' | grep -q "^pedidos_hacienda_scheduler$"; then
+    docker restart pedidos_hacienda_scheduler > /dev/null && ok "Scheduler reiniciado"
+else
+    warn "Container pedidos_hacienda_scheduler no encontrado — saltando"
 fi
 
 # ─── Verificación final ────────────────────────────────────────────────────
