@@ -852,8 +852,11 @@
                     </div>
                     <div x-show="abierto === 'confirmado'" x-cloak class="border-t border-emerald-200 bg-white p-4 space-y-2">
                         <div>
-                            <label class="block text-xs font-bold text-slate-700 mb-1">📝 Plantilla del mensaje de confirmación</label>
-                            <textarea wire:model.lazy="notif_pedido_confirmado_mensaje" rows="14"
+                            <label class="block text-xs font-bold text-slate-700 mb-1">
+                                <i class="fa-regular fa-pen-to-square text-emerald-600"></i> Plantilla del mensaje de confirmación
+                            </label>
+                            <x-emoji-picker target="textarea-notif-confirmado" />
+                            <textarea id="textarea-notif-confirmado" wire:model.lazy="notif_pedido_confirmado_mensaje" rows="14"
                                       class="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-mono leading-relaxed focus:border-emerald-400 focus:ring-1 focus:ring-emerald-100"></textarea>
                             <p class="text-[10px] text-slate-500 mt-1">
                                 Variables: <code>{nombre}</code> <code>{nombre_completo}</code> <code>{pedido}</code> <code>{productos}</code> <code>{direccion}</code> <code>{barrio}</code> <code>{telefono_contacto}</code> <code>{total}</code> <code>{beneficio}</code> <code>{bloque_pago}</code> <code>{link_seguimiento}</code>
@@ -937,8 +940,11 @@
                         {{-- Cuerpo expandible: textarea + delay --}}
                         <div x-show="abierto === '{{ $slug }}'" x-cloak class="border-t border-slate-200 bg-white p-4 space-y-3">
                             <div>
-                                <label class="block text-xs font-bold text-slate-700 mb-1">📝 Plantilla del mensaje</label>
-                                <textarea wire:model.lazy="{{ $keyMensaje }}" rows="5"
+                                <label class="block text-xs font-bold text-slate-700 mb-1">
+                                    <i class="fa-regular fa-pen-to-square text-{{ $color }}-600"></i> Plantilla del mensaje
+                                </label>
+                                <x-emoji-picker :target="'textarea-notif-' . $slug" />
+                                <textarea id="textarea-notif-{{ $slug }}" wire:model.lazy="{{ $keyMensaje }}" rows="5"
                                           class="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-mono leading-relaxed focus:border-{{ $color }}-400 focus:ring-1 focus:ring-{{ $color }}-100"
                                           placeholder="Escribe el mensaje que recibirá el cliente..."></textarea>
                                 <p class="text-[10px] text-slate-500 mt-1">
