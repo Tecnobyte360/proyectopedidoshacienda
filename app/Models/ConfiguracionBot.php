@@ -77,12 +77,12 @@ class ConfiguracionBot extends Model
 
     /** Plantillas por defecto si el tenant no las personaliza. */
     public const NOTIF_DEFAULTS = [
-        'pedido_confirmado' => "¡Listo {nombre}! Tu pedido quedó confirmado ✅\n\n📋 *Pedido #{pedido}*\n{productos}\n\n📍 *Dirección:* {direccion}\n🏘️ *Barrio:* {barrio}\n📞 *Contacto:* {telefono_contacto}\n{beneficio}💵 *Total:* {total}\n{bloque_pago}\n🔎 Puedes seguir tu pedido aquí:\n{link_seguimiento}\n\nGuarda también tu número de pedido *#{pedido}* para futuras consultas 😊",
-        'en_preparacion'  => "{nombre}, ya estamos preparando tu pedido 👨‍🍳🔥\nTe aviso apenas salga para tu casa.",
-        'en_camino'       => "{nombre}, tu pedido ya va en camino 🛵💨\n\nCuando llegue el domiciliario, dile este código para confirmar la entrega:\n\n🔐 *{token}*\n\n¡Ya casi llega! 🙌",
-        'entregado'       => "Listo {nombre} ✅\nTu pedido ya quedó entregado. ¡Gracias por confiar en nosotros! 🙌\n\nEn un momento te paso una encuesta cortica para saber cómo estuvo todo.",
-        'pago_aprobado'   => "✅ {nombre}, recibimos tu pago de {total} 🙌\n\nTu pedido #{pedido} ya quedó *pagado*. Procedemos a prepararlo y te avisamos cuando salga 🛵💨",
-        'pago_rechazado'  => "Hola {nombre}, tu pago no se pudo procesar 🙏.\n\nTu pedido #{pedido} sigue activo. Puedes intentar de nuevo aquí:\n{link_pago}\n\nO escríbenos si prefieres pagar contra entrega.",
+        'pedido_confirmado' => "✨ ¡Pedido confirmado, {nombre}!\n\n🧾 *Pedido #{pedido}*\n{productos}\n\n📍 *Dirección:* {direccion}\n🏘️ *Barrio:* {barrio}\n☎️ *Contacto:* {telefono_contacto}\n{beneficio}💰 *Total:* {total}\n{bloque_pago}\n🔗 Seguir tu pedido aquí:\n{link_seguimiento}\n\nGuarda *#{pedido}* para futuras consultas. 🙌",
+        'en_preparacion'  => "🍳 {nombre}, ya estamos preparando tu pedido.\nTe aviso apenas salga para tu casa.",
+        'en_camino'       => "🛵 {nombre}, tu pedido va en camino.\n\nCuando llegue el domiciliario, dile este código para confirmar la entrega:\n\n🔐 *{token}*\n\n¡Ya casi llega! 🙌",
+        'entregado'       => "✅ Listo {nombre}.\n\nTu pedido fue entregado. ¡Gracias por confiar en nosotros!\n\nEn un momento te paso una encuesta cortica para saber cómo estuvo todo. 🌟",
+        'pago_aprobado'   => "💳 {nombre}, recibimos tu pago de {total}.\n\nTu pedido *#{pedido}* ya quedó pagado. Procedemos a prepararlo y te avisamos cuando salga. 🛵",
+        'pago_rechazado'  => "⚠️ Hola {nombre}, tu pago no se pudo procesar.\n\nTu pedido *#{pedido}* sigue activo. Puedes intentar de nuevo aquí:\n🔗 {link_pago}\n\nO escríbenos si prefieres pagar contra entrega. 🙌",
     ];
 
     protected $casts = [
