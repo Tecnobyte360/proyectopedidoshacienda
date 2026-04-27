@@ -828,22 +828,26 @@
             <div class="space-y-3" x-data="{ abierto: '' }">
 
                 {{-- Card especial: mensaje de confirmación del pedido (siempre activo, sin delay) --}}
-                <div class="rounded-xl border-2 border-emerald-300 bg-emerald-50/40 overflow-hidden">
-                    <div class="flex items-center gap-3 p-4">
-                        <span class="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600">
-                            <i class="fa-solid fa-receipt"></i>
+                <div class="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50/60 to-white shadow-sm hover:shadow-md transition overflow-hidden">
+                    <div class="flex items-center gap-4 p-4">
+                        <span class="flex h-12 w-12 items-center justify-center rounded-xl text-white shadow-md flex-shrink-0"
+                              style="background: linear-gradient(135deg, #10b981, #059669);">
+                            <i class="fa-solid fa-clipboard-check text-lg"></i>
                         </span>
                         <div class="flex-1 min-w-0">
-                            <div class="flex items-center gap-2">
-                                <span class="text-sm font-bold text-slate-800">📋 Pedido confirmado (resumen + total + link)</span>
-                                <span class="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">SIEMPRE</span>
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="text-sm font-bold text-slate-800">Pedido confirmado</span>
+                                <span class="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                                    <i class="fa-solid fa-bolt text-[8px]"></i> SIEMPRE
+                                </span>
                             </div>
-                            <div class="text-[11px] text-slate-500 mt-0.5">El bot envía este mensaje justo después de confirmar el pedido. No se puede desactivar — es parte del flujo.</div>
+                            <div class="text-[11px] text-slate-500 mt-0.5">Resumen + total + link. Parte del flujo, no se puede desactivar.</div>
                         </div>
                         <button type="button" @click="abierto = (abierto === 'confirmado' ? '' : 'confirmado')"
-                                class="rounded-lg bg-slate-100 hover:bg-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700">
-                            <i class="fa-solid" :class="abierto === 'confirmado' ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
-                            Editar
+                                class="inline-flex items-center gap-1.5 rounded-xl bg-white border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50 px-3 py-2 text-xs font-bold text-slate-700 transition shadow-sm">
+                            <i class="fa-regular fa-pen-to-square text-emerald-600"></i>
+                            <span>Editar</span>
+                            <i class="fa-solid text-[10px] text-slate-400" :class="abierto === 'confirmado' ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
                         </button>
                     </div>
                     <div x-show="abierto === 'confirmado'" x-cloak class="border-t border-emerald-200 bg-white p-4 space-y-2">
@@ -864,16 +868,17 @@
                 </div>
 
                 @php
+                    // [slug, titulo, icon FA, color base, descripcion, gradient_from, gradient_to]
                     $notifs = [
-                        ['en_preparacion', '👨‍🍳 En preparación', 'fa-fire', 'amber',  'Cuando el pedido pasa a "en preparación".'],
-                        ['en_camino',      '🛵 En camino + código', 'fa-motorcycle', 'violet', 'Cuando sale el domiciliario.'],
-                        ['entregado',      '✅ Pedido entregado', 'fa-circle-check', 'emerald', 'Cuando se marca como entregado.'],
-                        ['pago_aprobado',  '💳 Pago aprobado (Wompi)', 'fa-circle-dollar-to-slot', 'blue',  'Cuando el webhook de Wompi confirma.'],
-                        ['pago_rechazado', '❌ Pago rechazado (Wompi)', 'fa-circle-xmark', 'rose',  'Cuando el pago falla.'],
+                        ['en_preparacion', 'En preparación',       'fa-utensils',         'amber',   'Pedido pasa a "en preparación".',     '#f59e0b', '#d97706'],
+                        ['en_camino',      'En camino con código', 'fa-truck-fast',       'violet',  'Sale el domiciliario.',                '#8b5cf6', '#6d28d9'],
+                        ['entregado',      'Pedido entregado',     'fa-circle-check',     'emerald', 'Se marca como entregado.',             '#10b981', '#059669'],
+                        ['pago_aprobado',  'Pago aprobado',        'fa-shield-halved',    'blue',    'Webhook Wompi confirma el pago.',      '#3b82f6', '#2563eb'],
+                        ['pago_rechazado', 'Pago rechazado',       'fa-triangle-exclamation','rose', 'El pago falla, link para reintentar.', '#f43f5e', '#e11d48'],
                     ];
                 @endphp
 
-                @foreach($notifs as [$slug, $titulo, $icon, $color, $cuando])
+                @foreach($notifs as [$slug, $titulo, $icon, $color, $cuando, $gradFrom, $gradTo])
                     @php
                         $keyActivo  = "notif_{$slug}_activa";
                         $keyMensaje = "notif_{$slug}_mensaje";
@@ -881,37 +886,52 @@
                         $valActivo  = $$keyActivo;
                         $valDelay   = $$keyDelay;
                     @endphp
-                    <div class="rounded-xl border-2 transition overflow-hidden
-                                {{ $valActivo ? "border-{$color}-300 bg-{$color}-50/40" : 'border-slate-200 bg-white' }}">
-                        {{-- Header: toggle + título + delay + expandir --}}
-                        <div class="flex items-center gap-3 p-4">
-                            <input type="checkbox" wire:model.live="{{ $keyActivo }}"
-                                   class="rounded border-slate-300 h-5 w-5 text-{{ $color }}-600">
+                    <div class="rounded-2xl border transition overflow-hidden shadow-sm hover:shadow-md
+                                {{ $valActivo
+                                    ? "border-{$color}-200 bg-gradient-to-br from-{$color}-50/60 to-white"
+                                    : 'border-slate-200 bg-white opacity-75' }}">
+
+                        {{-- Header: icono + título + estado + delay + expandir --}}
+                        <div class="flex items-center gap-4 p-4">
+                            {{-- Icono con gradiente (apagado si está OFF) --}}
+                            <span class="flex h-12 w-12 items-center justify-center rounded-xl text-white shadow-md flex-shrink-0 transition"
+                                  style="background: {{ $valActivo ? "linear-gradient(135deg, {$gradFrom}, {$gradTo})" : 'linear-gradient(135deg, #cbd5e1, #94a3b8)' }};">
+                                <i class="fa-solid {{ $icon }} text-lg"></i>
+                            </span>
+
+                            {{-- Toggle estilo switch --}}
+                            <label class="inline-flex items-center cursor-pointer flex-shrink-0">
+                                <input type="checkbox" wire:model.live="{{ $keyActivo }}" class="sr-only peer">
+                                <div class="relative w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-{{ $color }}-500"></div>
+                            </label>
+
                             <div class="flex-1 min-w-0">
-                                <div class="flex items-center gap-2">
-                                    <i class="fa-solid {{ $icon }} text-slate-500"></i>
+                                <div class="flex items-center gap-2 flex-wrap">
                                     <span class="text-sm font-bold text-slate-800">{{ $titulo }}</span>
                                     @if($valActivo)
-                                        <span class="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">ACTIVO</span>
+                                        <span class="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                                            <i class="fa-solid fa-circle text-[6px] text-emerald-500 animate-pulse"></i> ACTIVO
+                                        </span>
                                     @else
-                                        <span class="text-[10px] font-bold text-slate-500 bg-slate-200 px-2 py-0.5 rounded-full">OFF</span>
+                                        <span class="inline-flex items-center gap-1 text-[10px] font-bold text-slate-500 bg-slate-200 px-2 py-0.5 rounded-full">
+                                            <i class="fa-solid fa-power-off text-[8px]"></i> APAGADO
+                                        </span>
+                                    @endif
+                                    @if($valDelay > 0)
+                                        <span class="inline-flex items-center gap-1 text-[10px] font-bold bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full" title="Demora antes de enviar">
+                                            <i class="fa-regular fa-clock text-[9px]"></i> {{ $valDelay }}s
+                                        </span>
                                     @endif
                                 </div>
                                 <div class="text-[11px] text-slate-500 mt-0.5">{{ $cuando }}</div>
                             </div>
 
-                            <div class="flex items-center gap-2 flex-shrink-0">
-                                @if($valDelay > 0)
-                                    <span class="text-[10px] font-bold bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">
-                                        <i class="fa-solid fa-clock"></i> {{ $valDelay }}s
-                                    </span>
-                                @endif
-                                <button type="button" @click="abierto = (abierto === '{{ $slug }}' ? '' : '{{ $slug }}')"
-                                        class="rounded-lg bg-slate-100 hover:bg-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700">
-                                    <i class="fa-solid" :class="abierto === '{{ $slug }}' ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
-                                    Editar
-                                </button>
-                            </div>
+                            <button type="button" @click="abierto = (abierto === '{{ $slug }}' ? '' : '{{ $slug }}')"
+                                    class="inline-flex items-center gap-1.5 rounded-xl bg-white border border-slate-200 hover:border-{{ $color }}-300 hover:bg-{{ $color }}-50 px-3 py-2 text-xs font-bold text-slate-700 transition shadow-sm flex-shrink-0">
+                                <i class="fa-regular fa-pen-to-square text-{{ $color }}-600"></i>
+                                <span class="hidden sm:inline">Editar</span>
+                                <i class="fa-solid text-[10px] text-slate-400 transition" :class="abierto === '{{ $slug }}' ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+                            </button>
                         </div>
 
                         {{-- Cuerpo expandible: textarea + delay --}}
