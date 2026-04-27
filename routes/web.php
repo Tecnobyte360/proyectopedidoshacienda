@@ -137,9 +137,10 @@ Route::middleware(['no_super_sin_imp'])->group(function () {
     // principal puede tocarlos. Lo movemos abajo con `solo_principal`.
 });
 
-// 🔒 Roles globales — solo super-admin desde dominio principal
+// Roles: cada admin gestiona los roles propios de su tenant.
+// El componente filtra y bloquea edición de roles globales para no super-admin.
 Route::get('/roles', RolesIndex::class)
-    ->middleware(['permission:roles.gestionar', 'solo_principal'])
+    ->middleware('permission:roles.gestionar')
     ->name('roles.index');
 
 // 🌟 SUPER-ADMIN — solo TecnoByte360 (dueño plataforma).

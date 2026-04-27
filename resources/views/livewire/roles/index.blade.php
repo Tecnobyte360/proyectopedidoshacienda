@@ -10,7 +10,13 @@
                     </div>
                     <div>
                         <h2 class="text-2xl font-extrabold text-slate-800">Roles y Permisos</h2>
-                        <p class="text-sm text-slate-500">Define qué puede hacer cada rol en la plataforma</p>
+                        <p class="text-sm text-slate-500">
+                            @if($esSuperAdmin)
+                                Como super-admin, gestionas roles globales y de cualquier tenant.
+                            @else
+                                Crea y personaliza roles para los usuarios de tu empresa. Los roles del SISTEMA son plantillas read-only que puedes clonar.
+                            @endif
+                        </p>
                     </div>
                 </div>
                 <button wire:click="abrirModalCrear"
@@ -48,19 +54,38 @@
                                     </p>
                                 </div>
                             </div>
-                            <div class="flex gap-1">
-                                <button wire:click="abrirModalEditar({{ $rol->id }})"
-                                        class="flex h-8 w-8 items-center justify-center rounded-lg bg-white/20 hover:bg-white/30 backdrop-blur-sm transition"
-                                        title="Editar">
-                                    <i class="fa-solid fa-pen-to-square text-xs"></i>
-                                </button>
-                                @if($rol->name !== 'admin')
-                                    <button wire:click="eliminar({{ $rol->id }})"
-                                            wire:confirm="¿Eliminar el rol '{{ $rol->name }}'?"
-                                            class="flex h-8 w-8 items-center justify-center rounded-lg bg-white/20 hover:bg-rose-500 backdrop-blur-sm transition"
-                                            title="Eliminar">
-                                        <i class="fa-solid fa-trash text-xs"></i>
+                            <div class="flex items-center gap-1">
+                                @if(($rol->es_global ?? false))
+                                    <span class="inline-flex items-center gap-1 rounded-full bg-white/25 backdrop-blur-sm px-2 py-1 text-[10px] font-bold uppercase tracking-wider"
+                                          title="Rol del sistema — no editable">
+                                        <i class="fa-solid fa-lock text-[9px]"></i> SISTEMA
+                                    </span>
+                                    <button wire:click="clonar({{ $rol->id }})"
+                                            class="flex h-8 w-8 items-center justify-center rounded-lg bg-white/20 hover:bg-white/40 backdrop-blur-sm transition"
+                                            title="Clonar para personalizar">
+                                        <i class="fa-solid fa-copy text-xs"></i>
                                     </button>
+                                @else
+                                    <span class="inline-flex items-center gap-1 rounded-full bg-emerald-400/40 backdrop-blur-sm px-2 py-1 text-[10px] font-bold uppercase tracking-wider"
+                                          title="Rol propio del tenant">
+                                        <i class="fa-solid fa-building text-[9px]"></i> MI EMPRESA
+                                    </span>
+                                @endif
+
+                                @if($rol->es_editable ?? false)
+                                    <button wire:click="abrirModalEditar({{ $rol->id }})"
+                                            class="flex h-8 w-8 items-center justify-center rounded-lg bg-white/20 hover:bg-white/30 backdrop-blur-sm transition"
+                                            title="Editar">
+                                        <i class="fa-solid fa-pen-to-square text-xs"></i>
+                                    </button>
+                                    @if($rol->name !== 'admin' && !($rol->es_global ?? false))
+                                        <button wire:click="eliminar({{ $rol->id }})"
+                                                wire:confirm="¿Eliminar el rol '{{ $rol->name }}'?"
+                                                class="flex h-8 w-8 items-center justify-center rounded-lg bg-white/20 hover:bg-rose-500 backdrop-blur-sm transition"
+                                                title="Eliminar">
+                                            <i class="fa-solid fa-trash text-xs"></i>
+                                        </button>
+                                    @endif
                                 @endif
                             </div>
                         </div>

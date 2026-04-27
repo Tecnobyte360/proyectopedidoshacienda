@@ -104,12 +104,14 @@ class RolesPermisosSeeder extends Seeder
         // 🔒 PERMISOS DE PLATAFORMA — exclusivos del super-admin (dueño TecnoByte360).
         // Un admin de tenant (cliente) NUNCA debe tenerlos, porque le darían
         // poder sobre OTROS tenants (ver/editar planes, pagos, etc.).
+        // 'roles.gestionar' SÍ se da a admin de tenant porque la lógica del
+        // componente Roles\\Index protege que solo edite SUS roles (con tenant_id),
+        // los globales (tenant_id=null) son read-only para no super-admin.
         $permisosPlataforma = [
             'tenants.gestionar',
             'planes.gestionar',
             'suscripciones.gestionar',
             'pagos.gestionar',
-            'roles.gestionar',   // editar matriz de permisos = afectaría a TODOS los tenants
         ];
 
         // Permisos de operación = todos los catalogados aquí MENOS los de plataforma
