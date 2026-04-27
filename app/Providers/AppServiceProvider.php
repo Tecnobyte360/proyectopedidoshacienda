@@ -36,15 +36,31 @@ class AppServiceProvider extends ServiceProvider
     }
 
     // 🔓 Super-admin tiene acceso a TODO automáticamente.
-    // Devuelve true si el usuario tiene rol 'super-admin' — bypassa cualquier
-    // chequeo de permisos. Cualquier permiso que se agregue al sistema
-    // queda accesible para super-admin sin necesidad de re-seedear.
+    // Bypassa cualquier chequeo de permisos. Hacemos query directa a BD
+    // (no Spatie cache) para que sea robusto frente a cambios de tenant
+    // contexto y cache invalidations.
     Gate::before(function ($user, $ability) {
-        try {
-            return $user?->hasRole('super-admin') ? true : null;
-        } catch (\Throwable $e) {
-            return null;
+        if (!$user) return null;
+
+        // Cachear el resultado en memoria por request para no consultar BD
+        // en cada chequeo (puede haber decenas en una sola request).
+        static $esSuperPorUsuario = [];
+        $key = $user->id;
+
+        if (!array_key_exists($key, $esSuperPorUsuario)) {
+            try {
+                $esSuperPorUsuario[$key] = \Illuminate\Support\Facades\DB::table('model_has_roles')
+                    ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
+                    ->where('model_has_roles.model_id', $user->id)
+                    ->where('model_has_roles.model_type', get_class($user))
+                    ->where('roles.name', 'super-admin')
+                    ->exists();
+            } catch (\Throwable $e) {
+                $esSuperPorUsuario[$key] = false;
+            }
         }
+
+        return $esSuperPorUsuario[$key] ? true : null;
     });
 }
 }
