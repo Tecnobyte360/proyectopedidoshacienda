@@ -151,6 +151,16 @@ class RolesPermisosSeeder extends Seeder
             'clientes.ver',
         ]);
 
+        // 💬 Rol del sistema: SOLO acceso al chat en vivo.
+        // Útil para agentes de atención al cliente que no deben ver pedidos,
+        // productos ni reportes — solo responder mensajes de WhatsApp.
+        $chatOnly = Role::firstOrCreate(['name' => 'chat-only', 'guard_name' => 'web']);
+        $chatOnly->syncPermissions([
+            'chat.usar',
+            'conversaciones.ver',
+            'clientes.ver',
+        ]);
+
         // Crear usuario admin por defecto si no hay ninguno
         if (User::count() === 0) {
             $u = User::create([
