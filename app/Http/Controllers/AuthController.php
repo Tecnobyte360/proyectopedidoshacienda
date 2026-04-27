@@ -10,7 +10,7 @@ class AuthController extends Controller
     public function showLogin()
     {
         if (Auth::check()) {
-            return redirect()->intended($this->rutaInicialPara(Auth::user()));
+            return redirect($this->rutaInicialPara(Auth::user()));
         }
 
         // Resolver tenant por subdominio para branding dinámico
@@ -40,11 +40,13 @@ class AuthController extends Controller
             }
         } catch (\Throwable $e) { /* ignorar */ }
 
-        // 2. Si SOLO tiene rol "domiciliario" → portal de rutas
+        // 2. Roles especiales con destino exclusivo
         try {
             $roles = $user->getRoleNames();
-            if ($roles->count() === 1 && $roles->first() === 'domiciliario') {
-                return '/rutas';
+            if ($roles->count() === 1) {
+                $unicoRol = $roles->first();
+                if ($unicoRol === 'domiciliario') return '/rutas';
+                if ($unicoRol === 'chat-only')   return '/chat';
             }
         } catch (\Throwable $e) {}
 
@@ -110,7 +112,12 @@ class AuthController extends Controller
         $user = Auth::user();
         $user->update(['ultimo_login_at' => now()]);
 
-        return redirect()->intended($this->rutaInicialPara($user));
+        // Limpiar la URL "intended" — el usuario podría haber intentado entrar
+        // a una ruta que no le corresponde según su rol. Lo enviamos a SU ruta
+        // inicial calculada por permisos.
+        $request->session()->forget('url.intended');
+
+        return redirect($this->rutaInicialPara($user));
     }
 
     public function logout(Request $request)
