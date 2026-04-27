@@ -2458,73 +2458,49 @@ TXT;
         string $name,
         ?\App\Models\BeneficioCliente $beneficioAplicado = null
     ): string {
-        $lineas = [
-            "¡Listo {$name}! Tu pedido quedó confirmado ✅",
-            '',
-            "📋 *Pedido #{$pedido->id}*",
-        ];
+        $cfgBot = \App\Models\ConfiguracionBot::actual();
 
+        // Construir lista de productos como string multilínea
+        $productosTxt = [];
         foreach (($orderData['products'] ?? []) as $prod) {
             $cant = $this->formatearCantidadPedido((float) ($prod['quantity'] ?? 1));
             $unidad = $prod['unit'] ?? 'unidad';
-            $lineas[] = "• {$prod['name']} — {$cant} {$unidad}";
+            $productosTxt[] = "• {$prod['name']} — {$cant} {$unidad}";
         }
+        $productosStr = implode("\n", $productosTxt);
 
-        $lineas[] = '';
-
-        if (!empty($orderData['address'])) {
-            $lineas[] = "📍 *Dirección:* {$orderData['address']}";
-        }
-
-        if (!empty($orderData['neighborhood'])) {
-            $lineas[] = "🏘️ *Barrio:* {$orderData['neighborhood']}";
-        }
-
-        if (!empty($pedido->hora_entrega)) {
-            $lineas[] = "🕒 *Entrega estimada:* {$pedido->hora_entrega}";
-        }
-
-        if (!empty($pedido->telefono_contacto)) {
-            $lineas[] = "📞 *Contacto:* {$pedido->telefono_contacto}";
-        }
-
-        // 🎁 Si se aplicó un beneficio, avisarle al cliente para que sepa
-        // que ya lo usamos automáticamente (evita que pregunte después).
+        // Beneficio aplicado (línea opcional)
+        $beneficioTxt = '';
         if ($beneficioAplicado) {
-            $lineas[] = '';
-            $lineas[] = "🎁 *Envío GRATIS aplicado* (beneficio por "
-                . $beneficioAplicado->origen . ") — no pagaste costo de envío.";
+            $beneficioTxt = "🎁 *Envío GRATIS aplicado* (beneficio por {$beneficioAplicado->origen}) — no pagaste costo de envío.\n";
         }
 
-        $total = (float) $pedido->total;
-        if ($total > 0) {
-            $lineas[] = "💵 *Total:* $" . number_format($total, 0, ',', '.');
-        }
-
-        // 💳 Link de pago Wompi — solo si el tenant tiene Wompi configurado Y
-        // el toggle 'enviar_link_pago' está activo en la configuración del bot.
-        $linkPago = null;
-        $cfgBot = \App\Models\ConfiguracionBot::actual();
+        // Bloque de pago (opcional, solo si Wompi está activo)
+        $bloquePago = '';
         if ($cfgBot->enviar_link_pago ?? true) {
             try {
                 $linkPago = $pedido->urlPagoWompi();
+                if ($linkPago) {
+                    $bloquePago = "\n💳 *Paga ahora con tarjeta, Nequi o PSE:*\n{$linkPago}\n(También puedes pagar contra entrega)\n";
+                }
             } catch (\Throwable $e) { /* ignorar */ }
         }
 
-        if ($linkPago) {
-            $lineas[] = '';
-            $lineas[] = "💳 *Paga ahora con tarjeta, Nequi o PSE:*";
-            $lineas[] = $linkPago;
-            $lineas[] = "(También puedes pagar contra entrega)";
-        }
+        // Plantilla configurable o default
+        $plantilla = trim((string) ($cfgBot->notif_pedido_confirmado_mensaje ?? ''))
+            ?: \App\Models\ConfiguracionBot::NOTIF_DEFAULTS['pedido_confirmado'];
 
-        $lineas[] = '';
-        $lineas[] = "🔎 Puedes seguir tu pedido aquí:";
-        $lineas[] = $pedido->url_seguimiento;
-        $lineas[] = '';
-        $lineas[] = "Guarda también tu número de pedido *#{$pedido->id}* para futuras consultas 😊";
-
-        return implode("\n", $lineas);
+        // Renderizar con variables — usa el helper del modelo + extras específicos
+        return $pedido->renderizarPlantilla($plantilla, [
+            'productos'         => $productosStr,
+            'direccion'         => $orderData['address'] ?? $pedido->direccion ?? '',
+            'barrio'            => $orderData['neighborhood'] ?? $pedido->barrio ?? '',
+            'telefono_contacto' => $pedido->telefono_contacto ?? '',
+            'hora_entrega'      => $pedido->hora_entrega ?? '',
+            'beneficio'         => $beneficioTxt,
+            'bloque_pago'       => $bloquePago,
+            'link_seguimiento'  => $pedido->url_seguimiento,
+        ]);
     }
 
     /*

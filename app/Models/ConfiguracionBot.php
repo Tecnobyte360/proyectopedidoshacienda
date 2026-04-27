@@ -62,6 +62,7 @@ class ConfiguracionBot extends Model
         'notif_entregado_activa',
         'notif_pago_aprobado_activa',
         'notif_pago_rechazado_activa',
+        'notif_pedido_confirmado_mensaje',
         'notif_en_preparacion_mensaje',
         'notif_en_camino_mensaje',
         'notif_entregado_mensaje',
@@ -76,6 +77,7 @@ class ConfiguracionBot extends Model
 
     /** Plantillas por defecto si el tenant no las personaliza. */
     public const NOTIF_DEFAULTS = [
+        'pedido_confirmado' => "¡Listo {nombre}! Tu pedido quedó confirmado ✅\n\n📋 *Pedido #{pedido}*\n{productos}\n\n📍 *Dirección:* {direccion}\n🏘️ *Barrio:* {barrio}\n📞 *Contacto:* {telefono_contacto}\n{beneficio}💵 *Total:* {total}\n{bloque_pago}\n🔎 Puedes seguir tu pedido aquí:\n{link_seguimiento}\n\nGuarda también tu número de pedido *#{pedido}* para futuras consultas 😊",
         'en_preparacion'  => "{nombre}, ya estamos preparando tu pedido 👨‍🍳🔥\nTe aviso apenas salga para tu casa.",
         'en_camino'       => "{nombre}, tu pedido ya va en camino 🛵💨\n\nCuando llegue el domiciliario, dile este código para confirmar la entrega:\n\n🔐 *{token}*\n\n¡Ya casi llega! 🙌",
         'entregado'       => "Listo {nombre} ✅\nTu pedido ya quedó entregado. ¡Gracias por confiar en nosotros! 🙌\n\nEn un momento te paso una encuesta cortica para saber cómo estuvo todo.",

@@ -77,6 +77,7 @@ class Bot extends Component
     public bool   $notif_pago_rechazado_activa = true;
 
     // Plantillas + delays editables por tipo
+    public string $notif_pedido_confirmado_mensaje = '';
     public string $notif_en_preparacion_mensaje = '';
     public string $notif_en_camino_mensaje      = '';
     public string $notif_entregado_mensaje      = '';
@@ -172,6 +173,7 @@ class Bot extends Component
         $this->notif_pago_rechazado_activa = (bool) ($cfg->notif_pago_rechazado_activa ?? true);
 
         $D = ConfiguracionBot::NOTIF_DEFAULTS;
+        $this->notif_pedido_confirmado_mensaje = (string) ($cfg->notif_pedido_confirmado_mensaje ?: $D['pedido_confirmado']);
         $this->notif_en_preparacion_mensaje = (string) ($cfg->notif_en_preparacion_mensaje ?: $D['en_preparacion']);
         $this->notif_en_camino_mensaje      = (string) ($cfg->notif_en_camino_mensaje      ?: $D['en_camino']);
         $this->notif_entregado_mensaje      = (string) ($cfg->notif_entregado_mensaje      ?: $D['entregado']);
@@ -562,6 +564,7 @@ class Bot extends Component
             'notif_entregado_activa'                => 'boolean',
             'notif_pago_aprobado_activa'            => 'boolean',
             'notif_pago_rechazado_activa'           => 'boolean',
+            'notif_pedido_confirmado_mensaje'       => 'nullable|string|max:3000',
             'notif_en_preparacion_mensaje'          => 'nullable|string|max:2000',
             'notif_en_camino_mensaje'               => 'nullable|string|max:2000',
             'notif_entregado_mensaje'               => 'nullable|string|max:2000',

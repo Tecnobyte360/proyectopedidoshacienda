@@ -826,6 +826,43 @@
             </div>
 
             <div class="space-y-3" x-data="{ abierto: '' }">
+
+                {{-- Card especial: mensaje de confirmación del pedido (siempre activo, sin delay) --}}
+                <div class="rounded-xl border-2 border-emerald-300 bg-emerald-50/40 overflow-hidden">
+                    <div class="flex items-center gap-3 p-4">
+                        <span class="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600">
+                            <i class="fa-solid fa-receipt"></i>
+                        </span>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2">
+                                <span class="text-sm font-bold text-slate-800">📋 Pedido confirmado (resumen + total + link)</span>
+                                <span class="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">SIEMPRE</span>
+                            </div>
+                            <div class="text-[11px] text-slate-500 mt-0.5">El bot envía este mensaje justo después de confirmar el pedido. No se puede desactivar — es parte del flujo.</div>
+                        </div>
+                        <button type="button" @click="abierto = (abierto === 'confirmado' ? '' : 'confirmado')"
+                                class="rounded-lg bg-slate-100 hover:bg-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700">
+                            <i class="fa-solid" :class="abierto === 'confirmado' ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+                            Editar
+                        </button>
+                    </div>
+                    <div x-show="abierto === 'confirmado'" x-cloak class="border-t border-emerald-200 bg-white p-4 space-y-2">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">📝 Plantilla del mensaje de confirmación</label>
+                            <textarea wire:model.lazy="notif_pedido_confirmado_mensaje" rows="14"
+                                      class="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-mono leading-relaxed focus:border-emerald-400 focus:ring-1 focus:ring-emerald-100"></textarea>
+                            <p class="text-[10px] text-slate-500 mt-1">
+                                Variables: <code>{nombre}</code> <code>{nombre_completo}</code> <code>{pedido}</code> <code>{productos}</code> <code>{direccion}</code> <code>{barrio}</code> <code>{telefono_contacto}</code> <code>{total}</code> <code>{beneficio}</code> <code>{bloque_pago}</code> <code>{link_seguimiento}</code>
+                            </p>
+                            <p class="text-[10px] text-slate-500 mt-0.5">
+                                <strong>{productos}</strong> es el listado formateado (multilínea con cantidades).
+                                <strong>{beneficio}</strong> aparece solo si se aplicó envío gratis.
+                                <strong>{bloque_pago}</strong> aparece solo si Wompi está activado.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
                 @php
                     $notifs = [
                         ['en_preparacion', '👨‍🍳 En preparación', 'fa-fire', 'amber',  'Cuando el pedido pasa a "en preparación".'],
