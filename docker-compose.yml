@@ -16,6 +16,8 @@ services:
     environment:
       BROADCAST_CONNECTION: reverb
       QUEUE_CONNECTION: database
+      CACHE_STORE: database
+      SESSION_DRIVER: database
       REVERB_APP_ID: pedidos_hacienda
       REVERB_APP_KEY: app-key
       REVERB_APP_SECRET: app-secret
@@ -36,6 +38,8 @@ services:
       APP_ENV: production
       APP_DEBUG: "false"
       QUEUE_CONNECTION: database
+      CACHE_STORE: database
+      SESSION_DRIVER: database
       REVERB_APP_ID: pedidos_hacienda
       REVERB_APP_KEY: app-key
       REVERB_APP_SECRET: app-secret
@@ -70,6 +74,8 @@ services:
       APP_ENV: production
       APP_DEBUG: "false"
       QUEUE_CONNECTION: database
+      CACHE_STORE: database
+      SESSION_DRIVER: database
 
   # Queue Worker: procesa jobs en cola de forma continua.
   # Maneja: encuestas post-entrega, notificaciones Wompi, jobs delayed, etc.
@@ -91,6 +97,8 @@ services:
       APP_ENV: production
       APP_DEBUG: "false"
       QUEUE_CONNECTION: database
+      CACHE_STORE: database
+      SESSION_DRIVER: database
 
   pedidos_hacienda_db:
     image: mysql:8.0
