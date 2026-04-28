@@ -75,6 +75,36 @@ class SetCurrentTenant
             if (!$tenant->tieneAccesoActivo() && !auth()->user()?->isSuperAdmin()) {
                 abort(403, "Tu cuenta está suspendida o tu suscripción venció. Contacta al soporte.");
             }
+
+            // Si el usuario está logueado pero pertenece a OTRO tenant,
+            // redirigirlo al suyo (mejor UX que un 403 generico).
+            // Excepciones: super-admin puede entrar a cualquier tenant; si
+            // esta impersonando, ya paso por el flujo correcto.
+            if (auth()->check()) {
+                $user = auth()->user();
+                $esSuperAdmin = $user->tenant_id === null
+                    && method_exists($user, 'hasRole')
+                    && $user->hasRole('super-admin');
+                $estaImpersonando = session()->has('tenant_imitado_id');
+
+                if (!$esSuperAdmin && !$estaImpersonando
+                    && $user->tenant_id
+                    && (int) $user->tenant_id !== (int) $tenant->id) {
+
+                    $miTenant = Tenant::find($user->tenant_id);
+                    if ($miTenant && $miTenant->slug) {
+                        $base = config('app.tenant_base_domain', 'tecnobyte360.com');
+                        $scheme = $request->getScheme() ?: 'https';
+                        $url = "{$scheme}://{$miTenant->slug}.{$base}/pedidos";
+                        return redirect()->away($url);
+                    }
+                    // Sin tenant resoluble, cerrar sesion
+                    auth()->logout();
+                    session()->invalidate();
+                    return redirect('/login');
+                }
+            }
+
             $manager->set($tenant);
         }
 
