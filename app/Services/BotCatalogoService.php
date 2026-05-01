@@ -54,27 +54,52 @@ class BotCatalogoService
                             ->keyBy(fn ($p) => (string) $p->codigo);
                     }
 
-                    // Por cada fila del ERP: si hay match local → usar Producto
-                    // Eloquent con precio sobreescrito; si no → stdClass virtual.
-                    return $liveRows->map(function ($row) use ($localesPorCodigo) {
+                    // 1) Por cada fila del ERP: si hay match local → usar Producto
+                    //    Eloquent con precio sobreescrito; si no → stdClass virtual.
+                    $resultadoErp = $liveRows->map(function ($row) use ($localesPorCodigo) {
                         $codigo = (string) ($row->codigo ?? '');
                         $local  = $codigo !== '' ? $localesPorCodigo->get($codigo) : null;
 
                         if ($local) {
-                            // Overrides del ERP (precio actual + unidad si vino)
                             $local->precio_base = (float) ($row->precio_base ?? $local->precio_base);
                             if (!empty($row->unidad)) {
                                 $local->unidad = $row->unidad;
                             }
-                            // Marcar como "fuente live" para debug
-                            $local->setAttribute('_fuente', 'live_local');
+                            $local->setAttribute('_fuente', 'erp+local');
                             return $local;
                         }
 
-                        // Sin match local: virtual con campos minimos
-                        $row->_fuente = 'live_only';
+                        $row->_fuente = 'solo_erp';
                         return $row;
                     });
+
+                    // 2) Productos locales que NO estan en el ERP — los incluimos
+                    //    igual para que el bot no los pierda ("PIERNA A LA PARRILLA"
+                    //    en local, "PIERNA" en ERP, etc.).
+                    $codigosErp = $liveRows->pluck('codigo')
+                        ->filter(fn ($c) => $c !== null && $c !== '')
+                        ->map(fn ($c) => (string) $c)
+                        ->unique()
+                        ->values()
+                        ->all();
+
+                    $localesExtras = Producto::with(['categoria', 'sedes'])
+                        ->where('activo', true)
+                        ->where(function ($q) use ($codigosErp) {
+                            $q->whereNull('codigo')->orWhere('codigo', '');
+                            if (!empty($codigosErp)) {
+                                $q->orWhereNotIn('codigo', $codigosErp);
+                            }
+                        })
+                        ->orderBy('orden')
+                        ->orderBy('nombre')
+                        ->get()
+                        ->map(function ($p) {
+                            $p->setAttribute('_fuente', 'solo_local');
+                            return $p;
+                        });
+
+                    return $resultadoErp->concat($localesExtras)->values();
                 } catch (\Throwable $e) {
                     \Illuminate\Support\Facades\Log::warning('Live read productos fallo, fallback a tabla local', [
                         'tenant' => app(\App\Services\TenantManager::class)->id(),
