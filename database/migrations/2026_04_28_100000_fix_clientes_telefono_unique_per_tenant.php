@@ -16,22 +16,43 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('clientes', function (Blueprint $table) {
-            // Drop el unique viejo (single column). El nombre exacto puede variar
-            // según se haya creado, asi que probamos los nombres comunes.
-            try {
-                $table->dropUnique('clientes_telefono_normalizado_unique');
-            } catch (\Throwable $e) { /* puede que no exista con ese nombre */ }
-            try {
-                $table->dropUnique(['telefono_normalizado']);
-            } catch (\Throwable $e) { /* idem */ }
-        });
+        $database = DB::connection()->getDatabaseName();
 
-        // Crear el unique compuesto. Si tenant_id es NULL en algunas filas
-        // legacy, MySQL trata NULL como distinto a NULL en UNIQUE — no choca.
-        Schema::table('clientes', function (Blueprint $table) {
-            $table->unique(['tenant_id', 'telefono_normalizado'], 'clientes_tenant_telefono_unique');
-        });
+        // Detectar todos los indices UNIQUE que existan sobre la columna
+        // telefono_normalizado y dropearlos uno por uno con SQL crudo.
+        $indices = DB::select(
+            "SELECT DISTINCT INDEX_NAME
+             FROM information_schema.STATISTICS
+             WHERE TABLE_SCHEMA = ?
+               AND TABLE_NAME   = 'clientes'
+               AND COLUMN_NAME  = 'telefono_normalizado'
+               AND NON_UNIQUE   = 0
+               AND INDEX_NAME  != 'PRIMARY'",
+            [$database]
+        );
+
+        foreach ($indices as $idx) {
+            $name = $idx->INDEX_NAME;
+            // Saltar el indice compuesto si ya existe (re-ejecuciones)
+            if ($name === 'clientes_tenant_telefono_unique') continue;
+            try {
+                DB::statement("ALTER TABLE `clientes` DROP INDEX `{$name}`");
+            } catch (\Throwable $e) { /* otra migracion ya lo dropeo */ }
+        }
+
+        // Crear el unique compuesto solo si no existe
+        $existeCompuesto = DB::selectOne(
+            "SELECT COUNT(*) AS c FROM information_schema.STATISTICS
+             WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'clientes'
+               AND INDEX_NAME = 'clientes_tenant_telefono_unique'",
+            [$database]
+        );
+
+        if (!$existeCompuesto || (int) $existeCompuesto->c === 0) {
+            Schema::table('clientes', function (Blueprint $table) {
+                $table->unique(['tenant_id', 'telefono_normalizado'], 'clientes_tenant_telefono_unique');
+            });
+        }
     }
 
     public function down(): void
