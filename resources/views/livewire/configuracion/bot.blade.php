@@ -108,10 +108,10 @@
                     <input type="radio" wire:model.live="fuente_productos" value="integracion" class="mt-1 text-emerald-600">
                     <div class="flex-1">
                         <div class="font-bold text-sm text-slate-800">
-                            <i class="fa-solid fa-bolt text-emerald-600 mr-1"></i> Integración externa (LIVE)
+                            <i class="fa-solid fa-bolt text-emerald-600 mr-1"></i> Integración LIVE (híbrido)
                         </div>
                         <div class="text-xs text-slate-500 mt-1">
-                            Consulta la BD del ERP <strong>en tiempo real</strong>. Precios y disponibilidad siempre actuales (cache 30s).
+                            <strong>Precio/disponibilidad</strong> del ERP en tiempo real, <strong>enriquecido</strong> con cortes, fotos, palabras clave, destacados y sedes de la tabla local (match por código).
                         </div>
                     </div>
                 </label>
@@ -136,9 +136,16 @@
                         @endif
                     </div>
 
-                    <div class="rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-xs text-emerald-800">
-                        <i class="fa-solid fa-bolt mr-1"></i>
-                        <strong>Modo LIVE activo.</strong> El bot consulta esta BD directamente cada vez que un cliente pregunta por el catálogo. Cache de 30 segundos para no martillar el ERP en una misma conversación.
+                    <div class="rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-xs text-emerald-800 space-y-2">
+                        <p>
+                            <i class="fa-solid fa-bolt mr-1"></i>
+                            <strong>Modo LIVE híbrido.</strong> El bot consulta el ERP directamente (cache 30s).
+                        </p>
+                        <p class="text-[11px] opacity-80">
+                            ✅ Precio + disponibilidad del ERP en tiempo real.<br>
+                            ✅ Por cada producto del ERP, busca el código en <code>/productos</code> y trae cortes, fotos, palabras clave, destacados y precio por sede de allí.<br>
+                            💡 Para que enriquezca, tu producto local debe tener el <strong>mismo código</strong> que en el ERP.
+                        </p>
                     </div>
                 </div>
             @endif

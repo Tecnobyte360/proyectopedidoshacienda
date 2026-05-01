@@ -25,25 +25,62 @@ class BotCatalogoService
 
         $config = \App\Models\ConfiguracionBot::actual();
 
-        // ── MODO LIVE: lectura directa desde la BD externa ──
+        // ── MODO HÍBRIDO LIVE: precio/disponibilidad del ERP en tiempo real,
+        //    enriquecido con datos del modelo local (cortes, fotos, palabras
+        //    clave, destacados, sedes) cuando hay match por codigo.
         if ($config && $config->fuente_productos === \App\Models\ConfiguracionBot::FUENTE_INTEGRACION
             && $config->integracion_productos_id) {
 
             $cacheKey = "bot_catalogo_live_t{$tenantId}_i{$config->integracion_productos_id}";
-            // Cache muy corto (30s) para no martillar el ERP en la misma conversacion
+            // Cache 30s para no martillar el ERP en una misma conversacion
             return Cache::remember($cacheKey, 30, function () use ($config) {
                 try {
                     $integracion = \App\Models\Integracion::find($config->integracion_productos_id);
                     if (!$integracion || !$integracion->activo) return collect();
 
-                    return app(\App\Services\IntegracionSyncService::class)
+                    $liveRows = app(\App\Services\IntegracionSyncService::class)
                         ->leerProductosLive($integracion);
+
+                    if ($liveRows->isEmpty()) return collect();
+
+                    // Lookup local por codigo (todos de un solo query)
+                    $codigos = $liveRows->pluck('codigo')->filter()->unique()->values()->all();
+                    $localesPorCodigo = collect();
+
+                    if (!empty($codigos)) {
+                        $localesPorCodigo = Producto::with(['categoria', 'sedes'])
+                            ->whereIn('codigo', $codigos)
+                            ->get()
+                            ->keyBy(fn ($p) => (string) $p->codigo);
+                    }
+
+                    // Por cada fila del ERP: si hay match local → usar Producto
+                    // Eloquent con precio sobreescrito; si no → stdClass virtual.
+                    return $liveRows->map(function ($row) use ($localesPorCodigo) {
+                        $codigo = (string) ($row->codigo ?? '');
+                        $local  = $codigo !== '' ? $localesPorCodigo->get($codigo) : null;
+
+                        if ($local) {
+                            // Overrides del ERP (precio actual + unidad si vino)
+                            $local->precio_base = (float) ($row->precio_base ?? $local->precio_base);
+                            if (!empty($row->unidad)) {
+                                $local->unidad = $row->unidad;
+                            }
+                            // Marcar como "fuente live" para debug
+                            $local->setAttribute('_fuente', 'live_local');
+                            return $local;
+                        }
+
+                        // Sin match local: virtual con campos minimos
+                        $row->_fuente = 'live_only';
+                        return $row;
+                    });
                 } catch (\Throwable $e) {
                     \Illuminate\Support\Facades\Log::warning('Live read productos fallo, fallback a tabla local', [
                         'tenant' => app(\App\Services\TenantManager::class)->id(),
                         'error'  => $e->getMessage(),
                     ]);
-                    // Fallback: si la BD externa esta caida, usar lo que haya en local
+                    // Fallback: si la BD externa esta caida, usar la tabla local
                     return Producto::query()->with('categoria')->where('activo', true)->get();
                 }
             });
