@@ -612,14 +612,39 @@ class Bot extends Component
 
     public function sincronizarProductosAhora(): void
     {
-        if ($this->fuente_productos !== 'integracion' || !$this->integracion_productos_id) {
-            $this->dispatch('notify', ['type' => 'warning', 'message' => 'Selecciona una integración y guarda primero.']);
+        if ($this->fuente_productos !== 'integracion') {
+            $this->dispatch('notify', ['type' => 'warning', 'message' => 'Selecciona "Integración externa" antes de sincronizar.']);
             return;
         }
+        if (!$this->integracion_productos_id) {
+            $this->dispatch('notify', ['type' => 'warning', 'message' => 'Selecciona una integración del listado.']);
+            return;
+        }
+
         try {
-            $r = app(\App\Services\BotCatalogoService::class)->sincronizarAhora();
+            // Persistir la seleccion actual antes de sincronizar (para que la
+            // UI no requiera "Guardar" manualmente para activar la integracion).
+            $cfg = ConfiguracionBot::actual();
+            $cfg->update([
+                'fuente_productos'         => $this->fuente_productos,
+                'integracion_productos_id' => $this->integracion_productos_id,
+                'auto_sync_productos_min'  => $this->auto_sync_productos_min,
+            ]);
+
+            $integracion = \App\Models\Integracion::findOrFail($this->integracion_productos_id);
+            if (!$integracion->activo) {
+                $this->dispatch('notify', ['type' => 'error', 'message' => 'La integración seleccionada está inactiva.']);
+                return;
+            }
+
+            $r = app(\App\Services\IntegracionSyncService::class)->sincronizar($integracion);
+
+            $cfg->update(['ultimo_sync_productos_at' => now()]);
+            app(\App\Services\BotCatalogoService::class)->limpiarCache();
+
+            $this->ultimo_sync_productos_at = now()->format('Y-m-d H:i:s');
+
             if ($r['ok'] ?? false) {
-                $this->ultimo_sync_productos_at = now()->format('Y-m-d H:i:s');
                 $this->dispatch('notify', [
                     'type'    => 'success',
                     'message' => "✓ Sync OK: {$r['creados']} creados, {$r['actualizados']} actualizados.",
