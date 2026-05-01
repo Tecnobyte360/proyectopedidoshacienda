@@ -380,9 +380,38 @@
                                 @if($testResult['ok'])
                                     <p class="text-sm font-semibold text-emerald-700"><i class="fa-solid fa-check-circle"></i> {{ $testResult['mensaje'] }}</p>
                                     @if(!empty($testResult['muestra']))
-                                        <div class="mt-2 overflow-x-auto bg-white rounded-lg border border-slate-200 p-2">
+                                        @php
+                                            $pg = $testResult['page'] ?? 1;
+                                            $lp = $testResult['last_page'] ?? 1;
+                                            $pp = $testResult['per_page'] ?? 25;
+                                            $tot = $testResult['total'] ?? 0;
+                                            $desde = ($pg - 1) * $pp + 1;
+                                            $hasta = $desde + count($testResult['muestra']) - 1;
+                                        @endphp
+
+                                        {{-- Toolbar superior: total + selector page size --}}
+                                        <div class="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600">
+                                            <div>
+                                                @if($tot > 0)
+                                                    Mostrando <strong>{{ $desde }}–{{ $hasta }}</strong> de <strong>{{ number_format($tot) }}</strong>
+                                                @else
+                                                    {{ count($testResult['muestra']) }} filas
+                                                @endif
+                                            </div>
+                                            <div class="flex items-center gap-2">
+                                                <span>Filas por página:</span>
+                                                @foreach([25, 50, 100, 200] as $sz)
+                                                    <button type="button" wire:click="pruebaCambiarPerPage({{ $sz }})"
+                                                            class="px-2 py-0.5 rounded {{ $pp === $sz ? 'bg-emerald-600 text-white font-bold' : 'bg-white border border-slate-200 hover:bg-slate-100' }}">
+                                                        {{ $sz }}
+                                                    </button>
+                                                @endforeach
+                                            </div>
+                                        </div>
+
+                                        <div class="mt-2 overflow-x-auto bg-white rounded-lg border border-slate-200 p-2 max-h-96 overflow-y-auto">
                                             <table class="w-full text-[11px]">
-                                                <thead class="bg-slate-100">
+                                                <thead class="bg-slate-100 sticky top-0">
                                                     <tr>
                                                         @foreach(array_keys($testResult['muestra'][0] ?? []) as $col)
                                                             <th class="px-2 py-1 text-left font-bold">{{ $col }}</th>
@@ -400,6 +429,35 @@
                                                 </tbody>
                                             </table>
                                         </div>
+
+                                        {{-- Paginador --}}
+                                        @if($lp > 1)
+                                            <div class="mt-2 flex items-center justify-center gap-1 text-xs">
+                                                <button type="button" wire:click="pruebaIrPagina(1)"
+                                                        @disabled($pg <= 1)
+                                                        class="px-2 py-1 rounded bg-white border border-slate-200 hover:bg-slate-100 disabled:opacity-40">
+                                                    « Primera
+                                                </button>
+                                                <button type="button" wire:click="pruebaIrPagina({{ $pg - 1 }})"
+                                                        @disabled($pg <= 1)
+                                                        class="px-2 py-1 rounded bg-white border border-slate-200 hover:bg-slate-100 disabled:opacity-40">
+                                                    ‹ Anterior
+                                                </button>
+                                                <span class="px-3 py-1 rounded bg-emerald-600 text-white font-bold">
+                                                    {{ $pg }} / {{ $lp }}
+                                                </span>
+                                                <button type="button" wire:click="pruebaIrPagina({{ $pg + 1 }})"
+                                                        @disabled($pg >= $lp)
+                                                        class="px-2 py-1 rounded bg-white border border-slate-200 hover:bg-slate-100 disabled:opacity-40">
+                                                    Siguiente ›
+                                                </button>
+                                                <button type="button" wire:click="pruebaIrPagina({{ $lp }})"
+                                                        @disabled($pg >= $lp)
+                                                        class="px-2 py-1 rounded bg-white border border-slate-200 hover:bg-slate-100 disabled:opacity-40">
+                                                    Última »
+                                                </button>
+                                            </div>
+                                        @endif
                                     @endif
                                 @else
                                     <p class="text-sm font-semibold text-rose-700"><i class="fa-solid fa-triangle-exclamation"></i> Error: {{ $testResult['mensaje'] }}</p>

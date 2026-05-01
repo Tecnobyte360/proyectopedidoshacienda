@@ -119,25 +119,54 @@ class IntegracionSyncService
      * Prueba la conexión y devuelve ['ok'=>bool, 'mensaje'=>string, 'muestra'=>array].
      * 'muestra' contiene las primeras 5 filas si el query funciona.
      */
-    public function probarConexion(Integracion $integracion): array
+    public function probarConexion(Integracion $integracion, int $page = 1, int $perPage = 25): array
     {
         try {
             $pdo = $this->conectar($integracion);
             $query = (string) ($integracion->config['query'] ?? '');
             if (trim($query) === '') {
-                return ['ok' => true, 'mensaje' => 'Conexión OK — no hay query configurado para probar.', 'muestra' => []];
+                return [
+                    'ok' => true,
+                    'mensaje' => 'Conexión OK — no hay query configurado para probar.',
+                    'muestra' => [], 'total' => 0, 'page' => 1, 'per_page' => $perPage, 'last_page' => 1,
+                ];
             }
 
-            $stmt = $pdo->query($this->limitarQuery($query, $integracion->tipo, 5));
-            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $page    = max(1, $page);
+            $perPage = max(1, min(200, $perPage));
+            $offset  = ($page - 1) * $perPage;
+
+            // Total via subquery COUNT
+            $total = 0;
+            try {
+                $cleanQ = rtrim(trim($query), ';');
+                $countSql = "SELECT COUNT(*) AS cnt FROM ({$cleanQ}) AS _sub";
+                $total = (int) $pdo->query($countSql)->fetchColumn();
+            } catch (\Throwable $e) {
+                // Si la BD no soporta el wrap (raro), seguimos sin total exacto.
+                $total = 0;
+            }
+
+            // Pagina de filas
+            $sqlPag = $this->paginarQuery($query, $integracion->tipo, $perPage, $offset);
+            $rows = $pdo->query($sqlPag)->fetchAll(PDO::FETCH_ASSOC);
+
+            $lastPage = $total > 0 ? (int) ceil($total / $perPage) : ($rows ? $page : 1);
 
             return [
-                'ok' => true,
-                'mensaje' => 'Conexión y query OK. Primeras ' . count($rows) . ' filas:',
-                'muestra' => $rows,
+                'ok'        => true,
+                'mensaje'   => 'Conexión y query OK. ' . ($total > 0 ? "Total: {$total} filas." : 'Filas:'),
+                'muestra'   => $rows,
+                'total'     => $total,
+                'page'      => $page,
+                'per_page'  => $perPage,
+                'last_page' => $lastPage,
             ];
         } catch (\Throwable $e) {
-            return ['ok' => false, 'mensaje' => $e->getMessage(), 'muestra' => []];
+            return [
+                'ok' => false, 'mensaje' => $e->getMessage(),
+                'muestra' => [], 'total' => 0, 'page' => 1, 'per_page' => $perPage, 'last_page' => 1,
+            ];
         }
     }
 
@@ -281,6 +310,24 @@ class IntegracionSyncService
             return preg_replace('/^\s*SELECT\s+/i', "SELECT TOP {$n} ", $q, 1);
         }
         return $q . " LIMIT {$n}";
+    }
+
+    /**
+     * Pagina un query usando subquery + LIMIT/OFFSET (mysql/pgsql) o
+     * OFFSET ... FETCH NEXT (sqlsrv). Requiere ORDER BY en SQL Server, asi
+     * que si el query no lo tiene se ordena por (SELECT NULL).
+     */
+    private function paginarQuery(string $query, string $tipo, int $perPage, int $offset): string
+    {
+        $q = rtrim(trim($query), ';');
+
+        if ($tipo === Integracion::TIPO_SQLSRV) {
+            // SQL Server requiere ORDER BY para usar OFFSET/FETCH.
+            $orderBy = preg_match('/\bORDER\s+BY\b/i', $q) ? '' : 'ORDER BY (SELECT NULL)';
+            return "SELECT * FROM ({$q}) AS _sub {$orderBy} OFFSET {$offset} ROWS FETCH NEXT {$perPage} ROWS ONLY";
+        }
+        // mysql / pgsql / sqlite
+        return "SELECT * FROM ({$q}) AS _sub LIMIT {$perPage} OFFSET {$offset}";
     }
 
     private function syncProductos(array $rows, array $mapeo): array

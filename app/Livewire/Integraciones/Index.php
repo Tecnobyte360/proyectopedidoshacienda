@@ -35,6 +35,8 @@ class Index extends Component
 
     // Resultado del "Probar conexión"
     public ?array $testResult = null;
+    public int $pruebaPage = 1;
+    public int $pruebaPerPage = 25;
 
     // Explorador de BD
     public array $tablas = [];
@@ -293,8 +295,21 @@ class Index extends Component
         $temp->exists = false;
 
         $this->testResult = $this->utf8SafeArray(
-            app(IntegracionSyncService::class)->probarConexion($temp)
+            app(IntegracionSyncService::class)->probarConexion($temp, $this->pruebaPage, $this->pruebaPerPage)
         );
+    }
+
+    public function pruebaIrPagina(int $pagina): void
+    {
+        $this->pruebaPage = max(1, $pagina);
+        $this->probarConexion();
+    }
+
+    public function pruebaCambiarPerPage(int $n): void
+    {
+        $this->pruebaPerPage = max(10, min(200, $n));
+        $this->pruebaPage = 1;
+        $this->probarConexion();
     }
 
     /**
