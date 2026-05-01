@@ -75,21 +75,32 @@ class Index extends Component
     {
         $i = Integracion::findOrFail($id);
         $this->editandoId = $i->id;
-        $this->nombre     = $i->nombre;
+        $this->nombre     = $this->utf8Safe($i->nombre);
         $this->tipo       = $i->tipo;
         $this->entidad    = $i->entidad;
         $this->activo     = $i->activo;
 
         $c = $i->config ?? [];
-        $this->host     = $c['host']     ?? '';
+        $this->host     = $this->utf8Safe($c['host']     ?? '');
         $this->port     = (string) ($c['port'] ?? '');
-        $this->database = $c['database'] ?? '';
-        $this->username = $c['username'] ?? '';
-        $this->password = $c['password'] ?? '';
-        $this->query    = $c['query']    ?? '';
+        $this->database = $this->utf8Safe($c['database'] ?? '');
+        $this->username = $this->utf8Safe($c['username'] ?? '');
+        $this->password = $this->utf8Safe($c['password'] ?? '');
+        $this->query    = $this->utf8Safe($c['query']    ?? '');
         $this->mapeo    = array_merge($this->mapeo, $c['mapeo'] ?? []);
 
         $this->modal = true;
+    }
+
+    /**
+     * Asegura que un string sea UTF-8 válido. Los valores cifrados/binarios
+     * legacy en config rompen Livewire al serializar a JSON.
+     */
+    private function utf8Safe($value): string
+    {
+        if (!is_string($value) || $value === '') return '';
+        // mb_convert_encoding limpia bytes inválidos sustituyéndolos
+        return mb_convert_encoding($value, 'UTF-8', 'UTF-8');
     }
 
     public function cerrarModal(): void
