@@ -3,8 +3,10 @@
 namespace App\Services;
 
 use App\Models\Cliente;
+use App\Models\ConversacionWhatsapp;
 use App\Services\TenantManager;
 use App\Services\WhatsappResolverService;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -41,13 +43,33 @@ class WhatsappContactosService
 
         $base = rtrim($cred['api_base_url'] ?? 'https://wa-api.tecnobyteapp.com:1422', '/');
 
-        // Probar varios endpoints — TecnoByteApp puede exponer cualquiera de ellos.
+        // Probar muchos endpoints — TecnoByteApp puede exponer cualquiera de ellos.
+        // El que funcione gana; el resto cae en 404.
         $intentos = [
+            // Patrón estándar whatsapp-web.js wrapper
             "/whatsapp/{$connectionId}/contacts",
-            "/whatsapp/contacts?id={$connectionId}",
-            "/api/contacts?whatsappId={$connectionId}",
+            "/whatsapp/{$connectionId}/chats",
+            "/whatsapp/{$connectionId}/getContacts",
+            "/whatsapp/{$connectionId}/get-contacts",
+            "/whatsapps/{$connectionId}/contacts",
+            "/whatsapps/{$connectionId}/chats",
+            // Con prefijo /api
             "/api/whatsapp/{$connectionId}/contacts",
+            "/api/whatsapp/{$connectionId}/chats",
+            "/api/whatsapps/{$connectionId}/contacts",
+            "/api/whatsapps/{$connectionId}/chats",
+            "/api/contacts/{$connectionId}",
+            "/api/chats/{$connectionId}",
+            // Con query string
+            "/contacts?whatsappId={$connectionId}",
+            "/contacts?id={$connectionId}",
             "/chats?whatsappId={$connectionId}",
+            "/chats?id={$connectionId}",
+            "/api/contacts?whatsappId={$connectionId}",
+            "/api/chats?whatsappId={$connectionId}",
+            // Variantes camelCase
+            "/getContacts/{$connectionId}",
+            "/getChats/{$connectionId}",
         ];
 
         $contactos = null;
@@ -88,12 +110,92 @@ class WhatsappContactosService
     }
 
     /**
+     * Lee contactos de las conversaciones locales del tenant. Estos son los
+     * clientes que YA escribieron al bot, no toda la libreta de WhatsApp.
+     * Sirve como fallback cuando la API de TecnoByteApp no expone /contacts.
+     */
+    public function listarContactosLocal(): array
+    {
+        $tm = app(TenantManager::class);
+        $tenantId = (method_exists($tm, 'id') ? $tm->id() : null)
+            ?? $tm->current()?->id;
+
+        if (!$tenantId) return [];
+
+        // Tomar telefonos unicos de conversaciones del tenant + intentar
+        // sacar pushname del primer mensaje del usuario en meta JSON.
+        $rows = DB::table('conversaciones_whatsapp as c')
+            ->where('c.tenant_id', $tenantId)
+            ->whereNotNull('c.telefono_normalizado')
+            ->where('c.telefono_normalizado', '!=', '')
+            ->select('c.telefono_normalizado', 'c.id')
+            ->orderBy('c.id', 'desc')
+            ->get();
+
+        $vistos = [];
+        $result = [];
+        foreach ($rows as $r) {
+            $tel = preg_replace('/\D+/', '', (string) $r->telefono_normalizado);
+            if (!$tel || isset($vistos[$tel])) continue;
+            $vistos[$tel] = true;
+
+            // Buscar pushname en meta del primer mensaje user de esa conversacion
+            $nombre = '';
+            $msg = DB::table('mensajes_whatsapp')
+                ->where('conversacion_id', $r->id)
+                ->where('rol', 'user')
+                ->whereNotNull('meta')
+                ->orderBy('id')
+                ->limit(1)
+                ->value('meta');
+
+            if ($msg) {
+                $meta = is_string($msg) ? json_decode($msg, true) : $msg;
+                if (is_array($meta)) {
+                    $nombre = $meta['pushname']
+                        ?? $meta['notify']
+                        ?? $meta['name']
+                        ?? $meta['from_name']
+                        ?? '';
+                }
+            }
+
+            $result[] = [
+                'nombre'   => trim((string) $nombre),
+                'telefono' => $tel,
+                'foto'     => null,
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
      * Importa los contactos al tenant actual y devuelve el conteo.
+     * Si la API no expone endpoint de contactos, hace fallback a las
+     * conversaciones locales del tenant.
      * Skip = ya existe (no sobreescribe). Update = actualiza nombre/foto si vacios.
      */
     public function importar(?int $connectionId = null, bool $actualizarExistentes = false): array
     {
-        $contactos = $this->listarContactos($connectionId);
+        $fuente = 'api';
+        try {
+            $contactos = $this->listarContactos($connectionId);
+        } catch (\Throwable $e) {
+            Log::warning('API de contactos no disponible, usando fallback local', [
+                'error' => $e->getMessage(),
+            ]);
+            $contactos = $this->listarContactosLocal();
+            $fuente = 'local';
+
+            if (empty($contactos)) {
+                throw new \RuntimeException(
+                    "No se pudieron obtener contactos. La API no expone endpoint de contactos "
+                    . "y tampoco hay conversaciones locales registradas. "
+                    . "Detalle API: " . $e->getMessage()
+                );
+            }
+        }
 
         $tm = app(TenantManager::class);
         $tenant = method_exists($tm, 'current') ? $tm->current() : null;
@@ -162,6 +264,7 @@ class WhatsappContactosService
             'actualizados' => $actualizados,
             'omitidos'     => $omitidos,
             'errores'      => $errores,
+            'fuente'       => $fuente,
         ];
     }
 

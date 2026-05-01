@@ -104,6 +104,12 @@
                             <div class="text-xs text-amber-600">Omitidos</div>
                         </div>
                     </div>
+                    @if (($resultadoImportWa['fuente'] ?? '') === 'local')
+                        <div class="rounded-xl bg-blue-50 border border-blue-200 p-3 text-xs text-blue-700 mb-3">
+                            <i class="fa-solid fa-circle-info mr-1"></i>
+                            La API de TecnoByteApp no expuso endpoint de contactos, así que se importaron las personas que ya tienen <strong>conversación con el bot</strong> de este tenant.
+                        </div>
+                    @endif
                     @if (($resultadoImportWa['errores'] ?? 0) > 0)
                         <div class="rounded-xl bg-red-50 p-2 text-center text-sm text-red-700 mb-4">
                             {{ $resultadoImportWa['errores'] }} errores (revisa el log)
