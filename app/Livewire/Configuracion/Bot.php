@@ -90,6 +90,12 @@ class Bot extends Component
     public int $notif_pago_aprobado_delay  = 0;
     public int $notif_pago_rechazado_delay = 0;
 
+    // Fuente de productos del bot
+    public string $fuente_productos          = 'tabla'; // tabla | integracion
+    public ?int   $integracion_productos_id  = null;
+    public int    $auto_sync_productos_min   = 15;
+    public ?string $ultimo_sync_productos_at = null;
+
     // Auto-asignación de domiciliarios
     public bool   $auto_asignar_domiciliario = false;
     public string $criterio_asignacion       = 'balanceado';
@@ -185,6 +191,12 @@ class Bot extends Component
         $this->notif_entregado_delay      = (int) ($cfg->notif_entregado_delay ?? 0);
         $this->notif_pago_aprobado_delay  = (int) ($cfg->notif_pago_aprobado_delay ?? 0);
         $this->notif_pago_rechazado_delay = (int) ($cfg->notif_pago_rechazado_delay ?? 0);
+
+        // Fuente de productos
+        $this->fuente_productos          = $cfg->fuente_productos ?: 'tabla';
+        $this->integracion_productos_id  = $cfg->integracion_productos_id;
+        $this->auto_sync_productos_min   = (int) ($cfg->auto_sync_productos_min ?: 15);
+        $this->ultimo_sync_productos_at  = $cfg->ultimo_sync_productos_at?->format('Y-m-d H:i:s');
         $this->auto_asignar_domiciliario = (bool) ($cfg->auto_asignar_domiciliario ?? false);
         $this->criterio_asignacion       = (string) ($cfg->criterio_asignacion ?: 'balanceado');
         $this->asignar_en_estado         = (string) ($cfg->asignar_en_estado ?: 'en_preparacion');
@@ -575,6 +587,9 @@ class Bot extends Component
             'notif_entregado_delay'                 => 'integer|min:0|max:86400',
             'notif_pago_aprobado_delay'             => 'integer|min:0|max:86400',
             'notif_pago_rechazado_delay'            => 'integer|min:0|max:86400',
+            'fuente_productos'                      => 'required|in:tabla,integracion',
+            'integracion_productos_id'              => 'nullable|integer|exists:integraciones,id',
+            'auto_sync_productos_min'               => 'integer|min:1|max:1440',
             'auto_asignar_domiciliario'             => 'boolean',
             'criterio_asignacion'                   => 'nullable|in:balanceado,cercania,rotacion',
             'asignar_en_estado'                     => 'nullable|in:nuevo,en_preparacion,repartidor_en_camino',
@@ -593,6 +608,28 @@ class Bot extends Component
                 ? '🎤 Transcripción de audios ACTIVADA'
                 : '🔇 Transcripción de audios DESACTIVADA',
         ]);
+    }
+
+    public function sincronizarProductosAhora(): void
+    {
+        if ($this->fuente_productos !== 'integracion' || !$this->integracion_productos_id) {
+            $this->dispatch('notify', ['type' => 'warning', 'message' => 'Selecciona una integración y guarda primero.']);
+            return;
+        }
+        try {
+            $r = app(\App\Services\BotCatalogoService::class)->sincronizarAhora();
+            if ($r['ok'] ?? false) {
+                $this->ultimo_sync_productos_at = now()->format('Y-m-d H:i:s');
+                $this->dispatch('notify', [
+                    'type'    => 'success',
+                    'message' => "✓ Sync OK: {$r['creados']} creados, {$r['actualizados']} actualizados.",
+                ]);
+            } else {
+                $this->dispatch('notify', ['type' => 'error', 'message' => '❌ ' . ($r['mensaje'] ?? $r['log'] ?? 'Error en sync')]);
+            }
+        } catch (\Throwable $e) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => '❌ ' . $e->getMessage()]);
+        }
     }
 
     public function guardar(): void
@@ -621,6 +658,9 @@ class Bot extends Component
             ->unique()
             ->values()
             ->all();
+
+        // No persistir el campo readonly de UI
+        unset($data['ultimo_sync_productos_at']);
 
         $cfg = ConfiguracionBot::actual();
         $cfg->update($data);
@@ -653,10 +693,16 @@ class Bot extends Component
             ->orderBy('nombre')
             ->get(['id', 'nombre', 'sede_id', 'orden']);
 
+        $integracionesProductos = \App\Models\Integracion::where('entidad', \App\Models\Integracion::ENTIDAD_PRODUCTOS)
+            ->where('activo', true)
+            ->orderBy('nombre')
+            ->get(['id', 'nombre', 'tipo']);
+
         return view('livewire.configuracion.bot', [
             'variablesDisponibles' => BotPromptService::variablesDisponibles(),
             'conexionesDetectadas' => $conexionesDetectadas,
             'zonasDisponibles'     => $zonasDisponibles,
+            'integracionesProductos' => $integracionesProductos,
         ])->layout('layouts.app');
     }
 }

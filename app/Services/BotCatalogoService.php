@@ -24,6 +24,10 @@ class BotCatalogoService
         $tenantId = app(\App\Services\TenantManager::class)->id() ?? 'none';
         $cacheKey = "bot_catalogo_productos_t{$tenantId}_" . ($sedeId ?? 'all');
 
+        // Si la fuente del bot es 'integracion' y el ultimo sync esta vencido,
+        // sincronizar antes de leer (cache aparte para evitar runs paralelos).
+        $this->autoSyncSiCorresponde($tenantId);
+
         return Cache::remember($cacheKey, 120, function () use ($sedeId) {
             $query = Producto::query()
                 ->with(['categoria', 'sedes'])
@@ -35,6 +39,70 @@ class BotCatalogoService
 
             return $query->orderBy('orden')->orderBy('nombre')->get();
         });
+    }
+
+    /**
+     * Si la config del bot tiene fuente=integracion y la ventana de auto-sync
+     * vencio, ejecuta la sincronizacion ahi mismo. Tope de un sync por
+     * tenant cada N minutos (Cache::lock evita carreras).
+     */
+    private function autoSyncSiCorresponde(string|int $tenantId): void
+    {
+        try {
+            $config = \App\Models\ConfiguracionBot::actual();
+            if (!$config || $config->fuente_productos !== \App\Models\ConfiguracionBot::FUENTE_INTEGRACION) {
+                return;
+            }
+            if (!$config->integracion_productos_id) return;
+
+            $minutos = (int) ($config->auto_sync_productos_min ?: 15);
+            $ultimo  = $config->ultimo_sync_productos_at;
+
+            if ($ultimo && $ultimo->copy()->addMinutes($minutos)->isFuture()) {
+                return; // todavia esta fresco
+            }
+
+            $lock = Cache::lock("bot_auto_sync_productos_t{$tenantId}", 300);
+            if (!$lock->get()) return; // otro proceso ya esta sincronizando
+
+            try {
+                $integracion = \App\Models\Integracion::find($config->integracion_productos_id);
+                if (!$integracion || !$integracion->activo) return;
+
+                app(\App\Services\IntegracionSyncService::class)->sincronizar($integracion);
+
+                $config->update(['ultimo_sync_productos_at' => now()]);
+                $this->limpiarCache(); // invalidar el cache de catalogo
+            } finally {
+                optional($lock)->release();
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Auto-sync productos del bot fallo', [
+                'tenant' => $tenantId, 'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Sincronizacion manual (boton en la config del bot).
+     */
+    public function sincronizarAhora(): array
+    {
+        $config = \App\Models\ConfiguracionBot::actual();
+        if ($config->fuente_productos !== \App\Models\ConfiguracionBot::FUENTE_INTEGRACION) {
+            return ['ok' => false, 'mensaje' => 'La fuente del bot no es "integracion".'];
+        }
+        if (!$config->integracion_productos_id) {
+            return ['ok' => false, 'mensaje' => 'No hay integracion seleccionada.'];
+        }
+
+        $integracion = \App\Models\Integracion::findOrFail($config->integracion_productos_id);
+        $r = app(\App\Services\IntegracionSyncService::class)->sincronizar($integracion);
+
+        $config->update(['ultimo_sync_productos_at' => now()]);
+        $this->limpiarCache();
+
+        return $r;
     }
 
     /**

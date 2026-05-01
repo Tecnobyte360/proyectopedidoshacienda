@@ -49,6 +49,10 @@ class ConfiguracionBot extends Model
         'cumpleanos_ventana_hasta',
         'cumpleanos_dias_semana',
         'connection_id_default',
+        'fuente_productos',
+        'integracion_productos_id',
+        'auto_sync_productos_min',
+        'ultimo_sync_productos_at',
         'cumpleanos_dias_vigencia_beneficio',
         'encuesta_activa',
         'encuesta_delay_minutos',
@@ -112,7 +116,17 @@ class ConfiguracionBot extends Model
         'notif_entregado_activa'      => 'boolean',
         'notif_pago_aprobado_activa'  => 'boolean',
         'notif_pago_rechazado_activa' => 'boolean',
+        'auto_sync_productos_min'   => 'integer',
+        'ultimo_sync_productos_at'  => 'datetime',
     ];
+
+    public const FUENTE_TABLA       = 'tabla';
+    public const FUENTE_INTEGRACION = 'integracion';
+
+    public function integracionProductos()
+    {
+        return $this->belongsTo(\App\Models\Integracion::class, 'integracion_productos_id');
+    }
 
     /** Instrucciones IA por defecto para derivación automática a departamento */
     public const DERIVACION_INSTRUCCIONES_DEFAULT = <<<'TXT'

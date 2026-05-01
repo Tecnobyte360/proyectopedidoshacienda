@@ -79,6 +79,94 @@
             </div>
         </section>
 
+        {{-- FUENTE DE PRODUCTOS --}}
+        <section x-show="tab === 'mensajes'" x-cloak class="rounded-2xl bg-white shadow border border-slate-200 p-6">
+            <div class="flex items-center gap-2 mb-4">
+                <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+                    <i class="fa-solid fa-database"></i>
+                </span>
+                <h3 class="text-lg font-bold text-slate-800">Fuente de productos del bot</h3>
+            </div>
+            <p class="text-xs text-slate-500 mb-4">
+                Decide de dónde el bot lee el catálogo cuando atiende a los clientes.
+            </p>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                <label class="flex items-start gap-3 cursor-pointer rounded-2xl border-2 p-4 transition {{ $fuente_productos === 'tabla' ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 hover:bg-slate-50' }}">
+                    <input type="radio" wire:model.live="fuente_productos" value="tabla" class="mt-1 text-emerald-600">
+                    <div class="flex-1">
+                        <div class="font-bold text-sm text-slate-800">
+                            <i class="fa-solid fa-table-list text-slate-600 mr-1"></i> Tabla local de productos
+                        </div>
+                        <div class="text-xs text-slate-500 mt-1">
+                            Usa los productos que cargas manualmente en <strong>/productos</strong>. Control total.
+                        </div>
+                    </div>
+                </label>
+
+                <label class="flex items-start gap-3 cursor-pointer rounded-2xl border-2 p-4 transition {{ $fuente_productos === 'integracion' ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 hover:bg-slate-50' }}">
+                    <input type="radio" wire:model.live="fuente_productos" value="integracion" class="mt-1 text-emerald-600">
+                    <div class="flex-1">
+                        <div class="font-bold text-sm text-slate-800">
+                            <i class="fa-solid fa-rotate text-emerald-600 mr-1"></i> Integración externa (BD del ERP)
+                        </div>
+                        <div class="text-xs text-slate-500 mt-1">
+                            Auto-sincroniza desde tu BD externa antes de cada lectura. Precios siempre frescos.
+                        </div>
+                    </div>
+                </label>
+            </div>
+
+            @if ($fuente_productos === 'integracion')
+                <div class="rounded-2xl bg-slate-50 border border-slate-200 p-4 space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Integración a usar</label>
+                        <select wire:model="integracion_productos_id"
+                                class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white focus:border-emerald-500 focus:ring-emerald-500">
+                            <option value="">— Selecciona —</option>
+                            @foreach ($integracionesProductos ?? [] as $i)
+                                <option value="{{ $i->id }}">{{ $i->nombre }} ({{ strtoupper($i->tipo) }})</option>
+                            @endforeach
+                        </select>
+                        @if (($integracionesProductos ?? collect())->isEmpty())
+                            <p class="text-xs text-amber-600 mt-1">
+                                <i class="fa-solid fa-triangle-exclamation"></i>
+                                No hay integraciones de productos activas. Crea una en <a href="/integraciones" class="underline">/integraciones</a>.
+                            </p>
+                        @endif
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Auto-sync cada (minutos)</label>
+                            <input type="number" wire:model="auto_sync_productos_min" min="1" max="1440"
+                                   class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white">
+                            <p class="text-[11px] text-slate-400 mt-1">El bot sincroniza solo si pasaron N minutos desde el último.</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Último sync</label>
+                            <div class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
+                                {{ $ultimo_sync_productos_at ?? 'Nunca' }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end">
+                        <button type="button" wire:click="sincronizarProductosAhora"
+                                wire:loading.attr="disabled" wire:target="sincronizarProductosAhora"
+                                class="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-emerald-700 disabled:opacity-50">
+                            <span wire:loading.remove wire:target="sincronizarProductosAhora">
+                                <i class="fa-solid fa-bolt mr-1"></i> Sincronizar ahora
+                            </span>
+                            <span wire:loading wire:target="sincronizarProductosAhora">
+                                <i class="fa-solid fa-spinner fa-spin mr-1"></i> Sincronizando...
+                            </span>
+                        </button>
+                    </div>
+                </div>
+            @endif
+        </section>
+
         {{-- ENVÍO DE IMÁGENES --}}
         <section x-show="tab === 'mensajes'" x-cloak class="rounded-2xl bg-white shadow border border-slate-200 p-6">
             <div class="flex items-center gap-2 mb-4">
