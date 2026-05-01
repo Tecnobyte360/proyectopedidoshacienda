@@ -68,6 +68,11 @@
                             </td>
                             <td class="px-4 py-3">
                                 <div class="flex items-center justify-end gap-1">
+                                    <a href="{{ route('integraciones.consultas', $i->id) }}"
+                                       title="Consultas guardadas"
+                                       class="h-8 w-8 inline-flex items-center justify-center rounded-lg bg-purple-100 hover:bg-purple-200 text-purple-700 transition">
+                                        <i class="fa-solid fa-database text-xs"></i>
+                                    </a>
                                     <button wire:click="sincronizar({{ $i->id }})"
                                             wire:loading.attr="disabled"
                                             wire:target="sincronizar({{ $i->id }})"

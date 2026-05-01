@@ -813,6 +813,88 @@ TXT;
         $toolCalls   = $response['choices'][0]['message']['tool_calls'] ?? null;
         $textContent = $response['choices'][0]['message']['content'] ?? null;
 
+        // ── Tool calls DINÁMICAS (consultas guardadas con usar_en_bot=true) ──
+        // El nombre de las tools dinámicas siempre empieza con "consulta_".
+        if ($toolCalls && str_starts_with($toolCalls[0]['function']['name'] ?? '', 'consulta_')) {
+            $consultaSvc = app(\App\Services\ConsultaIntegracionService::class);
+            $toolMessages = [];
+
+            foreach ($toolCalls as $tc) {
+                $toolName = $tc['function']['name'] ?? '';
+                if (!str_starts_with($toolName, 'consulta_')) continue;
+
+                $args = json_decode($tc['function']['arguments'] ?? '{}', true) ?: [];
+
+                $consulta = \App\Models\IntegracionConsulta::query()
+                    ->where('usar_en_bot', true)
+                    ->where('activa', true)
+                    ->get()
+                    ->first(fn ($c) => $c->nombreTool() === $toolName);
+
+                $tStart = microtime(true);
+                if (!$consulta) {
+                    $resultado = ['ok' => false, 'error' => 'Consulta no encontrada o inactiva.'];
+                } else {
+                    $resultado = $consultaSvc->ejecutar($consulta, $args, 50);
+                }
+                $latenciaMs = (int) ((microtime(true) - $tStart) * 1000);
+
+                Log::info("🛠️ Tool dinámica {$toolName}", [
+                    'args' => $args, 'ok' => $resultado['ok'] ?? false,
+                    'total' => $resultado['total'] ?? 0, 'ms' => $latenciaMs,
+                ]);
+
+                // Persistir invocación para el monitor
+                try {
+                    \App\Models\AgenteToolInvocacion::create([
+                        'tenant_id'        => $conversacion->tenant_id ?? null,
+                        'conversacion_id'  => $conversacion->id ?? null,
+                        'tool_name'        => $toolName,
+                        'connection_id'    => (string) ($connectionId ?? ''),
+                        'telefono_cliente' => $from ?? null,
+                        'args'             => $args,
+                        'resultado'        => [
+                            'ok'    => $resultado['ok'] ?? false,
+                            'total' => $resultado['total'] ?? 0,
+                            'top'   => collect($resultado['filas'] ?? [])->take(3)->all(),
+                        ],
+                        'count_resultados' => (int) ($resultado['total'] ?? 0),
+                        'exitoso'          => (bool) ($resultado['ok'] ?? false),
+                        'error'            => $resultado['error'] ?? null,
+                        'latencia_ms'      => $latenciaMs,
+                    ]);
+                } catch (\Throwable $e) { /* no bloquear si log falla */ }
+
+                $toolMessages[] = [
+                    'role'         => 'tool',
+                    'tool_call_id' => $tc['id'] ?? ('call_' . count($toolMessages)),
+                    'name'         => $toolName,
+                    'content'      => json_encode($resultado, JSON_UNESCAPED_UNICODE),
+                ];
+            }
+
+            $followUpMessages = array_merge(
+                [['role' => 'system', 'content' => $systemPrompt]],
+                $reinforceAgent ?? [],
+                $conversationHistory,
+                [['role' => 'assistant', 'content' => null, 'tool_calls' => $toolCalls]],
+                $toolMessages
+            );
+
+            $followUp = $this->llamarOpenAI($followUpMessages);
+            $reply = $followUp['choices'][0]['message']['content'] ?? 'Déjame revisar eso 🙌';
+
+            $conversationHistory[] = ['role' => 'assistant', 'content' => $reply];
+            Cache::put($cacheKey, $conversationHistory, now()->addMinutes(45));
+
+            $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_ASSISTANT, $reply, [
+                'tipo' => 'tool_call_dinamica',
+                'meta' => ['tools' => array_map(fn ($t) => $t['name'] ?? null, $toolMessages)],
+            ]);
+
+            return $reply;
+        }
+
         // ── Tool calls de CATÁLOGO (modo agente) ──────────────────────────────
         // Si la primera tool call es una de las herramientas de consulta de
         // catálogo, las procesamos en bloque (potencialmente varias en paralelo)
@@ -3195,6 +3277,53 @@ PROMPT;
                     ],
                 ],
             ];
+        }
+
+        // ── Tools DINÁMICAS desde IntegracionConsulta (usar_en_bot=true) ──
+        // Cada consulta guardada que el usuario marque como "disponible para el
+        // bot" se expone aquí como tool. Esto permite construir agentes
+        // personalizados sin tocar código.
+        try {
+            $consultas = \App\Models\IntegracionConsulta::query()
+                ->where('usar_en_bot', true)
+                ->where('activa', true)
+                ->whereHas('integracion', fn ($q) => $q->where('activo', true))
+                ->get();
+
+            foreach ($consultas as $cons) {
+                $properties = [];
+                $required   = [];
+                foreach ((array) ($cons->parametros ?? []) as $p) {
+                    if (empty($p['nombre'])) continue;
+                    $jsonType = match ($p['tipo'] ?? 'string') {
+                        'number'  => 'number',
+                        'boolean' => 'boolean',
+                        default   => 'string',
+                    };
+                    $properties[$p['nombre']] = [
+                        'type'        => $jsonType,
+                        'description' => (string) ($p['descripcion'] ?? $p['nombre']),
+                    ];
+                    if (!empty($p['requerido'])) {
+                        $required[] = $p['nombre'];
+                    }
+                }
+
+                $tools[] = [
+                    'type'     => 'function',
+                    'function' => [
+                        'name'        => $cons->nombreTool(),
+                        'description' => trim(($cons->descripcion ?: $cons->nombre_publico) . ' (consulta personalizada del tenant).'),
+                        'parameters'  => [
+                            'type'       => 'object',
+                            'properties' => empty($properties) ? new \stdClass() : $properties,
+                            'required'   => $required,
+                        ],
+                    ],
+                ];
+            }
+        } catch (\Throwable $e) {
+            Log::warning('No se pudieron cargar consultas dinamicas: ' . $e->getMessage());
         }
 
         // Tool 2: enviar_imagen_producto — SOLO si está activado en config

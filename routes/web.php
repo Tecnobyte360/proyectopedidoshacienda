@@ -82,6 +82,9 @@ Route::middleware(['no_super_sin_imp'])->group(function () {
     Route::get('/campanas',      CampanasIndex::class)->middleware('permission:conversaciones.ver')->name('campanas.index');
     Route::get('/importaciones', ImportacionesIndex::class)->middleware('permission:productos.ver')->name('importaciones.index');
     Route::get('/integraciones', IntegracionesIndex::class)->middleware(['permission:productos.ver', 'role:super-admin'])->name('integraciones.index');
+    Route::get('/integraciones/{integracion}/consultas', \App\Livewire\Integraciones\Consultas::class)
+        ->middleware(['permission:productos.ver', 'role:super-admin'])
+        ->name('integraciones.consultas');
     Route::get('/usuarios-internos', UsuariosInternosIndex::class)->middleware('permission:conversaciones.ver')->name('usuarios-internos.index');
     Route::get('/departamentos',     DepartamentosIndex::class)->middleware('permission:conversaciones.ver')->name('departamentos.index');
     Route::get('/chat-widgets',      ChatWidgetsIndex::class)->middleware(['permission:conversaciones.ver', 'role:super-admin'])->name('chat-widgets.index');
