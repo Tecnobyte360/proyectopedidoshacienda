@@ -22,12 +22,35 @@ class BotCatalogoService
     public function productosActivos(?int $sedeId = null): Collection
     {
         $tenantId = app(\App\Services\TenantManager::class)->id() ?? 'none';
+
+        $config = \App\Models\ConfiguracionBot::actual();
+
+        // ── MODO LIVE: lectura directa desde la BD externa ──
+        if ($config && $config->fuente_productos === \App\Models\ConfiguracionBot::FUENTE_INTEGRACION
+            && $config->integracion_productos_id) {
+
+            $cacheKey = "bot_catalogo_live_t{$tenantId}_i{$config->integracion_productos_id}";
+            // Cache muy corto (30s) para no martillar el ERP en la misma conversacion
+            return Cache::remember($cacheKey, 30, function () use ($config) {
+                try {
+                    $integracion = \App\Models\Integracion::find($config->integracion_productos_id);
+                    if (!$integracion || !$integracion->activo) return collect();
+
+                    return app(\App\Services\IntegracionSyncService::class)
+                        ->leerProductosLive($integracion);
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning('Live read productos fallo, fallback a tabla local', [
+                        'tenant' => app(\App\Services\TenantManager::class)->id(),
+                        'error'  => $e->getMessage(),
+                    ]);
+                    // Fallback: si la BD externa esta caida, usar lo que haya en local
+                    return Producto::query()->with('categoria')->where('activo', true)->get();
+                }
+            });
+        }
+
+        // ── MODO TABLA: lectura normal del modelo local ──
         $cacheKey = "bot_catalogo_productos_t{$tenantId}_" . ($sedeId ?? 'all');
-
-        // Si la fuente del bot es 'integracion' y el ultimo sync esta vencido,
-        // sincronizar antes de leer (cache aparte para evitar runs paralelos).
-        $this->autoSyncSiCorresponde($tenantId);
-
         return Cache::remember($cacheKey, 120, function () use ($sedeId) {
             $query = Producto::query()
                 ->with(['categoria', 'sedes'])
@@ -160,31 +183,48 @@ class BotCatalogoService
         }
 
         $lineas = [];
-        $porCategoria = $productos->groupBy(fn ($p) => $p->categoria?->nombre ?? 'Otros');
+        $porCategoria = $productos->groupBy(function ($p) {
+            // Producto Eloquent: $p->categoria?->nombre. Live (stdClass): $p->categoria (string).
+            if (is_object($p->categoria ?? null)) return $p->categoria->nombre ?? 'Otros';
+            return $p->categoria ?: 'Otros';
+        });
+
+        // Mapa de iconos por nombre de categoria (para modo live, donde no hay relacion)
+        $emojisPorCategoria = \App\Models\ProductoCategoria::pluck('icono_emoji', 'nombre')->toArray();
 
         foreach ($porCategoria as $categoria => $grupo) {
-            $emoji = $grupo->first()->categoria?->icono_emoji ?? '📦';
+            $first = $grupo->first();
+            $emoji = is_object($first->categoria ?? null)
+                ? ($first->categoria->icono_emoji ?? '📦')
+                : ($emojisPorCategoria[$categoria] ?? '📦');
+
             $lineas[] = "";
             $lineas[] = "{$emoji} {$categoria}";
 
             foreach ($grupo as $p) {
-                $precio = $p->precioParaSede($sedeId);
-                $codigo = $p->codigo ? "[{$p->codigo}] " : '';
-                $destacado = $p->destacado ? ' ⭐' : '';
+                // Precio: si es Producto Eloquent usa precioParaSede, si es live usa precio_base
+                $precio = method_exists($p, 'precioParaSede')
+                    ? $p->precioParaSede($sedeId)
+                    : (float) ($p->precio_base ?? 0);
+
+                $codigo = !empty($p->codigo) ? "[{$p->codigo}] " : '';
+                $destacado = !empty($p->destacado) ? ' ⭐' : '';
 
                 $lineas[] = sprintf(
                     '  • %s%s — $%s/%s%s',
                     $codigo,
                     $p->nombre,
                     number_format($precio, 0, ',', '.'),
-                    $p->unidad,
+                    $p->unidad ?? 'unidad',
                     $destacado
                 );
 
-                // Cortes disponibles para este producto
-                $cortes = $p->cortes()->where('activo', true)->pluck('nombre');
-                if ($cortes->isNotEmpty()) {
-                    $lineas[] = '      ✂️ Cortes: ' . $cortes->implode(', ');
+                // Cortes solo si es Eloquent con id (live no tiene)
+                if ($p instanceof Producto && !empty($p->id)) {
+                    $cortes = $p->cortes()->where('activo', true)->pluck('nombre');
+                    if ($cortes->isNotEmpty()) {
+                        $lineas[] = '      ✂️ Cortes: ' . $cortes->implode(', ');
+                    }
                 }
             }
         }
@@ -273,7 +313,7 @@ class BotCatalogoService
      *  3) Match por palabras_clave (contiene)
      *  4) Match parcial por nombre (LIKE)
      */
-    public function resolverProducto(string $nombreOCodigo, ?int $sedeId = null): ?Producto
+    public function resolverProducto(string $nombreOCodigo, ?int $sedeId = null)
     {
         $entrada = $this->normalizar($nombreOCodigo);
         if ($entrada === '') return null;
@@ -282,23 +322,23 @@ class BotCatalogoService
 
         // 1) Match por código
         $porCodigo = $productos->first(function ($p) use ($nombreOCodigo) {
-            return $p->codigo && strcasecmp(trim($p->codigo), trim($nombreOCodigo)) === 0;
+            return !empty($p->codigo) && strcasecmp(trim($p->codigo), trim($nombreOCodigo)) === 0;
         });
         if ($porCodigo) return $porCodigo;
 
         // 2) Match exacto por nombre normalizado
         $porNombreExacto = $productos->first(function ($p) use ($entrada) {
-            return $this->normalizar($p->nombre) === $entrada;
+            return $this->normalizar((string) $p->nombre) === $entrada;
         });
         if ($porNombreExacto) return $porNombreExacto;
 
-        // 3) Palabras clave (todas las palabras de la entrada deben estar en alguna palabra_clave o nombre)
+        // 3) Palabras clave + nombre + descripcion (en live no hay palabras_clave)
         $tokens = collect(explode(' ', $entrada))->filter()->values();
 
         $candidatos = $productos->filter(function ($p) use ($tokens) {
             $bag = collect($p->palabras_clave ?? [])
-                ->push($p->nombre)
-                ->push($p->descripcion_corta ?? '')
+                ->push($p->nombre ?? '')
+                ->push($p->descripcion_corta ?? $p->descripcion ?? '')
                 ->map(fn ($t) => $this->normalizar((string) $t))
                 ->join(' ');
 
@@ -309,9 +349,9 @@ class BotCatalogoService
             return $candidatos->first();
         }
 
-        // 4) Coincidencia parcial — la entrada está contenida en el nombre o viceversa
+        // 4) Coincidencia parcial
         return $productos->first(function ($p) use ($entrada) {
-            $nombre = $this->normalizar($p->nombre);
+            $nombre = $this->normalizar((string) $p->nombre);
             return str_contains($nombre, $entrada) || str_contains($entrada, $nombre);
         });
     }

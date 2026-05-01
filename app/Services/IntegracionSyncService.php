@@ -119,6 +119,35 @@ class IntegracionSyncService
      * Prueba la conexión y devuelve ['ok'=>bool, 'mensaje'=>string, 'muestra'=>array].
      * 'muestra' contiene las primeras 5 filas si el query funciona.
      */
+    /**
+     * Lectura LIVE de productos desde la BD externa (sin sincronizar a la
+     * tabla local). Devuelve Collection de stdClass con los campos mapeados:
+     * codigo, nombre, categoria, precio_base, unidad, descripcion.
+     *
+     * Usado por el bot cuando fuente_productos = 'integracion' y se quiere
+     * consulta en vivo. Muy ligero — no hace UPSERT.
+     */
+    public function leerProductosLive(Integracion $integracion): \Illuminate\Support\Collection
+    {
+        $pdo = $this->conectar($integracion);
+        $query = (string) ($integracion->config['query'] ?? '');
+        if (trim($query) === '') return collect();
+
+        $rows = $pdo->query($query)->fetchAll(PDO::FETCH_ASSOC);
+        $mapeo = $integracion->config['mapeo'] ?? [];
+
+        return collect($rows)->map(function (array $r) use ($mapeo) {
+            return (object) [
+                'codigo'      => $this->valor($r, $mapeo, 'codigo'),
+                'nombre'      => $this->valor($r, $mapeo, 'nombre'),
+                'categoria'   => $this->valor($r, $mapeo, 'categoria'),
+                'precio_base' => (float) ($this->valor($r, $mapeo, 'precio_base') ?? 0),
+                'unidad'      => $this->valor($r, $mapeo, 'unidad') ?: 'unidad',
+                'descripcion' => $this->valor($r, $mapeo, 'descripcion'),
+            ];
+        })->filter(fn ($p) => !empty($p->nombre))->values();
+    }
+
     public function probarConexion(Integracion $integracion, int $page = 1, int $perPage = 25): array
     {
         try {

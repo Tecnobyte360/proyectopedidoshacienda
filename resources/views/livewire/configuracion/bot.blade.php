@@ -108,10 +108,10 @@
                     <input type="radio" wire:model.live="fuente_productos" value="integracion" class="mt-1 text-emerald-600">
                     <div class="flex-1">
                         <div class="font-bold text-sm text-slate-800">
-                            <i class="fa-solid fa-rotate text-emerald-600 mr-1"></i> Integración externa (BD del ERP)
+                            <i class="fa-solid fa-bolt text-emerald-600 mr-1"></i> Integración externa (LIVE)
                         </div>
                         <div class="text-xs text-slate-500 mt-1">
-                            Auto-sincroniza desde tu BD externa antes de cada lectura. Precios siempre frescos.
+                            Consulta la BD del ERP <strong>en tiempo real</strong>. Precios y disponibilidad siempre actuales (cache 30s).
                         </div>
                     </div>
                 </label>
@@ -136,32 +136,9 @@
                         @endif
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">Auto-sync cada (minutos)</label>
-                            <input type="number" wire:model="auto_sync_productos_min" min="1" max="1440"
-                                   class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white">
-                            <p class="text-[11px] text-slate-400 mt-1">El bot sincroniza solo si pasaron N minutos desde el último.</p>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">Último sync</label>
-                            <div class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
-                                {{ $ultimo_sync_productos_at ?? 'Nunca' }}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="flex justify-end">
-                        <button type="button" wire:click="sincronizarProductosAhora"
-                                wire:loading.attr="disabled" wire:target="sincronizarProductosAhora"
-                                class="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-emerald-700 disabled:opacity-50">
-                            <span wire:loading.remove wire:target="sincronizarProductosAhora">
-                                <i class="fa-solid fa-bolt mr-1"></i> Sincronizar ahora
-                            </span>
-                            <span wire:loading wire:target="sincronizarProductosAhora">
-                                <i class="fa-solid fa-spinner fa-spin mr-1"></i> Sincronizando...
-                            </span>
-                        </button>
+                    <div class="rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-xs text-emerald-800">
+                        <i class="fa-solid fa-bolt mr-1"></i>
+                        <strong>Modo LIVE activo.</strong> El bot consulta esta BD directamente cada vez que un cliente pregunta por el catálogo. Cache de 30 segundos para no martillar el ERP en una misma conversación.
                     </div>
                 </div>
             @endif
