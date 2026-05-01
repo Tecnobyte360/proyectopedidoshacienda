@@ -104,6 +104,28 @@
                             <div class="text-xs text-amber-600">Omitidos</div>
                         </div>
                     </div>
+
+                    @if (($resultadoImportWa['conv_vinculadas'] ?? 0) + ($resultadoImportWa['conv_creadas'] ?? 0) + ($resultadoImportWa['mensajes_imp'] ?? 0) > 0)
+                        <div class="rounded-2xl bg-purple-50 border border-purple-200 p-3 mb-3">
+                            <div class="text-xs font-bold text-purple-700 mb-2">
+                                <i class="fa-solid fa-comments mr-1"></i> Conversaciones
+                            </div>
+                            <div class="grid grid-cols-3 gap-2 text-center">
+                                <div>
+                                    <div class="text-lg font-extrabold text-purple-800">{{ $resultadoImportWa['conv_vinculadas'] ?? 0 }}</div>
+                                    <div class="text-[10px] text-purple-600 leading-tight">Vinculadas a cliente</div>
+                                </div>
+                                <div>
+                                    <div class="text-lg font-extrabold text-purple-800">{{ $resultadoImportWa['conv_creadas'] ?? 0 }}</div>
+                                    <div class="text-[10px] text-purple-600 leading-tight">Creadas (nuevas)</div>
+                                </div>
+                                <div>
+                                    <div class="text-lg font-extrabold text-purple-800">{{ $resultadoImportWa['mensajes_imp'] ?? 0 }}</div>
+                                    <div class="text-[10px] text-purple-600 leading-tight">Mensajes importados</div>
+                                </div>
+                            </div>
+                        </div>
+                    @endif
                     @if (($resultadoImportWa['fuente'] ?? '') === 'local')
                         <div class="rounded-xl bg-blue-50 border border-blue-200 p-3 text-xs text-blue-700 mb-3">
                             <i class="fa-solid fa-circle-info mr-1"></i>

@@ -176,7 +176,7 @@ class WhatsappContactosService
      * conversaciones locales del tenant.
      * Skip = ya existe (no sobreescribe). Update = actualiza nombre/foto si vacios.
      */
-    public function importar(?int $connectionId = null, bool $actualizarExistentes = false): array
+    public function importar(?int $connectionId = null, bool $actualizarExistentes = false, bool $importarConversaciones = true): array
     {
         $fuente = 'api';
         try {
@@ -200,10 +200,19 @@ class WhatsappContactosService
         $tm = app(TenantManager::class);
         $tenant = method_exists($tm, 'current') ? $tm->current() : null;
         $tenantId = $tenant?->id ?? (method_exists($tm, 'id') ? $tm->id() : null);
+
+        if (!$connectionId) {
+            $ids = app(WhatsappResolverService::class)->connectionIdsValidos();
+            $connectionId = $ids[0] ?? null;
+        }
+
         $creados = 0;
         $actualizados = 0;
         $omitidos = 0;
         $errores = 0;
+        $convVinculadas = 0;
+        $convCreadas = 0;
+        $msgsImportados = 0;
 
         foreach ($contactos as $c) {
             $tel = preg_replace('/\D+/', '', (string) ($c['telefono'] ?? ''));
@@ -218,6 +227,17 @@ class WhatsappContactosService
                     ->first();
 
                 if ($existente) {
+                    if ($importarConversaciones) {
+                        $stats = $this->procesarConversacion(
+                            $tenantId,
+                            $existente->id,
+                            $tel,
+                            $connectionId
+                        );
+                        $convVinculadas += $stats['vinculadas'];
+                        $convCreadas    += $stats['creadas'];
+                        $msgsImportados += $stats['mensajes'];
+                    }
                     if ($actualizarExistentes) {
                         $cambios = [];
                         if (empty($existente->nombre) || $existente->nombre === 'Cliente') {
@@ -238,7 +258,7 @@ class WhatsappContactosService
                     continue;
                 }
 
-                Cliente::create([
+                $cliente = Cliente::create([
                     'tenant_id'            => $tenantId,
                     'nombre'               => $c['nombre'] ?: 'Cliente',
                     'pais_codigo'          => '+57',
@@ -249,6 +269,19 @@ class WhatsappContactosService
                     'activo'               => true,
                 ]);
                 $creados++;
+
+                // Vincular conversaciones huerfanas + crear/importar mensajes
+                if ($importarConversaciones) {
+                    $stats = $this->procesarConversacion(
+                        $tenantId,
+                        $cliente->id,
+                        $tel,
+                        $connectionId
+                    );
+                    $convVinculadas += $stats['vinculadas'];
+                    $convCreadas    += $stats['creadas'];
+                    $msgsImportados += $stats['mensajes'];
+                }
             } catch (\Throwable $e) {
                 $errores++;
                 Log::warning('Error importando contacto', [
@@ -259,13 +292,150 @@ class WhatsappContactosService
         }
 
         return [
-            'total'        => count($contactos),
-            'creados'      => $creados,
-            'actualizados' => $actualizados,
-            'omitidos'     => $omitidos,
-            'errores'      => $errores,
-            'fuente'       => $fuente,
+            'total'             => count($contactos),
+            'creados'           => $creados,
+            'actualizados'      => $actualizados,
+            'omitidos'          => $omitidos,
+            'errores'           => $errores,
+            'fuente'            => $fuente,
+            'conv_vinculadas'   => $convVinculadas,
+            'conv_creadas'      => $convCreadas,
+            'mensajes_imp'      => $msgsImportados,
         ];
+    }
+
+    /**
+     * Vincula conversaciones huerfanas (cliente_id NULL con mismo telefono) al
+     * cliente, y opcionalmente intenta bajar el historial de mensajes desde la API.
+     */
+    private function procesarConversacion(int $tenantId, int $clienteId, string $tel, ?int $connectionId): array
+    {
+        $vinculadas = 0;
+        $creadas    = 0;
+        $mensajes   = 0;
+
+        // 1) Vincular conversaciones existentes con cliente_id NULL
+        try {
+            $vinculadas = ConversacionWhatsapp::where('tenant_id', $tenantId)
+                ->where('telefono_normalizado', $tel)
+                ->whereNull('cliente_id')
+                ->update(['cliente_id' => $clienteId]);
+        } catch (\Throwable $e) {
+            Log::warning('Error vinculando conversacion', [
+                'tel' => $tel, 'error' => $e->getMessage(),
+            ]);
+        }
+
+        // 2) Si no existe ninguna conversacion para este telefono, intentar
+        //    bajar historial desde la API y crear conversacion + mensajes.
+        $existeConv = ConversacionWhatsapp::where('tenant_id', $tenantId)
+            ->where('telefono_normalizado', $tel)
+            ->exists();
+
+        if (!$existeConv && $connectionId) {
+            $msgs = $this->bajarMensajesAPI($connectionId, $tel);
+            if (!empty($msgs)) {
+                try {
+                    $conv = ConversacionWhatsapp::create([
+                        'tenant_id'            => $tenantId,
+                        'cliente_id'           => $clienteId,
+                        'telefono_normalizado' => $tel,
+                        'canal'                => 'whatsapp',
+                        'connection_id'        => $connectionId,
+                        'estado'               => ConversacionWhatsapp::ESTADO_ACTIVA,
+                        'no_leidos'            => 0,
+                        'total_mensajes'       => count($msgs),
+                        'primer_mensaje_at'    => $msgs[0]['fecha'] ?? now(),
+                        'ultimo_mensaje_at'    => end($msgs)['fecha'] ?? now(),
+                    ]);
+                    $creadas++;
+
+                    foreach ($msgs as $m) {
+                        DB::table('mensajes_whatsapp')->insert([
+                            'conversacion_id'    => $conv->id,
+                            'rol'                => $m['rol'],
+                            'tipo'               => $m['tipo'] ?? 'text',
+                            'contenido'          => mb_substr((string) ($m['contenido'] ?? ''), 0, 65000),
+                            'mensaje_externo_id' => $m['external_id'] ?? null,
+                            'meta'               => json_encode($m['meta'] ?? []),
+                            'created_at'         => $m['fecha'] ?? now(),
+                            'updated_at'         => $m['fecha'] ?? now(),
+                        ]);
+                        $mensajes++;
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning('Error creando conversacion importada', [
+                        'tel' => $tel, 'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+        }
+
+        return ['vinculadas' => $vinculadas, 'creadas' => $creadas, 'mensajes' => $mensajes];
+    }
+
+    /**
+     * Best-effort: prueba endpoints de mensajes en TecnoByteApp y devuelve un
+     * array uniforme [{rol, contenido, fecha, tipo, external_id, meta}].
+     * Si ninguno responde, devuelve [].
+     */
+    private function bajarMensajesAPI(int $connectionId, string $telefono): array
+    {
+        $resolver = app(WhatsappResolverService::class);
+        $token = $resolver->token();
+        if (!$token) return [];
+
+        $cred = $resolver->credenciales();
+        $base = rtrim($cred['api_base_url'] ?? 'https://wa-api.tecnobyteapp.com:1422', '/');
+
+        // El "chat id" en whatsapp-web.js suele ser numero@c.us
+        $chatId = $telefono . '@c.us';
+
+        $intentos = [
+            "/whatsapp/{$connectionId}/messages?chatId={$chatId}",
+            "/whatsapp/{$connectionId}/chat/{$chatId}/messages",
+            "/api/whatsapp/{$connectionId}/messages?chatId={$chatId}",
+            "/api/messages?whatsappId={$connectionId}&chatId={$chatId}",
+            "/messages?whatsappId={$connectionId}&number={$telefono}",
+        ];
+
+        foreach ($intentos as $path) {
+            try {
+                $resp = Http::withoutVerifying()
+                    ->withToken($token)
+                    ->timeout(20)
+                    ->get($base . $path);
+
+                if (!$resp->successful()) continue;
+
+                $body = $resp->json();
+                $items = $body['messages'] ?? $body['data'] ?? $body;
+                if (!is_array($items) || empty($items)) continue;
+
+                $out = [];
+                foreach ($items as $m) {
+                    if (!is_array($m)) continue;
+                    $fromMe = $m['fromMe'] ?? $m['from_me'] ?? false;
+                    $body   = $m['body'] ?? $m['text'] ?? $m['content'] ?? $m['message'] ?? '';
+                    $ts     = $m['timestamp'] ?? $m['ts'] ?? $m['date'] ?? null;
+                    $fecha  = $ts ? date('Y-m-d H:i:s', is_numeric($ts) ? (int) $ts : strtotime((string) $ts)) : now();
+
+                    $out[] = [
+                        'rol'         => $fromMe ? 'assistant' : 'user',
+                        'tipo'        => $m['type'] ?? 'text',
+                        'contenido'   => is_string($body) ? $body : json_encode($body),
+                        'fecha'       => $fecha,
+                        'external_id' => $m['id'] ?? $m['_serialized'] ?? null,
+                        'meta'        => $m,
+                    ];
+                }
+                return $out;
+            } catch (\Throwable $e) {
+                continue;
+            }
+        }
+
+        return [];
     }
 
     /**
