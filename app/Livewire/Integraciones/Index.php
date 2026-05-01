@@ -103,6 +103,36 @@ class Index extends Component
         return mb_convert_encoding($value, 'UTF-8', 'UTF-8');
     }
 
+    /**
+     * Limpia recursivamente strings no-UTF8 de un array (resultados SQL Server,
+     * etc.). Detecta el encoding origen (CP1252/ISO-8859-1) y convierte a UTF-8.
+     * Sin esto, Livewire revienta al serializar el snapshot.
+     */
+    private function utf8SafeArray($value)
+    {
+        if (is_array($value)) {
+            $out = [];
+            foreach ($value as $k => $v) {
+                $out[is_string($k) ? $this->utf8SafeString($k) : $k] = $this->utf8SafeArray($v);
+            }
+            return $out;
+        }
+        if (is_string($value)) {
+            return $this->utf8SafeString($value);
+        }
+        return $value;
+    }
+
+    private function utf8SafeString(string $value): string
+    {
+        if ($value === '' || mb_check_encoding($value, 'UTF-8')) {
+            return $value;
+        }
+        // Intenta detectar; si falla cae a Windows-1252 (lo más común en SQL Server LATAM)
+        $detected = mb_detect_encoding($value, ['UTF-8', 'Windows-1252', 'ISO-8859-1', 'ASCII'], true) ?: 'Windows-1252';
+        return mb_convert_encoding($value, 'UTF-8', $detected);
+    }
+
     public function cerrarModal(): void
     {
         $this->modal = false;
@@ -175,7 +205,9 @@ class Index extends Component
     public function listarTablas(): void
     {
         $this->explorarError = null;
-        $r = app(IntegracionSyncService::class)->listarTablas($this->temporalParaExplorar());
+        $r = $this->utf8SafeArray(
+            app(IntegracionSyncService::class)->listarTablas($this->temporalParaExplorar())
+        );
         if ($r['ok']) {
             $this->tablas = $r['tablas'];
         } else {
@@ -192,7 +224,9 @@ class Index extends Component
         $this->tablaSeleccionada = $tabla;
         $this->explorarError = null;
 
-        $r = app(IntegracionSyncService::class)->describirTabla($this->temporalParaExplorar(), $tabla);
+        $r = $this->utf8SafeArray(
+            app(IntegracionSyncService::class)->describirTabla($this->temporalParaExplorar(), $tabla)
+        );
         if (!$r['ok']) {
             $this->explorarError = $r['mensaje'];
             return;
@@ -258,7 +292,9 @@ class Index extends Component
         ]);
         $temp->exists = false;
 
-        $this->testResult = app(IntegracionSyncService::class)->probarConexion($temp);
+        $this->testResult = $this->utf8SafeArray(
+            app(IntegracionSyncService::class)->probarConexion($temp)
+        );
     }
 
     /**
