@@ -24,7 +24,7 @@
     @if ($modalImportarWa)
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4"
              wire:key="modal-import-wa">
-            <div class="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl">
+            <div class="w-full max-w-2xl rounded-3xl bg-white p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
                 <div class="mb-4 flex items-start justify-between">
                     <div>
                         <h3 class="text-xl font-extrabold text-slate-800">
@@ -32,7 +32,7 @@
                             Importar contactos de WhatsApp
                         </h3>
                         <p class="text-sm text-slate-500 mt-1">
-                            Trae los contactos del WhatsApp conectado a este tenant y los crea como clientes.
+                            Tres formas de traer tus contactos al tenant.
                         </p>
                     </div>
                     <button wire:click="cerrarModalImportarWa" class="text-slate-400 hover:text-slate-700">
@@ -40,38 +40,163 @@
                     </button>
                 </div>
 
-                @if (!$resultadoImportWa)
-                    <div class="rounded-2xl bg-amber-50 border border-amber-200 p-4 text-sm text-amber-800 mb-4">
-                        <i class="fa-solid fa-circle-info mr-1"></i>
-                        Los teléfonos ya existentes <strong>no se sobreescriben</strong>. Se omiten grupos y broadcasts.
+                @if (!$resultadoImportWa && !$diagnosticoApi)
+                    {{-- TABS --}}
+                    <div class="flex gap-1 mb-5 border-b border-slate-200">
+                        <button wire:click="$set('tabImport', 'api')"
+                                class="px-4 py-2 text-sm font-semibold border-b-2 transition {{ $tabImport === 'api' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-slate-500 hover:text-slate-700' }}">
+                            <i class="fa-solid fa-cloud-arrow-down mr-1"></i> Desde la API
+                        </button>
+                        <button wire:click="$set('tabImport', 'archivo')"
+                                class="px-4 py-2 text-sm font-semibold border-b-2 transition {{ $tabImport === 'archivo' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-slate-500 hover:text-slate-700' }}">
+                            <i class="fa-solid fa-file-arrow-up mr-1"></i> Subir archivo
+                        </button>
+                        <button wire:click="$set('tabImport', 'diagnostico')"
+                                class="px-4 py-2 text-sm font-semibold border-b-2 transition {{ $tabImport === 'diagnostico' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-slate-500 hover:text-slate-700' }}">
+                            <i class="fa-solid fa-stethoscope mr-1"></i> Diagnóstico API
+                        </button>
                     </div>
 
-                    <label class="flex items-start gap-3 mb-5 cursor-pointer">
-                        <input type="checkbox" wire:model="actualizarExistentes"
-                               class="mt-1 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500">
-                        <span class="text-sm text-slate-700">
-                            <strong>Actualizar existentes</strong>
-                            <span class="block text-xs text-slate-500">
-                                Si ya existe un cliente con ese teléfono y no tiene nombre/foto, los completa.
-                            </span>
-                        </span>
-                    </label>
+                    @if ($tabImport === 'api')
+                        <div class="rounded-2xl bg-amber-50 border border-amber-200 p-4 text-sm text-amber-800 mb-4">
+                            <i class="fa-solid fa-circle-info mr-1"></i>
+                            Si la API expone <code>/contacts</code>, los trae todos. Si no, importa solo a quienes <strong>ya escribieron al bot</strong>. Los teléfonos existentes no se sobreescriben.
+                        </div>
 
-                    <div class="flex justify-end gap-2">
-                        <button wire:click="cerrarModalImportarWa"
-                                class="rounded-xl px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100">
-                            Cancelar
+                        <label class="flex items-start gap-3 mb-5 cursor-pointer">
+                            <input type="checkbox" wire:model="actualizarExistentes"
+                                   class="mt-1 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500">
+                            <span class="text-sm text-slate-700">
+                                <strong>Actualizar existentes</strong>
+                                <span class="block text-xs text-slate-500">Completa nombre/foto si están vacíos.</span>
+                            </span>
+                        </label>
+
+                        <div class="flex justify-end gap-2">
+                            <button wire:click="cerrarModalImportarWa"
+                                    class="rounded-xl px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100">
+                                Cancelar
+                            </button>
+                            <button wire:click="importarContactosWhatsapp"
+                                    wire:loading.attr="disabled"
+                                    wire:target="importarContactosWhatsapp"
+                                    class="rounded-xl bg-emerald-600 px-5 py-2 text-sm font-semibold text-white shadow hover:bg-emerald-700 disabled:opacity-50">
+                                <span wire:loading.remove wire:target="importarContactosWhatsapp">
+                                    <i class="fa-solid fa-cloud-arrow-down mr-1"></i> Importar ahora
+                                </span>
+                                <span wire:loading wire:target="importarContactosWhatsapp">
+                                    <i class="fa-solid fa-spinner fa-spin mr-1"></i> Importando...
+                                </span>
+                            </button>
+                        </div>
+                    @elseif ($tabImport === 'archivo')
+                        <div class="rounded-2xl bg-blue-50 border border-blue-200 p-4 text-sm text-blue-800 mb-4">
+                            <i class="fa-solid fa-circle-info mr-1"></i>
+                            Sube un <strong>.vcf</strong> (export desde el celular: Contactos → Exportar) o un <strong>.csv</strong> de Google Contacts.
+                        </div>
+
+                        <label class="block mb-4">
+                            <span class="block text-xs font-semibold text-slate-600 mb-1">Archivo (.vcf o .csv, máx 10 MB)</span>
+                            <input type="file" wire:model="archivoContactos"
+                                   accept=".vcf,.csv,.txt"
+                                   class="block w-full text-sm border border-slate-300 rounded-xl p-2 file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-600 file:text-white file:px-3 file:py-1 file:text-sm file:font-semibold">
+                            @error('archivoContactos') <span class="text-xs text-red-600 mt-1 block">{{ $message }}</span> @enderror
+                        </label>
+
+                        <label class="flex items-start gap-3 mb-5 cursor-pointer">
+                            <input type="checkbox" wire:model="actualizarExistentes"
+                                   class="mt-1 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500">
+                            <span class="text-sm text-slate-700"><strong>Actualizar existentes</strong></span>
+                        </label>
+
+                        <div class="flex justify-end gap-2">
+                            <button wire:click="cerrarModalImportarWa"
+                                    class="rounded-xl px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100">
+                                Cancelar
+                            </button>
+                            <button wire:click="importarDesdeArchivo"
+                                    wire:loading.attr="disabled" wire:target="importarDesdeArchivo,archivoContactos"
+                                    class="rounded-xl bg-emerald-600 px-5 py-2 text-sm font-semibold text-white shadow hover:bg-emerald-700 disabled:opacity-50">
+                                <span wire:loading.remove wire:target="importarDesdeArchivo,archivoContactos">
+                                    <i class="fa-solid fa-file-arrow-up mr-1"></i> Subir e importar
+                                </span>
+                                <span wire:loading wire:target="importarDesdeArchivo,archivoContactos">
+                                    <i class="fa-solid fa-spinner fa-spin mr-1"></i> Procesando...
+                                </span>
+                            </button>
+                        </div>
+                    @else
+                        <div class="rounded-2xl bg-slate-50 border border-slate-200 p-4 text-sm text-slate-700 mb-4">
+                            <i class="fa-solid fa-stethoscope mr-1"></i>
+                            Prueba <strong>todos los endpoints conocidos</strong> de la API de WhatsApp y reporta qué responde cada uno. Útil para descubrir el path correcto de tu wrapper.
+                        </div>
+                        <div class="flex justify-end gap-2">
+                            <button wire:click="cerrarModalImportarWa"
+                                    class="rounded-xl px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100">
+                                Cancelar
+                            </button>
+                            <button wire:click="ejecutarDiagnosticoApi"
+                                    wire:loading.attr="disabled" wire:target="ejecutarDiagnosticoApi"
+                                    class="rounded-xl bg-slate-700 px-5 py-2 text-sm font-semibold text-white shadow hover:bg-slate-800 disabled:opacity-50">
+                                <span wire:loading.remove wire:target="ejecutarDiagnosticoApi">
+                                    <i class="fa-solid fa-magnifying-glass mr-1"></i> Ejecutar diagnóstico
+                                </span>
+                                <span wire:loading wire:target="ejecutarDiagnosticoApi">
+                                    <i class="fa-solid fa-spinner fa-spin mr-1"></i> Probando...
+                                </span>
+                            </button>
+                        </div>
+                    @endif
+                @elseif ($diagnosticoApi)
+                    @if (isset($diagnosticoApi['error']))
+                        <div class="rounded-2xl bg-red-50 border border-red-200 p-4 text-sm text-red-800">
+                            <p class="font-semibold mb-1"><i class="fa-solid fa-circle-xmark mr-1"></i> Error</p>
+                            <p>{{ $diagnosticoApi['error'] }}</p>
+                        </div>
+                    @else
+                        <div class="text-xs text-slate-500 mb-2">
+                            <strong>Base:</strong> {{ $diagnosticoApi['base'] }} •
+                            <strong>connection_id:</strong> {{ $diagnosticoApi['connection_id'] }} •
+                            <strong>{{ $diagnosticoApi['exitosos'] }}</strong>/{{ $diagnosticoApi['total_probados'] }} OK
+                        </div>
+                        <div class="max-h-96 overflow-y-auto rounded-xl border border-slate-200">
+                            <table class="w-full text-xs">
+                                <thead class="bg-slate-50 sticky top-0">
+                                    <tr class="text-left text-slate-600">
+                                        <th class="p-2">Status</th>
+                                        <th class="p-2">Path</th>
+                                        <th class="p-2">Preview</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach ($diagnosticoApi['resultados'] as $r)
+                                        @php
+                                            $st = $r['status'];
+                                            $cls = is_int($st) && $st >= 200 && $st < 300 ? 'bg-emerald-100 text-emerald-800'
+                                                : (is_int($st) && $st >= 400 && $st < 500 ? 'bg-amber-50 text-amber-700'
+                                                : 'bg-red-50 text-red-700');
+                                        @endphp
+                                        <tr class="border-t border-slate-100">
+                                            <td class="p-2"><span class="inline-block rounded px-2 py-0.5 font-mono {{ $cls }}">{{ $st }}</span></td>
+                                            <td class="p-2 font-mono break-all">{{ $r['path'] }}</td>
+                                            <td class="p-2 text-slate-500 break-all">{{ \Illuminate\Support\Str::limit($r['preview'], 80) }}</td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="text-xs text-slate-500 mt-3">
+                            👉 Pásame los paths que respondieron <strong>200</strong> con JSON y construyo el sync de historial completo.
+                        </div>
+                    @endif
+                    <div class="mt-4 flex justify-end gap-2">
+                        <button wire:click="$set('diagnosticoApi', null)"
+                                class="rounded-xl bg-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-300">
+                            Volver
                         </button>
-                        <button wire:click="importarContactosWhatsapp"
-                                wire:loading.attr="disabled"
-                                wire:target="importarContactosWhatsapp"
-                                class="rounded-xl bg-emerald-600 px-5 py-2 text-sm font-semibold text-white shadow hover:bg-emerald-700 disabled:opacity-50">
-                            <span wire:loading.remove wire:target="importarContactosWhatsapp">
-                                <i class="fa-solid fa-cloud-arrow-down mr-1"></i> Importar ahora
-                            </span>
-                            <span wire:loading wire:target="importarContactosWhatsapp">
-                                <i class="fa-solid fa-spinner fa-spin mr-1"></i> Importando...
-                            </span>
+                        <button wire:click="cerrarModalImportarWa"
+                                class="rounded-xl bg-emerald-600 px-5 py-2 text-sm font-semibold text-white shadow hover:bg-emerald-700">
+                            Cerrar
                         </button>
                     </div>
                 @elseif (isset($resultadoImportWa['error']))

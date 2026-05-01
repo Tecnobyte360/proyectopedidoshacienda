@@ -6,11 +6,13 @@ use App\Models\Cliente;
 use App\Models\ZonaCobertura;
 use App\Services\WhatsappContactosService;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 use Livewire\WithPagination;
 
 class Index extends Component
 {
     use WithPagination;
+    use WithFileUploads;
 
     public string $search        = '';
     public string $filtroEstado  = 'todos';   // todos | activos | inactivos | recurrentes | nuevos
@@ -36,6 +38,9 @@ class Index extends Component
     public bool $importandoWa        = false;
     public bool $actualizarExistentes = false;
     public ?array $resultadoImportWa = null;
+    public string $tabImport          = 'api'; // api | archivo | diagnostico
+    public $archivoContactos          = null;  // Livewire upload
+    public ?array $diagnosticoApi     = null;
 
     public array $paises = [
         ['codigo' => '+57',  'nombre' => 'Colombia',       'flag' => '🇨🇴'],
@@ -181,6 +186,56 @@ class Index extends Component
                 'type'    => 'error',
                 'message' => '❌ ' . $e->getMessage(),
             ]);
+        } finally {
+            $this->importandoWa = false;
+        }
+    }
+
+    public function importarDesdeArchivo(): void
+    {
+        $this->validate([
+            'archivoContactos' => 'required|file|max:10240|mimes:vcf,csv,txt',
+        ]);
+
+        $this->importandoWa = true;
+        $this->resultadoImportWa = null;
+
+        try {
+            $service = app(WhatsappContactosService::class);
+            $contactos = $service->parsearArchivo(
+                $this->archivoContactos->getRealPath(),
+                $this->archivoContactos->getClientOriginalName()
+            );
+
+            if (empty($contactos)) {
+                throw new \RuntimeException('No se encontraron contactos validos en el archivo.');
+            }
+
+            $resumen = $service->importarLista($contactos, $this->actualizarExistentes);
+            $this->resultadoImportWa = $resumen;
+
+            $this->dispatch('notify', [
+                'type'    => 'success',
+                'message' => "✓ Importados {$resumen['creados']} contactos del archivo.",
+            ]);
+        } catch (\Throwable $e) {
+            $this->resultadoImportWa = ['error' => $e->getMessage()];
+            $this->dispatch('notify', ['type' => 'error', 'message' => '❌ ' . $e->getMessage()]);
+        } finally {
+            $this->importandoWa = false;
+            $this->archivoContactos = null;
+        }
+    }
+
+    public function ejecutarDiagnosticoApi(): void
+    {
+        $this->importandoWa = true;
+        $this->diagnosticoApi = null;
+
+        try {
+            $this->diagnosticoApi = app(WhatsappContactosService::class)->diagnosticarApi();
+        } catch (\Throwable $e) {
+            $this->diagnosticoApi = ['error' => $e->getMessage()];
         } finally {
             $this->importandoWa = false;
         }

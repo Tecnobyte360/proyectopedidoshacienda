@@ -110,6 +110,248 @@ class WhatsappContactosService
     }
 
     /**
+     * Diagnostica la API de TecnoByteApp probando muchos paths candidatos y
+     * devolviendo lo que respondio cada uno. Sirve para descubrir cual es el
+     * endpoint correcto sin depender de documentacion externa.
+     */
+    public function diagnosticarApi(): array
+    {
+        $resolver = app(WhatsappResolverService::class);
+        $token = $resolver->token();
+        $cred  = $resolver->credenciales();
+
+        if (!$token) {
+            throw new \RuntimeException('No hay token de WhatsApp activo.');
+        }
+
+        $ids = $resolver->connectionIdsValidos();
+        $cid = $ids[0] ?? null;
+        if (!$cid) {
+            throw new \RuntimeException('No hay connection_id valido.');
+        }
+
+        $base = rtrim($cred['api_base_url'] ?? 'https://wa-api.tecnobyteapp.com:1422', '/');
+
+        // Lista MUY amplia de candidatos. El que devuelva 200 con JSON gana.
+        $paths = [
+            // root level
+            "/whatsapp/{$cid}",
+            "/whatsapps/{$cid}",
+            "/api/whatsapp/{$cid}",
+            "/api/whatsapps/{$cid}",
+            // contacts
+            "/whatsapp/{$cid}/contacts",
+            "/whatsapp/{$cid}/getContacts",
+            "/whatsapp/{$cid}/get-contacts",
+            "/whatsapps/{$cid}/contacts",
+            "/api/whatsapp/{$cid}/contacts",
+            "/api/whatsapps/{$cid}/contacts",
+            "/api/contacts/{$cid}",
+            "/contacts/{$cid}",
+            "/contacts?whatsappId={$cid}",
+            "/api/contacts?whatsappId={$cid}",
+            // chats
+            "/whatsapp/{$cid}/chats",
+            "/whatsapp/{$cid}/getChats",
+            "/whatsapps/{$cid}/chats",
+            "/api/whatsapp/{$cid}/chats",
+            "/api/whatsapps/{$cid}/chats",
+            "/api/chats/{$cid}",
+            "/chats/{$cid}",
+            "/chats?whatsappId={$cid}",
+            "/api/chats?whatsappId={$cid}",
+            // messages
+            "/whatsapp/{$cid}/messages",
+            "/api/whatsapp/{$cid}/messages",
+            "/messages?whatsappId={$cid}",
+            "/api/messages?whatsappId={$cid}",
+            // routes index (para descubrir lista)
+            "/",
+            "/api",
+            "/api/",
+            "/routes",
+            "/healthcheck",
+            "/whatsapp/",
+        ];
+
+        $resultados = [];
+        foreach ($paths as $p) {
+            $start = microtime(true);
+            try {
+                $resp = Http::withoutVerifying()
+                    ->withToken($token)
+                    ->timeout(8)
+                    ->get($base . $p);
+
+                $body = (string) $resp->body();
+                $resultados[] = [
+                    'path'     => $p,
+                    'status'   => $resp->status(),
+                    'ms'       => (int) ((microtime(true) - $start) * 1000),
+                    'len'      => strlen($body),
+                    'preview'  => mb_substr(strip_tags($body), 0, 160),
+                    'is_json'  => str_starts_with(trim($body), '{') || str_starts_with(trim($body), '['),
+                ];
+            } catch (\Throwable $e) {
+                $resultados[] = [
+                    'path' => $p, 'status' => 'EXC', 'ms' => 0, 'len' => 0,
+                    'preview' => $e->getMessage(), 'is_json' => false,
+                ];
+            }
+        }
+
+        // Ordenar: 2xx primero, despues por status
+        usort($resultados, function ($a, $b) {
+            $sa = is_int($a['status']) ? $a['status'] : 999;
+            $sb = is_int($b['status']) ? $b['status'] : 999;
+            $ra = $sa >= 200 && $sa < 300 ? 0 : ($sa >= 400 && $sa < 500 ? 1 : 2);
+            $rb = $sb >= 200 && $sb < 300 ? 0 : ($sb >= 400 && $sb < 500 ? 1 : 2);
+            if ($ra !== $rb) return $ra <=> $rb;
+            return $sa <=> $sb;
+        });
+
+        return [
+            'base'           => $base,
+            'connection_id'  => $cid,
+            'total_probados' => count($paths),
+            'exitosos'       => count(array_filter($resultados, fn ($r) => is_int($r['status']) && $r['status'] >= 200 && $r['status'] < 300)),
+            'resultados'     => $resultados,
+        ];
+    }
+
+    /**
+     * Parsea un archivo VCF (vCard) o CSV y devuelve [{nombre, telefono, foto}].
+     * Soporta los exports tipicos de:
+     *   - Google Contacts (Google CSV)
+     *   - iPhone / Android (.vcf con multiples vCards concatenadas)
+     *   - WhatsApp Web (no exporta directo, pero usuario puede usar Google Contacts)
+     */
+    public function parsearArchivo(string $rutaAbsoluta, string $nombreOriginal): array
+    {
+        $contenido = @file_get_contents($rutaAbsoluta);
+        if ($contenido === false || $contenido === '') return [];
+
+        // Limpiar BOM
+        $contenido = preg_replace('/^\xEF\xBB\xBF/', '', $contenido);
+
+        $ext = strtolower(pathinfo($nombreOriginal, PATHINFO_EXTENSION));
+        if ($ext === 'vcf' || str_contains($contenido, 'BEGIN:VCARD')) {
+            return $this->parsearVCF($contenido);
+        }
+        return $this->parsearCSV($contenido);
+    }
+
+    private function parsearVCF(string $contenido): array
+    {
+        // Normalizar saltos de linea + unfold (vCard permite continuar lineas con espacio inicial)
+        $contenido = str_replace(["\r\n", "\r"], "\n", $contenido);
+        $contenido = preg_replace("/\n[ \t]/", '', $contenido);
+
+        $cards = preg_split('/BEGIN:VCARD/i', $contenido);
+        $result = [];
+
+        foreach ($cards as $card) {
+            if (trim($card) === '') continue;
+            $card = strstr($card, 'END:VCARD', true) ?: $card;
+
+            $nombre = '';
+            $telefono = '';
+
+            // FN (formatted name) o N (estructurado)
+            if (preg_match('/^FN[^:]*:(.+)$/im', $card, $m)) {
+                $nombre = trim($m[1]);
+            } elseif (preg_match('/^N[^:]*:(.+)$/im', $card, $m)) {
+                $partes = explode(';', $m[1]);
+                $nombre = trim(($partes[1] ?? '') . ' ' . ($partes[0] ?? ''));
+            }
+
+            // TEL — primer numero (preferentemente CELL/MOBILE)
+            $tels = [];
+            if (preg_match_all('/^TEL[^:]*:(.+)$/im', $card, $mm)) {
+                $tels = $mm[1];
+            }
+            // Decodificar QUOTED-PRINTABLE si aparece
+            $tels = array_map(fn ($t) => quoted_printable_decode(trim($t)), $tels);
+
+            if (empty($tels)) continue;
+            $telefono = $tels[0];
+
+            $result[] = [
+                'nombre'   => $this->utf8Limpio($nombre),
+                'telefono' => $telefono,
+                'foto'     => null,
+            ];
+        }
+        return $result;
+    }
+
+    private function parsearCSV(string $contenido): array
+    {
+        $contenido = str_replace(["\r\n", "\r"], "\n", $contenido);
+        $lineas = array_filter(explode("\n", $contenido), fn ($l) => trim($l) !== '');
+        if (empty($lineas)) return [];
+
+        // Detectar separador (, o ;)
+        $primera = reset($lineas);
+        $sep = substr_count($primera, ';') > substr_count($primera, ',') ? ';' : ',';
+
+        $headers = str_getcsv($primera, $sep);
+        $headers = array_map(fn ($h) => strtolower(trim($h, " \t\"'")), $headers);
+
+        // Indices de columnas (Google Contacts: "Name", "Phone 1 - Value"; CRM: "nombre", "telefono")
+        $idxNombre = $this->indiceCSV($headers, ['name', 'nombre', 'full name', 'first name', 'display name']);
+        $idxTel    = $this->indiceCSV($headers, ['phone 1 - value', 'phone', 'telefono', 'teléfono', 'mobile', 'celular', 'phone number']);
+
+        // Si no hay header reconocible, asumir que es nombre,telefono sin header
+        $tieneHeaders = ($idxNombre !== null || $idxTel !== null);
+        if (!$tieneHeaders) {
+            $idxNombre = 0;
+            $idxTel    = 1;
+        }
+
+        $result = [];
+        foreach ($lineas as $i => $linea) {
+            if ($tieneHeaders && $i === array_key_first($lineas)) continue;
+            $cols = str_getcsv($linea, $sep);
+
+            $tel    = trim($cols[$idxTel] ?? '', " \t\"'");
+            $nombre = trim($cols[$idxNombre] ?? '', " \t\"'");
+
+            if ($tel === '') continue;
+            $result[] = [
+                'nombre'   => $this->utf8Limpio($nombre),
+                'telefono' => $tel,
+                'foto'     => null,
+            ];
+        }
+        return $result;
+    }
+
+    private function indiceCSV(array $headers, array $candidatos): ?int
+    {
+        foreach ($candidatos as $cand) {
+            $idx = array_search($cand, $headers, true);
+            if ($idx !== false) return $idx;
+        }
+        return null;
+    }
+
+    private function utf8Limpio(string $s): string
+    {
+        if ($s === '' || mb_check_encoding($s, 'UTF-8')) return $s;
+        $det = mb_detect_encoding($s, ['UTF-8', 'Windows-1252', 'ISO-8859-1', 'ASCII'], true) ?: 'Windows-1252';
+        return mb_convert_encoding($s, 'UTF-8', $det);
+    }
+
+    /**
+     * Importa directamente un array de contactos ya parseado.
+     */
+    public function importarLista(array $contactos, bool $actualizarExistentes = false, bool $importarConversaciones = true): array
+    {
+        return $this->importarContactosArray($contactos, $actualizarExistentes, $importarConversaciones, 'archivo');
+    }
+
+    /**
      * Lee contactos de las conversaciones locales del tenant. Estos son los
      * clientes que YA escribieron al bot, no toda la libreta de WhatsApp.
      * Sirve como fallback cuando la API de TecnoByteApp no expone /contacts.
@@ -197,6 +439,15 @@ class WhatsappContactosService
             }
         }
 
+        return $this->importarContactosArray($contactos, $actualizarExistentes, $importarConversaciones, $fuente, $connectionId);
+    }
+
+    /**
+     * Logica comun de importacion: dado un array de contactos parseados,
+     * los crea/actualiza en la tabla clientes y vincula conversaciones.
+     */
+    private function importarContactosArray(array $contactos, bool $actualizarExistentes, bool $importarConversaciones, string $fuente, ?int $connectionId = null): array
+    {
         $tm = app(TenantManager::class);
         $tenant = method_exists($tm, 'current') ? $tm->current() : null;
         $tenantId = $tenant?->id ?? (method_exists($tm, 'id') ? $tm->id() : null);
