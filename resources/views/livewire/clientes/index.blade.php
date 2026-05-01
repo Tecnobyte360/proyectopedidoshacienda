@@ -40,7 +40,7 @@
                     </button>
                 </div>
 
-                @if (!$resultadoImportWa && !$diagnosticoApi)
+                @if (!$resultadoImportWa && !$diagnosticoApi && !$resultadoSyncFull)
                     {{-- TABS --}}
                     <div class="flex gap-1 mb-5 border-b border-slate-200">
                         <button wire:click="$set('tabImport', 'api')"
@@ -58,12 +58,37 @@
                     </div>
 
                     @if ($tabImport === 'api')
-                        <div class="rounded-2xl bg-amber-50 border border-amber-200 p-4 text-sm text-amber-800 mb-4">
-                            <i class="fa-solid fa-circle-info mr-1"></i>
-                            Si la API expone <code>/contacts</code>, los trae todos. Si no, importa solo a quienes <strong>ya escribieron al bot</strong>. Los teléfonos existentes no se sobreescriben.
+                        {{-- OPCION FUERTE: Sincronizar historial completo --}}
+                        <div class="rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-700 p-5 text-white mb-4">
+                            <div class="flex items-start gap-3">
+                                <i class="fa-solid fa-rotate text-2xl mt-1"></i>
+                                <div class="flex-1">
+                                    <h4 class="font-extrabold text-base">Sincronizar TODO el historial</h4>
+                                    <p class="text-xs opacity-90 mt-1 mb-3">
+                                        Trae <strong>todos los chats, contactos con foto, y mensajes</strong> del WhatsApp del tenant directo a la plataforma. Puede tardar minutos si hay muchos chats.
+                                    </p>
+                                    <button wire:click="sincronizarHistorial"
+                                            wire:loading.attr="disabled" wire:target="sincronizarHistorial"
+                                            class="rounded-xl bg-white text-emerald-700 px-4 py-2 text-sm font-bold shadow hover:bg-emerald-50 disabled:opacity-50">
+                                        <span wire:loading.remove wire:target="sincronizarHistorial">
+                                            <i class="fa-solid fa-bolt mr-1"></i> Sincronizar ahora
+                                        </span>
+                                        <span wire:loading wire:target="sincronizarHistorial">
+                                            <i class="fa-solid fa-spinner fa-spin mr-1"></i> Sincronizando...
+                                        </span>
+                                    </button>
+                                </div>
+                            </div>
                         </div>
 
-                        <label class="flex items-start gap-3 mb-5 cursor-pointer">
+                        <div class="text-center text-xs text-slate-400 my-3">— o solo contactos —</div>
+
+                        <div class="rounded-2xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-800 mb-3">
+                            <i class="fa-solid fa-circle-info mr-1"></i>
+                            Importa solo la lista de contactos (sin chats ni mensajes).
+                        </div>
+
+                        <label class="flex items-start gap-3 mb-4 cursor-pointer">
                             <input type="checkbox" wire:model="actualizarExistentes"
                                    class="mt-1 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500">
                             <span class="text-sm text-slate-700">
@@ -80,9 +105,9 @@
                             <button wire:click="importarContactosWhatsapp"
                                     wire:loading.attr="disabled"
                                     wire:target="importarContactosWhatsapp"
-                                    class="rounded-xl bg-emerald-600 px-5 py-2 text-sm font-semibold text-white shadow hover:bg-emerald-700 disabled:opacity-50">
+                                    class="rounded-xl bg-slate-700 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-slate-800 disabled:opacity-50">
                                 <span wire:loading.remove wire:target="importarContactosWhatsapp">
-                                    <i class="fa-solid fa-cloud-arrow-down mr-1"></i> Importar ahora
+                                    <i class="fa-solid fa-cloud-arrow-down mr-1"></i> Solo contactos
                                 </span>
                                 <span wire:loading wire:target="importarContactosWhatsapp">
                                     <i class="fa-solid fa-spinner fa-spin mr-1"></i> Importando...
@@ -147,6 +172,52 @@
                             </button>
                         </div>
                     @endif
+                @elseif ($resultadoSyncFull)
+                    @if (isset($resultadoSyncFull['error']))
+                        <div class="rounded-2xl bg-red-50 border border-red-200 p-4 text-sm text-red-800">
+                            <p class="font-semibold mb-1"><i class="fa-solid fa-circle-xmark mr-1"></i> Error</p>
+                            <p>{{ $resultadoSyncFull['error'] }}</p>
+                        </div>
+                    @else
+                        <div class="rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-700 text-white p-4 mb-4">
+                            <div class="text-xs opacity-90 mb-1">✅ Sincronización completada</div>
+                            <div class="text-3xl font-extrabold">{{ $resultadoSyncFull['tickets_procesados'] ?? 0 }} chats</div>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2 mb-3">
+                            <div class="rounded-xl bg-emerald-50 p-3 text-center">
+                                <div class="text-xl font-extrabold text-emerald-700">{{ $resultadoSyncFull['clientes_creados'] ?? 0 }}</div>
+                                <div class="text-[10px] text-emerald-600">Clientes nuevos</div>
+                            </div>
+                            <div class="rounded-xl bg-blue-50 p-3 text-center">
+                                <div class="text-xl font-extrabold text-blue-700">{{ $resultadoSyncFull['clientes_actualizados'] ?? 0 }}</div>
+                                <div class="text-[10px] text-blue-600">Clientes actualizados</div>
+                            </div>
+                            <div class="rounded-xl bg-purple-50 p-3 text-center">
+                                <div class="text-xl font-extrabold text-purple-700">{{ $resultadoSyncFull['mensajes_imp'] ?? 0 }}</div>
+                                <div class="text-[10px] text-purple-600">Mensajes importados</div>
+                            </div>
+                            <div class="rounded-xl bg-emerald-50 p-3 text-center">
+                                <div class="text-xl font-extrabold text-emerald-700">{{ $resultadoSyncFull['conv_creadas'] ?? 0 }}</div>
+                                <div class="text-[10px] text-emerald-600">Conversaciones nuevas</div>
+                            </div>
+                            <div class="rounded-xl bg-blue-50 p-3 text-center">
+                                <div class="text-xl font-extrabold text-blue-700">{{ $resultadoSyncFull['conv_actualizadas'] ?? 0 }}</div>
+                                <div class="text-[10px] text-blue-600">Conversaciones actualizadas</div>
+                            </div>
+                            @if (($resultadoSyncFull['errores'] ?? 0) > 0)
+                                <div class="rounded-xl bg-red-50 p-3 text-center">
+                                    <div class="text-xl font-extrabold text-red-700">{{ $resultadoSyncFull['errores'] }}</div>
+                                    <div class="text-[10px] text-red-600">Con error</div>
+                                </div>
+                            @endif
+                        </div>
+                    @endif
+                    <div class="flex justify-end">
+                        <button wire:click="cerrarModalImportarWa"
+                                class="rounded-xl bg-emerald-600 px-5 py-2 text-sm font-semibold text-white shadow hover:bg-emerald-700">
+                            <i class="fa-solid fa-check mr-1"></i> Listo
+                        </button>
+                    </div>
                 @elseif ($diagnosticoApi)
                     @if (isset($diagnosticoApi['error']))
                         <div class="rounded-2xl bg-red-50 border border-red-200 p-4 text-sm text-red-800">

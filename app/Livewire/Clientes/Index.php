@@ -41,6 +41,7 @@ class Index extends Component
     public string $tabImport          = 'api'; // api | archivo | diagnostico
     public $archivoContactos          = null;  // Livewire upload
     public ?array $diagnosticoApi     = null;
+    public ?array $resultadoSyncFull  = null;
 
     public array $paises = [
         ['codigo' => '+57',  'nombre' => 'Colombia',       'flag' => '🇨🇴'],
@@ -163,6 +164,9 @@ class Index extends Component
     {
         $this->modalImportarWa = false;
         $this->importandoWa    = false;
+        $this->resultadoSyncFull = null;
+        $this->diagnosticoApi = null;
+        $this->resultadoImportWa = null;
     }
 
     public function importarContactosWhatsapp(): void
@@ -224,6 +228,26 @@ class Index extends Component
         } finally {
             $this->importandoWa = false;
             $this->archivoContactos = null;
+        }
+    }
+
+    public function sincronizarHistorial(): void
+    {
+        $this->importandoWa = true;
+        $this->resultadoSyncFull = null;
+
+        try {
+            $stats = app(WhatsappContactosService::class)->sincronizarHistorialCompleto();
+            $this->resultadoSyncFull = $stats;
+            $this->dispatch('notify', [
+                'type'    => 'success',
+                'message' => "✓ Sync historial: {$stats['tickets_procesados']} chats, {$stats['clientes_creados']} clientes, {$stats['mensajes_imp']} mensajes.",
+            ]);
+        } catch (\Throwable $e) {
+            $this->resultadoSyncFull = ['error' => $e->getMessage()];
+            $this->dispatch('notify', ['type' => 'error', 'message' => '❌ ' . $e->getMessage()]);
+        } finally {
+            $this->importandoWa = false;
         }
     }
 

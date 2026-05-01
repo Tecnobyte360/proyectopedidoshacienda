@@ -43,33 +43,13 @@ class WhatsappContactosService
 
         $base = rtrim($cred['api_base_url'] ?? 'https://wa-api.tecnobyteapp.com:1422', '/');
 
-        // Probar muchos endpoints — TecnoByteApp puede exponer cualquiera de ellos.
-        // El que funcione gana; el resto cae en 404.
+        // ✅ Confirmado por diagnostico: el endpoint real es /contacts?whatsappId=
         $intentos = [
-            // Patrón estándar whatsapp-web.js wrapper
-            "/whatsapp/{$connectionId}/contacts",
-            "/whatsapp/{$connectionId}/chats",
-            "/whatsapp/{$connectionId}/getContacts",
-            "/whatsapp/{$connectionId}/get-contacts",
-            "/whatsapps/{$connectionId}/contacts",
-            "/whatsapps/{$connectionId}/chats",
-            // Con prefijo /api
-            "/api/whatsapp/{$connectionId}/contacts",
-            "/api/whatsapp/{$connectionId}/chats",
-            "/api/whatsapps/{$connectionId}/contacts",
-            "/api/whatsapps/{$connectionId}/chats",
-            "/api/contacts/{$connectionId}",
-            "/api/chats/{$connectionId}",
-            // Con query string
             "/contacts?whatsappId={$connectionId}",
-            "/contacts?id={$connectionId}",
-            "/chats?whatsappId={$connectionId}",
-            "/chats?id={$connectionId}",
+            // Mantener fallbacks por si en otra version del wrapper cambia
             "/api/contacts?whatsappId={$connectionId}",
-            "/api/chats?whatsappId={$connectionId}",
-            // Variantes camelCase
-            "/getContacts/{$connectionId}",
-            "/getChats/{$connectionId}",
+            "/whatsapp/{$connectionId}/contacts",
+            "/api/whatsapp/{$connectionId}/contacts",
         ];
 
         $contactos = null;
@@ -418,7 +398,7 @@ class WhatsappContactosService
      * conversaciones locales del tenant.
      * Skip = ya existe (no sobreescribe). Update = actualiza nombre/foto si vacios.
      */
-    public function importar(?int $connectionId = null, bool $actualizarExistentes = false, bool $importarConversaciones = true): array
+    public function importar(?int $connectionId = null, bool $actualizarExistentes = false, bool $importarConversaciones = true, bool $bajarFotos = false): array
     {
         $fuente = 'api';
         try {
@@ -642,12 +622,14 @@ class WhatsappContactosService
         // El "chat id" en whatsapp-web.js suele ser numero@c.us
         $chatId = $telefono . '@c.us';
 
+        // Patron observado: TecnoByteApp usa /resource?whatsappId=ID
         $intentos = [
-            "/whatsapp/{$connectionId}/messages?chatId={$chatId}",
-            "/whatsapp/{$connectionId}/chat/{$chatId}/messages",
-            "/api/whatsapp/{$connectionId}/messages?chatId={$chatId}",
-            "/api/messages?whatsappId={$connectionId}&chatId={$chatId}",
+            "/messages?whatsappId={$connectionId}&chatId={$chatId}",
             "/messages?whatsappId={$connectionId}&number={$telefono}",
+            "/messages?whatsappId={$connectionId}&contactNumber={$telefono}",
+            "/chats?whatsappId={$connectionId}&number={$telefono}",
+            "/api/messages?whatsappId={$connectionId}&chatId={$chatId}",
+            "/whatsapp/{$connectionId}/messages?chatId={$chatId}",
         ];
 
         foreach ($intentos as $path) {
@@ -710,23 +692,43 @@ class WhatsappContactosService
         foreach ($items as $item) {
             if (!is_array($item)) continue;
 
-            // Distintos shapes posibles
+            // Distintos shapes posibles. En TecnoByteApp el campo `name` suele
+            // ser el telefono internacional (ej "521998655477") y `pushname` /
+            // `verifiedName` el nombre real.
             $tel = $item['number']
                 ?? $item['phone']
                 ?? $item['phoneNumber']
                 ?? $item['wa_id']
+                ?? $item['waId']
+                ?? $item['contactNumber']
                 ?? $item['id']['user']
                 ?? null;
 
-            $nombre = $item['name']
-                ?? $item['pushname']
+            // Si no encontramos un campo explicito de telefono y `name` es
+            // todo digitos (o digitos + algunos chars), usar name como tel.
+            $rawName = $item['name'] ?? $item['displayName'] ?? '';
+            if (!$tel && $rawName !== '' && preg_match('/^\+?\d{7,}$/', preg_replace('/\s+/', '', (string) $rawName))) {
+                $tel = $rawName;
+            }
+
+            // Para el nombre real, preferir pushname/verifiedName/notify/short
+            $nombre = $item['pushname']
                 ?? $item['verifiedName']
                 ?? $item['notify']
+                ?? $item['shortName']
+                ?? $item['short']
                 ?? '';
 
+            // Si seguimos sin nombre y `name` NO es un telefono, usarlo.
+            if (!$nombre && $rawName !== '' && !preg_match('/^\+?\d+$/', preg_replace('/\s+/', '', (string) $rawName))) {
+                $nombre = $rawName;
+            }
+
             $foto = $item['profilePicUrl']
+                ?? $item['contactProfilePic']
                 ?? $item['profile_pic_url']
                 ?? $item['avatar']
+                ?? $item['picture']
                 ?? null;
 
             // Filtrar contactos que no son personas (grupos, broadcasts, etc.)
@@ -746,5 +748,294 @@ class WhatsappContactosService
         }
 
         return $result;
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // SINCRONIZACION COMPLETA DE HISTORIAL via /tickets (Whaticket-style API)
+    // ════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Sincroniza el HISTORIAL COMPLETO del WhatsApp del tenant:
+     *   - Recorre todos los tickets (chats) paginando
+     *   - Por cada ticket: upsert Cliente (con foto), upsert Conversacion,
+     *     baja todos los mensajes y los inserta como MensajeWhatsapp
+     *
+     * Es el metodo "matar todo de un golpe": deja la plataforma con la base
+     * de clientes + conversaciones + mensajes igual a lo que esta en el celular.
+     */
+    public function sincronizarHistorialCompleto(?int $connectionId = null, int $maxTickets = 1000, int $maxMensajesPorTicket = 500): array
+    {
+        $resolver = app(WhatsappResolverService::class);
+        $token = $resolver->token();
+        if (!$token) throw new \RuntimeException('No hay token de WhatsApp activo.');
+
+        if (!$connectionId) {
+            $ids = $resolver->connectionIdsValidos();
+            $connectionId = $ids[0] ?? null;
+        }
+        if (!$connectionId) throw new \RuntimeException('No hay connection_id valido.');
+
+        $tm = app(TenantManager::class);
+        $tenant = method_exists($tm, 'current') ? $tm->current() : null;
+        $tenantId = $tenant?->id ?? (method_exists($tm, 'id') ? $tm->id() : null);
+        if (!$tenantId) throw new \RuntimeException('No hay tenant activo.');
+
+        $cred = $resolver->credenciales();
+        $base = rtrim($cred['api_base_url'] ?? 'https://wa-api.tecnobyteapp.com:1422', '/');
+
+        $stats = [
+            'tickets_procesados' => 0,
+            'clientes_creados'   => 0,
+            'clientes_actualizados' => 0,
+            'conv_creadas'       => 0,
+            'conv_actualizadas'  => 0,
+            'mensajes_imp'       => 0,
+            'errores'            => 0,
+        ];
+
+        $page = 1;
+        $limit = 100;
+        $vistos = 0;
+
+        while ($vistos < $maxTickets) {
+            $resp = Http::withoutVerifying()
+                ->withToken($token)
+                ->timeout(60)
+                ->get("{$base}/tickets", [
+                    'whatsappId' => $connectionId,
+                    'pageNumber' => $page,
+                    'limit'      => $limit,
+                    'showAll'    => 'true',
+                ]);
+
+            if (!$resp->successful()) {
+                Log::warning('Fallo /tickets en sync historial', [
+                    'page' => $page, 'status' => $resp->status(),
+                ]);
+                break;
+            }
+
+            $body = $resp->json();
+            $tickets = $body['tickets'] ?? [];
+            $hasMore = $body['hasMore'] ?? false;
+
+            if (empty($tickets)) break;
+
+            foreach ($tickets as $t) {
+                $vistos++;
+                if ($vistos > $maxTickets) break 2;
+
+                try {
+                    $procesado = $this->procesarTicket($t, $tenantId, $connectionId, $token, $base, $maxMensajesPorTicket);
+                    foreach ($procesado as $k => $v) {
+                        if (isset($stats[$k])) $stats[$k] += $v;
+                    }
+                    $stats['tickets_procesados']++;
+                } catch (\Throwable $e) {
+                    $stats['errores']++;
+                    Log::warning('Error procesando ticket en sync', [
+                        'ticket_id' => $t['id'] ?? null,
+                        'error'     => $e->getMessage(),
+                    ]);
+                }
+            }
+
+            if (!$hasMore) break;
+            $page++;
+        }
+
+        return $stats;
+    }
+
+    /**
+     * Procesa un ticket individual: upsert cliente, conversacion y mensajes.
+     */
+    private function procesarTicket(array $ticket, int $tenantId, int $connectionId, string $token, string $base, int $maxMensajes): array
+    {
+        $stats = [
+            'clientes_creados' => 0, 'clientes_actualizados' => 0,
+            'conv_creadas' => 0, 'conv_actualizadas' => 0, 'mensajes_imp' => 0,
+        ];
+
+        $contact = $ticket['contact'] ?? [];
+        if (($contact['isGroup'] ?? false) === true) return $stats; // saltar grupos
+
+        $numero = (string) ($contact['number'] ?? '');
+        $tel = preg_replace('/\D+/', '', $numero);
+        if (!$tel || strlen($tel) < 7) return $stats;
+
+        $nombre = trim((string) ($contact['name'] ?? ''));
+        // Si el "nombre" es solo digitos (es el telefono), dejarlo vacio
+        if (preg_match('/^\d+$/', $nombre)) $nombre = '';
+        $foto = $contact['profilePicUrl'] ?? null;
+
+        // 1) UPSERT cliente
+        $cliente = Cliente::where('tenant_id', $tenantId)
+            ->where('telefono_normalizado', $tel)
+            ->first();
+
+        if (!$cliente) {
+            $cliente = Cliente::create([
+                'tenant_id'            => $tenantId,
+                'nombre'               => $nombre ?: 'Cliente',
+                'pais_codigo'          => '+57',
+                'telefono'             => substr($tel, -10),
+                'telefono_normalizado' => $tel,
+                'canal_origen'         => 'whatsapp_sync',
+                'profile_pic_url'      => $foto,
+                'activo'               => true,
+            ]);
+            $stats['clientes_creados']++;
+        } else {
+            // Actualizar foto/nombre si vienen y faltaban
+            $cambios = [];
+            if ($foto && empty($cliente->profile_pic_url)) {
+                $cambios['profile_pic_url'] = $foto;
+            }
+            if ($nombre && (empty($cliente->nombre) || $cliente->nombre === 'Cliente')) {
+                $cambios['nombre'] = $nombre;
+            }
+            if (!empty($cambios)) {
+                $cliente->update($cambios);
+                $stats['clientes_actualizados']++;
+            }
+        }
+
+        // 2) UPSERT conversacion
+        $conv = ConversacionWhatsapp::where('tenant_id', $tenantId)
+            ->where('telefono_normalizado', $tel)
+            ->first();
+
+        if (!$conv) {
+            $conv = ConversacionWhatsapp::create([
+                'tenant_id'            => $tenantId,
+                'cliente_id'           => $cliente->id,
+                'telefono_normalizado' => $tel,
+                'canal'                => 'whatsapp',
+                'connection_id'        => $connectionId,
+                'estado'               => ConversacionWhatsapp::ESTADO_ACTIVA,
+                'no_leidos'            => (int) ($ticket['unreadMessages'] ?? 0),
+            ]);
+            $stats['conv_creadas']++;
+        } else {
+            $cambios = [];
+            if (!$conv->cliente_id) $cambios['cliente_id'] = $cliente->id;
+            if (!$conv->connection_id) $cambios['connection_id'] = $connectionId;
+            if (!empty($cambios)) {
+                $conv->update($cambios);
+                $stats['conv_actualizadas']++;
+            }
+        }
+
+        // 3) BAJAR mensajes del ticket
+        $msgs = $this->listarMensajesTicket($base, $token, (int) $ticket['id'], $maxMensajes);
+        if (empty($msgs)) return $stats;
+
+        // IDs externos ya existentes para no duplicar
+        $existentes = DB::table('mensajes_whatsapp')
+            ->where('conversacion_id', $conv->id)
+            ->whereNotNull('mensaje_externo_id')
+            ->pluck('mensaje_externo_id')
+            ->flip()
+            ->toArray();
+
+        $primer = null;
+        $ultimo = null;
+        $insertados = 0;
+
+        foreach ($msgs as $m) {
+            $extId = $m['external_id'] ?? null;
+            if ($extId && isset($existentes[$extId])) continue;
+
+            DB::table('mensajes_whatsapp')->insert([
+                'conversacion_id'    => $conv->id,
+                'rol'                => $m['rol'],
+                'tipo'               => $m['tipo'] ?? 'text',
+                'contenido'          => mb_substr((string) ($m['contenido'] ?? ''), 0, 65000),
+                'mensaje_externo_id' => $extId,
+                'meta'               => json_encode($m['meta'] ?? []),
+                'created_at'         => $m['fecha'] ?? now(),
+                'updated_at'         => $m['fecha'] ?? now(),
+            ]);
+            $insertados++;
+
+            $f = $m['fecha'] ?? null;
+            if ($f) {
+                if ($primer === null || $f < $primer) $primer = $f;
+                if ($ultimo === null || $f > $ultimo) $ultimo = $f;
+            }
+        }
+
+        if ($insertados > 0) {
+            $stats['mensajes_imp'] += $insertados;
+
+            $update = ['total_mensajes' => DB::raw("COALESCE(total_mensajes,0) + {$insertados}")];
+            if ($primer && (!$conv->primer_mensaje_at || $primer < $conv->primer_mensaje_at)) {
+                $update['primer_mensaje_at'] = $primer;
+            }
+            if ($ultimo && (!$conv->ultimo_mensaje_at || $ultimo > $conv->ultimo_mensaje_at)) {
+                $update['ultimo_mensaje_at'] = $ultimo;
+            }
+            $conv->update($update);
+        }
+
+        return $stats;
+    }
+
+    /**
+     * Baja mensajes de un ticket via /messages/{ticketId} con paginacion.
+     */
+    private function listarMensajesTicket(string $base, string $token, int $ticketId, int $maxMensajes = 500): array
+    {
+        $out = [];
+        $page = 1;
+        $limit = 100;
+
+        while (count($out) < $maxMensajes) {
+            // Patron Whaticket: /messages/{ticketId}?pageNumber=N
+            $resp = Http::withoutVerifying()
+                ->withToken($token)
+                ->timeout(30)
+                ->get("{$base}/messages/{$ticketId}", [
+                    'pageNumber' => $page,
+                    'limit'      => $limit,
+                ]);
+
+            if (!$resp->successful()) break;
+
+            $body = $resp->json();
+            $items = $body['messages'] ?? $body['data'] ?? [];
+            if (!is_array($items) || empty($items)) break;
+
+            foreach ($items as $m) {
+                if (!is_array($m)) continue;
+                $fromMe = $m['fromMe'] ?? false;
+                $contenido = $m['body'] ?? $m['text'] ?? '';
+                $ts = $m['timestamp'] ?? $m['createdAt'] ?? null;
+                $fecha = $ts ? date('Y-m-d H:i:s', is_numeric($ts) ? (int) $ts : strtotime((string) $ts)) : now();
+
+                $out[] = [
+                    'rol'         => $fromMe ? 'assistant' : 'user',
+                    'tipo'        => $m['mediaType'] ?? $m['type'] ?? 'text',
+                    'contenido'   => is_string($contenido) ? $contenido : json_encode($contenido),
+                    'fecha'       => $fecha,
+                    'external_id' => isset($m['id']) ? (string) $m['id'] : null,
+                    'meta'        => [
+                        'ack'       => $m['ack'] ?? null,
+                        'mediaType' => $m['mediaType'] ?? null,
+                        'mediaUrl'  => $m['mediaUrl'] ?? null,
+                    ],
+                ];
+                if (count($out) >= $maxMensajes) break 2;
+            }
+
+            $hasMore = $body['hasMore'] ?? (count($items) >= $limit);
+            if (!$hasMore) break;
+            $page++;
+        }
+
+        // Ordenar de mas viejo a mas nuevo
+        usort($out, fn ($a, $b) => strcmp((string) $a['fecha'], (string) $b['fecha']));
+        return $out;
     }
 }
