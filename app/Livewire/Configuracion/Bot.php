@@ -96,6 +96,10 @@ class Bot extends Component
     public int    $auto_sync_productos_min   = 15;
     public ?string $ultimo_sync_productos_at = null;
 
+    // Filtros del catalogo del bot
+    public string $categorias_excluidas_bot_str = '';      // textarea (una por linea)
+    public bool   $excluir_productos_sin_precio = true;
+
     // Auto-asignación de domiciliarios
     public bool   $auto_asignar_domiciliario = false;
     public string $criterio_asignacion       = 'balanceado';
@@ -197,6 +201,10 @@ class Bot extends Component
         $this->integracion_productos_id  = $cfg->integracion_productos_id;
         $this->auto_sync_productos_min   = (int) ($cfg->auto_sync_productos_min ?: 15);
         $this->ultimo_sync_productos_at  = $cfg->ultimo_sync_productos_at?->format('Y-m-d H:i:s');
+
+        $this->categorias_excluidas_bot_str = collect($cfg->categorias_excluidas_bot ?? [])
+            ->filter()->implode("\n");
+        $this->excluir_productos_sin_precio = (bool) ($cfg->excluir_productos_sin_precio ?? true);
         $this->auto_asignar_domiciliario = (bool) ($cfg->auto_asignar_domiciliario ?? false);
         $this->criterio_asignacion       = (string) ($cfg->criterio_asignacion ?: 'balanceado');
         $this->asignar_en_estado         = (string) ($cfg->asignar_en_estado ?: 'en_preparacion');
@@ -590,6 +598,8 @@ class Bot extends Component
             'fuente_productos'                      => 'required|in:tabla,integracion',
             'integracion_productos_id'              => 'nullable|integer|exists:integraciones,id',
             'auto_sync_productos_min'               => 'integer|min:1|max:1440',
+            'categorias_excluidas_bot_str'          => 'nullable|string',
+            'excluir_productos_sin_precio'          => 'boolean',
             'auto_asignar_domiciliario'             => 'boolean',
             'criterio_asignacion'                   => 'nullable|in:balanceado,cercania,rotacion',
             'asignar_en_estado'                     => 'nullable|in:nuevo,en_preparacion,repartidor_en_camino',
@@ -612,6 +622,26 @@ class Bot extends Component
 
     public ?string $catalogoPreview = null;
     public ?array  $catalogoPreviewMeta = null;
+
+    public function cargarSugerenciasExclusion(): void
+    {
+        // Categorias tipicas que NO son comida y suelen llenar el ERP
+        $sugeridas = [
+            'GENERAL',
+            'SERVICIOS Y OTROS',
+            'INSUMOS Y MP',
+            'BOLSAS Y EMPAQUES',
+            'EMBUTIDOS',
+            'PETS',
+        ];
+        $actuales = collect(preg_split('/\R+/', $this->categorias_excluidas_bot_str))
+            ->map(fn ($l) => trim($l))->filter()->all();
+        $combinadas = collect($actuales)->concat($sugeridas)->map(fn ($c) => trim($c))
+            ->unique()->values()->all();
+        $this->categorias_excluidas_bot_str = implode("\n", $combinadas);
+
+        $this->dispatch('notify', ['type' => 'success', 'message' => '✓ Sugerencias agregadas. No olvides Guardar.']);
+    }
 
     public function verCatalogoBot(): void
     {
@@ -711,6 +741,17 @@ class Bot extends Component
 
         // No persistir el campo readonly de UI
         unset($data['ultimo_sync_productos_at']);
+
+        // Convertir el textarea de categorias excluidas a array (una por linea)
+        if (isset($data['categorias_excluidas_bot_str'])) {
+            $data['categorias_excluidas_bot'] = collect(preg_split('/\R+/', (string) $data['categorias_excluidas_bot_str']))
+                ->map(fn ($l) => trim($l))
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
+            unset($data['categorias_excluidas_bot_str']);
+        }
 
         $cfg = ConfiguracionBot::actual();
         $cfg->update($data);

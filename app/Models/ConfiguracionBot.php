@@ -53,6 +53,8 @@ class ConfiguracionBot extends Model
         'integracion_productos_id',
         'auto_sync_productos_min',
         'ultimo_sync_productos_at',
+        'categorias_excluidas_bot',
+        'excluir_productos_sin_precio',
         'cumpleanos_dias_vigencia_beneficio',
         'encuesta_activa',
         'encuesta_delay_minutos',
@@ -118,6 +120,8 @@ class ConfiguracionBot extends Model
         'notif_pago_rechazado_activa' => 'boolean',
         'auto_sync_productos_min'   => 'integer',
         'ultimo_sync_productos_at'  => 'datetime',
+        'categorias_excluidas_bot'  => 'array',
+        'excluir_productos_sin_precio' => 'boolean',
     ];
 
     public const FUENTE_TABLA       = 'tabla';

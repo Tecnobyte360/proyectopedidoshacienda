@@ -192,6 +192,41 @@
                     </div>
                 </div>
             @endif
+
+            {{-- FILTROS DEL CATÁLOGO --}}
+            <div class="mt-6 pt-6 border-t border-slate-200">
+                <h4 class="text-base font-bold text-slate-800 mb-1">
+                    <i class="fa-solid fa-filter text-indigo-600 mr-1"></i> Filtros del catálogo del bot
+                </h4>
+                <p class="text-xs text-slate-500 mb-4">
+                    Limita lo que el bot ve. Esencial cuando el ERP tiene MUCHOS productos no-comida (insumos, bolsas, impuestos, etc.) que saturan al LLM.
+                </p>
+
+                <label class="flex items-start gap-3 mb-4 cursor-pointer rounded-xl border border-slate-200 p-3 hover:bg-slate-50">
+                    <input type="checkbox" wire:model="excluir_productos_sin_precio"
+                           class="mt-1 rounded border-slate-300 text-indigo-600 h-5 w-5">
+                    <div>
+                        <div class="text-sm font-bold text-slate-800">Ocultar productos sin precio (precio = $0)</div>
+                        <div class="text-xs text-slate-500">Recomendado. Filtra ítems internos, raw materials, ajustes contables.</div>
+                    </div>
+                </label>
+
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <label class="block text-sm font-medium text-slate-700">Categorías a excluir</label>
+                        <button type="button" wire:click="cargarSugerenciasExclusion"
+                                class="text-xs font-semibold text-indigo-600 hover:text-indigo-800">
+                            <i class="fa-solid fa-wand-magic-sparkles mr-1"></i> Cargar sugerencias
+                        </button>
+                    </div>
+                    <textarea wire:model="categorias_excluidas_bot_str" rows="6"
+                              placeholder="GENERAL&#10;SERVICIOS Y OTROS&#10;INSUMOS Y MP&#10;BOLSAS Y EMPAQUES&#10;EMBUTIDOS"
+                              class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-mono focus:border-indigo-500 focus:ring-indigo-500"></textarea>
+                    <p class="text-[11px] text-slate-400 mt-1">
+                        Una categoría por línea. Coincide por nombre exacto (case-insensitive). Las verás listadas tal cual aparecen en el preview del catálogo.
+                    </p>
+                </div>
+            </div>
         </section>
 
         {{-- ENVÍO DE IMÁGENES --}}

@@ -99,7 +99,10 @@ class BotCatalogoService
                             return $p;
                         });
 
-                    return $resultadoErp->concat($localesExtras)->values();
+                    return $this->filtrarCatalogo(
+                        $resultadoErp->concat($localesExtras)->values(),
+                        $config
+                    );
                 } catch (\Throwable $e) {
                     \Illuminate\Support\Facades\Log::warning('Live read productos fallo, fallback a tabla local', [
                         'tenant' => app(\App\Services\TenantManager::class)->id(),
@@ -113,7 +116,7 @@ class BotCatalogoService
 
         // ── MODO TABLA: lectura normal del modelo local ──
         $cacheKey = "bot_catalogo_productos_t{$tenantId}_" . ($sedeId ?? 'all');
-        return Cache::remember($cacheKey, 120, function () use ($sedeId) {
+        $productos = Cache::remember($cacheKey, 120, function () use ($sedeId) {
             $query = Producto::query()
                 ->with(['categoria', 'sedes'])
                 ->where('activo', true);
@@ -124,6 +127,49 @@ class BotCatalogoService
 
             return $query->orderBy('orden')->orderBy('nombre')->get();
         });
+
+        return $this->filtrarCatalogo($productos, $config);
+    }
+
+    /**
+     * Aplica filtros del bot al catalogo:
+     *  - Categorias excluidas
+     *  - Productos sin precio (si esta activo)
+     */
+    private function filtrarCatalogo(Collection $productos, $config): Collection
+    {
+        if (!$config) return $productos;
+
+        $excluidas = collect($config->categorias_excluidas_bot ?? [])
+            ->filter()
+            ->map(fn ($c) => mb_strtolower(trim((string) $c)))
+            ->unique()
+            ->values()
+            ->all();
+
+        $excluirSinPrecio = (bool) ($config->excluir_productos_sin_precio ?? true);
+
+        if (empty($excluidas) && !$excluirSinPrecio) return $productos;
+
+        return $productos->reject(function ($p) use ($excluidas, $excluirSinPrecio) {
+            // Categoria
+            if (!empty($excluidas)) {
+                $cat = is_object($p->categoria ?? null)
+                    ? ($p->categoria->nombre ?? '')
+                    : ($p->categoria ?? '');
+                if (in_array(mb_strtolower(trim((string) $cat)), $excluidas, true)) {
+                    return true;
+                }
+            }
+            // Sin precio
+            if ($excluirSinPrecio) {
+                $precio = method_exists($p, 'precioParaSede')
+                    ? $p->precioParaSede(null)
+                    : (float) ($p->precio_base ?? 0);
+                if ($precio <= 0) return true;
+            }
+            return false;
+        })->values();
     }
 
     /**
