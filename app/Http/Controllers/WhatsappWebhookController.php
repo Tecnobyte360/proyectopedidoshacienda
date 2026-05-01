@@ -828,6 +828,9 @@ TXT;
                 if (!in_array($name, $catalogoTools, true)) continue;
 
                 $args = json_decode($tc['function']['arguments'] ?? '{}', true) ?: [];
+                $tStart = microtime(true);
+                $exitoso = true;
+                $errorMsg = null;
                 try {
                     $resultado = match ($name) {
                         'buscar_productos' => $catalogoSvc->buscarProductos(
@@ -853,9 +856,40 @@ TXT;
                     };
                 } catch (\Throwable $e) {
                     $resultado = ['error' => $e->getMessage()];
+                    $exitoso = false;
+                    $errorMsg = $e->getMessage();
                 }
+                $latenciaMs = (int) ((microtime(true) - $tStart) * 1000);
 
-                Log::info("🛠️ Tool call {$name}", ['args' => $args, 'count' => is_array($resultado) ? count($resultado) : 0]);
+                $countResultados = (int) ($resultado['encontrados']
+                    ?? $resultado['total_categorias']
+                    ?? (isset($resultado['productos']) ? count($resultado['productos']) : 0)
+                    ?? (isset($resultado['destacados']) ? count($resultado['destacados']) : 0)
+                    ?? 0);
+
+                Log::info("🛠️ Tool call {$name}", [
+                    'args' => $args, 'count' => $countResultados, 'ms' => $latenciaMs,
+                ]);
+
+                // Persistir invocacion para el dashboard de monitoreo
+                try {
+                    \App\Models\AgenteToolInvocacion::create([
+                        'tenant_id'        => $conversacion->tenant_id ?? null,
+                        'conversacion_id'  => $conversacion->id ?? null,
+                        'tool_name'        => $name,
+                        'connection_id'    => (string) ($connectionId ?? ''),
+                        'telefono_cliente' => $from ?? null,
+                        'args'             => $args,
+                        // Solo guardamos un resumen para no llenar la BD con catálogos enteros
+                        'resultado'        => $this->resumirResultadoTool($name, $resultado),
+                        'count_resultados' => $countResultados,
+                        'exitoso'          => $exitoso,
+                        'error'            => $errorMsg,
+                        'latencia_ms'      => $latenciaMs,
+                    ]);
+                } catch (\Throwable $e) {
+                    Log::warning('No se pudo registrar AgenteToolInvocacion: ' . $e->getMessage());
+                }
 
                 $toolMessages[] = [
                     'role'         => 'tool',
@@ -4110,5 +4144,53 @@ PROMPT;
 
         return str_contains(strtoupper($rawBody), 'ERR_WAPP_NOT_CONNECTED')
             || str_contains(strtoupper($rawBody), 'NOT_CONNECTED');
+    }
+
+    /**
+     * Resume el resultado de una tool a algo compacto para guardar en BD.
+     * Evita persistir catalogos enteros — solo metadatos clave.
+     */
+    private function resumirResultadoTool(string $tool, $resultado): array
+    {
+        if (!is_array($resultado)) return ['raw' => (string) $resultado];
+
+        return match ($tool) {
+            'buscar_productos' => [
+                'query'       => $resultado['query'] ?? null,
+                'categoria'   => $resultado['categoria'] ?? null,
+                'encontrados' => $resultado['encontrados'] ?? 0,
+                'top'         => collect($resultado['productos'] ?? [])->take(3)->map(fn ($p) => [
+                    'codigo' => $p['codigo'] ?? null,
+                    'nombre' => $p['nombre'] ?? null,
+                    'precio' => $p['precio'] ?? null,
+                    'score'  => $p['_score'] ?? null,
+                ])->all(),
+            ],
+            'listar_categorias' => [
+                'total' => $resultado['total_categorias'] ?? 0,
+                'top5'  => collect($resultado['categorias'] ?? [])->take(5)->map(fn ($c) => [
+                    'categoria' => $c['categoria'] ?? null,
+                    'cantidad'  => $c['cantidad'] ?? 0,
+                ])->all(),
+            ],
+            'productos_de_categoria' => [
+                'categoria'   => $resultado['categoria'] ?? null,
+                'encontrados' => $resultado['encontrados'] ?? 0,
+                'top'         => collect($resultado['productos'] ?? [])->take(3)->map(fn ($p) => [
+                    'codigo' => $p['codigo'] ?? null,
+                    'nombre' => $p['nombre'] ?? null,
+                ])->all(),
+            ],
+            'info_producto' => [
+                'encontrado' => $resultado['encontrado'] ?? false,
+                'codigo'     => $resultado['producto']['codigo'] ?? null,
+                'nombre'     => $resultado['producto']['nombre'] ?? null,
+            ],
+            'productos_destacados' => [
+                'destacados'  => count($resultado['destacados'] ?? []),
+                'promociones' => count($resultado['promociones'] ?? []),
+            ],
+            default => $resultado,
+        };
     }
 }

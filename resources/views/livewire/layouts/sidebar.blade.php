@@ -77,6 +77,7 @@
                     ['name' => 'Pagos',             'icon' => 'fa-credit-card',        'route' => 'pagos.index',            'badge' => null, 'permission' => 'reportes.ver'],
                     ['name' => 'ANS Tiempos',       'icon' => 'fa-stopwatch',          'route' => 'ans.index',              'badge' => null, 'permission' => 'ans.gestionar'],
                     ['name' => 'Bot WhatsApp',      'icon' => 'fa-robot',              'route' => 'configuracion.bot',      'badge' => null, 'permission' => 'bot.configurar'],
+                    ['name' => 'Monitor del Agente','icon' => 'fa-chart-line',         'route' => 'monitoreo.agente',       'badge' => 'NUEVO', 'permission' => 'bot.configurar'],
                     ['name' => 'Sedes',             'icon' => 'fa-shop',               'route' => 'sedes.index',            'badge' => null, 'permission' => 'sedes.gestionar'],
                 ],
             ],
