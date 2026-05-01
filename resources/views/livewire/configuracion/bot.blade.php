@@ -139,13 +139,56 @@
                     <div class="rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-xs text-emerald-800 space-y-2">
                         <p>
                             <i class="fa-solid fa-bolt mr-1"></i>
-                            <strong>Modo LIVE híbrido.</strong> El bot consulta el ERP directamente (cache 30s).
+                            <strong>Modo LIVE híbrido + fusión.</strong> El bot lee del ERP (cache 30s) y combina con productos locales que no estén en el ERP.
                         </p>
                         <p class="text-[11px] opacity-80">
                             ✅ Precio + disponibilidad del ERP en tiempo real.<br>
-                            ✅ Por cada producto del ERP, busca el código en <code>/productos</code> y trae cortes, fotos, palabras clave, destacados y precio por sede de allí.<br>
-                            💡 Para que enriquezca, tu producto local debe tener el <strong>mismo código</strong> que en el ERP.
+                            ✅ Match por código → enriquece con cortes, fotos, palabras clave, destacados y sedes.<br>
+                            ✅ Productos solo en <code>/productos</code> también se incluyen.<br>
                         </p>
+                    </div>
+
+                    <div class="border-t border-slate-200 pt-3 mt-3">
+                        <div class="flex items-center justify-between mb-2">
+                            <h4 class="text-sm font-bold text-slate-800">
+                                <i class="fa-solid fa-eye mr-1"></i> Vista previa del catálogo del bot
+                            </h4>
+                            <button type="button" wire:click="verCatalogoBot"
+                                    wire:loading.attr="disabled" wire:target="verCatalogoBot"
+                                    class="rounded-xl bg-slate-700 hover:bg-slate-800 text-white text-xs font-semibold px-3 py-1.5 disabled:opacity-50">
+                                <span wire:loading.remove wire:target="verCatalogoBot">
+                                    <i class="fa-solid fa-magnifying-glass mr-1"></i> Ver lo que ve el bot
+                                </span>
+                                <span wire:loading wire:target="verCatalogoBot">
+                                    <i class="fa-solid fa-spinner fa-spin mr-1"></i> Cargando...
+                                </span>
+                            </button>
+                        </div>
+                        @if ($catalogoPreview !== null)
+                            @if ($catalogoPreviewMeta)
+                                <div class="text-xs text-slate-600 mb-2 flex flex-wrap gap-2">
+                                    <span class="rounded-md bg-slate-100 px-2 py-0.5">
+                                        <strong>{{ $catalogoPreviewMeta['total'] }}</strong> productos en total
+                                    </span>
+                                    @foreach ($catalogoPreviewMeta['fuentes'] ?? [] as $fuente => $cnt)
+                                        @php
+                                            $color = match($fuente) {
+                                                'erp+local' => 'bg-emerald-100 text-emerald-700',
+                                                'solo_erp'  => 'bg-blue-100 text-blue-700',
+                                                'solo_local'=> 'bg-amber-100 text-amber-700',
+                                                default     => 'bg-slate-100 text-slate-700',
+                                            };
+                                        @endphp
+                                        <span class="rounded-md px-2 py-0.5 {{ $color }}">
+                                            {{ $fuente }}: {{ $cnt }}
+                                        </span>
+                                    @endforeach
+                                </div>
+                            @endif
+                            <pre class="rounded-xl bg-slate-900 text-emerald-100 text-[11px] p-3 overflow-x-auto max-h-96 whitespace-pre-wrap font-mono">{{ $catalogoPreview }}</pre>
+                        @else
+                            <p class="text-xs text-slate-400">Click en "Ver lo que ve el bot" para inspeccionar el catálogo formateado tal cual lo recibe la IA.</p>
+                        @endif
                     </div>
                 </div>
             @endif

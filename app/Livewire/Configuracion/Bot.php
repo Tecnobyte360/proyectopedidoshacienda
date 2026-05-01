@@ -610,6 +610,31 @@ class Bot extends Component
         ]);
     }
 
+    public ?string $catalogoPreview = null;
+    public ?array  $catalogoPreviewMeta = null;
+
+    public function verCatalogoBot(): void
+    {
+        try {
+            // Forzar lectura fresca: limpiar el cache antes
+            app(\App\Services\BotCatalogoService::class)->limpiarCache();
+
+            $service = app(\App\Services\BotCatalogoService::class);
+            $productos = $service->productosActivos();
+            $this->catalogoPreview = $service->catalogoFormateado();
+
+            // Meta: cuantos hay y de cada fuente (modo integracion)
+            $fuentes = $productos->groupBy(fn ($p) => $p->_fuente ?? '—')->map->count();
+            $this->catalogoPreviewMeta = [
+                'total'   => $productos->count(),
+                'fuentes' => $fuentes->toArray(),
+            ];
+        } catch (\Throwable $e) {
+            $this->catalogoPreview = "❌ Error: " . $e->getMessage();
+            $this->catalogoPreviewMeta = null;
+        }
+    }
+
     public function sincronizarProductosAhora(): void
     {
         if ($this->fuente_productos !== 'integracion') {
