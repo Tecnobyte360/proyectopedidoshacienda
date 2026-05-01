@@ -118,7 +118,9 @@ class BotPromptService
             'fecha_actual'      => $ahora->locale('es')->isoFormat('D [de] MMMM [de] YYYY'),
             'hora_actual'       => $ahora->format('h:i a'),  // 12h con AM/PM
             'empresa'           => $infoEmpresa,
-            'catalogo'          => $this->catalogo->catalogoFormateado($sedeId),
+            'catalogo'          => ($config->bot_modo_agente ?? false)
+                ? $this->catalogoEnModoAgente()
+                : $this->catalogo->catalogoFormateado($sedeId),
             'promociones'       => $this->catalogo->promocionesFormateadas($sedeId),
             'zonas'             => $this->catalogo->zonasFormateadas($sedeId),
             'historial_cliente' => $historialCliente,
@@ -139,6 +141,44 @@ class BotPromptService
         }
 
         return $resultado;
+    }
+
+    /**
+     * Texto que sustituye al catalogo completo cuando el bot esta en MODO AGENTE.
+     * Le indica al LLM que en lugar de leer un catalogo embebido, use las tools
+     * disponibles para consultar productos.
+     */
+    private function catalogoEnModoAgente(): string
+    {
+        return <<<TXT
+🛠️ MODO AGENTE — CATÁLOGO POR TOOLS
+
+NO recibes el catálogo completo en este prompt. En su lugar tienes herramientas para consultarlo:
+
+  • buscar_productos(query, [categoria], [limite])
+      Busca productos por nombre, código o palabras clave. Úsala SIEMPRE que el cliente
+      pregunte por algo específico (ej: "pierna a la parrilla", "pollo", "queso").
+
+  • listar_categorias()
+      Devuelve todas las categorías disponibles con cantidad de productos. Úsala cuando
+      el cliente pregunte "qué tienen", "muéstrame el menú", o esté indeciso.
+
+  • productos_de_categoria(categoria, [limite])
+      Lista productos de una categoría específica (ej: "muéstrame las carnes de res").
+
+  • info_producto(codigo)
+      Detalle de un producto: cortes disponibles, descripción, foto, etc.
+
+  • productos_destacados()
+      Top destacados + promociones vigentes. Útil al saludar o si el cliente está perdido.
+
+REGLAS:
+  1. ANTES de afirmar o negar tener un producto, USA buscar_productos.
+  2. NUNCA inventes productos que no salgan de las tools.
+  3. Si buscar_productos devuelve vacío, ENTONCES sí no lo manejas.
+  4. Llama tools en paralelo si necesitas varias cosas (ej: buscar + categorías).
+
+TXT;
     }
 
     /**

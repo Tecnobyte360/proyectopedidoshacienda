@@ -794,6 +794,86 @@ TXT;
         $toolCalls   = $response['choices'][0]['message']['tool_calls'] ?? null;
         $textContent = $response['choices'][0]['message']['content'] ?? null;
 
+        // ── Tool calls de CATÁLOGO (modo agente) ──────────────────────────────
+        // Si la primera tool call es una de las herramientas de consulta de
+        // catálogo, las procesamos en bloque (potencialmente varias en paralelo)
+        // y mandamos los results al LLM para que arme la respuesta final.
+        $catalogoTools = ['buscar_productos', 'listar_categorias', 'productos_de_categoria', 'info_producto', 'productos_destacados'];
+        if ($toolCalls && in_array($toolCalls[0]['function']['name'] ?? '', $catalogoTools, true)) {
+            $catalogoSvc = app(\App\Services\BotCatalogoToolService::class);
+            $sedeIdAct   = $this->obtenerSedeIdDesdeConexion($connectionId);
+
+            $toolMessages = [];
+            foreach ($toolCalls as $tc) {
+                $name = $tc['function']['name'] ?? '';
+                if (!in_array($name, $catalogoTools, true)) continue;
+
+                $args = json_decode($tc['function']['arguments'] ?? '{}', true) ?: [];
+                try {
+                    $resultado = match ($name) {
+                        'buscar_productos' => $catalogoSvc->buscarProductos(
+                            (string) ($args['query'] ?? ''),
+                            !empty($args['categoria']) ? (string) $args['categoria'] : null,
+                            min(20, max(1, (int) ($args['limite'] ?? 5))),
+                            $sedeIdAct
+                        ),
+                        'listar_categorias' => $catalogoSvc->listarCategorias($sedeIdAct),
+                        'productos_de_categoria' => $catalogoSvc->productosDeCategoria(
+                            (string) ($args['categoria'] ?? ''),
+                            min(50, max(1, (int) ($args['limite'] ?? 20))),
+                            $sedeIdAct
+                        ),
+                        'info_producto' => $catalogoSvc->infoProducto(
+                            (string) ($args['codigo'] ?? ''),
+                            $sedeIdAct
+                        ),
+                        'productos_destacados' => $catalogoSvc->productosDestacados(
+                            min(20, max(1, (int) ($args['limite'] ?? 8))),
+                            $sedeIdAct
+                        ),
+                    };
+                } catch (\Throwable $e) {
+                    $resultado = ['error' => $e->getMessage()];
+                }
+
+                Log::info("🛠️ Tool call {$name}", ['args' => $args, 'count' => is_array($resultado) ? count($resultado) : 0]);
+
+                $toolMessages[] = [
+                    'role'         => 'tool',
+                    'tool_call_id' => $tc['id'] ?? ('call_' . count($toolMessages)),
+                    'name'         => $name,
+                    'content'      => json_encode($resultado, JSON_UNESCAPED_UNICODE),
+                ];
+            }
+
+            $followUpMessages = array_merge(
+                [['role' => 'system', 'content' => $systemPrompt]],
+                $conversationHistory,
+                [[
+                    'role'       => 'assistant',
+                    'content'    => null,
+                    'tool_calls' => $toolCalls,
+                ]],
+                $toolMessages
+            );
+
+            $followUp = $this->llamarOpenAI($followUpMessages);
+            $reply    = $followUp['choices'][0]['message']['content']
+                ?? 'Déjame revisar eso un momento 🙌';
+
+            $conversationHistory[] = ['role' => 'assistant', 'content' => $reply];
+            Cache::put($cacheKey, $conversationHistory, now()->addMinutes(45));
+
+            $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_ASSISTANT, $reply, [
+                'tipo' => 'tool_call',
+                'meta' => [
+                    'tools' => array_map(fn ($t) => $t['name'] ?? null, $toolMessages),
+                ],
+            ]);
+
+            return $reply;
+        }
+
         // ── Tool call: validar_cobertura ──────────────────────────────────────
         // El bot pregunta si una dirección está cubierta. NO confirma pedido.
         // Devuelve un "tool result" como mensaje del bot y guarda en el historial
@@ -2969,6 +3049,92 @@ PROMPT;
                             ],
                         ],
                         'required' => ['departamento', 'razon'],
+                    ],
+                ],
+            ];
+        }
+
+        // ── Tools de CONSULTA DE CATÁLOGO — solo si bot_modo_agente=true ──
+        if (!empty($config->bot_modo_agente)) {
+            $tools[] = [
+                'type'     => 'function',
+                'function' => [
+                    'name'        => 'buscar_productos',
+                    'description' => 'Busca productos del catálogo por nombre, código o palabras clave. '
+                        . 'Úsala SIEMPRE que el cliente pregunte por algo específico antes de afirmar/negar tenerlo. '
+                        . 'Retorna top N con código, nombre, categoría, precio y unidad.',
+                    'parameters'  => [
+                        'type'       => 'object',
+                        'properties' => [
+                            'query' => [
+                                'type'        => 'string',
+                                'description' => 'Texto a buscar (ej: "pierna a la parrilla", "pollo campesino", "queso").',
+                            ],
+                            'categoria' => [
+                                'type'        => 'string',
+                                'description' => 'Categoría opcional para acotar la búsqueda (ej: "RES", "ASADERO"). Omitir para buscar en todas.',
+                            ],
+                            'limite' => [
+                                'type'        => 'integer',
+                                'description' => 'Cantidad máxima de resultados (default 5, máx 20).',
+                            ],
+                        ],
+                        'required' => ['query'],
+                    ],
+                ],
+            ];
+
+            $tools[] = [
+                'type'     => 'function',
+                'function' => [
+                    'name'        => 'listar_categorias',
+                    'description' => 'Lista todas las categorías del catálogo con cantidad de productos en cada una. '
+                        . 'Úsala cuando el cliente pregunte "qué tienen", "qué venden", "muéstrame el menú", o esté indeciso.',
+                    'parameters'  => ['type' => 'object', 'properties' => new \stdClass()],
+                ],
+            ];
+
+            $tools[] = [
+                'type'     => 'function',
+                'function' => [
+                    'name'        => 'productos_de_categoria',
+                    'description' => 'Lista productos de una categoría específica. Útil cuando el cliente pide "muéstrame las carnes de res", "qué pescados tienen", etc.',
+                    'parameters'  => [
+                        'type'       => 'object',
+                        'properties' => [
+                            'categoria' => ['type' => 'string', 'description' => 'Nombre de la categoría exacto o parcial.'],
+                            'limite'    => ['type' => 'integer', 'description' => 'Cantidad máxima (default 20, máx 50).'],
+                        ],
+                        'required' => ['categoria'],
+                    ],
+                ],
+            ];
+
+            $tools[] = [
+                'type'     => 'function',
+                'function' => [
+                    'name'        => 'info_producto',
+                    'description' => 'Detalle de un producto por código: descripción completa, cortes disponibles, foto, destacado.',
+                    'parameters'  => [
+                        'type'       => 'object',
+                        'properties' => [
+                            'codigo' => ['type' => 'string', 'description' => 'Código SKU del producto.'],
+                        ],
+                        'required' => ['codigo'],
+                    ],
+                ],
+            ];
+
+            $tools[] = [
+                'type'     => 'function',
+                'function' => [
+                    'name'        => 'productos_destacados',
+                    'description' => 'Top destacados + promociones vigentes. Úsala al saludar o cuando el cliente esté perdido.',
+                    'parameters'  => [
+                        'type'       => 'object',
+                        'properties' => [
+                            'limite' => ['type' => 'integer', 'description' => 'Cantidad de destacados (default 8).'],
+                        ],
                     ],
                 ],
             ];

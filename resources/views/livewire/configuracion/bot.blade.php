@@ -193,10 +193,42 @@
                 </div>
             @endif
 
+            {{-- MODO AGENTE (RAG con tools) --}}
+            <div class="mt-6 pt-6 border-t border-slate-200">
+                <label class="flex items-start gap-4 cursor-pointer rounded-2xl border-2 p-4 transition {{ $bot_modo_agente ? 'border-purple-500 bg-purple-50' : 'border-slate-200 hover:bg-slate-50' }}">
+                    <input type="checkbox" wire:model.live="bot_modo_agente"
+                           class="mt-1 rounded border-slate-300 text-purple-600 h-6 w-6">
+                    <div class="flex-1">
+                        <div class="font-bold text-base text-slate-800 flex items-center gap-2">
+                            <i class="fa-solid fa-robot text-purple-600"></i>
+                            Modo agente (recomendado para catálogos grandes)
+                        </div>
+                        <div class="text-xs text-slate-600 mt-1">
+                            En vez de meterle al bot el catálogo completo en cada mensaje, le damos <strong>tools</strong> para que él consulte solo lo que necesita. Reduce ~80% de tokens y mejora precisión.
+                        </div>
+                        @if ($bot_modo_agente)
+                            <div class="mt-3 rounded-xl bg-white border border-purple-200 p-3 text-xs text-slate-700 space-y-1">
+                                <p class="font-semibold text-purple-700 mb-1">Tools disponibles para el agente:</p>
+                                <p>🔍 <code>buscar_productos(query, categoria?)</code> — busca por nombre/código/keywords</p>
+                                <p>📂 <code>listar_categorias()</code> — lista todas las categorías con conteo</p>
+                                <p>🗂️ <code>productos_de_categoria(categoria)</code> — items de una categoría</p>
+                                <p>📦 <code>info_producto(codigo)</code> — detalle + cortes + foto</p>
+                                <p>⭐ <code>productos_destacados()</code> — top destacados + promociones</p>
+                            </div>
+                        @endif
+                    </div>
+                </label>
+            </div>
+
             {{-- FILTROS DEL CATÁLOGO --}}
             <div class="mt-6 pt-6 border-t border-slate-200">
                 <h4 class="text-base font-bold text-slate-800 mb-1">
                     <i class="fa-solid fa-filter text-indigo-600 mr-1"></i> Filtros del catálogo del bot
+                    @if ($bot_modo_agente)
+                        <span class="ml-2 text-[10px] font-semibold uppercase rounded bg-purple-100 text-purple-700 px-2 py-0.5">
+                            También aplica al modo agente
+                        </span>
+                    @endif
                 </h4>
                 <p class="text-xs text-slate-500 mb-4">
                     Limita lo que el bot ve. Esencial cuando el ERP tiene MUCHOS productos no-comida (insumos, bolsas, impuestos, etc.) que saturan al LLM.

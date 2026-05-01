@@ -55,6 +55,7 @@ class ConfiguracionBot extends Model
         'ultimo_sync_productos_at',
         'categorias_excluidas_bot',
         'excluir_productos_sin_precio',
+        'bot_modo_agente',
         'cumpleanos_dias_vigencia_beneficio',
         'encuesta_activa',
         'encuesta_delay_minutos',
@@ -122,6 +123,7 @@ class ConfiguracionBot extends Model
         'ultimo_sync_productos_at'  => 'datetime',
         'categorias_excluidas_bot'  => 'array',
         'excluir_productos_sin_precio' => 'boolean',
+        'bot_modo_agente'           => 'boolean',
     ];
 
     public const FUENTE_TABLA       = 'tabla';

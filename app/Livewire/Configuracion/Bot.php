@@ -99,6 +99,7 @@ class Bot extends Component
     // Filtros del catalogo del bot
     public string $categorias_excluidas_bot_str = '';      // textarea (una por linea)
     public bool   $excluir_productos_sin_precio = true;
+    public bool   $bot_modo_agente              = false;
 
     // Auto-asignación de domiciliarios
     public bool   $auto_asignar_domiciliario = false;
@@ -205,6 +206,7 @@ class Bot extends Component
         $this->categorias_excluidas_bot_str = collect($cfg->categorias_excluidas_bot ?? [])
             ->filter()->implode("\n");
         $this->excluir_productos_sin_precio = (bool) ($cfg->excluir_productos_sin_precio ?? true);
+        $this->bot_modo_agente              = (bool) ($cfg->bot_modo_agente ?? false);
         $this->auto_asignar_domiciliario = (bool) ($cfg->auto_asignar_domiciliario ?? false);
         $this->criterio_asignacion       = (string) ($cfg->criterio_asignacion ?: 'balanceado');
         $this->asignar_en_estado         = (string) ($cfg->asignar_en_estado ?: 'en_preparacion');
@@ -600,6 +602,7 @@ class Bot extends Component
             'auto_sync_productos_min'               => 'integer|min:1|max:1440',
             'categorias_excluidas_bot_str'          => 'nullable|string',
             'excluir_productos_sin_precio'          => 'boolean',
+            'bot_modo_agente'                       => 'boolean',
             'auto_asignar_domiciliario'             => 'boolean',
             'criterio_asignacion'                   => 'nullable|in:balanceado,cercania,rotacion',
             'asignar_en_estado'                     => 'nullable|in:nuevo,en_preparacion,repartidor_en_camino',
