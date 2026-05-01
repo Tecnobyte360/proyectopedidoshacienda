@@ -7,11 +7,118 @@
             <p class="text-sm text-slate-500">Conoce a quién atiende tu bot. Cada cliente y su historial.</p>
         </div>
 
-        <button wire:click="abrirModalCrear"
-                class="rounded-2xl bg-brand px-5 py-3 text-white font-semibold shadow hover:bg-brand-dark transition">
-            <i class="fa-solid fa-user-plus mr-2"></i> Nuevo cliente
-        </button>
+        <div class="flex flex-wrap items-center gap-2">
+            <button wire:click="abrirModalImportarWa"
+                    class="rounded-2xl bg-emerald-600 px-5 py-3 text-white font-semibold shadow hover:bg-emerald-700 transition">
+                <i class="fa-brands fa-whatsapp mr-2"></i> Importar de WhatsApp
+            </button>
+
+            <button wire:click="abrirModalCrear"
+                    class="rounded-2xl bg-brand px-5 py-3 text-white font-semibold shadow hover:bg-brand-dark transition">
+                <i class="fa-solid fa-user-plus mr-2"></i> Nuevo cliente
+            </button>
+        </div>
     </div>
+
+    {{-- MODAL IMPORTAR WHATSAPP --}}
+    @if ($modalImportarWa)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4"
+             wire:key="modal-import-wa">
+            <div class="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl">
+                <div class="mb-4 flex items-start justify-between">
+                    <div>
+                        <h3 class="text-xl font-extrabold text-slate-800">
+                            <i class="fa-brands fa-whatsapp text-emerald-600 mr-1"></i>
+                            Importar contactos de WhatsApp
+                        </h3>
+                        <p class="text-sm text-slate-500 mt-1">
+                            Trae los contactos del WhatsApp conectado a este tenant y los crea como clientes.
+                        </p>
+                    </div>
+                    <button wire:click="cerrarModalImportarWa" class="text-slate-400 hover:text-slate-700">
+                        <i class="fa-solid fa-xmark text-xl"></i>
+                    </button>
+                </div>
+
+                @if (!$resultadoImportWa)
+                    <div class="rounded-2xl bg-amber-50 border border-amber-200 p-4 text-sm text-amber-800 mb-4">
+                        <i class="fa-solid fa-circle-info mr-1"></i>
+                        Los teléfonos ya existentes <strong>no se sobreescriben</strong>. Se omiten grupos y broadcasts.
+                    </div>
+
+                    <label class="flex items-start gap-3 mb-5 cursor-pointer">
+                        <input type="checkbox" wire:model="actualizarExistentes"
+                               class="mt-1 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500">
+                        <span class="text-sm text-slate-700">
+                            <strong>Actualizar existentes</strong>
+                            <span class="block text-xs text-slate-500">
+                                Si ya existe un cliente con ese teléfono y no tiene nombre/foto, los completa.
+                            </span>
+                        </span>
+                    </label>
+
+                    <div class="flex justify-end gap-2">
+                        <button wire:click="cerrarModalImportarWa"
+                                class="rounded-xl px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100">
+                            Cancelar
+                        </button>
+                        <button wire:click="importarContactosWhatsapp"
+                                wire:loading.attr="disabled"
+                                wire:target="importarContactosWhatsapp"
+                                class="rounded-xl bg-emerald-600 px-5 py-2 text-sm font-semibold text-white shadow hover:bg-emerald-700 disabled:opacity-50">
+                            <span wire:loading.remove wire:target="importarContactosWhatsapp">
+                                <i class="fa-solid fa-cloud-arrow-down mr-1"></i> Importar ahora
+                            </span>
+                            <span wire:loading wire:target="importarContactosWhatsapp">
+                                <i class="fa-solid fa-spinner fa-spin mr-1"></i> Importando...
+                            </span>
+                        </button>
+                    </div>
+                @elseif (isset($resultadoImportWa['error']))
+                    <div class="rounded-2xl bg-red-50 border border-red-200 p-4 text-sm text-red-800">
+                        <p class="font-semibold mb-1"><i class="fa-solid fa-circle-xmark mr-1"></i> Error</p>
+                        <p class="break-all">{{ $resultadoImportWa['error'] }}</p>
+                    </div>
+                    <div class="mt-4 flex justify-end">
+                        <button wire:click="cerrarModalImportarWa"
+                                class="rounded-xl bg-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-300">
+                            Cerrar
+                        </button>
+                    </div>
+                @else
+                    <div class="grid grid-cols-2 gap-3 mb-4">
+                        <div class="rounded-2xl bg-slate-50 p-3 text-center">
+                            <div class="text-2xl font-extrabold text-slate-800">{{ $resultadoImportWa['total'] ?? 0 }}</div>
+                            <div class="text-xs text-slate-500">Total leídos</div>
+                        </div>
+                        <div class="rounded-2xl bg-emerald-50 p-3 text-center">
+                            <div class="text-2xl font-extrabold text-emerald-700">{{ $resultadoImportWa['creados'] ?? 0 }}</div>
+                            <div class="text-xs text-emerald-600">Creados</div>
+                        </div>
+                        <div class="rounded-2xl bg-blue-50 p-3 text-center">
+                            <div class="text-2xl font-extrabold text-blue-700">{{ $resultadoImportWa['actualizados'] ?? 0 }}</div>
+                            <div class="text-xs text-blue-600">Actualizados</div>
+                        </div>
+                        <div class="rounded-2xl bg-amber-50 p-3 text-center">
+                            <div class="text-2xl font-extrabold text-amber-700">{{ $resultadoImportWa['omitidos'] ?? 0 }}</div>
+                            <div class="text-xs text-amber-600">Omitidos</div>
+                        </div>
+                    </div>
+                    @if (($resultadoImportWa['errores'] ?? 0) > 0)
+                        <div class="rounded-xl bg-red-50 p-2 text-center text-sm text-red-700 mb-4">
+                            {{ $resultadoImportWa['errores'] }} errores (revisa el log)
+                        </div>
+                    @endif
+                    <div class="flex justify-end">
+                        <button wire:click="cerrarModalImportarWa"
+                                class="rounded-xl bg-emerald-600 px-5 py-2 text-sm font-semibold text-white shadow hover:bg-emerald-700">
+                            <i class="fa-solid fa-check mr-1"></i> Listo
+                        </button>
+                    </div>
+                @endif
+            </div>
+        </div>
+    @endif
 
     {{-- KPIS --}}
     <div class="mb-6 grid grid-cols-2 md:grid-cols-4 gap-3">

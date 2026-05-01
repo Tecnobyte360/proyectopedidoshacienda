@@ -4,6 +4,7 @@ namespace App\Livewire\Clientes;
 
 use App\Models\Cliente;
 use App\Models\ZonaCobertura;
+use App\Services\WhatsappContactosService;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -29,6 +30,12 @@ class Index extends Component
     public ?int    $zona_cobertura_id   = null;
     public string  $notas_internas      = '';
     public bool    $activo              = true;
+
+    // Importación WhatsApp
+    public bool $modalImportarWa     = false;
+    public bool $importandoWa        = false;
+    public bool $actualizarExistentes = false;
+    public ?array $resultadoImportWa = null;
 
     public array $paises = [
         ['codigo' => '+57',  'nombre' => 'Colombia',       'flag' => '🇨🇴'],
@@ -138,6 +145,45 @@ class Index extends Component
             'type'    => 'success',
             'message' => 'Cliente eliminado.',
         ]);
+    }
+
+    public function abrirModalImportarWa(): void
+    {
+        $this->resultadoImportWa    = null;
+        $this->actualizarExistentes = false;
+        $this->modalImportarWa      = true;
+    }
+
+    public function cerrarModalImportarWa(): void
+    {
+        $this->modalImportarWa = false;
+        $this->importandoWa    = false;
+    }
+
+    public function importarContactosWhatsapp(): void
+    {
+        $this->importandoWa     = true;
+        $this->resultadoImportWa = null;
+
+        try {
+            $resumen = app(WhatsappContactosService::class)
+                ->importar(null, $this->actualizarExistentes);
+
+            $this->resultadoImportWa = $resumen;
+
+            $this->dispatch('notify', [
+                'type'    => 'success',
+                'message' => "✓ Importación: {$resumen['creados']} creados, {$resumen['actualizados']} actualizados, {$resumen['omitidos']} omitidos.",
+            ]);
+        } catch (\Throwable $e) {
+            $this->resultadoImportWa = ['error' => $e->getMessage()];
+            $this->dispatch('notify', [
+                'type'    => 'error',
+                'message' => '❌ ' . $e->getMessage(),
+            ]);
+        } finally {
+            $this->importandoWa = false;
+        }
     }
 
     public function recalcular(int $id): void
