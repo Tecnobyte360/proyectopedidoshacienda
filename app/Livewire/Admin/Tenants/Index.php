@@ -42,6 +42,10 @@ class Index extends Component
     public string $contacto_nombre     = '';
     public string $contacto_email      = '';
     public string $contacto_telefono   = '';
+    public string $ciudad               = '';
+    public string $tipo_negocio         = '';
+    public string $slogan               = '';
+    public string $descripcion_negocio  = '';
     public string $color_primario      = '#d68643';
     public string $color_secundario    = '#a85f24';
     public ?string $logo_url_actual    = null;
@@ -106,6 +110,10 @@ class Index extends Component
             'contacto_nombre'     => 'nullable|string|max:120',
             'contacto_email'      => 'nullable|email|max:150',
             'contacto_telefono'   => 'nullable|string|max:30',
+            'ciudad'              => 'nullable|string|max:80',
+            'tipo_negocio'        => 'nullable|string|max:40',
+            'slogan'              => 'nullable|string|max:200',
+            'descripcion_negocio' => 'nullable|string|max:2000',
             'color_primario'      => 'nullable|string|max:10',
             'color_secundario'    => 'nullable|string|max:10',
             'logo_archivo'        => 'nullable',   // legacy, ya no se usa
@@ -173,6 +181,10 @@ class Index extends Component
         $this->contacto_nombre      = (string) $t->contacto_nombre;
         $this->contacto_email       = (string) $t->contacto_email;
         $this->contacto_telefono    = (string) $t->contacto_telefono;
+        $this->ciudad               = (string) ($t->ciudad ?? '');
+        $this->tipo_negocio         = (string) ($t->tipo_negocio ?? '');
+        $this->slogan               = (string) ($t->slogan ?? '');
+        $this->descripcion_negocio  = (string) ($t->descripcion_negocio ?? '');
         $this->color_primario       = (string) ($t->color_primario ?: '#d68643');
         $this->color_secundario     = (string) ($t->color_secundario ?: '#a85f24');
         $this->logo_url_actual      = $t->logo_url;
@@ -768,6 +780,10 @@ class Index extends Component
         $this->contacto_nombre      = '';
         $this->contacto_email       = '';
         $this->contacto_telefono    = '';
+        $this->ciudad               = '';
+        $this->tipo_negocio         = '';
+        $this->slogan               = '';
+        $this->descripcion_negocio  = '';
         $this->color_primario       = '#d68643';
         $this->color_secundario     = '#a85f24';
         $this->logo_url_actual      = null;

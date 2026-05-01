@@ -503,9 +503,24 @@ class Bot extends Component
     public function cargarPlantillaPorDefecto(): void
     {
         $this->system_prompt = BotPromptService::plantillaPorDefecto();
+        $this->bloquesPrompt = $this->parsearBloques($this->system_prompt);
         $this->dispatch('notify', [
             'type'    => 'info',
             'message' => 'Plantilla por defecto cargada — recuerda guardar.',
+        ]);
+    }
+
+    /**
+     * Carga la plantilla GENÉRICA dinámica (sin texto hardcoded).
+     * Lee solo de variables del tenant — funciona con cualquier negocio.
+     */
+    public function cargarPlantillaGenerica(): void
+    {
+        $this->system_prompt = BotPromptService::plantillaGenerica();
+        $this->bloquesPrompt = $this->parsearBloques($this->system_prompt);
+        $this->dispatch('notify', [
+            'type'    => 'success',
+            'message' => '✓ Plantilla genérica cargada. Funciona con cualquier tenant. Guarda para aplicar.',
         ]);
     }
 

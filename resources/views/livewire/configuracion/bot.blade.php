@@ -713,6 +713,19 @@
                                 Tu prompt
                             </label>
                             <div class="flex items-center gap-3">
+                                {{-- Carga plantilla GENERICA (dinamica, sin hardcode) --}}
+                                <button type="button"
+                                        @click.prevent="$dispatch('confirm-show', {
+                                            title: 'Cargar plantilla genérica dinámica',
+                                            message: '✨ Plantilla 100% dinámica: usa solo variables del tenant ({tenant_nombre}, {ciudad}, {tipo_negocio}, etc). Funciona out-of-the-box con cualquier negocio. Reemplaza tu prompt actual (NO guarda hasta que pulses Guardar).',
+                                            confirmText: 'Sí, cargar genérica',
+                                            type: 'primary',
+                                            onConfirm: () => $wire.cargarPlantillaGenerica(),
+                                        })"
+                                        class="text-[11px] font-bold text-purple-600 hover:text-purple-800 hover:underline">
+                                    <i class="fa-solid fa-wand-sparkles mr-1"></i> Cargar plantilla genérica
+                                </button>
+
                                 {{-- Carga + edita (no guarda) --}}
                                 <button type="button"
                                         @click.prevent="$dispatch('confirm-show', {
@@ -723,7 +736,7 @@
                                             onConfirm: () => $wire.cargarPlantillaPorDefecto(),
                                         })"
                                         class="text-[11px] font-semibold text-brand hover:underline">
-                                    <i class="fa-solid fa-rotate-left mr-1"></i> Cargar plantilla
+                                    <i class="fa-solid fa-rotate-left mr-1"></i> Por defecto (legacy)
                                 </button>
 
                                 {{-- Sincroniza Y guarda automáticamente --}}

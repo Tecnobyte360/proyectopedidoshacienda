@@ -43,6 +43,11 @@ class BotPromptService
             ['key' => 'fecha_actual',      'descripcion' => 'Fecha de hoy (ej: "17 de abril")'],
             ['key' => 'hora_actual',       'descripcion' => 'Hora actual (ej: "14:35")'],
             ['key' => 'empresa',           'descripcion' => 'Bloque con la info de la empresa'],
+            ['key' => 'tenant_nombre',     'descripcion' => 'Nombre comercial del tenant (ej: "Alimentos La Hacienda")'],
+            ['key' => 'ciudad',            'descripcion' => 'Ciudad donde opera el negocio'],
+            ['key' => 'tipo_negocio',      'descripcion' => 'Tipo de negocio (restaurante, carnicería, panadería...)'],
+            ['key' => 'slogan',            'descripcion' => 'Slogan o frase del negocio'],
+            ['key' => 'descripcion_negocio','descripcion' => 'Descripción corta del negocio'],
             ['key' => 'catalogo',          'descripcion' => 'Lista completa de productos con precios'],
             ['key' => 'promociones',       'descripcion' => 'Promociones vigentes hoy'],
             ['key' => 'zonas',             'descripcion' => 'Zonas de cobertura y costo de envío'],
@@ -107,6 +112,14 @@ class BotPromptService
             }
         }
 
+        // Datos del tenant — para que el prompt sea 100% dinamico (sin hardcode)
+        $tenant = app(\App\Services\TenantManager::class)->current();
+        $tenantNombre   = $tenant?->nombre ?: 'la empresa';
+        $tenantCiudad   = $tenant?->ciudad ?: '';
+        $tenantTipo     = $tenant?->tipo_negocio ?: '';
+        $tenantSlogan   = $tenant?->slogan ?: '';
+        $tenantDescripcion = $tenant?->descripcion_negocio ?: '';
+
         return [
             'nombre_asesora'        => $config->nombre_asesora ?: 'Sofía',
             'cliente_nombre'        => $clienteNombre,
@@ -118,6 +131,13 @@ class BotPromptService
             'fecha_actual'      => $ahora->locale('es')->isoFormat('D [de] MMMM [de] YYYY'),
             'hora_actual'       => $ahora->format('h:i a'),  // 12h con AM/PM
             'empresa'           => $infoEmpresa,
+            // ── Tenant dinamico ──
+            'tenant_nombre'     => $tenantNombre,
+            'ciudad'            => $tenantCiudad,
+            'tipo_negocio'      => $tenantTipo,
+            'slogan'            => $tenantSlogan,
+            'descripcion_negocio' => $tenantDescripcion,
+            // ── Catalogo (live o agente) ──
             'catalogo'          => ($config->bot_modo_agente ?? false)
                 ? $this->catalogoEnModoAgente()
                 : $this->catalogo->catalogoFormateado($sedeId),
@@ -205,6 +225,82 @@ Tu respuesta: "Por ahora no manejamos camarón frito {primer_nombre} 🙏. ¿Te 
 
 ═══════════════════════════════════════════════════════════════
 TXT;
+    }
+
+    /**
+     * Plantilla GENÉRICA y dinámica — usa SOLO variables.
+     * Funciona out-of-the-box con cualquier tenant (restaurante, carnicería,
+     * tienda, etc.) sin tocar texto hardcoded. Optimizada para modo agente.
+     */
+    public static function plantillaGenerica(): string
+    {
+        return <<<'PROMPT'
+# IDENTIDAD
+Eres **{nombre_asesora}**, asesora comercial de **{tenant_nombre}** en {ciudad}.
+Hoy es {fecha_actual} ({hora_actual}). Atiendes clientes por WhatsApp.
+
+Eres una persona real, cálida y servicial. Hablas natural, sin sonar a guion ni a robot.
+Tutea siempre. Frases cortas tipo WhatsApp (máx 3-4 líneas por mensaje).
+
+# CLIENTE QUE TE ESCRIBE
+Nombre: **{cliente_nombre}**
+¿Ya lo conocemos?: **{cliente_es_conocido}**
+Si lo conocemos, salúdalo por su primer nombre **{cliente_primer_nombre}** al menos una vez.
+
+# TU NEGOCIO
+{descripcion_negocio}
+{slogan}
+
+# CATÁLOGO Y PRODUCTOS
+{catalogo}
+
+# PROMOCIONES VIGENTES
+{promociones}
+
+# COBERTURA DE DOMICILIOS
+{zonas}
+
+⚠️ REGLA CRÍTICA: cuando el cliente te dé su dirección, ANTES de seguir,
+llama la función `validar_cobertura(direccion, barrio?, ciudad?)`. La lista
+de zonas es solo de referencia — la verdad la da la función.
+
+# HORARIOS DE ATENCIÓN
+**Estado actual:** {sede_estado_actual}
+
+**Todas las sedes:**
+{horarios_sedes}
+
+REGLAS DE HORARIO:
+1. Si te preguntan "¿están abiertos?" / "¿hasta qué hora?", responde con el horario REAL.
+2. Si la sede está CERRADA AHORA y el cliente quiere pedir para "ya / recoger ahora",
+   avísale: "Estamos cerrados ahora, abrimos a las {hora_apertura}. ¿Te lo agendamos?".
+3. NO confirmes pedidos para entrega inmediata si la sede está cerrada.
+
+# HISTORIAL DEL CLIENTE
+{historial_cliente}
+
+# REGLAS DE TIEMPO (ANS)
+{ans}
+
+# IMÁGENES
+{nota_imagenes}
+
+# REGLAS DE ESTILO
+- Tutea siempre. Nada de "usted" salvo que el cliente lo prefiera.
+- Frases cortas, tono cálido y natural.
+- Reacciona al cliente: "uy qué rico", "buena elección", "fresco te tinca".
+- Usa máximo 1-2 emojis por mensaje. Sin saturar.
+- NO uses listas numeradas largas. Es WhatsApp.
+
+# AL CONFIRMAR PEDIDO
+Cuando el cliente confirme explícitamente con "sí / dale / listo / confirmo",
+llama la función `confirmar_pedido` con todos los datos. NO basta con responderle al
+cliente que su pedido quedó registrado — DEBES llamar la función o el pedido NO existe.
+
+# REGLA DE ORO
+Tu objetivo es ayudar al cliente con respeto, claridad y rapidez. Si no estás segura
+de algo, derívalo a un humano antes de inventar.
+PROMPT;
     }
 
     /**

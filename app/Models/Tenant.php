@@ -13,6 +13,20 @@ class Tenant extends Model
 
     protected $table = 'tenants';
 
+    /** Tipos de negocio soportados (para personalizar prompts y plantillas). */
+    public const TIPOS_NEGOCIO = [
+        'restaurante'   => '🍽️ Restaurante / Comida',
+        'carniceria'    => '🥩 Carnicería / Carnes',
+        'panaderia'     => '🥐 Panadería / Repostería',
+        'tienda'        => '🛒 Tienda / Minimarket',
+        'farmacia'      => '💊 Farmacia / Droguería',
+        'ferreteria'    => '🔧 Ferretería',
+        'distribuidora' => '📦 Distribuidora / Mayorista',
+        'servicios'     => '🛠️ Servicios profesionales',
+        'manufactura'   => '🏭 Manufactura / Producción',
+        'otro'          => '🏢 Otro',
+    ];
+
     protected $fillable = [
         'nombre',
         'slug',
@@ -25,6 +39,10 @@ class Tenant extends Model
         'contacto_nombre',
         'contacto_email',
         'contacto_telefono',
+        'ciudad',
+        'tipo_negocio',
+        'slogan',
+        'descripcion_negocio',
         'color_primario',
         'color_secundario',
         'openai_api_key',

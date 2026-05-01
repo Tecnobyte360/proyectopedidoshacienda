@@ -322,6 +322,47 @@
                             <label class="block text-sm font-medium text-slate-700 mb-1.5">Contacto teléfono</label>
                             <input type="text" wire:model="contacto_telefono" class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-2 focus:ring-brand/20">
                         </div>
+
+                        {{-- Datos del negocio (para que el bot sea dinámico) --}}
+                        <div class="md:col-span-2 mt-2 rounded-2xl bg-purple-50 border border-purple-200 p-4">
+                            <h4 class="text-sm font-bold text-purple-800 mb-1">
+                                <i class="fa-solid fa-store mr-1"></i> Datos del negocio (para el bot)
+                            </h4>
+                            <p class="text-[11px] text-purple-600 mb-3">
+                                Estos datos se inyectan automáticamente en el prompt del bot. Sin tocar el prompt, cada tenant queda personalizado.
+                            </p>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-700 mb-1">Ciudad</label>
+                                    <input type="text" wire:model="ciudad"
+                                           placeholder="Ej: Bello, Antioquia"
+                                           class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-700 mb-1">Tipo de negocio</label>
+                                    <select wire:model="tipo_negocio"
+                                            class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white">
+                                        <option value="">— Selecciona —</option>
+                                        @foreach (\App\Models\Tenant::TIPOS_NEGOCIO as $key => $label)
+                                            <option value="{{ $key }}">{{ $label }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="md:col-span-2">
+                                    <label class="block text-xs font-medium text-slate-700 mb-1">Slogan / frase</label>
+                                    <input type="text" wire:model="slogan"
+                                           placeholder='Ej: "La carne más fresca de Antioquia"'
+                                           class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white">
+                                </div>
+                                <div class="md:col-span-2">
+                                    <label class="block text-xs font-medium text-slate-700 mb-1">Descripción corta del negocio</label>
+                                    <textarea wire:model="descripcion_negocio" rows="3"
+                                              placeholder="2-3 líneas describiendo qué hace el negocio. El bot las usará al saludar y presentar la empresa."
+                                              class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white"></textarea>
+                                </div>
+                            </div>
+                        </div>
+
                         {{-- Colores del tenant: se aplican a sidebar, login, gradientes, badges, etc. --}}
                         <div class="md:col-span-2">
                             <label class="block text-sm font-semibold text-slate-700 mb-2">
