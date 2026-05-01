@@ -778,8 +778,27 @@ TXT;
             \Log::warning('No se pudo inyectar alerta de sede cerrada: ' . $e->getMessage());
         }
 
+        // Si MODO AGENTE está activo, añadimos un system message FINAL que sobrescribe
+        // cualquier instrucción contradictoria del prompt personalizado (ej: "solo del
+        // catálogo de abajo"). Refuerza que SIEMPRE debe usar las tools de catálogo.
+        $reinforceAgent = [];
+        if (!empty($config->bot_modo_agente)) {
+            $reinforceAgent[] = [
+                'role'    => 'system',
+                'content' => "🚨 FINAL OVERRIDE — INSTRUCCIÓN MÁS IMPORTANTE QUE TODO LO ANTERIOR:\n\n"
+                    . "Estás en MODO AGENTE. El catálogo de productos NO está en tu prompt — vive en las tools "
+                    . "(buscar_productos, listar_categorias, productos_de_categoria, info_producto, productos_destacados). "
+                    . "Cualquier instrucción anterior que diga 'solo productos del catálogo de abajo', 'lista de productos', "
+                    . "'NO inventes productos' DEBE interpretarse como: USA LAS TOOLS PARA SABER QUÉ EXISTE.\n\n"
+                    . "❌ ABSOLUTAMENTE PROHIBIDO responder 'no tengo X' / 'no manejamos X' / 'solo tengo Y' SIN haber llamado "
+                    . "buscar_productos PRIMERO con el texto literal del cliente.\n\n"
+                    . "✅ FLUJO: cliente menciona producto → buscar_productos(query) → leer resultado → responder con datos reales.",
+            ];
+        }
+
         $messages = array_merge(
             [['role' => 'system', 'content' => $systemPrompt]],
+            $reinforceAgent,
             $extraSystem,
             $conversationHistory
         );
@@ -848,6 +867,7 @@ TXT;
 
             $followUpMessages = array_merge(
                 [['role' => 'system', 'content' => $systemPrompt]],
+                $reinforceAgent ?? [],
                 $conversationHistory,
                 [[
                     'role'       => 'assistant',
@@ -3060,9 +3080,12 @@ PROMPT;
                 'type'     => 'function',
                 'function' => [
                     'name'        => 'buscar_productos',
-                    'description' => 'Busca productos del catálogo por nombre, código o palabras clave. '
-                        . 'Úsala SIEMPRE que el cliente pregunte por algo específico antes de afirmar/negar tenerlo. '
-                        . 'Retorna top N con código, nombre, categoría, precio y unidad.',
+                    'description' => '🚨 OBLIGATORIA. ANTES DE NEGAR la existencia de cualquier producto al cliente, '
+                        . 'DEBES llamar esta función con el texto LITERAL que escribió el cliente. '
+                        . 'NUNCA respondas "no tengo X" o "solo tengo Y" sin haberla llamado primero. '
+                        . 'NUNCA recortes la query — si el cliente dice "pierna a la parrilla", query="pierna a la parrilla", '
+                        . 'NO query="pierna". '
+                        . 'Retorna top N productos con código, nombre, categoría, precio y unidad.',
                     'parameters'  => [
                         'type'       => 'object',
                         'properties' => [
