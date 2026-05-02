@@ -3026,10 +3026,13 @@ TXT;
 
         $config = \App\Models\ConfiguracionBot::actual();
 
-        // Si el usuario activó "prompt personalizado" y guardó algo, usarlo
+        // Si el usuario activó "prompt personalizado" y guardó algo, usarlo.
+        // Si no, usar la plantilla GENÉRICA dinámica (con variables {tenant_nombre},
+        // {ciudad}, etc.) en lugar de la legacy con "La Hacienda" hardcoded.
+        // Así cada tenant funciona out-of-the-box sin que tengan que personalizar.
         $base = ($config->usar_prompt_personalizado && !empty(trim($config->system_prompt ?? '')))
             ? $config->system_prompt
-            : BotPromptService::plantillaPorDefecto();
+            : BotPromptService::plantillaGenerica();
 
         $prompt = $promptService->renderizar($base, $contexto);
 
