@@ -8,7 +8,7 @@
         <div class="mt-2 flex flex-wrap items-center justify-between gap-4">
             <div>
                 <h2 class="text-3xl font-extrabold text-slate-800">
-                    <i class="fa-solid fa-database text-purple-600 mr-2"></i>
+                    <i class="fa-solid fa-database text-brand mr-2"></i>
                     Consultas de {{ $integracion->nombre }}
                 </h2>
                 <p class="text-sm text-slate-500">
@@ -16,7 +16,7 @@
                 </p>
             </div>
             <button wire:click="abrirCrear"
-                    class="rounded-2xl bg-purple-600 px-5 py-3 text-white font-semibold shadow hover:bg-purple-700 transition">
+                    class="rounded-2xl bg-brand px-5 py-3 text-white font-semibold shadow hover:bg-brand-dark transition">
                 <i class="fa-solid fa-plus mr-2"></i> Nueva consulta
             </button>
         </div>
@@ -29,7 +29,7 @@
                 <i class="fa-solid fa-database text-5xl text-slate-300 mb-4"></i>
                 <h3 class="text-lg font-bold text-slate-700 mb-1">Sin consultas guardadas</h3>
                 <p class="text-sm text-slate-500 mb-4">Crea tu primera consulta — puede ser para clientes, productos, ventas, etc.</p>
-                <button wire:click="abrirCrear" class="rounded-xl bg-purple-600 text-white px-4 py-2 text-sm font-semibold hover:bg-purple-700">
+                <button wire:click="abrirCrear" class="rounded-xl bg-brand text-white px-4 py-2 text-sm font-semibold hover:bg-brand-dark">
                     <i class="fa-solid fa-plus mr-1"></i> Crear consulta
                 </button>
             </div>
@@ -64,7 +64,7 @@
                             </td>
                             <td class="px-4 py-3 text-center">
                                 <button wire:click="toggleBot({{ $c->id }})"
-                                        class="text-xl {{ $c->usar_en_bot ? 'text-purple-600' : 'text-slate-300 hover:text-slate-500' }}"
+                                        class="text-xl {{ $c->usar_en_bot ? 'text-brand' : 'text-slate-300 hover:text-slate-500' }}"
                                         title="{{ $c->usar_en_bot ? 'Disponible para el bot' : 'No disponible para el bot' }}">
                                     <i class="fa-solid fa-robot"></i>
                                 </button>
@@ -110,7 +110,7 @@
             <div class="w-full max-w-3xl rounded-3xl bg-white shadow-2xl max-h-[90vh] overflow-hidden flex flex-col">
                 <div class="px-6 py-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
                     <h3 class="text-lg font-extrabold text-slate-800">
-                        <i class="fa-solid fa-database text-purple-600 mr-1"></i>
+                        <i class="fa-solid fa-database text-brand mr-1"></i>
                         {{ $editandoId ? 'Editar' : 'Nueva' }} consulta
                     </h3>
                     <button wire:click="$set('modalAbierto', false)" class="text-slate-400 hover:text-slate-700">
@@ -162,7 +162,7 @@
                         <div class="flex items-center justify-between mb-2">
                             <label class="text-xs font-bold text-slate-700">Parámetros</label>
                             <button type="button" wire:click="agregarParametro"
-                                    class="text-xs font-semibold text-purple-600 hover:text-purple-800">
+                                    class="text-xs font-semibold text-brand hover:text-brand-dark">
                                 <i class="fa-solid fa-plus mr-1"></i> Agregar parámetro
                             </button>
                         </div>
@@ -195,7 +195,7 @@
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <label class="flex items-start gap-3 cursor-pointer rounded-xl border border-slate-200 p-3 hover:bg-slate-50">
-                            <input type="checkbox" wire:model="usar_en_bot" class="mt-1 rounded text-purple-600">
+                            <input type="checkbox" wire:model="usar_en_bot" class="mt-1 rounded text-brand">
                             <div>
                                 <div class="text-sm font-bold text-slate-800">🤖 Disponible para el bot</div>
                                 <div class="text-[11px] text-slate-500">El agente puede llamarla como tool.</div>
@@ -214,7 +214,7 @@
                     <button wire:click="$set('modalAbierto', false)" class="rounded-xl px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100">
                         Cancelar
                     </button>
-                    <button wire:click="guardar" class="rounded-xl bg-purple-600 hover:bg-purple-700 px-5 py-2 text-sm font-bold text-white shadow">
+                    <button wire:click="guardar" class="rounded-xl bg-brand hover:bg-brand-dark px-5 py-2 text-sm font-bold text-white shadow">
                         Guardar
                     </button>
                 </div>

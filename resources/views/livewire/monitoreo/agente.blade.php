@@ -4,14 +4,14 @@
     <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
             <h2 class="text-3xl font-extrabold text-slate-800">
-                <i class="fa-solid fa-robot text-purple-600 mr-2"></i> Monitoreo del Agente
+                <i class="fa-solid fa-robot text-brand mr-2"></i> Monitoreo del Agente
             </h2>
             <p class="text-sm text-slate-500">Cada tool call que el bot ejecuta en tiempo real. Refresca cada 5s.</p>
         </div>
         <div class="flex items-center gap-2">
             @foreach (['hoy' => 'Hoy', '7d' => '7 días', '30d' => '30 días'] as $key => $label)
                 <button wire:click="$set('rango', '{{ $key }}')"
-                        class="px-4 py-2 text-sm font-semibold rounded-xl transition {{ $rango === $key ? 'bg-purple-600 text-white shadow' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50' }}">
+                        class="px-4 py-2 text-sm font-semibold rounded-xl transition {{ $rango === $key ? 'bg-brand text-white shadow' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50' }}">
                     {{ $label }}
                 </button>
             @endforeach
@@ -22,7 +22,7 @@
     <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         <div class="rounded-2xl bg-white p-4 shadow border border-slate-200">
             <div class="flex items-center gap-3">
-                <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
+                <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-soft text-brand">
                     <i class="fa-solid fa-bolt"></i>
                 </div>
                 <div>
@@ -73,7 +73,7 @@
         {{-- Distribución por tool --}}
         <div class="rounded-2xl bg-white p-5 shadow border border-slate-200">
             <h3 class="text-sm font-bold text-slate-700 mb-3">
-                <i class="fa-solid fa-chart-simple text-purple-600 mr-1"></i> Tools más usadas
+                <i class="fa-solid fa-chart-simple text-brand mr-1"></i> Tools más usadas
             </h3>
             @if ($porTool->isEmpty())
                 <p class="text-xs text-slate-400">Aún no hay datos.</p>
@@ -87,7 +87,7 @@
                                 <span class="font-bold text-slate-800">{{ $row->total }} <span class="text-slate-400">· {{ (int) $row->latencia }}ms</span></span>
                             </div>
                             <div class="h-2 rounded-full bg-slate-100 overflow-hidden">
-                                <div class="h-full bg-gradient-to-r from-purple-500 to-indigo-500" style="width: {{ $pct }}%"></div>
+                                <div class="h-full bg-brand" style="width: {{ $pct }}%"></div>
                             </div>
                         </div>
                     @endforeach
@@ -181,7 +181,7 @@
                             <tr class="hover:bg-slate-50">
                                 <td class="px-3 py-2 text-slate-500 font-mono">{{ $i->created_at->format('H:i:s') }}</td>
                                 <td class="px-3 py-2">
-                                    <span class="inline-block rounded-md bg-purple-100 text-purple-700 px-2 py-0.5 font-mono font-bold">{{ $i->tool_name }}</span>
+                                    <span class="inline-block rounded-md bg-brand-soft text-brand px-2 py-0.5 font-mono font-bold">{{ $i->tool_name }}</span>
                                 </td>
                                 <td class="px-3 py-2 font-mono text-slate-600 max-w-xs truncate" title="{{ $argsStr }}">
                                     {{ \Illuminate\Support\Str::limit($argsStr, 50) }}
@@ -204,7 +204,7 @@
                                 </td>
                                 <td class="px-3 py-2 text-right">
                                     <button wire:click="verDetalle({{ $i->id }})"
-                                            class="text-purple-600 hover:text-purple-800 font-semibold">
+                                            class="text-brand hover:text-brand-dark font-semibold">
                                         Ver
                                     </button>
                                 </td>
@@ -226,7 +226,7 @@
                 <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
                     <div>
                         <h3 class="text-lg font-extrabold text-slate-800">
-                            <i class="fa-solid fa-magnifying-glass-chart text-purple-600 mr-1"></i>
+                            <i class="fa-solid fa-magnifying-glass-chart text-brand mr-1"></i>
                             Detalle invocación #{{ $detalle->id }}
                         </h3>
                         <p class="text-xs text-slate-500 mt-0.5">{{ $detalle->created_at->format('d/m/Y H:i:s') }} · {{ $detalle->latencia_ms }}ms</p>
@@ -238,7 +238,7 @@
                 <div class="overflow-y-auto p-6 space-y-4 text-sm">
                     <div>
                         <div class="text-xs font-bold text-slate-500 uppercase mb-1">Tool</div>
-                        <div class="font-mono bg-purple-50 text-purple-700 inline-block rounded px-2 py-0.5">{{ $detalle->tool_name }}</div>
+                        <div class="font-mono bg-brand-soft text-brand inline-block rounded px-2 py-0.5">{{ $detalle->tool_name }}</div>
                     </div>
                     <div>
                         <div class="text-xs font-bold text-slate-500 uppercase mb-1">Cliente</div>
