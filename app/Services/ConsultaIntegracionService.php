@@ -91,13 +91,13 @@ class ConsultaIntegracionService
                 'total_ejecuciones'   => ($consulta->total_ejecuciones ?? 0) + 1,
             ]);
 
-            return [
+            return $this->limpiarUtf8([
                 'ok'         => true,
                 'total'      => count($filas),
                 'columnas'   => $columnas,
                 'filas'      => $filas,
                 'parametros' => $bindings,
-            ];
+            ]);
         } catch (\Throwable $e) {
             Log::warning('Consulta integracion fallo', [
                 'consulta_id' => $consulta->id,
@@ -109,6 +109,31 @@ class ConsultaIntegracionService
                 'filas' => [],
             ];
         }
+    }
+
+    /**
+     * Limpia recursivamente strings con encoding distinto a UTF-8.
+     * SQL Server / FreeTDS suele devolver Windows-1252 → Livewire/JSON revientan.
+     */
+    private function limpiarUtf8($value)
+    {
+        if (is_array($value)) {
+            $out = [];
+            foreach ($value as $k => $v) {
+                $key = is_string($k) ? $this->stringUtf8($k) : $k;
+                $out[$key] = $this->limpiarUtf8($v);
+            }
+            return $out;
+        }
+        if (is_string($value)) return $this->stringUtf8($value);
+        return $value;
+    }
+
+    private function stringUtf8(string $s): string
+    {
+        if ($s === '' || mb_check_encoding($s, 'UTF-8')) return $s;
+        $det = mb_detect_encoding($s, ['UTF-8', 'Windows-1252', 'ISO-8859-1', 'ASCII'], true) ?: 'Windows-1252';
+        return mb_convert_encoding($s, 'UTF-8', $det);
     }
 
     /**
