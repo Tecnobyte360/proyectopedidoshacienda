@@ -756,14 +756,17 @@ class WhatsappWebhookController extends Controller
         }
 
         // ── ALERTA DE SEDE CERRADA ──────────────────────────────────────
-        // Si la sede que atiende a este cliente está cerrada AHORA, inyectamos
-        // un system DURO al inicio para que la IA NO inicie toma de pedido.
-        // El template usa las MISMAS variables dinámicas que el resto del prompt
-        // ({cliente_primer_nombre}, {sede_estado_actual}, {horarios_sedes},
-        // {nombre_asesora}, etc.) y se resuelve con BotPromptService::renderizar.
+        // SOLO inyectamos la alerta DURA si TODAS las sedes activas están
+        // cerradas (no podemos atender desde ninguna). Si al menos una está
+        // abierta, dejamos que el bot ofrezca ese punto de atención.
         try {
-            $sedeActual = $sedeId ? \App\Models\Sede::find($sedeId) : \App\Models\Sede::query()->first();
-            if ($sedeActual && !$sedeActual->estaAbierta()) {
+            $sedesActivas = \App\Models\Sede::where('activa', true)->get();
+            $hayAlgunaAbierta = $sedesActivas->isNotEmpty()
+                && $sedesActivas->contains(fn ($s) => $s->estaAbierta());
+
+            $sedeActual = $sedeId ? \App\Models\Sede::find($sedeId) : $sedesActivas->first();
+
+            if (!$hayAlgunaAbierta && $sedeActual) {
                 $promptService = app(BotPromptService::class);
                 $contextoCierre = $promptService->construirContexto(
                     $nombreParaPrompt,
@@ -815,6 +818,31 @@ TXT;
                     'role'    => 'system',
                     'content' => $promptService->renderizar($template, $contextoCierre),
                 ];
+            }
+
+            // ── INFO de DISPONIBILIDAD POR SEDE ─────────────────────────
+            // Si hay varias sedes con horarios distintos, le decimos al bot
+            // CUÁLES están abiertas para que pueda ofrecer la correcta.
+            if ($sedesActivas->count() >= 2) {
+                $abiertas = $sedesActivas->filter(fn ($s) => $s->estaAbierta());
+                $cerradas = $sedesActivas->reject(fn ($s) => $s->estaAbierta());
+
+                if ($abiertas->isNotEmpty() && $cerradas->isNotEmpty()) {
+                    // Caso mixto: algunas abiertas, algunas cerradas
+                    $extraSystem[] = [
+                        'role'    => 'system',
+                        'content' => "📍 ESTADO REAL DE SEDES AHORA:\n\n"
+                            . "✅ ABIERTAS y atendiendo:\n"
+                            . $abiertas->map(fn ($s) => "  • " . $s->nombre . " (" . $s->direccion . ") — " . $s->horarioHoyTexto())->implode("\n")
+                            . "\n\n🔴 CERRADAS ahora:\n"
+                            . $cerradas->map(fn ($s) => "  • " . $s->nombre . " — abre: " . ($s->proximaApertura() ?: 'según horario'))->implode("\n")
+                            . "\n\nREGLAS:\n"
+                            . "1. NUNCA digas 'estamos cerrados' como afirmación general — al menos una sede está atendiendo.\n"
+                            . "2. Cuando el cliente pregunte por horario o si están abiertos, responde con la SEDE ABIERTA.\n"
+                            . "3. Si el cliente está cerca de una sede cerrada, ofrece la sede abierta más cercana o entrega a domicilio.\n"
+                            . "4. Si el cliente no especifica sede, asume que despachamos desde la abierta.",
+                    ];
+                }
             }
         } catch (\Throwable $e) {
             \Log::warning('No se pudo inyectar alerta de sede cerrada: ' . $e->getMessage());
