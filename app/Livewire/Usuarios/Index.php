@@ -27,6 +27,15 @@ class Index extends Component
     public string $rol       = '';
     public bool   $activo    = true;
 
+    // Modal de reset de contraseña
+    public bool   $modalResetAbierto   = false;
+    public ?int   $resetUserId         = null;
+    public string $resetUserNombre     = '';
+    public string $resetUserEmail      = '';
+    public string $resetPasswordNueva  = '';
+    public string $resetModoPersonalizado = 'aleatoria'; // aleatoria | personalizada
+    public string $resetPasswordCustom = '';
+
     public function updatingBusqueda(): void { $this->resetPage(); }
 
     public function abrirModalCrear(): void
@@ -122,6 +131,86 @@ class Index extends Component
             'type'    => 'success',
             'message' => $this->editandoId ? 'Usuario actualizado.' : 'Usuario creado.',
         ]);
+    }
+
+    /**
+     * Abre el modal de reset de contraseña para un usuario del tenant.
+     */
+    public function abrirModalReset(int $id): void
+    {
+        $u = $this->aplicarFiltroTenant(User::query())->find($id);
+        if (!$u) {
+            $this->dispatch('notify', ['type' => 'warning', 'message' => 'Usuario no encontrado.']);
+            return;
+        }
+
+        $this->resetUserId            = $u->id;
+        $this->resetUserNombre        = $u->name;
+        $this->resetUserEmail         = $u->email;
+        $this->resetPasswordNueva     = '';
+        $this->resetPasswordCustom    = '';
+        $this->resetModoPersonalizado = 'aleatoria';
+        $this->modalResetAbierto      = true;
+    }
+
+    public function cerrarModalReset(): void
+    {
+        $this->modalResetAbierto      = false;
+        $this->resetUserId            = null;
+        $this->resetUserNombre        = '';
+        $this->resetUserEmail         = '';
+        $this->resetPasswordNueva     = '';
+        $this->resetPasswordCustom    = '';
+    }
+
+    /**
+     * Aplica el reset según el modo elegido (aleatoria o personalizada).
+     * Persiste la contraseña hasheada y muestra la nueva en plano UNA SOLA VEZ.
+     */
+    public function aplicarResetPassword(): void
+    {
+        if (!$this->resetUserId) return;
+
+        $u = $this->aplicarFiltroTenant(User::query())->find($this->resetUserId);
+        if (!$u) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Usuario no encontrado.']);
+            return;
+        }
+
+        if ($this->resetModoPersonalizado === 'personalizada') {
+            $custom = trim($this->resetPasswordCustom);
+            if (mb_strlen($custom) < 6) {
+                $this->dispatch('notify', ['type' => 'warning', 'message' => 'La contraseña debe tener al menos 6 caracteres.']);
+                return;
+            }
+            $nueva = $custom;
+        } else {
+            // Generar aleatoria: letras + números, fácil de leer (sin l, I, O, 0)
+            $nueva = $this->generarPasswordSegura(10);
+        }
+
+        $u->password = Hash::make($nueva);
+        $u->save();
+
+        $this->resetPasswordNueva = $nueva;
+
+        \Illuminate\Support\Facades\Log::info('🔐 Reset de contraseña', [
+            'user_id'    => $u->id,
+            'email'      => $u->email,
+            'reseteado_por' => auth()->id(),
+            'tenant_id'  => $u->tenant_id,
+        ]);
+    }
+
+    private function generarPasswordSegura(int $longitud = 10): string
+    {
+        $chars = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // sin caracteres confusos
+        $maxIdx = mb_strlen($chars) - 1;
+        $resultado = '';
+        for ($i = 0; $i < $longitud; $i++) {
+            $resultado .= mb_substr($chars, random_int(0, $maxIdx), 1);
+        }
+        return $resultado;
     }
 
     public function toggleActivo(int $id): void

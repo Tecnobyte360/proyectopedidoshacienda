@@ -177,6 +177,11 @@
                                                     class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 hover:bg-brand-soft hover:text-brand-secondary text-slate-600 transition">
                                                 <i class="fa-solid fa-pen-to-square text-xs"></i>
                                             </button>
+                                            <button wire:click="abrirModalReset({{ $u->id }})"
+                                                    title="Restablecer contraseña"
+                                                    class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 transition">
+                                                <i class="fa-solid fa-key text-xs"></i>
+                                            </button>
                                             @if(!$esYo)
                                                 <button wire:click="toggleActivo({{ $u->id }})"
                                                         title="{{ $u->activo ? 'Desactivar' : 'Activar' }}"
@@ -305,6 +310,123 @@
                         </button>
                     </div>
                 </form>
+            </div>
+        </div>
+    @endif
+
+    {{-- ╔═════════════════════════════════════════════════════╗
+         ║ MODAL: Restablecer contraseña                       ║
+         ╚═════════════════════════════════════════════════════╝ --}}
+    @if ($modalResetAbierto)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4" wire:click.self="cerrarModalReset">
+            <div class="w-full max-w-lg rounded-3xl bg-white shadow-2xl overflow-hidden">
+                <div class="px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="h-10 w-10 rounded-xl bg-blue-600 flex items-center justify-center">
+                                <i class="fa-solid fa-key text-white"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-extrabold text-slate-800">Restablecer contraseña</h3>
+                                <p class="text-xs text-slate-500">{{ $resetUserNombre }} · {{ $resetUserEmail }}</p>
+                            </div>
+                        </div>
+                        <button wire:click="cerrarModalReset" class="text-slate-400 hover:text-slate-700">
+                            <i class="fa-solid fa-xmark text-xl"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="p-6">
+                    @if (!$resetPasswordNueva)
+                        {{-- Paso 1: elegir modo --}}
+                        <p class="text-sm text-slate-700 mb-4">
+                            Elige cómo quieres restablecer la contraseña de este usuario:
+                        </p>
+
+                        <div class="space-y-3 mb-6">
+                            <label class="flex items-start gap-3 cursor-pointer rounded-xl border-2 p-4 transition {{ $resetModoPersonalizado === 'aleatoria' ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:bg-slate-50' }}">
+                                <input type="radio" wire:model.live="resetModoPersonalizado" value="aleatoria" class="mt-1 text-blue-600">
+                                <div class="flex-1">
+                                    <div class="font-bold text-sm text-slate-800">
+                                        <i class="fa-solid fa-dice text-blue-600 mr-1"></i> Generar contraseña aleatoria
+                                    </div>
+                                    <div class="text-xs text-slate-500 mt-1">
+                                        El sistema crea una contraseña segura de 10 caracteres. Se la entregas al usuario por canal seguro.
+                                    </div>
+                                </div>
+                            </label>
+
+                            <label class="flex items-start gap-3 cursor-pointer rounded-xl border-2 p-4 transition {{ $resetModoPersonalizado === 'personalizada' ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:bg-slate-50' }}">
+                                <input type="radio" wire:model.live="resetModoPersonalizado" value="personalizada" class="mt-1 text-blue-600">
+                                <div class="flex-1">
+                                    <div class="font-bold text-sm text-slate-800">
+                                        <i class="fa-solid fa-pen text-blue-600 mr-1"></i> Escribir contraseña manualmente
+                                    </div>
+                                    <div class="text-xs text-slate-500 mt-1">
+                                        Tú escribes la nueva contraseña. Útil cuando el usuario te dicta la que quiere.
+                                    </div>
+                                </div>
+                            </label>
+                        </div>
+
+                        @if ($resetModoPersonalizado === 'personalizada')
+                            <div class="mb-4">
+                                <label class="block text-xs font-bold text-slate-700 mb-1">Nueva contraseña (mínimo 6 caracteres)</label>
+                                <input type="text" wire:model="resetPasswordCustom"
+                                       placeholder="Ej: MiPass2026"
+                                       class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-mono focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
+                            </div>
+                        @endif
+
+                        <div class="flex justify-end gap-2">
+                            <button wire:click="cerrarModalReset"
+                                    class="rounded-xl px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100">
+                                Cancelar
+                            </button>
+                            <button wire:click="aplicarResetPassword"
+                                    wire:loading.attr="disabled" wire:target="aplicarResetPassword"
+                                    class="rounded-xl bg-blue-600 hover:bg-blue-700 px-5 py-2 text-sm font-bold text-white shadow disabled:opacity-50">
+                                <span wire:loading.remove wire:target="aplicarResetPassword">
+                                    <i class="fa-solid fa-key mr-1"></i> Restablecer
+                                </span>
+                                <span wire:loading wire:target="aplicarResetPassword">
+                                    <i class="fa-solid fa-spinner fa-spin mr-1"></i> Procesando...
+                                </span>
+                            </button>
+                        </div>
+                    @else
+                        {{-- Paso 2: mostrar la contraseña nueva --}}
+                        <div class="rounded-2xl bg-emerald-50 border border-emerald-200 p-4 mb-4">
+                            <div class="flex items-center gap-2 text-emerald-800 font-bold mb-1">
+                                <i class="fa-solid fa-circle-check"></i>
+                                Contraseña restablecida
+                            </div>
+                            <p class="text-xs text-emerald-700">
+                                Esta es la nueva contraseña. <strong>Cópiala ahora</strong> y entrégala al usuario por canal seguro — no se podrá volver a ver.
+                            </p>
+                        </div>
+
+                        <div class="rounded-xl bg-slate-900 p-4 text-center">
+                            <p class="text-[11px] text-slate-400 mb-2 uppercase tracking-widest">Nueva contraseña</p>
+                            <p class="text-2xl font-mono font-bold text-emerald-300 tracking-wide select-all" id="reset-pw-text">
+                                {{ $resetPasswordNueva }}
+                            </p>
+                        </div>
+
+                        <div class="mt-4 flex items-center justify-end gap-2">
+                            <button x-data
+                                    @click="navigator.clipboard.writeText('{{ $resetPasswordNueva }}'); $el.innerHTML = '<i class=\'fa-solid fa-check mr-1\'></i> Copiado'; setTimeout(() => $el.innerHTML = '<i class=\'fa-solid fa-clipboard mr-1\'></i> Copiar', 2000)"
+                                    class="rounded-xl bg-slate-200 hover:bg-slate-300 px-4 py-2 text-sm font-semibold text-slate-700">
+                                <i class="fa-solid fa-clipboard mr-1"></i> Copiar
+                            </button>
+                            <button wire:click="cerrarModalReset"
+                                    class="rounded-xl bg-blue-600 hover:bg-blue-700 px-5 py-2 text-sm font-bold text-white shadow">
+                                Listo
+                            </button>
+                        </div>
+                    @endif
+                </div>
             </div>
         </div>
     @endif
