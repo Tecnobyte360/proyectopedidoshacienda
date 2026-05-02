@@ -478,6 +478,36 @@
                                     </script>
                                 </div>
 
+                                {{-- Server-side API Key (sin restricciones de referrer) --}}
+                                <div class="rounded-xl bg-amber-50 border border-amber-200 p-3 mt-2">
+                                    <label class="block text-xs font-bold text-amber-800 mb-1">
+                                        <i class="fa-solid fa-server mr-1"></i> Server API Key (para el bot)
+                                    </label>
+                                    <p class="text-[11px] text-amber-700 mb-2">
+                                        Crea una <strong>segunda</strong> API Key SIN restricción de referrer (o con IP restriction). El bot la usará para geocodificar las direcciones que le dan los clientes y validar cobertura con polígonos exactos.
+                                    </p>
+                                    <div class="flex gap-2">
+                                        <input type="password" wire:model="google_maps_server_api_key"
+                                               placeholder="AIzaSy... (sin HTTP referrer)"
+                                               class="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm font-mono bg-white">
+                                        <button type="button" wire:click="probarGoogleMapsServerKey"
+                                                wire:loading.attr="disabled" wire:target="probarGoogleMapsServerKey"
+                                                class="rounded-xl bg-amber-600 hover:bg-amber-700 px-4 py-2 text-sm font-bold text-white shadow disabled:opacity-50">
+                                            <span wire:loading.remove wire:target="probarGoogleMapsServerKey">
+                                                <i class="fa-solid fa-flask mr-1"></i> Probar
+                                            </span>
+                                            <span wire:loading wire:target="probarGoogleMapsServerKey">
+                                                <i class="fa-solid fa-spinner fa-spin"></i>
+                                            </span>
+                                        </button>
+                                    </div>
+                                    @if ($googleMapsServerTestResult !== null)
+                                        <div class="mt-2 rounded-xl p-3 text-xs {{ $googleMapsServerTestResult['ok'] ? 'bg-emerald-50 border border-emerald-200 text-emerald-800' : 'bg-rose-50 border border-rose-200 text-rose-700' }}">
+                                            {{ $googleMapsServerTestResult['mensaje'] }}
+                                        </div>
+                                    @endif
+                                </div>
+
                                 <div class="grid grid-cols-3 gap-2">
                                     <div>
                                         <label class="block text-[11px] font-medium text-slate-700 mb-1">Centro Latitud</label>

@@ -33,6 +33,10 @@ class GeocodingService
         ?string $departamento = 'Antioquia',
         ?string $pais = 'Colombia'
     ): ?array {
+        // 🌍 PREFERIR Google Geocoding API si el tenant tiene server key
+        $resultadoGoogle = $this->geocodificarGoogle($direccion, $barrio, $ciudad, $departamento, $pais);
+        if ($resultadoGoogle) return $resultadoGoogle;
+
         $direccionLimpia = $this->limpiarDireccion($direccion);
 
         // Generar varias versiones de query (de más específica a más general)
@@ -155,6 +159,84 @@ class GeocodingService
                     'error' => $e->getMessage(),
                     'query' => $query,
                 ]);
+                return null;
+            }
+        });
+    }
+
+    /**
+     * Geocodifica usando Google Maps Geocoding API si el tenant tiene
+     * configurada una server-side API key (sin restricción HTTP referrer).
+     * Mucho más preciso que Nominatim para direcciones colombianas.
+     *
+     * Returns: ['lat'=>float, 'lng'=>float, 'display'=>string] o null.
+     */
+    private function geocodificarGoogle(
+        string $direccion,
+        ?string $barrio,
+        ?string $ciudad,
+        ?string $departamento,
+        ?string $pais
+    ): ?array {
+        $tenant = app(\App\Services\TenantManager::class)->current();
+        if (!$tenant || empty($tenant->google_maps_server_api_key)) {
+            return null; // No hay server key, fallback a Nominatim
+        }
+
+        $apiKey = $tenant->google_maps_server_api_key;
+        $address = trim(implode(', ', array_filter([
+            $direccion, $barrio, $ciudad, $departamento, $pais,
+        ])));
+
+        if ($address === '') return null;
+
+        $cacheKey = 'gmaps_geocode_' . md5($address);
+
+        return Cache::remember($cacheKey, 86400, function () use ($address, $apiKey) {
+            try {
+                $resp = Http::timeout(8)->get('https://maps.googleapis.com/maps/api/geocode/json', [
+                    'address' => $address,
+                    'key'     => $apiKey,
+                    'region'  => 'co',
+                    'language' => 'es',
+                ]);
+
+                if (!$resp->successful()) {
+                    Log::warning('🗺️ Google Geocoding HTTP error', ['status' => $resp->status()]);
+                    return null;
+                }
+
+                $body = $resp->json();
+                $status = $body['status'] ?? '';
+
+                if ($status !== 'OK' || empty($body['results'][0])) {
+                    Log::info('🗺️ Google Geocoding sin resultado', [
+                        'address' => $address,
+                        'status'  => $status,
+                        'error'   => $body['error_message'] ?? null,
+                    ]);
+                    return null;
+                }
+
+                $primero = $body['results'][0];
+                $loc = $primero['geometry']['location'];
+
+                Log::info('✅ Google Geocoding resuelto', [
+                    'address' => $address,
+                    'lat'     => $loc['lat'],
+                    'lng'     => $loc['lng'],
+                    'display' => $primero['formatted_address'] ?? null,
+                    'tipo'    => $primero['geometry']['location_type'] ?? null,
+                ]);
+
+                return [
+                    'lat'     => (float) $loc['lat'],
+                    'lng'     => (float) $loc['lng'],
+                    'display' => $primero['formatted_address'] ?? $address,
+                    'fuente'  => 'google',
+                ];
+            } catch (\Throwable $e) {
+                Log::warning('🗺️ Google Geocoding excepción: ' . $e->getMessage());
                 return null;
             }
         });

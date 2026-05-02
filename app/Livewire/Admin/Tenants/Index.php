@@ -51,7 +51,9 @@ class Index extends Component
     public ?float $google_maps_centro_lat = null;
     public ?float $google_maps_centro_lng = null;
     public int    $google_maps_zoom      = 13;
+    public string $google_maps_server_api_key = '';
     public ?array $googleMapsTestResult  = null;
+    public ?array $googleMapsServerTestResult = null;
     public string $color_primario      = '#d68643';
     public string $color_secundario    = '#a85f24';
     public ?string $logo_url_actual    = null;
@@ -125,6 +127,7 @@ class Index extends Component
             'google_maps_centro_lat' => 'nullable|numeric|between:-90,90',
             'google_maps_centro_lng' => 'nullable|numeric|between:-180,180',
             'google_maps_zoom'    => 'integer|min:1|max:20',
+            'google_maps_server_api_key' => 'nullable|string|max:200',
             'color_primario'      => 'nullable|string|max:10',
             'color_secundario'    => 'nullable|string|max:10',
             'logo_archivo'        => 'nullable',   // legacy, ya no se usa
@@ -201,7 +204,9 @@ class Index extends Component
         $this->google_maps_centro_lat = $t->google_maps_centro_lat;
         $this->google_maps_centro_lng = $t->google_maps_centro_lng;
         $this->google_maps_zoom     = (int) ($t->google_maps_zoom ?? 13);
+        $this->google_maps_server_api_key = (string) ($t->google_maps_server_api_key ?? '');
         $this->googleMapsTestResult = null;
+        $this->googleMapsServerTestResult = null;
         $this->color_primario       = (string) ($t->color_primario ?: '#d68643');
         $this->color_secundario     = (string) ($t->color_secundario ?: '#a85f24');
         $this->logo_url_actual      = $t->logo_url;
@@ -358,6 +363,56 @@ class Index extends Component
      * navegador (con referrer correcto). El test PHP no funciona porque las
      * keys con HTTP referrer restrictions rechazan llamadas server-side.
      */
+    /**
+     * Prueba la server-side API Key haciendo geocode desde PHP.
+     * Esta SÍ funciona server-side porque la key NO tiene HTTP referrer
+     * restrictions (debería tener IP restrictions o ninguna).
+     */
+    public function probarGoogleMapsServerKey(): void
+    {
+        $key = trim($this->google_maps_server_api_key);
+        if ($key === '') {
+            $this->googleMapsServerTestResult = ['ok' => false, 'mensaje' => 'Ingresa la server API Key primero.'];
+            return;
+        }
+
+        $direccion = trim($this->ciudad ?: 'Bogotá, Colombia');
+
+        try {
+            $resp = \Illuminate\Support\Facades\Http::timeout(10)->get('https://maps.googleapis.com/maps/api/geocode/json', [
+                'address' => $direccion,
+                'key'     => $key,
+            ]);
+
+            if (!$resp->successful()) {
+                $this->googleMapsServerTestResult = ['ok' => false, 'mensaje' => "HTTP {$resp->status()}"];
+                return;
+            }
+
+            $body = $resp->json();
+            $status = $body['status'] ?? '';
+
+            if ($status === 'OK') {
+                $loc = $body['results'][0]['geometry']['location'] ?? null;
+                $this->googleMapsServerTestResult = [
+                    'ok'      => true,
+                    'mensaje' => '✅ Server key válida. Geocode OK desde PHP. El bot puede usarla para validar direcciones.',
+                    'lat'     => $loc['lat'] ?? null,
+                    'lng'     => $loc['lng'] ?? null,
+                ];
+            } else {
+                $msg = $body['error_message'] ?? "Status: {$status}";
+                $hint = '';
+                if (str_contains($msg, 'referer')) {
+                    $hint = ' 💡 Esta key tiene HTTP referrer restrictions, no puede usarse server-side. Crea una key SIN restricciones (o con IP restrictions) específicamente para el backend.';
+                }
+                $this->googleMapsServerTestResult = ['ok' => false, 'mensaje' => "❌ {$msg}{$hint}"];
+            }
+        } catch (\Throwable $e) {
+            $this->googleMapsServerTestResult = ['ok' => false, 'mensaje' => 'Error: ' . $e->getMessage()];
+        }
+    }
+
     public function setGoogleMapsTestResult(array $resultado): void
     {
         $this->googleMapsTestResult = $resultado;
@@ -822,7 +877,9 @@ class Index extends Component
         $this->google_maps_centro_lat = null;
         $this->google_maps_centro_lng = null;
         $this->google_maps_zoom     = 13;
+        $this->google_maps_server_api_key = '';
         $this->googleMapsTestResult = null;
+        $this->googleMapsServerTestResult = null;
         $this->color_primario       = '#d68643';
         $this->color_secundario     = '#a85f24';
         $this->logo_url_actual      = null;
