@@ -274,7 +274,7 @@ class IntegracionSyncService
     /**
      * Crea una conexión PDO a la BD externa según el tipo.
      */
-    private function conectar(Integracion $integracion): PDO
+    public function conectar(Integracion $integracion): PDO
     {
         $c = $integracion->config;
 

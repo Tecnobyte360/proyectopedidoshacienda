@@ -37,9 +37,9 @@ class ConsultaIntegracionService
         }
 
         try {
-            // Conectar usando el mismo metodo que el SyncService (reflection no, hacerlo publico mejor)
-            // Usamos un PDO directamente desde el config de la integracion
-            $pdo = $this->conectarDesdeIntegracion($integracion);
+            // Reutilizamos la conexión que ya funciona en IntegracionSyncService
+            // (maneja pdo_dblib / pdo_sqlsrv, mysql, pgsql, etc).
+            $pdo = $this->syncService->conectar($integracion);
 
             $sql = trim($consulta->query_sql);
             if ($sql === '') {
@@ -109,32 +109,6 @@ class ConsultaIntegracionService
                 'filas' => [],
             ];
         }
-    }
-
-    /**
-     * Crea un PDO desde la config de una integración — replica la lógica de
-     * IntegracionSyncService::conectar pero accesible públicamente desde aquí.
-     */
-    private function conectarDesdeIntegracion(\App\Models\Integracion $i): PDO
-    {
-        $c = (array) ($i->config ?? []);
-        $host = $c['host'] ?? '';
-        $port = $c['port'] ?? null;
-        $db   = $c['database'] ?? '';
-        $user = $c['username'] ?? '';
-        $pass = $c['password'] ?? '';
-
-        $dsn = match ($i->tipo) {
-            'sqlsrv' => "sqlsrv:Server={$host}" . ($port ? ",{$port}" : '') . ";Database={$db};Encrypt=no;TrustServerCertificate=yes",
-            'pgsql'  => "pgsql:host={$host};" . ($port ? "port={$port};" : '') . "dbname={$db}",
-            default  => "mysql:host={$host};" . ($port ? "port={$port};" : '') . "dbname={$db};charset=utf8mb4",
-        };
-
-        $pdo = new PDO($dsn, $user, $pass, [
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_TIMEOUT => 10,
-        ]);
-        return $pdo;
     }
 
     /**
