@@ -43,9 +43,9 @@ class Consultas extends Component
         ];
     }
 
-    public function mount(int $integracion): void
+    public function mount(Integracion $integracion): void
     {
-        $this->integracion = Integracion::findOrFail($integracion);
+        $this->integracion = $integracion;
     }
 
     public function abrirCrear(): void
