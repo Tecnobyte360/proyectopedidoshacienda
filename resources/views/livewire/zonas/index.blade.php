@@ -94,10 +94,16 @@
 
             {{-- Mapa global --}}
             <div wire:ignore
-                 x-data="zonasMapaGlobal(@js($zonasMapa), @js($pedidosMapa))"
-                 x-init="initMap()"
+                 @if ($gmapsActivo ?? false)
+                    x-data="zonasGoogleMapaGlobal(@js($zonasMapa), @js($pedidosMapa), @js($gmapsConfig))"
+                    x-init="$nextTick(() => cargarGoogleMaps())"
+                 @else
+                    x-data="zonasMapaGlobal(@js($zonasMapa), @js($pedidosMapa))"
+                    x-init="initMap()"
+                 @endif
                  class="relative">
-                <div id="mapa-global" style="height: 600px; width: 100%;"></div>
+                <div id="{{ ($gmapsActivo ?? false) ? 'mapa-global-google' : 'mapa-global' }}"
+                     style="height: 600px; width: 100%; border-radius: 0.75rem;"></div>
 
                 @if($zonasMapa->isEmpty())
                     <div class="absolute inset-0 flex items-center justify-center bg-slate-900/60 backdrop-blur z-[400] pointer-events-none">
@@ -413,7 +419,30 @@
                                 </template>
                             </div>
 
+                            @if ($gmapsActivo ?? false)
+                                {{-- Cuando Google Maps esta activo, sugerir abrir el editor visual completo --}}
+                                <div class="rounded-2xl bg-blue-50 border-2 border-dashed border-blue-300 p-6 text-center">
+                                    <i class="fa-solid fa-map-location-dot text-3xl text-blue-600 mb-2"></i>
+                                    <p class="text-sm font-bold text-slate-800 mb-1">Editor visual con Google Maps</p>
+                                    <p class="text-xs text-slate-600 mb-3">
+                                        Para dibujar el polígono de esta zona, abre el editor visual dedicado.
+                                    </p>
+                                    @if ($editandoId)
+                                        <a href="{{ route('zonas.editor-mapa', $editandoId) }}"
+                                           target="_blank"
+                                           class="inline-flex items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 text-sm font-bold shadow">
+                                            <i class="fa-solid fa-external-link-alt"></i>
+                                            Abrir editor en pestaña nueva
+                                        </a>
+                                    @else
+                                        <p class="text-[11px] text-amber-700">
+                                            <i class="fa-solid fa-info-circle"></i> Guarda primero la zona y luego edita el polígono visualmente.
+                                        </p>
+                                    @endif
+                                </div>
+                            @else
                             <div id="mapa-zona-modal" style="height: 350px; width: 100%; border-radius: 0.75rem; border: 1px solid #e2e8f0;"></div>
+                            @endif
 
                             <div class="mt-2 flex items-center justify-between text-xs text-slate-600">
                                 <span>
@@ -826,3 +855,117 @@
     });
 </script>
 @endpush
+
+@if ($gmapsActivo ?? false)
+@push('scripts')
+<script>
+    // Componente Alpine para mapa global de zonas con Google Maps
+    Alpine.data('zonasGoogleMapaGlobal', (zonasMapa, pedidosMapa, config) => ({
+        zonas: zonasMapa,
+        pedidos: pedidosMapa,
+        config: config,
+        map: null,
+        polygons: [],
+        markers: [],
+
+        cargarGoogleMaps() {
+            if (typeof google !== 'undefined' && google.maps) {
+                this.initMap();
+                return;
+            }
+            const existing = document.querySelector('script[data-gmaps-zonas-global]');
+            if (existing) {
+                existing.addEventListener('load', () => this.initMap());
+                return;
+            }
+            const s = document.createElement('script');
+            s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(this.config.api_key)}&libraries=geometry&language=es&region=CO`;
+            s.dataset.gmapsZonasGlobal = '1';
+            s.async = true;
+            s.onload = () => this.initMap();
+            document.head.appendChild(s);
+        },
+
+        initMap() {
+            const centro = { lat: this.config.centro_lat, lng: this.config.centro_lng };
+
+            this.map = new google.maps.Map(document.getElementById('mapa-global-google'), {
+                center: centro,
+                zoom: this.config.zoom,
+                mapTypeControl: true,
+                streetViewControl: false,
+                fullscreenControl: true,
+            });
+
+            const bounds = new google.maps.LatLngBounds();
+            let huboCoords = false;
+
+            // Dibujar polígonos de cada zona
+            this.zonas.forEach(z => {
+                if (!z.poligono || z.poligono.length < 3) return;
+                const path = z.poligono.map(p => ({ lat: parseFloat(p[0]), lng: parseFloat(p[1]) }));
+                const polygon = new google.maps.Polygon({
+                    paths: path,
+                    strokeColor: z.color || '#d68643',
+                    strokeOpacity: 0.9,
+                    strokeWeight: 2,
+                    fillColor: z.color || '#d68643',
+                    fillOpacity: 0.25,
+                });
+                polygon.setMap(this.map);
+                this.polygons.push(polygon);
+
+                path.forEach(p => { bounds.extend(p); huboCoords = true; });
+
+                // InfoWindow al hacer click
+                const info = new google.maps.InfoWindow({
+                    content: `
+                        <div style="font-family:sans-serif;min-width:200px;">
+                            <div style="font-weight:bold;color:${z.color || '#d68643'};font-size:14px;">${z.nombre}</div>
+                            ${z.sede ? `<div style="font-size:12px;color:#64748b;">📍 ${z.sede}</div>` : ''}
+                            <div style="margin-top:6px;font-size:11px;color:#475569;">
+                                ${z.area_km2 ? `Área: ${parseFloat(z.area_km2).toFixed(2)} km²<br>` : ''}
+                                Pedidos: ${z.pedidos || 0}
+                            </div>
+                        </div>
+                    `,
+                });
+                polygon.addListener('click', (e) => {
+                    info.setPosition(e.latLng);
+                    info.open(this.map);
+                });
+            });
+
+            // Pedidos como marcadores
+            this.pedidos.forEach(p => {
+                if (!p.lat || !p.lng) return;
+                const m = new google.maps.Marker({
+                    position: { lat: parseFloat(p.lat), lng: parseFloat(p.lng) },
+                    map: this.map,
+                    title: `${p.cliente} · $${new Intl.NumberFormat('es-CO').format(p.total || 0)}`,
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 6,
+                        fillColor: '#d68643',
+                        fillOpacity: 0.9,
+                        strokeColor: '#fff',
+                        strokeWeight: 2,
+                    },
+                });
+                this.markers.push(m);
+                bounds.extend(m.getPosition());
+                huboCoords = true;
+            });
+
+            if (huboCoords) {
+                this.map.fitBounds(bounds);
+                // Si solo hay un punto, no zoom-in extremo
+                google.maps.event.addListenerOnce(this.map, 'bounds_changed', () => {
+                    if (this.map.getZoom() > 15) this.map.setZoom(15);
+                });
+            }
+        },
+    }));
+</script>
+@endpush
+@endif
