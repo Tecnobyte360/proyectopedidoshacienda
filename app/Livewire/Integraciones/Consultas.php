@@ -157,8 +157,33 @@ class Consultas extends Component
     {
         if (!$this->probandoId) return;
         $c = IntegracionConsulta::findOrFail($this->probandoId);
-        $this->resultadoPrueba = app(ConsultaIntegracionService::class)
+        $resultado = app(ConsultaIntegracionService::class)
             ->ejecutar($c, $this->paramsPrueba, 50);
+
+        // Sanitizar UTF-8 antes de asignar a propiedad publica de Livewire
+        // (SQL Server devuelve Windows-1252 y revienta al serializar el snapshot)
+        $this->resultadoPrueba = $this->utf8SafeArray($resultado);
+    }
+
+    /** Recorre recursivamente arrays/strings y normaliza encoding a UTF-8. */
+    private function utf8SafeArray($value)
+    {
+        if (is_array($value)) {
+            $out = [];
+            foreach ($value as $k => $v) {
+                $out[is_string($k) ? $this->utf8SafeString($k) : $k] = $this->utf8SafeArray($v);
+            }
+            return $out;
+        }
+        if (is_string($value)) return $this->utf8SafeString($value);
+        return $value;
+    }
+
+    private function utf8SafeString(string $s): string
+    {
+        if ($s === '' || mb_check_encoding($s, 'UTF-8')) return $s;
+        $det = mb_detect_encoding($s, ['UTF-8', 'Windows-1252', 'ISO-8859-1', 'ASCII'], true) ?: 'Windows-1252';
+        return mb_convert_encoding($s, 'UTF-8', $det);
     }
 
     public function cerrarProbar(): void
