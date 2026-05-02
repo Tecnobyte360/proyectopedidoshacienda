@@ -382,21 +382,17 @@
                                     </div>
                                 </label>
 
-                                <div>
+                                <div x-data="googleMapsTester()">
                                     <label class="block text-xs font-medium text-slate-700 mb-1">API Key</label>
                                     <div class="flex gap-2">
                                         <input type="password" wire:model="google_maps_api_key"
-                                               placeholder="AIzaSy..."
+                                               placeholder="AIzaSy..." x-ref="keyInput"
                                                class="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm font-mono bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-100">
-                                        <button type="button" wire:click="probarGoogleMapsApiKey"
-                                                wire:loading.attr="disabled" wire:target="probarGoogleMapsApiKey"
+                                        <button type="button" @click="probar"
+                                                :disabled="cargando"
                                                 class="rounded-xl bg-blue-600 hover:bg-blue-700 px-4 py-2 text-sm font-bold text-white shadow disabled:opacity-50">
-                                            <span wire:loading.remove wire:target="probarGoogleMapsApiKey">
-                                                <i class="fa-solid fa-flask mr-1"></i> Probar
-                                            </span>
-                                            <span wire:loading wire:target="probarGoogleMapsApiKey">
-                                                <i class="fa-solid fa-spinner fa-spin"></i>
-                                            </span>
+                                            <span x-show="!cargando"><i class="fa-solid fa-flask mr-1"></i> Probar</span>
+                                            <span x-show="cargando"><i class="fa-solid fa-spinner fa-spin"></i></span>
                                         </button>
                                     </div>
                                     @if ($googleMapsTestResult !== null)
@@ -409,6 +405,77 @@
                                             @endif
                                         </div>
                                     @endif
+                                    <p class="text-[11px] text-slate-500 mt-1">
+                                        💡 La prueba se hace desde tu navegador con el referrer correcto (las keys con
+                                        restricciones de sitio web no aceptan llamadas server-side).
+                                    </p>
+
+                                    {{-- Script Alpine para probar Google Maps desde el navegador --}}
+                                    <script>
+                                        if (!window.googleMapsTester) {
+                                            window.googleMapsTester = function () {
+                                                return {
+                                                    cargando: false,
+                                                    async probar() {
+                                                        const key = this.$wire.google_maps_api_key;
+                                                        if (!key || key.trim() === '') {
+                                                            this.$wire.setGoogleMapsTestResult({ ok: false, mensaje: 'Ingresa la API Key primero.' });
+                                                            return;
+                                                        }
+                                                        const ciudad = this.$wire.ciudad || 'Bogotá, Colombia';
+                                                        this.cargando = true;
+
+                                                        try {
+                                                            // 1. Cargar Maps JS API si no está cargada
+                                                            if (typeof google === 'undefined' || !google.maps) {
+                                                                await new Promise((resolve, reject) => {
+                                                                    const existing = document.querySelector('script[data-gmaps-tester]');
+                                                                    if (existing) {
+                                                                        existing.remove();
+                                                                        delete window.google;
+                                                                    }
+                                                                    const s = document.createElement('script');
+                                                                    s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&libraries=geometry&language=es`;
+                                                                    s.dataset.gmapsTester = '1';
+                                                                    s.async = true;
+                                                                    s.onload = resolve;
+                                                                    s.onerror = () => reject(new Error('No se pudo cargar Google Maps. Verifica que Maps JavaScript API esté habilitada.'));
+                                                                    document.head.appendChild(s);
+                                                                });
+                                                            }
+
+                                                            // 2. Hacer geocode desde el navegador (con referrer correcto)
+                                                            const geocoder = new google.maps.Geocoder();
+                                                            const result = await new Promise((resolve, reject) => {
+                                                                geocoder.geocode({ address: ciudad }, (results, status) => {
+                                                                    if (status === 'OK' && results[0]) {
+                                                                        resolve(results[0]);
+                                                                    } else {
+                                                                        reject(new Error(`Geocoding falló: ${status}. Verifica que Geocoding API esté habilitada.`));
+                                                                    }
+                                                                });
+                                                            });
+
+                                                            const loc = result.geometry.location;
+                                                            this.$wire.setGoogleMapsTestResult({
+                                                                ok: true,
+                                                                mensaje: `✅ API Key válida. Geocode OK para: ${result.formatted_address}`,
+                                                                lat: loc.lat(),
+                                                                lng: loc.lng(),
+                                                            });
+                                                        } catch (e) {
+                                                            this.$wire.setGoogleMapsTestResult({
+                                                                ok: false,
+                                                                mensaje: `❌ ${e.message}`,
+                                                            });
+                                                        } finally {
+                                                            this.cargando = false;
+                                                        }
+                                                    },
+                                                };
+                                            };
+                                        }
+                                    </script>
                                 </div>
 
                                 <div class="grid grid-cols-3 gap-2">

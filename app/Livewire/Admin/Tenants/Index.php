@@ -354,51 +354,18 @@ class Index extends Component
     }
 
     /**
-     * Prueba la API Key de Google Maps haciendo una geocode request a la
-     * ciudad del tenant. Si responde 200 + status OK, la key sirve.
+     * Recibe el resultado del test de Google Maps que se ejecutó en el
+     * navegador (con referrer correcto). El test PHP no funciona porque las
+     * keys con HTTP referrer restrictions rechazan llamadas server-side.
      */
-    public function probarGoogleMapsApiKey(): void
+    public function setGoogleMapsTestResult(array $resultado): void
     {
-        $key = trim($this->google_maps_api_key);
-        if ($key === '') {
-            $this->googleMapsTestResult = ['ok' => false, 'mensaje' => 'Ingresa la API Key primero.'];
-            return;
-        }
+        $this->googleMapsTestResult = $resultado;
 
-        $direccion = trim($this->ciudad ?: 'Bogotá, Colombia');
-
-        try {
-            $resp = \Illuminate\Support\Facades\Http::timeout(10)->get('https://maps.googleapis.com/maps/api/geocode/json', [
-                'address' => $direccion,
-                'key'     => $key,
-            ]);
-
-            if (!$resp->successful()) {
-                $this->googleMapsTestResult = ['ok' => false, 'mensaje' => "HTTP {$resp->status()}: " . mb_substr($resp->body(), 0, 200)];
-                return;
-            }
-
-            $body = $resp->json();
-            $status = $body['status'] ?? '';
-
-            if ($status === 'OK') {
-                $loc = $body['results'][0]['geometry']['location'] ?? null;
-                if ($loc && empty($this->google_maps_centro_lat)) {
-                    $this->google_maps_centro_lat = (float) $loc['lat'];
-                    $this->google_maps_centro_lng = (float) $loc['lng'];
-                }
-                $this->googleMapsTestResult = [
-                    'ok'      => true,
-                    'mensaje' => '✅ API Key válida. Geocode exitoso para: ' . ($body['results'][0]['formatted_address'] ?? $direccion),
-                    'lat'     => $loc['lat'] ?? null,
-                    'lng'     => $loc['lng'] ?? null,
-                ];
-            } else {
-                $msg = $body['error_message'] ?? "Status: {$status}";
-                $this->googleMapsTestResult = ['ok' => false, 'mensaje' => "❌ {$msg}"];
-            }
-        } catch (\Throwable $e) {
-            $this->googleMapsTestResult = ['ok' => false, 'mensaje' => 'Error: ' . $e->getMessage()];
+        // Si el test fue exitoso y nos dio lat/lng, autoll Sevenarlas
+        if (!empty($resultado['ok']) && !empty($resultado['lat']) && empty($this->google_maps_centro_lat)) {
+            $this->google_maps_centro_lat = (float) $resultado['lat'];
+            $this->google_maps_centro_lng = (float) $resultado['lng'];
         }
     }
 
