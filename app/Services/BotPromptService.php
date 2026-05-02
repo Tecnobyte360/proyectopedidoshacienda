@@ -49,6 +49,7 @@ class BotPromptService
             ['key' => 'slogan',            'descripcion' => 'Slogan o frase del negocio'],
             ['key' => 'descripcion_negocio','descripcion' => 'Descripción corta del negocio'],
             ['key' => 'regla_cedula',      'descripcion' => 'Instrucciones de cuándo y cómo pedir la cédula (vacío si está desactivado)'],
+            ['key' => 'bloque_especializado', 'descripcion' => 'Bloque de tono/enfoque según tipo_negocio (cafetería, restaurante, etc)'],
             ['key' => 'catalogo',          'descripcion' => 'Lista completa de productos con precios'],
             ['key' => 'promociones',       'descripcion' => 'Promociones vigentes hoy'],
             ['key' => 'zonas',             'descripcion' => 'Zonas de cobertura y costo de envío'],
@@ -148,6 +149,7 @@ class BotPromptService
             'ans'               => $ansInfo,
             'nota_imagenes'     => $notaImagenes,
             'regla_cedula'      => $this->reglaCedula($config),
+            'bloque_especializado' => $this->bloqueEspecializadoPorTipo($tenantTipo),
         ];
     }
 
@@ -170,6 +172,104 @@ class BotPromptService
      * Le indica al LLM que en lugar de leer un catalogo embebido, use las tools
      * disponibles para consultar productos.
      */
+    /**
+     * Devuelve un bloque adicional con instrucciones, ejemplos y tono
+     * adaptado al tipo de negocio del tenant. Esto permite que UN solo
+     * prompt maestro funcione para cualquier industria.
+     */
+    private function bloqueEspecializadoPorTipo(?string $tipo): string
+    {
+        $tipo = strtolower(trim((string) $tipo));
+        if (empty($tipo) || $tipo === 'otro') return '';
+
+        return match ($tipo) {
+            'restaurante' => <<<TXT
+# 🍽️ ENFOQUE PARA RESTAURANTE
+- Saluda con calidez y pregunta si es para domicilio o recoger en sede.
+- Sugiere combos cuando aplique, comenta el plato del día si lo hay.
+- Cuando el cliente dude, recomienda los productos destacados (productos_destacados).
+- Si pregunta por algo que no manejas, ofrece alternativas similares.
+- Tono: cálido, paisa, sabroso. Reacciona: "uy qué rico", "ese se va volando".
+TXT,
+
+            'cafeteria' => <<<TXT
+# ☕ ENFOQUE PARA CAFETERÍA / CAFÉ DE ESPECIALIDAD
+- Educa suavemente sobre los granos, perfiles y métodos de preparación.
+- Pregunta si el café es para consumo personal, regalo o negocio.
+- Para regalos sugiere presentaciones premium / reservas especiales.
+- Pregunta si lo quiere en grano o molido cuando aplique.
+- Tono: elegante, apasionado por el café, sin ser pretensioso.
+- Reacciona: "ese es espectacular", "tiene un perfil delicioso".
+TXT,
+
+            'carniceria' => <<<TXT
+# 🥩 ENFOQUE PARA CARNICERÍA
+- Pregunta para qué preparación es la carne (asado, sudado, sancocho, frito).
+- Sugiere el corte adecuado según el método de cocción.
+- Pregunta cantidad en libras o kilos (acostumbra el negocio local).
+- Si manejas cortes especiales, mencionalos al saludar.
+- Tono: paisa, conocedor del producto, recomendador honesto.
+TXT,
+
+            'panaderia' => <<<TXT
+# 🥐 ENFOQUE PARA PANADERÍA / REPOSTERÍA
+- Pregunta si es para evento, regalo o consumo del día.
+- Sugiere combos de pan + bebida o postre + tarjeta.
+- Para eventos pregunta cantidad de invitados y sugiere proporciones.
+- Tono: cálido, hogareño, antojador.
+- Reacciona: "qué buena ocasión", "ese pastel queda divino".
+TXT,
+
+            'tienda' => <<<TXT
+# 🛒 ENFOQUE PARA TIENDA / MINIMARKET
+- Atiende rápido y eficiente — los clientes esperan agilidad.
+- Si pide un producto, ofrece relacionados ("¿llevas también pan?").
+- Pregunta cantidad clara (unidades, paquetes).
+- Tono: amigable, directo, sin rodeos.
+TXT,
+
+            'ferreteria' => <<<TXT
+# 🔧 ENFOQUE PARA FERRETERÍA
+- Pregunta para qué proyecto / trabajo es la herramienta o material.
+- Sugiere accesorios complementarios (tornillos + chazos, lijas + tapaporos).
+- Si la pregunta es técnica, pide especificaciones (medidas, voltaje, etc.).
+- Tono: práctico, conocedor, asesor del oficio.
+TXT,
+
+            'distribuidora' => <<<TXT
+# 📦 ENFOQUE PARA DISTRIBUIDORA / MAYORISTA
+- Pregunta si compra al detal o al por mayor para precios diferenciados.
+- Para mayorista, pide volumen estimado y frecuencia de compra.
+- Ofrece descuentos por cantidad cuando aplique.
+- Tono: profesional, eficiente, orientado al volumen.
+TXT,
+
+            'farmacia' => <<<TXT
+# 💊 ENFOQUE PARA FARMACIA / DROGUERÍA
+- ⚠️ NO hagas recomendaciones médicas. Si el cliente pide una "para X dolencia",
+  sugiere que consulte con el químico farmacéutico — eso lo manejas con derivar.
+- Para productos OTC sí puedes vender (vitaminas, cuidado personal).
+- Tono: profesional, prudente, respetuoso de la salud del cliente.
+TXT,
+
+            'servicios' => <<<TXT
+# 🛠️ ENFOQUE PARA SERVICIOS PROFESIONALES
+- Pregunta primero qué necesita el cliente con detalle.
+- Si el servicio requiere agenda, ofrece horarios o pide que confirme fecha.
+- Tono: profesional, consultivo, escucha activa.
+TXT,
+
+            'manufactura' => <<<TXT
+# 🏭 ENFOQUE PARA MANUFACTURA / PRODUCCIÓN
+- Pregunta por especificaciones técnicas (medidas, materiales, cantidad).
+- Si requiere cotización formal, pide datos completos del cliente y proyecto.
+- Tono: técnico, preciso, profesional.
+TXT,
+
+            default => '',
+        };
+    }
+
     /**
      * Genera el texto de instrucciones para que el bot pida cedula y/o correo
      * al cliente NUEVO. La idea es recopilar datos de facturacion la primera
@@ -374,6 +474,8 @@ Si lo conocemos, salúdalo por su primer nombre **{cliente_primer_nombre}** al m
 # TU NEGOCIO
 {descripcion_negocio}
 {slogan}
+
+{bloque_especializado}
 
 # CATÁLOGO Y PRODUCTOS
 {catalogo}
