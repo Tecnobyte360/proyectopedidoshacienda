@@ -35,6 +35,12 @@ class AppServiceProvider extends ServiceProvider
         URL::forceScheme('https');
     }
 
+    // 📦 Forzar límite de payload de Livewire a 10 MB en runtime.
+    // Necesario para polígonos grandes de zonas (980+ puntos) y snapshots
+    // de componentes con mucha data. Default es 1 MB.
+    // Esto sobreescribe el cache de config aunque esté desactualizado.
+    config(['livewire.payload.max_size' => 10240]);
+
     // 🔓 Super-admin tiene acceso a TODO automáticamente.
     // Bypassa cualquier chequeo de permisos. Hacemos query directa a BD
     // (no Spatie cache) para que sea robusto frente a cambios de tenant
