@@ -43,6 +43,11 @@ class Tenant extends Model
         'tipo_negocio',
         'slogan',
         'descripcion_negocio',
+        'google_maps_api_key',
+        'google_maps_activo',
+        'google_maps_centro_lat',
+        'google_maps_centro_lng',
+        'google_maps_zoom',
         'color_primario',
         'color_secundario',
         'openai_api_key',
@@ -61,6 +66,11 @@ class Tenant extends Model
         //    para no exponer cada una como columna independiente.
         'wompi_config'         => 'encrypted:array',
         'openai_api_key'       => \App\Casts\EncryptedTolerante::class,
+        'google_maps_api_key'  => \App\Casts\EncryptedTolerante::class,
+        'google_maps_activo'   => 'boolean',
+        'google_maps_centro_lat' => 'float',
+        'google_maps_centro_lng' => 'float',
+        'google_maps_zoom'     => 'integer',
     ];
 
     protected $hidden = [

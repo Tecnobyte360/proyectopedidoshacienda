@@ -363,6 +363,79 @@
                             </div>
                         </div>
 
+                        {{-- Google Maps: API Key + centro del mapa --}}
+                        <div class="md:col-span-2 mt-2 rounded-2xl bg-blue-50 border border-blue-200 p-4">
+                            <h4 class="text-sm font-bold text-blue-800 mb-1">
+                                <i class="fa-solid fa-map-location-dot mr-1"></i> Google Maps
+                            </h4>
+                            <p class="text-[11px] text-blue-600 mb-3">
+                                Ingresa tu API Key de Google Maps para activar el editor visual de zonas de cobertura.
+                                <a href="https://developers.google.com/maps/documentation/javascript/get-api-key" target="_blank" class="underline font-semibold">¿Cómo obtengo una?</a>
+                            </p>
+
+                            <div class="space-y-3">
+                                <label class="flex items-start gap-3 cursor-pointer">
+                                    <input type="checkbox" wire:model.live="google_maps_activo" class="mt-1 rounded border-slate-300 text-blue-600 h-5 w-5">
+                                    <div>
+                                        <div class="text-sm font-bold text-slate-800">Activar Google Maps para este tenant</div>
+                                        <div class="text-[11px] text-slate-500">Si está OFF, no se carga el script del mapa.</div>
+                                    </div>
+                                </label>
+
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-700 mb-1">API Key</label>
+                                    <div class="flex gap-2">
+                                        <input type="password" wire:model="google_maps_api_key"
+                                               placeholder="AIzaSy..."
+                                               class="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm font-mono bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-100">
+                                        <button type="button" wire:click="probarGoogleMapsApiKey"
+                                                wire:loading.attr="disabled" wire:target="probarGoogleMapsApiKey"
+                                                class="rounded-xl bg-blue-600 hover:bg-blue-700 px-4 py-2 text-sm font-bold text-white shadow disabled:opacity-50">
+                                            <span wire:loading.remove wire:target="probarGoogleMapsApiKey">
+                                                <i class="fa-solid fa-flask mr-1"></i> Probar
+                                            </span>
+                                            <span wire:loading wire:target="probarGoogleMapsApiKey">
+                                                <i class="fa-solid fa-spinner fa-spin"></i>
+                                            </span>
+                                        </button>
+                                    </div>
+                                    @if ($googleMapsTestResult !== null)
+                                        <div class="mt-2 rounded-xl p-3 text-xs {{ $googleMapsTestResult['ok'] ? 'bg-emerald-50 border border-emerald-200 text-emerald-800' : 'bg-rose-50 border border-rose-200 text-rose-700' }}">
+                                            {{ $googleMapsTestResult['mensaje'] }}
+                                            @if (!empty($googleMapsTestResult['lat']))
+                                                <div class="mt-1 font-mono text-[10px]">
+                                                    Centro detectado: {{ $googleMapsTestResult['lat'] }}, {{ $googleMapsTestResult['lng'] }}
+                                                </div>
+                                            @endif
+                                        </div>
+                                    @endif
+                                </div>
+
+                                <div class="grid grid-cols-3 gap-2">
+                                    <div>
+                                        <label class="block text-[11px] font-medium text-slate-700 mb-1">Centro Latitud</label>
+                                        <input type="number" step="any" wire:model="google_maps_centro_lat"
+                                               placeholder="6.3414"
+                                               class="w-full rounded-xl border border-slate-200 px-2 py-1.5 text-xs font-mono bg-white">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[11px] font-medium text-slate-700 mb-1">Centro Longitud</label>
+                                        <input type="number" step="any" wire:model="google_maps_centro_lng"
+                                               placeholder="-75.5538"
+                                               class="w-full rounded-xl border border-slate-200 px-2 py-1.5 text-xs font-mono bg-white">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[11px] font-medium text-slate-700 mb-1">Zoom inicial</label>
+                                        <input type="number" min="1" max="20" wire:model="google_maps_zoom"
+                                               class="w-full rounded-xl border border-slate-200 px-2 py-1.5 text-xs bg-white">
+                                    </div>
+                                </div>
+                                <p class="text-[10px] text-slate-500">
+                                    💡 Tip: si dejas centro/lng vacíos, el botón "Probar" los rellena automáticamente con la ciudad del tenant.
+                                </p>
+                            </div>
+                        </div>
+
                         {{-- Colores del tenant: se aplican a sidebar, login, gradientes, badges, etc. --}}
                         <div class="md:col-span-2">
                             <label class="block text-sm font-semibold text-slate-700 mb-2">

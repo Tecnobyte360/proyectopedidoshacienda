@@ -370,7 +370,17 @@ class Index extends Component
 
         $sedes = Sede::orderBy('nombre')->get();
 
-        return view('livewire.zonas.index', compact('zonas', 'zonasMapa', 'pedidosMapa', 'sedes'))
+        // Config de Google Maps del tenant para activar el editor visual
+        $tenant = app(\App\Services\TenantManager::class)->current();
+        $gmapsActivo = $tenant && $tenant->google_maps_activo && !empty($tenant->google_maps_api_key);
+        $gmapsConfig = $gmapsActivo ? [
+            'api_key'    => $tenant->google_maps_api_key,
+            'centro_lat' => $tenant->google_maps_centro_lat ?: 6.3414,
+            'centro_lng' => $tenant->google_maps_centro_lng ?: -75.5538,
+            'zoom'       => $tenant->google_maps_zoom ?: 13,
+        ] : null;
+
+        return view('livewire.zonas.index', compact('zonas', 'zonasMapa', 'pedidosMapa', 'sedes', 'gmapsActivo', 'gmapsConfig'))
             ->layout('layouts.app');
     }
 }

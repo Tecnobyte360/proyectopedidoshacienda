@@ -218,6 +218,13 @@
                         </div>
 
                         <div class="flex items-center justify-end gap-1 pt-3 border-t border-slate-100">
+                            @if ($gmapsActivo ?? false)
+                                <a href="{{ route('zonas.editor-mapa', $zona->id) }}"
+                                   title="Editor visual con Google Maps"
+                                   class="rounded-lg p-2 text-blue-600 hover:bg-blue-50 transition">
+                                    <i class="fa-solid fa-map-location-dot"></i>
+                                </a>
+                            @endif
                             <button wire:click="abrirModalEditar({{ $zona->id }})"
                                     class="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition">
                                 <i class="fa-solid fa-pen-to-square"></i>

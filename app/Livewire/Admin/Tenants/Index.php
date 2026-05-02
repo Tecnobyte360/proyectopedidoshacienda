@@ -46,6 +46,12 @@ class Index extends Component
     public string $tipo_negocio         = '';
     public string $slogan               = '';
     public string $descripcion_negocio  = '';
+    public string $google_maps_api_key  = '';
+    public bool   $google_maps_activo   = false;
+    public ?float $google_maps_centro_lat = null;
+    public ?float $google_maps_centro_lng = null;
+    public int    $google_maps_zoom      = 13;
+    public ?array $googleMapsTestResult  = null;
     public string $color_primario      = '#d68643';
     public string $color_secundario    = '#a85f24';
     public ?string $logo_url_actual    = null;
@@ -114,6 +120,11 @@ class Index extends Component
             'tipo_negocio'        => 'nullable|string|max:40',
             'slogan'              => 'nullable|string|max:200',
             'descripcion_negocio' => 'nullable|string|max:2000',
+            'google_maps_api_key' => 'nullable|string|max:200',
+            'google_maps_activo'  => 'boolean',
+            'google_maps_centro_lat' => 'nullable|numeric|between:-90,90',
+            'google_maps_centro_lng' => 'nullable|numeric|between:-180,180',
+            'google_maps_zoom'    => 'integer|min:1|max:20',
             'color_primario'      => 'nullable|string|max:10',
             'color_secundario'    => 'nullable|string|max:10',
             'logo_archivo'        => 'nullable',   // legacy, ya no se usa
@@ -185,6 +196,12 @@ class Index extends Component
         $this->tipo_negocio         = (string) ($t->tipo_negocio ?? '');
         $this->slogan               = (string) ($t->slogan ?? '');
         $this->descripcion_negocio  = (string) ($t->descripcion_negocio ?? '');
+        $this->google_maps_api_key  = (string) ($t->google_maps_api_key ?? '');
+        $this->google_maps_activo   = (bool) ($t->google_maps_activo ?? false);
+        $this->google_maps_centro_lat = $t->google_maps_centro_lat;
+        $this->google_maps_centro_lng = $t->google_maps_centro_lng;
+        $this->google_maps_zoom     = (int) ($t->google_maps_zoom ?? 13);
+        $this->googleMapsTestResult = null;
         $this->color_primario       = (string) ($t->color_primario ?: '#d68643');
         $this->color_secundario     = (string) ($t->color_secundario ?: '#a85f24');
         $this->logo_url_actual      = $t->logo_url;
@@ -333,6 +350,55 @@ class Index extends Component
             $this->error_conexiones = 'Error: ' . $e->getMessage();
         } finally {
             $this->cargando_conexiones = false;
+        }
+    }
+
+    /**
+     * Prueba la API Key de Google Maps haciendo una geocode request a la
+     * ciudad del tenant. Si responde 200 + status OK, la key sirve.
+     */
+    public function probarGoogleMapsApiKey(): void
+    {
+        $key = trim($this->google_maps_api_key);
+        if ($key === '') {
+            $this->googleMapsTestResult = ['ok' => false, 'mensaje' => 'Ingresa la API Key primero.'];
+            return;
+        }
+
+        $direccion = trim($this->ciudad ?: 'Bogotá, Colombia');
+
+        try {
+            $resp = \Illuminate\Support\Facades\Http::timeout(10)->get('https://maps.googleapis.com/maps/api/geocode/json', [
+                'address' => $direccion,
+                'key'     => $key,
+            ]);
+
+            if (!$resp->successful()) {
+                $this->googleMapsTestResult = ['ok' => false, 'mensaje' => "HTTP {$resp->status()}: " . mb_substr($resp->body(), 0, 200)];
+                return;
+            }
+
+            $body = $resp->json();
+            $status = $body['status'] ?? '';
+
+            if ($status === 'OK') {
+                $loc = $body['results'][0]['geometry']['location'] ?? null;
+                if ($loc && empty($this->google_maps_centro_lat)) {
+                    $this->google_maps_centro_lat = (float) $loc['lat'];
+                    $this->google_maps_centro_lng = (float) $loc['lng'];
+                }
+                $this->googleMapsTestResult = [
+                    'ok'      => true,
+                    'mensaje' => '✅ API Key válida. Geocode exitoso para: ' . ($body['results'][0]['formatted_address'] ?? $direccion),
+                    'lat'     => $loc['lat'] ?? null,
+                    'lng'     => $loc['lng'] ?? null,
+                ];
+            } else {
+                $msg = $body['error_message'] ?? "Status: {$status}";
+                $this->googleMapsTestResult = ['ok' => false, 'mensaje' => "❌ {$msg}"];
+            }
+        } catch (\Throwable $e) {
+            $this->googleMapsTestResult = ['ok' => false, 'mensaje' => 'Error: ' . $e->getMessage()];
         }
     }
 
@@ -784,6 +850,12 @@ class Index extends Component
         $this->tipo_negocio         = '';
         $this->slogan               = '';
         $this->descripcion_negocio  = '';
+        $this->google_maps_api_key  = '';
+        $this->google_maps_activo   = false;
+        $this->google_maps_centro_lat = null;
+        $this->google_maps_centro_lng = null;
+        $this->google_maps_zoom     = 13;
+        $this->googleMapsTestResult = null;
         $this->color_primario       = '#d68643';
         $this->color_secundario     = '#a85f24';
         $this->logo_url_actual      = null;
