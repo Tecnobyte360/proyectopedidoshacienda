@@ -52,6 +52,26 @@ class Index extends Component
         ]);
     }
 
+    /**
+     * Resetea el contexto cacheado del bot para una conversación.
+     * Útil cuando el bot está respondiendo cosas viejas y el cliente
+     * empieza un tema nuevo.
+     */
+    public function resetearContexto(int $id): void
+    {
+        $conv = ConversacionWhatsapp::findOrFail($id);
+        $tenantId = $conv->tenant_id ?? 'none';
+        $telefono = $conv->telefono_normalizado;
+
+        \Illuminate\Support\Facades\Cache::forget("whatsapp_chat_t{$tenantId}_{$telefono}");
+        \Illuminate\Support\Facades\Cache::forget("wa_rechazo_cobertura_idx_t{$tenantId}_{$telefono}");
+
+        $this->dispatch('notify', [
+            'type'    => 'success',
+            'message' => '✓ Contexto reseteado. El próximo mensaje del cliente arranca de cero.',
+        ]);
+    }
+
     public function render()
     {
         $query = ConversacionWhatsapp::query()

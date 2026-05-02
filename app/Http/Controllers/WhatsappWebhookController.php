@@ -656,6 +656,15 @@ class WhatsappWebhookController extends Controller
         $tenantId = app(\App\Services\TenantManager::class)->id() ?? 'none';
         $cacheKey = "whatsapp_chat_t{$tenantId}_{$from}";
 
+        // ── AUTO-RESET DE CONTEXTO ────────────────────────────────────────
+        // Producción: si el cliente saluda con un mensaje corto tipo "hola"
+        // y la última actividad fue hace >20 min, asumimos que es una nueva
+        // conversación y reseteamos el cache para evitar que el bot responda
+        // con contexto viejo (ej: "tu dirección está fuera de cobertura"
+        // cuando el cliente solo dijo "hola").
+        $telefonoNorm = $this->normalizarTelefono($from);
+        $this->autoResetSiCorresponde($cacheKey, $message, $tenantId, $telefonoNorm);
+
         $pedidosInfo  = $this->buscarPedidosClienteSQL($from, $message);
         $ansInfo      = $this->construirResumenAns();
 
@@ -663,7 +672,6 @@ class WhatsappWebhookController extends Controller
         $sedeId = $this->obtenerSedeIdDesdeConexion($connectionId);
 
         // ── CLIENTE: identificar/crear y enriquecer el contexto ──────────────
-        $telefonoNorm = $this->normalizarTelefono($from);
         $cliente = Cliente::encontrarOCrearPorTelefono($telefonoNorm, $name);
 
         // ── CONVERSACIÓN: obtener/crear y persistir mensaje del usuario ──────
@@ -2459,7 +2467,7 @@ TXT;
                     . "si tienes otra dirección cercana me la pasas y vuelvo a revisar 🙌";
             }
 
-            Cache::put($rechazoKey, true, now()->addMinutes(15));
+            Cache::put($rechazoKey, true, now()->addMinutes(5));
 
             // Index para que el siguiente turno de la IA reciba la nota
             // de rechazo en el system message (rompe el bucle de reintento).
@@ -2467,7 +2475,7 @@ TXT;
             Cache::put($rechazoIndexKey, [
                 'direccion' => trim($direccion . ($barrio ? " ({$barrio})" : '')),
                 'ts'        => now()->timestamp,
-            ], now()->addMinutes(15));
+            ], now()->addMinutes(5));
 
             Log::warning('🚫 Pedido rechazado — fuera de cobertura', [
                 'from'           => $from,
@@ -4381,6 +4389,61 @@ PROMPT;
 
         return str_contains(strtoupper($rawBody), 'ERR_WAPP_NOT_CONNECTED')
             || str_contains(strtoupper($rawBody), 'NOT_CONNECTED');
+    }
+
+    /**
+     * Auto-resetea la conversación si:
+     *  - El mensaje es un saludo simple ("hola", "buenas", "hey", etc).
+     *  - La última actividad del cliente fue hace >20 minutos.
+     *
+     * Esto evita que el bot en producción responda con contexto viejo
+     * cuando un cliente vuelve después de un rato. También limpia las
+     * reglas de "rechazo de cobertura reciente" si están guardadas.
+     */
+    private function autoResetSiCorresponde(string $cacheKey, string $mensaje, string|int $tenantId, string $telefonoNorm): void
+    {
+        $msgLimpio = mb_strtolower(trim($mensaje));
+        // Saludos típicos en español (cortos, sin contexto adicional)
+        $patronesSaludo = [
+            '/^(hola|holi|holaa|holaaaa|buenas|buenas tardes|buenas noches|buenos d[ií]as|hey|holaa+|qu[eé] m[aá]s|q m[aá]s|saludos|menor|hello|hi)[\s\.\!\,\?¿¡]*$/u',
+        ];
+
+        $esSaludo = false;
+        foreach ($patronesSaludo as $patron) {
+            if (preg_match($patron, $msgLimpio)) {
+                $esSaludo = true;
+                break;
+            }
+        }
+
+        if (!$esSaludo) return;
+
+        // ¿Cuándo fue el último mensaje? Si hay historial reciente, vemos su timestamp.
+        $ultimoMsg = \App\Models\MensajeWhatsapp::query()
+            ->whereHas('conversacion', fn ($q) => $q
+                ->where('tenant_id', is_int($tenantId) ? $tenantId : null)
+                ->where('telefono_normalizado', $telefonoNorm))
+            ->orderByDesc('id')
+            ->first();
+
+        $minutosDesdeUltimo = $ultimoMsg
+            ? now()->diffInMinutes($ultimoMsg->created_at)
+            : 999;
+
+        if ($minutosDesdeUltimo < 20) {
+            // Conversación todavía fresca, no resetear
+            return;
+        }
+
+        // Reset: borrar cache de historial + cache de rechazo cobertura
+        Cache::forget($cacheKey);
+        Cache::forget("wa_rechazo_cobertura_idx_t{$tenantId}_{$telefonoNorm}");
+
+        \Illuminate\Support\Facades\Log::info('🔄 Auto-reset de conversación', [
+            'telefono'        => $telefonoNorm,
+            'mensaje'         => $msgLimpio,
+            'minutos_silencio' => $minutosDesdeUltimo,
+        ]);
     }
 
     /**
