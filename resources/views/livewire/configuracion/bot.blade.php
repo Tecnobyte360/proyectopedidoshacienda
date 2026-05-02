@@ -220,6 +220,68 @@
                 </label>
             </div>
 
+            {{-- SOLICITAR CÉDULA AL CLIENTE --}}
+            <div class="mt-6 pt-6 border-t border-slate-200">
+                <label class="flex items-start gap-4 cursor-pointer rounded-2xl border-2 p-4 transition {{ $pedir_cedula ? 'border-amber-400 bg-amber-50' : 'border-slate-200 hover:bg-slate-50' }}">
+                    <input type="checkbox" wire:model.live="pedir_cedula"
+                           class="mt-1 rounded border-slate-300 text-amber-600 h-6 w-6">
+                    <div class="flex-1">
+                        <div class="font-bold text-base text-slate-800 flex items-center gap-2">
+                            <i class="fa-solid fa-id-card text-amber-600"></i>
+                            Solicitar cédula al cliente
+                        </div>
+                        <div class="text-xs text-slate-600 mt-1">
+                            Si lo activas, el bot le pedirá la cédula al cliente. Útil para validar contra el ERP, registrar usuarios o personalizar la atención.
+                        </div>
+                    </div>
+                </label>
+
+                @if ($pedir_cedula)
+                    <div class="mt-4 rounded-2xl bg-slate-50 border border-slate-200 p-4 space-y-4">
+                        <label class="flex items-start gap-3 cursor-pointer">
+                            <input type="checkbox" wire:model="cedula_obligatoria"
+                                   class="mt-1 rounded border-slate-300 text-amber-600 h-5 w-5">
+                            <div>
+                                <div class="text-sm font-bold text-slate-800">Hacerla obligatoria</div>
+                                <div class="text-[11px] text-slate-500">El bot la pedirá ANTES de tomar pedidos o dar info detallada. Si está OFF, solo la pide cuando le parezca útil.</div>
+                            </div>
+                        </label>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">Cómo presentarlo al cliente (opcional)</label>
+                            <textarea wire:model="cedula_descripcion" rows="2"
+                                      placeholder='Ej: "¿Me regalas tu cédula para registrarte y darte mejor atención?"'
+                                      class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white"></textarea>
+                            <p class="text-[11px] text-slate-400 mt-1">Si lo dejas vacío, el bot improvisa una frase natural.</p>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">
+                                Consulta a usar cuando la obtenga (opcional)
+                            </label>
+                            <select wire:model="cedula_consulta_id"
+                                    class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white">
+                                <option value="">— Solo guardar la cédula, no consultar —</option>
+                                @foreach ($consultasDisponibles ?? [] as $c)
+                                    <option value="{{ $c->id }}">
+                                        {{ $c->nombre_publico }} ({{ \App\Models\IntegracionConsulta::TIPOS[$c->tipo] ?? $c->tipo }})
+                                    </option>
+                                @endforeach
+                            </select>
+                            <p class="text-[11px] text-slate-400 mt-1">
+                                Si seleccionas una consulta, el bot la llamará con la cédula como parámetro para buscar al cliente en tu ERP. La consulta debe tener un parámetro llamado <code>cedula</code>.
+                            </p>
+                            @if (($consultasDisponibles ?? collect())->isEmpty())
+                                <p class="text-[11px] text-amber-700 mt-1">
+                                    <i class="fa-solid fa-triangle-exclamation"></i>
+                                    No hay consultas disponibles. Crea una en <a href="/integraciones" class="underline font-semibold">/integraciones</a> y márcala como "disponible para el bot".
+                                </p>
+                            @endif
+                        </div>
+                    </div>
+                @endif
+            </div>
+
             {{-- FILTROS DEL CATÁLOGO --}}
             <div class="mt-6 pt-6 border-t border-slate-200">
                 <h4 class="text-base font-bold text-slate-800 mb-1">

@@ -56,6 +56,10 @@ class ConfiguracionBot extends Model
         'categorias_excluidas_bot',
         'excluir_productos_sin_precio',
         'bot_modo_agente',
+        'pedir_cedula',
+        'cedula_obligatoria',
+        'cedula_descripcion',
+        'cedula_consulta_id',
         'cumpleanos_dias_vigencia_beneficio',
         'encuesta_activa',
         'encuesta_delay_minutos',
@@ -124,6 +128,8 @@ class ConfiguracionBot extends Model
         'categorias_excluidas_bot'  => 'array',
         'excluir_productos_sin_precio' => 'boolean',
         'bot_modo_agente'           => 'boolean',
+        'pedir_cedula'              => 'boolean',
+        'cedula_obligatoria'        => 'boolean',
     ];
 
     public const FUENTE_TABLA       = 'tabla';

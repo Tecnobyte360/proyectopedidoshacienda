@@ -101,6 +101,12 @@ class Bot extends Component
     public bool   $excluir_productos_sin_precio = true;
     public bool   $bot_modo_agente              = false;
 
+    // Solicitar cedula al cliente
+    public bool   $pedir_cedula        = false;
+    public bool   $cedula_obligatoria  = false;
+    public string $cedula_descripcion  = '';
+    public ?int   $cedula_consulta_id  = null;
+
     // Auto-asignación de domiciliarios
     public bool   $auto_asignar_domiciliario = false;
     public string $criterio_asignacion       = 'balanceado';
@@ -207,6 +213,11 @@ class Bot extends Component
             ->filter()->implode("\n");
         $this->excluir_productos_sin_precio = (bool) ($cfg->excluir_productos_sin_precio ?? true);
         $this->bot_modo_agente              = (bool) ($cfg->bot_modo_agente ?? false);
+
+        $this->pedir_cedula        = (bool) ($cfg->pedir_cedula ?? false);
+        $this->cedula_obligatoria  = (bool) ($cfg->cedula_obligatoria ?? false);
+        $this->cedula_descripcion  = (string) ($cfg->cedula_descripcion ?? '');
+        $this->cedula_consulta_id  = $cfg->cedula_consulta_id;
         $this->auto_asignar_domiciliario = (bool) ($cfg->auto_asignar_domiciliario ?? false);
         $this->criterio_asignacion       = (string) ($cfg->criterio_asignacion ?: 'balanceado');
         $this->asignar_en_estado         = (string) ($cfg->asignar_en_estado ?: 'en_preparacion');
@@ -618,6 +629,10 @@ class Bot extends Component
             'categorias_excluidas_bot_str'          => 'nullable|string',
             'excluir_productos_sin_precio'          => 'boolean',
             'bot_modo_agente'                       => 'boolean',
+            'pedir_cedula'                          => 'boolean',
+            'cedula_obligatoria'                    => 'boolean',
+            'cedula_descripcion'                    => 'nullable|string|max:300',
+            'cedula_consulta_id'                    => 'nullable|integer|exists:integracion_consultas,id',
             'auto_asignar_domiciliario'             => 'boolean',
             'criterio_asignacion'                   => 'nullable|in:balanceado,cercania,rotacion',
             'asignar_en_estado'                     => 'nullable|in:nuevo,en_preparacion,repartidor_en_camino',
@@ -807,11 +822,19 @@ class Bot extends Component
             ->orderBy('nombre')
             ->get(['id', 'nombre', 'tipo']);
 
+        // Consultas dinamicas activas y expuestas al bot — para vincular a la regla de cedula
+        $consultasDisponibles = \App\Models\IntegracionConsulta::query()
+            ->where('activa', true)
+            ->where('usar_en_bot', true)
+            ->orderBy('nombre_publico')
+            ->get(['id', 'nombre_publico', 'nombre', 'tipo']);
+
         return view('livewire.configuracion.bot', [
             'variablesDisponibles' => BotPromptService::variablesDisponibles(),
             'conexionesDetectadas' => $conexionesDetectadas,
             'zonasDisponibles'     => $zonasDisponibles,
             'integracionesProductos' => $integracionesProductos,
+            'consultasDisponibles'   => $consultasDisponibles,
         ])->layout('layouts.app');
     }
 }

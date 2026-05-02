@@ -48,6 +48,7 @@ class BotPromptService
             ['key' => 'tipo_negocio',      'descripcion' => 'Tipo de negocio (restaurante, carnicería, panadería...)'],
             ['key' => 'slogan',            'descripcion' => 'Slogan o frase del negocio'],
             ['key' => 'descripcion_negocio','descripcion' => 'Descripción corta del negocio'],
+            ['key' => 'regla_cedula',      'descripcion' => 'Instrucciones de cuándo y cómo pedir la cédula (vacío si está desactivado)'],
             ['key' => 'catalogo',          'descripcion' => 'Lista completa de productos con precios'],
             ['key' => 'promociones',       'descripcion' => 'Promociones vigentes hoy'],
             ['key' => 'zonas',             'descripcion' => 'Zonas de cobertura y costo de envío'],
@@ -146,6 +147,7 @@ class BotPromptService
             'historial_cliente' => $historialCliente,
             'ans'               => $ansInfo,
             'nota_imagenes'     => $notaImagenes,
+            'regla_cedula'      => $this->reglaCedula($config),
         ];
     }
 
@@ -168,6 +170,48 @@ class BotPromptService
      * Le indica al LLM que en lugar de leer un catalogo embebido, use las tools
      * disponibles para consultar productos.
      */
+    /**
+     * Genera el texto de instrucciones para que el bot pida (o no) la cédula
+     * al cliente, según la config del tenant.
+     */
+    private function reglaCedula(?ConfiguracionBot $config): string
+    {
+        if (!$config || !($config->pedir_cedula ?? false)) {
+            return '';
+        }
+
+        $obligatoria = (bool) ($config->cedula_obligatoria ?? false);
+        $descripcion = trim((string) ($config->cedula_descripcion ?? ''));
+        $consultaId  = $config->cedula_consulta_id ?? null;
+
+        $partes = ['# 🆔 SOLICITUD DE CÉDULA'];
+
+        if ($obligatoria) {
+            $partes[] = '⚠️ OBLIGATORIO: ANTES de tomar pedidos o dar información detallada, DEBES pedir la cédula del cliente.';
+        } else {
+            $partes[] = 'Si te parece útil, pide la cédula del cliente para personalizarle la atención. No es bloqueante — si el cliente no quiere darla, sigue normal.';
+        }
+
+        if ($descripcion !== '') {
+            $partes[] = "Cómo presentarlo al cliente: \"{$descripcion}\"";
+        } else {
+            $partes[] = 'Pídela de forma natural: "¿Me regalas tu número de cédula para registrarte / validar tu cuenta?"';
+        }
+
+        // Si hay consulta vinculada, decirle al bot que la use
+        if ($consultaId) {
+            $consulta = \App\Models\IntegracionConsulta::find($consultaId);
+            if ($consulta && $consulta->usar_en_bot && $consulta->activa) {
+                $tool = $consulta->nombreTool();
+                $partes[] = "🔧 Cuando obtengas la cédula, llama la tool `{$tool}(cedula=\"...\")` para buscar al cliente en el ERP. Si lo encuentras, salúdalo por su nombre real y úsalo en la conversación. Si no, pídele que confirme la cédula o continúa con su nombre actual.";
+            }
+        } else {
+            $partes[] = 'Cuando la obtengas, agradece y úsala para registrar al cliente.';
+        }
+
+        return implode("\n\n", $partes);
+    }
+
     private function catalogoEnModoAgente(): string
     {
         return <<<TXT
@@ -264,6 +308,8 @@ Tutea siempre. Frases cortas tipo WhatsApp (máx 3-4 líneas por mensaje).
 Nombre: **{cliente_nombre}**
 ¿Ya lo conocemos?: **{cliente_es_conocido}**
 Si lo conocemos, salúdalo por su primer nombre **{cliente_primer_nombre}** al menos una vez.
+
+{regla_cedula}
 
 # TU NEGOCIO
 {descripcion_negocio}
