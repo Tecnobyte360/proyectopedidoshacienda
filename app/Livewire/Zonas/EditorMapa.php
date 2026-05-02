@@ -20,9 +20,9 @@ class EditorMapa extends Component
     public string $color  = '#d68643';
     public string $nombre = '';
 
-    public function mount(int $zona): void
+    public function mount(ZonaCobertura $zona): void
     {
-        $this->zona = ZonaCobertura::findOrFail($zona);
+        $this->zona = $zona;
         $this->nombre     = $this->zona->nombre;
         $this->color      = $this->zona->color ?: '#d68643';
         $this->poligono   = $this->zona->poligono;
