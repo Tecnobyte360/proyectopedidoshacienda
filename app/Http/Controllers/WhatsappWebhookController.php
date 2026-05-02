@@ -33,6 +33,35 @@ class WhatsappWebhookController extends Controller
     |==========================================================================
     */
 
+    /**
+     * Webhook ESPECÍFICO POR TENANT (URL: /api/whatsapp-webhook/tenant/{slug}).
+     * Activa el tenant por slug ANTES de procesar el mensaje. Esto evita
+     * depender del connection_id para identificarlo y permite que cada
+     * tenant tenga su URL propia para configurar en TecnoByteApp.
+     */
+    public function receivePorTenant(Request $request, string $slug)
+    {
+        $tenant = \App\Models\Tenant::where('slug', $slug)->first();
+
+        if (!$tenant) {
+            Log::warning('🚫 Webhook tenant slug desconocido', ['slug' => $slug, 'ip' => $request->ip()]);
+            return response()->json(['ok' => false, 'error' => 'tenant no encontrado'], 404);
+        }
+
+        if (!$tenant->activo) {
+            Log::warning('🚫 Webhook tenant inactivo', ['slug' => $slug]);
+            return response()->json(['ok' => false, 'error' => 'tenant inactivo'], 403);
+        }
+
+        // Forzar tenant activo en este request (todo el flujo respeta este context)
+        app(\App\Services\TenantManager::class)->set($tenant);
+
+        Log::info('📩 WEBHOOK por tenant', ['slug' => $slug, 'tenant_id' => $tenant->id]);
+
+        // Reusar el método existente — el resto del flujo es idéntico.
+        return $this->receive($request);
+    }
+
     public function receive(Request $request)
     {
         $rawBody = $request->getContent();

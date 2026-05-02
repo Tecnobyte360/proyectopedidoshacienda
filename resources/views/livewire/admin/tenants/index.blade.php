@@ -1028,6 +1028,38 @@
                                 </p>
                             @endif
                         </div>
+
+                        {{-- 🔗 URL del webhook ÚNICO de este tenant --}}
+                        @if ($editandoId && !empty($slug))
+                            @php
+                                $webhookUrl = url('/api/whatsapp-webhook/tenant/' . $slug);
+                            @endphp
+                            <div class="rounded-xl bg-white border-2 border-dashed border-emerald-300 p-3 mt-2">
+                                <label class="block text-xs font-bold text-emerald-700 mb-2">
+                                    <i class="fa-solid fa-link mr-1"></i> URL del webhook único de este tenant
+                                </label>
+                                <div class="flex items-stretch gap-2"
+                                     x-data="{ copiado: false, copiar() { navigator.clipboard.writeText('{{ $webhookUrl }}'); this.copiado = true; setTimeout(() => this.copiado = false, 2000); } }">
+                                    <input type="text" readonly
+                                           value="{{ $webhookUrl }}"
+                                           class="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-mono">
+                                    <button type="button" @click="copiar()"
+                                            class="inline-flex items-center gap-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 text-xs font-bold whitespace-nowrap">
+                                        <i class="fa-solid" :class="copiado ? 'fa-check' : 'fa-clipboard'"></i>
+                                        <span x-text="copiado ? 'Copiado' : 'Copiar'"></span>
+                                    </button>
+                                </div>
+                                <p class="text-[11px] text-emerald-700 mt-2">
+                                    💡 Pega esta URL en el campo <strong>"URL del Webhook"</strong> de TecnoByteApp para este tenant.
+                                    Cada cliente tiene su URL única — los mensajes llegan directamente al tenant correcto.
+                                </p>
+                            </div>
+                        @else
+                            <div class="rounded-xl bg-amber-50 border border-amber-200 p-3 mt-2 text-[11px] text-amber-700">
+                                <i class="fa-solid fa-circle-info"></i>
+                                Guarda primero el tenant para generar su URL única de webhook.
+                            </div>
+                        @endif
                     </div>
 
                     {{-- 💳 Wompi por tenant (pagos en línea) --}}

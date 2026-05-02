@@ -23,6 +23,18 @@ Route::get('/whatsapp-webhook', function () {
 
 Route::post('/whatsapp-webhook', [WhatsappWebhookController::class, 'receive']);
 
+// Webhook ESPECÍFICO POR TENANT — identifica al tenant por slug en la URL.
+// Recomendado en producción: cada tenant tiene su URL única que copia y
+// pega en TecnoByteApp para SU conexión de WhatsApp.
+Route::post('/whatsapp-webhook/tenant/{slug}', [WhatsappWebhookController::class, 'receivePorTenant']);
+Route::get('/whatsapp-webhook/tenant/{slug}', function (string $slug) {
+    return response()->json([
+        'ok'          => true,
+        'tenant_slug' => $slug,
+        'estado'      => 'webhook activo, esperando POST',
+    ]);
+});
+
 // Wompi: receptor de eventos de pagos POR TENANT (slug en la URL).
 // Cada tenant configura en su panel de Wompi:
 //   https://{APP_URL}/api/wompi/webhook/{slug}
