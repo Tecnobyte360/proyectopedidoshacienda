@@ -98,6 +98,7 @@
                 'title' => 'Super Admin',
                 'items' => [
                     ['name' => 'Tenants',       'icon' => 'fa-building',           'route' => 'admin.tenants.index',       'badge' => null, 'permission' => 'tenants.gestionar'],
+                    ['name' => 'Plantillas Bot','icon' => 'fa-layer-group',        'route' => 'admin.plantillas-bot',      'badge' => 'NUEVO', 'permission' => 'tenants.gestionar'],
                     ['name' => 'Planes',        'icon' => 'fa-money-check-dollar', 'route' => 'admin.planes.index',        'badge' => null, 'permission' => 'planes.gestionar'],
                     ['name' => 'Suscripciones', 'icon' => 'fa-receipt',            'route' => 'admin.suscripciones.index', 'badge' => null, 'permission' => 'suscripciones.gestionar'],
                     ['name' => 'Pagos',         'icon' => 'fa-money-bills',        'route' => 'admin.pagos.index',         'badge' => null, 'permission' => 'pagos.gestionar'],

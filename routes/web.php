@@ -157,6 +157,9 @@ Route::get('/roles', RolesIndex::class)
 // Doble blindaje: permiso + middleware "solo_principal" (404 si entran desde subdominio).
 Route::middleware(['solo_principal'])->group(function () {
     Route::get('/admin/tenants',       AdminTenantsIndex::class)->middleware('permission:tenants.gestionar')->name('admin.tenants.index');
+    Route::get('/admin/plantillas-bot', \App\Livewire\Admin\PlantillasBot::class)
+        ->middleware('permission:tenants.gestionar')
+        ->name('admin.plantillas-bot');
     Route::get('/admin/planes',        AdminPlanesIndex::class)->middleware('permission:planes.gestionar')->name('admin.planes.index');
     Route::get('/admin/suscripciones', AdminSuscripcionesIndex::class)->middleware('permission:suscripciones.gestionar')->name('admin.suscripciones.index');
     Route::get('/admin/pagos',         AdminPagosIndex::class)->middleware('permission:pagos.gestionar')->name('admin.pagos.index');

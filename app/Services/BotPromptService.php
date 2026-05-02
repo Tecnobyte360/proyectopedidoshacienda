@@ -177,6 +177,33 @@ class BotPromptService
      * adaptado al tipo de negocio del tenant. Esto permite que UN solo
      * prompt maestro funcione para cualquier industria.
      */
+    /**
+     * Acceso público para que la UI pueda mostrar el bloque que se aplicaría.
+     */
+    public static function obtenerBloquePorTipo(?string $tipo): string
+    {
+        return (new self(app(BotCatalogoService::class)))->bloqueEspecializadoPorTipo($tipo);
+    }
+
+    /**
+     * Lista TODOS los bloques especializados disponibles. Útil para el
+     * visualizador de plantillas en /admin/plantillas-bot.
+     */
+    public static function todosLosBloquesEspecializados(): array
+    {
+        $tipos = ['restaurante', 'cafeteria', 'carniceria', 'panaderia', 'tienda',
+                  'ferreteria', 'distribuidora', 'farmacia', 'servicios', 'manufactura'];
+        $svc = new self(app(BotCatalogoService::class));
+        $resultado = [];
+        foreach ($tipos as $t) {
+            $contenido = $svc->bloqueEspecializadoPorTipo($t);
+            if ($contenido !== '') {
+                $resultado[$t] = $contenido;
+            }
+        }
+        return $resultado;
+    }
+
     private function bloqueEspecializadoPorTipo(?string $tipo): string
     {
         $tipo = strtolower(trim((string) $tipo));
