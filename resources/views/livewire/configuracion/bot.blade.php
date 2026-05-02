@@ -220,64 +220,90 @@
                 </label>
             </div>
 
-            {{-- SOLICITAR CÉDULA AL CLIENTE --}}
+            {{-- DATOS DE FACTURACIÓN AL CLIENTE NUEVO --}}
             <div class="mt-6 pt-6 border-t border-slate-200">
-                <label class="flex items-start gap-4 cursor-pointer rounded-2xl border-2 p-4 transition {{ $pedir_cedula ? 'border-amber-400 bg-amber-50' : 'border-slate-200 hover:bg-slate-50' }}">
-                    <input type="checkbox" wire:model.live="pedir_cedula"
-                           class="mt-1 rounded border-slate-300 text-amber-600 h-6 w-6">
-                    <div class="flex-1">
-                        <div class="font-bold text-base text-slate-800 flex items-center gap-2">
-                            <i class="fa-solid fa-id-card text-amber-600"></i>
-                            Solicitar cédula al cliente
-                        </div>
-                        <div class="text-xs text-slate-600 mt-1">
-                            Si lo activas, el bot le pedirá la cédula al cliente. Útil para validar contra el ERP, registrar usuarios o personalizar la atención.
-                        </div>
-                    </div>
-                </label>
+                <h4 class="text-base font-bold text-slate-800 mb-1">
+                    <i class="fa-solid fa-receipt text-amber-600 mr-1"></i>
+                    Datos de facturación (cliente nuevo)
+                </h4>
+                <p class="text-xs text-slate-500 mb-4">
+                    El bot pide estos datos solo a clientes <strong>nuevos</strong>. Si ya están registrados, no se les pide otra vez.
+                </p>
 
-                @if ($pedir_cedula)
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {{-- Toggle cédula --}}
+                    <label class="flex items-start gap-3 cursor-pointer rounded-2xl border-2 p-4 transition {{ $pedir_cedula ? 'border-amber-400 bg-amber-50' : 'border-slate-200 hover:bg-slate-50' }}">
+                        <input type="checkbox" wire:model.live="pedir_cedula"
+                               class="mt-1 rounded border-slate-300 text-amber-600 h-5 w-5">
+                        <div class="flex-1">
+                            <div class="font-bold text-sm text-slate-800">
+                                <i class="fa-solid fa-id-card text-amber-600 mr-1"></i> Pedir cédula
+                            </div>
+                            <div class="text-[11px] text-slate-500 mt-1">
+                                Para identificar al cliente y futura facturación electrónica.
+                            </div>
+                        </div>
+                    </label>
+
+                    {{-- Toggle correo --}}
+                    <label class="flex items-start gap-3 cursor-pointer rounded-2xl border-2 p-4 transition {{ $pedir_correo ? 'border-amber-400 bg-amber-50' : 'border-slate-200 hover:bg-slate-50' }}">
+                        <input type="checkbox" wire:model.live="pedir_correo"
+                               class="mt-1 rounded border-slate-300 text-amber-600 h-5 w-5">
+                        <div class="flex-1">
+                            <div class="font-bold text-sm text-slate-800">
+                                <i class="fa-solid fa-envelope text-amber-600 mr-1"></i> Pedir correo electrónico
+                            </div>
+                            <div class="text-[11px] text-slate-500 mt-1">
+                                Para enviarle la factura electrónica y promociones futuras.
+                            </div>
+                        </div>
+                    </label>
+                </div>
+
+                @if ($pedir_cedula || $pedir_correo)
                     <div class="mt-4 rounded-2xl bg-slate-50 border border-slate-200 p-4 space-y-4">
                         <label class="flex items-start gap-3 cursor-pointer">
                             <input type="checkbox" wire:model="cedula_obligatoria"
                                    class="mt-1 rounded border-slate-300 text-amber-600 h-5 w-5">
                             <div>
-                                <div class="text-sm font-bold text-slate-800">Hacerla obligatoria</div>
-                                <div class="text-[11px] text-slate-500">El bot la pedirá ANTES de tomar pedidos o dar info detallada. Si está OFF, solo la pide cuando le parezca útil.</div>
+                                <div class="text-sm font-bold text-slate-800">Hacerlo obligatorio</div>
+                                <div class="text-[11px] text-slate-500">El bot pedirá los datos ANTES de tomar pedidos. Si está OFF, los pide solo cuando le parezca útil.</div>
                             </div>
                         </label>
 
                         <div>
-                            <label class="block text-xs font-bold text-slate-700 mb-1">Cómo presentarlo al cliente (opcional)</label>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">Razón / mensaje al cliente (opcional)</label>
                             <textarea wire:model="cedula_descripcion" rows="2"
-                                      placeholder='Ej: "¿Me regalas tu cédula para registrarte y darte mejor atención?"'
+                                      placeholder='Ej: "Para poder facturarte electrónicamente y darte mejor servicio"'
                                       class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white"></textarea>
-                            <p class="text-[11px] text-slate-400 mt-1">Si lo dejas vacío, el bot improvisa una frase natural.</p>
+                            <p class="text-[11px] text-slate-400 mt-1">El bot la usa al pedirle los datos al cliente.</p>
                         </div>
 
-                        <div>
-                            <label class="block text-xs font-bold text-slate-700 mb-1">
-                                Consulta a usar cuando la obtenga (opcional)
-                            </label>
-                            <select wire:model="cedula_consulta_id"
-                                    class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white">
-                                <option value="">— Solo guardar la cédula, no consultar —</option>
-                                @foreach ($consultasDisponibles ?? [] as $c)
-                                    <option value="{{ $c->id }}">
-                                        {{ $c->nombre_publico }} ({{ \App\Models\IntegracionConsulta::TIPOS[$c->tipo] ?? $c->tipo }})
-                                    </option>
-                                @endforeach
-                            </select>
-                            <p class="text-[11px] text-slate-400 mt-1">
-                                Si seleccionas una consulta, el bot la llamará con la cédula como parámetro para buscar al cliente en tu ERP. La consulta debe tener un parámetro llamado <code>cedula</code>.
-                            </p>
-                            @if (($consultasDisponibles ?? collect())->isEmpty())
-                                <p class="text-[11px] text-amber-700 mt-1">
-                                    <i class="fa-solid fa-triangle-exclamation"></i>
-                                    No hay consultas disponibles. Crea una en <a href="/integraciones" class="underline font-semibold">/integraciones</a> y márcala como "disponible para el bot".
+                        @if ($pedir_cedula)
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-1">
+                                    <i class="fa-solid fa-magnifying-glass mr-1"></i> Consulta a usar con la cédula (opcional)
+                                </label>
+                                <select wire:model="cedula_consulta_id"
+                                        class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white">
+                                    <option value="">— Solo guardar, no consultar —</option>
+                                    @foreach ($consultasDisponibles ?? [] as $c)
+                                        <option value="{{ $c->id }}">
+                                            {{ $c->nombre_publico }} ({{ \App\Models\IntegracionConsulta::TIPOS[$c->tipo] ?? $c->tipo }})
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <p class="text-[11px] text-slate-400 mt-1">
+                                    Si seleccionas una, el bot llamará la consulta con la cédula como parámetro para validar el cliente en tu ERP.
                                 </p>
-                            @endif
-                        </div>
+                                @if (($consultasDisponibles ?? collect())->isEmpty())
+                                    <p class="text-[11px] text-amber-700 mt-1">
+                                        <i class="fa-solid fa-triangle-exclamation"></i>
+                                        No hay consultas disponibles. Crea una en <a href="/integraciones" class="underline font-semibold">/integraciones</a> y márcala como "disponible para el bot".
+                                    </p>
+                                @endif
+                            </div>
+                        @endif
                     </div>
                 @endif
             </div>

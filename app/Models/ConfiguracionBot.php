@@ -60,6 +60,7 @@ class ConfiguracionBot extends Model
         'cedula_obligatoria',
         'cedula_descripcion',
         'cedula_consulta_id',
+        'pedir_correo',
         'cumpleanos_dias_vigencia_beneficio',
         'encuesta_activa',
         'encuesta_delay_minutos',
@@ -130,6 +131,7 @@ class ConfiguracionBot extends Model
         'bot_modo_agente'           => 'boolean',
         'pedir_cedula'              => 'boolean',
         'cedula_obligatoria'        => 'boolean',
+        'pedir_correo'              => 'boolean',
     ];
 
     public const FUENTE_TABLA       = 'tabla';

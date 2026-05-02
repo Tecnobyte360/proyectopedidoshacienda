@@ -21,6 +21,7 @@ class Cliente extends Model
         'telefono',
         'telefono_normalizado',
         'email',
+        'cedula',
         'fecha_nacimiento',
         'ultima_felicitacion_anio',
         'direccion_principal',

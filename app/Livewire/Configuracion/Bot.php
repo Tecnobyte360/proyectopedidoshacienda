@@ -106,6 +106,7 @@ class Bot extends Component
     public bool   $cedula_obligatoria  = false;
     public string $cedula_descripcion  = '';
     public ?int   $cedula_consulta_id  = null;
+    public bool   $pedir_correo        = false;
 
     // Auto-asignación de domiciliarios
     public bool   $auto_asignar_domiciliario = false;
@@ -218,6 +219,7 @@ class Bot extends Component
         $this->cedula_obligatoria  = (bool) ($cfg->cedula_obligatoria ?? false);
         $this->cedula_descripcion  = (string) ($cfg->cedula_descripcion ?? '');
         $this->cedula_consulta_id  = $cfg->cedula_consulta_id;
+        $this->pedir_correo        = (bool) ($cfg->pedir_correo ?? false);
         $this->auto_asignar_domiciliario = (bool) ($cfg->auto_asignar_domiciliario ?? false);
         $this->criterio_asignacion       = (string) ($cfg->criterio_asignacion ?: 'balanceado');
         $this->asignar_en_estado         = (string) ($cfg->asignar_en_estado ?: 'en_preparacion');
@@ -633,6 +635,7 @@ class Bot extends Component
             'cedula_obligatoria'                    => 'boolean',
             'cedula_descripcion'                    => 'nullable|string|max:300',
             'cedula_consulta_id'                    => 'nullable|integer|exists:integracion_consultas,id',
+            'pedir_correo'                          => 'boolean',
             'auto_asignar_domiciliario'             => 'boolean',
             'criterio_asignacion'                   => 'nullable|in:balanceado,cercania,rotacion',
             'asignar_en_estado'                     => 'nullable|in:nuevo,en_preparacion,repartidor_en_camino',

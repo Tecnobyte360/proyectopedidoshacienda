@@ -691,6 +691,11 @@ class WhatsappWebhookController extends Controller
         $resumenCliente = $cliente->resumenParaBot();
         $pedidosInfo = $resumenCliente . "\n\n" . $pedidosInfo;
 
+        // Pasamos el telefono al request para que BotPromptService::reglaCedula
+        // pueda saber si el cliente actual ya tiene cedula/correo registrados
+        // y no se los pida de nuevo.
+        request()->attributes->set('telefono_cliente_actual', $cliente->telefono_normalizado);
+
         $systemPrompt = $this->getSystemPrompt($pedidosInfo, $this->infoEmpresa(), $nombreParaPrompt, $ansInfo, $sedeId);
 
         // ── NOTA DE RECHAZO RECIENTE DE COBERTURA ────────────────────────
@@ -1005,6 +1010,83 @@ TXT;
                 'meta' => [
                     'tools' => array_map(fn ($t) => $t['name'] ?? null, $toolMessages),
                 ],
+            ]);
+
+            return $reply;
+        }
+
+        // ── Tool call: registrar_datos_cliente ────────────────────────────────
+        if ($toolCalls && ($toolCalls[0]['function']['name'] ?? '') === 'registrar_datos_cliente') {
+            $rawArgs = $toolCalls[0]['function']['arguments'] ?? '{}';
+            $args    = json_decode($rawArgs, true) ?: [];
+            $tStart  = microtime(true);
+
+            $cedulaArg = trim((string) ($args['cedula'] ?? ''));
+            $emailArg  = trim((string) ($args['email'] ?? ''));
+
+            $cambios = [];
+            if ($cedulaArg !== '' && empty($cliente->cedula)) {
+                $cambios['cedula'] = preg_replace('/[^0-9]/', '', $cedulaArg);
+            }
+            if ($emailArg !== '' && filter_var($emailArg, FILTER_VALIDATE_EMAIL) && empty($cliente->email)) {
+                $cambios['email'] = strtolower($emailArg);
+            }
+
+            $resultado = [
+                'ok'              => !empty($cambios),
+                'guardados'       => array_keys($cambios),
+                'cedula_actual'   => $cliente->cedula,
+                'email_actual'    => $cliente->email,
+            ];
+
+            if (!empty($cambios)) {
+                $cliente->update($cambios);
+                $cliente->refresh();
+                $resultado['cedula_actual'] = $cliente->cedula;
+                $resultado['email_actual']  = $cliente->email;
+            }
+
+            $latenciaMs = (int) ((microtime(true) - $tStart) * 1000);
+            Log::info('🆔 Tool call registrar_datos_cliente', ['cambios' => $cambios, 'cliente_id' => $cliente->id]);
+
+            // Persistir en el monitor
+            try {
+                \App\Models\AgenteToolInvocacion::create([
+                    'tenant_id'        => $conversacion->tenant_id ?? null,
+                    'conversacion_id'  => $conversacion->id ?? null,
+                    'tool_name'        => 'registrar_datos_cliente',
+                    'connection_id'    => (string) ($connectionId ?? ''),
+                    'telefono_cliente' => $from ?? null,
+                    'args'             => $args,
+                    'resultado'        => $resultado,
+                    'count_resultados' => count($cambios),
+                    'exitoso'          => true,
+                    'latencia_ms'      => $latenciaMs,
+                ]);
+            } catch (\Throwable $e) { /* ignorar */ }
+
+            $followUpMessages = array_merge(
+                [['role' => 'system', 'content' => $systemPrompt]],
+                $reinforceAgent ?? [],
+                $conversationHistory,
+                [['role' => 'assistant', 'content' => null, 'tool_calls' => $toolCalls]],
+                [[
+                    'role'         => 'tool',
+                    'tool_call_id' => $toolCalls[0]['id'] ?? 'call_1',
+                    'name'         => 'registrar_datos_cliente',
+                    'content'      => json_encode($resultado, JSON_UNESCAPED_UNICODE),
+                ]]
+            );
+
+            $followUp = $this->llamarOpenAI($followUpMessages);
+            $reply    = $followUp['choices'][0]['message']['content'] ?? 'Listo, ya quedó registrado 🙌';
+
+            $conversationHistory[] = ['role' => 'assistant', 'content' => $reply];
+            Cache::put($cacheKey, $conversationHistory, now()->addMinutes(45));
+
+            $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_ASSISTANT, $reply, [
+                'tipo' => 'tool_call',
+                'meta' => ['tool' => 'registrar_datos_cliente', 'cambios' => $cambios],
             ]);
 
             return $reply;
@@ -3185,6 +3267,32 @@ PROMPT;
                             ],
                         ],
                         'required' => ['departamento', 'razon'],
+                    ],
+                ],
+            ];
+        }
+
+        // ── Tool: registrar_datos_cliente — si el tenant pide cedula o correo ──
+        if (!empty($config->pedir_cedula) || !empty($config->pedir_correo)) {
+            $props = [];
+            $required = [];
+            if (!empty($config->pedir_cedula)) {
+                $props['cedula'] = ['type' => 'string', 'description' => 'Número de cédula que dio el cliente.'];
+            }
+            if (!empty($config->pedir_correo)) {
+                $props['email'] = ['type' => 'string', 'description' => 'Correo electrónico que dio el cliente.'];
+            }
+            $tools[] = [
+                'type'     => 'function',
+                'function' => [
+                    'name'        => 'registrar_datos_cliente',
+                    'description' => '🆔 OBLIGATORIA: cuando el cliente te dé su cédula y/o correo electrónico, '
+                        . 'DEBES llamar esta función para registrarlos en su perfil. '
+                        . 'Llámala UNA SOLA VEZ cuando tengas los datos. Después puedes seguir con el pedido normalmente.',
+                    'parameters'  => [
+                        'type'       => 'object',
+                        'properties' => empty($props) ? new \stdClass() : $props,
+                        'required'   => [],
                     ],
                 ],
             ];

@@ -171,43 +171,94 @@ class BotPromptService
      * disponibles para consultar productos.
      */
     /**
-     * Genera el texto de instrucciones para que el bot pida (o no) la cédula
-     * al cliente, según la config del tenant.
+     * Genera el texto de instrucciones para que el bot pida cedula y/o correo
+     * al cliente NUEVO. La idea es recopilar datos de facturacion la primera
+     * vez para futuras compras.
      */
     private function reglaCedula(?ConfiguracionBot $config): string
     {
-        if (!$config || !($config->pedir_cedula ?? false)) {
-            return '';
-        }
+        if (!$config) return '';
+
+        $pedirCedula = (bool) ($config->pedir_cedula ?? false);
+        $pedirCorreo = (bool) ($config->pedir_correo ?? false);
+
+        if (!$pedirCedula && !$pedirCorreo) return '';
 
         $obligatoria = (bool) ($config->cedula_obligatoria ?? false);
         $descripcion = trim((string) ($config->cedula_descripcion ?? ''));
         $consultaId  = $config->cedula_consulta_id ?? null;
 
-        $partes = ['# 🆔 SOLICITUD DE CÉDULA'];
+        // Buscar el cliente actual en BD para saber qué le falta
+        $tenantId = app(\App\Services\TenantManager::class)->id();
+        $clienteActual = null;
+        $clienteData = ['cedula' => null, 'email' => null];
+
+        if ($tenantId && function_exists('request') && ($telef = request()->attributes->get('telefono_cliente_actual'))) {
+            $clienteActual = \App\Models\Cliente::where('tenant_id', $tenantId)
+                ->where('telefono_normalizado', $telef)
+                ->first();
+            if ($clienteActual) {
+                $clienteData['cedula'] = $clienteActual->cedula;
+                $clienteData['email']  = $clienteActual->email;
+            }
+        }
+
+        $faltaCedula = $pedirCedula && empty($clienteData['cedula']);
+        $faltaCorreo = $pedirCorreo && empty($clienteData['email']);
+
+        // Si ya tiene todos los datos, no pedimos nada
+        if (!$faltaCedula && !$faltaCorreo) {
+            $partes = ['# 🆔 DATOS DEL CLIENTE — YA REGISTRADO'];
+            if ($clienteData['cedula']) {
+                $partes[] = "✅ El cliente YA tiene cédula registrada: **{$clienteData['cedula']}**. NO se la vuelvas a pedir.";
+            }
+            if ($clienteData['email']) {
+                $partes[] = "✅ El cliente YA tiene correo registrado: **{$clienteData['email']}**. NO se lo vuelvas a pedir.";
+            }
+            return implode("\n", $partes);
+        }
+
+        // Construir lista de datos faltantes
+        $faltantes = [];
+        if ($faltaCedula) $faltantes[] = 'cédula';
+        if ($faltaCorreo) $faltantes[] = 'correo electrónico';
+        $listaFaltantes = count($faltantes) === 2
+            ? 'cédula y correo electrónico'
+            : $faltantes[0];
+
+        $partes = ['# 🆔 DATOS DE FACTURACIÓN (Cliente nuevo o sin datos)'];
 
         if ($obligatoria) {
-            $partes[] = '⚠️ OBLIGATORIO: ANTES de tomar pedidos o dar información detallada, DEBES pedir la cédula del cliente.';
+            $partes[] = "⚠️ OBLIGATORIO: ANTES de tomar pedidos, DEBES pedirle al cliente su **{$listaFaltantes}** para registrarlo y poder facturarle electrónicamente.";
         } else {
-            $partes[] = 'Si te parece útil, pide la cédula del cliente para personalizarle la atención. No es bloqueante — si el cliente no quiere darla, sigue normal.';
+            $partes[] = "Pídele al cliente su **{$listaFaltantes}** para registrarlo. Si no quiere darlos, sigue normal.";
         }
 
         if ($descripcion !== '') {
-            $partes[] = "Cómo presentarlo al cliente: \"{$descripcion}\"";
+            $partes[] = "Razón a darle al cliente: \"{$descripcion}\"";
         } else {
-            $partes[] = 'Pídela de forma natural: "¿Me regalas tu número de cédula para registrarte / validar tu cuenta?"';
+            $partes[] = "Razón a darle al cliente: \"para poder facturarte electrónicamente y darte mejor servicio\"";
         }
 
-        // Si hay consulta vinculada, decirle al bot que la use
-        if ($consultaId) {
+        // Frase ejemplo natural
+        if ($faltaCedula && $faltaCorreo) {
+            $partes[] = 'Pídelo de forma natural y AMBOS DATOS de una sola vez: "Antes de armar tu pedido, ¿me regalas tu cédula y un correo electrónico? Es para registrarte y poder facturarte 🙏".';
+        } elseif ($faltaCedula) {
+            $partes[] = 'Frase ejemplo: "¿Me regalas tu número de cédula para registrarte?"';
+        } else {
+            $partes[] = 'Frase ejemplo: "¿Me regalas un correo electrónico para mandarte la factura?"';
+        }
+
+        // Tool de búsqueda en ERP (si está configurada)
+        if ($faltaCedula && $consultaId) {
             $consulta = \App\Models\IntegracionConsulta::find($consultaId);
             if ($consulta && $consulta->usar_en_bot && $consulta->activa) {
                 $tool = $consulta->nombreTool();
-                $partes[] = "🔧 Cuando obtengas la cédula, llama la tool `{$tool}(cedula=\"...\")` para buscar al cliente en el ERP. Si lo encuentras, salúdalo por su nombre real y úsalo en la conversación. Si no, pídele que confirme la cédula o continúa con su nombre actual.";
+                $partes[] = "🔧 Cuando obtengas la cédula, llama la tool `{$tool}(cedula=\"...\")` para buscar al cliente en el ERP. Si lo encuentras, salúdalo por su nombre real y úsalo en el resto de la conversación.";
             }
-        } else {
-            $partes[] = 'Cuando la obtengas, agradece y úsala para registrar al cliente.';
         }
+
+        $partes[] = '⚠️ IMPORTANTE: Solo pide los datos UNA VEZ por conversación. Si el cliente los da, agradece y CONTINÚA con el flujo normal — NO sigas insistiendo.';
 
         return implode("\n\n", $partes);
     }
