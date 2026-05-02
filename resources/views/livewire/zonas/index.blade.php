@@ -362,99 +362,118 @@
                             </span>
                         </div>
 
-                        <div wire:ignore
-                             x-data="zonaMapaEditor({
-                                poligono: @js($poligono),
-                                color: @js($color),
-                                nombre: @js($nombre),
-                             })"
-                             x-init="initMap()">
-
-                            {{-- Buscador Nominatim --}}
-                            <div class="mb-3 rounded-xl bg-white border border-slate-200 p-3">
-                                <div class="flex items-center gap-2 mb-2">
-                                    <i class="fa-solid fa-magnifying-glass-location text-brand"></i>
-                                    <label class="text-xs font-bold text-slate-700">
-                                        Importar área de un lugar
-                                    </label>
-                                    <span class="text-[10px] text-slate-400">— escribe Bello, Copacabana, Itagüí...</span>
-                                </div>
-
-                                <div class="flex gap-2">
-                                    <input type="text"
-                                           x-model="busquedaTexto"
-                                           @keydown.enter.prevent="buscarLugar()"
-                                           placeholder="Ej: Bello, Antioquia"
-                                           class="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-brand focus:ring-2 focus:ring-amber-100">
-                                    <button type="button"
-                                            @click="buscarLugar()"
-                                            :disabled="buscando"
-                                            class="rounded-xl bg-brand px-4 py-2 text-sm font-bold text-white hover:bg-brand-dark transition disabled:opacity-60 whitespace-nowrap">
-                                        <span x-show="!buscando">
-                                            <i class="fa-solid fa-magnifying-glass mr-1"></i> Buscar
-                                        </span>
-                                        <span x-show="buscando">
-                                            <i class="fa-solid fa-spinner fa-spin"></i> Buscando...
-                                        </span>
-                                    </button>
-                                </div>
-
-                                {{-- Resultados --}}
-                                <template x-if="resultados.length > 0">
-                                    <div class="mt-2 max-h-40 overflow-y-auto rounded-lg border border-slate-200 divide-y divide-slate-100">
-                                        <template x-for="(r, idx) in resultados" :key="idx">
-                                            <button type="button"
-                                                    @click="usarLugar(r)"
-                                                    class="w-full text-left px-3 py-2 text-xs hover:bg-amber-50 transition">
-                                                <div class="font-semibold text-slate-800" x-text="r.display_name"></div>
-                                                <div class="text-[10px] text-slate-500" x-text="r.type + ' · ' + (r.class || '')"></div>
-                                            </button>
-                                        </template>
+                        @if ($gmapsActivo ?? false)
+                            {{-- ╔═══════════════════════════════════════════════════════╗
+                                 ║ Modo Google Maps: solo info + botón al editor visual  ║
+                                 ╚═══════════════════════════════════════════════════════╝ --}}
+                            <div class="rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 p-5">
+                                <div class="flex items-start gap-4">
+                                    <div class="flex-shrink-0 h-14 w-14 rounded-2xl bg-blue-600 flex items-center justify-center shadow-lg">
+                                        <i class="fa-solid fa-map-location-dot text-2xl text-white"></i>
                                     </div>
-                                </template>
+                                    <div class="flex-1">
+                                        <h4 class="text-base font-bold text-slate-800">Editor visual con Google Maps</h4>
+                                        @if ($poligono && count($poligono) >= 3)
+                                            <p class="text-xs text-slate-600 mt-1">
+                                                ✅ Polígono dibujado con <strong>{{ count($poligono) }} puntos</strong>
+                                                @if ($area_km2)
+                                                    · Área <strong>{{ number_format($area_km2, 2, ',', '.') }} km²</strong>
+                                                @endif
+                                            </p>
+                                            <p class="text-[11px] text-slate-500 mt-1">
+                                                Para editarlo o redibujarlo, abre el editor dedicado.
+                                            </p>
+                                        @else
+                                            <p class="text-xs text-amber-700 mt-1">
+                                                ⚠️ Esta zona aún no tiene polígono dibujado.
+                                            </p>
+                                            <p class="text-[11px] text-slate-500 mt-1">
+                                                Sin polígono el bot solo valida coberturas por nombre de barrio (menos preciso).
+                                            </p>
+                                        @endif
+                                    </div>
+                                </div>
 
-                                <template x-if="errorBusqueda">
-                                    <div class="mt-2 rounded-lg bg-rose-50 border border-rose-200 px-3 py-2 text-xs text-rose-700"
-                                         x-text="errorBusqueda"></div>
-                                </template>
-                            </div>
-
-                            @if ($gmapsActivo ?? false)
-                                {{-- Cuando Google Maps esta activo, sugerir abrir el editor visual completo --}}
-                                <div class="rounded-2xl bg-blue-50 border-2 border-dashed border-blue-300 p-6 text-center">
-                                    <i class="fa-solid fa-map-location-dot text-3xl text-blue-600 mb-2"></i>
-                                    <p class="text-sm font-bold text-slate-800 mb-1">Editor visual con Google Maps</p>
-                                    <p class="text-xs text-slate-600 mb-3">
-                                        Para dibujar el polígono de esta zona, abre el editor visual dedicado.
-                                    </p>
+                                <div class="mt-4 flex items-center justify-end">
                                     @if ($editandoId)
                                         <a href="{{ route('zonas.editor-mapa', $editandoId) }}"
                                            target="_blank"
-                                           class="inline-flex items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 text-sm font-bold shadow">
+                                           class="inline-flex items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 text-sm font-bold shadow transition">
                                             <i class="fa-solid fa-external-link-alt"></i>
-                                            Abrir editor en pestaña nueva
+                                            {{ ($poligono && count($poligono) >= 3) ? 'Editar polígono' : 'Dibujar polígono' }}
                                         </a>
                                     @else
-                                        <p class="text-[11px] text-amber-700">
-                                            <i class="fa-solid fa-info-circle"></i> Guarda primero la zona y luego edita el polígono visualmente.
-                                        </p>
+                                        <span class="inline-flex items-center gap-2 rounded-xl bg-slate-200 text-slate-500 px-4 py-2 text-xs font-semibold">
+                                            <i class="fa-solid fa-circle-info"></i>
+                                            Guarda primero los datos y luego dibuja el polígono
+                                        </span>
                                     @endif
                                 </div>
-                            @else
-                            <div id="mapa-zona-modal" style="height: 350px; width: 100%; border-radius: 0.75rem; border: 1px solid #e2e8f0;"></div>
-                            @endif
-
-                            <div class="mt-2 flex items-center justify-between text-xs text-slate-600">
-                                <span>
-                                    <i class="fa-solid fa-circle-info"></i>
-                                    Usa el ícono de polígono (arriba izquierda) para dibujar manualmente, o busca un lugar arriba.
-                                </span>
-                                <button type="button" @click="centrarEnColombia()"
-                                        class="text-brand hover:underline font-semibold">
-                                    <i class="fa-solid fa-location-crosshairs"></i> Centrar
-                                </button>
                             </div>
-                        </div>
+                        @else
+                            {{-- ╔═══════════════════════════════════════════════════════╗
+                                 ║ Modo Leaflet/OSM: editor inline tradicional           ║
+                                 ╚═══════════════════════════════════════════════════════╝ --}}
+                            <div wire:ignore
+                                 x-data="zonaMapaEditor({
+                                    poligono: @js($poligono),
+                                    color: @js($color),
+                                    nombre: @js($nombre),
+                                 })"
+                                 x-init="initMap()">
+
+                                {{-- Buscador Nominatim --}}
+                                <div class="mb-3 rounded-xl bg-white border border-slate-200 p-3">
+                                    <div class="flex items-center gap-2 mb-2">
+                                        <i class="fa-solid fa-magnifying-glass-location text-brand"></i>
+                                        <label class="text-xs font-bold text-slate-700">Importar área de un lugar</label>
+                                        <span class="text-[10px] text-slate-400">— escribe Bello, Copacabana, Itagüí...</span>
+                                    </div>
+
+                                    <div class="flex gap-2">
+                                        <input type="text" x-model="busquedaTexto"
+                                               @keydown.enter.prevent="buscarLugar()"
+                                               placeholder="Ej: Bello, Antioquia"
+                                               class="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-brand focus:ring-2 focus:ring-amber-100">
+                                        <button type="button" @click="buscarLugar()" :disabled="buscando"
+                                                class="rounded-xl bg-brand px-4 py-2 text-sm font-bold text-white hover:bg-brand-dark transition disabled:opacity-60 whitespace-nowrap">
+                                            <span x-show="!buscando"><i class="fa-solid fa-magnifying-glass mr-1"></i> Buscar</span>
+                                            <span x-show="buscando"><i class="fa-solid fa-spinner fa-spin"></i> Buscando...</span>
+                                        </button>
+                                    </div>
+
+                                    <template x-if="resultados.length > 0">
+                                        <div class="mt-2 max-h-40 overflow-y-auto rounded-lg border border-slate-200 divide-y divide-slate-100">
+                                            <template x-for="(r, idx) in resultados" :key="idx">
+                                                <button type="button" @click="usarLugar(r)"
+                                                        class="w-full text-left px-3 py-2 text-xs hover:bg-amber-50 transition">
+                                                    <div class="font-semibold text-slate-800" x-text="r.display_name"></div>
+                                                    <div class="text-[10px] text-slate-500" x-text="r.type + ' · ' + (r.class || '')"></div>
+                                                </button>
+                                            </template>
+                                        </div>
+                                    </template>
+
+                                    <template x-if="errorBusqueda">
+                                        <div class="mt-2 rounded-lg bg-rose-50 border border-rose-200 px-3 py-2 text-xs text-rose-700"
+                                             x-text="errorBusqueda"></div>
+                                    </template>
+                                </div>
+
+                                <div id="mapa-zona-modal" style="height: 350px; width: 100%; border-radius: 0.75rem; border: 1px solid #e2e8f0;"></div>
+
+                                <div class="mt-2 flex items-center justify-between text-xs text-slate-600">
+                                    <span>
+                                        <i class="fa-solid fa-circle-info"></i>
+                                        Usa el ícono de polígono (arriba izquierda) para dibujar manualmente, o busca un lugar arriba.
+                                    </span>
+                                    <button type="button" @click="centrarEnColombia()"
+                                            class="text-brand hover:underline font-semibold">
+                                        <i class="fa-solid fa-location-crosshairs"></i> Centrar
+                                    </button>
+                                </div>
+                            </div>
+                        @endif
                     </div>
 
                     <div>
