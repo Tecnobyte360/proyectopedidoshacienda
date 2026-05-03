@@ -23,6 +23,16 @@ class Sede extends Model
         'whatsapp_connection_id',
         'whatsapp_id',
         'whatsapp_telefono',
+        // Cobertura propia de la sede (refactor: cada sede su area)
+        'cobertura_poligono',
+        'cobertura_costo_envio',
+        'cobertura_tiempo_min',
+        'cobertura_pedido_minimo',
+        'cobertura_color',
+        'cobertura_descripcion',
+        'cobertura_activa',
+        'cobertura_centro_lat',
+        'cobertura_centro_lng',
     ];
 
     protected $casts = [
@@ -32,7 +42,42 @@ class Sede extends Model
         'horarios' => 'array',
         'whatsapp_connection_id' => 'integer',
         'whatsapp_id'            => 'integer',
+        'cobertura_poligono'     => 'array',
+        'cobertura_costo_envio'  => 'float',
+        'cobertura_tiempo_min'   => 'integer',
+        'cobertura_pedido_minimo' => 'float',
+        'cobertura_activa'       => 'boolean',
+        'cobertura_centro_lat'   => 'float',
+        'cobertura_centro_lng'   => 'float',
     ];
+
+    /**
+     * ¿Esta sede tiene polígono de cobertura definido?
+     */
+    public function tieneCobertura(): bool
+    {
+        return !empty($this->cobertura_poligono)
+            && is_array($this->cobertura_poligono)
+            && count($this->cobertura_poligono) >= 3;
+    }
+
+    /**
+     * Calcula distancia haversine en km desde la sede hasta un punto.
+     * Usa la ubicación física (latitud/longitud) de la sede.
+     */
+    public function distanciaA(float $lat, float $lng): float
+    {
+        if (!$this->latitud || !$this->longitud) return PHP_FLOAT_MAX;
+        $earthRadius = 6371; // km
+        $latFrom = deg2rad((float) $this->latitud);
+        $lngFrom = deg2rad((float) $this->longitud);
+        $latTo = deg2rad($lat);
+        $lngTo = deg2rad($lng);
+        $latDelta = $latTo - $latFrom;
+        $lngDelta = $lngTo - $lngFrom;
+        $a = sin($latDelta / 2) ** 2 + cos($latFrom) * cos($latTo) * sin($lngDelta / 2) ** 2;
+        return $earthRadius * (2 * atan2(sqrt($a), sqrt(1 - $a)));
+    }
 
     /**
      * Busca la sede que tiene asignado el connection_id recibido

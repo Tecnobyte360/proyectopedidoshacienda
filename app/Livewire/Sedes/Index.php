@@ -21,6 +21,17 @@ class Index extends Component
     public ?int    $whatsapp_id            = null;
     public string  $whatsapp_telefono      = '';
 
+    // Cobertura de la sede (refactor: cada sede maneja su zona)
+    public ?array  $cobertura_poligono       = null;
+    public float   $cobertura_costo_envio    = 0;
+    public int     $cobertura_tiempo_min     = 45;
+    public float   $cobertura_pedido_minimo  = 0;
+    public string  $cobertura_color          = '#d68643';
+    public string  $cobertura_descripcion    = '';
+    public bool    $cobertura_activa         = true;
+    public ?float  $cobertura_centro_lat     = null;
+    public ?float  $cobertura_centro_lng     = null;
+
     /** Array editable: [dia_key => ['abierto'=>bool, 'abre'=>'HH:MM', 'cierra'=>'HH:MM']] */
     public array $horarios = [];
 
@@ -37,6 +48,14 @@ class Index extends Component
             'whatsapp_connection_id' => 'nullable|integer',
             'whatsapp_id'            => 'nullable|integer',
             'whatsapp_telefono'      => 'nullable|string|max:32',
+            'cobertura_costo_envio'   => 'numeric|min:0',
+            'cobertura_tiempo_min'    => 'integer|min:1|max:480',
+            'cobertura_pedido_minimo' => 'numeric|min:0',
+            'cobertura_color'         => 'nullable|string|max:10',
+            'cobertura_descripcion'   => 'nullable|string|max:500',
+            'cobertura_activa'        => 'boolean',
+            'cobertura_centro_lat'    => 'nullable|numeric|between:-90,90',
+            'cobertura_centro_lng'    => 'nullable|numeric|between:-180,180',
         ];
     }
 
@@ -65,6 +84,17 @@ class Index extends Component
         $this->whatsapp_connection_id = $sede->whatsapp_connection_id;
         $this->whatsapp_id            = $sede->whatsapp_id;
         $this->whatsapp_telefono      = (string) $sede->whatsapp_telefono;
+
+        // Cobertura de la sede
+        $this->cobertura_poligono      = $sede->cobertura_poligono;
+        $this->cobertura_costo_envio   = (float) ($sede->cobertura_costo_envio ?? 0);
+        $this->cobertura_tiempo_min    = (int) ($sede->cobertura_tiempo_min ?? 45);
+        $this->cobertura_pedido_minimo = (float) ($sede->cobertura_pedido_minimo ?? 0);
+        $this->cobertura_color         = (string) ($sede->cobertura_color ?: '#d68643');
+        $this->cobertura_descripcion   = (string) ($sede->cobertura_descripcion ?? '');
+        $this->cobertura_activa        = (bool) ($sede->cobertura_activa ?? true);
+        $this->cobertura_centro_lat    = $sede->cobertura_centro_lat;
+        $this->cobertura_centro_lng    = $sede->cobertura_centro_lng;
 
         // Cargar horarios existentes o defaults
         $existentes = $sede->horarios ?? [];
@@ -154,6 +184,17 @@ class Index extends Component
         $this->whatsapp_connection_id = null;
         $this->whatsapp_id            = null;
         $this->whatsapp_telefono      = '';
+
+        // Cobertura defaults
+        $this->cobertura_poligono       = null;
+        $this->cobertura_costo_envio    = 0;
+        $this->cobertura_tiempo_min     = 45;
+        $this->cobertura_pedido_minimo  = 0;
+        $this->cobertura_color          = '#d68643';
+        $this->cobertura_descripcion    = '';
+        $this->cobertura_activa         = true;
+        $this->cobertura_centro_lat     = null;
+        $this->cobertura_centro_lng     = null;
 
         // Defaults: L-V 8a8, S 9a4, D cerrado
         $this->horarios = [];

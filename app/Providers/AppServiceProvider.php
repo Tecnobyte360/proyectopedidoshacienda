@@ -36,10 +36,9 @@ class AppServiceProvider extends ServiceProvider
     }
 
     // 📦 Forzar límite de payload de Livewire a 10 MB en runtime.
-    // Necesario para polígonos grandes de zonas (980+ puntos) y snapshots
-    // de componentes con mucha data. Default es 1 MB.
-    // Esto sobreescribe el cache de config aunque esté desactualizado.
-    config(['livewire.payload.max_size' => 10240]);
+    // ⚠️ La unidad es BYTES (no KB). 10 MB = 10 * 1024 * 1024 = 10485760
+    // Default es 1024*1024 (1 MB). Polígonos grandes (2000+ puntos) lo exceden.
+    config(['livewire.payload.max_size' => 10 * 1024 * 1024]);
 
     // 🔓 Super-admin tiene acceso a TODO automáticamente.
     // Bypassa cualquier chequeo de permisos. Hacemos query directa a BD

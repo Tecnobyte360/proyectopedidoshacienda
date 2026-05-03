@@ -2212,12 +2212,15 @@ TXT;
       ?string $telefonoCliente = null
   ): array {
       $zonaResolver = app(ZonaResolverService::class);
+      $sedeResolver = app(\App\Services\SedeResolverService::class);
 
       $zona   = null;
       $metodo = null;
       $coord  = null;
 
-      // ── Estrategia 1: Geocode + polígono (el mapa manda) ──────────────
+      // 🌟 ESTRATEGIA NUEVA (PREFERIDA): cobertura DIRECTA en sedes
+      // Cada sede tiene su propio polígono. SedeResolverService elige la
+      // mejor sede (cercanía + abierto) automáticamente.
       if (!empty($direccion) || !empty($barrio)) {
           $geocode = app(GeocodingService::class)->geocodificar(
               $direccion ?: '',
@@ -2227,10 +2230,95 @@ TXT;
 
           if ($geocode) {
               $coord = $geocode;
+              $tenantId = app(\App\Services\TenantManager::class)->id();
+              $resultado = $sedeResolver->resolverParaPunto($geocode['lat'], $geocode['lng'], $tenantId);
+
+              if ($resultado['cubierta'] && $resultado['sede']) {
+                  $sede = $resultado['sede'];
+                  $sedeAlt = $resultado['sede_alternativa'];
+
+                  Log::info('✅ Cobertura por sede (smart resolver)', [
+                      'sede'           => $sede->nombre,
+                      'distancia_km'   => $resultado['distancia_km'],
+                      'sede_cerrada'   => $sedeAlt ? true : false,
+                      'coord'          => $geocode,
+                  ]);
+
+                  $costoOriginal = (float) ($sede->cobertura_costo_envio ?? 0);
+                  $beneficioInfo = null;
+                  $costoEfectivo = $costoOriginal;
+
+                  // Beneficio activo (envío gratis por cumple, etc)
+                  if (!empty($telefonoCliente)) {
+                      $telNorm = $this->normalizarTelefono($telefonoCliente);
+                      $clientePosible = Cliente::where('telefono_normalizado', $telNorm)->first();
+                      if ($clientePosible) {
+                          $ben = $clientePosible->beneficioVigente(\App\Models\BeneficioCliente::TIPO_ENVIO_GRATIS);
+                          if ($ben) {
+                              $beneficioInfo = [
+                                  'tipo'            => 'envio_gratis',
+                                  'origen'          => $ben->origen,
+                                  'vigente_hasta'   => $ben->vigente_hasta?->format('d/m/Y'),
+                                  'descripcion'     => $ben->descripcion,
+                                  'ahorro_original' => $costoOriginal,
+                              ];
+                              $costoEfectivo = 0;
+                          }
+                      }
+                  }
+
+                  $mensajeSugerido = "Genial, te despachamos desde *{$sede->nombre}* (~{$sede->cobertura_tiempo_min} min, {$resultado['distancia_km']} km).";
+                  if ($sedeAlt) {
+                      $mensajeSugerido = "Tu dirección es cercana a otra sede pero está cerrada ahora. Te despachamos desde *{$sede->nombre}* (~{$sede->cobertura_tiempo_min} min).";
+                  }
+
+                  return [
+                      'cubierta'         => true,
+                      'zona'             => $sede->nombre,
+                      'sede_sugerida'    => $sede->nombre,
+                      'sede_id'          => $sede->id,
+                      'distancia_km'     => $resultado['distancia_km'],
+                      'costo_envio'      => $costoEfectivo,
+                      'costo_original'   => $costoOriginal,
+                      'tiempo_estimado'  => $sede->cobertura_tiempo_min,
+                      'pedido_minimo'    => (float) ($sede->cobertura_pedido_minimo ?? 0),
+                      'beneficio_activo' => $beneficioInfo,
+                      'coordenadas'      => $coord,
+                      'mensaje_sugerido' => $mensajeSugerido,
+                      'metodo_usado'     => 'sede_poligono_smart',
+                      'aviso_alternativa' => $sedeAlt ? "Sede más cercana cerrada — atendiendo desde {$sede->nombre}" : null,
+                  ];
+              }
+
+              // Si no cubierta pero hay sede más cercana para recoger
+              if (!$resultado['cubierta'] && $resultado['recoger_en_sede']) {
+                  $sedeRecoger = $resultado['recoger_en_sede'];
+                  $distancia = $resultado['distancia_km'];
+                  Log::info('ℹ️ Sin cobertura — sugerir recoger', [
+                      'sede_mas_cercana' => $sedeRecoger->nombre,
+                      'distancia_km' => $distancia,
+                  ]);
+                  // Caemos al return de "sin cobertura" pero con sugerencia rica
+              }
+          }
+      }
+
+      // ── Estrategia LEGACY: Geocode + polígono de ZonaCobertura (compat) ──
+      if (!empty($direccion) || !empty($barrio)) {
+          if (!isset($geocode) || !$geocode) {
+              $geocode = app(GeocodingService::class)->geocodificar(
+                  $direccion ?: '',
+                  $barrio,
+                  $ciudad ?: 'Bello'
+              );
+          }
+
+          if ($geocode) {
+              $coord = $geocode;
               $zona = $zonaResolver->porCoordenadas($geocode['lat'], $geocode['lng'], $sedeId);
               if ($zona) {
                   $metodo = 'poligono_mapa';
-                  Log::info('✅ Cobertura por polígono', [
+                  Log::info('✅ Cobertura por polígono (legacy zonas)', [
                       'zona'  => $zona->nombre,
                       'coord' => $geocode,
                   ]);

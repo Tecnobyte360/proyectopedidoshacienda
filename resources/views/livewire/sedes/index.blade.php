@@ -86,7 +86,26 @@
                         </details>
                     </div>
 
+                    {{-- Indicador de cobertura --}}
+                    @if (!empty($sede->cobertura_poligono) && count($sede->cobertura_poligono) >= 3)
+                        <div class="rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2 text-xs">
+                            <i class="fa-solid fa-map text-emerald-600 mr-1"></i>
+                            <strong class="text-emerald-800">Cobertura activa</strong>
+                            <span class="text-emerald-600">— {{ count($sede->cobertura_poligono) }} pts · ${{ number_format($sede->cobertura_costo_envio ?? 0, 0, ',', '.') }} · {{ $sede->cobertura_tiempo_min ?? 45 }} min</span>
+                        </div>
+                    @else
+                        <div class="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs">
+                            <i class="fa-solid fa-triangle-exclamation text-amber-600 mr-1"></i>
+                            <span class="text-amber-700">Sin cobertura dibujada — solo recoger en sede</span>
+                        </div>
+                    @endif
+
                     <div class="flex gap-2 pt-2">
+                        <a href="{{ route('sedes.editor-cobertura', $sede->id) }}"
+                           title="Editor visual de cobertura"
+                           class="text-xs font-semibold rounded-lg bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 py-2 transition">
+                            <i class="fa-solid fa-map-location-dot"></i>
+                        </a>
                         <button wire:click="abrirModalEditar({{ $sede->id }})"
                                 class="flex-1 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 transition">
                             <i class="fa-solid fa-pen-to-square"></i> Editar
@@ -269,6 +288,81 @@
                                            placeholder="+57 305 399 9848"
                                            class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand">
                                 </div>
+                            </div>
+                        @endif
+                    </div>
+
+                    {{-- ╔═══════════════════════════════════════════════╗
+                         ║ ÁREA DE COBERTURA DE LA SEDE (refactor wow)   ║
+                         ╚═══════════════════════════════════════════════╝ --}}
+                    <div class="rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 p-5">
+                        <div class="flex items-center gap-2 mb-3">
+                            <i class="fa-solid fa-map-location-dot text-blue-600 text-xl"></i>
+                            <h3 class="text-base font-bold text-slate-800">Área de cobertura para domicilios</h3>
+                        </div>
+                        <p class="text-xs text-slate-600 mb-4">
+                            El bot determina automáticamente si una dirección cae dentro de esta sede para domicilios.
+                            Si cae en varias, elige la más cercana. Si está cerrada, usa otra abierta.
+                        </p>
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-1">Costo de envío</label>
+                                <input type="number" wire:model="cobertura_costo_envio" min="0" step="100"
+                                       class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-1">Tiempo estimado (min)</label>
+                                <input type="number" wire:model="cobertura_tiempo_min" min="1" max="480"
+                                       class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-1">Pedido mínimo</label>
+                                <input type="number" wire:model="cobertura_pedido_minimo" min="0" step="1000"
+                                       class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-1">Color en el mapa</label>
+                                <input type="color" wire:model="cobertura_color"
+                                       class="w-full rounded-xl border border-slate-200 px-2 py-1 h-10 bg-white">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-1">Descripción (opcional)</label>
+                                <input type="text" wire:model="cobertura_descripcion"
+                                       placeholder="Ej: norte, occidente..."
+                                       class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white">
+                            </div>
+                        </div>
+
+                        @if ($editandoId)
+                            <div class="mt-4 rounded-xl bg-white border border-slate-200 p-3 flex items-center justify-between">
+                                <div class="text-xs">
+                                    @if ($cobertura_poligono && count($cobertura_poligono) >= 3)
+                                        <span class="text-emerald-700 font-bold">
+                                            <i class="fa-solid fa-check-circle"></i>
+                                            Polígono dibujado: {{ count($cobertura_poligono) }} puntos
+                                        </span>
+                                    @else
+                                        <span class="text-amber-700">
+                                            <i class="fa-solid fa-triangle-exclamation"></i>
+                                            Sin polígono — la sede solo aparecerá para "recoger en sede"
+                                        </span>
+                                    @endif
+                                </div>
+                                <a href="{{ route('sedes.editor-cobertura', $editandoId) }}"
+                                   target="_blank"
+                                   class="rounded-xl bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 text-xs font-bold whitespace-nowrap">
+                                    <i class="fa-solid fa-external-link-alt mr-1"></i>
+                                    {{ ($cobertura_poligono && count($cobertura_poligono) >= 3) ? 'Editar polígono' : 'Dibujar polígono' }}
+                                </a>
+                            </div>
+                        @else
+                            <div class="mt-4 rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-700">
+                                <i class="fa-solid fa-info-circle"></i>
+                                Guarda primero la sede y luego dibuja el polígono visualmente.
                             </div>
                         @endif
                     </div>

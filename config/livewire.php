@@ -106,6 +106,7 @@ return [
     | detalladas, vistas previas de catálogos, etc.
     */
     'payload' => [
-        'max_size' => 10240,
+        // ⚠️ Unidad: BYTES (no KB). 10 MB = 10485760
+        'max_size' => 10 * 1024 * 1024,
     ],
 ];

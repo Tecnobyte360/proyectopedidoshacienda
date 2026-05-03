@@ -141,6 +141,9 @@ Route::middleware(['no_super_sin_imp'])->group(function () {
     Route::get('/felicitaciones',    FelicitacionesIndex::class)->middleware('permission:felicitaciones.ver')->name('felicitaciones.index');
     Route::get('/encuestas',         EncuestasIndex::class)->middleware('permission:reportes.ver')->name('encuestas.index');
     Route::get('/sedes',             SedesIndex::class)->middleware('permission:sedes.gestionar')->name('sedes.index');
+    Route::get('/sedes/{sede}/editor-cobertura', \App\Livewire\Sedes\EditorCobertura::class)
+        ->middleware('permission:sedes.gestionar')
+        ->name('sedes.editor-cobertura');
     Route::get('/usuarios',          UsuariosIndex::class)->middleware('permission:usuarios.ver')->name('usuarios.index');
     // Roles ya NO se gestionan por tenant — los roles son globales
     // (compartidos por todos), entonces solo el super-admin desde el dominio
