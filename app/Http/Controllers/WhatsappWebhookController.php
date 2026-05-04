@@ -2576,6 +2576,17 @@ TXT;
                 ?? 'Bello'; // fallback final
         }
 
+        // 🐛 LOG DIAGNÓSTICO (temporal): ver qué viene del bot exactamente
+        Log::info('🔎 [confirmar_pedido] datos para validación cobertura', [
+            'address_raw'   => $orderData['address'] ?? null,
+            'neighborhood'  => $orderData['neighborhood'] ?? null,
+            'city_raw'      => $orderData['city'] ?? null,
+            'direccion_usada' => $direccion,
+            'barrio_usado'    => $barrio,
+            'ciudad_resuelta' => $ciudadOrden,
+            'orderData_keys'  => array_keys($orderData),
+        ]);
+
         // Resolver zona de cobertura — primero por barrio, si falla intenta geocode
         $validacion = $this->validarCoberturaDireccion(
             $direccion,
