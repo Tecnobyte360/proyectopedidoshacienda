@@ -2204,6 +2204,55 @@ TXT;
    *      fallback por nombre de barrio (match exacto/parcial).
    *   3. Si todo falla, sin cobertura.
    */
+  /**
+   * Detecta el nombre de una ciudad colombiana mencionada en un texto libre.
+   * Busca coincidencias case/tilde insensibles para evitar pasar 'Bello' por
+   * default cuando la dirección habla de Bogotá, Cali, etc.
+   */
+  private function detectarCiudadDesdeDireccion(?string $texto): ?string
+  {
+      if (empty($texto)) return null;
+      $t = mb_strtolower($texto);
+      $t = strtr($t, ['á'=>'a','é'=>'e','í'=>'i','ó'=>'o','ú'=>'u','ñ'=>'n']);
+
+      // Ordenado por longitud descendente para que "santa marta" gane sobre "santa".
+      $ciudades = [
+          'bogota d.c.' => 'Bogotá',
+          'santa marta' => 'Santa Marta',
+          'la estrella' => 'La Estrella',
+          'barranquilla' => 'Barranquilla', 'bucaramanga' => 'Bucaramanga',
+          'floridablanca' => 'Floridablanca', 'piedecuesta' => 'Piedecuesta',
+          'villavicencio' => 'Villavicencio', 'dosquebradas' => 'Dosquebradas',
+          'valledupar' => 'Valledupar', 'sincelejo' => 'Sincelejo',
+          'cartagena' => 'Cartagena', 'medellin' => 'Medellín',
+          'envigado' => 'Envigado', 'sabaneta' => 'Sabaneta',
+          'copacabana' => 'Copacabana', 'girardota' => 'Girardota',
+          'rionegro' => 'Rionegro', 'concordia' => 'Concordia',
+          'manizales' => 'Manizales', 'pereira' => 'Pereira',
+          'palmira' => 'Palmira', 'jamundi' => 'Jamundí',
+          'monteria' => 'Montería', 'riohacha' => 'Riohacha',
+          'maicao' => 'Maicao', 'popayan' => 'Popayán',
+          'pasto' => 'Pasto', 'tumaco' => 'Tumaco',
+          'tunja' => 'Tunja', 'duitama' => 'Duitama', 'sogamoso' => 'Sogamoso',
+          'cucuta' => 'Cúcuta', 'armenia' => 'Armenia', 'ibague' => 'Ibagué',
+          'neiva' => 'Neiva', 'quibdo' => 'Quibdó', 'leticia' => 'Leticia',
+          'soacha' => 'Soacha', 'chia' => 'Chía', 'zipaquira' => 'Zipaquirá',
+          'mosquera' => 'Mosquera', 'funza' => 'Funza', 'cajica' => 'Cajicá',
+          'soledad' => 'Soledad', 'malambo' => 'Malambo',
+          'buenaventura' => 'Buenaventura', 'tulua' => 'Tuluá',
+          'yumbo' => 'Yumbo', 'itagui' => 'Itagüí', 'caldas' => 'Caldas',
+          'barbosa' => 'Barbosa', 'giron' => 'Girón', 'cienaga' => 'Ciénaga',
+          'bogota' => 'Bogotá', 'cali' => 'Cali', 'bello' => 'Bello',
+      ];
+
+      foreach ($ciudades as $needle => $nombre) {
+          if (strpos($t, $needle) !== false) {
+              return $nombre;
+          }
+      }
+      return null;
+  }
+
   private function validarCoberturaDireccion(
       string $direccion,
       ?string $barrio = null,
@@ -2517,11 +2566,21 @@ TXT;
         $direccion = trim((string) ($orderData['address'] ?? ''));
         $barrio    = trim((string) ($orderData['neighborhood'] ?? ''));
 
+        // 🧠 Detectar ciudad: priorizar el campo explícito, si no viene
+        // intentar extraerla del texto de la dirección (busca nombres de
+        // ciudades grandes al final). Default seguro: la ciudad de la sede.
+        $ciudadOrden = trim((string) ($orderData['city'] ?? ''));
+        if ($ciudadOrden === '') {
+            $ciudadOrden = $this->detectarCiudadDesdeDireccion($direccion)
+                ?? $this->detectarCiudadDesdeDireccion($barrio)
+                ?? 'Bello'; // fallback final
+        }
+
         // Resolver zona de cobertura — primero por barrio, si falla intenta geocode
         $validacion = $this->validarCoberturaDireccion(
             $direccion,
             $barrio,
-            'Bello',
+            $ciudadOrden,
             $sede?->id,
             $from
         );
