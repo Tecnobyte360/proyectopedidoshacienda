@@ -75,12 +75,12 @@
                 <h3 class="text-sm font-bold text-slate-800">Buscar y dibujar área automáticamente</h3>
             </div>
             <p class="text-xs text-slate-600 mb-3">
-                Escribe el nombre de un barrio, ciudad o área (ej: <em>"Niquía"</em>, <em>"Área Metropolitana del Valle de Aburrá"</em>, <em>"Bello"</em>). Si OpenStreetMap tiene su polígono administrativo, se dibuja automáticamente.
+                Escribe el nombre de un barrio, ciudad, departamento, área metropolitana o <strong>país completo</strong> (ej: <em>"Niquía"</em>, <em>"Bello"</em>, <em>"Antioquia"</em>, <em>"Colombia"</em>, <em>"México"</em>). Si OpenStreetMap tiene su polígono administrativo, se dibuja automáticamente.
             </p>
 
-            <div class="flex gap-2">
+            <div class="flex gap-2 items-center">
                 <input type="text" id="gmaps-busqueda-area"
-                       placeholder="Ej: Niquía, Bello, Área Metropolitana..."
+                       placeholder="Ej: Niquía, Bello, Antioquia, Colombia, México..."
                        class="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                        onkeydown="if(event.key==='Enter'){event.preventDefault();gmapsSedeBuscarArea();}">
                 <button type="button" onclick="gmapsSedeBuscarArea()"
@@ -89,6 +89,11 @@
                     <i class="fa-solid fa-search mr-1"></i> Buscar y dibujar
                 </button>
             </div>
+
+            <label class="mt-2 inline-flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+                <input type="checkbox" id="gmaps-busqueda-mundial" class="rounded border-slate-300 text-blue-600">
+                <span>🌎 Buscar en todo el mundo (no solo Colombia)</span>
+            </label>
 
             <div id="gmaps-busqueda-resultados" class="mt-2 hidden">
                 <p class="text-[11px] text-slate-500 mb-1">Encontré varios. Click en uno para dibujarlo:</p>
@@ -245,12 +250,23 @@
 
                 try {
                     // Buscar en Nominatim con polygon_geojson=1 para obtener forma
+                    const mundial = document.getElementById('gmaps-busqueda-mundial')?.checked;
+                    // Heurística: si la consulta parece un país (ej: "colombia", "mexico"),
+                    // o el usuario activó búsqueda mundial → no restringir a Colombia.
+                    const paisesComunes = ['colombia','mexico','méxico','peru','perú','chile','argentina','ecuador','venezuela','panama','panamá','costa rica','guatemala','honduras','nicaragua','el salvador','cuba','republica dominicana','república dominicana','bolivia','paraguay','uruguay','brasil','brazil','estados unidos','usa','united states','españa','spain','francia','france','italia','italy','alemania','germany','portugal','reino unido','uk'];
+                    const pareceQueriesPais = paisesComunes.some(p => query.toLowerCase() === p);
+
                     const url = new URL('https://nominatim.openstreetmap.org/search');
-                    url.searchParams.set('q', query + ', Colombia');
+                    url.searchParams.set('q', mundial || pareceQueriesPais ? query : query + ', Colombia');
                     url.searchParams.set('format', 'json');
                     url.searchParams.set('polygon_geojson', '1');
+                    // Simplificar polígonos grandes (países tienen miles de puntos).
+                    // 0.01 ≈ ~1km de tolerancia, suficiente para cobertura de envíos.
+                    url.searchParams.set('polygon_threshold', '0.01');
                     url.searchParams.set('limit', '5');
-                    url.searchParams.set('countrycodes', 'co');
+                    if (!mundial && !pareceQueriesPais) {
+                        url.searchParams.set('countrycodes', 'co');
+                    }
 
                     const resp = await fetch(url.toString(), {
                         headers: { 'Accept-Language': 'es' }
