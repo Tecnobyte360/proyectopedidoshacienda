@@ -30,9 +30,15 @@ class GeocodingService
         string $direccion,
         ?string $barrio = null,
         ?string $ciudad = 'Bello',
-        ?string $departamento = 'Antioquia',
+        ?string $departamento = null,
         ?string $pais = 'Colombia'
     ): ?array {
+        // 🧠 Si no nos pasaron departamento, INFIERELO según la ciudad para no
+        // contaminar la query con "Antioquia" cuando la dirección es de Bogotá.
+        // Mapeo de ciudades grandes y de capitales de departamento conocidas.
+        if ($departamento === null && $ciudad) {
+            $departamento = $this->inferirDepartamento($ciudad);
+        }
         // 🌍 PREFERIR Google Geocoding API si el tenant tiene server key
         $resultadoGoogle = $this->geocodificarGoogle($direccion, $barrio, $ciudad, $departamento, $pais);
         if ($resultadoGoogle) return $resultadoGoogle;
@@ -240,5 +246,98 @@ class GeocodingService
                 return null;
             }
         });
+    }
+
+    /**
+     * Infiere el departamento colombiano a partir del nombre de ciudad.
+     * Si la ciudad no está en el mapa, devuelve null (mejor sin departamento
+     * que con uno equivocado — Google resuelve mejor sin contradicciones).
+     */
+    private function inferirDepartamento(string $ciudad): ?string
+    {
+        $c = mb_strtolower(trim($ciudad));
+        // Quitar tildes y caracteres especiales para matching robusto
+        $c = strtr($c, ['á'=>'a','é'=>'e','í'=>'i','ó'=>'o','ú'=>'u','ñ'=>'n']);
+
+        $mapa = [
+            // Bogotá D.C.
+            'bogota' => 'Cundinamarca', 'bogota d.c.' => 'Cundinamarca',
+            'soacha' => 'Cundinamarca', 'chia' => 'Cundinamarca', 'zipaquira' => 'Cundinamarca',
+            'mosquera' => 'Cundinamarca', 'funza' => 'Cundinamarca', 'cajica' => 'Cundinamarca',
+
+            // Antioquia
+            'medellin' => 'Antioquia', 'bello' => 'Antioquia', 'envigado' => 'Antioquia',
+            'itagui' => 'Antioquia', 'sabaneta' => 'Antioquia', 'la estrella' => 'Antioquia',
+            'caldas' => 'Antioquia', 'copacabana' => 'Antioquia', 'girardota' => 'Antioquia',
+            'barbosa' => 'Antioquia', 'rionegro' => 'Antioquia', 'concordia' => 'Antioquia',
+
+            // Valle del Cauca
+            'cali' => 'Valle del Cauca', 'palmira' => 'Valle del Cauca',
+            'buenaventura' => 'Valle del Cauca', 'tulua' => 'Valle del Cauca',
+            'jamundi' => 'Valle del Cauca', 'yumbo' => 'Valle del Cauca',
+
+            // Atlántico
+            'barranquilla' => 'Atlantico', 'soledad' => 'Atlantico', 'malambo' => 'Atlantico',
+
+            // Bolívar
+            'cartagena' => 'Bolivar', 'magangue' => 'Bolivar',
+
+            // Magdalena
+            'santa marta' => 'Magdalena', 'cienaga' => 'Magdalena',
+
+            // Cesar
+            'valledupar' => 'Cesar',
+
+            // Santander
+            'bucaramanga' => 'Santander', 'floridablanca' => 'Santander',
+            'giron' => 'Santander', 'piedecuesta' => 'Santander',
+
+            // Norte de Santander
+            'cucuta' => 'Norte de Santander',
+
+            // Risaralda
+            'pereira' => 'Risaralda', 'dosquebradas' => 'Risaralda',
+
+            // Quindío
+            'armenia' => 'Quindio',
+
+            // Caldas
+            'manizales' => 'Caldas',
+
+            // Tolima
+            'ibague' => 'Tolima',
+
+            // Huila
+            'neiva' => 'Huila',
+
+            // Nariño
+            'pasto' => 'Narino', 'ipiales' => 'Narino', 'tumaco' => 'Narino',
+
+            // Cauca
+            'popayan' => 'Cauca',
+
+            // Boyacá
+            'tunja' => 'Boyaca', 'duitama' => 'Boyaca', 'sogamoso' => 'Boyaca',
+
+            // Meta
+            'villavicencio' => 'Meta',
+
+            // Córdoba
+            'monteria' => 'Cordoba',
+
+            // Sucre
+            'sincelejo' => 'Sucre',
+
+            // La Guajira
+            'riohacha' => 'La Guajira', 'maicao' => 'La Guajira',
+
+            // Chocó
+            'quibdo' => 'Choco',
+
+            // Amazonas
+            'leticia' => 'Amazonas',
+        ];
+
+        return $mapa[$c] ?? null;
     }
 }
