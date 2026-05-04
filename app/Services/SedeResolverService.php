@@ -46,7 +46,7 @@ class SedeResolverService
         // Sedes que cubren el punto vía point-in-polygon
         $candidatas = $sedesActivas
             ->filter(fn ($s) => $s->cobertura_activa && $s->tieneCobertura())
-            ->filter(fn ($s) => $this->puntoEnPoligono($lat, $lng, $s->cobertura_poligono))
+            ->filter(fn ($s) => $this->puntoEnAlgunPoligono($lat, $lng, $s->poligonosNormalizados()))
             ->map(function ($s) use ($lat, $lng) {
                 $s->_distancia_punto_km = $s->distanciaA($lat, $lng);
                 return $s;
@@ -103,6 +103,23 @@ class SedeResolverService
         $q = Sede::where('activa', true);
         if ($tenantId) $q->where('tenant_id', $tenantId);
         return $q->get();
+    }
+
+    /**
+     * Verifica si un punto está dentro de CUALQUIERA de varios polígonos.
+     * Usado para sedes con cobertura multi-zona (ej: Bello + Envigado + Sabaneta
+     * como una sola sede).
+     *
+     * @param array $poligonos array de polígonos: [[[lat,lng]...], [[lat,lng]...], ...]
+     */
+    public function puntoEnAlgunPoligono(float $lat, float $lng, array $poligonos): bool
+    {
+        foreach ($poligonos as $poly) {
+            if (is_array($poly) && $this->puntoEnPoligono($lat, $lng, $poly)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

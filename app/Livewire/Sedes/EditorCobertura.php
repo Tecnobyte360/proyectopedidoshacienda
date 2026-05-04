@@ -30,9 +30,27 @@ class EditorCobertura extends Component
         $this->cobertura_centro_lng = $sede->cobertura_centro_lng ?: $sede->longitud;
     }
 
+    /**
+     * Recibe los polígonos desde el editor.
+     * Acepta:
+     *   - 'polygons' => [[[lat,lng]...], [[lat,lng]...]]  (multi-zona, nuevo)
+     *   - 'coordinates' => [[lat,lng]...]                  (legacy, una sola zona)
+     */
     public function actualizarPoligono(array $data): void
     {
-        $this->cobertura_poligono   = $data['coordinates'] ?? null;
+        if (isset($data['polygons']) && is_array($data['polygons']) && count($data['polygons']) > 0) {
+            // Filtrar polígonos válidos (mínimo 3 puntos)
+            $polys = array_values(array_filter(
+                $data['polygons'],
+                fn ($p) => is_array($p) && count($p) >= 3
+            ));
+            $this->cobertura_poligono = count($polys) > 0 ? $polys : null;
+        } else {
+            // Legacy: una sola zona — la envolvemos como multi para uniformidad
+            $coords = $data['coordinates'] ?? null;
+            $this->cobertura_poligono = (is_array($coords) && count($coords) >= 3) ? [$coords] : null;
+        }
+
         $this->cobertura_centro_lat = isset($data['center']['lat']) ? (float) $data['center']['lat'] : null;
         $this->cobertura_centro_lng = isset($data['center']['lng']) ? (float) $data['center']['lng'] : null;
         $this->area_km2 = isset($data['area_km2']) ? (float) $data['area_km2'] : null;
@@ -40,19 +58,37 @@ class EditorCobertura extends Component
 
     public function guardar(): void
     {
-        if (!$this->cobertura_poligono || count($this->cobertura_poligono) < 3) {
-            $this->dispatch('notify', ['type' => 'warning', 'message' => 'Dibuja un polígono primero (mínimo 3 puntos).']);
+        // Validar que al menos un polígono tenga 3+ puntos
+        $polys = $this->cobertura_poligono ?: [];
+        // Detectar si ya viene en formato multi o aún en legacy
+        $primero = $polys[0] ?? null;
+        if (is_array($primero) && isset($primero[0]) && !is_array($primero[0])) {
+            // Está en legacy [[lat,lng],...] — wrap
+            $polys = [$polys];
+        }
+
+        $valido = false;
+        foreach ($polys as $p) {
+            if (is_array($p) && count($p) >= 3) { $valido = true; break; }
+        }
+
+        if (!$valido) {
+            $this->dispatch('notify', ['type' => 'warning', 'message' => 'Dibuja al menos una zona válida (mínimo 3 puntos).']);
             return;
         }
 
         $this->sede->update([
-            'cobertura_poligono'   => $this->cobertura_poligono,
+            'cobertura_poligono'   => $polys,
             'cobertura_centro_lat' => $this->cobertura_centro_lat,
             'cobertura_centro_lng' => $this->cobertura_centro_lng,
             'cobertura_activa'     => true,
         ]);
 
-        $this->dispatch('notify', ['type' => 'success', 'message' => '✓ Cobertura de la sede guardada.']);
+        $count = count($polys);
+        $msg = $count > 1
+            ? "✓ Cobertura guardada con {$count} zonas."
+            : "✓ Cobertura de la sede guardada.";
+        $this->dispatch('notify', ['type' => 'success', 'message' => $msg]);
     }
 
     public function render()

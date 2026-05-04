@@ -87,11 +87,15 @@
                     </div>
 
                     {{-- Indicador de cobertura --}}
-                    @if (!empty($sede->cobertura_poligono) && count($sede->cobertura_poligono) >= 3)
+                    @php
+                        $polysSede = $sede->poligonosNormalizados();
+                        $totalPtsSede = array_sum(array_map('count', $polysSede));
+                    @endphp
+                    @if ($sede->tieneCobertura())
                         <div class="rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2 text-xs">
                             <i class="fa-solid fa-map text-emerald-600 mr-1"></i>
                             <strong class="text-emerald-800">Cobertura activa</strong>
-                            <span class="text-emerald-600">— {{ count($sede->cobertura_poligono) }} pts · ${{ number_format($sede->cobertura_costo_envio ?? 0, 0, ',', '.') }} · {{ $sede->cobertura_tiempo_min ?? 45 }} min</span>
+                            <span class="text-emerald-600">— {{ count($polysSede) }} zona(s) · {{ $totalPtsSede }} pts · ${{ number_format($sede->cobertura_costo_envio ?? 0, 0, ',', '.') }} · {{ $sede->cobertura_tiempo_min ?? 45 }} min</span>
                         </div>
                     @else
                         <div class="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs">

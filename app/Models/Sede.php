@@ -52,13 +52,44 @@ class Sede extends Model
     ];
 
     /**
-     * ¿Esta sede tiene polígono de cobertura definido?
+     * ¿Esta sede tiene polígono(s) de cobertura definido(s)?
+     * Soporta tanto formato simple [[lat,lng],...] como multi [[[lat,lng]...],...].
      */
     public function tieneCobertura(): bool
     {
-        return !empty($this->cobertura_poligono)
-            && is_array($this->cobertura_poligono)
-            && count($this->cobertura_poligono) >= 3;
+        $polys = $this->poligonosNormalizados();
+        foreach ($polys as $p) {
+            if (is_array($p) && count($p) >= 3) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Devuelve SIEMPRE un array de polígonos (multi-zona).
+     * Si la cobertura está guardada como polígono único legacy, lo envuelve.
+     *
+     * Formato siempre garantizado: [[[lat,lng], ...], [[lat,lng], ...], ...]
+     */
+    public function poligonosNormalizados(): array
+    {
+        $p = $this->cobertura_poligono;
+        if (!is_array($p) || empty($p)) return [];
+
+        $primero = $p[0] ?? null;
+        if (!is_array($primero)) return [];
+
+        // Detectar formato:
+        //  - simple: [[lat,lng], [lat,lng], ...] → primero es [lat,lng] (2 numéricos)
+        //  - multi:  [[[lat,lng], ...], ...]    → primero es array de puntos
+        $primerSubElemento = $primero[0] ?? null;
+
+        if (is_array($primerSubElemento)) {
+            // Ya es multi
+            return $p;
+        }
+
+        // Es simple → wrap
+        return [$p];
     }
 
     /**

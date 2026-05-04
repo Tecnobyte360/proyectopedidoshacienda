@@ -43,9 +43,9 @@
         {{-- Stats --}}
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
             <div class="rounded-xl bg-white p-3 shadow border border-slate-200">
-                <div class="text-[11px] text-slate-500">Vértices</div>
-                <div class="text-xl font-extrabold text-slate-800">
-                    {{ count($cobertura_poligono ?? []) }}
+                <div class="text-[11px] text-slate-500">Zonas / vértices</div>
+                <div class="text-xl font-extrabold text-slate-800" id="gmaps-sede-conteo-zonas">
+                    —
                 </div>
             </div>
             <div class="rounded-xl bg-white p-3 shadow border border-slate-200">
@@ -103,8 +103,31 @@
             <div id="gmaps-busqueda-error" class="mt-2 hidden rounded-lg bg-rose-50 border border-rose-200 px-3 py-2 text-xs text-rose-700"></div>
         </div>
 
-        <div id="gmaps-sede-editor" style="height: 65vh; width: 100%; border-radius: 1rem; border: 1px solid #cbd5e1;"></div>
-        <div id="gmaps-sede-status" class="mt-2 text-xs text-slate-500 font-mono"></div>
+        <div class="grid grid-cols-1 lg:grid-cols-[1fr,280px] gap-3">
+            <div>
+                <div id="gmaps-sede-editor" style="height: 65vh; width: 100%; border-radius: 1rem; border: 1px solid #cbd5e1;"></div>
+                <div id="gmaps-sede-status" class="mt-2 text-xs text-slate-500 font-mono"></div>
+            </div>
+
+            {{-- 🗂️ Panel lateral de zonas --}}
+            <div class="rounded-2xl bg-white border-2 border-slate-200 p-3 shadow-sm">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-sm font-bold text-slate-800">
+                        <i class="fa-solid fa-layer-group text-emerald-600 mr-1"></i> Zonas
+                    </h3>
+                    <button type="button" onclick="gmapsSedeNuevaZona()"
+                            class="rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1 text-[11px] font-bold">
+                        <i class="fa-solid fa-plus mr-1"></i> Nueva zona
+                    </button>
+                </div>
+                <p class="text-[11px] text-slate-500 mb-2">
+                    Puedes combinar varias áreas (ej: Bello + Envigado + Sabaneta) o un país completo.
+                </p>
+                <div id="gmaps-sede-zonas-lista" class="space-y-1 max-h-[55vh] overflow-y-auto">
+                    <p class="text-[11px] text-slate-400 italic" id="gmaps-zonas-empty">Sin zonas aún. Usa el buscador o el lápiz del mapa.</p>
+                </div>
+            </div>
+        </div>
 
         <script src="https://maps.googleapis.com/maps/api/js?key={{ $config['api_key'] }}&libraries=drawing,geometry&language=es&region=CO"
                 defer
@@ -112,7 +135,8 @@
 
         <script>
             window.gmapsSedeState = {
-                polygon: null,
+                polygons: [],     // ✨ multi-zona: array de google.maps.Polygon
+                nombresZonas: [], // labels paralelos a polygons
                 drawingManager: null,
                 map: null,
                 poligonoInicial: @json($cobertura_poligono),
@@ -126,30 +150,140 @@
                 if (el) el.textContent = msg;
             }
 
-            function gmapsSedeCalcularYEnviar(polygon) {
-                const path = polygon.getPath();
+            // Convierte un google.maps.Polygon a [[lat,lng],...]
+            function gmapsSedePathToCoords(polygon) {
                 const coords = [];
-                path.forEach(latlng => coords.push([latlng.lat(), latlng.lng()]));
-
-                if (coords.length > 0 && (coords[0][0] !== coords[coords.length-1][0] || coords[0][1] !== coords[coords.length-1][1])) {
-                    coords.push(coords[0]);
+                polygon.getPath().forEach(latlng => coords.push([latlng.lat(), latlng.lng()]));
+                if (coords.length > 0) {
+                    const a = coords[0], b = coords[coords.length-1];
+                    if (a[0] !== b[0] || a[1] !== b[1]) coords.push(a);
                 }
+                return coords;
+            }
 
-                const center = coords.reduce((acc, c) => ({ lat: acc.lat + c[0]/coords.length, lng: acc.lng + c[1]/coords.length }), { lat: 0, lng: 0 });
+            // Recopila TODAS las zonas y las envía a Livewire (estructura multi).
+            function gmapsSedeSyncEstado() {
+                const state = window.gmapsSedeState;
+                const polygons = state.polygons.map(p => gmapsSedePathToCoords(p)).filter(c => c.length >= 3);
 
+                // Centro = promedio de todos los puntos de todas las zonas
+                let totalLat = 0, totalLng = 0, totalPts = 0;
+                polygons.forEach(coords => coords.forEach(c => { totalLat += c[0]; totalLng += c[1]; totalPts++; }));
+                const center = totalPts > 0 ? { lat: totalLat/totalPts, lng: totalLng/totalPts } : { lat: 0, lng: 0 };
+
+                // Área total
                 let areaKm2 = 0;
                 try {
-                    const m2 = google.maps.geometry.spherical.computeArea(path);
-                    areaKm2 = m2 / 1_000_000;
+                    state.polygons.forEach(p => {
+                        areaKm2 += google.maps.geometry.spherical.computeArea(p.getPath()) / 1_000_000;
+                    });
                 } catch (e) {}
 
-                gmapsSedeSetStatus(`✓ Polígono: ${coords.length} vértices · Área: ${areaKm2.toFixed(2)} km²`);
+                const totalVerts = polygons.reduce((acc, c) => acc + c.length, 0);
+                const cnt = document.getElementById('gmaps-sede-conteo-zonas');
+                if (cnt) cnt.textContent = polygons.length + ' / ' + totalVerts;
+
+                gmapsSedeSetStatus(`✓ ${polygons.length} zona(s) · ${totalVerts} vértices · ${areaKm2.toFixed(2)} km²`);
+                gmapsSedeRenderListaZonas();
 
                 @this.actualizarPoligono({
-                    coordinates: coords,
+                    polygons: polygons,
                     center: center,
                     area_km2: areaKm2,
                 });
+            }
+
+            // Renderiza el panel lateral con cada zona y un botón eliminar.
+            function gmapsSedeRenderListaZonas() {
+                const state = window.gmapsSedeState;
+                const lista = document.getElementById('gmaps-sede-zonas-lista');
+                const empty = document.getElementById('gmaps-zonas-empty');
+                if (!lista) return;
+
+                if (state.polygons.length === 0) {
+                    lista.innerHTML = '<p class="text-[11px] text-slate-400 italic">Sin zonas aún. Usa el buscador o el lápiz del mapa.</p>';
+                    return;
+                }
+
+                lista.innerHTML = '';
+                state.polygons.forEach((p, idx) => {
+                    const nombre = state.nombresZonas[idx] || `Zona ${idx+1}`;
+                    const pts = p.getPath().getLength();
+                    const item = document.createElement('div');
+                    item.className = 'rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 flex items-center justify-between gap-2 hover:bg-slate-100';
+                    item.innerHTML = `
+                        <div class="flex-1 min-w-0">
+                            <div class="text-[11px] font-bold text-slate-800 truncate" title="${nombre}">
+                                <span class="inline-block w-2 h-2 rounded-full mr-1" style="background:${state.color}"></span>
+                                ${nombre}
+                            </div>
+                            <div class="text-[10px] text-slate-500">${pts} pts</div>
+                        </div>
+                        <button type="button" class="text-rose-600 hover:text-rose-800 text-xs" title="Eliminar zona">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    `;
+                    item.querySelector('button').onclick = () => gmapsSedeEliminarZona(idx);
+                    item.querySelector('div.flex-1').onclick = () => {
+                        // Centrar el mapa en esta zona
+                        const bounds = new google.maps.LatLngBounds();
+                        p.getPath().forEach(ll => bounds.extend(ll));
+                        state.map.fitBounds(bounds);
+                    };
+                    lista.appendChild(item);
+                });
+            }
+
+            function gmapsSedeEliminarZona(idx) {
+                const state = window.gmapsSedeState;
+                if (!state.polygons[idx]) return;
+                state.polygons[idx].setMap(null);
+                state.polygons.splice(idx, 1);
+                state.nombresZonas.splice(idx, 1);
+                gmapsSedeSyncEstado();
+            }
+
+            // Activa el drawing manager para dibujar UNA nueva zona manual.
+            function gmapsSedeNuevaZona() {
+                const state = window.gmapsSedeState;
+                if (!state.drawingManager) return;
+                state.drawingManager.setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
+                gmapsSedeSetStatus('✏️ Modo dibujo activo. Haz clic en el mapa para trazar la nueva zona.');
+            }
+
+            // Conecta listeners a un Polygon para que ediciones disparen sync.
+            function gmapsSedeConectarListeners(polygon) {
+                const onChange = () => gmapsSedeSyncEstado();
+                google.maps.event.addListener(polygon.getPath(), 'set_at', onChange);
+                google.maps.event.addListener(polygon.getPath(), 'insert_at', onChange);
+                google.maps.event.addListener(polygon.getPath(), 'remove_at', onChange);
+            }
+
+            // Agrega un nuevo polígono al state.
+            function gmapsSedeAgregarPoligono(coords, nombre = null) {
+                const state = window.gmapsSedeState;
+                if (!coords || coords.length < 3) return null;
+
+                const path = coords.map(c =>
+                    Array.isArray(c) ? { lat: c[0], lng: c[1] } : c
+                );
+
+                const poly = new google.maps.Polygon({
+                    paths: path,
+                    editable: true,
+                    draggable: false,
+                    strokeColor: state.color,
+                    strokeOpacity: 0.9,
+                    strokeWeight: 2,
+                    fillColor: state.color,
+                    fillOpacity: 0.25,
+                });
+                poly.setMap(state.map);
+                gmapsSedeConectarListeners(poly);
+
+                state.polygons.push(poly);
+                state.nombresZonas.push(nombre || `Zona ${state.polygons.length}`);
+                return poly;
             }
 
             function initGoogleMapsSedeEditor() {
@@ -163,35 +297,33 @@
                     fullscreenControl: true,
                 });
 
-                if (state.poligonoInicial && Array.isArray(state.poligonoInicial) && state.poligonoInicial.length >= 3) {
-                    const path = state.poligonoInicial.map(p => ({ lat: p[0], lng: p[1] }));
-                    state.polygon = new google.maps.Polygon({
-                        paths: path,
-                        editable: true,
-                        draggable: true,
-                        strokeColor: state.color,
-                        strokeOpacity: 0.9,
-                        strokeWeight: 2,
-                        fillColor: state.color,
-                        fillOpacity: 0.25,
+                // Cargar polígono(s) inicial(es). Soporta:
+                //   - legacy: [[lat,lng],...]            (un solo polígono)
+                //   - multi:  [[[lat,lng],...], ...]     (varias zonas)
+                if (state.poligonoInicial && Array.isArray(state.poligonoInicial) && state.poligonoInicial.length > 0) {
+                    const primero = state.poligonoInicial[0];
+                    const esMulti = Array.isArray(primero) && Array.isArray(primero[0]);
+
+                    const todasLasZonas = esMulti ? state.poligonoInicial : [state.poligonoInicial];
+                    const boundsTotales = new google.maps.LatLngBounds();
+
+                    todasLasZonas.forEach((coords, i) => {
+                        if (Array.isArray(coords) && coords.length >= 3) {
+                            gmapsSedeAgregarPoligono(coords, `Zona ${i+1}`);
+                            coords.forEach(c => boundsTotales.extend({ lat: c[0], lng: c[1] }));
+                        }
                     });
-                    state.polygon.setMap(state.map);
 
-                    const bounds = new google.maps.LatLngBounds();
-                    path.forEach(p => bounds.extend(p));
-                    state.map.fitBounds(bounds);
-
-                    google.maps.event.addListener(state.polygon.getPath(), 'set_at', () => gmapsSedeCalcularYEnviar(state.polygon));
-                    google.maps.event.addListener(state.polygon.getPath(), 'insert_at', () => gmapsSedeCalcularYEnviar(state.polygon));
-                    google.maps.event.addListener(state.polygon.getPath(), 'remove_at', () => gmapsSedeCalcularYEnviar(state.polygon));
-
-                    gmapsSedeSetStatus('Polígono cargado. Arrastra los puntos para editarlo.');
+                    if (state.polygons.length > 0) {
+                        state.map.fitBounds(boundsTotales);
+                        gmapsSedeSetStatus(`Cargada(s) ${state.polygons.length} zona(s).`);
+                    }
                 } else {
-                    gmapsSedeSetStatus('Sin polígono. Usa la herramienta del lápiz para dibujar.');
+                    gmapsSedeSetStatus('Sin zonas. Busca un lugar o usa el lápiz para dibujar.');
                 }
 
                 state.drawingManager = new google.maps.drawing.DrawingManager({
-                    drawingMode: state.polygon ? null : google.maps.drawing.OverlayType.POLYGON,
+                    drawingMode: state.polygons.length === 0 ? google.maps.drawing.OverlayType.POLYGON : null,
                     drawingControl: true,
                     drawingControlOptions: {
                         position: google.maps.ControlPosition.TOP_LEFT,
@@ -199,7 +331,7 @@
                     },
                     polygonOptions: {
                         editable: true,
-                        draggable: true,
+                        draggable: false,
                         strokeColor: state.color,
                         strokeOpacity: 0.9,
                         strokeWeight: 2,
@@ -209,17 +341,18 @@
                 });
                 state.drawingManager.setMap(state.map);
 
+                // Cuando termina de dibujar manual → AGREGA (no reemplaza)
                 google.maps.event.addListener(state.drawingManager, 'polygoncomplete', (poly) => {
-                    if (state.polygon) state.polygon.setMap(null);
-                    state.polygon = poly;
+                    state.polygons.push(poly);
+                    state.nombresZonas.push(`Zona ${state.polygons.length}`);
+                    gmapsSedeConectarListeners(poly);
                     state.drawingManager.setDrawingMode(null);
-
-                    google.maps.event.addListener(poly.getPath(), 'set_at', () => gmapsSedeCalcularYEnviar(poly));
-                    google.maps.event.addListener(poly.getPath(), 'insert_at', () => gmapsSedeCalcularYEnviar(poly));
-                    google.maps.event.addListener(poly.getPath(), 'remove_at', () => gmapsSedeCalcularYEnviar(poly));
-
-                    gmapsSedeCalcularYEnviar(poly);
+                    gmapsSedeSyncEstado();
                 });
+
+                // Render inicial
+                gmapsSedeRenderListaZonas();
+                if (state.polygons.length > 0) gmapsSedeSyncEstado();
             }
 
             // ═══════════════════════════════════════════════════════════════
@@ -353,38 +486,22 @@
                     return;
                 }
 
-                // Quitar polígono actual y dibujar el nuevo
-                if (state.polygon) state.polygon.setMap(null);
+                // ✨ AGREGAR (no reemplazar) → soporta múltiples zonas combinadas
+                const nombreCorto = (lugar.display_name || 'Zona').split(',').slice(0, 2).join(',').trim();
+                const coordsArr = coords.map(c => [c.lat, c.lng]);
+                gmapsSedeAgregarPoligono(coordsArr, nombreCorto);
 
-                state.polygon = new google.maps.Polygon({
-                    paths: coords,
-                    editable: true,
-                    draggable: false,
-                    strokeColor: state.color,
-                    strokeOpacity: 0.9,
-                    strokeWeight: 2,
-                    fillColor: state.color,
-                    fillOpacity: 0.25,
-                });
-                state.polygon.setMap(state.map);
-
-                // Listeners para edición posterior
-                google.maps.event.addListener(state.polygon.getPath(), 'set_at', () => gmapsSedeCalcularYEnviar(state.polygon));
-                google.maps.event.addListener(state.polygon.getPath(), 'insert_at', () => gmapsSedeCalcularYEnviar(state.polygon));
-                google.maps.event.addListener(state.polygon.getPath(), 'remove_at', () => gmapsSedeCalcularYEnviar(state.polygon));
-
-                // Apagar drawing manager (ya hay polígono)
                 state.drawingManager.setDrawingMode(null);
 
-                // Centrar el mapa en el polígono
+                // Centrar en el polígono recién agregado
                 const bounds = new google.maps.LatLngBounds();
                 coords.forEach(p => bounds.extend(p));
                 state.map.fitBounds(bounds);
 
-                gmapsSedeSetStatus('✅ Polígono de "' + lugar.display_name + '" cargado (' + coords.length + ' pts). Puedes ajustarlo o guardarlo.');
+                gmapsSedeSetStatus('✅ "' + nombreCorto + '" agregado como zona ' + state.polygons.length + ' (' + coords.length + ' pts). Busca otra para combinar o guarda.');
 
-                // Persistir en Livewire
-                gmapsSedeCalcularYEnviar(state.polygon);
+                // Persistir en Livewire (todas las zonas)
+                gmapsSedeSyncEstado();
             }
         </script>
     @endif
