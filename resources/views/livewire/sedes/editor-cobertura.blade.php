@@ -105,7 +105,10 @@
 
         <div class="grid grid-cols-1 lg:grid-cols-[1fr,280px] gap-3">
             <div>
-                <div id="gmaps-sede-editor" style="height: 65vh; width: 100%; border-radius: 1rem; border: 1px solid #cbd5e1;"></div>
+                {{-- 🔒 wire:ignore es CRÍTICO: evita que Livewire borre el mapa al re-renderizar --}}
+                <div wire:ignore id="gmaps-sede-editor-wrap">
+                    <div id="gmaps-sede-editor" style="height: 65vh; width: 100%; border-radius: 1rem; border: 1px solid #cbd5e1;"></div>
+                </div>
                 <div id="gmaps-sede-status" class="mt-2 text-xs text-slate-500 font-mono"></div>
             </div>
 
@@ -123,7 +126,7 @@
                 <p class="text-[11px] text-slate-500 mb-2">
                     Puedes combinar varias áreas (ej: Bello + Envigado + Sabaneta) o un país completo.
                 </p>
-                <div id="gmaps-sede-zonas-lista" class="space-y-1 max-h-[55vh] overflow-y-auto">
+                <div wire:ignore id="gmaps-sede-zonas-lista" class="space-y-1 max-h-[55vh] overflow-y-auto">
                     <p class="text-[11px] text-slate-400 italic" id="gmaps-zonas-empty">Sin zonas aún. Usa el buscador o el lápiz del mapa.</p>
                 </div>
             </div>
