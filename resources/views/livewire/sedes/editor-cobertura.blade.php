@@ -68,7 +68,37 @@
             </div>
         </div>
 
-        <div id="gmaps-sede-editor" style="height: 70vh; width: 100%; border-radius: 1rem; border: 1px solid #cbd5e1;"></div>
+        {{-- 🔍 Buscador inteligente de áreas administrativas --}}
+        <div class="rounded-2xl bg-white border-2 border-blue-200 p-4 mb-4 shadow-sm">
+            <div class="flex items-center gap-2 mb-2">
+                <i class="fa-solid fa-magnifying-glass-location text-blue-600 text-lg"></i>
+                <h3 class="text-sm font-bold text-slate-800">Buscar y dibujar área automáticamente</h3>
+            </div>
+            <p class="text-xs text-slate-600 mb-3">
+                Escribe el nombre de un barrio, ciudad o área (ej: <em>"Niquía"</em>, <em>"Área Metropolitana del Valle de Aburrá"</em>, <em>"Bello"</em>). Si OpenStreetMap tiene su polígono administrativo, se dibuja automáticamente.
+            </p>
+
+            <div class="flex gap-2">
+                <input type="text" id="gmaps-busqueda-area"
+                       placeholder="Ej: Niquía, Bello, Área Metropolitana..."
+                       class="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                       onkeydown="if(event.key==='Enter'){event.preventDefault();gmapsSedeBuscarArea();}">
+                <button type="button" onclick="gmapsSedeBuscarArea()"
+                        id="gmaps-btn-buscar"
+                        class="rounded-xl bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 text-sm font-bold whitespace-nowrap shadow disabled:opacity-50">
+                    <i class="fa-solid fa-search mr-1"></i> Buscar y dibujar
+                </button>
+            </div>
+
+            <div id="gmaps-busqueda-resultados" class="mt-2 hidden">
+                <p class="text-[11px] text-slate-500 mb-1">Encontré varios. Click en uno para dibujarlo:</p>
+                <div id="gmaps-resultados-lista" class="space-y-1"></div>
+            </div>
+
+            <div id="gmaps-busqueda-error" class="mt-2 hidden rounded-lg bg-rose-50 border border-rose-200 px-3 py-2 text-xs text-rose-700"></div>
+        </div>
+
+        <div id="gmaps-sede-editor" style="height: 65vh; width: 100%; border-radius: 1rem; border: 1px solid #cbd5e1;"></div>
         <div id="gmaps-sede-status" class="mt-2 text-xs text-slate-500 font-mono"></div>
 
         <script src="https://maps.googleapis.com/maps/api/js?key={{ $config['api_key'] }}&libraries=drawing,geometry&language=es&region=CO"
@@ -185,6 +215,160 @@
 
                     gmapsSedeCalcularYEnviar(poly);
                 });
+            }
+
+            // ═══════════════════════════════════════════════════════════════
+            // 🔍 BUSCADOR INTELIGENTE: escribe nombre → dibuja polígono auto
+            // Usa Nominatim (OpenStreetMap) que es gratis y devuelve polígonos
+            // administrativos para barrios/ciudades/áreas conocidas.
+            // ═══════════════════════════════════════════════════════════════
+
+            async function gmapsSedeBuscarArea() {
+                const input = document.getElementById('gmaps-busqueda-area');
+                const btn = document.getElementById('gmaps-btn-buscar');
+                const errBox = document.getElementById('gmaps-busqueda-error');
+                const listBox = document.getElementById('gmaps-busqueda-resultados');
+                const lista = document.getElementById('gmaps-resultados-lista');
+
+                const query = input.value.trim();
+                if (!query) {
+                    errBox.classList.remove('hidden');
+                    errBox.textContent = '⚠️ Escribe el nombre de un lugar.';
+                    return;
+                }
+
+                errBox.classList.add('hidden');
+                listBox.classList.add('hidden');
+                lista.innerHTML = '';
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Buscando...';
+
+                try {
+                    // Buscar en Nominatim con polygon_geojson=1 para obtener forma
+                    const url = new URL('https://nominatim.openstreetmap.org/search');
+                    url.searchParams.set('q', query + ', Colombia');
+                    url.searchParams.set('format', 'json');
+                    url.searchParams.set('polygon_geojson', '1');
+                    url.searchParams.set('limit', '5');
+                    url.searchParams.set('countrycodes', 'co');
+
+                    const resp = await fetch(url.toString(), {
+                        headers: { 'Accept-Language': 'es' }
+                    });
+                    if (!resp.ok) throw new Error('Error consultando OpenStreetMap');
+                    const datos = await resp.json();
+
+                    if (!datos || datos.length === 0) {
+                        errBox.classList.remove('hidden');
+                        errBox.textContent = '😔 No encontré resultados para "' + query + '". Prueba con otro nombre o dibújalo manualmente con la herramienta del lápiz.';
+                        return;
+                    }
+
+                    // Si solo hay 1 resultado, aplicar directo
+                    if (datos.length === 1) {
+                        gmapsSedeAplicarLugar(datos[0]);
+                        return;
+                    }
+
+                    // Varios → mostrar opciones
+                    listBox.classList.remove('hidden');
+                    datos.forEach((d, idx) => {
+                        const tienePol = d.geojson && (d.geojson.type === 'Polygon' || d.geojson.type === 'MultiPolygon');
+                        const btnRes = document.createElement('button');
+                        btnRes.type = 'button';
+                        btnRes.className = 'w-full text-left rounded-lg border ' + (tienePol ? 'border-blue-200 bg-blue-50 hover:bg-blue-100' : 'border-slate-200 bg-slate-50 hover:bg-slate-100') + ' px-3 py-2 text-xs transition';
+                        btnRes.innerHTML = `
+                            <div class="font-semibold text-slate-800">${d.display_name}</div>
+                            <div class="text-[10px] text-slate-500 mt-0.5">
+                                ${d.type || ''} ${d.class ? '· ' + d.class : ''}
+                                ${tienePol ? '<span class="text-blue-600 font-bold">· ✓ Tiene polígono</span>' : '<span class="text-amber-600">· solo punto</span>'}
+                            </div>
+                        `;
+                        btnRes.onclick = () => gmapsSedeAplicarLugar(d);
+                        lista.appendChild(btnRes);
+                    });
+                } catch (e) {
+                    errBox.classList.remove('hidden');
+                    errBox.textContent = '❌ Error: ' + e.message;
+                } finally {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa-solid fa-search mr-1"></i> Buscar y dibujar';
+                }
+            }
+
+            function gmapsSedeAplicarLugar(lugar) {
+                const state = window.gmapsSedeState;
+                document.getElementById('gmaps-busqueda-resultados').classList.add('hidden');
+
+                if (!lugar.geojson) {
+                    // Solo es un punto, centrar el mapa
+                    if (lugar.lat && lugar.lon) {
+                        state.map.setCenter({ lat: parseFloat(lugar.lat), lng: parseFloat(lugar.lon) });
+                        state.map.setZoom(14);
+                    }
+                    gmapsSedeSetStatus('📍 Centrado en ' + lugar.display_name + ' (sin polígono administrativo, dibújalo manualmente).');
+                    return;
+                }
+
+                // Convertir GeoJSON a path Google Maps [{lat,lng}]
+                let coords = [];
+
+                if (lugar.geojson.type === 'Polygon') {
+                    // Polígono simple — coords[0] es el anillo exterior
+                    coords = lugar.geojson.coordinates[0].map(c => ({ lat: c[1], lng: c[0] }));
+                } else if (lugar.geojson.type === 'MultiPolygon') {
+                    // MultiPolygon — tomar el polígono más grande (mayor área aproximada)
+                    let mayor = lugar.geojson.coordinates[0];
+                    let mayorPts = mayor[0].length;
+                    for (const p of lugar.geojson.coordinates) {
+                        if (p[0].length > mayorPts) {
+                            mayor = p;
+                            mayorPts = p[0].length;
+                        }
+                    }
+                    coords = mayor[0].map(c => ({ lat: c[1], lng: c[0] }));
+                } else {
+                    gmapsSedeSetStatus('⚠️ El lugar no tiene polígono dibujable.');
+                    return;
+                }
+
+                if (coords.length < 3) {
+                    gmapsSedeSetStatus('⚠️ El polígono recibido es inválido.');
+                    return;
+                }
+
+                // Quitar polígono actual y dibujar el nuevo
+                if (state.polygon) state.polygon.setMap(null);
+
+                state.polygon = new google.maps.Polygon({
+                    paths: coords,
+                    editable: true,
+                    draggable: false,
+                    strokeColor: state.color,
+                    strokeOpacity: 0.9,
+                    strokeWeight: 2,
+                    fillColor: state.color,
+                    fillOpacity: 0.25,
+                });
+                state.polygon.setMap(state.map);
+
+                // Listeners para edición posterior
+                google.maps.event.addListener(state.polygon.getPath(), 'set_at', () => gmapsSedeCalcularYEnviar(state.polygon));
+                google.maps.event.addListener(state.polygon.getPath(), 'insert_at', () => gmapsSedeCalcularYEnviar(state.polygon));
+                google.maps.event.addListener(state.polygon.getPath(), 'remove_at', () => gmapsSedeCalcularYEnviar(state.polygon));
+
+                // Apagar drawing manager (ya hay polígono)
+                state.drawingManager.setDrawingMode(null);
+
+                // Centrar el mapa en el polígono
+                const bounds = new google.maps.LatLngBounds();
+                coords.forEach(p => bounds.extend(p));
+                state.map.fitBounds(bounds);
+
+                gmapsSedeSetStatus('✅ Polígono de "' + lugar.display_name + '" cargado (' + coords.length + ' pts). Puedes ajustarlo o guardarlo.');
+
+                // Persistir en Livewire
+                gmapsSedeCalcularYEnviar(state.polygon);
             }
         </script>
     @endif
