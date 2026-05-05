@@ -376,16 +376,23 @@ class BotCatalogoService
 
     /**
      * Genera texto de zonas de cobertura para inyectar en el prompt.
+     *
+     * Combina:
+     *   - Zonas legacy (tabla zonas_cobertura) — sistema viejo por barrios
+     *   - Cobertura por sede (sedes.cobertura_poligono) — sistema nuevo
+     *
+     * Y CIERRA con una regla dura anti-alucinación: si el cliente pregunta
+     * por un país/ciudad que NO esté en estas zonas, el bot DEBE decir que
+     * no hay cobertura, sin importar lo que diga el prompt maestro.
      */
     public function zonasFormateadas(?int $sedeId = null): string
     {
         $zonas = $this->zonasActivas($sedeId);
-
-        if ($zonas->isEmpty()) {
-            return "(No hay zonas de cobertura configuradas — pregunta el barrio y valida con el equipo)";
-        }
+        $sedesConCobertura = $this->sedesConCoberturaResumen($sedeId);
 
         $lineas = [];
+
+        // Zonas legacy
         foreach ($zonas as $z) {
             $linea = "📍 {$z->nombre}";
 
@@ -410,7 +417,90 @@ class BotCatalogoService
             $lineas[] = $linea;
         }
 
-        return implode("\n", $lineas);
+        // Cobertura por polígono de cada sede
+        foreach ($sedesConCobertura as $resumen) {
+            $lineas[] = $resumen;
+        }
+
+        if (empty($lineas)) {
+            return "(⚠️ No hay zonas de cobertura configuradas. Antes de prometer entregas, "
+                 . "siempre llama a `validar_cobertura` con la dirección. "
+                 . "Si devuelve no cubierta, NO inventes cobertura — ofrece recoger en sede.)";
+        }
+
+        $texto = implode("\n", $lineas);
+
+        // 🔒 REGLA DURA ANTI-ALUCINACIÓN
+        $texto .= "\n\n⚠️ **ALCANCE DE COBERTURA REAL — REGLA INVIOLABLE**\n";
+        $texto .= "Las zonas de arriba son las ÚNICAS donde se hacen entregas a domicilio.\n";
+        $texto .= "Si el cliente pregunta por un país, ciudad, departamento o región que NO está\n";
+        $texto .= "explícitamente listado arriba, debes responder que actualmente NO hay cobertura\n";
+        $texto .= "en ese lugar y ofrecer recoger en sede o tomar nota para futuro contacto.\n";
+        $texto .= "❌ PROHIBIDO afirmar que se hacen envíos internacionales (FedEx, DHL, etc) si\n";
+        $texto .= "no aparece explícitamente arriba — aunque el prompt maestro lo mencione.\n";
+        $texto .= "❌ PROHIBIDO inventar cobertura para Brasil, USA, Europa, etc, si no está listada.\n";
+        $texto .= "✅ Si el cliente da una dirección específica, SIEMPRE llama `validar_cobertura`\n";
+        $texto .= "antes de confirmar — la herramienta valida contra el polígono real configurado.";
+
+        return $texto;
+    }
+
+    /**
+     * Resumen humano de la cobertura por sede (sedes.cobertura_poligono).
+     * Usa Reverse-Geocoding del centro de cada zona para nombrar el área.
+     */
+    private function sedesConCoberturaResumen(?int $sedeId = null): array
+    {
+        $tenantId = app(\App\Services\TenantManager::class)->id();
+        if (!$tenantId) return [];
+
+        $q = \App\Models\Sede::where('tenant_id', $tenantId)
+            ->where('activa', true)
+            ->where('cobertura_activa', true);
+
+        if ($sedeId) $q->where('id', $sedeId);
+
+        $sedes = $q->get();
+        $resumenes = [];
+
+        foreach ($sedes as $sede) {
+            if (!$sede->tieneCobertura()) continue;
+
+            $polys = $sede->poligonosNormalizados();
+            $costo = $sede->cobertura_costo_envio > 0
+                ? '$' . $this->formatNumber($sede->cobertura_costo_envio)
+                : 'gratis';
+            $tiempo = $sede->cobertura_tiempo_min ? " (~{$sede->cobertura_tiempo_min} min)" : '';
+
+            // Describir cada zona por su bbox aproximado
+            $descripciones = [];
+            foreach ($polys as $i => $poly) {
+                $lats = array_column($poly, 0);
+                $lngs = array_column($poly, 1);
+                if (empty($lats)) continue;
+
+                $latMin = min($lats); $latMax = max($lats);
+                $lngMin = min($lngs); $lngMax = max($lngs);
+                $rangoLat = $latMax - $latMin;
+                $rangoLng = $lngMax - $lngMin;
+
+                // Heurística simple: si rango > 8°, probablemente es país; > 1°, departamento; menos, ciudad/barrio
+                if ($rangoLat > 8 || $rangoLng > 8) {
+                    $descripciones[] = "Colombia (toda)";
+                } elseif ($rangoLat > 2 || $rangoLng > 2) {
+                    $descripciones[] = "región amplia (~" . round(max($rangoLat, $rangoLng) * 111) . " km)";
+                } elseif ($rangoLat > 0.3 || $rangoLng > 0.3) {
+                    $descripciones[] = "área metropolitana o departamento";
+                } else {
+                    $descripciones[] = "ciudad/barrio (~" . round(max($rangoLat, $rangoLng) * 111, 1) . " km)";
+                }
+            }
+
+            $zonasTexto = implode(' + ', array_unique($descripciones));
+            $resumenes[] = "📍 Sede {$sede->nombre}: cubre {$zonasTexto} — domicilio {$costo}{$tiempo}";
+        }
+
+        return $resumenes;
     }
 
     /**
