@@ -2566,10 +2566,18 @@ TXT;
         $direccion = trim((string) ($orderData['address'] ?? ''));
         $barrio    = trim((string) ($orderData['neighborhood'] ?? ''));
 
-        // 🧠 Detectar ciudad: priorizar el campo explícito, si no viene
-        // intentar extraerla del texto de la dirección (busca nombres de
-        // ciudades grandes al final). Default seguro: la ciudad de la sede.
-        $ciudadOrden = trim((string) ($orderData['city'] ?? ''));
+        // 🧠 Detectar ciudad: priorizar campos explícitos del bot.
+        // El bot LLM puede mandar la ciudad en cualquiera de estos campos:
+        //   - 'city'      (estándar)
+        //   - 'location'  (lo que está mandando OpenAI con el schema actual)
+        //   - 'ciudad'    (por si en español)
+        // Si nada viene, la INFIERE desde el texto de la dirección.
+        $ciudadOrden = trim((string) (
+            $orderData['city']
+            ?? $orderData['location']
+            ?? $orderData['ciudad']
+            ?? ''
+        ));
         if ($ciudadOrden === '') {
             $ciudadOrden = $this->detectarCiudadDesdeDireccion($direccion)
                 ?? $this->detectarCiudadDesdeDireccion($barrio)
@@ -2581,6 +2589,7 @@ TXT;
             'address_raw'   => $orderData['address'] ?? null,
             'neighborhood'  => $orderData['neighborhood'] ?? null,
             'city_raw'      => $orderData['city'] ?? null,
+            'location_raw'  => $orderData['location'] ?? null,
             'direccion_usada' => $direccion,
             'barrio_usado'    => $barrio,
             'ciudad_resuelta' => $ciudadOrden,
@@ -2659,7 +2668,14 @@ TXT;
         // en sede), se permite crearlo sin zona.
         $indicoDomicilio = (!empty($direccion) || !empty($barrio));
 
-        if ($indicoDomicilio && !$zonaCobertura) {
+        // 🌟 La cobertura es válida si:
+        //   (a) tenemos una ZonaCobertura legacy (sistema viejo), O
+        //   (b) el smart resolver de sedes dijo cubierta=true (sistema nuevo)
+        // Antes solo se chequeaba (a), por eso pedidos a Bogotá se rechazaban
+        // aunque la sede tuviera Colombia entera como zona.
+        $coberturaValida = !empty($zonaCobertura) || !empty($validacion['cubierta']);
+
+        if ($indicoDomicilio && !$coberturaValida) {
             Cache::forget($confirmKey);   // liberar el lock de deduplicación
             DB::rollBack();
 
