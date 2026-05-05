@@ -2765,7 +2765,13 @@ TXT;
         $subtotalProductos = 0;
 
         foreach (($orderData['products'] ?? []) as $product) {
-            $entrada = $product['code'] ?? $product['name'] ?? '';
+            // 🐛 BUG FIX: el operador ?? solo reemplaza null, NO string vacío.
+            // El bot LLM frecuentemente manda code:"" (vacío) cuando no sabe el SKU
+            // y el nombre del producto. Antes el catálogo recibía "" y rechazaba.
+            // Ahora preferimos código solo si NO es vacío, sino el nombre.
+            $entrada = !empty(trim((string) ($product['code'] ?? '')))
+                ? trim((string) $product['code'])
+                : trim((string) ($product['name'] ?? ''));
             $producto = $catalogo->resolverProducto($entrada, $sede?->id);
 
             $cantidad = (float) ($product['quantity'] ?? 1);
