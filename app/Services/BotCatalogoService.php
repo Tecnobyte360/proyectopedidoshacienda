@@ -559,10 +559,52 @@ class BotCatalogoService
         }
 
         // 4) Coincidencia parcial
-        return $productos->first(function ($p) use ($entrada) {
+        $parcial = $productos->first(function ($p) use ($entrada) {
             $nombre = $this->normalizar((string) $p->nombre);
             return str_contains($nombre, $entrada) || str_contains($entrada, $nombre);
         });
+        if ($parcial) return $parcial;
+
+        // 5) FUZZY MATCH — tolera typos comunes (Huayacan → Guayacán, etc)
+        // Usa similar_text + Levenshtein contra el nombre del producto.
+        // Umbral: similitud >= 70% O distancia Levenshtein <= 30% del largo.
+        $mejor = null;
+        $mejorScore = 0.0;
+
+        foreach ($productos as $p) {
+            $nombre = $this->normalizar((string) $p->nombre);
+            if ($nombre === '') continue;
+
+            // similar_text: 0..100, mientras más alto mejor
+            similar_text($entrada, $nombre, $similitud);
+
+            // También probar contra primer token del nombre (ej: "guayacan")
+            $primerTokenNombre = explode(' ', $nombre)[0] ?? '';
+            $primerTokenEntrada = explode(' ', $entrada)[0] ?? '';
+            $sim2 = 0.0;
+            if ($primerTokenNombre && $primerTokenEntrada) {
+                similar_text($primerTokenEntrada, $primerTokenNombre, $sim2);
+            }
+
+            // Tomar la mejor de las dos similitudes
+            $score = max($similitud, $sim2);
+
+            if ($score > $mejorScore && $score >= 70) {
+                $mejorScore = $score;
+                $mejor = $p;
+            }
+        }
+
+        if ($mejor) {
+            \Log::info('🎯 Producto resuelto por fuzzy match', [
+                'entrada' => $entrada,
+                'producto' => $mejor->nombre,
+                'codigo'   => $mejor->codigo,
+                'score'    => round($mejorScore, 1),
+            ]);
+        }
+
+        return $mejor;
     }
 
     /**
