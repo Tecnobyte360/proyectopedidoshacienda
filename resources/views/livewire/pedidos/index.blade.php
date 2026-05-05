@@ -402,6 +402,28 @@
                                 </div>
                             @endif
                         </div>
+
+                        {{-- 🛒 Detalle de productos --}}
+                        @if($pedido->detalles && $pedido->detalles->count() > 0)
+                            <div class="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-2">
+                                <div class="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                                    <i class="fa-solid fa-cart-shopping mr-1"></i>Productos
+                                </div>
+                                <div class="space-y-0.5">
+                                    @foreach($pedido->detalles as $detalle)
+                                        <div class="flex items-center justify-between text-xs">
+                                            <span class="text-slate-700">
+                                                <strong>{{ (int)($detalle->cantidad ?: 1) }}×</strong>
+                                                {{ $detalle->producto }}
+                                            </span>
+                                            <span class="font-mono text-slate-600 text-[11px]">
+                                                ${{ number_format((float) $detalle->subtotal, 0, ',', '.') }}
+                                            </span>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endif
                     </div>
 
                     {{-- Acción --}}
@@ -437,6 +459,7 @@
                                 $cols = [
                                     ['label' => 'Pedido',       'cls' => ''],
                                     ['label' => 'Cliente',      'cls' => ''],
+                                    ['label' => 'Productos',    'cls' => ''],
                                     ['label' => 'Zona',         'cls' => 'hidden xl:table-cell'],
                                     ['label' => 'Teléfono',     'cls' => 'hidden 2xl:table-cell'],
                                     ['label' => 'Estado',       'cls' => ''],
@@ -513,6 +536,39 @@
                                             </div>
                                         </div>
                                     </div>
+                                </td>
+
+                                {{-- 🛒 Productos del pedido --}}
+                                <td class="px-3 py-3.5 align-middle">
+                                    @php
+                                        $detalles = $pedido->detalles ?? collect();
+                                        $totalLineas = $detalles->count();
+                                        $resumenCorto = $detalles->take(2)->map(function ($d) {
+                                            $cant = (int) $d->cantidad ?: 1;
+                                            return "{$cant}× " . \Illuminate\Support\Str::limit($d->producto ?? 'item', 18);
+                                        })->implode(' · ');
+                                        $masItems = $totalLineas > 2 ? ' +' . ($totalLineas - 2) . ' más' : '';
+                                        $tooltipDetalle = $detalles->map(function ($d) {
+                                            $cant = (int) $d->cantidad ?: 1;
+                                            $sub  = number_format((float) $d->subtotal, 0, ',', '.');
+                                            return "• {$cant}× {$d->producto} — \${$sub}";
+                                        })->implode("\n");
+                                    @endphp
+
+                                    @if($totalLineas > 0)
+                                        <div class="min-w-0 max-w-[230px]"
+                                             title="{{ $tooltipDetalle }}">
+                                            <div class="truncate text-xs font-medium text-slate-800">
+                                                <i class="fa-solid fa-cart-shopping text-[10px] text-slate-400 mr-1"></i>
+                                                {{ $resumenCorto }}{{ $masItems }}
+                                            </div>
+                                            <div class="text-[10px] text-slate-500">
+                                                {{ $totalLineas }} {{ $totalLineas === 1 ? 'producto' : 'productos' }}
+                                            </div>
+                                        </div>
+                                    @else
+                                        <span class="text-xs text-slate-400 italic">Sin detalle</span>
+                                    @endif
                                 </td>
 
                                 {{-- Zona (xl+) --}}
