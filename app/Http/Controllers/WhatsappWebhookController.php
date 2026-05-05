@@ -346,6 +346,13 @@ class WhatsappWebhookController extends Controller
                 return response()->json(['status' => 'superseded_by_newer_message']);
             }
 
+            // 🛡️ GUARD ANTI-ALUCINACIÓN: pedidos fuera de horario
+            // Si el tenant aceptaPedidos fuera de horario y todas las sedes
+            // están cerradas, intercepta respuestas que digan "no puedo
+            // registrar" / "te aviso cuando abramos" y las REEMPLAZA por
+            // un mensaje correcto.
+            $reply = $this->aplicarGuardPedidosProgramados($reply);
+
             Log::info('💬 RESPUESTA GENERADA', compact('reply', 'from', 'messageId', 'connectionId'));
 
             $sent = $this->enviarRespuestaWhatsapp($from, $reply, $connectionId);
@@ -2246,6 +2253,72 @@ TXT;
    *      fallback por nombre de barrio (match exacto/parcial).
    *   3. Si todo falla, sin cobertura.
    */
+  /**
+   * 🛡️ GUARD: si el bot generó una respuesta diciendo "no puedo registrar"
+   * cuando estamos cerrados Y el tenant tiene activo el toggle de aceptar
+   * pedidos fuera de horario, la reescribe por una respuesta correcta.
+   *
+   * Última línea de defensa contra alucinaciones del LLM.
+   */
+  private function aplicarGuardPedidosProgramados(string $reply): string
+  {
+      try {
+          $cfgBot = \App\Models\ConfiguracionBot::actual();
+          if (!$cfgBot?->aceptar_pedidos_fuera_horario) return $reply;
+
+          // Verificar que TODAS las sedes activas estén cerradas
+          $sedes = \App\Models\Sede::where('activa', true)->get();
+          if ($sedes->isEmpty()) return $reply;
+
+          $todasCerradas = $sedes->every(fn ($s) => !$s->estaAbierta());
+          if (!$todasCerradas) return $reply;
+
+          // Frases prohibidas que indican alucinación del LLM
+          $patronesProhibidos = [
+              '/no puedo registrar/i',
+              '/no podr[ée] registrar/i',
+              '/no puedo tomar (el|tu) pedido/i',
+              '/te aviso (apenas|cuando) abramos/i',
+              '/te (atender[ée]|espero) mañana/i',
+              '/te atendemos mañana/i',
+              '/te atender[ée] mañana/i',
+              '/vuelve mañana/i',
+              '/escr[íi]beme mañana/i',
+              '/cont[áa]ctame mañana/i',
+              '/regresa mañana/i',
+              '/ahorita estamos cerrados/i', // si va seguido de "te aviso/atiendo"
+          ];
+
+          $coincide = false;
+          foreach ($patronesProhibidos as $patron) {
+              if (preg_match($patron, $reply)) {
+                  $coincide = true;
+                  break;
+              }
+          }
+
+          if (!$coincide) return $reply;
+
+          // Calcular próxima apertura
+          $proxima = $sedes->first()?->proximaApertura() ?: 'mañana 8:00 am';
+
+          $replyOriginal = $reply;
+          $reply = "Estamos cerrados ahora pero te puedo dejar el pedido *PROGRAMADO* "
+                 . "para {$proxima} 📅\n\n"
+                 . "¿Te parece bien? Si me confirmas, sigo con tu pedido y queda en cola "
+                 . "para preparar apenas abramos.";
+
+          \Log::warning('🛡️ Guard activado — respuesta del LLM reescrita por alucinación', [
+              'original' => $replyOriginal,
+              'reescrita' => $reply,
+          ]);
+      } catch (\Throwable $e) {
+          \Log::warning('Guard pedidos programados falló: ' . $e->getMessage());
+      }
+
+      return $reply;
+  }
+
   /**
    * Detecta el nombre de una ciudad colombiana mencionada en un texto libre.
    * Busca coincidencias case/tilde insensibles para evitar pasar 'Bello' por
