@@ -848,6 +848,47 @@ TXT;
             \Log::warning('No se pudo inyectar alerta de sede cerrada: ' . $e->getMessage());
         }
 
+        // 📅 RECORDATORIO JUST-IN-TIME — pedidos fuera de horario
+        // Si TODAS las sedes están cerradas Y el tenant tiene activo el toggle
+        // de aceptar pedidos fuera de horario, inyectamos un recordatorio fuerte
+        // como ÚLTIMO system message para que el LLM no caiga en su patrón
+        // de "te aviso cuando abramos".
+        $reinforceProgramado = [];
+        try {
+            $cfgBotPrograma = $config; // ya cargado arriba
+            $aceptaProgramados = (bool) ($cfgBotPrograma?->aceptar_pedidos_fuera_horario ?? false);
+
+            if ($aceptaProgramados) {
+                $sedesActivasCheck = \App\Models\Sede::where('activa', true)->get();
+                $todasCerradas = $sedesActivasCheck->isNotEmpty()
+                    && $sedesActivasCheck->every(fn ($s) => !$s->estaAbierta());
+
+                if ($todasCerradas) {
+                    $proxima = $sedesActivasCheck->first()->proximaApertura() ?: 'mañana 8:00 am';
+                    $reinforceProgramado[] = [
+                        'role'    => 'system',
+                        'content' => "🚨 RECORDATORIO CRÍTICO — ESTE NEGOCIO ACEPTA PEDIDOS PROGRAMADOS\n\n"
+                            . "Todas las sedes están CERRADAS AHORA, pero el dueño ACTIVÓ una opción\n"
+                            . "para que SÍ aceptes pedidos en este momento — los registras como\n"
+                            . "PROGRAMADOS para la próxima apertura ({$proxima}).\n\n"
+                            . "❌ NUNCA digas estas frases:\n"
+                            . "  - '¿Te aviso apenas abramos?'\n"
+                            . "  - 'Te atendemos mañana'\n"
+                            . "  - 'Estamos cerrados ahora'\n"
+                            . "  - 'No puedo registrar el pedido'\n\n"
+                            . "✅ EN CAMBIO, SIEMPRE responde así:\n"
+                            . "  'Estamos cerrados pero te puedo dejar el pedido PROGRAMADO\n"
+                            . "   para {$proxima}. ¿Te parece?'\n\n"
+                            . "Si el cliente acepta, sigue el flujo normal: pides datos faltantes\n"
+                            . "y llamas `confirmar_pedido`. El sistema lo marcará como programado\n"
+                            . "automáticamente. NO te preocupes por marcar nada especial.",
+                    ];
+                }
+            }
+        } catch (\Throwable $e) {
+            \Log::warning('No se pudo inyectar recordatorio de programados: ' . $e->getMessage());
+        }
+
         // Si MODO AGENTE está activo, añadimos un system message FINAL que sobrescribe
         // cualquier instrucción contradictoria del prompt personalizado (ej: "solo del
         // catálogo de abajo"). Refuerza que SIEMPRE debe usar las tools de catálogo.
@@ -870,6 +911,7 @@ TXT;
             [['role' => 'system', 'content' => $systemPrompt]],
             $reinforceAgent,
             $extraSystem,
+            $reinforceProgramado, // 📅 último system msg: pedidos programados
             $conversationHistory
         );
 
