@@ -7,7 +7,7 @@
         <p class="text-sm text-slate-500">Ajusta el comportamiento de la asesora IA.</p>
     </div>
 
-    <form wire:submit.prevent="guardar" class="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6 items-start">
+    <form wire:submit.prevent="guardar" novalidate class="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6 items-start">
 
         {{-- ╔═══ SIDEBAR DE NAVEGACIÓN ═══╗ --}}
         <aside class="lg:sticky lg:top-24 self-start space-y-1 rounded-2xl bg-white border border-slate-200 p-2 shadow-sm">
