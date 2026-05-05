@@ -224,7 +224,24 @@ class GeocodingService
                     return null;
                 }
 
+                // 🧠 Si hay VARIOS resultados y el primero es solo APPROXIMATE,
+                // preferir el que sea más específico (ROOFTOP > RANGE_INTERPOLATED > GEOMETRIC_CENTER)
                 $primero = $body['results'][0];
+                $tipoPrimero = $primero['geometry']['location_type'] ?? '';
+
+                if ($tipoPrimero === 'APPROXIMATE' && count($body['results']) > 1) {
+                    foreach ($body['results'] as $r) {
+                        $tipo = $r['geometry']['location_type'] ?? '';
+                        if (in_array($tipo, ['ROOFTOP', 'RANGE_INTERPOLATED'])) {
+                            $primero = $r;
+                            Log::info('🎯 Geocoding: usando resultado más específico', [
+                                'tipo_anterior' => $tipoPrimero,
+                                'tipo_nuevo'    => $tipo,
+                            ]);
+                            break;
+                        }
+                    }
+                }
                 $loc = $primero['geometry']['location'];
 
                 Log::info('✅ Google Geocoding resuelto', [

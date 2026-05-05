@@ -3255,6 +3255,25 @@ TXT;
                      . $extraRendered . "\n";
         }
 
+        // 🧠 REGLA: PREGUNTAR CIUDAD/BARRIO CUANDO LA DIRECCIÓN ES AMBIGUA
+        // El geocoding falla cuando una dirección como "Cra 50 #63-48" puede estar
+        // en varias ciudades. El bot debe pedir ciudad antes de validar.
+        $prompt .= "\n\n═══════════════════════════════════════════════════════════════════════════════\n"
+                 . "# 🗺️ DIRECCIONES AMBIGUAS — REGLA INTELIGENTE\n\n"
+                 . "Una dirección sin ciudad NI barrio (ej: solo 'Cra 50 #63-48') puede estar en\n"
+                 . "muchos lugares. ANTES de llamar `validar_cobertura`:\n\n"
+                 . "1. Si SOLO te dan número de calle/carrera (sin ciudad ni barrio), PREGUNTA:\n"
+                 . "   '¿En qué ciudad y barrio queda esa dirección?'\n"
+                 . "2. Si te dan dirección + ciudad, OK → llama validar_cobertura.\n"
+                 . "3. Si validar_cobertura dice 'no cubierta' pero el cliente insiste que SÍ\n"
+                 . "   está en una ciudad cubierta, pídele el BARRIO específico y vuelve a\n"
+                 . "   llamar la herramienta con barrio + dirección + ciudad.\n"
+                 . "4. NO asumas la ciudad por contexto del prompt — pregunta.\n\n"
+                 . "Ejemplo:\n"
+                 . "Cliente: 'envíame a Cra 50 # 63-48'\n"
+                 . "❌ Mal: 'Uy, fuera de cobertura' (alucina ciudad)\n"
+                 . "✅ Bien: '¿En qué ciudad o barrio queda esa dirección? Para validarte bien.'\n";
+
         // 🔒 REGLA DE CONFIRMACIÓN DE PEDIDO INEQUÍVOCA
         // El bot a veces dice "ya quedó registrado" (ambiguo) cuando el cliente
         // manda un dato como el correo. El cliente cree que el correo se
