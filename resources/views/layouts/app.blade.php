@@ -7,10 +7,13 @@
 
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    {{-- Config de Reverb leída por resources/js/app.js (auto-detección con override) --}}
-    <meta name="reverb-host"   content="{{ env('REVERB_PUBLIC_HOST', '') }}">
-    <meta name="reverb-port"   content="{{ env('REVERB_PUBLIC_PORT', '') }}">
-    <meta name="reverb-scheme" content="{{ env('REVERB_PUBLIC_SCHEME', '') }}">
+    {{-- Config de Reverb leída por resources/js/bootstrap.js
+         Sirve config server-side para no depender del bundle compilado.
+         Fallbacks inteligentes: REVERB_PUBLIC_* override → REVERB_* base → request host. --}}
+    <meta name="reverb-key"    content="{{ config('reverb.apps.apps.0.key', env('REVERB_APP_KEY', '')) }}">
+    <meta name="reverb-host"   content="{{ env('REVERB_PUBLIC_HOST', request()->getHost()) }}">
+    <meta name="reverb-port"   content="{{ env('REVERB_PUBLIC_PORT', request()->isSecure() ? 443 : 80) }}">
+    <meta name="reverb-scheme" content="{{ env('REVERB_PUBLIC_SCHEME', request()->isSecure() ? 'https' : 'http') }}">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
