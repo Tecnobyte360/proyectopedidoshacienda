@@ -32,6 +32,9 @@ class Index extends Component
     public ?float  $cobertura_centro_lat     = null;
     public ?float  $cobertura_centro_lng     = null;
 
+    /** Si está en true, la sede acepta pedidos cuando está cerrada (los programa para la próxima apertura) */
+    public bool    $aceptar_pedidos_cerrada  = false;
+
     /** Array editable: [dia_key => ['abierto'=>bool, 'abre'=>'HH:MM', 'cierra'=>'HH:MM']] */
     public array $horarios = [];
 

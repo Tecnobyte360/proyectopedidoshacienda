@@ -69,6 +69,9 @@ class Bot extends Component
     // Pagos en línea (Wompi)
     public bool   $enviar_link_pago         = true;
 
+    // 📅 Pedidos fuera de horario (programados)
+    public bool   $aceptar_pedidos_fuera_horario = false;
+
     // Toggles de notificaciones al cliente
     public bool   $notif_en_preparacion_activa = true;
     public bool   $notif_en_camino_activa      = true;
@@ -184,6 +187,7 @@ class Bot extends Component
         $this->encuesta_delay_minutos = (int) ($cfg->encuesta_delay_minutos ?? 15);
         $this->encuesta_mensaje       = (string) ($cfg->encuesta_mensaje ?? '');
         $this->enviar_link_pago       = (bool) ($cfg->enviar_link_pago ?? true);
+        $this->aceptar_pedidos_fuera_horario = (bool) ($cfg->aceptar_pedidos_fuera_horario ?? false);
         $this->notif_en_preparacion_activa = (bool) ($cfg->notif_en_preparacion_activa ?? true);
         $this->notif_en_camino_activa      = (bool) ($cfg->notif_en_camino_activa ?? true);
         $this->notif_entregado_activa      = (bool) ($cfg->notif_entregado_activa ?? true);
@@ -609,6 +613,7 @@ class Bot extends Component
             'encuesta_delay_minutos'                => 'integer|min:0|max:1440',
             'encuesta_mensaje'                      => 'nullable|string|max:2000',
             'enviar_link_pago'                      => 'boolean',
+            'aceptar_pedidos_fuera_horario'         => 'boolean',
             'notif_en_preparacion_activa'           => 'boolean',
             'notif_en_camino_activa'                => 'boolean',
             'notif_entregado_activa'                => 'boolean',

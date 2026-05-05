@@ -2632,7 +2632,13 @@ TXT;
         $programadoPara = null; // se setea si entramos al camino B
 
         if ($sede && !$sede->estaAbierta()) {
-            if ($sede->aceptar_pedidos_cerrada) {
+            // Toggle global del bot por tenant (configurable desde /configuracion-bot
+            // → Despachos / Domiciliarios → "Pedidos fuera de horario")
+            $cfgBot = \App\Models\ConfiguracionBot::actual();
+            $aceptarFueraHorario = (bool) ($cfgBot?->aceptar_pedidos_fuera_horario
+                ?? $sede->aceptar_pedidos_cerrada);
+
+            if ($aceptarFueraHorario) {
                 // Camino B: programar pedido para la próxima apertura
                 $programadoPara = $sede->proximaAperturaTimestamp();
 
@@ -3287,7 +3293,10 @@ TXT;
         // Si la sede tiene activado 'aceptar_pedidos_cerrada', se pueden registrar
         // pedidos cuando estamos cerrados — quedan programados para la próxima
         // apertura. El bot debe AVISAR al cliente y pedir confirmación.
-        $sedesConProgramados = \App\Models\Sede::where('tenant_id', app(\App\Services\TenantManager::class)->id() ?? 0)
+        // Activado si: el toggle global del bot está ON, O alguna sede lo tiene activado
+        $cfgBotProgramados = \App\Models\ConfiguracionBot::actual();
+        $tenantAceptaFueraHorario = (bool) ($cfgBotProgramados?->aceptar_pedidos_fuera_horario ?? false);
+        $sedesConProgramados = $tenantAceptaFueraHorario || \App\Models\Sede::where('tenant_id', app(\App\Services\TenantManager::class)->id() ?? 0)
             ->where('aceptar_pedidos_cerrada', true)
             ->where('activa', true)
             ->exists();

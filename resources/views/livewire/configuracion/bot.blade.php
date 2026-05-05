@@ -1320,6 +1320,51 @@
 
         {{-- ╔═══ DESPACHOS / DOMICILIARIOS ═══╗ --}}
         <section x-show="tab === 'despachos'" x-cloak class="rounded-2xl bg-white border border-slate-200 p-6 shadow-sm">
+
+            {{-- 📅 PEDIDOS FUERA DE HORARIO (PROGRAMADOS) --}}
+            <div class="rounded-xl bg-blue-50 border-2 border-blue-200 p-5 mb-6">
+                <div class="flex items-center gap-3 mb-3">
+                    <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 text-blue-600 text-xl">
+                        <i class="fa-solid fa-clock"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-slate-800">Pedidos fuera de horario</h3>
+                        <p class="text-xs text-slate-500">
+                            ¿Qué hacer cuando un cliente quiere pedir mientras la sede está cerrada?
+                        </p>
+                    </div>
+                </div>
+
+                <label class="flex items-start gap-3 cursor-pointer rounded-xl border-2 p-4 transition bg-white
+                              {{ $aceptar_pedidos_fuera_horario ? 'border-blue-300' : 'border-slate-200' }}">
+                    <input type="checkbox" wire:model="aceptar_pedidos_fuera_horario"
+                           class="mt-1 rounded border-slate-300 text-blue-600 h-5 w-5">
+                    <div class="flex-1">
+                        <div class="text-sm font-bold text-slate-800 mb-1">
+                            📅 Aceptar pedidos cuando estamos cerrados (programados)
+                        </div>
+                        <div class="text-xs text-slate-600 leading-relaxed">
+                            Si está <strong>activo</strong>: el bot acepta pedidos fuera de horario y los registra
+                            como <em>programados</em> para la próxima apertura de la sede. El cliente recibe
+                            un mensaje claro: <em>"📅 Tu pedido quedó programado para mañana a las 8:00 am"</em>.<br>
+                            Si está <strong>desactivado</strong>: el bot rechaza el pedido cuando la sede está cerrada
+                            y le pide al cliente que vuelva en horario.
+                        </div>
+                    </div>
+                </label>
+
+                @if($aceptar_pedidos_fuera_horario)
+                    <div class="mt-3 rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2 text-xs text-emerald-800 flex items-start gap-2">
+                        <i class="fa-solid fa-circle-check mt-0.5"></i>
+                        <div>
+                            <strong>Activado.</strong> Los pedidos fuera de horario aparecerán en
+                            <a href="{{ route('pedidos.index') }}" class="underline font-bold">/pedidos</a>
+                            con etiqueta "📅 Programado" y la fecha de preparación esperada.
+                        </div>
+                    </div>
+                @endif
+            </div>
+
             <div class="flex items-center gap-3 mb-4">
                 <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-50 text-orange-600 text-xl">
                     <i class="fa-solid fa-motorcycle"></i>
