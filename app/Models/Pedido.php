@@ -64,6 +64,7 @@ class Pedido extends Model
         'wompi_transaction_id',
         'pago_metodo',
         'pagado_at',
+        'programado_para',
     ];
 
     protected $casts = [
@@ -72,6 +73,7 @@ class Pedido extends Model
         'fecha_entregado' => 'datetime',
         'fecha_cancelado' => 'datetime',
         'pagado_at'       => 'datetime',
+        'programado_para' => 'datetime',
         'wompi_referencias_historial' => 'array',
         'total'           => 'decimal:2',
         'empresa_id'      => 'integer',

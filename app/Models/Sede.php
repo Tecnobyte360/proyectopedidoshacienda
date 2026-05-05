@@ -33,6 +33,7 @@ class Sede extends Model
         'cobertura_activa',
         'cobertura_centro_lat',
         'cobertura_centro_lng',
+        'aceptar_pedidos_cerrada',
     ];
 
     protected $casts = [
@@ -49,7 +50,37 @@ class Sede extends Model
         'cobertura_activa'       => 'boolean',
         'cobertura_centro_lat'   => 'float',
         'cobertura_centro_lng'   => 'float',
+        'aceptar_pedidos_cerrada' => 'boolean',
     ];
+
+    /**
+     * Calcula el próximo timestamp en que esta sede abrirá.
+     * Útil para programar pedidos hechos fuera de horario.
+     */
+    public function proximaAperturaTimestamp(?\Carbon\Carbon $desde = null): ?\Carbon\Carbon
+    {
+        $desde = $desde ?: \Carbon\Carbon::now('America/Bogota');
+        $todos = $this->horariosCompletos();
+
+        // Si hoy abre y aún no ha pasado la hora, usar HOY
+        $hoyKey = self::CARBON_A_DIA[$desde->dayOfWeek] ?? 'lunes';
+        $hoyConf = $todos[$hoyKey] ?? null;
+        if ($hoyConf && $hoyConf['abierto']) {
+            $abreHoy = \Carbon\Carbon::parse($desde->format('Y-m-d') . ' ' . $hoyConf['abre'], 'America/Bogota');
+            if ($desde->lt($abreHoy)) return $abreHoy;
+        }
+
+        // Buscar próximos 7 días
+        for ($i = 1; $i <= 7; $i++) {
+            $futuro = $desde->copy()->addDays($i);
+            $dKey = self::CARBON_A_DIA[$futuro->dayOfWeek] ?? 'lunes';
+            $conf = $todos[$dKey] ?? null;
+            if ($conf && $conf['abierto']) {
+                return \Carbon\Carbon::parse($futuro->format('Y-m-d') . ' ' . $conf['abre'], 'America/Bogota');
+            }
+        }
+        return null;
+    }
 
     /**
      * ¿Esta sede tiene polígono(s) de cobertura definido(s)?

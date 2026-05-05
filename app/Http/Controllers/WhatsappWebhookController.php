@@ -2625,40 +2625,55 @@ TXT;
         }
 
         // ── VALIDACIÓN DE HORARIO DE LA SEDE ──────────────────────────────
-        // Si la sede que va a despachar el pedido está CERRADA AHORA, no
-        // permitimos registrar. Mensaje al cliente usa variables dinámicas
-        // resueltas por BotPromptService (mismo motor del prompt principal).
+        // Si la sede está cerrada, hay 2 caminos según configuración:
+        //   A. sede.aceptar_pedidos_cerrada = false (default) → rechazar
+        //   B. sede.aceptar_pedidos_cerrada = true → registrar como
+        //      pedido programado para la próxima apertura
+        $programadoPara = null; // se setea si entramos al camino B
+
         if ($sede && !$sede->estaAbierta()) {
-            Cache::forget($confirmKey);
-            DB::rollBack();
+            if ($sede->aceptar_pedidos_cerrada) {
+                // Camino B: programar pedido para la próxima apertura
+                $programadoPara = $sede->proximaAperturaTimestamp();
 
-            $promptService = app(BotPromptService::class);
-            $contexto = $promptService->construirContexto(
-                $name,
-                $sede->id,
-                $this->infoEmpresa(),
-                '',
-                ''
-            );
-            $contexto['proxima_apertura'] = $sede->proximaApertura() ?: 'cuando abramos';
-            $contexto['mensaje_cerrado_sede'] = trim((string) $sede->mensaje_cerrado);
+                Log::info('📅 Pedido FUERA DE HORARIO — programando para próxima apertura', [
+                    'sede'             => $sede->nombre,
+                    'programado_para'  => $programadoPara?->toDateTimeString(),
+                ]);
+                // No retornamos, seguimos creando el pedido pero con programado_para
+            } else {
+                // Camino A: rechazar (comportamiento original)
+                Cache::forget($confirmKey);
+                DB::rollBack();
 
-            $tieneMsgPersonalizado = $contexto['mensaje_cerrado_sede'] !== '';
-            $template = $tieneMsgPersonalizado
-                ? "Ay {cliente_primer_nombre}, en este momento estamos cerrados 🙏\n\n"
-                . "🕐 {sede_estado_actual}\n"
-                . "👉 Te atendemos {proxima_apertura}.\n\n"
-                . "{mensaje_cerrado_sede}"
-                : "Ay {cliente_primer_nombre}, en este momento estamos cerrados 🙏\n\n"
-                . "🕐 {sede_estado_actual}\n"
-                . "👉 Te atendemos {proxima_apertura}.";
+                $promptService = app(BotPromptService::class);
+                $contexto = $promptService->construirContexto(
+                    $name,
+                    $sede->id,
+                    $this->infoEmpresa(),
+                    '',
+                    ''
+                );
+                $contexto['proxima_apertura'] = $sede->proximaApertura() ?: 'cuando abramos';
+                $contexto['mensaje_cerrado_sede'] = trim((string) $sede->mensaje_cerrado);
 
-            Log::info('⛔ Pedido rechazado por sede cerrada', [
-                'sede'   => $sede->nombre,
-                'pedido' => $orderData,
-            ]);
+                $tieneMsgPersonalizado = $contexto['mensaje_cerrado_sede'] !== '';
+                $template = $tieneMsgPersonalizado
+                    ? "Ay {cliente_primer_nombre}, en este momento estamos cerrados 🙏\n\n"
+                    . "🕐 {sede_estado_actual}\n"
+                    . "👉 Te atendemos {proxima_apertura}.\n\n"
+                    . "{mensaje_cerrado_sede}"
+                    : "Ay {cliente_primer_nombre}, en este momento estamos cerrados 🙏\n\n"
+                    . "🕐 {sede_estado_actual}\n"
+                    . "👉 Te atendemos {proxima_apertura}.";
 
-            return $promptService->renderizar($template, $contexto);
+                Log::info('⛔ Pedido rechazado por sede cerrada', [
+                    'sede'   => $sede->nombre,
+                    'pedido' => $orderData,
+                ]);
+
+                return $promptService->renderizar($template, $contexto);
+            }
         }
 
         // ── VALIDACIÓN ESTRICTA de cobertura ───────────────────────────────
@@ -2890,7 +2905,10 @@ TXT;
             'hora_entrega'          => $pickupTime,
             'estado'                => 'nuevo',
             'fecha_estado'          => now(),
-            'observacion_estado'    => 'Pedido creado automáticamente desde WhatsApp',
+            'programado_para'       => $programadoPara, // null si está abierto, timestamp si está cerrado y acepta programados
+            'observacion_estado'    => $programadoPara
+                ? "Pedido programado para preparación: " . $programadoPara->format('d/m/Y H:i')
+                : 'Pedido creado automáticamente desde WhatsApp',
             'total'                 => $totalCalculado,
             'notas'                 => $notas,
             'cliente_nombre'        => $orderData['customer_name'] ?? $name,
@@ -3033,8 +3051,16 @@ TXT;
         $plantilla = trim((string) ($cfgBot->notif_pedido_confirmado_mensaje ?? ''))
             ?: \App\Models\ConfiguracionBot::NOTIF_DEFAULTS['pedido_confirmado'];
 
+        // 📅 Si el pedido es PROGRAMADO (sede cerrada, lo despachamos mañana),
+        // anteponer un aviso claro al cliente.
+        $avisoProgramado = '';
+        if ($pedido->programado_para) {
+            $cuando = $pedido->programado_para->locale('es')->isoFormat('dddd D [de] MMMM [a las] h:mm a');
+            $avisoProgramado = "📅 *Pedido programado* — estamos cerrados ahora, pero ya te lo dejamos en cola para preparar el {$cuando}.\n\n";
+        }
+
         // Renderizar con variables — usa el helper del modelo + extras específicos
-        return $pedido->renderizarPlantilla($plantilla, [
+        $mensaje = $pedido->renderizarPlantilla($plantilla, [
             'productos'         => $productosStr,
             'direccion'         => $orderData['address'] ?? $pedido->direccion ?? '',
             'barrio'            => $orderData['neighborhood'] ?? $pedido->barrio ?? '',
@@ -3044,6 +3070,8 @@ TXT;
             'bloque_pago'       => $bloquePago,
             'link_seguimiento'  => $pedido->url_seguimiento,
         ]);
+
+        return $avisoProgramado . $mensaje;
     }
 
     /*
@@ -3253,6 +3281,28 @@ TXT;
             $prompt .= "\n\n═══════════════════════════════════════════════════════════════════════════════\n"
                      . "# 🔧 REGLAS ADICIONALES DE ESTE NEGOCIO\n\n"
                      . $extraRendered . "\n";
+        }
+
+        // 📅 REGLA: PEDIDOS FUERA DE HORARIO (PROGRAMADOS)
+        // Si la sede tiene activado 'aceptar_pedidos_cerrada', se pueden registrar
+        // pedidos cuando estamos cerrados — quedan programados para la próxima
+        // apertura. El bot debe AVISAR al cliente y pedir confirmación.
+        $sedesConProgramados = \App\Models\Sede::where('tenant_id', app(\App\Services\TenantManager::class)->id() ?? 0)
+            ->where('aceptar_pedidos_cerrada', true)
+            ->where('activa', true)
+            ->exists();
+
+        if ($sedesConProgramados) {
+            $prompt .= "\n\n═══════════════════════════════════════════════════════════════════════════════\n"
+                     . "# 📅 PEDIDOS FUERA DE HORARIO — PROGRAMADOS\n\n"
+                     . "Este negocio acepta pedidos aunque esté cerrado. Si el cliente pide\n"
+                     . "fuera del horario de la sede:\n"
+                     . "1. AVÍSALE: 'Estamos cerrados ahora, pero puedo dejar tu pedido programado\n"
+                     . "   para el primer turno de mañana. ¿Te parece?'\n"
+                     . "2. Si dice SÍ → llama `confirmar_pedido` normal. El sistema lo registra\n"
+                     . "   con flag de programado automáticamente.\n"
+                     . "3. Si dice NO → no registres y dile que te avise cuando quiera retomar.\n"
+                     . "❌ NO digas 'no puedo registrarlo' cuando estamos cerrados — sí podemos.\n";
         }
 
         // 🧠 REGLA: PREGUNTAR CIUDAD/BARRIO CUANDO LA DIRECCIÓN ES AMBIGUA
