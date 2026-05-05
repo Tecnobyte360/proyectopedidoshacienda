@@ -497,7 +497,9 @@ class BotCatalogoService
             }
 
             $zonasTexto = implode(' + ', array_unique($descripciones));
-            $resumenes[] = "📍 Sede {$sede->nombre}: cubre {$zonasTexto} — domicilio {$costo}{$tiempo}";
+            // Evita "Sede Sede Medellín" si el nombre ya empieza con "Sede"
+            $prefijo = stripos(trim($sede->nombre), 'sede') === 0 ? '' : 'Sede ';
+            $resumenes[] = "📍 {$prefijo}{$sede->nombre}: cubre {$zonasTexto} — domicilio {$costo}{$tiempo}";
         }
 
         return $resumenes;
