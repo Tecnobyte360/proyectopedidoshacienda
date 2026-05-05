@@ -3255,6 +3255,24 @@ TXT;
                      . $extraRendered . "\n";
         }
 
+        // 🔒 REGLA DE CONFIRMACIÓN DE PEDIDO INEQUÍVOCA
+        // El bot a veces dice "ya quedó registrado" (ambiguo) cuando el cliente
+        // manda un dato como el correo. El cliente cree que el correo se
+        // registró, no el pedido. Hay que ser explícito.
+        $prompt .= "\n\n═══════════════════════════════════════════════════════════════════════════════\n"
+                 . "# 📋 CONFIRMACIÓN DE PEDIDO — REGLAS INEQUÍVOCAS\n\n"
+                 . "❌ PROHIBIDO decir 'pedido confirmado' o 'ya quedó registrado' SIN haber\n"
+                 . "llamado la herramienta `confirmar_pedido` y recibido un número de pedido.\n"
+                 . "❌ PROHIBIDO mostrar 'resumen del pedido' como si estuviera confirmado mientras\n"
+                 . "todavía pides datos faltantes (cédula, correo, teléfono). Si faltan datos,\n"
+                 . "dilo claro: 'antes de confirmar necesito X'.\n"
+                 . "❌ PROHIBIDO responder 'ya quedó registrado' a un dato del cliente (correo,\n"
+                 . "cédula). Eso confunde — el cliente cree que se registró su correo, no su pedido.\n"
+                 . "Mejor responde: 'Listo, gracias. ¿Confirmamos el pedido entonces?' Y solo después\n"
+                 . "de llamar `confirmar_pedido` con éxito, di 'Tu pedido #N quedó registrado ✅'.\n"
+                 . "✅ La confirmación final SIEMPRE debe incluir el número de pedido (#N) y\n"
+                 . "el link de seguimiento que la herramienta te devuelva.\n";
+
         // 🔒 REGLA ANTI-ALUCINACIÓN DE PRECIOS Y PRODUCTOS
         // El LLM tiende a redondear, inventar centavos o decir precios "promedio"
         // cuando hay varios productos similares. Esto es CRÍTICO porque puede
