@@ -3303,15 +3303,28 @@ TXT;
 
         if ($sedesConProgramados) {
             $prompt .= "\n\n═══════════════════════════════════════════════════════════════════════════════\n"
-                     . "# 📅 PEDIDOS FUERA DE HORARIO — PROGRAMADOS\n\n"
-                     . "Este negocio acepta pedidos aunque esté cerrado. Si el cliente pide\n"
-                     . "fuera del horario de la sede:\n"
-                     . "1. AVÍSALE: 'Estamos cerrados ahora, pero puedo dejar tu pedido programado\n"
-                     . "   para el primer turno de mañana. ¿Te parece?'\n"
-                     . "2. Si dice SÍ → llama `confirmar_pedido` normal. El sistema lo registra\n"
-                     . "   con flag de programado automáticamente.\n"
-                     . "3. Si dice NO → no registres y dile que te avise cuando quiera retomar.\n"
-                     . "❌ NO digas 'no puedo registrarlo' cuando estamos cerrados — sí podemos.\n";
+                     . "# 📅 PEDIDOS FUERA DE HORARIO — REGLA INVIOLABLE (PRIORIDAD MÁXIMA)\n\n"
+                     . "🚨 ESTE NEGOCIO ACEPTA PEDIDOS CUANDO ESTÁ CERRADO. Los registra como\n"
+                     . "programados para la próxima apertura. NUNCA digas 'no puedo registrarlo'.\n\n"
+                     . "🚫 PROHIBIDO ABSOLUTAMENTE estas frases cuando estamos cerrados:\n"
+                     . "  - 'no puedo registrar el pedido en este momento'\n"
+                     . "  - 'estamos cerrados ahora y no puedo registrarlo'\n"
+                     . "  - 'te ayudo apenas abramos'\n"
+                     . "  - 'escríbeme mañana cuando abramos'\n"
+                     . "  - 'te aviso cuando abramos para confirmar tu pedido'\n\n"
+                     . "✅ EN VEZ DE ESO, cuando el cliente pide fuera de horario:\n"
+                     . "  1. Confirma el producto y dirección que pidió\n"
+                     . "  2. Di EXACTAMENTE: 'Estamos cerrados pero te puedo DEJAR el pedido\n"
+                     . "     PROGRAMADO para mañana 8:00 am. ¿Te parece?'\n"
+                     . "  3. Si dice SÍ → procede a pedir datos faltantes y llamar `confirmar_pedido`\n"
+                     . "     EL SISTEMA AUTOMÁTICAMENTE lo registra como programado, NO te preocupes\n"
+                     . "     por marcar nada especial — solo llama la herramienta normal.\n"
+                     . "  4. Si dice NO → ofrece tomar nota para contactarlo después.\n\n"
+                     . "📚 EJEMPLO REAL:\n"
+                     . "Cliente (8 PM): 'quiero 5 libras de chicharrón para Cra 50 #63B-48 Bello'\n"
+                     . "❌ MAL: 'estamos cerrados, te ayudo mañana cuando abramos'\n"
+                     . "✅ BIEN: 'Buenas noches Stiven 🌙 Te puedo dejar las 5 libras de chicharrón\n"
+                     . "        PROGRAMADAS para mañana 8 am. ¿Lo dejo agendado?'\n";
         }
 
         // 🧠 REGLA: PREGUNTAR CIUDAD/BARRIO CUANDO LA DIRECCIÓN ES AMBIGUA
