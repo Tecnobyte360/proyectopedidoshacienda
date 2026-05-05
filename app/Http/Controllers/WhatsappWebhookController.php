@@ -3255,6 +3255,22 @@ TXT;
                      . $extraRendered . "\n";
         }
 
+        // 🔒 REGLA ANTI-ALUCINACIÓN DE PRECIOS Y PRODUCTOS
+        // El LLM tiende a redondear, inventar centavos o decir precios "promedio"
+        // cuando hay varios productos similares. Esto es CRÍTICO porque puede
+        // registrar pedidos con precios falsos.
+        $prompt .= "\n\n═══════════════════════════════════════════════════════════════════════════════\n"
+                 . "# 💰 PRECIOS Y PRODUCTOS — FUENTE DE VERDAD\n\n"
+                 . "Los precios y productos del catálogo de arriba son la ÚNICA verdad.\n"
+                 . "❌ PROHIBIDO inventar precios (ej: \"\$79.999,99\" cuando dice \$80.000).\n"
+                 . "❌ PROHIBIDO redondear, sumar centavos o promediar precios.\n"
+                 . "❌ PROHIBIDO ofrecer productos que no estén en el catálogo.\n"
+                 . "✅ Si el cliente pregunta por una variedad (Chiroso, Geisha, Bourbón) o\n"
+                 . "presentación (grano, molido, 250g, 500g), MENCIONA TODAS las opciones reales\n"
+                 . "del catálogo, no solo algunas. Si hay 6 versiones de Reserva Especial,\n"
+                 . "lístalas las 6 (o agrúpalas claramente).\n"
+                 . "✅ Repite el precio EXACTO como aparece en el catálogo (\$80.000, no \$80.000,00).\n";
+
         // 🔒 INYECCIÓN OBLIGATORIA DE COBERTURA REAL (anti-alucinación)
         // Sin importar lo que diga el prompt maestro, agregamos al final la cobertura
         // real configurada en sedes + reglas duras. El LLM da más peso a las

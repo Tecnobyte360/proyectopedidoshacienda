@@ -318,10 +318,19 @@ class BotCatalogoService
                 $codigo = !empty($p->codigo) ? "[{$p->codigo}] " : '';
                 $destacado = !empty($p->destacado) ? ' ⭐' : '';
 
+                // 🆕 Incluir descripcion_corta (variedad/presentación) si existe.
+                // Sin esto, productos con nombre genérico ("Guayacán Rosado Reserva
+                // Especial") aparecen 6 veces idénticos y el bot los confunde con
+                // duplicados → solo menciona 2 al cliente.
+                $variante = !empty($p->descripcion_corta)
+                    ? ' (' . trim($p->descripcion_corta) . ')'
+                    : '';
+
                 $lineas[] = sprintf(
-                    '  • %s%s — $%s/%s%s',
+                    '  • %s%s%s — $%s/%s%s',
                     $codigo,
                     $p->nombre,
+                    $variante,
                     number_format($precio, 0, ',', '.'),
                     $p->unidad ?? 'unidad',
                     $destacado
