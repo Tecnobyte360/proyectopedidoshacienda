@@ -3255,6 +3255,23 @@ TXT;
                      . $extraRendered . "\n";
         }
 
+        // 🔒 INYECCIÓN OBLIGATORIA DE COBERTURA REAL (anti-alucinación)
+        // Sin importar lo que diga el prompt maestro, agregamos al final la cobertura
+        // real configurada en sedes + reglas duras. El LLM da más peso a las
+        // últimas instrucciones, así la cobertura SIEMPRE refleja la configuración
+        // real (no lo que el prompt maestro hardcoded prometa: 'envíos
+        // internacionales con FedEx', etc.).
+        $zonasReales = $contexto['zonas'] ?? '';
+        if (!empty($zonasReales)) {
+            $prompt .= "\n\n═══════════════════════════════════════════════════════════════════════════════\n"
+                     . "# 🌍 COBERTURA REAL DEL NEGOCIO (FUENTE DE VERDAD — IGNORA OTRAS SECCIONES)\n\n"
+                     . $zonasReales . "\n\n"
+                     . "Este bloque es la verdad operacional del momento. Si secciones anteriores del\n"
+                     . "prompt mencionan envíos a otros países, ciudades o regiones, esas son SOLO\n"
+                     . "INFORMACIONALES y deben ser ignoradas si no aparecen aquí. Para validar\n"
+                     . "cualquier dirección concreta, llama `validar_cobertura`.\n";
+        }
+
         return $prompt;
     }
 
