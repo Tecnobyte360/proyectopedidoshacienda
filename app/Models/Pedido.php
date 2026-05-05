@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Events\PedidoActualizado;
 use App\Models\Concerns\BelongsToTenant;
+use App\Models\Tenant;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
@@ -764,6 +765,19 @@ MSG;
 
     public function getUrlSeguimientoAttribute(): string
     {
+        // Genera la URL en el subdominio del tenant del pedido,
+        // no en el dominio "principal" donde corre la app. Así un pedido
+        // de Guayacán Café apunta a guayacan-cafe.tecnobyte360.com
+        // y no al subdominio genérico (pedidosonline.*).
+        $path = '/seguimiento-pedido/' . $this->codigo_seguimiento;
+
+        $tenant = $this->tenant ?: ($this->tenant_id ? Tenant::find($this->tenant_id) : null);
+        if ($tenant && method_exists($tenant, 'dominio')) {
+            $scheme = config('app.env') === 'production' ? 'https' : 'http';
+            return $scheme . '://' . $tenant->dominio() . $path;
+        }
+
+        // Fallback: route() usa APP_URL (genérico del sistema)
         return route('pedidos.seguimiento', $this->codigo_seguimiento);
     }
 
