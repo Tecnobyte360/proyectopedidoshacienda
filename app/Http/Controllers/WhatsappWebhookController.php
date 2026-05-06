@@ -3096,6 +3096,24 @@ TXT;
 
         DB::commit();
 
+        // 🚀 EXPORTAR pedido al ERP del cliente (si tiene integración configurada)
+        // Ejecuta DESPUÉS del commit para no quedar atrapado en la transacción.
+        // Si falla, NO afecta el registro del pedido — solo se loguea el error
+        // en integracion_export_logs para que el operador lo vea y reintente.
+        try {
+            $exportService = app(\App\Services\IntegracionExportService::class);
+            $resExport = $exportService->exportarPedido($pedido);
+            if ($resExport['exportadas'] > 0) {
+                Log::info('🔄 Pedido exportado a integraciones', [
+                    'pedido_id'   => $pedido->id,
+                    'exportadas'  => $resExport['exportadas'],
+                    'resultados'  => $resExport['resultados'],
+                ]);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Export pedido al ERP falló (no crítico): ' . $e->getMessage());
+        }
+
         // Recalcular métricas del cliente (total_pedidos, total_gastado, etc.)
         try {
             $cliente->refresh()->recalcularMetricas();

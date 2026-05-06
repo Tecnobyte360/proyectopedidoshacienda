@@ -19,6 +19,7 @@ class Integracion extends Model
         'entidad',
         'config',
         'activo',
+        'exporta_pedidos',
         'ultima_sincronizacion_at',
         'ultima_sincronizacion_estado',
         'ultima_sincronizacion_log',
@@ -28,6 +29,7 @@ class Integracion extends Model
     protected $casts = [
         'config' => 'array',
         'activo' => 'boolean',
+        'exporta_pedidos' => 'boolean',
         'ultima_sincronizacion_at' => 'datetime',
         'total_registros_ultima_sync' => 'integer',
     ];
