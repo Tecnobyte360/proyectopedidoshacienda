@@ -49,6 +49,10 @@ class Index extends Component
     public string $export_ccosto         = '0';
     public string $export_subccosto      = '0';
 
+    // 📋 EXPORT DETALLE (líneas del pedido a TblDetalleDocumentos)
+    public bool   $export_detalle_activo = false;
+    public string $export_detalle_tabla  = 'TblDetalleDocumentos';
+
     // Resultado del "Probar conexión"
     public ?array $testResult = null;
     public int $pruebaPage = 1;
@@ -123,6 +127,11 @@ class Index extends Component
         $this->export_sucursal    = (string) ($exp['sucursal']            ?? '0');
         $this->export_ccosto      = (string) ($exp['ccosto']              ?? '0');
         $this->export_subccosto   = (string) ($exp['subccosto']           ?? '0');
+
+        // Cargar config de detalle
+        $det = $exp['detalle'] ?? [];
+        $this->export_detalle_activo = (bool) ($det['activo'] ?? false);
+        $this->export_detalle_tabla  = (string) ($det['tabla'] ?? 'TblDetalleDocumentos');
 
         $this->modal = true;
     }
@@ -204,6 +213,12 @@ class Index extends Component
                 'subccosto'          => trim($this->export_subccosto) ?: '0',
                 'tran_aux'           => 0,
                 'doc_ref'            => 0,
+                // 📋 Detalle (líneas del pedido)
+                'detalle' => [
+                    'activo' => $this->export_detalle_activo,
+                    'tabla'  => trim($this->export_detalle_tabla) ?: 'TblDetalleDocumentos',
+                    // Los demás campos heredan del header por default (ver IntegracionExportService::camposDetalle)
+                ],
             ],
         ];
 

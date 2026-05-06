@@ -470,9 +470,64 @@
                             </div>
 
                             <div class="mt-3 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-[11px] text-amber-800">
-                                💡 <strong>StrTercero</strong> se llena automáticamente con la cédula del cliente
-                                (o teléfono si no tiene cédula). <strong>IntTotal/Subtotal/Neto</strong> = total del pedido.
-                                <strong>DatFecha/DatVencimiento</strong> = fecha del pedido.
+                                💡 <strong>Variables disponibles</strong> en cualquier campo (escríbelas con llaves):
+                                <code class="text-[10px] bg-amber-100 px-1 rounded">{cliente.cedula}</code>
+                                <code class="text-[10px] bg-amber-100 px-1 rounded">{cliente.nombre}</code>
+                                <code class="text-[10px] bg-amber-100 px-1 rounded">{cliente.telefono}</code>
+                                <code class="text-[10px] bg-amber-100 px-1 rounded">{pedido.total}</code>
+                                <code class="text-[10px] bg-amber-100 px-1 rounded">{pedido.fecha}</code>
+                                <code class="text-[10px] bg-amber-100 px-1 rounded">{pedido.fecha_hora}</code>
+                                <code class="text-[10px] bg-amber-100 px-1 rounded">{pedido.id}</code>
+                                <code class="text-[10px] bg-amber-100 px-1 rounded">{consecutivo}</code>
+                                <code class="text-[10px] bg-amber-100 px-1 rounded">{ano}</code>
+                                <code class="text-[10px] bg-amber-100 px-1 rounded">{mes}</code><br>
+                                Por ejemplo, en <strong>StrUsuarioGra</strong> puedes poner <code>{cliente.cedula}</code> y se reemplazará por la cédula real al insertar.
+                            </div>
+
+                            {{-- 📋 DETALLE — TblDetalleDocumentos --}}
+                            <div class="mt-4 pt-4 border-t-2 border-blue-200">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <i class="fa-solid fa-list-ol text-blue-600"></i>
+                                    <h5 class="font-bold text-slate-800 text-sm">Detalle (líneas del pedido)</h5>
+                                </div>
+                                <p class="text-[11px] text-slate-600 mb-3">
+                                    Adicionalmente, ¿quieres insertar también <strong>UNA fila por cada producto</strong>
+                                    en una tabla de detalle (TblDetalleDocumentos)?
+                                </p>
+
+                                <label class="flex items-start gap-3 cursor-pointer rounded-xl border-2 p-3 transition bg-white mb-2
+                                              {{ $export_detalle_activo ? 'border-blue-400' : 'border-slate-200' }}">
+                                    <input type="checkbox" wire:model.live="export_detalle_activo"
+                                           class="mt-1 rounded border-slate-300 text-blue-600 h-5 w-5">
+                                    <div class="flex-1">
+                                        <div class="text-sm font-bold text-slate-800">📋 Insertar también el detalle</div>
+                                        <div class="text-[11px] text-slate-500">
+                                            Por cada producto del pedido, se hará un <code>INSERT INTO {{ $export_detalle_tabla }}</code>.
+                                            Cantidad, código, precio unitario, etc., se llenan automáticamente.
+                                        </div>
+                                    </div>
+                                </label>
+
+                                @if($export_detalle_activo)
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
+                                        <div>
+                                            <label class="block text-xs font-semibold text-slate-700 mb-1">Tabla detalle</label>
+                                            <input type="text" wire:model="export_detalle_tabla"
+                                                   class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="TblDetalleDocumentos">
+                                        </div>
+                                    </div>
+
+                                    <div class="mt-3 rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2 text-[11px] text-emerald-800">
+                                        ✓ Variables específicas del detalle:
+                                        <code class="text-[10px] bg-emerald-100 px-1 rounded">{detalle.codigo}</code>
+                                        <code class="text-[10px] bg-emerald-100 px-1 rounded">{detalle.nombre}</code>
+                                        <code class="text-[10px] bg-emerald-100 px-1 rounded">{detalle.cantidad}</code>
+                                        <code class="text-[10px] bg-emerald-100 px-1 rounded">{detalle.unidad}</code>
+                                        <code class="text-[10px] bg-emerald-100 px-1 rounded">{detalle.precio}</code>
+                                        <code class="text-[10px] bg-emerald-100 px-1 rounded">{detalle.subtotal}</code><br>
+                                        Estas se rellenan automáticamente. La estructura del INSERT es la estándar (StrProducto, IntCantidad, IntValorUnitario, etc.).
+                                    </div>
+                                @endif
                             </div>
                         @endif
                     </div>
