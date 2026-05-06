@@ -104,13 +104,15 @@ class IntegracionExportService
         $exportarDetalle = ($cfg['detalle']['activo'] ?? false) && $tablaDetalle !== '';
 
         if ($exportarDetalle && $pedido->detalles && $pedido->detalles->count() > 0) {
+            $numeroLinea = 1; // serie incremental por línea (1, 2, 3...)
             foreach ($pedido->detalles as $linea) {
-                $ctxLinea = $ctxBase + $this->construirContextoDetalle($linea);
+                $ctxLinea = $ctxBase + $this->construirContextoDetalle($linea, $numeroLinea);
                 $detFields = $this->camposDetalle($cfg, $ctxLinea);
                 [$sqlDet, $paramsDet] = $this->construirInsert($tablaDetalle, $detFields);
                 $stmtDet = $pdo->prepare($sqlDet);
                 $stmtDet->execute($paramsDet);
                 $detalleInsertados++;
+                $numeroLinea++;
             }
         }
 
@@ -172,7 +174,7 @@ class IntegracionExportService
         ];
     }
 
-    private function construirContextoDetalle($detalle): array
+    private function construirContextoDetalle($detalle, int $numeroLinea = 1): array
     {
         return [
             'detalle.codigo'   => (string) ($detalle->codigo_producto ?? ''),
@@ -181,6 +183,14 @@ class IntegracionExportService
             'detalle.unidad'   => (string) ($detalle->unidad ?? 'Und'),
             'detalle.precio'   => (float) ($detalle->precio_unitario ?? 0),
             'detalle.subtotal' => (float) ($detalle->subtotal ?? 0),
+            // 🔢 Número de línea (StrSerie incremental: 1, 2, 3... por pedido)
+            'detalle.numero'   => $numeroLinea,
+            'linea'            => $numeroLinea,
+            // 💰 Descuentos e impuestos por línea (si los maneja el pedido)
+            'detalle.descuento_porcentaje' => (float) ($detalle->descuento_porcentaje ?? 0),
+            'detalle.descuento_valor'      => (float) ($detalle->descuento_valor ?? 0),
+            'detalle.iva'                  => (float) ($detalle->iva ?? 0),
+            'detalle.impuesto_consumo'     => (float) ($detalle->impuesto_consumo ?? 0),
         ];
     }
 
@@ -242,9 +252,10 @@ class IntegracionExportService
             'StrSucursal'        => $this->resolver($det['sucursal']     ?? $cfg['sucursal']    ?? '0', $ctx),
             'StrCCosto'          => $this->resolver($det['ccosto']       ?? $cfg['ccosto']      ?? '0', $ctx),
             'StrSubCCosto'       => $this->resolver($det['subccosto']    ?? $cfg['subccosto']   ?? '0', $ctx),
-            'StrSerie'           => $this->resolver($det['serie']        ?? '0', $ctx),
-            'IntPorDescuento'    => $this->resolver($det['por_descuento']    ?? 1, $ctx),
-            'IntValorDescuento'  => $this->resolver($det['valor_descuento']  ?? 0, $ctx),
+            // StrSerie: ID creciente por línea (1, 2, 3...) — patrón estándar HGI
+            'StrSerie'           => $this->resolver($det['serie']        ?? '{detalle.numero}', $ctx),
+            'IntPorDescuento'    => $this->resolver($det['por_descuento']    ?? '{detalle.descuento_porcentaje}', $ctx),
+            'IntValorDescuento'  => $this->resolver($det['valor_descuento']  ?? '{detalle.descuento_valor}', $ctx),
         ];
     }
 

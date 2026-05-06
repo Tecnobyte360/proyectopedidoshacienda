@@ -470,18 +470,27 @@
                             </div>
 
                             <div class="mt-3 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-[11px] text-amber-800">
-                                💡 <strong>Variables disponibles</strong> en cualquier campo (escríbelas con llaves):
-                                <code class="text-[10px] bg-amber-100 px-1 rounded">{cliente.cedula}</code>
-                                <code class="text-[10px] bg-amber-100 px-1 rounded">{cliente.nombre}</code>
-                                <code class="text-[10px] bg-amber-100 px-1 rounded">{cliente.telefono}</code>
-                                <code class="text-[10px] bg-amber-100 px-1 rounded">{pedido.total}</code>
-                                <code class="text-[10px] bg-amber-100 px-1 rounded">{pedido.fecha}</code>
-                                <code class="text-[10px] bg-amber-100 px-1 rounded">{pedido.fecha_hora}</code>
-                                <code class="text-[10px] bg-amber-100 px-1 rounded">{pedido.id}</code>
-                                <code class="text-[10px] bg-amber-100 px-1 rounded">{consecutivo}</code>
-                                <code class="text-[10px] bg-amber-100 px-1 rounded">{ano}</code>
-                                <code class="text-[10px] bg-amber-100 px-1 rounded">{mes}</code><br>
-                                Por ejemplo, en <strong>StrUsuarioGra</strong> puedes poner <code>{cliente.cedula}</code> y se reemplazará por la cédula real al insertar.
+                                💡 <strong>Variables disponibles</strong> en cualquier campo (escríbelas con llaves):<br>
+
+                                <strong>Cliente:</strong>
+                                <code class="text-[10px] bg-amber-100 px-1 rounded mx-0.5">{cliente.cedula}</code>
+                                <code class="text-[10px] bg-amber-100 px-1 rounded mx-0.5">{cliente.nombre}</code>
+                                <code class="text-[10px] bg-amber-100 px-1 rounded mx-0.5">{cliente.telefono}</code><br>
+
+                                <strong>Pedido:</strong>
+                                <code class="text-[10px] bg-amber-100 px-1 rounded mx-0.5">{pedido.id}</code>
+                                <code class="text-[10px] bg-amber-100 px-1 rounded mx-0.5">{pedido.total}</code>
+                                <code class="text-[10px] bg-amber-100 px-1 rounded mx-0.5">{pedido.fecha}</code>
+                                <code class="text-[10px] bg-amber-100 px-1 rounded mx-0.5">{pedido.fecha_hora}</code>
+                                <code class="text-[10px] bg-amber-100 px-1 rounded mx-0.5">{consecutivo}</code><br>
+
+                                <strong>Fecha actual:</strong>
+                                <code class="text-[10px] bg-amber-100 px-1 rounded mx-0.5">{ano}</code>
+                                <code class="text-[10px] bg-amber-100 px-1 rounded mx-0.5">{mes}</code>
+                                <code class="text-[10px] bg-amber-100 px-1 rounded mx-0.5">{dia}</code>
+                                ← <strong>{mes} cambia automáticamente cada mes</strong> (1=enero, 12=diciembre)<br>
+
+                                <em>Ej:</em> en <strong>IntPeriodo</strong> puedes poner <code>{mes}</code> y siempre tendrá el mes en curso sin actualizar manualmente.
                             </div>
 
                             {{-- 📋 DETALLE — TblDetalleDocumentos --}}
@@ -571,13 +580,18 @@
                                     </div>
 
                                     <div class="mt-3 rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2 text-[11px] text-emerald-800">
-                                        ✓ <strong>Variables del detalle</strong> (escríbelas con llaves en cualquier campo):<br>
-                                        <code class="text-[10px] bg-emerald-100 px-1 rounded mr-1">{detalle.codigo}</code>código del producto en BD
-                                        <code class="text-[10px] bg-emerald-100 px-1 rounded mr-1 ml-2">{detalle.nombre}</code>nombre del producto
-                                        <code class="text-[10px] bg-emerald-100 px-1 rounded mr-1 ml-2">{detalle.cantidad}</code>cantidad pedida<br>
-                                        <code class="text-[10px] bg-emerald-100 px-1 rounded mr-1">{detalle.unidad}</code>unidad (kg, und, lb)
-                                        <code class="text-[10px] bg-emerald-100 px-1 rounded mr-1 ml-2">{detalle.precio}</code>precio unitario
-                                        <code class="text-[10px] bg-emerald-100 px-1 rounded mr-1 ml-2">{detalle.subtotal}</code>cantidad × precio<br>
+                                        ✓ <strong>Variables del detalle</strong>:<br>
+                                        <code class="text-[10px] bg-emerald-100 px-1 rounded mr-1">{detalle.codigo}</code>SKU/código
+                                        <code class="text-[10px] bg-emerald-100 px-1 rounded mr-1 ml-2">{detalle.nombre}</code>nombre
+                                        <code class="text-[10px] bg-emerald-100 px-1 rounded mr-1 ml-2">{detalle.cantidad}</code>cantidad
+                                        <code class="text-[10px] bg-emerald-100 px-1 rounded mr-1 ml-2">{detalle.unidad}</code>Und/Kg<br>
+                                        <code class="text-[10px] bg-emerald-100 px-1 rounded mr-1">{detalle.precio}</code>precio unitario
+                                        <code class="text-[10px] bg-emerald-100 px-1 rounded mr-1 ml-2">{detalle.subtotal}</code>cantidad × precio
+                                        <code class="text-[10px] bg-emerald-100 px-1 rounded mr-1 ml-2">{detalle.numero}</code><strong>← StrSerie incremental (1,2,3...)</strong><br>
+                                        <code class="text-[10px] bg-emerald-100 px-1 rounded mr-1">{detalle.descuento_porcentaje}</code>
+                                        <code class="text-[10px] bg-emerald-100 px-1 rounded mr-1 ml-2">{detalle.descuento_valor}</code>
+                                        <code class="text-[10px] bg-emerald-100 px-1 rounded mr-1 ml-2">{detalle.iva}</code>
+                                        <code class="text-[10px] bg-emerald-100 px-1 rounded mr-1 ml-2">{detalle.impuesto_consumo}</code><br>
                                         <strong>Tip:</strong> también puedes usar variables del header como <code class="text-[10px] bg-emerald-100 px-1 rounded">{cliente.cedula}</code>, <code class="text-[10px] bg-emerald-100 px-1 rounded">{consecutivo}</code>, <code class="text-[10px] bg-emerald-100 px-1 rounded">{pedido.fecha}</code>
                                     </div>
                                 @endif

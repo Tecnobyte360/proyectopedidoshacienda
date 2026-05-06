@@ -60,9 +60,10 @@ class Index extends Component
     public string $export_det_valor_total    = '{detalle.subtotal}';
     public string $export_det_iva            = '0';
     public string $export_det_impuesto1      = '0';
-    public string $export_det_serie          = '0';
-    public string $export_det_por_descuento  = '1';
-    public string $export_det_valor_descuento= '0';
+    // StrSerie: ID creciente por línea (1, 2, 3...) — patrón HGI estándar
+    public string $export_det_serie          = '{detalle.numero}';
+    public string $export_det_por_descuento  = '{detalle.descuento_porcentaje}';
+    public string $export_det_valor_descuento= '{detalle.descuento_valor}';
 
     // Resultado del "Probar conexión"
     public ?array $testResult = null;
@@ -150,9 +151,9 @@ class Index extends Component
         $this->export_det_valor_total    = (string) ($det['valor_total']    ?? '{detalle.subtotal}');
         $this->export_det_iva            = (string) ($det['valor_iva']      ?? '0');
         $this->export_det_impuesto1      = (string) ($det['impuesto1']      ?? '0');
-        $this->export_det_serie          = (string) ($det['serie']          ?? '0');
-        $this->export_det_por_descuento  = (string) ($det['por_descuento']  ?? '1');
-        $this->export_det_valor_descuento= (string) ($det['valor_descuento']?? '0');
+        $this->export_det_serie          = (string) ($det['serie']          ?? '{detalle.numero}');
+        $this->export_det_por_descuento  = (string) ($det['por_descuento']  ?? '{detalle.descuento_porcentaje}');
+        $this->export_det_valor_descuento= (string) ($det['valor_descuento']?? '{detalle.descuento_valor}');
 
         $this->modal = true;
     }
