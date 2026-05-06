@@ -84,8 +84,58 @@ class IntegracionExportService
     {
         $cfg = $integracion->config['export'] ?? [];
         $tablaHeader = $cfg['tabla'] ?? 'TblDocumentos';
+        $tablaDetalle = trim((string) ($cfg['detalle']['tabla'] ?? ''));
 
         $pdo = $this->sync->conectar($integracion);
+
+        // 🔧 Si está activado, desactivar triggers ANTES del INSERT.
+        // Útil cuando el ERP del cliente tiene triggers que validan cosas
+        // (saldos, terceros, transacciones registradas) que se cumplen
+        // por el flujo normal del ERP pero no por inserts externos.
+        // Los triggers se reactivan en el finally para garantizar que
+        // queden activos pase lo que pase.
+        $disableTriggers = (bool) ($cfg['disable_triggers'] ?? false);
+        if ($disableTriggers) {
+            $this->desactivarTriggers($pdo, $tablaHeader);
+            if ($tablaDetalle) $this->desactivarTriggers($pdo, $tablaDetalle);
+        }
+
+        try {
+            return $this->ejecutarInserts($pdo, $integracion, $pedido, $cfg, $tablaHeader, $tablaDetalle);
+        } finally {
+            if ($disableTriggers) {
+                $this->reactivarTriggers($pdo, $tablaHeader);
+                if ($tablaDetalle) $this->reactivarTriggers($pdo, $tablaDetalle);
+            }
+        }
+    }
+
+    private function desactivarTriggers(PDO $pdo, string $tabla): void
+    {
+        try {
+            $pdo->exec("DISABLE TRIGGER ALL ON {$tabla}");
+            Log::info("🔧 Triggers DESACTIVADOS en {$tabla}");
+        } catch (\Throwable $e) {
+            Log::warning("No se pudieron desactivar triggers en {$tabla}: " . $e->getMessage());
+        }
+    }
+
+    private function reactivarTriggers(PDO $pdo, string $tabla): void
+    {
+        try {
+            $pdo->exec("ENABLE TRIGGER ALL ON {$tabla}");
+            Log::info("✓ Triggers REACTIVADOS en {$tabla}");
+        } catch (\Throwable $e) {
+            Log::error("⚠️ NO SE PUDIERON REACTIVAR LOS TRIGGERS EN {$tabla}: " . $e->getMessage()
+                . " — Reactívalos manualmente con: ENABLE TRIGGER ALL ON {$tabla}");
+        }
+    }
+
+    /**
+     * Lógica original del INSERT, separada para envolverla en try/finally.
+     */
+    private function ejecutarInserts(PDO $pdo, Integracion $integracion, Pedido $pedido, array $cfg, string $tablaHeader, string $tablaDetalle): array
+    {
         $documentoId = $this->siguienteConsecutivo($pdo, $tablaHeader, $cfg);
 
         // Contexto base de variables (header + cada línea de detalle)
@@ -100,7 +150,6 @@ class IntegracionExportService
 
         // ── 2. INSERT por cada LÍNEA de DETALLE ──────────────────────────
         $detalleInsertados = 0;
-        $tablaDetalle = trim((string) ($cfg['detalle']['tabla'] ?? ''));
         $exportarDetalle = ($cfg['detalle']['activo'] ?? false) && $tablaDetalle !== '';
 
         if ($exportarDetalle && $pedido->detalles && $pedido->detalles->count() > 0) {

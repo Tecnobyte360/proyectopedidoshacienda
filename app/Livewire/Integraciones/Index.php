@@ -49,6 +49,9 @@ class Index extends Component
     public string $export_ccosto         = '0';
     public string $export_subccosto      = '0';
 
+    /** Si true, ejecuta DISABLE TRIGGER ALL antes del INSERT y ENABLE después */
+    public bool   $export_disable_triggers = false;
+
     // 📋 EXPORT DETALLE (líneas del pedido a TblDetalleDocumentos)
     public bool   $export_detalle_activo = false;
     public string $export_detalle_tabla  = 'TblDetalleDocumentos';
@@ -139,6 +142,7 @@ class Index extends Component
         $this->export_sucursal    = (string) ($exp['sucursal']            ?? '0');
         $this->export_ccosto      = (string) ($exp['ccosto']              ?? '0');
         $this->export_subccosto   = (string) ($exp['subccosto']           ?? '0');
+        $this->export_disable_triggers = (bool) ($exp['disable_triggers'] ?? false);
 
         // Cargar config de detalle
         $det = $exp['detalle'] ?? [];
@@ -235,6 +239,7 @@ class Index extends Component
                 'subccosto'          => trim($this->export_subccosto) ?: '0',
                 'tran_aux'           => 0,
                 'doc_ref'            => 0,
+                'disable_triggers'   => $this->export_disable_triggers,
                 // 📋 Detalle (líneas del pedido)
                 'detalle' => [
                     'activo'           => $this->export_detalle_activo,

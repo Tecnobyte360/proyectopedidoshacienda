@@ -475,6 +475,31 @@
                                 </div>
                             </div>
 
+                            {{-- 🔧 TOGGLE: desactivar triggers --}}
+                            <div class="mt-3 rounded-lg bg-rose-50 border-2 border-rose-200 px-4 py-3">
+                                <label class="flex items-start gap-3 cursor-pointer">
+                                    <input type="checkbox" wire:model="export_disable_triggers"
+                                           class="mt-1 rounded border-slate-300 text-rose-600 h-5 w-5">
+                                    <div class="flex-1">
+                                        <div class="text-sm font-bold text-rose-800 flex items-center gap-2">
+                                            <i class="fa-solid fa-shield-halved"></i>
+                                            Desactivar triggers durante el INSERT
+                                        </div>
+                                        <div class="text-[11px] text-rose-700 mt-1 leading-relaxed">
+                                            Si tu ERP tiene triggers en <strong>{{ $export_tabla }}</strong> o
+                                            <strong>{{ $export_detalle_tabla }}</strong> que validan terceros/saldos
+                                            y abortan el INSERT (error <code>20018 transaction ended in trigger</code>),
+                                            activa esto. El sistema ejecutará:
+                                            <code class="bg-rose-100 px-1 rounded text-[10px]">DISABLE TRIGGER ALL</code>
+                                            antes y <code class="bg-rose-100 px-1 rounded text-[10px]">ENABLE TRIGGER ALL</code>
+                                            después del INSERT.<br>
+                                            ⚠️ <strong>Requiere permiso ALTER en la tabla.</strong> Idealmente prefiere
+                                            crear el cliente/producto en el ERP antes que desactivar triggers.
+                                        </div>
+                                    </div>
+                                </label>
+                            </div>
+
                             <div class="mt-3 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-[11px] text-amber-800">
                                 💡 <strong>Variables disponibles</strong> en cualquier campo (escríbelas con llaves):<br>
 
