@@ -13,10 +13,16 @@
                         <p class="text-sm text-slate-500">Conecta a la BD externa de esta empresa y sincroniza productos o categorías</p>
                     </div>
                 </div>
-                <button wire:click="abrirCrear"
-                        class="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-brand to-brand-secondary hover:from-brand-dark hover:to-brand-dark text-white font-bold px-5 py-3 transition shadow-lg">
-                    <i class="fa-solid fa-plus"></i> Nueva integración
-                </button>
+                <div class="flex items-center gap-2">
+                    <a href="{{ route('integraciones.exports') }}"
+                       class="inline-flex items-center gap-2 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-3 transition shadow-lg">
+                        <i class="fa-solid fa-cloud-arrow-up"></i> Ver exports
+                    </a>
+                    <button wire:click="abrirCrear"
+                            class="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-brand to-brand-secondary hover:from-brand-dark hover:to-brand-dark text-white font-bold px-5 py-3 transition shadow-lg">
+                        <i class="fa-solid fa-plus"></i> Nueva integración
+                    </button>
+                </div>
             </div>
         </div>
 
