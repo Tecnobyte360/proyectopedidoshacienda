@@ -52,6 +52,17 @@ class Index extends Component
     // 📋 EXPORT DETALLE (líneas del pedido a TblDetalleDocumentos)
     public bool   $export_detalle_activo = false;
     public string $export_detalle_tabla  = 'TblDetalleDocumentos';
+    // Campos editables del detalle (todos aceptan literales o {variables})
+    public string $export_det_producto       = '{detalle.codigo}';
+    public string $export_det_cantidad       = '{detalle.cantidad}';
+    public string $export_det_unidad         = '{detalle.unidad}';
+    public string $export_det_valor_unitario = '{detalle.precio}';
+    public string $export_det_valor_total    = '{detalle.subtotal}';
+    public string $export_det_iva            = '0';
+    public string $export_det_impuesto1      = '0';
+    public string $export_det_serie          = '0';
+    public string $export_det_por_descuento  = '1';
+    public string $export_det_valor_descuento= '0';
 
     // Resultado del "Probar conexión"
     public ?array $testResult = null;
@@ -132,6 +143,16 @@ class Index extends Component
         $det = $exp['detalle'] ?? [];
         $this->export_detalle_activo = (bool) ($det['activo'] ?? false);
         $this->export_detalle_tabla  = (string) ($det['tabla'] ?? 'TblDetalleDocumentos');
+        $this->export_det_producto       = (string) ($det['producto']       ?? '{detalle.codigo}');
+        $this->export_det_cantidad       = (string) ($det['cantidad']       ?? '{detalle.cantidad}');
+        $this->export_det_unidad         = (string) ($det['unidad']         ?? '{detalle.unidad}');
+        $this->export_det_valor_unitario = (string) ($det['valor_unitario'] ?? '{detalle.precio}');
+        $this->export_det_valor_total    = (string) ($det['valor_total']    ?? '{detalle.subtotal}');
+        $this->export_det_iva            = (string) ($det['valor_iva']      ?? '0');
+        $this->export_det_impuesto1      = (string) ($det['impuesto1']      ?? '0');
+        $this->export_det_serie          = (string) ($det['serie']          ?? '0');
+        $this->export_det_por_descuento  = (string) ($det['por_descuento']  ?? '1');
+        $this->export_det_valor_descuento= (string) ($det['valor_descuento']?? '0');
 
         $this->modal = true;
     }
@@ -215,9 +236,19 @@ class Index extends Component
                 'doc_ref'            => 0,
                 // 📋 Detalle (líneas del pedido)
                 'detalle' => [
-                    'activo' => $this->export_detalle_activo,
-                    'tabla'  => trim($this->export_detalle_tabla) ?: 'TblDetalleDocumentos',
-                    // Los demás campos heredan del header por default (ver IntegracionExportService::camposDetalle)
+                    'activo'           => $this->export_detalle_activo,
+                    'tabla'            => trim($this->export_detalle_tabla) ?: 'TblDetalleDocumentos',
+                    'producto'         => trim($this->export_det_producto)       ?: '{detalle.codigo}',
+                    'cantidad'         => trim($this->export_det_cantidad)       ?: '{detalle.cantidad}',
+                    'cantidad_doc'     => trim($this->export_det_cantidad)       ?: '{detalle.cantidad}',
+                    'unidad'           => trim($this->export_det_unidad)         ?: '{detalle.unidad}',
+                    'valor_unitario'   => trim($this->export_det_valor_unitario) ?: '{detalle.precio}',
+                    'valor_total'      => trim($this->export_det_valor_total)    ?: '{detalle.subtotal}',
+                    'valor_iva'        => trim($this->export_det_iva)            ?: '0',
+                    'impuesto1'        => trim($this->export_det_impuesto1)      ?: '0',
+                    'serie'            => trim($this->export_det_serie)          ?: '0',
+                    'por_descuento'    => trim($this->export_det_por_descuento)  ?: '1',
+                    'valor_descuento'  => trim($this->export_det_valor_descuento)?: '0',
                 ],
             ],
         ];

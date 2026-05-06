@@ -509,23 +509,76 @@
                                 </label>
 
                                 @if($export_detalle_activo)
-                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
-                                        <div>
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
+                                        <div class="md:col-span-3">
                                             <label class="block text-xs font-semibold text-slate-700 mb-1">Tabla detalle</label>
                                             <input type="text" wire:model="export_detalle_tabla"
                                                    class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="TblDetalleDocumentos">
                                         </div>
+
+                                        <div>
+                                            <label class="block text-xs font-semibold text-slate-700 mb-1">StrProducto</label>
+                                            <input type="text" wire:model="export_det_producto"
+                                                   class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-mono" placeholder="{detalle.codigo}">
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-semibold text-slate-700 mb-1">IntCantidad</label>
+                                            <input type="text" wire:model="export_det_cantidad"
+                                                   class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-mono" placeholder="{detalle.cantidad}">
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-semibold text-slate-700 mb-1">StrUnidad</label>
+                                            <input type="text" wire:model="export_det_unidad"
+                                                   class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-mono" placeholder="{detalle.unidad}">
+                                        </div>
+
+                                        <div>
+                                            <label class="block text-xs font-semibold text-slate-700 mb-1">IntValorUnitario</label>
+                                            <input type="text" wire:model="export_det_valor_unitario"
+                                                   class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-mono" placeholder="{detalle.precio}">
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-semibold text-slate-700 mb-1">IntValorTotal</label>
+                                            <input type="text" wire:model="export_det_valor_total"
+                                                   class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-mono" placeholder="{detalle.subtotal}">
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-semibold text-slate-700 mb-1">IntValorIva</label>
+                                            <input type="text" wire:model="export_det_iva"
+                                                   class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-mono" placeholder="0">
+                                        </div>
+
+                                        <div>
+                                            <label class="block text-xs font-semibold text-slate-700 mb-1">IntVrImpuesto1</label>
+                                            <input type="text" wire:model="export_det_impuesto1"
+                                                   class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-mono" placeholder="0">
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-semibold text-slate-700 mb-1">StrSerie</label>
+                                            <input type="text" wire:model="export_det_serie"
+                                                   class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-mono" placeholder="0">
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-semibold text-slate-700 mb-1">IntPorDescuento</label>
+                                            <input type="text" wire:model="export_det_por_descuento"
+                                                   class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-mono" placeholder="1">
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-semibold text-slate-700 mb-1">IntValorDescuento</label>
+                                            <input type="text" wire:model="export_det_valor_descuento"
+                                                   class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-mono" placeholder="0">
+                                        </div>
                                     </div>
 
                                     <div class="mt-3 rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2 text-[11px] text-emerald-800">
-                                        ✓ Variables específicas del detalle:
-                                        <code class="text-[10px] bg-emerald-100 px-1 rounded">{detalle.codigo}</code>
-                                        <code class="text-[10px] bg-emerald-100 px-1 rounded">{detalle.nombre}</code>
-                                        <code class="text-[10px] bg-emerald-100 px-1 rounded">{detalle.cantidad}</code>
-                                        <code class="text-[10px] bg-emerald-100 px-1 rounded">{detalle.unidad}</code>
-                                        <code class="text-[10px] bg-emerald-100 px-1 rounded">{detalle.precio}</code>
-                                        <code class="text-[10px] bg-emerald-100 px-1 rounded">{detalle.subtotal}</code><br>
-                                        Estas se rellenan automáticamente. La estructura del INSERT es la estándar (StrProducto, IntCantidad, IntValorUnitario, etc.).
+                                        ✓ <strong>Variables del detalle</strong> (escríbelas con llaves en cualquier campo):<br>
+                                        <code class="text-[10px] bg-emerald-100 px-1 rounded mr-1">{detalle.codigo}</code>código del producto en BD
+                                        <code class="text-[10px] bg-emerald-100 px-1 rounded mr-1 ml-2">{detalle.nombre}</code>nombre del producto
+                                        <code class="text-[10px] bg-emerald-100 px-1 rounded mr-1 ml-2">{detalle.cantidad}</code>cantidad pedida<br>
+                                        <code class="text-[10px] bg-emerald-100 px-1 rounded mr-1">{detalle.unidad}</code>unidad (kg, und, lb)
+                                        <code class="text-[10px] bg-emerald-100 px-1 rounded mr-1 ml-2">{detalle.precio}</code>precio unitario
+                                        <code class="text-[10px] bg-emerald-100 px-1 rounded mr-1 ml-2">{detalle.subtotal}</code>cantidad × precio<br>
+                                        <strong>Tip:</strong> también puedes usar variables del header como <code class="text-[10px] bg-emerald-100 px-1 rounded">{cliente.cedula}</code>, <code class="text-[10px] bg-emerald-100 px-1 rounded">{consecutivo}</code>, <code class="text-[10px] bg-emerald-100 px-1 rounded">{pedido.fecha}</code>
                                     </div>
                                 @endif
                             </div>
