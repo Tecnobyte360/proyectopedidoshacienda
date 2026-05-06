@@ -369,6 +369,114 @@
                         </div>
                     @endif
 
+                    {{-- 🚀 EXPORT DE PEDIDOS AL ERP --}}
+                    <div class="rounded-xl border-2 border-blue-200 bg-blue-50 p-5 mb-4">
+                        <div class="flex items-center gap-2 mb-3">
+                            <i class="fa-solid fa-cloud-arrow-up text-blue-600 text-lg"></i>
+                            <h4 class="font-bold text-slate-800">Exportar pedidos al ERP</h4>
+                        </div>
+                        <p class="text-xs text-slate-600 mb-3">
+                            Si está activo, cuando un cliente confirme un pedido por WhatsApp, el sistema
+                            ejecutará automáticamente un <code>INSERT INTO {{ $export_tabla ?: 'TblDocumentos' }}</code>
+                            en esta base de datos con los datos del pedido (cédula, total, fecha, etc).
+                        </p>
+
+                        <label class="flex items-start gap-3 cursor-pointer rounded-xl border-2 p-3 transition bg-white mb-3
+                                      {{ $exporta_pedidos ? 'border-blue-400' : 'border-slate-200' }}">
+                            <input type="checkbox" wire:model.live="exporta_pedidos"
+                                   class="mt-1 rounded border-slate-300 text-blue-600 h-5 w-5">
+                            <div class="flex-1">
+                                <div class="text-sm font-bold text-slate-800">
+                                    📤 Exportar pedidos confirmados a esta BD
+                                </div>
+                                <div class="text-[11px] text-slate-500">
+                                    Cada pedido nuevo se insertará en la tabla <code>{{ $export_tabla }}</code> del ERP.
+                                </div>
+                            </div>
+                        </label>
+
+                        @if($exporta_pedidos)
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                <div class="md:col-span-3">
+                                    <label class="block text-xs font-semibold text-slate-700 mb-1">Tabla destino</label>
+                                    <input type="text" wire:model="export_tabla"
+                                           class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                                </div>
+
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-700 mb-1">IntEmpresa</label>
+                                    <input type="number" wire:model="export_empresa"
+                                           class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-700 mb-1">IntTransaccion</label>
+                                    <input type="text" wire:model="export_transaccion"
+                                           class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="009">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-700 mb-1">IntBodega</label>
+                                    <input type="number" wire:model="export_bodega"
+                                           class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                                </div>
+
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-700 mb-1">IntCartera</label>
+                                    <input type="number" wire:model="export_cartera"
+                                           class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-700 mb-1">StrUsuarioGra</label>
+                                    <input type="text" wire:model="export_usuario"
+                                           class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="admin">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-700 mb-1">Consecutivo inicial</label>
+                                    <input type="number" wire:model="export_consecutivo"
+                                           class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                                    <p class="text-[10px] text-slate-500 mt-1">Si está vacío, calcula MAX+1</p>
+                                </div>
+
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-700 mb-1">IntAno</label>
+                                    <input type="number" wire:model="export_ano"
+                                           class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-700 mb-1">IntPeriodo</label>
+                                    <input type="number" wire:model="export_periodo"
+                                           class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-700 mb-1">StrPlazo</label>
+                                    <input type="text" wire:model="export_plazo"
+                                           class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                                </div>
+
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-700 mb-1">StrSucursal</label>
+                                    <input type="text" wire:model="export_sucursal"
+                                           class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-700 mb-1">StrCcosto</label>
+                                    <input type="text" wire:model="export_ccosto"
+                                           class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-700 mb-1">StrSubCcosto</label>
+                                    <input type="text" wire:model="export_subccosto"
+                                           class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                                </div>
+                            </div>
+
+                            <div class="mt-3 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-[11px] text-amber-800">
+                                💡 <strong>StrTercero</strong> se llena automáticamente con la cédula del cliente
+                                (o teléfono si no tiene cédula). <strong>IntTotal/Subtotal/Neto</strong> = total del pedido.
+                                <strong>DatFecha/DatVencimiento</strong> = fecha del pedido.
+                            </div>
+                        @endif
+                    </div>
+
                     {{-- Test --}}
                     <div class="rounded-xl border-2 border-dashed border-[#fbe9d7] bg-brand-soft/30 p-4">
                         <button wire:click="probarConexion"

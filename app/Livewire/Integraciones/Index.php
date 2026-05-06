@@ -33,6 +33,22 @@ class Index extends Component
         'descripcion' => 'descripcion',
     ];
 
+    // 🚀 EXPORT DE PEDIDOS al ERP del cliente
+    public bool   $exporta_pedidos       = false;
+    public string $export_tabla          = 'TblDocumentos';
+    public string $export_empresa        = '1';
+    public string $export_transaccion    = '009';
+    public string $export_bodega         = '1';
+    public string $export_cartera        = '1';
+    public string $export_usuario        = 'admin';
+    public string $export_consecutivo    = '600';
+    public string $export_ano            = '';
+    public string $export_periodo        = '';
+    public string $export_plazo          = '0';
+    public string $export_sucursal       = '0';
+    public string $export_ccosto         = '0';
+    public string $export_subccosto      = '0';
+
     // Resultado del "Probar conexión"
     public ?array $testResult = null;
     public int $pruebaPage = 1;
@@ -90,6 +106,23 @@ class Index extends Component
         $this->password = $this->utf8Safe($c['password'] ?? '');
         $this->query    = $this->utf8Safe($c['query']    ?? '');
         $this->mapeo    = array_merge($this->mapeo, $c['mapeo'] ?? []);
+
+        // Cargar config de export
+        $this->exporta_pedidos = (bool) $i->exporta_pedidos;
+        $exp = $c['export'] ?? [];
+        $this->export_tabla       = (string) ($exp['tabla']               ?? 'TblDocumentos');
+        $this->export_empresa     = (string) ($exp['empresa']             ?? '1');
+        $this->export_transaccion = (string) ($exp['transaccion']         ?? '009');
+        $this->export_bodega      = (string) ($exp['bodega']              ?? '1');
+        $this->export_cartera     = (string) ($exp['cartera']             ?? '1');
+        $this->export_usuario     = (string) ($exp['usuario_grabador']    ?? 'admin');
+        $this->export_consecutivo = (string) ($exp['consecutivo_inicial'] ?? '1');
+        $this->export_ano         = (string) ($exp['ano']                 ?? date('Y'));
+        $this->export_periodo     = (string) ($exp['periodo']             ?? date('n'));
+        $this->export_plazo       = (string) ($exp['plazo']               ?? '0');
+        $this->export_sucursal    = (string) ($exp['sucursal']            ?? '0');
+        $this->export_ccosto      = (string) ($exp['ccosto']              ?? '0');
+        $this->export_subccosto   = (string) ($exp['subccosto']           ?? '0');
 
         $this->modal = true;
     }
@@ -153,18 +186,40 @@ class Index extends Component
             'password' => $this->password,
             'query'    => $this->query,
             'mapeo'    => array_filter($this->mapeo, fn ($v) => $v !== '' && $v !== null),
+            'export'   => [
+                'tabla'              => trim($this->export_tabla) ?: 'TblDocumentos',
+                'empresa'            => (int) $this->export_empresa,
+                'transaccion'        => trim($this->export_transaccion),
+                'bodega'             => (int) $this->export_bodega,
+                'cartera'            => (int) $this->export_cartera,
+                'usuario_grabador'   => trim($this->export_usuario) ?: 'admin',
+                'consecutivo_inicial'=> (int) $this->export_consecutivo,
+                'ano'                => (int) $this->export_ano ?: (int) date('Y'),
+                'periodo'            => (int) $this->export_periodo ?: (int) date('n'),
+                'ano_cartera'        => (int) $this->export_ano ?: (int) date('Y'),
+                'periodo_cartera'    => (int) $this->export_periodo ?: (int) date('n'),
+                'plazo'              => trim($this->export_plazo) ?: '0',
+                'sucursal'           => trim($this->export_sucursal) ?: '0',
+                'ccosto'             => trim($this->export_ccosto) ?: '0',
+                'subccosto'          => trim($this->export_subccosto) ?: '0',
+                'tran_aux'           => 0,
+                'doc_ref'            => 0,
+            ],
+        ];
+
+        $datosBase = [
+            'nombre'  => $this->nombre,
+            'tipo'    => $this->tipo,
+            'entidad' => $this->entidad,
+            'activo'  => $this->activo,
+            'config'  => $config,
+            'exporta_pedidos' => $this->exporta_pedidos,
         ];
 
         if ($this->editandoId) {
-            Integracion::findOrFail($this->editandoId)->update([
-                'nombre' => $this->nombre, 'tipo' => $this->tipo, 'entidad' => $this->entidad,
-                'activo' => $this->activo, 'config' => $config,
-            ]);
+            Integracion::findOrFail($this->editandoId)->update($datosBase);
         } else {
-            Integracion::create([
-                'nombre' => $this->nombre, 'tipo' => $this->tipo, 'entidad' => $this->entidad,
-                'activo' => $this->activo, 'config' => $config,
-            ]);
+            Integracion::create($datosBase);
         }
 
         $this->modal = false;
