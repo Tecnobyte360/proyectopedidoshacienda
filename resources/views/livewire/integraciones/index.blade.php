@@ -15,7 +15,7 @@
                 </div>
                 <div class="flex items-center gap-2">
                     <a href="{{ route('integraciones.exports') }}"
-                       class="inline-flex items-center gap-2 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-3 transition shadow-lg">
+                       class="inline-flex items-center gap-2 rounded-2xl border-2 border-[#fbe9d7] bg-white hover:bg-brand-soft/40 text-brand-dark font-bold px-5 py-3 transition shadow-sm">
                         <i class="fa-solid fa-cloud-arrow-up"></i> Ver exports
                     </a>
                     <button wire:click="abrirCrear"
