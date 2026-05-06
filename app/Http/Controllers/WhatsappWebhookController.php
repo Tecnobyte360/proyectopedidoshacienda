@@ -2254,6 +2254,30 @@ TXT;
    *   3. Si todo falla, sin cobertura.
    */
   /**
+   * 🛡️ GUARD: si el bot dice 'no llegamos a X / no tenemos cobertura en X'
+   * sin haber llamado validar_cobertura, lo detectamos y hacemos que el bot
+   * valide ANTES de responder.
+   *
+   * Detecta patrones de negación de cobertura SIN evidencia.
+   * Útil cuando el LLM aluciña que un barrio/ciudad no está cubierto.
+   */
+  private function detectarNegacionCoberturaSinValidar(string $reply): bool
+  {
+      $patrones = [
+          '/no (tenemos|hay) cobertura (ah[íi]|all[íi]|en)/i',
+          '/no llegamos (hasta )?(ah[íi]|all[íi]|hasta esa)/i',
+          '/(esa|esta) (zona|ciudad|municipio|barrio).*no est[áa] (cubierta|cubierto|dentro)/i',
+          '/no est[áa] (dentro de )?(nuestra )?cobertura/i',
+          '/lamentablemente no (cubrimos|llegamos)/i',
+      ];
+
+      foreach ($patrones as $p) {
+          if (preg_match($p, $reply)) return true;
+      }
+      return false;
+  }
+
+  /**
    * 🛡️ GUARD: si el bot generó una respuesta diciendo "no puedo registrar"
    * cuando estamos cerrados Y el tenant tiene activo el toggle de aceptar
    * pedidos fuera de horario, la reescribe por una respuesta correcta.
@@ -3441,6 +3465,23 @@ TXT;
                      . "✅ BIEN: 'Buenas noches Stiven 🌙 Te puedo dejar las 5 libras de chicharrón\n"
                      . "        PROGRAMADAS para mañana 8 am. ¿Lo dejo agendado?'\n";
         }
+
+        // 🌍 REGLA: VALIDAR ANTES DE NEGAR COBERTURA
+        $prompt .= "\n\n═══════════════════════════════════════════════════════════════════════════════\n"
+                 . "# 🌍 PREGUNTAS DE COBERTURA POR CIUDAD/BARRIO — REGLA INVIOLABLE\n\n"
+                 . "Si el cliente pregunta '¿llegan a X?' / '¿tienen cobertura en Y?' / '¿hacen envíos a Z?'\n"
+                 . "donde X/Y/Z es una ciudad, barrio o municipio:\n\n"
+                 . "❌ PROHIBIDO RESPONDER 'no tenemos cobertura ahí' o 'no llegamos hasta allá' SIN haber\n"
+                 . "llamado primero `validar_cobertura(direccion: nombre_lugar, ciudad: nombre_lugar)`.\n\n"
+                 . "✅ FLUJO CORRECTO:\n"
+                 . "1. Cliente: '¿y Girardota?' o '¿llegan a Bello?'\n"
+                 . "2. Tú llamas: validar_cobertura(direccion='Girardota', ciudad='Girardota')\n"
+                 . "3. Lees la respuesta de la herramienta\n"
+                 . "4. Si dice cubierta=true → '¡Sí, llegamos a Girardota! Dame la dirección exacta.'\n"
+                 . "5. Si dice cubierta=false → 'No llegamos a Girardota por ahora 😔'\n\n"
+                 . "❌ NUNCA confíes solo en el listado de zonas del prompt para negar cobertura. Las zonas\n"
+                 . "se describen genéricamente (ej: 'área metropolitana') pero el polígono real puede\n"
+                 . "incluir lugares no listados explícitamente. La herramienta es la fuente de verdad.\n";
 
         // 🧠 REGLA: PREGUNTAR CIUDAD/BARRIO CUANDO LA DIRECCIÓN ES AMBIGUA
         // El geocoding falla cuando una dirección como "Cra 50 #63-48" puede estar
