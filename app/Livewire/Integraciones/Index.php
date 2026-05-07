@@ -262,7 +262,7 @@ class Index extends Component
                 'tabla'              => trim($this->export_tabla) ?: 'TblDocumentos',
                 'empresa'            => (int) $this->export_empresa,
                 'transaccion'        => trim($this->export_transaccion),
-                'bodega'             => (int) $this->export_bodega,
+                'bodega'             => trim($this->export_bodega),
                 'cartera'            => (int) $this->export_cartera,
                 'usuario_grabador'   => trim($this->export_usuario) ?: 'admin',
                 'consecutivo_inicial'=> (int) $this->export_consecutivo,
