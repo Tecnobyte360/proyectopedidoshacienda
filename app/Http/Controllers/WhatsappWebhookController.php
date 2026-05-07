@@ -3096,6 +3096,33 @@ TXT;
 
         DB::commit();
 
+        // 👤 ASEGURAR CLIENTE EN ERP — antes de exportar el pedido
+        // Si la integración tiene cliente_lookup activo, verifica que la
+        // cédula esté en TblTerceros. Si no, la crea automáticamente con
+        // los datos que el cliente dio. Esto evita el FK_TblDocumentos_TblTerceros.
+        try {
+            $integraciones = \App\Models\Integracion::where('tenant_id', $pedido->tenant_id)
+                ->where('activo', true)
+                ->where('exporta_pedidos', true)
+                ->get();
+
+            foreach ($integraciones as $integracion) {
+                if (!($integracion->config['cliente_lookup']['activo'] ?? false)) continue;
+
+                app(\App\Services\ClienteErpService::class)->asegurarCliente($integracion, [
+                    'cedula'    => $pedido->cliente?->cedula ?? '',
+                    'nombre'    => $pedido->cliente_nombre ?? $pedido->cliente?->nombre ?? '',
+                    'telefono'  => $pedido->telefono_whatsapp ?? $pedido->telefono ?? '',
+                    'email'     => $pedido->cliente?->correo ?? '',
+                    'direccion' => $pedido->direccion ?? '',
+                    'ciudad'    => $pedido->cliente?->ciudad ?? '',
+                    'barrio'    => $pedido->barrio ?? '',
+                ]);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Asegurar cliente en ERP falló (no crítico): ' . $e->getMessage());
+        }
+
         // 🚀 EXPORTAR pedido al ERP del cliente (si tiene integración configurada)
         // Ejecuta DESPUÉS del commit para no quedar atrapado en la transacción.
         // Si falla, NO afecta el registro del pedido — solo se loguea el error
@@ -3444,6 +3471,52 @@ TXT;
             $prompt .= "\n\n═══════════════════════════════════════════════════════════════════════════════\n"
                      . "# 🔧 REGLAS ADICIONALES DE ESTE NEGOCIO\n\n"
                      . $extraRendered . "\n";
+        }
+
+        // 👤 REGLA: VERIFICACIÓN DE CLIENTE EN ERP (LOOKUP)
+        // Si alguna integración del tenant tiene cliente_lookup activado,
+        // el bot debe pedir cédula y solicitar los campos configurados
+        // SOLO si el cliente es nuevo (no está registrado en el ERP).
+        try {
+            $tenantIdLookup = app(\App\Services\TenantManager::class)->id();
+            if ($tenantIdLookup) {
+                $integLookup = \App\Models\Integracion::where('tenant_id', $tenantIdLookup)
+                    ->where('activo', true)
+                    ->where('exporta_pedidos', true)
+                    ->get()
+                    ->first(fn ($i) => $i->config['cliente_lookup']['activo'] ?? false);
+
+                if ($integLookup) {
+                    $req = $integLookup->config['cliente_lookup']['campos_requeridos'] ?? [];
+                    $listaCampos = collect($req)->map(fn ($c) => match ($c) {
+                        'cedula'    => 'cédula',
+                        'nombre'    => 'nombre completo',
+                        'direccion' => 'dirección exacta',
+                        'telefono'  => 'teléfono',
+                        'email'     => 'correo electrónico',
+                        'ciudad'    => 'ciudad',
+                        default     => $c,
+                    })->implode(', ');
+
+                    $prompt .= "\n\n═══════════════════════════════════════════════════════════════════════════════\n"
+                             . "# 👤 LOOKUP DE CLIENTE EN ERP — REGLA INTELIGENTE\n\n"
+                             . "Este negocio está conectado a un ERP que valida si el cliente existe antes\n"
+                             . "de registrar pedidos. ANTES de confirmar pedido, recopila estos datos:\n"
+                             . "  → {$listaCampos}\n\n"
+                             . "Reglas:\n"
+                             . "1. La CÉDULA es OBLIGATORIA siempre que sea cliente nuevo. Pídela claramente:\n"
+                             . "   '¿Me regalas tu número de cédula? Es para registrarte en el sistema'\n"
+                             . "2. Si el cliente dice que ya compró antes, igual pide la cédula — el sistema\n"
+                             . "   verifica automáticamente y, si está registrada, no le pide nada más.\n"
+                             . "3. NO pidas todos los datos de golpe — uno por uno conversacionalmente.\n"
+                             . "4. Cuando tengas todo, llama `confirmar_pedido` con los datos en orderData:\n"
+                             . "   { customer_name, phone, address, location (ciudad), email, ... }\n"
+                             . "5. El sistema automáticamente verificará si el cliente existe en el ERP\n"
+                             . "   y lo creará si es necesario.\n";
+                }
+            }
+        } catch (\Throwable $e) {
+            \Log::warning('No se pudo inyectar regla de lookup cliente: ' . $e->getMessage());
         }
 
         // 📅 REGLA: PEDIDOS FUERA DE HORARIO (PROGRAMADOS)
