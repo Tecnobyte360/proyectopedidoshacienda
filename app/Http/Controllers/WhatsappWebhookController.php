@@ -864,7 +864,7 @@ TXT;
         // de "te aviso cuando abramos".
         $reinforceProgramado = [];
         try {
-            $cfgBotPrograma = $config; // ya cargado arriba
+            $cfgBotPrograma = \App\Models\ConfiguracionBot::actual();
             $aceptaProgramados = (bool) ($cfgBotPrograma?->aceptar_pedidos_fuera_horario ?? false);
 
             if ($aceptaProgramados) {

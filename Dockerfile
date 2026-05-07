@@ -31,6 +31,15 @@ RUN apt-get update && apt-get install -y \
         zip \
         intl
 
+# 🚀 Aumentar memory_limit de PHP de 128M (default) a 512M.
+# El bot maneja prompts grandes (~36k chars) + historial de conversaciones +
+# cache + exports al ERP. Con 128M se quedaba sin memoria al procesar
+# mensajes con contexto largo (ver error en logs: 'Allowed memory exhausted').
+RUN echo "memory_limit = 512M" > /usr/local/etc/php/conf.d/zz-custom.ini \
+    && echo "max_execution_time = 120" >> /usr/local/etc/php/conf.d/zz-custom.ini \
+    && echo "post_max_size = 32M" >> /usr/local/etc/php/conf.d/zz-custom.ini \
+    && echo "upload_max_filesize = 32M" >> /usr/local/etc/php/conf.d/zz-custom.ini
+
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/html
