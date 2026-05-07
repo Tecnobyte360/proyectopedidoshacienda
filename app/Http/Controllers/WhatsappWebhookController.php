@@ -347,11 +347,13 @@ class WhatsappWebhookController extends Controller
             }
 
             // 🛡️ GUARD ANTI-ALUCINACIÓN: pedidos fuera de horario
-            // Si el tenant aceptaPedidos fuera de horario y todas las sedes
-            // están cerradas, intercepta respuestas que digan "no puedo
-            // registrar" / "te aviso cuando abramos" y las REEMPLAZA por
-            // un mensaje correcto.
             $reply = $this->aplicarGuardPedidosProgramados($reply);
+
+            // 🛡️ GUARD CRÍTICO: el bot dice "pedido confirmado" SIN haber
+            // llamado la tool confirmar_pedido en este turno. Esto es
+            // alucinación pura, basada en historial viejo.
+            // Si detectamos esto, REEMPLAZAMOS por un mensaje seguro.
+            $reply = $this->aplicarGuardPedidoFalsoConfirmado($reply, $toolCalls ?? []);
 
             Log::info('💬 RESPUESTA GENERADA', compact('reply', 'from', 'messageId', 'connectionId'));
 
@@ -2275,6 +2277,67 @@ TXT;
           if (preg_match($p, $reply)) return true;
       }
       return false;
+  }
+
+  /**
+   * 🛡️ GUARD CRÍTICO: detecta cuando el bot afirma haber confirmado un pedido
+   * SIN que se haya creado uno realmente en BD en este request.
+   *
+   * Causa típica: el LLM lee el historial de conversaciones viejas y
+   * "continúa" un pedido pasado como si fuera actual. Si decimos al cliente
+   * que tiene un pedido confirmado que no existe, es CATASTRÓFICO.
+   *
+   * Detección: el reply contiene frases tipo "ya te confirmé el pedido /
+   * pedido registrado / confirmé tu pedido" y NO hay un pedido creado
+   * en los últimos 30 segundos para ese teléfono.
+   *
+   * Acción: reemplazar la respuesta por un mensaje neutro que invita a
+   * empezar el pedido desde cero.
+   */
+  private function aplicarGuardPedidoFalsoConfirmado(string $reply, array $toolCalls = []): string
+  {
+      // Si el LLM llamó confirmar_pedido en este turno, NO hay alucinación
+      foreach ($toolCalls as $tc) {
+          $name = $tc['function']['name'] ?? '';
+          if ($name === 'confirmar_pedido') return $reply;
+      }
+
+      $patrones = [
+          '/ya te confirm[ée] el pedido/i',
+          '/te confirm[ée] el pedido/i',
+          '/pedido confirmado/i',
+          '/queda registrado/i',
+          '/qued[óo] registrado/i',
+          '/pedido registrado/i',
+          '/✨\s*[¡!]?pedido confirmado/i',
+      ];
+
+      $coincide = false;
+      foreach ($patrones as $p) {
+          if (preg_match($p, $reply)) { $coincide = true; break; }
+      }
+      if (!$coincide) return $reply;
+
+      // Verificar si HAY pedido creado en los últimos 60s para este tenant
+      try {
+          $tenantId = app(\App\Services\TenantManager::class)->id();
+          $reciente = \App\Models\Pedido::where('tenant_id', $tenantId)
+              ->where('created_at', '>=', now()->subMinute())
+              ->exists();
+          if ($reciente) return $reply; // hubo pedido real, no es alucinación
+      } catch (\Throwable $e) { /* sigue al fix */ }
+
+      // ALUCINACIÓN: reescribir
+      $original = $reply;
+      $reply = "¡Hola! 👋 Para hacer tu pedido, dime qué necesitas y la cantidad. "
+             . "Por ejemplo: '5 libras de chicharrón'.";
+
+      \Log::warning('🚨 GUARD: bot alucinó pedido confirmado sin haberlo creado', [
+          'original'  => $original,
+          'reescrita' => $reply,
+      ]);
+
+      return $reply;
   }
 
   /**
