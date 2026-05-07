@@ -72,6 +72,23 @@ class Bot extends Component
     // 📅 Pedidos fuera de horario (programados)
     public bool   $aceptar_pedidos_fuera_horario = false;
 
+    // 🎯 Flujo de pedido — orden y activación de los campos que pide el bot
+    /** @var array<int, array{campo:string,activo:bool}> */
+    public array $flujo_pedido_orden = [];
+
+    public const CAMPOS_FLUJO_DISPONIBLES = [
+        'cedula'    => ['label' => 'Cédula / NIT',           'icon' => '🪪', 'descripcion' => 'Identifica al cliente. Si lookup ERP está activo, verifica si ya existe.'],
+        'nombre'    => ['label' => 'Nombre completo',        'icon' => '👤', 'descripcion' => 'Solo se pide si el cliente NO existe en BD/ERP.'],
+        'producto'  => ['label' => 'Producto y cantidad',    'icon' => '🛒', 'descripcion' => 'Qué quiere comprar y cuánto.'],
+        'direccion' => ['label' => 'Dirección de entrega',   'icon' => '📍', 'descripcion' => 'Para envíos a domicilio.'],
+        'barrio'    => ['label' => 'Barrio',                 'icon' => '🏘️', 'descripcion' => 'Útil para validar cobertura en algunas ciudades.'],
+        'ciudad'    => ['label' => 'Ciudad',                 'icon' => '🏙️', 'descripcion' => 'Para envíos fuera del área principal.'],
+        'telefono'  => ['label' => 'Teléfono de contacto',   'icon' => '📞', 'descripcion' => 'Por defecto se toma el de WhatsApp. Pídelo solo si quieres uno alterno.'],
+        'email'     => ['label' => 'Correo electrónico',     'icon' => '📧', 'descripcion' => 'Para enviar facturación o promociones.'],
+        'metodo_pago'=> ['label' => 'Método de pago',        'icon' => '💳', 'descripcion' => 'Efectivo, tarjeta, contra entrega, link Wompi.'],
+        'notas'     => ['label' => 'Notas / instrucciones',  'icon' => '📝', 'descripcion' => 'Aclaraciones adicionales del cliente sobre el pedido.'],
+    ];
+
     // Toggles de notificaciones al cliente
     public bool   $notif_en_preparacion_activa = true;
     public bool   $notif_en_camino_activa      = true;
@@ -188,6 +205,9 @@ class Bot extends Component
         $this->encuesta_mensaje       = (string) ($cfg->encuesta_mensaje ?? '');
         $this->enviar_link_pago       = (bool) ($cfg->enviar_link_pago ?? true);
         $this->aceptar_pedidos_fuera_horario = (bool) ($cfg->aceptar_pedidos_fuera_horario ?? false);
+
+        // Flujo de pedido — si no hay nada guardado, usar default sensato
+        $this->flujo_pedido_orden = $this->cargarFlujoPedido($cfg->flujo_pedido_orden ?? null);
         $this->notif_en_preparacion_activa = (bool) ($cfg->notif_en_preparacion_activa ?? true);
         $this->notif_en_camino_activa      = (bool) ($cfg->notif_en_camino_activa ?? true);
         $this->notif_entregado_activa      = (bool) ($cfg->notif_entregado_activa ?? true);
@@ -572,6 +592,68 @@ class Bot extends Component
         ]);
     }
 
+    /**
+     * Construye el array de flujo de pedido a partir de lo guardado en BD,
+     * agregando campos faltantes con defaults sensatos.
+     */
+    private function cargarFlujoPedido($guardado): array
+    {
+        $defaultOrden = [
+            ['campo' => 'cedula',    'activo' => true],
+            ['campo' => 'producto',  'activo' => true],
+            ['campo' => 'direccion', 'activo' => true],
+            ['campo' => 'barrio',    'activo' => false],
+            ['campo' => 'ciudad',    'activo' => false],
+            ['campo' => 'nombre',    'activo' => true],
+            ['campo' => 'telefono',  'activo' => false],
+            ['campo' => 'email',     'activo' => false],
+            ['campo' => 'metodo_pago','activo' => false],
+            ['campo' => 'notas',     'activo' => false],
+        ];
+
+        if (!is_array($guardado) || empty($guardado)) return $defaultOrden;
+
+        // Mantener orden guardado, pero agregar al final cualquier campo que falte
+        $existentes = collect($guardado)->pluck('campo')->all();
+        foreach ($defaultOrden as $d) {
+            if (!in_array($d['campo'], $existentes, true)) {
+                $guardado[] = $d;
+            }
+        }
+        return array_values($guardado);
+    }
+
+    /** Mueve un campo del flujo hacia arriba */
+    public function flujoSubir(int $idx): void
+    {
+        if ($idx <= 0 || !isset($this->flujo_pedido_orden[$idx])) return;
+        $tmp = $this->flujo_pedido_orden[$idx - 1];
+        $this->flujo_pedido_orden[$idx - 1] = $this->flujo_pedido_orden[$idx];
+        $this->flujo_pedido_orden[$idx] = $tmp;
+    }
+
+    /** Mueve un campo del flujo hacia abajo */
+    public function flujoBajar(int $idx): void
+    {
+        if (!isset($this->flujo_pedido_orden[$idx + 1])) return;
+        $tmp = $this->flujo_pedido_orden[$idx + 1];
+        $this->flujo_pedido_orden[$idx + 1] = $this->flujo_pedido_orden[$idx];
+        $this->flujo_pedido_orden[$idx] = $tmp;
+    }
+
+    /** Activa/desactiva un campo del flujo */
+    public function flujoToggle(int $idx): void
+    {
+        if (!isset($this->flujo_pedido_orden[$idx])) return;
+        $this->flujo_pedido_orden[$idx]['activo'] = !($this->flujo_pedido_orden[$idx]['activo'] ?? false);
+    }
+
+    public function flujoResetDefaults(): void
+    {
+        $this->flujo_pedido_orden = $this->cargarFlujoPedido(null);
+        $this->dispatch('notify', ['type' => 'info', 'message' => 'Orden restablecido a default.']);
+    }
+
     protected function rules(): array
     {
         return [
@@ -614,6 +696,9 @@ class Bot extends Component
             'encuesta_mensaje'                      => 'nullable|string|max:2000',
             'enviar_link_pago'                      => 'boolean',
             'aceptar_pedidos_fuera_horario'         => 'boolean',
+            'flujo_pedido_orden'                    => 'nullable|array',
+            'flujo_pedido_orden.*.campo'            => 'required|string',
+            'flujo_pedido_orden.*.activo'           => 'required|boolean',
             'notif_en_preparacion_activa'           => 'boolean',
             'notif_en_camino_activa'                => 'boolean',
             'notif_entregado_activa'                => 'boolean',

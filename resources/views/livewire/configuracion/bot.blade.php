@@ -23,6 +23,7 @@
                     'notificaciones' => ['Notificaciones cliente', 'fa-bell',           'text-amber-600 bg-amber-50'],
                     'pagos'      => ['Pagos en línea',         'fa-credit-card',       'text-violet-600 bg-violet-50'],
                     'despachos'  => ['Despachos / Domiciliarios','fa-motorcycle',      'text-orange-600 bg-orange-50'],
+                    'flujo'      => ['Flujo del pedido',        'fa-list-check',       'text-teal-600 bg-teal-50'],
                     'cumple'     => ['Felicitaciones',         'fa-cake-candles',      'text-pink-600 bg-pink-50'],
                 ];
             @endphp
@@ -1457,6 +1458,117 @@
                     y tu operador escoge a qué domiciliario asignarlos.
                 </div>
             @endif
+        </section>
+
+        {{-- ╔═══ FLUJO DEL PEDIDO — orden de los datos que pide el bot ═══╗ --}}
+        <section x-show="tab === 'flujo'" x-cloak class="rounded-2xl bg-white border border-slate-200 p-6 shadow-sm">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-50 text-teal-600 text-xl">
+                    <i class="fa-solid fa-list-check"></i>
+                </div>
+                <div class="flex-1">
+                    <h3 class="font-bold text-slate-800">Flujo del pedido</h3>
+                    <p class="text-xs text-slate-500">
+                        Define qué datos pide el bot al armar un pedido y en qué orden los pregunta.
+                    </p>
+                </div>
+                <button type="button" wire:click="flujoResetDefaults"
+                        class="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 hover:border-slate-300 bg-white px-3 py-2 text-xs text-slate-600 font-medium transition">
+                    <i class="fa-solid fa-arrow-rotate-left"></i> Reset
+                </button>
+            </div>
+
+            <div class="rounded-xl bg-teal-50 border border-teal-200 px-4 py-3 text-xs text-teal-900 mb-4">
+                <strong>💡 Cómo funciona:</strong>
+                Marca qué datos pides y ordénalos con las flechas.<br>
+                <strong>Activos</strong> = el bot los pedirá. <strong>Desactivos</strong> = el bot los omite.<br>
+                ⚠️ Si un dato es opcional (ej: barrio, email), el cliente puede saltárselo. La cédula sigue siendo
+                obligatoria si el lookup ERP está activo.
+            </div>
+
+            {{-- Lista del flujo --}}
+            <div class="space-y-2">
+                @php $totalActivos = count(array_filter($flujo_pedido_orden, fn($f) => ($f['activo'] ?? false))); @endphp
+                @foreach($flujo_pedido_orden as $idx => $item)
+                    @php
+                        $campo = $item['campo'] ?? '';
+                        $activo = (bool) ($item['activo'] ?? false);
+                        $info = \App\Livewire\Configuracion\Bot::CAMPOS_FLUJO_DISPONIBLES[$campo] ?? null;
+                        if (!$info) continue;
+                        $orden = $activo ? collect($flujo_pedido_orden)->take($idx + 1)->where('activo', true)->count() : null;
+                    @endphp
+                    <div class="rounded-xl border-2 p-3 flex items-center gap-3 transition
+                                {{ $activo ? 'border-teal-300 bg-white' : 'border-slate-200 bg-slate-50/50' }}">
+                        {{-- Número de orden --}}
+                        <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg font-mono font-extrabold text-base
+                                    {{ $activo ? 'bg-gradient-to-br from-teal-500 to-teal-600 text-white shadow' : 'bg-slate-100 text-slate-400 line-through' }}">
+                            {{ $orden ?? '—' }}
+                        </div>
+
+                        {{-- Toggle activo --}}
+                        <label class="cursor-pointer">
+                            <input type="checkbox" wire:click="flujoToggle({{ $idx }})"
+                                   {{ $activo ? 'checked' : '' }}
+                                   class="rounded border-slate-300 text-teal-600 h-5 w-5">
+                        </label>
+
+                        {{-- Info del campo --}}
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2 mb-0.5">
+                                <span class="text-base">{{ $info['icon'] }}</span>
+                                <span class="font-bold text-sm text-slate-800">{{ $info['label'] }}</span>
+                                @if($campo === 'cedula')
+                                    <span class="rounded-full bg-rose-100 border border-rose-200 px-2 py-0.5 text-[9px] font-bold uppercase text-rose-700">obligatorio si ERP activo</span>
+                                @endif
+                            </div>
+                            <p class="text-[11px] text-slate-500 leading-relaxed">{{ $info['descripcion'] }}</p>
+                        </div>
+
+                        {{-- Botones de orden --}}
+                        <div class="flex flex-col gap-0.5 shrink-0">
+                            <button type="button" wire:click="flujoSubir({{ $idx }})"
+                                    @if($idx === 0) disabled @endif
+                                    title="Subir"
+                                    class="h-7 w-7 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition">
+                                <i class="fa-solid fa-chevron-up text-[10px]"></i>
+                            </button>
+                            <button type="button" wire:click="flujoBajar({{ $idx }})"
+                                    @if($idx === count($flujo_pedido_orden) - 1) disabled @endif
+                                    title="Bajar"
+                                    class="h-7 w-7 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition">
+                                <i class="fa-solid fa-chevron-down text-[10px]"></i>
+                            </button>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+
+            {{-- Vista previa --}}
+            <div class="mt-5 rounded-xl bg-gradient-to-br from-slate-900 to-slate-800 p-4 text-white">
+                <div class="flex items-center gap-2 mb-3">
+                    <i class="fa-solid fa-eye text-emerald-400"></i>
+                    <h4 class="text-sm font-bold">Vista previa del flujo del bot</h4>
+                </div>
+                <div class="space-y-1.5 text-xs font-mono">
+                    @php $n = 1; @endphp
+                    @foreach($flujo_pedido_orden as $item)
+                        @if($item['activo'] ?? false)
+                            @php
+                                $info = \App\Livewire\Configuracion\Bot::CAMPOS_FLUJO_DISPONIBLES[$item['campo']] ?? null;
+                                if (!$info) continue;
+                            @endphp
+                            <div class="flex items-start gap-2">
+                                <span class="text-emerald-400 font-bold">{{ $n }}.</span>
+                                <span class="text-slate-300">{{ $info['icon'] }} {{ $info['label'] }}</span>
+                            </div>
+                            @php $n++; @endphp
+                        @endif
+                    @endforeach
+                    @if($totalActivos === 0)
+                        <div class="text-slate-500 italic">⚠️ No hay campos activos. El bot no podrá armar pedidos.</div>
+                    @endif
+                </div>
+            </div>
         </section>
 
         <section x-show="tab === 'cumple'" x-cloak class="rounded-2xl bg-white border border-slate-200 p-6 shadow-sm">

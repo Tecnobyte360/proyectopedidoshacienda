@@ -3617,6 +3617,46 @@ TXT;
                      . $extraRendered . "\n";
         }
 
+        // 🎯 REGLA: ORDEN DEL FLUJO DEL PEDIDO (configurable desde panel)
+        try {
+            $cfgOrden = \App\Models\ConfiguracionBot::actual();
+            $flujo = $cfgOrden?->flujo_pedido_orden ?? [];
+            $activos = collect($flujo)->filter(fn ($f) => ($f['activo'] ?? false))->values();
+
+            if ($activos->count() > 0) {
+                $labels = [
+                    'cedula'    => '🪪 Cédula / NIT',
+                    'nombre'    => '👤 Nombre completo',
+                    'producto'  => '🛒 Producto y cantidad',
+                    'direccion' => '📍 Dirección',
+                    'barrio'    => '🏘️ Barrio',
+                    'ciudad'    => '🏙️ Ciudad',
+                    'telefono'  => '📞 Teléfono',
+                    'email'     => '📧 Correo',
+                    'metodo_pago' => '💳 Método de pago',
+                    'notas'     => '📝 Notas',
+                ];
+
+                $listaOrdenada = $activos->map(fn ($f, $i) => ($i + 1) . '. ' . ($labels[$f['campo']] ?? $f['campo']))
+                    ->implode("\n   ");
+
+                $prompt .= "\n\n═══════════════════════════════════════════════════════════════════════════════\n"
+                         . "# 🎯 ORDEN DEL FLUJO DEL PEDIDO — RESPÉTALO\n\n"
+                         . "Cuando el cliente quiera hacer un pedido, pide los datos EN ESTE ORDEN:\n\n"
+                         . "   {$listaOrdenada}\n\n"
+                         . "Reglas:\n"
+                         . "1. Pídelos UNO POR UNO (no todos juntos). Espera respuesta antes de pedir el siguiente.\n"
+                         . "2. Si un dato ya lo tienes (ej: cédula del cliente que ya está registrado),\n"
+                         . "   SÁLTALO y pide el siguiente.\n"
+                         . "3. Si lookup ERP está activo y el dato es 'cedula', llama `verificar_cliente_erp`\n"
+                         . "   apenas la tengas.\n"
+                         . "4. Cuando hayas recopilado TODOS los activos, llama `confirmar_pedido`.\n"
+                         . "5. Los datos NO listados arriba NO los pidas (a menos que el cliente los mencione).\n";
+            }
+        } catch (\Throwable $e) {
+            \Log::warning('No se pudo inyectar regla de orden de flujo: ' . $e->getMessage());
+        }
+
         // 👤 REGLA: VERIFICACIÓN DE CLIENTE EN ERP (LOOKUP)
         // Si alguna integración del tenant tiene cliente_lookup activado,
         // el bot debe pedir cédula y solicitar los campos configurados
