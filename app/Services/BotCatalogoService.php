@@ -48,7 +48,7 @@ class BotCatalogoService
                     $localesPorCodigo = collect();
 
                     if (!empty($codigos)) {
-                        $localesPorCodigo = Producto::with(['categoria', 'sedes'])
+                        $localesPorCodigo = Producto::with(['categoria'])
                             ->whereIn('codigo', $codigos)
                             ->get()
                             ->keyBy(fn ($p) => (string) $p->codigo);
@@ -83,7 +83,7 @@ class BotCatalogoService
                         ->values()
                         ->all();
 
-                    $localesExtras = Producto::with(['categoria', 'sedes'])
+                    $localesExtras = Producto::with(['categoria'])
                         ->where('activo', true)
                         ->where(function ($q) use ($codigosErp) {
                             $q->whereNull('codigo')->orWhere('codigo', '');
@@ -115,10 +115,13 @@ class BotCatalogoService
         }
 
         // ── MODO TABLA: lectura normal del modelo local ──
+        // ⚠️ NO cargar la relación 'sedes' eager — cada sede trae su polígono
+        // de cobertura completo (cientos de KB de coords GPS) y revienta el cache.
+        // El filtro por sede se hace via scope disponibleEnSede en el query.
         $cacheKey = "bot_catalogo_productos_t{$tenantId}_" . ($sedeId ?? 'all');
         $productos = Cache::remember($cacheKey, 120, function () use ($sedeId) {
             $query = Producto::query()
-                ->with(['categoria', 'sedes'])
+                ->with(['categoria'])
                 ->where('activo', true);
 
             if ($sedeId) {
