@@ -2602,6 +2602,15 @@ TXT;
           '/qued[óo] registrado/i',
           '/pedido registrado/i',
           '/✨\s*[¡!]?pedido confirmado/i',
+          // Frases nuevas que también indican alucinación de pedido
+          '/(tu )?pedido (de|del).*qued[óo]? lis[at]o/i',
+          '/qued[óo]? listo para recoger/i',
+          '/qued[óo]? listo para entrega/i',
+          '/te esperamos.*tu pedido/i',
+          '/(ya )?(est[áa]|qued[óo])\s*(listo|preparado|registrado)/i',
+          '/te reservo.*(libras|kilos|productos|cantidad)/i',
+          '/voy a (registrar|reservar|preparar) tu pedido/i',
+          '/pedido (de|por).*qued[óo]/i',
       ];
 
       $coincide = false;
@@ -3869,6 +3878,11 @@ TXT;
             $prompt .= "\n\n📅 Si estamos cerrados, NO digas 'no puedo registrar'. Ofrece dejar "
                      . "el pedido programado para la próxima apertura.\n";
         }
+
+        // ⚠️ Regla CRÍTICA pero corta sobre confirmar_pedido
+        $prompt .= "\n\n⚠️ Para registrar un pedido OBLIGATORIO llamar la herramienta `confirmar_pedido`. "
+                 . "NUNCA digas 'queda listo', 'te esperamos', 'pedido registrado' SIN haber llamado la herramienta. "
+                 . "Si el cliente confirma con 'sí', 'confirmar', 'dale' → llama `confirmar_pedido` antes de responder.\n";
 
         // 🔒 INYECCIÓN OBLIGATORIA DE COBERTURA REAL (anti-alucinación)
         // Sin importar lo que diga el prompt maestro, agregamos al final la cobertura
