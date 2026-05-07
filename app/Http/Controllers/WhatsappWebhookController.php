@@ -1467,6 +1467,21 @@ TXT;
 
             Log::info('🎯 CAPA 3: Function call confirmar_pedido', compact('from', 'orderData'));
 
+            // 🛡️ GUARD CRÍTICO ANTES DE GUARDAR: el bot llamó confirmar_pedido
+            // pero ¿realmente el cliente pidió algo? Si el último mensaje del
+            // cliente es solo un saludo, el bot está alucinando datos viejos.
+            if ($this->esIntentoConfirmacionFalsa($conversationHistory)) {
+                Log::warning('🚨 GUARD: bot intentó confirmar_pedido sin intención real del cliente', [
+                    'from' => $from,
+                    'orderData' => $orderData,
+                ]);
+
+                $reply = "¡Hola! 👋 Bienvenido. ¿Qué se te antoja hoy? Dime el producto y la cantidad y te armo el pedido.";
+                $conversationHistory[] = ['role' => 'assistant', 'content' => $reply];
+                Cache::put($cacheKey, $conversationHistory, now()->addMinutes(45));
+                return $reply;
+            }
+
             return $this->guardarPedidoDesdeToolCall(
                 $orderData,
                 $from,
@@ -2358,6 +2373,72 @@ TXT;
           if (preg_match($p, $reply)) return true;
       }
       return false;
+  }
+
+  /**
+   * 🛡️ GUARD CRÍTICO: el bot llamó `confirmar_pedido` PERO el cliente NO
+   * dio intención real de pedir nada en sus últimos mensajes.
+   *
+   * Causa típica: el LLM lee historial viejo y "continúa" un pedido pasado
+   * cuando el cliente solo saluda con "hola", "buenas noches", etc.
+   *
+   * Detección: revisamos los últimos 3 mensajes del usuario:
+   *   - Si solo contienen saludos sin mención de productos/cantidad → SOSPECHOSO
+   *   - Si NO hay verbos de intención (quiero, deme, necesito, mándame)
+   *     → SOSPECHOSO
+   *
+   * Si es sospechoso, rechazamos la confirmación y respondemos con un saludo.
+   */
+  private function esIntentoConfirmacionFalsa(array $conversationHistory): bool
+  {
+      // Mensajes recientes del usuario (últimos 3)
+      $usuarioRecientes = collect($conversationHistory)
+          ->reverse()
+          ->filter(fn ($m) => ($m['role'] ?? '') === 'user')
+          ->take(3)
+          ->pluck('content')
+          ->reverse()
+          ->all();
+
+      if (empty($usuarioRecientes)) return true; // sin mensaje del usuario, claramente no pidió
+
+      $textoUnido = mb_strtolower(implode(' | ', $usuarioRecientes));
+      $textoUnido = strtr($textoUnido, ['á'=>'a','é'=>'e','í'=>'i','ó'=>'o','ú'=>'u','ñ'=>'n']);
+
+      // Solo saludos puros sin mención de pedido
+      $patronesSoloSaludo = [
+          '/^(hola|buenas|buenos dias|buenas tardes|buenas noches|hi|hey|que tal|que mas|saludos)\s*\.?\s*\|?\s*$/i',
+          '/^(hola|buenas|hey)( hola| buenas)*\s*$/i',
+      ];
+      foreach ($patronesSoloSaludo as $p) {
+          if (preg_match($p, trim($textoUnido))) {
+              return true; // solo saludó, NO pidió
+          }
+      }
+
+      // ¿Hay verbo/sustantivo de intención de pedir?
+      $palabrasIntencion = [
+          'quiero', 'queremos', 'pedir', 'pido', 'pidieramos',
+          'mandar', 'mandame', 'enviar', 'envia', 'envien', 'enviame',
+          'necesito', 'necesitamos', 'me gustaria', 'gustaria',
+          'comprar', 'compro', 'compra', 'comprame',
+          'dame', 'deme', 'me da', 'me das', 'me regalas', 'regalame',
+          'llevame', 'llevarme',
+          'libra', 'libras', 'kilo', 'kilos', 'kg', 'gramos', 'paquete',
+          'caja', 'unidad', 'unidades', 'docena',
+          'pierna', 'chuleta', 'chicharron', 'res', 'cerdo', 'pollo',
+          'cafe', 'lomo', 'costilla', 'producto',
+      ];
+
+      $tieneIntencion = false;
+      foreach ($palabrasIntencion as $w) {
+          if (str_contains($textoUnido, $w)) {
+              $tieneIntencion = true;
+              break;
+          }
+      }
+
+      return !$tieneIntencion; // si NO hay intención → es sospechoso
   }
 
   /**
@@ -3616,6 +3697,30 @@ TXT;
                      . "# 🔧 REGLAS ADICIONALES DE ESTE NEGOCIO\n\n"
                      . $extraRendered . "\n";
         }
+
+        // 🚨 REGLA INVIOLABLE: NO CONFIRMAR PEDIDO SIN INTENCIÓN EXPLÍCITA
+        $prompt .= "\n\n═══════════════════════════════════════════════════════════════════════════════\n"
+                 . "# 🚨 REGLA SAGRADA — NUNCA CONFIRMES PEDIDOS QUE EL CLIENTE NO PIDIÓ\n\n"
+                 . "ANTES de llamar `confirmar_pedido`, el cliente DEBE haber expresado en este\n"
+                 . "chat actual una intención CLARA de pedir algo. Ejemplos válidos:\n"
+                 . "  - 'quiero 2 libras de chicharrón'\n"
+                 . "  - 'mándame una bolsa de café'\n"
+                 . "  - 'dame 5 kg de pollo'\n"
+                 . "  - 'me das un pedido de X'\n\n"
+                 . "🚫 PROHIBIDO ABSOLUTAMENTE llamar `confirmar_pedido` si:\n"
+                 . "  - El cliente solo saludó: 'hola', 'buenas noches', 'qué tal'\n"
+                 . "  - El cliente solo preguntó algo: '¿qué tienen?', '¿cuánto cuesta?'\n"
+                 . "  - El cliente solo dio datos personales: 'mi cédula es X'\n"
+                 . "  - El historial dice que ya hubo un pedido — eso es del PASADO, no continúes\n"
+                 . "  - Tienes los datos del cliente pero NO ha mencionado producto/cantidad HOY\n\n"
+                 . "✅ FLUJO CORRECTO al inicio de la conversación:\n"
+                 . "  Cliente: 'hola'\n"
+                 . "  Tú: '¡Hola! ¿Qué se te antoja hoy? Dime el producto y la cantidad'\n"
+                 . "  Cliente: 'quiero 2 libras de res'\n"
+                 . "  Tú: (ahora SÍ procedes con el flujo del pedido)\n\n"
+                 . "❌ FLUJO PROHIBIDO:\n"
+                 . "  Cliente: 'hola'\n"
+                 . "  Tú: 'Te confirmo el pedido de 5 libras de chicharrón'  ← INVENTADO, prohibido\n";
 
         // 🎯 REGLA: ORDEN DEL FLUJO DEL PEDIDO (configurable desde panel)
         try {
