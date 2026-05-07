@@ -33,12 +33,20 @@ class BotCatalogoToolService
         // Esto resuelve casos donde el operador no asignó sedes a algunos productos
         // (típico en migraciones desde ERP). Mejor mostrar productos de "cualquier
         // sede" que decirle al cliente "no manejo eso".
-        if ($sedeId !== null && empty($resultado)) {
+        // FIX: usar 'encontrados' en vez de empty() (el array siempre tiene claves)
+        $sinResultados = ($resultado['encontrados'] ?? 0) === 0;
+
+        if ($sedeId !== null && $sinResultados) {
             $resultado = $this->buscarInternoConSede($query, $categoria, $limite, null);
-            if (!empty($resultado)) {
+            $encontrados = $resultado['encontrados'] ?? 0;
+            if ($encontrados > 0) {
                 \Log::info('🔄 buscar_productos fallback sin sede', [
-                    'query' => $query, 'sedeId' => $sedeId, 'encontrados' => count($resultado),
+                    'query'       => $query,
+                    'sedeId'      => $sedeId,
+                    'encontrados' => $encontrados,
                 ]);
+                // Marca para que el bot sepa que el producto existe pero no en la sede
+                $resultado['nota_sede'] = 'Estos productos existen pero no están asignados a la sede actual del bot. Inclúyelos igualmente en la respuesta.';
             }
         }
 
