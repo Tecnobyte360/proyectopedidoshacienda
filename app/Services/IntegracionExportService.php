@@ -114,9 +114,10 @@ class IntegracionExportService
     {
         try {
             $pdo->exec("DISABLE TRIGGER ALL ON {$tabla}");
-            Log::info("🔧 Triggers DESACTIVADOS en {$tabla}");
+            $pdo->exec("ALTER TABLE {$tabla} NOCHECK CONSTRAINT ALL");
+            Log::info("🔧 Triggers + Constraints DESACTIVADOS en {$tabla}");
         } catch (\Throwable $e) {
-            Log::warning("No se pudieron desactivar triggers en {$tabla}: " . $e->getMessage());
+            Log::warning("No se pudieron desactivar triggers/constraints en {$tabla}: " . $e->getMessage());
         }
     }
 
@@ -124,10 +125,11 @@ class IntegracionExportService
     {
         try {
             $pdo->exec("ENABLE TRIGGER ALL ON {$tabla}");
-            Log::info("✓ Triggers REACTIVADOS en {$tabla}");
+            $pdo->exec("ALTER TABLE {$tabla} CHECK CONSTRAINT ALL");
+            Log::info("✓ Triggers + Constraints REACTIVADOS en {$tabla}");
         } catch (\Throwable $e) {
-            Log::error("⚠️ NO SE PUDIERON REACTIVAR LOS TRIGGERS EN {$tabla}: " . $e->getMessage()
-                . " — Reactívalos manualmente con: ENABLE TRIGGER ALL ON {$tabla}");
+            Log::error("⚠️ NO SE PUDIERON REACTIVAR EN {$tabla}: " . $e->getMessage()
+                . " — Reactiva manualmente: ENABLE TRIGGER ALL ON {$tabla}; ALTER TABLE {$tabla} CHECK CONSTRAINT ALL");
         }
     }
 
