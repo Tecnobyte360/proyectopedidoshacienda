@@ -1813,7 +1813,9 @@ TXT;
 
     private function llamarOpenAI(array $messages): ?array
     {
-        $intentos = 2;
+        // 🔁 4 intentos con backoff exponencial (1s, 2s, 4s, 8s)
+        // Antes eran 2 con 1s — insuficiente para rate limits de OpenAI.
+        $intentos = 4;
         $ultimoStatus = null;
         $ultimoBody   = null;
         $ultimaExc    = null;
@@ -1872,7 +1874,12 @@ TXT;
             }
 
             if ($i < $intentos) {
-                sleep(1);
+                // ⏳ Backoff exponencial: 1, 2, 4, 8 segundos
+                // Si es rate limit (429), aplicamos espera más larga.
+                $esperaSegs = $ultimoStatus === 429
+                    ? min(15, pow(2, $i) * 2) // hasta 15s en rate limit
+                    : pow(2, $i - 1);          // backoff normal
+                sleep($esperaSegs);
             }
         }
 
