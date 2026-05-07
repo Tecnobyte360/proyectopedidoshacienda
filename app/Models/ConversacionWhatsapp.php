@@ -97,22 +97,42 @@ class ConversacionWhatsapp extends Model
     /**
      * Devuelve los últimos N mensajes en orden cronológico (user/assistant)
      * formateados para inyectar al prompt de OpenAI.
+     *
+     * IMPORTANTE: trunca cada mensaje a 2000 chars y todo el bloque a 30k chars
+     * MAX para evitar requests gigantes a OpenAI (rate_limit_exceeded).
      */
     public function historialParaIA(int $cantidad = 20): array
     {
-        // Tomamos los últimos N por id desc (estable) y luego volteamos a cronológico
-        return MensajeWhatsapp::query()
+        $maxBloque = 30000; // 30k chars total max (~7.5k tokens)
+        $maxMsg    = 2000;  // cada mensaje truncado a 2k chars
+
+        $mensajes = MensajeWhatsapp::query()
             ->where('conversacion_id', $this->id)
             ->whereIn('rol', ['user', 'assistant'])
             ->orderByDesc('id')
             ->limit($cantidad)
             ->get()
             ->reverse()
-            ->values()
-            ->map(fn ($m) => [
+            ->values();
+
+        $bytesAcumulados = 0;
+        $resultado = [];
+
+        foreach ($mensajes as $m) {
+            $contenido = (string) $m->contenido;
+            // Truncar mensajes individuales muy largos (ej: dumps de tool results)
+            if (mb_strlen($contenido) > $maxMsg) {
+                $contenido = mb_substr($contenido, 0, $maxMsg) . ' …[truncado]';
+            }
+            $bytesAcumulados += mb_strlen($contenido);
+            // Si el total ya supera el max, paramos (mantenemos los más recientes)
+            if ($bytesAcumulados > $maxBloque) break;
+            $resultado[] = [
                 'role'    => $m->rol,
-                'content' => (string) $m->contenido,
-            ])
-            ->toArray();
+                'content' => $contenido,
+            ];
+        }
+
+        return $resultado;
     }
 }
