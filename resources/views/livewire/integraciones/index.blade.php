@@ -630,6 +630,149 @@
                         @endif
                     </div>
 
+                    {{-- 👤 LOOKUP / CREACIÓN AUTOMÁTICA DE CLIENTES --}}
+                    <div class="rounded-2xl border-2 border-violet-200 bg-violet-50 p-5 mb-4">
+                        <div class="flex items-center gap-2 mb-3">
+                            <i class="fa-solid fa-user-plus text-violet-600 text-lg"></i>
+                            <h4 class="font-bold text-slate-800">Lookup automático de clientes</h4>
+                        </div>
+                        <p class="text-xs text-slate-600 mb-3">
+                            Cuando un cliente vaya a hacer un pedido por WhatsApp, el bot puede consultar
+                            primero si ya existe en <code class="bg-violet-100 px-1 rounded text-[10px]">{{ $cliente_tabla }}</code>
+                            del ERP. Si no existe, le pide los datos faltantes y lo registra automáticamente.
+                        </p>
+
+                        <label class="flex items-start gap-3 cursor-pointer rounded-xl border-2 p-3 transition bg-white mb-3
+                                      {{ $cliente_lookup_activo ? 'border-violet-400' : 'border-slate-200' }}">
+                            <input type="checkbox" wire:model.live="cliente_lookup_activo"
+                                   class="mt-1 rounded border-slate-300 text-violet-600 h-5 w-5">
+                            <div class="flex-1">
+                                <div class="text-sm font-bold text-slate-800">
+                                    🔍 Activar lookup y registro de clientes en el ERP
+                                </div>
+                                <div class="text-[11px] text-slate-500">
+                                    El bot consulta y crea clientes automáticamente antes de registrar pedidos.
+                                </div>
+                            </div>
+                        </label>
+
+                        @if($cliente_lookup_activo)
+                            {{-- Configuración de tabla y columnas --}}
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-700 mb-1">Tabla de clientes</label>
+                                    <input type="text" wire:model="cliente_tabla"
+                                           class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-mono" placeholder="TblTerceros">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-700 mb-1">Columna del NIT/cédula</label>
+                                    <input type="text" wire:model="cliente_columna_id"
+                                           class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-mono" placeholder="StrIdTercero">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-700 mb-1">Columna del teléfono <span class="text-slate-400">(opcional)</span></label>
+                                    <input type="text" wire:model="cliente_columna_telefono"
+                                           class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-mono" placeholder="StrCelular">
+                                </div>
+                            </div>
+
+                            <div class="mt-3 rounded-lg bg-violet-100/50 border border-violet-200 px-3 py-2 text-[11px] text-violet-900">
+                                💡 El bot busca primero por <strong>{{ $cliente_columna_id }} = cédula</strong>;
+                                @if($cliente_columna_telefono)
+                                    si no encuentra, busca por <strong>{{ $cliente_columna_telefono }} = teléfono</strong>.
+                                @endif
+                            </div>
+
+                            {{-- Mapeo de columnas para INSERT cuando NO existe --}}
+                            <div class="mt-4 pt-4 border-t-2 border-violet-200">
+                                <h5 class="font-bold text-sm text-slate-800 mb-1">Datos al crear el cliente nuevo</h5>
+                                <p class="text-[11px] text-slate-600 mb-3">
+                                    Cuando el cliente NO exista, se hará un <code class="bg-violet-100 px-1 rounded text-[10px]">INSERT INTO {{ $cliente_tabla }}</code> con estos datos.
+                                </p>
+
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-xs font-semibold text-slate-700 mb-1">{{ $cliente_columna_id }} (NIT/cédula)</label>
+                                        <input type="text" wire:model="cliente_map_id"
+                                               class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-mono" placeholder="{cliente.cedula}">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-semibold text-slate-700 mb-1">StrNombre</label>
+                                        <input type="text" wire:model="cliente_map_nombre"
+                                               class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-mono" placeholder="{cliente.nombre}">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-semibold text-slate-700 mb-1">{{ $cliente_columna_telefono ?: 'StrCelular' }}</label>
+                                        <input type="text" wire:model="cliente_map_telefono"
+                                               class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-mono" placeholder="{cliente.telefono}">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-semibold text-slate-700 mb-1">StrDireccion</label>
+                                        <input type="text" wire:model="cliente_map_direccion"
+                                               class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-mono" placeholder="{cliente.direccion}">
+                                    </div>
+                                </div>
+                            </div>
+
+                            {{-- Datos que el bot debe pedir --}}
+                            <div class="mt-4 pt-4 border-t-2 border-violet-200">
+                                <h5 class="font-bold text-sm text-slate-800 mb-1">Datos que el bot pedirá si el cliente no existe</h5>
+                                <p class="text-[11px] text-slate-600 mb-3">
+                                    Marca qué datos pedir cuando el cliente sea nuevo. Si el cliente ya está
+                                    registrado en el ERP, NO se pide nada de esto — usa lo que ya tienen.
+                                </p>
+
+                                <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
+                                    <label class="flex items-center gap-2 rounded-lg border-2 border-slate-200 bg-white p-2 cursor-not-allowed opacity-75">
+                                        <input type="checkbox" checked disabled
+                                               class="rounded border-slate-300 text-violet-600 h-4 w-4">
+                                        <span class="text-xs font-semibold text-slate-700">📇 Cédula <span class="text-[9px] text-rose-500">(obligatorio)</span></span>
+                                    </label>
+                                    <label class="flex items-center gap-2 rounded-lg border-2 p-2 cursor-pointer
+                                                  {{ $cliente_pedir_nombre ? 'border-violet-300 bg-white' : 'border-slate-200 bg-slate-50' }}">
+                                        <input type="checkbox" wire:model.live="cliente_pedir_nombre"
+                                               class="rounded border-slate-300 text-violet-600 h-4 w-4">
+                                        <span class="text-xs font-semibold text-slate-700">👤 Nombre completo</span>
+                                    </label>
+                                    <label class="flex items-center gap-2 rounded-lg border-2 p-2 cursor-pointer
+                                                  {{ $cliente_pedir_direccion ? 'border-violet-300 bg-white' : 'border-slate-200 bg-slate-50' }}">
+                                        <input type="checkbox" wire:model.live="cliente_pedir_direccion"
+                                               class="rounded border-slate-300 text-violet-600 h-4 w-4">
+                                        <span class="text-xs font-semibold text-slate-700">📍 Dirección</span>
+                                    </label>
+                                    <label class="flex items-center gap-2 rounded-lg border-2 p-2 cursor-pointer
+                                                  {{ $cliente_pedir_telefono ? 'border-violet-300 bg-white' : 'border-slate-200 bg-slate-50' }}">
+                                        <input type="checkbox" wire:model.live="cliente_pedir_telefono"
+                                               class="rounded border-slate-300 text-violet-600 h-4 w-4">
+                                        <span class="text-xs font-semibold text-slate-700">📞 Teléfono <span class="text-[9px] text-slate-400">(de WhatsApp)</span></span>
+                                    </label>
+                                    <label class="flex items-center gap-2 rounded-lg border-2 p-2 cursor-pointer
+                                                  {{ $cliente_pedir_email ? 'border-violet-300 bg-white' : 'border-slate-200 bg-slate-50' }}">
+                                        <input type="checkbox" wire:model.live="cliente_pedir_email"
+                                               class="rounded border-slate-300 text-violet-600 h-4 w-4">
+                                        <span class="text-xs font-semibold text-slate-700">📧 Email</span>
+                                    </label>
+                                    <label class="flex items-center gap-2 rounded-lg border-2 p-2 cursor-pointer
+                                                  {{ $cliente_pedir_ciudad ? 'border-violet-300 bg-white' : 'border-slate-200 bg-slate-50' }}">
+                                        <input type="checkbox" wire:model.live="cliente_pedir_ciudad"
+                                               class="rounded border-slate-300 text-violet-600 h-4 w-4">
+                                        <span class="text-xs font-semibold text-slate-700">🏙️ Ciudad</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="mt-3 rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2 text-[11px] text-emerald-800">
+                                ✓ <strong>Flujo del bot:</strong>
+                                (1) Cliente saluda → bot busca su teléfono en TblTerceros<br>
+                                (2) Si EXISTE → bot ya lo identifica, NO le pide cédula<br>
+                                (3) Si NO existe → bot le pide cédula primero<br>
+                                (4) Con la cédula busca otra vez. Si existe → continúa<br>
+                                (5) Si no existe ni por cédula → pide los datos marcados arriba<br>
+                                (6) Crea el cliente en TblTerceros y procede con el pedido
+                            </div>
+                        @endif
+                    </div>
+
                     {{-- Test --}}
                     <div class="rounded-xl border-2 border-dashed border-[#fbe9d7] bg-brand-soft/30 p-4">
                         <button wire:click="probarConexion"

@@ -52,6 +52,24 @@ class Index extends Component
     /** Si true, ejecuta DISABLE TRIGGER ALL antes del INSERT y ENABLE después */
     public bool   $export_disable_triggers = false;
 
+    // 👤 LOOKUP / CREACIÓN AUTOMÁTICA DE CLIENTES en TblTerceros
+    public bool   $cliente_lookup_activo   = false;
+    public string $cliente_tabla           = 'TblTerceros';
+    public string $cliente_columna_id      = 'StrIdTercero';
+    public string $cliente_columna_telefono= 'StrCelular';
+    // Mapeo de columnas para el INSERT cuando el cliente no existe
+    public string $cliente_map_id          = '{cliente.cedula}';
+    public string $cliente_map_nombre      = '{cliente.nombre}';
+    public string $cliente_map_telefono    = '{cliente.telefono}';
+    public string $cliente_map_direccion   = '{cliente.direccion}';
+    // Datos que el bot debe pedir si el cliente NO existe (toggles)
+    public bool $cliente_pedir_cedula    = true;  // siempre obligatorio
+    public bool $cliente_pedir_nombre    = true;
+    public bool $cliente_pedir_direccion = true;
+    public bool $cliente_pedir_telefono  = false; // ya lo tenemos del WhatsApp
+    public bool $cliente_pedir_email     = false;
+    public bool $cliente_pedir_ciudad    = false;
+
     // 📋 EXPORT DETALLE (líneas del pedido a TblDetalleDocumentos)
     public bool   $export_detalle_activo = false;
     public string $export_detalle_tabla  = 'TblDetalleDocumentos';
@@ -143,6 +161,25 @@ class Index extends Component
         $this->export_ccosto      = (string) ($exp['ccosto']              ?? '0');
         $this->export_subccosto   = (string) ($exp['subccosto']           ?? '0');
         $this->export_disable_triggers = (bool) ($exp['disable_triggers'] ?? false);
+
+        // Cargar config de cliente lookup
+        $cl = $i->config['cliente_lookup'] ?? [];
+        $this->cliente_lookup_activo    = (bool) ($cl['activo'] ?? false);
+        $this->cliente_tabla            = (string) ($cl['tabla'] ?? 'TblTerceros');
+        $this->cliente_columna_id       = (string) ($cl['columna_id'] ?? 'StrIdTercero');
+        $this->cliente_columna_telefono = (string) ($cl['columna_telefono'] ?? 'StrCelular');
+        $mp = $cl['mapeo_insert'] ?? [];
+        $this->cliente_map_id        = (string) ($mp['StrIdTercero'] ?? $mp[$this->cliente_columna_id] ?? '{cliente.cedula}');
+        $this->cliente_map_nombre    = (string) ($mp['StrNombre']    ?? '{cliente.nombre}');
+        $this->cliente_map_telefono  = (string) ($mp['StrCelular']   ?? '{cliente.telefono}');
+        $this->cliente_map_direccion = (string) ($mp['StrDireccion'] ?? '{cliente.direccion}');
+        $req = $cl['campos_requeridos'] ?? [];
+        $this->cliente_pedir_cedula    = in_array('cedula', $req, true)    ?: true;
+        $this->cliente_pedir_nombre    = in_array('nombre', $req, true);
+        $this->cliente_pedir_direccion = in_array('direccion', $req, true);
+        $this->cliente_pedir_telefono  = in_array('telefono', $req, true);
+        $this->cliente_pedir_email     = in_array('email', $req, true);
+        $this->cliente_pedir_ciudad    = in_array('ciudad', $req, true);
 
         // Cargar config de detalle
         $det = $exp['detalle'] ?? [];
@@ -257,6 +294,32 @@ class Index extends Component
                     'valor_descuento'  => trim($this->export_det_valor_descuento)?: '0',
                 ],
             ],
+        ];
+
+        // Mapeo INSERT del cliente (solo columnas no vacías)
+        $clienteMapeo = array_filter([
+            $this->cliente_columna_id        => trim($this->cliente_map_id),
+            'StrNombre'                      => trim($this->cliente_map_nombre),
+            $this->cliente_columna_telefono  => trim($this->cliente_map_telefono),
+            'StrDireccion'                   => trim($this->cliente_map_direccion),
+        ], fn ($v) => $v !== '');
+
+        $clienteRequeridos = array_keys(array_filter([
+            'cedula'    => $this->cliente_pedir_cedula,
+            'nombre'    => $this->cliente_pedir_nombre,
+            'direccion' => $this->cliente_pedir_direccion,
+            'telefono'  => $this->cliente_pedir_telefono,
+            'email'     => $this->cliente_pedir_email,
+            'ciudad'    => $this->cliente_pedir_ciudad,
+        ]));
+
+        $config['cliente_lookup'] = [
+            'activo'             => $this->cliente_lookup_activo,
+            'tabla'              => trim($this->cliente_tabla)            ?: 'TblTerceros',
+            'columna_id'         => trim($this->cliente_columna_id)       ?: 'StrIdTercero',
+            'columna_telefono'   => trim($this->cliente_columna_telefono) ?: 'StrCelular',
+            'mapeo_insert'       => $clienteMapeo,
+            'campos_requeridos'  => $clienteRequeridos,
         ];
 
         $datosBase = [
