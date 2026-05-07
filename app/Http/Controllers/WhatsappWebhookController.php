@@ -1453,6 +1453,25 @@ TXT;
 
             Log::info('🎯 CAPA 3: Function call confirmar_pedido', compact('from', 'orderData'));
 
+            // 🛡️ VALIDACIÓN DETERMINISTA: el bot debe enviar TODOS los datos
+            // requeridos antes de confirmar. Si falta alguno, rechazamos y le
+            // pedimos al bot que los recopile primero.
+            // Esto NO depende del LLM seguir reglas — es código duro.
+            $faltantes = $this->validarDatosObligatoriosPedido($orderData);
+            if (!empty($faltantes)) {
+                $listaFaltantes = implode(', ', $faltantes);
+                Log::warning('🚨 GUARD: confirmar_pedido sin datos obligatorios — rechazado', [
+                    'from' => $from,
+                    'faltantes' => $faltantes,
+                ]);
+
+                // Mensaje natural al cliente pidiendo los datos faltantes
+                $reply = "Para registrar tu pedido necesito estos datos: {$listaFaltantes}. ¿Me los compartes?";
+                $conversationHistory[] = ['role' => 'assistant', 'content' => $reply];
+                Cache::put($cacheKey, $conversationHistory, now()->addMinutes(45));
+                return $reply;
+            }
+
             // 🛡️ GUARD CRÍTICO ANTES DE GUARDAR: el bot llamó confirmar_pedido
             // pero ¿realmente el cliente pidió algo? Si el último mensaje del
             // cliente es solo un saludo, el bot está alucinando datos viejos.
@@ -2506,6 +2525,81 @@ TXT;
   }
 
   /**
+   * 🛡️ VALIDACIÓN DETERMINISTA: revisa el orderData del bot contra el flujo
+   * configurado en flujo_pedido_orden + lookup ERP.
+   *
+   * Retorna lista de campos faltantes con etiquetas humanas. Si está vacía,
+   * el pedido se puede crear. Si trae elementos, hay que pedir esos datos.
+   *
+   * Mapea los campos del flujo a las claves de orderData:
+   *   cedula      → orderData['cedula']
+   *   nombre      → orderData['customer_name']
+   *   producto    → orderData['products'] (no vacío)
+   *   direccion   → orderData['address']
+   *   barrio      → orderData['neighborhood']
+   *   ciudad      → orderData['location']
+   *   telefono    → orderData['phone']
+   *   email       → orderData['email']
+   *   metodo_pago → orderData['payment_method']
+   */
+  private function validarDatosObligatoriosPedido(array $orderData): array
+  {
+      $faltantes = [];
+
+      try {
+          $cfg = \App\Models\ConfiguracionBot::actual();
+          $flujo = $cfg?->flujo_pedido_orden ?? [];
+          $activos = collect($flujo)->filter(fn ($f) => ($f['activo'] ?? false))->pluck('campo')->all();
+
+          // Si no hay flujo configurado, exigir los básicos
+          if (empty($activos)) {
+              $activos = ['producto', 'nombre', 'direccion'];
+          }
+
+          // Si lookup ERP activo, cédula también es obligatoria
+          $tenantId = app(\App\Services\TenantManager::class)->id();
+          if ($tenantId) {
+              $lookupActivo = \App\Models\Integracion::where('tenant_id', $tenantId)
+                  ->where('activo', true)->where('exporta_pedidos', true)
+                  ->get()
+                  ->contains(fn ($i) => $i->config['cliente_lookup']['activo'] ?? false);
+
+              if ($lookupActivo && !in_array('cedula', $activos, true)) {
+                  $activos[] = 'cedula';
+              }
+          }
+
+          // Mapeo campo → función validación + label
+          $validadores = [
+              'cedula'    => ['cédula',          fn ($d) => !empty(trim((string) ($d['cedula'] ?? $d['document_id'] ?? '')))],
+              'nombre'    => ['nombre completo', fn ($d) => !empty(trim((string) ($d['customer_name'] ?? '')))],
+              'producto'  => ['producto y cantidad', fn ($d) => !empty($d['products'] ?? [])],
+              'direccion' => ['dirección',       fn ($d) => !empty(trim((string) ($d['address'] ?? '')))
+                                                          || !empty(trim((string) ($d['payment_method'] ?? ''))) // si es recoger, no necesita address
+                                                          || stripos((string) ($d['notes'] ?? ''), 'recog') !== false],
+              'barrio'    => ['barrio',          fn ($d) => !empty(trim((string) ($d['neighborhood'] ?? '')))],
+              'ciudad'    => ['ciudad',          fn ($d) => !empty(trim((string) ($d['location'] ?? '')))],
+              'telefono'  => ['teléfono',        fn ($d) => !empty(trim((string) ($d['phone'] ?? '')))],
+              'email'     => ['correo electrónico', fn ($d) => !empty(trim((string) ($d['email'] ?? '')))
+                                                              && filter_var(trim((string) ($d['email'] ?? '')), FILTER_VALIDATE_EMAIL)],
+              'metodo_pago' => ['método de pago', fn ($d) => !empty(trim((string) ($d['payment_method'] ?? '')))],
+          ];
+
+          foreach ($activos as $campo) {
+              if (!isset($validadores[$campo])) continue;
+              [$label, $validador] = $validadores[$campo];
+              if (!$validador($orderData)) {
+                  $faltantes[] = $label;
+              }
+          }
+      } catch (\Throwable $e) {
+          \Log::warning('Validación obligatorios falló: ' . $e->getMessage());
+      }
+
+      return $faltantes;
+  }
+
+  /**
    * 🛡️ GUARD CRÍTICO: el bot llamó `confirmar_pedido` PERO el cliente NO
    * dio intención real de pedir nada en sus últimos mensajes.
    *
@@ -2602,15 +2696,16 @@ TXT;
           '/qued[óo] registrado/i',
           '/pedido registrado/i',
           '/✨\s*[¡!]?pedido confirmado/i',
-          // Frases nuevas que también indican alucinación de pedido
-          '/(tu )?pedido (de|del).*qued[óo]? lis[at]o/i',
-          '/qued[óo]? listo para recoger/i',
-          '/qued[óo]? listo para entrega/i',
-          '/te esperamos.*tu pedido/i',
-          '/(ya )?(est[áa]|qued[óo])\s*(listo|preparado|registrado)/i',
-          '/te reservo.*(libras|kilos|productos|cantidad)/i',
-          '/voy a (registrar|reservar|preparar) tu pedido/i',
-          '/pedido (de|por).*qued[óo]/i',
+          // Frases que indican alucinación de pedido
+          '/(tu )?pedido (de|del|por).*qued[óoa]?/i',          // "tu pedido de X queda/quedó/queda"
+          '/qued[óoa]?\s*listo/i',                              // "queda listo", "quedó listo"
+          '/lis[at]o para (recoger|recoja|recojas|recojan|entrega|entregar)/i',
+          '/lis[at]o para que (lo|la|los|las) (recoja|recojas|recojan|recoger)/i',
+          '/te esperamos\s*(con\s*gusto|en|para)/i',           // "te esperamos con gusto"
+          '/(ya )?(est[áa]|qued[óoa]?)\s*(listo|preparado|registrado|reservado|agendado)/i',
+          '/te reservo.*(libras|kilos|productos|cantidad|kg|gramos|unidades)/i',
+          '/voy a (registrar|reservar|preparar|agendar) tu pedido/i',
+          '/(¡|!)?[hH]asta pronto.*(pedido|recoger|entrega)/i',
       ];
 
       $coincide = false;
@@ -2630,8 +2725,9 @@ TXT;
 
       // ALUCINACIÓN: reescribir
       $original = $reply;
-      $reply = "¡Hola! 👋 Para hacer tu pedido, dime qué necesitas y la cantidad. "
-             . "Por ejemplo: '5 libras de chicharrón'.";
+      $reply = "Disculpa, hubo un detalle al registrar el pedido 🙏. "
+             . "¿Me confirmas que sí lo deseas con un 'sí'? "
+             . "Para finalizar también necesito tu cédula (es obligatoria para registrarte en el sistema).";
 
       \Log::warning('🚨 GUARD: bot alucinó pedido confirmado sin haberlo creado', [
           'original'  => $original,
