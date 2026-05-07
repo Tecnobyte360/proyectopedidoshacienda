@@ -38,6 +38,36 @@ class MensajeWhatsapp extends Model
 
     public const ROL_USER      = 'user';
     public const ROL_ASSISTANT = 'assistant';
+
+    /**
+     * 🛡️ PROTECCIÓN: trunca contenido y meta gigantes ANTES de guardar.
+     * Evita que mensajes con tool_results enormes (catálogos, etc.) inflen
+     * la BD y posteriormente causen rate_limit_exceeded en OpenAI.
+     */
+    protected static function booted(): void
+    {
+        static::saving(function ($msg) {
+            $maxContent = 5000; // 5k chars por mensaje (~1.250 tokens)
+            $maxMeta    = 3000; // 3k chars de metadata
+
+            if (is_string($msg->contenido) && mb_strlen($msg->contenido) > $maxContent) {
+                $msg->contenido = mb_substr($msg->contenido, 0, $maxContent) . ' …[truncado]';
+            }
+
+            // El meta es array (cast). Si serializado supera el límite, lo recortamos
+            if (is_array($msg->meta)) {
+                $serialized = json_encode($msg->meta);
+                if ($serialized && mb_strlen($serialized) > $maxMeta) {
+                    // Mantener solo claves esenciales + marca de truncado
+                    $msg->meta = [
+                        'tipo' => $msg->meta['tipo'] ?? 'data_truncada',
+                        'truncado_at' => now()->toDateTimeString(),
+                        'tamano_original_kb' => round(mb_strlen($serialized) / 1024, 1),
+                    ];
+                }
+            }
+        });
+    }
     public const ROL_SYSTEM    = 'system';
     public const ROL_TOOL      = 'tool';
 

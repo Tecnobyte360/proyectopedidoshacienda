@@ -1003,7 +1003,15 @@ TXT;
             );
 
             $followUp = $this->llamarOpenAI($followUpMessages);
-            $reply = $followUp['choices'][0]['message']['content'] ?? 'Déjame revisar eso 🙌';
+            $reply = $followUp['choices'][0]['message']['content'] ?? null;
+
+            // 🛡️ Mismo fallback crítico aquí
+            if (empty($reply)) {
+                $reply = $this->respuestaFallbackDeTools($toolMessages);
+                Log::warning('🛡️ LLM falló post-tool dinámica — usando fallback', [
+                    'tools' => array_map(fn ($t) => $t['name'] ?? null, $toolMessages),
+                ]);
+            }
 
             $conversationHistory[] = ['role' => 'assistant', 'content' => $reply];
             Cache::put($cacheKey, $conversationHistory, now()->addMinutes(45));
@@ -1122,8 +1130,18 @@ TXT;
             );
 
             $followUp = $this->llamarOpenAI($followUpMessages);
-            $reply    = $followUp['choices'][0]['message']['content']
-                ?? 'Déjame revisar eso un momento 🙌';
+            $reply    = $followUp['choices'][0]['message']['content'] ?? null;
+
+            // 🛡️ FALLBACK CRÍTICO: si el LLM falló (rate limit, timeout, etc),
+            // NO dejamos al cliente colgado con "déjame revisar".
+            // Generamos una respuesta directa con los datos de la(s) tool(s).
+            if (empty($reply)) {
+                $reply = $this->respuestaFallbackDeTools($toolMessages);
+                Log::warning('🛡️ LLM falló en post-tool — usando fallback con datos de tool', [
+                    'from' => $from,
+                    'tools' => array_map(fn ($t) => $t['name'] ?? null, $toolMessages),
+                ]);
+            }
 
             $conversationHistory[] = ['role' => 'assistant', 'content' => $reply];
             Cache::put($cacheKey, $conversationHistory, now()->addMinutes(45));
@@ -1811,8 +1829,145 @@ TXT;
 
 
 
+    /**
+     * 🛡️ FALLBACK CRÍTICO: si el LLM falla DESPUÉS de ejecutar una tool,
+     * generamos una respuesta inmediata con los datos de la tool, en vez de
+     * dejar al cliente colgado con "déjame revisar...".
+     *
+     * Soporta los principales tools: buscar_productos, listar_categorias,
+     * info_producto, productos_destacados.
+     */
+    private function respuestaFallbackDeTools(array $toolMessages): string
+    {
+        if (empty($toolMessages)) {
+            return "Disculpa, tuve un problemita procesando. ¿Puedes repetirme qué necesitas?";
+        }
+
+        $lineas = [];
+
+        foreach ($toolMessages as $tm) {
+            $tool = $tm['name'] ?? '';
+            $contenido = json_decode($tm['content'] ?? '{}', true) ?: [];
+
+            if ($tool === 'buscar_productos') {
+                $productos = $contenido['productos'] ?? [];
+                if (empty($productos)) {
+                    $lineas[] = "Disculpa, no encontré ese producto en este momento. ¿Quieres que te muestre el menú?";
+                } else {
+                    $lineas[] = "Esto es lo que tenemos:";
+                    foreach (array_slice($productos, 0, 5) as $p) {
+                        $nombre = $p['nombre'] ?? '?';
+                        $precio = isset($p['precio']) ? '$' . number_format($p['precio'], 0, ',', '.') : '';
+                        $unidad = $p['unidad'] ? '/' . $p['unidad'] : '';
+                        $lineas[] = "• {$nombre} {$precio}{$unidad}";
+                    }
+                    $lineas[] = "\n¿Cuál te llevas?";
+                }
+            } elseif ($tool === 'listar_categorias') {
+                $cats = $contenido['categorias'] ?? [];
+                if (!empty($cats)) {
+                    $lineas[] = "Tenemos estas categorías:";
+                    foreach (array_slice($cats, 0, 8) as $c) {
+                        $lineas[] = "• " . ($c['nombre'] ?? $c);
+                    }
+                }
+            } elseif ($tool === 'info_producto') {
+                $p = $contenido['producto'] ?? null;
+                if ($p) {
+                    $lineas[] = "📦 *{$p['nombre']}*";
+                    if (!empty($p['precio'])) $lineas[] = "Precio: $" . number_format($p['precio'], 0, ',', '.');
+                    if (!empty($p['descripcion'])) $lineas[] = $p['descripcion'];
+                }
+            } elseif ($tool === 'productos_destacados') {
+                $dst = $contenido['destacados'] ?? [];
+                if (!empty($dst)) {
+                    $lineas[] = "⭐ Te recomendamos:";
+                    foreach (array_slice($dst, 0, 5) as $p) {
+                        $lineas[] = "• {$p['nombre']}" . (isset($p['precio']) ? ' — $' . number_format($p['precio'], 0, ',', '.') : '');
+                    }
+                }
+            }
+        }
+
+        if (empty($lineas)) {
+            return "Tuve un problemita pero ya estoy listo. Dime qué necesitas y te ayudo 🙌";
+        }
+
+        return implode("\n", $lineas);
+    }
+
+    /**
+     * 🛡️ PRE-FLIGHT GUARD para llamadas a OpenAI.
+     * Estima el tamaño total del payload (chars / 4 ≈ tokens). Si excede el
+     * presupuesto, recorta agresivamente:
+     *  1. Trunca cada mensaje individual a 3000 chars
+     *  2. Si aún excede, descarta los mensajes más viejos (mantiene system + últimos)
+     *
+     * Evita rate_limit_exceeded de OpenAI por requests gigantes.
+     */
+    private function recortarMessagesParaLLM(array $messages, int $maxCharsTotal): array
+    {
+        $maxCharsPorMsg = 3000; // ~750 tokens por mensaje individual
+
+        // Paso 1: truncar mensajes individuales gigantes
+        foreach ($messages as &$m) {
+            $contenido = $m['content'] ?? '';
+            if (is_string($contenido) && mb_strlen($contenido) > $maxCharsPorMsg) {
+                $m['content'] = mb_substr($contenido, 0, $maxCharsPorMsg) . ' …[truncado]';
+            }
+        }
+        unset($m);
+
+        // Paso 2: si el total aún excede, descartar los más viejos.
+        // Mantenemos: 1) PRIMER system message (prompt principal). 2) ÚLTIMOS N mensajes.
+        $totalChars = array_sum(array_map(fn ($m) => mb_strlen($m['content'] ?? ''), $messages));
+        if ($totalChars <= $maxCharsTotal) {
+            return $messages;
+        }
+
+        $primerSystem = null;
+        $resto = [];
+        foreach ($messages as $i => $m) {
+            if ($primerSystem === null && ($m['role'] ?? '') === 'system') {
+                $primerSystem = $m;
+            } else {
+                $resto[] = $m;
+            }
+        }
+
+        // Tomar de atrás hacia adelante hasta llenar el presupuesto
+        $primerSystemChars = $primerSystem ? mb_strlen($primerSystem['content'] ?? '') : 0;
+        $presupuestoRestante = max(0, $maxCharsTotal - $primerSystemChars);
+        $finalReverso = [];
+        $usado = 0;
+        foreach (array_reverse($resto) as $m) {
+            $size = mb_strlen($m['content'] ?? '');
+            if ($usado + $size > $presupuestoRestante) break;
+            $finalReverso[] = $m;
+            $usado += $size;
+        }
+
+        $resultado = [];
+        if ($primerSystem) $resultado[] = $primerSystem;
+        $resultado = array_merge($resultado, array_reverse($finalReverso));
+
+        \Log::info('🛡️ Pre-flight recortó request a OpenAI', [
+            'antes' => $totalChars,
+            'despues' => array_sum(array_map(fn ($m) => mb_strlen($m['content'] ?? ''), $resultado)),
+            'mensajes_antes' => count($messages),
+            'mensajes_despues' => count($resultado),
+        ]);
+
+        return $resultado;
+    }
+
     private function llamarOpenAI(array $messages): ?array
     {
+        // 🛡️ PRE-FLIGHT: estimar tokens y recortar si excede el límite seguro.
+        // gpt-4o-mini contexto max: 128k. TPM tier 2: 2M. Para evitar rate limits
+        // y errores de contexto, limitamos a 30k tokens por request (~120k chars).
+        $messages = $this->recortarMessagesParaLLM($messages, 30000);
+
         // 🔁 4 intentos con backoff exponencial (1s, 2s, 4s, 8s)
         // Antes eran 2 con 1s — insuficiente para rate limits de OpenAI.
         $intentos = 4;
