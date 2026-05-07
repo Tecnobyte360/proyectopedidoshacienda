@@ -1070,8 +1070,15 @@ TXT;
                     ?? (isset($resultado['destacados']) ? count($resultado['destacados']) : 0)
                     ?? 0);
 
+                // Log ligero — solo string args para evitar OOM en Monolog
+                $argsBrief = is_array($args) ? array_map(
+                    fn ($v) => is_scalar($v) ? mb_substr((string) $v, 0, 100) : '[obj]',
+                    $args
+                ) : [];
                 Log::info("🛠️ Tool call {$name}", [
-                    'args' => $args, 'count' => $countResultados, 'ms' => $latenciaMs,
+                    'args' => $argsBrief,
+                    'count' => $countResultados,
+                    'ms' => $latenciaMs,
                 ]);
 
                 // Persistir invocacion para el dashboard de monitoreo

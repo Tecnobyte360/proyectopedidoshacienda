@@ -26,6 +26,27 @@ class BotCatalogoToolService
      */
     public function buscarProductos(string $query, ?string $categoria = null, int $limite = 5, ?int $sedeId = null): array
     {
+        // Primer intento: buscar con sede filtrada
+        $resultado = $this->buscarInternoConSede($query, $categoria, $limite, $sedeId);
+
+        // 🔄 Fallback: si no encontró NADA con sede, intentar SIN filtrar por sede.
+        // Esto resuelve casos donde el operador no asignó sedes a algunos productos
+        // (típico en migraciones desde ERP). Mejor mostrar productos de "cualquier
+        // sede" que decirle al cliente "no manejo eso".
+        if ($sedeId !== null && empty($resultado)) {
+            $resultado = $this->buscarInternoConSede($query, $categoria, $limite, null);
+            if (!empty($resultado)) {
+                \Log::info('🔄 buscar_productos fallback sin sede', [
+                    'query' => $query, 'sedeId' => $sedeId, 'encontrados' => count($resultado),
+                ]);
+            }
+        }
+
+        return $resultado;
+    }
+
+    private function buscarInternoConSede(string $query, ?string $categoria, int $limite, ?int $sedeId): array
+    {
         $productos = $this->catalogo->productosActivos($sedeId);
         $q  = $this->normalizar($query);
         $qF = $this->normalizarFuzzy($query); // tolera typos (dobles letras, etc)

@@ -35,7 +35,7 @@ RUN apt-get update && apt-get install -y \
 # El bot maneja prompts grandes (~36k chars) + historial de conversaciones +
 # cache + exports al ERP. Con 128M se quedaba sin memoria al procesar
 # mensajes con contexto largo (ver error en logs: 'Allowed memory exhausted').
-RUN echo "memory_limit = 512M" > /usr/local/etc/php/conf.d/zz-custom.ini \
+RUN echo "memory_limit = 1024M" > /usr/local/etc/php/conf.d/zz-custom.ini \
     && echo "max_execution_time = 120" >> /usr/local/etc/php/conf.d/zz-custom.ini \
     && echo "post_max_size = 32M" >> /usr/local/etc/php/conf.d/zz-custom.ini \
     && echo "upload_max_filesize = 32M" >> /usr/local/etc/php/conf.d/zz-custom.ini
