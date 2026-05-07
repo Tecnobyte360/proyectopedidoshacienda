@@ -857,46 +857,7 @@ TXT;
             \Log::warning('No se pudo inyectar alerta de sede cerrada: ' . $e->getMessage());
         }
 
-        // 📅 RECORDATORIO JUST-IN-TIME — pedidos fuera de horario
-        // Si TODAS las sedes están cerradas Y el tenant tiene activo el toggle
-        // de aceptar pedidos fuera de horario, inyectamos un recordatorio fuerte
-        // como ÚLTIMO system message para que el LLM no caiga en su patrón
-        // de "te aviso cuando abramos".
         $reinforceProgramado = [];
-        try {
-            $cfgBotPrograma = \App\Models\ConfiguracionBot::actual();
-            $aceptaProgramados = (bool) ($cfgBotPrograma?->aceptar_pedidos_fuera_horario ?? false);
-
-            if ($aceptaProgramados) {
-                $sedesActivasCheck = \App\Models\Sede::where('activa', true)->get();
-                $todasCerradas = $sedesActivasCheck->isNotEmpty()
-                    && $sedesActivasCheck->every(fn ($s) => !$s->estaAbierta());
-
-                if ($todasCerradas) {
-                    $proxima = $sedesActivasCheck->first()->proximaApertura() ?: 'mañana 8:00 am';
-                    $reinforceProgramado[] = [
-                        'role'    => 'system',
-                        'content' => "🚨 RECORDATORIO CRÍTICO — ESTE NEGOCIO ACEPTA PEDIDOS PROGRAMADOS\n\n"
-                            . "Todas las sedes están CERRADAS AHORA, pero el dueño ACTIVÓ una opción\n"
-                            . "para que SÍ aceptes pedidos en este momento — los registras como\n"
-                            . "PROGRAMADOS para la próxima apertura ({$proxima}).\n\n"
-                            . "❌ NUNCA digas estas frases:\n"
-                            . "  - '¿Te aviso apenas abramos?'\n"
-                            . "  - 'Te atendemos mañana'\n"
-                            . "  - 'Estamos cerrados ahora'\n"
-                            . "  - 'No puedo registrar el pedido'\n\n"
-                            . "✅ EN CAMBIO, SIEMPRE responde así:\n"
-                            . "  'Estamos cerrados pero te puedo dejar el pedido PROGRAMADO\n"
-                            . "   para {$proxima}. ¿Te parece?'\n\n"
-                            . "Si el cliente acepta, sigue el flujo normal: pides datos faltantes\n"
-                            . "y llamas `confirmar_pedido`. El sistema lo marcará como programado\n"
-                            . "automáticamente. NO te preocupes por marcar nada especial.",
-                    ];
-                }
-            }
-        } catch (\Throwable $e) {
-            \Log::warning('No se pudo inyectar recordatorio de programados: ' . $e->getMessage());
-        }
 
         // Si MODO AGENTE está activo, añadimos un system message FINAL que sobrescribe
         // cualquier instrucción contradictoria del prompt personalizado (ej: "solo del
@@ -3867,30 +3828,6 @@ TXT;
                      . $extraRendered . "\n";
         }
 
-        // 🚨 REGLA INVIOLABLE: NO CONFIRMAR PEDIDO SIN INTENCIÓN EXPLÍCITA
-        $prompt .= "\n\n═══════════════════════════════════════════════════════════════════════════════\n"
-                 . "# 🚨 REGLA SAGRADA — NUNCA CONFIRMES PEDIDOS QUE EL CLIENTE NO PIDIÓ\n\n"
-                 . "ANTES de llamar `confirmar_pedido`, el cliente DEBE haber expresado en este\n"
-                 . "chat actual una intención CLARA de pedir algo. Ejemplos válidos:\n"
-                 . "  - 'quiero 2 libras de chicharrón'\n"
-                 . "  - 'mándame una bolsa de café'\n"
-                 . "  - 'dame 5 kg de pollo'\n"
-                 . "  - 'me das un pedido de X'\n\n"
-                 . "🚫 PROHIBIDO ABSOLUTAMENTE llamar `confirmar_pedido` si:\n"
-                 . "  - El cliente solo saludó: 'hola', 'buenas noches', 'qué tal'\n"
-                 . "  - El cliente solo preguntó algo: '¿qué tienen?', '¿cuánto cuesta?'\n"
-                 . "  - El cliente solo dio datos personales: 'mi cédula es X'\n"
-                 . "  - El historial dice que ya hubo un pedido — eso es del PASADO, no continúes\n"
-                 . "  - Tienes los datos del cliente pero NO ha mencionado producto/cantidad HOY\n\n"
-                 . "✅ FLUJO CORRECTO al inicio de la conversación:\n"
-                 . "  Cliente: 'hola'\n"
-                 . "  Tú: '¡Hola! ¿Qué se te antoja hoy? Dime el producto y la cantidad'\n"
-                 . "  Cliente: 'quiero 2 libras de res'\n"
-                 . "  Tú: (ahora SÍ procedes con el flujo del pedido)\n\n"
-                 . "❌ FLUJO PROHIBIDO:\n"
-                 . "  Cliente: 'hola'\n"
-                 . "  Tú: 'Te confirmo el pedido de 5 libras de chicharrón'  ← INVENTADO, prohibido\n";
-
         // 🎯 REGLA: ORDEN DEL FLUJO DEL PEDIDO (configurable desde panel)
         try {
             $cfgOrden = \App\Models\ConfiguracionBot::actual();
@@ -3912,86 +3849,15 @@ TXT;
                 ];
 
                 $listaOrdenada = $activos->map(fn ($f, $i) => ($i + 1) . '. ' . ($labels[$f['campo']] ?? $f['campo']))
-                    ->implode("\n   ");
+                    ->implode(', ');
 
-                $prompt .= "\n\n═══════════════════════════════════════════════════════════════════════════════\n"
-                         . "# 🎯 ORDEN DEL FLUJO DEL PEDIDO — RESPÉTALO\n\n"
-                         . "Cuando el cliente quiera hacer un pedido, pide los datos EN ESTE ORDEN:\n\n"
-                         . "   {$listaOrdenada}\n\n"
-                         . "Reglas:\n"
-                         . "1. Pídelos UNO POR UNO (no todos juntos). Espera respuesta antes de pedir el siguiente.\n"
-                         . "2. Si un dato ya lo tienes (ej: cédula del cliente que ya está registrado),\n"
-                         . "   SÁLTALO y pide el siguiente.\n"
-                         . "3. Si lookup ERP está activo y el dato es 'cedula', llama `verificar_cliente_erp`\n"
-                         . "   apenas la tengas.\n"
-                         . "4. Cuando hayas recopilado TODOS los activos, llama `confirmar_pedido`.\n"
-                         . "5. Los datos NO listados arriba NO los pidas (a menos que el cliente los mencione).\n";
+                $prompt .= "\n\n📝 Para tomar un pedido pide en este orden, uno por uno: {$listaOrdenada}.\n";
             }
         } catch (\Throwable $e) {
-            \Log::warning('No se pudo inyectar regla de orden de flujo: ' . $e->getMessage());
+            // ignorar
         }
 
-        // 👤 REGLA: VERIFICACIÓN DE CLIENTE EN ERP (LOOKUP)
-        // Si alguna integración del tenant tiene cliente_lookup activado,
-        // el bot debe pedir cédula y solicitar los campos configurados
-        // SOLO si el cliente es nuevo (no está registrado en el ERP).
-        try {
-            $tenantIdLookup = app(\App\Services\TenantManager::class)->id();
-            if ($tenantIdLookup) {
-                $integLookup = \App\Models\Integracion::where('tenant_id', $tenantIdLookup)
-                    ->where('activo', true)
-                    ->where('exporta_pedidos', true)
-                    ->get()
-                    ->first(fn ($i) => $i->config['cliente_lookup']['activo'] ?? false);
-
-                if ($integLookup) {
-                    $req = $integLookup->config['cliente_lookup']['campos_requeridos'] ?? [];
-                    $listaCampos = collect($req)->map(fn ($c) => match ($c) {
-                        'cedula'    => 'cédula',
-                        'nombre'    => 'nombre completo',
-                        'direccion' => 'dirección exacta',
-                        'telefono'  => 'teléfono',
-                        'email'     => 'correo electrónico',
-                        'ciudad'    => 'ciudad',
-                        default     => $c,
-                    })->implode(', ');
-
-                    $prompt .= "\n\n═══════════════════════════════════════════════════════════════════════════════\n"
-                             . "# 👤 LOOKUP DE CLIENTE EN ERP — FLUJO OBLIGATORIO\n\n"
-                             . "Este negocio valida cada cliente en su ERP ANTES de registrar pedidos.\n\n"
-                             . "🚦 FLUJO OBLIGATORIO cuando el cliente quiere hacer un pedido:\n\n"
-                             . "PASO 1 — PIDE LA CÉDULA SIEMPRE PRIMERO:\n"
-                             . "   Cliente: 'quiero pedir' / 'qué tienen' / 'quiero X producto'\n"
-                             . "   Tú: 'Antes de armar tu pedido, ¿me regalas tu número de cédula? 🙏'\n"
-                             . "   ⚠️ NO procedas sin la cédula. NO inventes pedidos sin cédula.\n\n"
-                             . "PASO 2 — APENAS TENGAS LA CÉDULA, LLAMA `verificar_cliente_erp`:\n"
-                             . "   Cliente: '1007767612'\n"
-                             . "   Tú: (llama tool) verificar_cliente_erp(cedula='1007767612', telefono='3216499744')\n"
-                             . "   Esta tool busca en TblTerceros del ERP y te dice si existe.\n\n"
-                             . "PASO 3 — SEGÚN EL RESULTADO:\n"
-                             . "   3a) Si existe=true → 'Hola {nombre}! Ya estás registrado.\n"
-                             . "       ¿Qué te llevas hoy?' — sigues con el pedido SIN pedir más datos.\n"
-                             . "   3b) Si existe=false → pides UNO POR UNO los campos_faltantes:\n"
-                             . "       'Para registrarte necesito tu nombre completo'\n"
-                             . "       (espera respuesta)\n"
-                             . "       'Y tu dirección exacta?'\n"
-                             . "       (espera respuesta)\n"
-                             . "       — luego procedes con el pedido normal\n\n"
-                             . "PASO 4 — Cuando tengas el pedido completo, llama `confirmar_pedido`.\n"
-                             . "   El sistema crea el cliente en TblTerceros automáticamente y registra el pedido.\n\n"
-                             . "❌ PROHIBIDO: pedir todos los datos de golpe, confirmar pedido sin cédula,\n"
-                             . "   inventar que el cliente ya está registrado sin haber llamado la tool.\n";
-                }
-            }
-        } catch (\Throwable $e) {
-            \Log::warning('No se pudo inyectar regla de lookup cliente: ' . $e->getMessage());
-        }
-
-        // 📅 REGLA: PEDIDOS FUERA DE HORARIO (PROGRAMADOS)
-        // Si la sede tiene activado 'aceptar_pedidos_cerrada', se pueden registrar
-        // pedidos cuando estamos cerrados — quedan programados para la próxima
-        // apertura. El bot debe AVISAR al cliente y pedir confirmación.
-        // Activado si: el toggle global del bot está ON, O alguna sede lo tiene activado
+        // 📅 REGLA: PEDIDOS FUERA DE HORARIO (PROGRAMADOS) - solo si activo
         $cfgBotProgramados = \App\Models\ConfiguracionBot::actual();
         $tenantAceptaFueraHorario = (bool) ($cfgBotProgramados?->aceptar_pedidos_fuera_horario ?? false);
         $sedesConProgramados = $tenantAceptaFueraHorario || \App\Models\Sede::where('tenant_id', app(\App\Services\TenantManager::class)->id() ?? 0)
@@ -4000,100 +3866,9 @@ TXT;
             ->exists();
 
         if ($sedesConProgramados) {
-            $prompt .= "\n\n═══════════════════════════════════════════════════════════════════════════════\n"
-                     . "# 📅 PEDIDOS FUERA DE HORARIO — REGLA INVIOLABLE (PRIORIDAD MÁXIMA)\n\n"
-                     . "🚨 ESTE NEGOCIO ACEPTA PEDIDOS CUANDO ESTÁ CERRADO. Los registra como\n"
-                     . "programados para la próxima apertura. NUNCA digas 'no puedo registrarlo'.\n\n"
-                     . "🚫 PROHIBIDO ABSOLUTAMENTE estas frases cuando estamos cerrados:\n"
-                     . "  - 'no puedo registrar el pedido en este momento'\n"
-                     . "  - 'estamos cerrados ahora y no puedo registrarlo'\n"
-                     . "  - 'te ayudo apenas abramos'\n"
-                     . "  - 'escríbeme mañana cuando abramos'\n"
-                     . "  - 'te aviso cuando abramos para confirmar tu pedido'\n\n"
-                     . "✅ EN VEZ DE ESO, cuando el cliente pide fuera de horario:\n"
-                     . "  1. Confirma el producto y dirección que pidió\n"
-                     . "  2. Di EXACTAMENTE: 'Estamos cerrados pero te puedo DEJAR el pedido\n"
-                     . "     PROGRAMADO para mañana 8:00 am. ¿Te parece?'\n"
-                     . "  3. Si dice SÍ → procede a pedir datos faltantes y llamar `confirmar_pedido`\n"
-                     . "     EL SISTEMA AUTOMÁTICAMENTE lo registra como programado, NO te preocupes\n"
-                     . "     por marcar nada especial — solo llama la herramienta normal.\n"
-                     . "  4. Si dice NO → ofrece tomar nota para contactarlo después.\n\n"
-                     . "📚 EJEMPLO REAL:\n"
-                     . "Cliente (8 PM): 'quiero 5 libras de chicharrón para Cra 50 #63B-48 Bello'\n"
-                     . "❌ MAL: 'estamos cerrados, te ayudo mañana cuando abramos'\n"
-                     . "✅ BIEN: 'Buenas noches Stiven 🌙 Te puedo dejar las 5 libras de chicharrón\n"
-                     . "        PROGRAMADAS para mañana 8 am. ¿Lo dejo agendado?'\n";
+            $prompt .= "\n\n📅 Si estamos cerrados, NO digas 'no puedo registrar'. Ofrece dejar "
+                     . "el pedido programado para la próxima apertura.\n";
         }
-
-        // 🌍 REGLA: VALIDAR ANTES DE NEGAR COBERTURA
-        $prompt .= "\n\n═══════════════════════════════════════════════════════════════════════════════\n"
-                 . "# 🌍 PREGUNTAS DE COBERTURA POR CIUDAD/BARRIO — REGLA INVIOLABLE\n\n"
-                 . "Si el cliente pregunta '¿llegan a X?' / '¿tienen cobertura en Y?' / '¿hacen envíos a Z?'\n"
-                 . "donde X/Y/Z es una ciudad, barrio o municipio:\n\n"
-                 . "❌ PROHIBIDO RESPONDER 'no tenemos cobertura ahí' o 'no llegamos hasta allá' SIN haber\n"
-                 . "llamado primero `validar_cobertura(direccion: nombre_lugar, ciudad: nombre_lugar)`.\n\n"
-                 . "✅ FLUJO CORRECTO:\n"
-                 . "1. Cliente: '¿y Girardota?' o '¿llegan a Bello?'\n"
-                 . "2. Tú llamas: validar_cobertura(direccion='Girardota', ciudad='Girardota')\n"
-                 . "3. Lees la respuesta de la herramienta\n"
-                 . "4. Si dice cubierta=true → '¡Sí, llegamos a Girardota! Dame la dirección exacta.'\n"
-                 . "5. Si dice cubierta=false → 'No llegamos a Girardota por ahora 😔'\n\n"
-                 . "❌ NUNCA confíes solo en el listado de zonas del prompt para negar cobertura. Las zonas\n"
-                 . "se describen genéricamente (ej: 'área metropolitana') pero el polígono real puede\n"
-                 . "incluir lugares no listados explícitamente. La herramienta es la fuente de verdad.\n";
-
-        // 🧠 REGLA: PREGUNTAR CIUDAD/BARRIO CUANDO LA DIRECCIÓN ES AMBIGUA
-        // El geocoding falla cuando una dirección como "Cra 50 #63-48" puede estar
-        // en varias ciudades. El bot debe pedir ciudad antes de validar.
-        $prompt .= "\n\n═══════════════════════════════════════════════════════════════════════════════\n"
-                 . "# 🗺️ DIRECCIONES AMBIGUAS — REGLA INTELIGENTE\n\n"
-                 . "Una dirección sin ciudad NI barrio (ej: solo 'Cra 50 #63-48') puede estar en\n"
-                 . "muchos lugares. ANTES de llamar `validar_cobertura`:\n\n"
-                 . "1. Si SOLO te dan número de calle/carrera (sin ciudad ni barrio), PREGUNTA:\n"
-                 . "   '¿En qué ciudad y barrio queda esa dirección?'\n"
-                 . "2. Si te dan dirección + ciudad, OK → llama validar_cobertura.\n"
-                 . "3. Si validar_cobertura dice 'no cubierta' pero el cliente insiste que SÍ\n"
-                 . "   está en una ciudad cubierta, pídele el BARRIO específico y vuelve a\n"
-                 . "   llamar la herramienta con barrio + dirección + ciudad.\n"
-                 . "4. NO asumas la ciudad por contexto del prompt — pregunta.\n\n"
-                 . "Ejemplo:\n"
-                 . "Cliente: 'envíame a Cra 50 # 63-48'\n"
-                 . "❌ Mal: 'Uy, fuera de cobertura' (alucina ciudad)\n"
-                 . "✅ Bien: '¿En qué ciudad o barrio queda esa dirección? Para validarte bien.'\n";
-
-        // 🔒 REGLA DE CONFIRMACIÓN DE PEDIDO INEQUÍVOCA
-        // El bot a veces dice "ya quedó registrado" (ambiguo) cuando el cliente
-        // manda un dato como el correo. El cliente cree que el correo se
-        // registró, no el pedido. Hay que ser explícito.
-        $prompt .= "\n\n═══════════════════════════════════════════════════════════════════════════════\n"
-                 . "# 📋 CONFIRMACIÓN DE PEDIDO — REGLAS INEQUÍVOCAS\n\n"
-                 . "❌ PROHIBIDO decir 'pedido confirmado' o 'ya quedó registrado' SIN haber\n"
-                 . "llamado la herramienta `confirmar_pedido` y recibido un número de pedido.\n"
-                 . "❌ PROHIBIDO mostrar 'resumen del pedido' como si estuviera confirmado mientras\n"
-                 . "todavía pides datos faltantes (cédula, correo, teléfono). Si faltan datos,\n"
-                 . "dilo claro: 'antes de confirmar necesito X'.\n"
-                 . "❌ PROHIBIDO responder 'ya quedó registrado' a un dato del cliente (correo,\n"
-                 . "cédula). Eso confunde — el cliente cree que se registró su correo, no su pedido.\n"
-                 . "Mejor responde: 'Listo, gracias. ¿Confirmamos el pedido entonces?' Y solo después\n"
-                 . "de llamar `confirmar_pedido` con éxito, di 'Tu pedido #N quedó registrado ✅'.\n"
-                 . "✅ La confirmación final SIEMPRE debe incluir el número de pedido (#N) y\n"
-                 . "el link de seguimiento que la herramienta te devuelva.\n";
-
-        // 🔒 REGLA ANTI-ALUCINACIÓN DE PRECIOS Y PRODUCTOS
-        // El LLM tiende a redondear, inventar centavos o decir precios "promedio"
-        // cuando hay varios productos similares. Esto es CRÍTICO porque puede
-        // registrar pedidos con precios falsos.
-        $prompt .= "\n\n═══════════════════════════════════════════════════════════════════════════════\n"
-                 . "# 💰 PRECIOS Y PRODUCTOS — FUENTE DE VERDAD\n\n"
-                 . "Los precios y productos del catálogo de arriba son la ÚNICA verdad.\n"
-                 . "❌ PROHIBIDO inventar precios (ej: \"\$79.999,99\" cuando dice \$80.000).\n"
-                 . "❌ PROHIBIDO redondear, sumar centavos o promediar precios.\n"
-                 . "❌ PROHIBIDO ofrecer productos que no estén en el catálogo.\n"
-                 . "✅ Si el cliente pregunta por una variedad (Chiroso, Geisha, Bourbón) o\n"
-                 . "presentación (grano, molido, 250g, 500g), MENCIONA TODAS las opciones reales\n"
-                 . "del catálogo, no solo algunas. Si hay 6 versiones de Reserva Especial,\n"
-                 . "lístalas las 6 (o agrúpalas claramente).\n"
-                 . "✅ Repite el precio EXACTO como aparece en el catálogo (\$80.000, no \$80.000,00).\n";
 
         // 🔒 INYECCIÓN OBLIGATORIA DE COBERTURA REAL (anti-alucinación)
         // Sin importar lo que diga el prompt maestro, agregamos al final la cobertura
