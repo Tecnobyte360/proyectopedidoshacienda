@@ -3400,6 +3400,19 @@ TXT;
             'barrio'              => $barrio ?: $cliente->barrio,
             'zona_cobertura_id'   => $zonaCobertura?->id ?? $cliente->zona_cobertura_id,
         ];
+
+        // 🪪 Guardar cédula si vino en el orderData (desde 'cedula' o 'document_id')
+        $cedulaNueva = trim((string) ($orderData['cedula'] ?? $orderData['document_id'] ?? ''));
+        if ($cedulaNueva !== '' && empty($cliente->cedula)) {
+            $datosClienteActualizar['cedula'] = $cedulaNueva;
+        }
+
+        // 📧 Guardar correo si vino en el orderData
+        $correoNuevo = trim((string) ($orderData['email'] ?? $orderData['correo'] ?? ''));
+        if ($correoNuevo !== '' && filter_var($correoNuevo, FILTER_VALIDATE_EMAIL) && empty($cliente->correo)) {
+            $datosClienteActualizar['correo'] = $correoNuevo;
+        }
+
         $cliente->update($datosClienteActualizar);
 
         // Coordenadas del cliente (si la validación las encontró vía geocoding)
@@ -3879,6 +3892,24 @@ TXT;
                      . "el pedido programado para la próxima apertura.\n";
         }
 
+        // 👤 Si lookup ERP activo → cédula obligatoria (regla corta)
+        try {
+            $tenantIdLookup = app(\App\Services\TenantManager::class)->id();
+            if ($tenantIdLookup) {
+                $integLookupActivo = \App\Models\Integracion::where('tenant_id', $tenantIdLookup)
+                    ->where('activo', true)
+                    ->where('exporta_pedidos', true)
+                    ->get()
+                    ->contains(fn ($i) => $i->config['cliente_lookup']['activo'] ?? false);
+
+                if ($integLookupActivo) {
+                    $prompt .= "\n\n🪪 ANTES de llamar `confirmar_pedido`, pide la CÉDULA del cliente "
+                             . "y pásala en orderData['cedula']. Es OBLIGATORIA — sin ella no se "
+                             . "puede registrar en el sistema.\n";
+                }
+            }
+        } catch (\Throwable $e) { /* ignorar */ }
+
         // ⚠️ Regla CRÍTICA pero corta sobre confirmar_pedido
         $prompt .= "\n\n⚠️ Para registrar un pedido OBLIGATORIO llamar la herramienta `confirmar_pedido`. "
                  . "NUNCA digas 'queda listo', 'te esperamos', 'pedido registrado' SIN haber llamado la herramienta. "
@@ -4081,7 +4112,9 @@ PROMPT;
                                 ],
                             ],
                             'customer_name'  => ['type' => 'string', 'description' => 'Nombre completo del cliente'],
+                            'cedula'         => ['type' => 'string', 'description' => 'Número de cédula o NIT del cliente — OBLIGATORIO si el negocio tiene lookup ERP activo. Solo dígitos sin puntos.'],
                             'phone'          => ['type' => 'string', 'description' => 'Teléfono del cliente'],
+                            'email'          => ['type' => 'string', 'description' => 'Correo electrónico del cliente (si lo dio)'],
                             'address'        => ['type' => 'string', 'description' => 'Dirección de entrega exacta'],
                             'neighborhood'   => ['type' => 'string', 'description' => 'Barrio (debe estar en alguna zona de cobertura del catálogo)'],
                             'location'       => ['type' => 'string', 'description' => 'Ciudad o zona'],
