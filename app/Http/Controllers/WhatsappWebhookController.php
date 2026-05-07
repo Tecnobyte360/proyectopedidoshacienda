@@ -1257,6 +1257,87 @@ TXT;
             return $reply;
         }
 
+        // ── Tool call: verificar_cliente_erp ──────────────────────────────────
+        // Bot llama esta tool con la cédula del cliente. El sistema busca en
+        // TblTerceros del ERP. Si existe, devuelve sus datos (el bot continúa
+        // sin pedir más datos). Si no existe, devuelve los campos faltantes
+        // (el bot los pide uno por uno y luego llama confirmar_pedido).
+        if ($toolCalls && ($toolCalls[0]['function']['name'] ?? '') === 'verificar_cliente_erp') {
+            $rawArgs = $toolCalls[0]['function']['arguments'] ?? '{}';
+            $args    = json_decode($rawArgs, true) ?: [];
+
+            $cedula   = trim((string) ($args['cedula'] ?? ''));
+            $telefono = trim((string) ($args['telefono'] ?? $from));
+
+            Log::info('🔍 Tool call verificar_cliente_erp', compact('from', 'cedula', 'telefono'));
+
+            $tenantId = app(\App\Services\TenantManager::class)->id();
+            $integ = \App\Models\Integracion::where('tenant_id', $tenantId)
+                ->where('activo', true)
+                ->where('exporta_pedidos', true)
+                ->get()
+                ->first(fn ($i) => $i->config['cliente_lookup']['activo'] ?? false);
+
+            $resultado = ['existe' => false, 'datos' => null, 'campos_faltantes' => []];
+
+            if ($integ && $cedula) {
+                $clienteErp = app(\App\Services\ClienteErpService::class)
+                    ->buscar($integ, $cedula, $telefono);
+
+                if ($clienteErp) {
+                    $resultado = [
+                        'existe' => true,
+                        'datos'  => [
+                            'cedula'    => $cedula,
+                            'nombre'    => $clienteErp['StrNombre']    ?? null,
+                            'telefono'  => $clienteErp['StrCelular']   ?? null,
+                            'direccion' => $clienteErp['StrDireccion'] ?? null,
+                        ],
+                        'mensaje' => "Cliente registrado: {$clienteErp['StrNombre']}. NO pidas más datos personales — continúa con el pedido.",
+                    ];
+                } else {
+                    $req = $integ->config['cliente_lookup']['campos_requeridos'] ?? [];
+                    $resultado = [
+                        'existe' => false,
+                        'campos_faltantes' => array_values(array_diff($req, ['cedula','telefono'])),
+                        'mensaje' => "Cliente NO está registrado. Pídele UNO POR UNO los siguientes datos antes de confirmar pedido: " . implode(', ', $req),
+                    ];
+                }
+            } else {
+                $resultado['mensaje'] = "Lookup no configurado en este tenant — continúa el flujo normal del pedido.";
+            }
+
+            // Respuesta de la tool para OpenAI
+            $toolResponseMessages = array_merge(
+                [['role' => 'system', 'content' => $systemPrompt]],
+                $conversationHistory,
+                [[
+                    'role'       => 'assistant',
+                    'content'    => null,
+                    'tool_calls' => $toolCalls,
+                ]],
+                [[
+                    'role'         => 'tool',
+                    'tool_call_id' => $toolCalls[0]['id'] ?? 'call_1',
+                    'name'         => 'verificar_cliente_erp',
+                    'content'      => json_encode($resultado, JSON_UNESCAPED_UNICODE),
+                ]]
+            );
+
+            $followUp = $this->llamarOpenAI($toolResponseMessages);
+            $reply    = $followUp['choices'][0]['message']['content'] ?? 'Un momento, verificando tus datos 🙌';
+
+            $conversationHistory[] = ['role' => 'assistant', 'content' => $reply];
+            Cache::put($cacheKey, $conversationHistory, now()->addMinutes(45));
+
+            $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_ASSISTANT, $reply, [
+                'tipo' => 'tool_call',
+                'meta' => ['tool' => 'verificar_cliente_erp', 'resultado' => $resultado],
+            ]);
+
+            return $reply;
+        }
+
         // ── Tool call: derivar_a_departamento ─────────────────────────────────
         if ($toolCalls && ($toolCalls[0]['function']['name'] ?? '') === 'derivar_a_departamento') {
             $rawArgs = $toolCalls[0]['function']['arguments'] ?? '{}';
@@ -3562,20 +3643,30 @@ TXT;
                     })->implode(', ');
 
                     $prompt .= "\n\n═══════════════════════════════════════════════════════════════════════════════\n"
-                             . "# 👤 LOOKUP DE CLIENTE EN ERP — REGLA INTELIGENTE\n\n"
-                             . "Este negocio está conectado a un ERP que valida si el cliente existe antes\n"
-                             . "de registrar pedidos. ANTES de confirmar pedido, recopila estos datos:\n"
-                             . "  → {$listaCampos}\n\n"
-                             . "Reglas:\n"
-                             . "1. La CÉDULA es OBLIGATORIA siempre que sea cliente nuevo. Pídela claramente:\n"
-                             . "   '¿Me regalas tu número de cédula? Es para registrarte en el sistema'\n"
-                             . "2. Si el cliente dice que ya compró antes, igual pide la cédula — el sistema\n"
-                             . "   verifica automáticamente y, si está registrada, no le pide nada más.\n"
-                             . "3. NO pidas todos los datos de golpe — uno por uno conversacionalmente.\n"
-                             . "4. Cuando tengas todo, llama `confirmar_pedido` con los datos en orderData:\n"
-                             . "   { customer_name, phone, address, location (ciudad), email, ... }\n"
-                             . "5. El sistema automáticamente verificará si el cliente existe en el ERP\n"
-                             . "   y lo creará si es necesario.\n";
+                             . "# 👤 LOOKUP DE CLIENTE EN ERP — FLUJO OBLIGATORIO\n\n"
+                             . "Este negocio valida cada cliente en su ERP ANTES de registrar pedidos.\n\n"
+                             . "🚦 FLUJO OBLIGATORIO cuando el cliente quiere hacer un pedido:\n\n"
+                             . "PASO 1 — PIDE LA CÉDULA SIEMPRE PRIMERO:\n"
+                             . "   Cliente: 'quiero pedir' / 'qué tienen' / 'quiero X producto'\n"
+                             . "   Tú: 'Antes de armar tu pedido, ¿me regalas tu número de cédula? 🙏'\n"
+                             . "   ⚠️ NO procedas sin la cédula. NO inventes pedidos sin cédula.\n\n"
+                             . "PASO 2 — APENAS TENGAS LA CÉDULA, LLAMA `verificar_cliente_erp`:\n"
+                             . "   Cliente: '1007767612'\n"
+                             . "   Tú: (llama tool) verificar_cliente_erp(cedula='1007767612', telefono='3216499744')\n"
+                             . "   Esta tool busca en TblTerceros del ERP y te dice si existe.\n\n"
+                             . "PASO 3 — SEGÚN EL RESULTADO:\n"
+                             . "   3a) Si existe=true → 'Hola {nombre}! Ya estás registrado.\n"
+                             . "       ¿Qué te llevas hoy?' — sigues con el pedido SIN pedir más datos.\n"
+                             . "   3b) Si existe=false → pides UNO POR UNO los campos_faltantes:\n"
+                             . "       'Para registrarte necesito tu nombre completo'\n"
+                             . "       (espera respuesta)\n"
+                             . "       'Y tu dirección exacta?'\n"
+                             . "       (espera respuesta)\n"
+                             . "       — luego procedes con el pedido normal\n\n"
+                             . "PASO 4 — Cuando tengas el pedido completo, llama `confirmar_pedido`.\n"
+                             . "   El sistema crea el cliente en TblTerceros automáticamente y registra el pedido.\n\n"
+                             . "❌ PROHIBIDO: pedir todos los datos de golpe, confirmar pedido sin cédula,\n"
+                             . "   inventar que el cliente ya está registrado sin haber llamado la tool.\n";
                 }
             }
         } catch (\Throwable $e) {
@@ -3933,6 +4024,54 @@ PROMPT;
                 ],
             ],
         ];
+
+        // 👤 Tool: verificar_cliente_erp — solo si alguna integración tiene cliente_lookup activo
+        $tenantIdLkp = app(\App\Services\TenantManager::class)->id();
+        $integLookup = $tenantIdLkp ? \App\Models\Integracion::where('tenant_id', $tenantIdLkp)
+            ->where('activo', true)
+            ->where('exporta_pedidos', true)
+            ->get()
+            ->first(fn ($i) => $i->config['cliente_lookup']['activo'] ?? false) : null;
+
+        if ($integLookup) {
+            $camposReq = $integLookup->config['cliente_lookup']['campos_requeridos'] ?? [];
+            $listaCampos = collect($camposReq)->map(fn ($c) => match ($c) {
+                'cedula'    => 'cédula',
+                'nombre'    => 'nombre completo',
+                'direccion' => 'dirección',
+                'telefono'  => 'teléfono',
+                'email'     => 'correo',
+                'ciudad'    => 'ciudad',
+                default     => $c,
+            })->implode(', ');
+
+            $tools[] = [
+                'type'     => 'function',
+                'function' => [
+                    'name'        => 'verificar_cliente_erp',
+                    'description' => "Verifica si un cliente ya está registrado en el ERP de este negocio. "
+                        . "DEBES llamar esta función SIEMPRE al INICIO del flujo de pedido, apenas el cliente te dé su cédula. "
+                        . "Retorna: existe (bool), datos del cliente si existe (nombre, dirección, teléfono), "
+                        . "campos_faltantes (lista de datos que debes pedir si NO existe). "
+                        . "Si existe → continúa con el pedido sin pedir más datos personales. "
+                        . "Si NO existe → pide UNO POR UNO los campos: {$listaCampos}, después llama confirmar_pedido normalmente.",
+                    'parameters'  => [
+                        'type'       => 'object',
+                        'properties' => [
+                            'cedula' => [
+                                'type'        => 'string',
+                                'description' => 'Número de cédula o NIT del cliente, sin puntos ni guiones (ej: "1007767612").',
+                            ],
+                            'telefono' => [
+                                'type'        => 'string',
+                                'description' => 'Teléfono del cliente (opcional, si lo conoces). Se usa para buscar también por celular en el ERP.',
+                            ],
+                        ],
+                        'required' => ['cedula'],
+                    ],
+                ],
+            ];
+        }
 
         // Tool: derivar_a_departamento — solo si está activada en config y hay departamentos.
         $deptos = ($config->derivacion_activa ?? true)
