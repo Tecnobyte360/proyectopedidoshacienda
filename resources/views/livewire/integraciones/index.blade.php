@@ -13,7 +13,11 @@
                         <p class="text-sm text-slate-500">Conecta a la BD externa de esta empresa y sincroniza productos o categorías</p>
                     </div>
                 </div>
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 flex-wrap">
+                    <a href="{{ route('integraciones.clientes-erp') }}"
+                       class="inline-flex items-center gap-2 rounded-2xl border-2 border-[#fbe9d7] bg-white hover:bg-brand-soft/40 text-brand-dark font-bold px-5 py-3 transition shadow-sm">
+                        <i class="fa-solid fa-id-card"></i> Clientes ERP
+                    </a>
                     <a href="{{ route('integraciones.exports') }}"
                        class="inline-flex items-center gap-2 rounded-2xl border-2 border-[#fbe9d7] bg-white hover:bg-brand-soft/40 text-brand-dark font-bold px-5 py-3 transition shadow-sm">
                         <i class="fa-solid fa-cloud-arrow-up"></i> Ver exports

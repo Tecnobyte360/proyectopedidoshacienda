@@ -46,6 +46,9 @@ class ClienteErpService
         $colTel   = trim((string) ($cfg['columna_telefono'] ?? ''));
         if ($tabla === '' || $colId === '') return null;
 
+        $resultado = null;
+        $error = null;
+
         try {
             $pdo = $this->sync->conectar($integracion);
 
@@ -54,26 +57,37 @@ class ClienteErpService
                 $stmt = $pdo->prepare("SELECT TOP 1 * FROM {$tabla} WHERE {$colId} = :id");
                 $stmt->execute([':id' => $cedula]);
                 $row = $stmt->fetch(PDO::FETCH_ASSOC);
-                if ($row) return $row;
+                if ($row) $resultado = $row;
             }
 
             // Si no encontró por cédula y hay columna de teléfono configurada
-            if (!empty($telefono) && $colTel !== '') {
+            if (!$resultado && !empty($telefono) && $colTel !== '') {
                 $stmt = $pdo->prepare("SELECT TOP 1 * FROM {$tabla} WHERE {$colTel} = :tel");
                 $stmt->execute([':tel' => $telefono]);
                 $row = $stmt->fetch(PDO::FETCH_ASSOC);
-                if ($row) return $row;
+                if ($row) $resultado = $row;
             }
-
-            return null;
         } catch (\Throwable $e) {
+            $error = $e->getMessage();
             Log::warning('ClienteErpService::buscar falló — ' . $e->getMessage(), [
                 'integracion_id' => $integracion->id,
                 'cedula'         => $cedula,
                 'telefono'       => $telefono,
             ]);
-            return null;
         }
+
+        // Registrar en log para auditoría visual
+        $this->registrarLog($integracion, [
+            'accion'     => 'buscar',
+            'cedula'     => $cedula,
+            'telefono'   => $telefono,
+            'encontrado' => $resultado !== null,
+            'exitoso'    => $error === null,
+            'datos_cliente_erp' => $resultado,
+            'error_mensaje'     => $error,
+        ]);
+
+        return $resultado;
     }
 
     /**
@@ -91,6 +105,9 @@ class ClienteErpService
             Log::warning('ClienteErpService::crear sin mapeo_insert configurado');
             return false;
         }
+
+        $error = null;
+        $exitoso = false;
 
         try {
             $pdo = $this->sync->conectar($integracion);
@@ -110,19 +127,62 @@ class ClienteErpService
 
             $stmt = $pdo->prepare($sql);
             $stmt->execute($params);
+            $exitoso = true;
 
             Log::info('✅ Cliente creado en ERP', [
                 'integracion_id' => $integracion->id,
                 'tabla'          => $tabla,
                 'datos'          => $datos,
             ]);
-            return true;
         } catch (\Throwable $e) {
-            Log::error('❌ Error al crear cliente en ERP: ' . $e->getMessage(), [
+            $error = $e->getMessage();
+            Log::error('❌ Error al crear cliente en ERP: ' . $error, [
                 'integracion_id' => $integracion->id,
                 'datos'          => $datos,
             ]);
-            return false;
+        }
+
+        $this->registrarLog($integracion, [
+            'accion'        => 'crear',
+            'cedula'        => $datos['cedula'] ?? null,
+            'telefono'      => $datos['telefono'] ?? null,
+            'nombre'        => $datos['nombre'] ?? null,
+            'direccion'     => $datos['direccion'] ?? null,
+            'exitoso'       => $exitoso,
+            'error_mensaje' => $error,
+        ]);
+
+        return $exitoso;
+    }
+
+    /**
+     * Registra cada operación de búsqueda/creación de cliente en el ERP
+     * para auditoría visual desde /integraciones/clientes-erp.
+     */
+    private function registrarLog(Integracion $integracion, array $data): void
+    {
+        try {
+            \Illuminate\Support\Facades\DB::table('cliente_erp_lookups')->insert([
+                'tenant_id'         => $integracion->tenant_id,
+                'integracion_id'    => $integracion->id,
+                'pedido_id'         => $data['pedido_id'] ?? null,
+                'accion'            => $data['accion'] ?? 'buscar',
+                'encontrado'        => (bool) ($data['encontrado'] ?? false),
+                'exitoso'           => (bool) ($data['exitoso'] ?? true),
+                'cedula'            => $data['cedula']    ?? null,
+                'telefono'          => $data['telefono']  ?? null,
+                'nombre'            => $data['nombre']    ?? null,
+                'direccion'         => $data['direccion'] ?? null,
+                'datos_cliente_erp' => isset($data['datos_cliente_erp'])
+                    ? json_encode($data['datos_cliente_erp'], JSON_UNESCAPED_UNICODE)
+                    : null,
+                'error_mensaje'     => $data['error_mensaje'] ?? null,
+                'created_at'        => now(),
+                'updated_at'        => now(),
+            ]);
+        } catch (\Throwable $e) {
+            // No es crítico — solo log warning
+            Log::warning('No se pudo registrar cliente_erp_lookup: ' . $e->getMessage());
         }
     }
 
