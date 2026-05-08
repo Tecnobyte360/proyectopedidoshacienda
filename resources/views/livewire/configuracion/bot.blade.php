@@ -25,6 +25,7 @@
                     'despachos'  => ['Despachos / Domiciliarios','fa-motorcycle',      'text-orange-600 bg-orange-50'],
                     'flujo'      => ['Flujo del pedido',        'fa-list-check',       'text-teal-600 bg-teal-50'],
                     'cumple'     => ['Felicitaciones',         'fa-cake-candles',      'text-pink-600 bg-pink-50'],
+                    'mantenimiento' => ['Mantenimiento',       'fa-broom',             'text-slate-700 bg-slate-100'],
                 ];
             @endphp
 
@@ -1807,6 +1808,102 @@
         </section>
 
         {{-- BOTÓN GUARDAR (también en el sidebar) --}}
+        {{-- 🧹 MANTENIMIENTO AUTOMÁTICO --}}
+        <section x-show="tab === 'mantenimiento'" x-cloak class="rounded-2xl bg-white border border-slate-200 p-6 shadow-sm">
+            <div class="flex items-center gap-3 mb-2">
+                <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
+                    <i class="fa-solid fa-broom"></i>
+                </span>
+                <div>
+                    <h3 class="text-xl font-bold text-slate-800">Mantenimiento automático del bot</h3>
+                    <p class="text-sm text-slate-500">Mantiene liviano el historial para evitar que el bot se confunda y para no saturar a OpenAI con tokens innecesarios.</p>
+                </div>
+            </div>
+
+            <div class="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                <p class="font-semibold mb-1"><i class="fa-solid fa-circle-info mr-1"></i> ¿Por qué es importante?</p>
+                <ul class="list-disc pl-5 space-y-1">
+                    <li>Mensajes muy viejos confunden al bot al recordar pedidos antiguos como si fueran actuales.</li>
+                    <li>Conversaciones con cientos de mensajes consumen muchos tokens y disparan errores 429 (rate limit) en OpenAI.</li>
+                    <li>El historial sucio hace que el bot se salte los pasos del flujo de pedido.</li>
+                </ul>
+            </div>
+
+            <div class="mt-6 grid gap-5 md:grid-cols-2">
+                {{-- Toggle activa --}}
+                <div class="md:col-span-2">
+                    <label class="flex items-start gap-3 cursor-pointer rounded-xl border-2 p-4 transition {{ $auto_limpieza_activa ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 hover:bg-slate-50' }}">
+                        <input type="checkbox" wire:model.live="auto_limpieza_activa" class="mt-1 h-5 w-5 rounded text-emerald-600">
+                        <div class="flex-1">
+                            <div class="font-semibold text-slate-800">
+                                <i class="fa-solid fa-power-off mr-1"></i> Activar limpieza automática diaria
+                            </div>
+                            <p class="text-xs text-slate-600 mt-0.5">
+                                Si está activo, todos los días a la hora configurada se borran mensajes viejos y se trim el historial de cada conversación.
+                            </p>
+                        </div>
+                    </label>
+                </div>
+
+                {{-- Hora --}}
+                <div>
+                    <label class="text-xs font-semibold text-slate-700 mb-1 block uppercase tracking-wide">
+                        <i class="fa-solid fa-clock mr-1"></i> Hora de limpieza diaria
+                    </label>
+                    <input type="time" wire:model="auto_limpieza_hora"
+                           class="w-full rounded-xl border-slate-300 focus:border-brand focus:ring-brand">
+                    <p class="text-xs text-slate-500 mt-1">Hora local de Bogotá. Recomendado: madrugada (03:30).</p>
+                </div>
+
+                {{-- Días --}}
+                <div>
+                    <label class="text-xs font-semibold text-slate-700 mb-1 block uppercase tracking-wide">
+                        <i class="fa-solid fa-calendar-xmark mr-1"></i> Borrar mensajes más viejos que (días)
+                    </label>
+                    <input type="number" min="1" max="365" wire:model="auto_limpieza_dias"
+                           class="w-full rounded-xl border-slate-300 focus:border-brand focus:ring-brand">
+                    <p class="text-xs text-slate-500 mt-1">Recomendado: 7 días. Mensajes anteriores se borran sin importar la conversación.</p>
+                </div>
+
+                {{-- Máximo por conversación --}}
+                <div>
+                    <label class="text-xs font-semibold text-slate-700 mb-1 block uppercase tracking-wide">
+                        <i class="fa-solid fa-scissors mr-1"></i> Máximo de mensajes por conversación
+                    </label>
+                    <input type="number" min="10" max="5000" wire:model="auto_limpieza_max_msgs"
+                           class="w-full rounded-xl border-slate-300 focus:border-brand focus:ring-brand">
+                    <p class="text-xs text-slate-500 mt-1">Si una conversación pasa este número, se conservan solo los más recientes. Recomendado: 100.</p>
+                </div>
+
+                {{-- Reset por inactividad --}}
+                <div>
+                    <label class="text-xs font-semibold text-slate-700 mb-1 block uppercase tracking-wide">
+                        <i class="fa-solid fa-rotate-left mr-1"></i> Reset por saludo tras inactividad (horas)
+                    </label>
+                    <input type="number" min="0" max="168" wire:model="auto_reset_horas_inactividad"
+                           class="w-full rounded-xl border-slate-300 focus:border-brand focus:ring-brand">
+                    <p class="text-xs text-slate-500 mt-1">
+                        Si el cliente saluda y han pasado N horas sin actividad, el bot ignora el historial viejo
+                        y empieza una conversación limpia. Recomendado: 3. (0 = desactivado).
+                    </p>
+                </div>
+            </div>
+
+            {{-- Ejecución manual --}}
+            <div class="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <p class="text-sm font-semibold text-slate-700 mb-2">
+                    <i class="fa-solid fa-terminal mr-1"></i> ¿Quieres ejecutarla ahora mismo?
+                </p>
+                <p class="text-xs text-slate-600 mb-2">Desde el servidor / contenedor:</p>
+                <code class="block bg-slate-900 text-emerald-300 text-xs rounded-lg p-3 font-mono">
+                    php artisan bot:limpiar-historial
+                </code>
+                <p class="text-xs text-slate-500 mt-2">
+                    Agrega <code class="text-slate-700">--dry</code> para simular sin borrar.
+                </p>
+            </div>
+        </section>
+
         <div class="flex justify-end pt-4">
             <button type="submit"
                     class="rounded-2xl bg-brand px-8 py-3 text-white font-bold shadow hover:bg-brand-dark transition">

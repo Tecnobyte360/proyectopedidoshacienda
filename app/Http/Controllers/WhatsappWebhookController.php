@@ -2566,10 +2566,15 @@ TXT;
 
       $horasInactividad = $ultimoMsg->created_at->diffInHours(now());
 
-      if ($horasInactividad >= 3) {
+      // Umbral configurable desde /configuracion-bot → Mantenimiento.
+      // 0 desactiva el auto-reset.
+      $horasMin = (int) (\App\Models\ConfiguracionBot::actual()?->auto_reset_horas_inactividad ?? 3);
+
+      if ($horasMin > 0 && $horasInactividad >= $horasMin) {
           \Log::info('🧹 AUTO-RESET activado por saludo + inactividad', [
               'conversacion_id' => $conversacion->id,
               'horas_inactivo'  => $horasInactividad,
+              'umbral_horas'    => $horasMin,
               'mensaje'         => $mensajeActual,
           ]);
           // Devolver historial vacío → bot empieza fresco

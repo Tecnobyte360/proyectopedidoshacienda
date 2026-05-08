@@ -18,17 +18,32 @@ use Illuminate\Support\Facades\Log;
 class BotLimpiarHistorial extends Command
 {
     protected $signature = 'bot:limpiar-historial
-                          {--dias=7 : Borrar mensajes más viejos que N días}
-                          {--max-msgs-por-conv=100 : Mantener máximo N mensajes recientes por conversación}
+                          {--dias= : Borrar mensajes más viejos que N días (default: config)}
+                          {--max-msgs-por-conv= : Mantener máximo N mensajes (default: config)}
                           {--dry : Solo simular sin borrar}';
 
     protected $description = 'Limpia mensajes WhatsApp viejos para mantener el historial liviano';
 
     public function handle(): int
     {
-        $dias        = (int) $this->option('dias');
-        $maxPorConv  = (int) $this->option('max-msgs-por-conv');
-        $dry         = (bool) $this->option('dry');
+        // Si no se pasan opciones, leer de la configuración del bot
+        $config = \App\Models\ConfiguracionBot::actual();
+
+        $dias = $this->option('dias') !== null
+            ? (int) $this->option('dias')
+            : (int) ($config?->auto_limpieza_dias ?? 7);
+
+        $maxPorConv = $this->option('max-msgs-por-conv') !== null
+            ? (int) $this->option('max-msgs-por-conv')
+            : (int) ($config?->auto_limpieza_max_msgs ?? 100);
+
+        $dry = (bool) $this->option('dry');
+
+        // Si está desactivada la limpieza, salir sin hacer nada
+        if (!$dry && $config && !$config->auto_limpieza_activa) {
+            $this->info("⏸️ Auto-limpieza está DESACTIVADA en /configuracion-bot. Saltando.");
+            return self::SUCCESS;
+        }
 
         $this->info("🧹 Limpieza de historial WhatsApp" . ($dry ? ' (DRY-RUN)' : ''));
         $this->info("   • Borrar mensajes >$dias días");

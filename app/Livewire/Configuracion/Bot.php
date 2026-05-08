@@ -133,6 +133,13 @@ class Bot extends Component
     public string $criterio_asignacion       = 'balanceado';
     public string $asignar_en_estado         = 'en_preparacion';
 
+    // 🧹 Mantenimiento automático del historial
+    public bool   $auto_limpieza_activa          = true;
+    public string $auto_limpieza_hora            = '03:30';
+    public int    $auto_limpieza_dias            = 7;
+    public int    $auto_limpieza_max_msgs        = 100;
+    public int    $auto_reset_horas_inactividad  = 3;
+
     // Editor de prompt por bloques
     public bool  $vistaPorBloques = true;
     public array $bloquesPrompt   = [];   // [{titulo, contenido}]
@@ -247,6 +254,13 @@ class Bot extends Component
         $this->auto_asignar_domiciliario = (bool) ($cfg->auto_asignar_domiciliario ?? false);
         $this->criterio_asignacion       = (string) ($cfg->criterio_asignacion ?: 'balanceado');
         $this->asignar_en_estado         = (string) ($cfg->asignar_en_estado ?: 'en_preparacion');
+
+        // 🧹 Mantenimiento automático
+        $this->auto_limpieza_activa         = (bool) ($cfg->auto_limpieza_activa ?? true);
+        $this->auto_limpieza_hora           = (string) ($cfg->auto_limpieza_hora ?: '03:30');
+        $this->auto_limpieza_dias           = (int) ($cfg->auto_limpieza_dias ?? 7);
+        $this->auto_limpieza_max_msgs       = (int) ($cfg->auto_limpieza_max_msgs ?? 100);
+        $this->auto_reset_horas_inactividad = (int) ($cfg->auto_reset_horas_inactividad ?? 3);
 
         // Parsear el system_prompt en bloques editables
         $this->bloquesPrompt = $this->parsearBloques($this->system_prompt);
@@ -729,6 +743,11 @@ class Bot extends Component
             'auto_asignar_domiciliario'             => 'boolean',
             'criterio_asignacion'                   => 'nullable|in:balanceado,cercania,rotacion',
             'asignar_en_estado'                     => 'nullable|in:nuevo,en_preparacion,repartidor_en_camino',
+            'auto_limpieza_activa'                  => 'boolean',
+            'auto_limpieza_hora'                    => 'nullable|string|regex:/^\d{2}:\d{2}$/',
+            'auto_limpieza_dias'                    => 'integer|min:1|max:365',
+            'auto_limpieza_max_msgs'                => 'integer|min:10|max:5000',
+            'auto_reset_horas_inactividad'          => 'integer|min:0|max:168',
         ];
     }
 

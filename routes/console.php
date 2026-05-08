@@ -26,10 +26,20 @@ Schedule::command('tenants:suspender-vencidos')
     ->runInBackground();
 
 // 🧹 Limpieza diaria del historial WhatsApp para evitar bloat que confunda al bot
-// Borra mensajes >7 días y trim conversaciones a max 100 mensajes recientes
+// Hora y parámetros se leen de ConfiguracionBot (UI: /configuracion-bot → Mantenimiento)
 Schedule::command('bot:limpiar-historial')
-    ->dailyAt('03:30')
+    ->everyMinute()
     ->timezone('America/Bogota')
+    ->when(function () {
+        try {
+            $config = ConfiguracionBot::actual();
+            if (!$config?->auto_limpieza_activa) return false;
+            $hora = trim($config->auto_limpieza_hora ?: '03:30');
+            return now('America/Bogota')->format('H:i') === $hora;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    })
     ->withoutOverlapping()
     ->runInBackground();
 
