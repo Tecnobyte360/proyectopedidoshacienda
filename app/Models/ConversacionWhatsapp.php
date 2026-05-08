@@ -98,6 +98,11 @@ class ConversacionWhatsapp extends Model
      * Devuelve los últimos N mensajes en orden cronológico (user/assistant)
      * formateados para inyectar al prompt de OpenAI.
      *
+     * 🛡️ AISLAMIENTO POR DÍA: solo se envían a la IA mensajes de HOY
+     * (zona horaria America/Bogota). Mensajes de días anteriores quedan en BD
+     * intactos para auditoría / reclamos / análisis, pero NO contaminan el
+     * contexto del bot. Así el bot no se confunde con pedidos viejos.
+     *
      * IMPORTANTE: trunca cada mensaje a 2000 chars y todo el bloque a 30k chars
      * MAX para evitar requests gigantes a OpenAI (rate_limit_exceeded).
      */
@@ -106,9 +111,22 @@ class ConversacionWhatsapp extends Model
         $maxBloque = 30000; // 30k chars total max (~7.5k tokens)
         $maxMsg    = 2000;  // cada mensaje truncado a 2k chars
 
-        $mensajes = MensajeWhatsapp::query()
+        $query = MensajeWhatsapp::query()
             ->where('conversacion_id', $this->id)
-            ->whereIn('rol', ['user', 'assistant'])
+            ->whereIn('rol', ['user', 'assistant']);
+
+        // 🛡️ Si está activo el aislamiento por día, filtrar a HOY (Bogotá)
+        try {
+            $cfg = ConfiguracionBot::actual();
+            if ($cfg && (bool) ($cfg->aislar_contexto_por_dia ?? true)) {
+                $inicioHoyUtc = \Carbon\Carbon::now('America/Bogota')->startOfDay()->utc();
+                $query->where('created_at', '>=', $inicioHoyUtc);
+            }
+        } catch (\Throwable $e) {
+            // En caso de error de config, fallback a comportamiento clásico
+        }
+
+        $mensajes = $query
             ->orderByDesc('id')
             ->limit($cantidad)
             ->get()

@@ -1830,13 +1830,31 @@
             </div>
 
             <div class="mt-6 grid gap-5 md:grid-cols-2">
+                {{-- 🛡️ Aislamiento por día (LO MÁS IMPORTANTE) --}}
+                <div class="md:col-span-2">
+                    <label class="flex items-start gap-3 cursor-pointer rounded-xl border-2 p-4 transition {{ $aislar_contexto_por_dia ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:bg-slate-50' }}">
+                        <input type="checkbox" wire:model.live="aislar_contexto_por_dia" class="mt-1 h-5 w-5 rounded text-blue-600">
+                        <div class="flex-1">
+                            <div class="font-semibold text-slate-800">
+                                <i class="fa-solid fa-shield-halved mr-1 text-blue-600"></i> Aislar contexto por día (recomendado)
+                            </div>
+                            <p class="text-xs text-slate-600 mt-0.5">
+                                A la IA solo se le envían los mensajes de <strong>HOY</strong> (zona Bogotá).
+                                El historial completo se conserva en BD para auditoría y reclamos —
+                                solo se filtra <em>lo que ve el bot</em>. Así nunca se confunde con pedidos viejos
+                                aunque tengas conversaciones de meses.
+                            </p>
+                        </div>
+                    </label>
+                </div>
+
                 {{-- Toggle activa --}}
                 <div class="md:col-span-2">
                     <label class="flex items-start gap-3 cursor-pointer rounded-xl border-2 p-4 transition {{ $auto_limpieza_activa ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 hover:bg-slate-50' }}">
                         <input type="checkbox" wire:model.live="auto_limpieza_activa" class="mt-1 h-5 w-5 rounded text-emerald-600">
                         <div class="flex-1">
                             <div class="font-semibold text-slate-800">
-                                <i class="fa-solid fa-power-off mr-1"></i> Activar limpieza automática diaria
+                                <i class="fa-solid fa-power-off mr-1"></i> Activar limpieza automática diaria (opcional)
                             </div>
                             <p class="text-xs text-slate-600 mt-0.5">
                                 Si está activo, todos los días a la hora configurada se borran mensajes viejos y se trim el historial de cada conversación.

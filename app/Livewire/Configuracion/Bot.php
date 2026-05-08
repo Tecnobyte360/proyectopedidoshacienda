@@ -139,6 +139,7 @@ class Bot extends Component
     public int    $auto_limpieza_dias            = 7;
     public int    $auto_limpieza_max_msgs        = 100;
     public int    $auto_reset_horas_inactividad  = 3;
+    public bool   $aislar_contexto_por_dia       = true;
 
     // Editor de prompt por bloques
     public bool  $vistaPorBloques = true;
@@ -261,6 +262,7 @@ class Bot extends Component
         $this->auto_limpieza_dias           = (int) ($cfg->auto_limpieza_dias ?? 7);
         $this->auto_limpieza_max_msgs       = (int) ($cfg->auto_limpieza_max_msgs ?? 100);
         $this->auto_reset_horas_inactividad = (int) ($cfg->auto_reset_horas_inactividad ?? 3);
+        $this->aislar_contexto_por_dia      = (bool) ($cfg->aislar_contexto_por_dia ?? true);
 
         // Parsear el system_prompt en bloques editables
         $this->bloquesPrompt = $this->parsearBloques($this->system_prompt);
@@ -748,6 +750,7 @@ class Bot extends Component
             'auto_limpieza_dias'                    => 'integer|min:1|max:365',
             'auto_limpieza_max_msgs'                => 'integer|min:10|max:5000',
             'auto_reset_horas_inactividad'          => 'integer|min:0|max:168',
+            'aislar_contexto_por_dia'               => 'boolean',
         ];
     }
 
