@@ -2525,6 +2525,33 @@ TXT;
   }
 
   /**
+   * Busca la cédula del cliente actual (de la conversación que se está
+   * procesando). Lee del teléfono guardado en orderData o del context.
+   */
+  private function cedulaCienteActual(array $orderData): ?string
+  {
+      try {
+          $tel = trim((string) ($orderData['phone'] ?? ''));
+          if ($tel === '') return null;
+
+          $telNorm = preg_replace('/\D+/', '', $tel);
+          $tenantId = app(\App\Services\TenantManager::class)->id();
+          if (!$tenantId) return null;
+
+          $cliente = \App\Models\Cliente::where('tenant_id', $tenantId)
+              ->where(function ($q) use ($telNorm, $tel) {
+                  $q->where('telefono_normalizado', $telNorm)
+                    ->orWhere('telefono', $tel);
+              })
+              ->first();
+
+          return !empty($cliente?->cedula) ? (string) $cliente->cedula : null;
+      } catch (\Throwable $e) {
+          return null;
+      }
+  }
+
+  /**
    * 🛡️ VALIDACIÓN DETERMINISTA: revisa el orderData del bot contra el flujo
    * configurado en flujo_pedido_orden + lookup ERP.
    *
@@ -2569,9 +2596,13 @@ TXT;
               }
           }
 
+          // Si el cliente local YA tiene cédula registrada, NO se la exigimos
+          // al bot — la inyectamos automáticamente desde BD al confirmar.
+          $cedulaExistente = $this->cedulaCienteActual($orderData);
+
           // Mapeo campo → función validación + label
           $validadores = [
-              'cedula'    => ['cédula',          fn ($d) => !empty(trim((string) ($d['cedula'] ?? $d['document_id'] ?? '')))],
+              'cedula'    => ['cédula',          fn ($d) => !empty(trim((string) ($d['cedula'] ?? $d['document_id'] ?? ''))) || !empty($cedulaExistente)],
               'nombre'    => ['nombre completo', fn ($d) => !empty(trim((string) ($d['customer_name'] ?? '')))],
               'producto'  => ['producto y cantidad', fn ($d) => !empty($d['products'] ?? [])],
               'direccion' => ['dirección',       fn ($d) => !empty(trim((string) ($d['address'] ?? '')))
@@ -3503,6 +3534,12 @@ TXT;
             $datosClienteActualizar['cedula'] = $cedulaNueva;
         }
 
+        // 🔄 Si el bot NO pasó cédula pero el cliente local SÍ la tiene,
+        // usar la guardada para que llegue al ERP (no perder la asociación).
+        if ($cedulaNueva === '' && !empty($cliente->cedula)) {
+            $orderData['cedula'] = (string) $cliente->cedula;
+        }
+
         // 📧 Guardar correo si vino en el orderData
         $correoNuevo = trim((string) ($orderData['email'] ?? $orderData['correo'] ?? ''));
         if ($correoNuevo !== '' && filter_var($correoNuevo, FILTER_VALIDATE_EMAIL) && empty($cliente->correo)) {
@@ -3999,9 +4036,36 @@ TXT;
                     ->contains(fn ($i) => $i->config['cliente_lookup']['activo'] ?? false);
 
                 if ($integLookupActivo) {
-                    $prompt .= "\n\n🪪 ANTES de llamar `confirmar_pedido`, pide la CÉDULA del cliente "
-                             . "y pásala en orderData['cedula']. Es OBLIGATORIA — sin ella no se "
-                             . "puede registrar en el sistema.\n";
+                    // Cargar el cliente del teléfono actual (si lo conocemos)
+                    $clienteActual = null;
+                    try {
+                        $telActual = isset($telefonoFrom) ? $telefonoFrom : ($from ?? null);
+                        if ($telActual) {
+                            $telNorm = preg_replace('/\D+/', '', (string) $telActual);
+                            $clienteActual = \App\Models\Cliente::where('tenant_id', $tenantIdLookup)
+                                ->where(function ($q) use ($telNorm, $telActual) {
+                                    $q->where('telefono_normalizado', $telNorm)
+                                      ->orWhere('telefono', $telActual);
+                                })
+                                ->first();
+                        }
+                    } catch (\Throwable $e) { /* ignorar */ }
+
+                    if ($clienteActual && !empty($clienteActual->cedula)) {
+                        // Cliente YA tiene cédula registrada → no pedirla
+                        $prompt .= "\n\n🪪 CLIENTE YA REGISTRADO:\n"
+                                 . "- Cédula del cliente: {$clienteActual->cedula}\n"
+                                 . "- Nombre: " . ($clienteActual->nombre ?? '—') . "\n"
+                                 . "- NO le pidas la cédula otra vez — ya la tienes.\n"
+                                 . "- Pásala automáticamente en orderData['cedula'] cuando llames confirmar_pedido.\n";
+                    } else {
+                        // Cliente NO tiene cédula → pedírsela
+                        $prompt .= "\n\n🪪 CÉDULA REQUERIDA (cliente nuevo):\n"
+                                 . "- Este cliente NO tiene cédula registrada todavía.\n"
+                                 . "- Antes de confirmar pedido, pídela: '¿Me regalas tu número de cédula? "
+                                 . "Es para registrarte en el sistema.'\n"
+                                 . "- Cuando el cliente la dé, pásala en orderData['cedula'] al llamar confirmar_pedido.\n";
+                    }
                 }
             }
         } catch (\Throwable $e) { /* ignorar */ }
