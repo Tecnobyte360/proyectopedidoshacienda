@@ -109,7 +109,7 @@ class BotLimpiarHistorial extends Command
         // 5. Resumen
         $this->newLine();
         $totalActual = DB::table('mensajes_whatsapp')->count();
-        $bytesActual = DB::selectOne("SELECT SUM(LENGTH(contenido) + COALESCE(LENGTH(metadata),0)) as b FROM mensajes_whatsapp")?->b ?? 0;
+        $bytesActual = DB::selectOne("SELECT SUM(LENGTH(contenido) + COALESCE(LENGTH(meta),0)) as b FROM mensajes_whatsapp")?->b ?? 0;
         $this->line("📦 Total ahora: {$totalActual} mensajes (" . round($bytesActual / 1024) . " KB)");
 
         Log::info('🧹 bot:limpiar-historial ejecutado', [

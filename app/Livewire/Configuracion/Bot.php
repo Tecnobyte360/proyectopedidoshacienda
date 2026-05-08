@@ -860,6 +860,48 @@ class Bot extends Component
         }
     }
 
+    /**
+     * Ejecuta el comando bot:limpiar-historial desde la UI.
+     * Si $dry = true, solo simula sin borrar.
+     */
+    public function ejecutarLimpiezaAhora(bool $dry = false): void
+    {
+        try {
+            $exitCode = \Illuminate\Support\Facades\Artisan::call('bot:limpiar-historial', [
+                '--dias'                => $this->auto_limpieza_dias,
+                '--max-msgs-por-conv'   => $this->auto_limpieza_max_msgs,
+                '--dry'                 => $dry,
+            ]);
+
+            $output = \Illuminate\Support\Facades\Artisan::output();
+
+            if ($exitCode === 0) {
+                $this->dispatch('notify', [
+                    'type'    => 'success',
+                    'message' => $dry
+                        ? '🔍 Simulación completada. Revisa los logs para ver qué se borraría.'
+                        : '✅ Limpieza ejecutada correctamente.',
+                ]);
+
+                \Log::info('🧹 Limpieza manual desde UI', [
+                    'dry'    => $dry,
+                    'output' => $output,
+                ]);
+            } else {
+                $this->dispatch('notify', [
+                    'type'    => 'error',
+                    'message' => '❌ El comando falló (exit code ' . $exitCode . '). Revisa los logs.',
+                ]);
+            }
+        } catch (\Throwable $e) {
+            \Log::error('Error ejecutando limpieza desde UI', ['error' => $e->getMessage()]);
+            $this->dispatch('notify', [
+                'type'    => 'error',
+                'message' => '❌ Error: ' . $e->getMessage(),
+            ]);
+        }
+    }
+
     public function guardar(): void
     {
         // Si está en vista por bloques, regenerar el system_prompt antes de validar

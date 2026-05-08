@@ -1907,17 +1907,47 @@
                 </div>
             </div>
 
-            {{-- Ejecución manual --}}
+            {{-- Ejecución manual desde la UI --}}
             <div class="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <p class="text-sm font-semibold text-slate-700 mb-2">
-                    <i class="fa-solid fa-terminal mr-1"></i> ¿Quieres ejecutarla ahora mismo?
+                <p class="text-sm font-semibold text-slate-700 mb-1">
+                    <i class="fa-solid fa-bolt mr-1 text-amber-500"></i> Ejecutar limpieza ahora mismo
                 </p>
-                <p class="text-xs text-slate-600 mb-2">Desde el servidor / contenedor:</p>
-                <code class="block bg-slate-900 text-emerald-300 text-xs rounded-lg p-3 font-mono">
-                    php artisan bot:limpiar-historial
-                </code>
-                <p class="text-xs text-slate-500 mt-2">
-                    Agrega <code class="text-slate-700">--dry</code> para simular sin borrar.
+                <p class="text-xs text-slate-600 mb-3">
+                    Aplica los valores de arriba <strong>(días: {{ $auto_limpieza_dias }}, máx: {{ $auto_limpieza_max_msgs }})</strong>.
+                    Recomendado: probar primero en modo simulación.
+                </p>
+
+                <div class="flex flex-wrap gap-2">
+                    <button type="button"
+                            wire:click="ejecutarLimpiezaAhora(true)"
+                            wire:loading.attr="disabled"
+                            wire:target="ejecutarLimpiezaAhora"
+                            class="inline-flex items-center gap-2 rounded-xl bg-slate-700 hover:bg-slate-800 text-white font-semibold text-sm px-4 py-2 shadow transition disabled:opacity-50">
+                        <i class="fa-solid fa-eye"></i>
+                        <span>Simular (DRY-RUN)</span>
+                        <span wire:loading wire:target="ejecutarLimpiezaAhora(true)">
+                            <i class="fa-solid fa-spinner fa-spin"></i>
+                        </span>
+                    </button>
+
+                    <button type="button"
+                            wire:click="ejecutarLimpiezaAhora(false)"
+                            wire:loading.attr="disabled"
+                            wire:target="ejecutarLimpiezaAhora"
+                            wire:confirm="⚠️ Esto BORRARÁ mensajes del historial según la configuración. ¿Continuar?"
+                            class="inline-flex items-center gap-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-semibold text-sm px-4 py-2 shadow transition disabled:opacity-50">
+                        <i class="fa-solid fa-broom"></i>
+                        <span>Ejecutar limpieza ahora</span>
+                        <span wire:loading wire:target="ejecutarLimpiezaAhora(false)">
+                            <i class="fa-solid fa-spinner fa-spin"></i>
+                        </span>
+                    </button>
+                </div>
+
+                <p class="text-xs text-slate-500 mt-3">
+                    <i class="fa-solid fa-circle-info mr-1"></i>
+                    Si tienes activado <strong>"Aislar contexto por día"</strong> arriba, el bot ya está
+                    protegido sin necesidad de borrar nada. Esta limpieza solo libera espacio en BD.
                 </p>
             </div>
         </section>
