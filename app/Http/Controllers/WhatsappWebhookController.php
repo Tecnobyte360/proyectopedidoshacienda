@@ -727,8 +727,14 @@ class WhatsappWebhookController extends Controller
             $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_USER, $message);
         }
 
-        // ── HISTORIAL: leer de BD (últimos 20 mensajes user/assistant) ───────
-        $conversationHistory = $conversacion->fresh()->historialParaIA(20);
+        // ── HISTORIAL: reducido a últimos 10 (en vez de 20) para evitar
+        // que historial viejo confunda al bot. 10 = ~5 turnos = suficiente.
+        $conversationHistory = $conversacion->fresh()->historialParaIA(10);
+
+        // ⏰ AUTO-RESET: si el cliente saluda Y la última actividad fue
+        // hace más de 3 horas, reseteamos el historial. Esto evita que
+        // pedidos viejos se mezclen con conversaciones nuevas.
+        $conversationHistory = $this->autoResetSiSaludoLargoTiempo($conversacion, $message, $conversationHistory);
 
         // Usar el nombre del cliente guardado si está mejor que el de WhatsApp
         $nombreParaPrompt = $cliente->nombre !== 'Cliente' ? $cliente->nombre : $name;
@@ -2522,6 +2528,55 @@ TXT;
           if (preg_match($p, $reply)) return true;
       }
       return false;
+  }
+
+  /**
+   * 🧹 AUTO-RESET inteligente: si el cliente saluda Y han pasado más de
+   * 3 horas desde su último mensaje, asume que es una conversación NUEVA
+   * y descarta el historial viejo (que podría confundir al LLM con
+   * pedidos pasados).
+   *
+   * Esto evita que el bot diga "tu pedido queda listo" basándose en
+   * conversaciones de hace días/semanas.
+   */
+  private function autoResetSiSaludoLargoTiempo($conversacion, string $mensajeActual, array $historial): array
+  {
+      // Si el historial está vacío, no hay nada que resetear
+      if (empty($historial)) return $historial;
+
+      $msgNormalizado = mb_strtolower(trim($mensajeActual));
+      $msgNormalizado = strtr($msgNormalizado, ['á'=>'a','é'=>'e','í'=>'i','ó'=>'o','ú'=>'u','ñ'=>'n']);
+
+      // Detectar saludos puros (no "hola quiero pedir")
+      $esSaludoPuro = preg_match(
+          '/^\s*(hola|holaa+|buenas|buenos dias|buenas tardes|buenas noches|hi|hey|que tal|que mas|saludos|buen dia|buenos d[ií]as)\s*[\.!?]*\s*$/i',
+          $msgNormalizado
+      );
+
+      if (!$esSaludoPuro) return $historial;
+
+      // ¿Cuándo fue el último mensaje?
+      $ultimoMsg = \App\Models\MensajeWhatsapp::where('conversacion_id', $conversacion->id)
+          ->where('rol', \App\Models\MensajeWhatsapp::ROL_USER)
+          ->orderByDesc('id')
+          ->skip(1) // saltar el mensaje actual que se acaba de guardar
+          ->first();
+
+      if (!$ultimoMsg) return $historial;
+
+      $horasInactividad = $ultimoMsg->created_at->diffInHours(now());
+
+      if ($horasInactividad >= 3) {
+          \Log::info('🧹 AUTO-RESET activado por saludo + inactividad', [
+              'conversacion_id' => $conversacion->id,
+              'horas_inactivo'  => $horasInactividad,
+              'mensaje'         => $mensajeActual,
+          ]);
+          // Devolver historial vacío → bot empieza fresco
+          return [];
+      }
+
+      return $historial;
   }
 
   /**

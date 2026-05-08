@@ -25,6 +25,14 @@ Schedule::command('tenants:suspender-vencidos')
     ->withoutOverlapping()
     ->runInBackground();
 
+// 🧹 Limpieza diaria del historial WhatsApp para evitar bloat que confunda al bot
+// Borra mensajes >7 días y trim conversaciones a max 100 mensajes recientes
+Schedule::command('bot:limpiar-historial')
+    ->dailyAt('03:30')
+    ->timezone('America/Bogota')
+    ->withoutOverlapping()
+    ->runInBackground();
+
 // 📨 Procesar campañas WhatsApp en lotes con throttle anti-baneo
 Schedule::command('campanas:procesar')
     ->everyMinute()
