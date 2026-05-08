@@ -1238,6 +1238,17 @@ TXT;
             $reply    = $followUp['choices'][0]['message']['content']
                 ?? ($resultado['mensaje_sugerido'] ?? 'Déjame verificar tu dirección un momento 🙌');
 
+            // 🛡️ Guard: el bot suele decir "Genial te despachamos" después de
+            // validar_cobertura sin haber llamado confirmar_pedido. Si lo hace,
+            // forzamos el retry con tool_choice.
+            $replyConGuard = $this->aplicarGuardFalsaConfirmacion(
+                $reply, $toolResponseMessages, $from, $name, $conversationHistory,
+                $cacheKey, $connectionId, $conversacion, $convService, 'validar_cobertura'
+            );
+            if ($replyConGuard !== $reply) {
+                return $replyConGuard;
+            }
+
             $conversationHistory[] = ['role' => 'assistant', 'content' => $reply];
             Cache::put($cacheKey, $conversationHistory, now()->addMinutes(45));
 
@@ -1318,6 +1329,17 @@ TXT;
 
             $followUp = $this->llamarOpenAI($toolResponseMessages);
             $reply    = $followUp['choices'][0]['message']['content'] ?? 'Un momento, verificando tus datos 🙌';
+
+            // 🛡️ Guard: si el cliente existe en ERP, el bot debería pasar de
+            // verificar_cliente_erp → confirmar_pedido directamente. A veces
+            // intenta cerrar con frase tipo "queda listo". Forzamos retry.
+            $replyConGuard = $this->aplicarGuardFalsaConfirmacion(
+                $reply, $toolResponseMessages, $from, $name, $conversationHistory,
+                $cacheKey, $connectionId, $conversacion, $convService, 'verificar_cliente_erp'
+            );
+            if ($replyConGuard !== $reply) {
+                return $replyConGuard;
+            }
 
             $conversationHistory[] = ['role' => 'assistant', 'content' => $reply];
             Cache::put($cacheKey, $conversationHistory, now()->addMinutes(45));
@@ -1580,33 +1602,15 @@ TXT;
         // Si el bot dice "pedido registrado / confirmado / va en camino"
         // pero NO llamó a confirmar_pedido → es una mentira. Registramos
         // alerta operativa para que el admin lo vea y corrijamos el prompt.
-        $fraseFalsaConfirmacion = $this->detectarFalsaConfirmacion($reply);
-        if ($fraseFalsaConfirmacion) {
-            Log::warning('⚠️ ALUCINACIÓN: Bot dijo que confirmó pero NO llamó la función', [
-                'from'  => $from,
-                'frase' => $fraseFalsaConfirmacion,
-                'reply' => mb_substr($reply, 0, 300),
-            ]);
-
-            try {
-                app(\App\Services\BotAlertaService::class)->registrar(
-                    \App\Models\BotAlerta::TIPO_OTRO,
-                    '🤥 Bot dijo que confirmó un pedido pero NO lo hizo',
-                    "El bot respondió \"{$fraseFalsaConfirmacion}\" al cliente {$from} "
-                        . "pero NO invocó la función confirmar_pedido. El pedido NO está registrado en BD. "
-                        . "Revisa /chat para ver la conversación y completarlo manualmente si es necesario.",
-                    \App\Models\BotAlerta::SEV_WARNING,
-                    null,
-                    [
-                        'from'         => $from,
-                        'frase'        => $fraseFalsaConfirmacion,
-                        'reply'        => mb_substr($reply, 0, 500),
-                        'conversacion_id' => $conversacion->id,
-                    ]
-                );
-            } catch (\Throwable $e) {
-                Log::warning('No se pudo registrar alerta de falsa confirmación: ' . $e->getMessage());
-            }
+        // 🛡️ Guard: si el bot insinuó que confirmó pero NO llamó la función,
+        // forzar retry con tool_choice = confirmar_pedido.
+        $replyConGuard = $this->aplicarGuardFalsaConfirmacion(
+            $reply, $messages, $from, $name, $conversationHistory,
+            $cacheKey, $connectionId, $conversacion, $convService, 'main'
+        );
+        if ($replyConGuard !== $reply) {
+            // Recovery exitoso (o alerta registrada). Devolver inmediatamente.
+            return $replyConGuard;
         }
 
         $conversationHistory[] = ['role' => 'assistant', 'content' => $reply];
@@ -1624,19 +1628,143 @@ TXT;
      * Detecta si el bot dijo que confirmó/registró un pedido SIN haber llamado
      * la función. Si encuentra la frase, retorna la frase detectada; sino, null.
      */
+    /**
+     * 🛡️ Aplica el guard de "falsa confirmación" sobre $reply.
+     * Si detecta que el bot sugirió que confirmó el pedido SIN haber llamado
+     * confirmar_pedido, fuerza un retry con tool_choice = confirmar_pedido.
+     * Si el retry tiene éxito, retorna el reply nuevo (con pedido creado).
+     * Si falla, registra alerta y retorna el reply original.
+     *
+     * IMPORTANTE: este método ejecuta side effects (guarda pedido en BD,
+     * persiste mensajes, actualiza cache) cuando logra recovery.
+     */
+    private function aplicarGuardFalsaConfirmacion(
+        string $reply,
+        array $messages,
+        string $from,
+        string $name,
+        array &$conversationHistory,
+        string $cacheKey,
+        ?int $connectionId,
+        $conversacion,
+        $convService,
+        string $contextoTool = 'general'
+    ): string {
+        $frase = $this->detectarFalsaConfirmacion($reply);
+        if (!$frase) return $reply;
+
+        Log::warning('⚠️ ALUCINACIÓN detectada — forzando retry confirmar_pedido', [
+            'from'     => $from,
+            'frase'    => $frase,
+            'contexto' => $contextoTool,
+            'reply'    => mb_substr($reply, 0, 300),
+        ]);
+
+        try {
+            $forzarMessages = $messages;
+            $forzarMessages[] = [
+                'role'    => 'system',
+                'content' => "🚨 OBLIGATORIO: el cliente ya tiene los datos suficientes para crear el pedido (productos, sede o dirección, identificación). DEBES invocar la función `confirmar_pedido` AHORA con TODOS los datos recopilados de la conversación. NO respondas en texto plano. TODO pedido — sea para recoger en sede o entrega a domicilio — DEBE pasar por confirmar_pedido. Sin excepción.",
+            ];
+
+            $forzarResponse = $this->llamarOpenAI($forzarMessages, [
+                'type'     => 'function',
+                'function' => ['name' => 'confirmar_pedido'],
+            ]);
+
+            $tc = $forzarResponse['choices'][0]['message']['tool_calls'] ?? null;
+            if ($tc && ($tc[0]['function']['name'] ?? '') === 'confirmar_pedido') {
+                $orderData2 = json_decode($tc[0]['function']['arguments'] ?? '{}', true) ?: [];
+                $orderData2['products'] = array_values(array_filter($orderData2['products'] ?? [], fn ($p) => !empty($p['name'])));
+
+                if (!empty($orderData2['products'])) {
+                    Log::info('✅ Auto-recovery: confirmar_pedido FORZADO exitosamente', [
+                        'from'     => $from,
+                        'productos' => count($orderData2['products']),
+                        'contexto' => $contextoTool,
+                    ]);
+
+                    $faltantes = $this->validarDatosObligatoriosPedido($orderData2);
+                    if (!empty($faltantes)) {
+                        $lista = implode(', ', $faltantes);
+                        $nuevo = "Para registrar tu pedido necesito estos datos: {$lista}. ¿Me los compartes?";
+                        $conversationHistory[] = ['role' => 'assistant', 'content' => $nuevo];
+                        Cache::put($cacheKey, $conversationHistory, now()->addMinutes(45));
+                        $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_ASSISTANT, $nuevo);
+                        return $nuevo;
+                    }
+
+                    return $this->guardarPedidoDesdeToolCall(
+                        $orderData2,
+                        $from,
+                        $name,
+                        $conversationHistory,
+                        $cacheKey,
+                        $connectionId,
+                        $conversacion,
+                        $convService
+                    );
+                }
+            }
+
+            Log::warning('⚠️ Auto-recovery NO logró extraer pedido del retry forzado', ['from' => $from]);
+        } catch (\Throwable $e) {
+            Log::error('❌ Auto-recovery falló: ' . $e->getMessage(), ['from' => $from]);
+        }
+
+        // Recovery falló → registrar alerta operativa
+        try {
+            app(\App\Services\BotAlertaService::class)->registrar(
+                \App\Models\BotAlerta::TIPO_OTRO,
+                '🤥 Bot dijo que confirmó un pedido pero NO lo hizo',
+                "El bot respondió \"{$frase}\" al cliente {$from} en contexto {$contextoTool} "
+                    . "pero NO invocó confirmar_pedido y el auto-recovery falló. "
+                    . "El pedido NO está registrado en BD. Revisa /chat y complétalo manualmente.",
+                \App\Models\BotAlerta::SEV_WARNING,
+                null,
+                ['from' => $from, 'frase' => $frase, 'reply' => mb_substr($reply, 0, 500), 'conversacion_id' => $conversacion->id]
+            );
+        } catch (\Throwable $e) {
+            Log::warning('No se pudo registrar alerta: ' . $e->getMessage());
+        }
+
+        return $reply;
+    }
+
     private function detectarFalsaConfirmacion(string $reply): ?string
     {
         $frases = [
+            // Confirmación explícita
             'pedido quedó registrado',
             'pedido registrado',
             'pedido confirmado',
+            'queda confirmado',
+            'queda registrado',
+            'tu pedido #',
+            'quedó en preparación',
+            'tu pedido quedó listo',
+            // Despacho / domicilio
             'va en camino',
             'salió en camino',
             'sale en camino',
             'lo estamos preparando',
-            'tu pedido #',
-            'quedó en preparación',
-            'tu pedido quedó listo',
+            'te despachamos',
+            'te lo despachamos',
+            'te lo enviamos',
+            'te lo entregamos',
+            'lo enviamos a',
+            'sale para tu casa',
+            // Recoger en sede
+            'lo recogerás',
+            'la recogerás',
+            'puedes recogerlo',
+            'puedes pasar a recoger',
+            'pasa a recoger',
+            'lista tu compra',
+            'listo para recoger',
+            // Cierre genérico
+            'genial, te despachamos',
+            'perfecto, queda',
         ];
 
         $lower = mb_strtolower($reply);
@@ -1947,7 +2075,12 @@ TXT;
         return $resultado;
     }
 
-    private function llamarOpenAI(array $messages): ?array
+    /**
+     * @param array        $messages
+     * @param string|array $toolChoice 'auto' (default), 'none',
+     *                                 o ['type'=>'function','function'=>['name'=>'X']] para forzar
+     */
+    private function llamarOpenAI(array $messages, $toolChoice = 'auto'): ?array
     {
         // 🛡️ PRE-FLIGHT: estimar tokens y recortar si excede el límite seguro.
         // gpt-4o-mini contexto max: 128k. TPM tier 2: 2M. Para evitar rate limits
@@ -1995,7 +2128,7 @@ TXT;
                         'presence_penalty'  => 0.4,
                         'max_tokens'        => (int) ($config->max_tokens ?? 700),
                         'tools'       => $this->getToolsDefinicion(),
-                        'tool_choice' => 'auto',
+                        'tool_choice' => $toolChoice,
                     ]);
 
                 if ($response->successful()) {
@@ -3006,9 +3139,11 @@ TXT;
                       }
                   }
 
-                  $mensajeSugerido = "Genial, te despachamos desde *{$sede->nombre}* (~{$sede->cobertura_tiempo_min} min, {$resultado['distancia_km']} km).";
+                  // ⚠️ Texto neutro: NO insinúa pedido confirmado.
+                  // El bot DEBE llamar confirmar_pedido después.
+                  $mensajeSugerido = "Cobertura OK desde sede *{$sede->nombre}* (a {$resultado['distancia_km']} km, ~{$sede->cobertura_tiempo_min} min). RECUERDA: aún DEBES llamar `confirmar_pedido` para registrarlo.";
                   if ($sedeAlt) {
-                      $mensajeSugerido = "Tu dirección es cercana a otra sede pero está cerrada ahora. Te despachamos desde *{$sede->nombre}* (~{$sede->cobertura_tiempo_min} min).";
+                      $mensajeSugerido = "Sede más cercana cerrada. Cobertura desde *{$sede->nombre}* (~{$sede->cobertura_tiempo_min} min). RECUERDA: aún DEBES llamar `confirmar_pedido` para registrarlo.";
                   }
 
                   return [
