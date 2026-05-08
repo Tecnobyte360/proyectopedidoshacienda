@@ -891,7 +891,25 @@ TXT;
             $conversationHistory
         );
 
-        $response = $this->llamarOpenAI($messages);
+        // 🎯 SHORT-CIRCUIT: si el cliente pidió EXPLÍCITAMENTE generar el pedido,
+        // forzamos al LLM a invocar confirmar_pedido sin pasar por otras tools.
+        $forzarConfirmar = $this->clientePidioGenerarPedido($message);
+        $toolChoiceInicial = $forzarConfirmar
+            ? ['type' => 'function', 'function' => ['name' => 'confirmar_pedido']]
+            : 'auto';
+
+        if ($forzarConfirmar) {
+            Log::info('🎯 Cliente pidió generar pedido — forzando tool_choice=confirmar_pedido', [
+                'from' => $from,
+                'mensaje' => $message,
+            ]);
+            $messages[] = [
+                'role' => 'system',
+                'content' => "🚨 OBLIGATORIO: el cliente acaba de pedir explícitamente que generes/confirmes el pedido. INVOCA `confirmar_pedido` AHORA con TODOS los datos recopilados de la conversación. NO llames otras tools. NO respondas en texto.",
+            ];
+        }
+
+        $response = $this->llamarOpenAI($messages, $toolChoiceInicial);
 
         if (!$response) {
             Cache::put($cacheKey, $conversationHistory, now()->addMinutes(45));
@@ -1217,6 +1235,14 @@ TXT;
             $sedeId    = $this->obtenerSedeIdDesdeConexion($connectionId);
             $resultado = $this->validarCoberturaDireccion($direccion, $barrio, $ciudad, $sedeId, $from);
 
+            // 🛡️ INSTRUCCIÓN INTERNA al LLM (NO al cliente): si cobertura OK,
+            // el siguiente paso DEBE ser confirmar_pedido. Va como system msg
+            // separado, NO dentro del JSON del tool result (porque el LLM
+            // tiende a copiar lo que ve en el JSON).
+            $instruccionInternaPostCobertura = ($resultado['cubierta'] ?? false)
+                ? "🚨 SISTEMA: la cobertura ya quedó validada. Tu siguiente acción OBLIGATORIA es invocar `confirmar_pedido` con todos los datos recopilados. NO repitas la validación de cobertura. NO digas 'te despachamos' en texto. INVOCA LA FUNCIÓN."
+                : "🚨 SISTEMA: cobertura NO disponible en esta dirección. Ofrece al cliente recoger en sede o cambiar de dirección. NO confirmes pedido aún.";
+
             // Respuesta de la tool para OpenAI — formato segunda llamada
             $toolResponseMessages = array_merge(
                 [['role' => 'system', 'content' => $systemPrompt]],
@@ -1231,12 +1257,41 @@ TXT;
                     'tool_call_id' => $toolCalls[0]['id'] ?? 'call_1',
                     'name'         => 'validar_cobertura',
                     'content'      => json_encode($resultado, JSON_UNESCAPED_UNICODE),
-                ]]
+                ]],
+                [['role' => 'system', 'content' => $instruccionInternaPostCobertura]]
             );
 
             $followUp = $this->llamarOpenAI($toolResponseMessages);
             $reply    = $followUp['choices'][0]['message']['content']
                 ?? ($resultado['mensaje_sugerido'] ?? 'Déjame verificar tu dirección un momento 🙌');
+
+            // 🛡️ Si el LLM tras validar_cobertura llamó otra tool (en vez de
+            // responder texto), procesar esa tool en cascada — caso típico:
+            // valida cobertura → confirmar_pedido en el mismo flujo.
+            $followUpToolCalls = $followUp['choices'][0]['message']['tool_calls'] ?? null;
+            if ($followUpToolCalls && ($followUpToolCalls[0]['function']['name'] ?? '') === 'confirmar_pedido') {
+                $orderDataPost = json_decode($followUpToolCalls[0]['function']['arguments'] ?? '{}', true) ?: [];
+                $orderDataPost['products'] = array_values(array_filter($orderDataPost['products'] ?? [], fn ($p) => !empty($p['name'])));
+
+                if (!empty($orderDataPost['products'])) {
+                    Log::info('✅ Cascada: validar_cobertura → confirmar_pedido', ['from' => $from]);
+
+                    $faltantesPost = $this->validarDatosObligatoriosPedido($orderDataPost);
+                    if (!empty($faltantesPost)) {
+                        $listaPost = implode(', ', $faltantesPost);
+                        $replyPost = "Para registrar tu pedido necesito estos datos: {$listaPost}. ¿Me los compartes?";
+                        $conversationHistory[] = ['role' => 'assistant', 'content' => $replyPost];
+                        Cache::put($cacheKey, $conversationHistory, now()->addMinutes(45));
+                        $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_ASSISTANT, $replyPost);
+                        return $replyPost;
+                    }
+
+                    return $this->guardarPedidoDesdeToolCall(
+                        $orderDataPost, $from, $name, $conversationHistory,
+                        $cacheKey, $connectionId, $conversacion, $convService
+                    );
+                }
+            }
 
             // 🛡️ Guard: el bot suele decir "Genial te despachamos" después de
             // validar_cobertura sin haber llamado confirmar_pedido. Si lo hace,
@@ -1729,6 +1784,43 @@ TXT;
         }
 
         return $reply;
+    }
+
+    /**
+     * Detecta si el cliente pidió explícitamente "generar / confirmar el
+     * pedido". En ese caso forzamos tool_choice a confirmar_pedido para
+     * cortar el ciclo de validar_cobertura → texto → validar_cobertura.
+     */
+    private function clientePidioGenerarPedido(string $mensaje): bool
+    {
+        $m = mb_strtolower(trim($mensaje));
+        if ($m === '') return false;
+
+        $patrones = [
+            'genera el pedido',
+            'generar el pedido',
+            'genera mi pedido',
+            'confirma el pedido',
+            'confirma mi pedido',
+            'confirmar pedido',
+            'confirmamos pedido',
+            'hagamos el pedido',
+            'haz el pedido',
+            'crea el pedido',
+            'crear pedido',
+            'registra el pedido',
+            'registra mi pedido',
+            'procede con el pedido',
+            'cierra el pedido',
+            'cerremos el pedido',
+            'finaliza el pedido',
+            'finalizar pedido',
+        ];
+
+        foreach ($patrones as $p) {
+            if (str_contains($m, $p)) return true;
+        }
+        return false;
     }
 
     private function detectarFalsaConfirmacion(string $reply): ?string
@@ -3139,11 +3231,11 @@ TXT;
                       }
                   }
 
-                  // ⚠️ Texto neutro: NO insinúa pedido confirmado.
-                  // El bot DEBE llamar confirmar_pedido después.
-                  $mensajeSugerido = "Cobertura OK desde sede *{$sede->nombre}* (a {$resultado['distancia_km']} km, ~{$sede->cobertura_tiempo_min} min). RECUERDA: aún DEBES llamar `confirmar_pedido` para registrarlo.";
+                  // ⚠️ Texto neutro: NO insinúa pedido confirmado, NO contiene
+                  // instrucciones internas (el bot a veces las copia al cliente).
+                  $mensajeSugerido = "Cobertura confirmada desde *{$sede->nombre}* (a {$resultado['distancia_km']} km, ~{$sede->cobertura_tiempo_min} min).";
                   if ($sedeAlt) {
-                      $mensajeSugerido = "Sede más cercana cerrada. Cobertura desde *{$sede->nombre}* (~{$sede->cobertura_tiempo_min} min). RECUERDA: aún DEBES llamar `confirmar_pedido` para registrarlo.";
+                      $mensajeSugerido = "Atendiendo desde *{$sede->nombre}* (~{$sede->cobertura_tiempo_min} min) — la sede más cercana está cerrada ahora.";
                   }
 
                   return [
