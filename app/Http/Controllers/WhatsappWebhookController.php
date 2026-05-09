@@ -1208,7 +1208,35 @@ TXT;
                                 ->groupBy('promocion_id')
                                 ->map(fn ($rows) => $rows->pluck('sede_id')->all());
 
-                            $payloadPromo = function ($p) {
+                            // 🛒 Cargar productos vinculados a cada promoción (si no aplica a todos)
+                            $productosPorPromo = \DB::table('promocion_producto')
+                                ->whereIn('promocion_id', $promosVigentes->pluck('id'))
+                                ->get(['promocion_id', 'producto_id'])
+                                ->groupBy('promocion_id');
+
+                            $idsProductos = $productosPorPromo->flatten()->pluck('producto_id')->unique()->all();
+                            $productosCatalogo = \App\Models\Producto::whereIn('id', $idsProductos)
+                                ->get(['id', 'nombre', 'precio', 'unidad'])
+                                ->keyBy('id');
+
+                            $payloadPromo = function ($p) use ($productosPorPromo, $productosCatalogo) {
+                                // Productos que aplican a esta promoción
+                                $productosPromo = [];
+                                if ($p->aplica_todos_productos) {
+                                    $productosPromo = ['_aplica_todos' => true];
+                                } else {
+                                    $productosVinculados = $productosPorPromo->get($p->id, collect());
+                                    foreach ($productosVinculados as $pivot) {
+                                        $prod = $productosCatalogo->get($pivot->producto_id);
+                                        if (!$prod) continue;
+                                        $productosPromo[] = [
+                                            'nombre' => $prod->nombre,
+                                            'precio' => (float) ($prod->precio ?? 0),
+                                            'unidad' => $prod->unidad,
+                                        ];
+                                    }
+                                }
+
                                 return [
                                     'nombre'        => $p->nombre,
                                     'descripcion'   => $p->descripcion,
@@ -1218,6 +1246,7 @@ TXT;
                                     'compra_paga'   => ($p->compra && $p->paga) ? "{$p->compra}x{$p->paga}" : null,
                                     'fecha_inicio'  => $p->fecha_inicio?->format('d/m/Y'),
                                     'fecha_fin'     => $p->fecha_fin?->format('d/m/Y'),
+                                    'productos'     => $productosPromo,
                                 ];
                             };
 
@@ -1240,7 +1269,15 @@ TXT;
                                     'Las promociones se aplican POR SEDE. Si una promo aparece en varias sedes, '
                                     . 'es porque está activa en todas (aplica_todas_sedes=true). NUNCA inventes '
                                     . 'promociones — usa SOLO las que aparecen en este payload. Si el array '
-                                    . 'promociones de una sede está vacío, esa sede no tiene promos vigentes.',
+                                    . 'promociones de una sede está vacío, esa sede no tiene promos vigentes.\n\n'
+                                    . 'CADA promoción tiene un campo `productos`:\n'
+                                    . '  - Si productos = {_aplica_todos: true} → la promo aplica a TODOS los productos.\n'
+                                    . '  - Si productos es un array con items → la promo aplica SOLO a esos productos.\n'
+                                    . '    Cuando el cliente pregunte "qué productos están en promoción", lista esos '
+                                    . 'productos con sus nombres y precios. Si la promo es por monto fijo, dile que '
+                                    . 'el descuento se aplica al comprar esos productos.\n'
+                                    . '  - Si productos = [] (vacío) y aplica_todos_productos=false → es promo huérfana, '
+                                    . 'menciona la promo pero acláralo: "aplica a productos seleccionados, consúltame por uno específico".',
                             ];
                         })(),
                     };
