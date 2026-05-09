@@ -74,7 +74,13 @@ class BotPromptInspectorService
             $orch = app(FlujoPedidoOrchestrator::class);
             $estado = app(EstadoPedidoService::class)->obtener($conv);
             $paso = $estado->paso_actual;
-            $msgOrch = $orch->systemMessageParaPaso($conv);
+            // Pasar las tools al orquestador para que su system message las describa
+            try {
+                $todasToolsDefRaw = app(\App\Http\Controllers\WhatsappWebhookController::class)->getToolsDefinicion();
+            } catch (\Throwable $eToolDef) {
+                $todasToolsDefRaw = null;
+            }
+            $msgOrch = $orch->systemMessageParaPaso($conv, $todasToolsDefRaw);
 
             $tc = $orch->toolChoice($paso);
             $tcDesc = is_string($tc) ? $tc : 'function:' . ($tc['function']['name'] ?? '?');

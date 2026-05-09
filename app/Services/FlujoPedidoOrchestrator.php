@@ -203,7 +203,7 @@ class FlujoPedidoOrchestrator
      * + lista de tools disponibles. Se inyecta al final del prompt para que
      * sea lo último que ve el LLM antes de responder.
      */
-    public function systemMessageParaPaso(ConversacionWhatsapp $conv): array
+    public function systemMessageParaPaso(ConversacionWhatsapp $conv, ?array $todasLasToolsDef = null): array
     {
         $estado = app(EstadoPedidoService::class)->obtener($conv);
         $paso   = $estado->paso_actual;
@@ -211,11 +211,55 @@ class FlujoPedidoOrchestrator
         $instruccion = $this->instruccion($paso);
         $permitidas  = $this->toolsPermitidas($paso);
 
+        // Construir lista enriquecida con descripciones (si nos las pasaron)
+        $toolsDescritas = [];
+        if (is_array($todasLasToolsDef)) {
+            $defByName = [];
+            foreach ($todasLasToolsDef as $t) {
+                $name = $t['function']['name'] ?? null;
+                if ($name) $defByName[$name] = $t['function'];
+            }
+
+            foreach ($permitidas as $nombre) {
+                $def = $defByName[$nombre] ?? null;
+                if ($def) {
+                    $desc = trim((string) ($def['description'] ?? ''));
+                    $desc = mb_substr($desc, 0, 180);
+                    if (mb_strlen((string) ($def['description'] ?? '')) > 180) $desc .= '…';
+
+                    $props = $def['parameters']['properties'] ?? [];
+                    if (!is_array($props)) $props = (array) $props;
+                    $required = $def['parameters']['required'] ?? [];
+                    $paramsStr = '';
+                    if (!empty($props)) {
+                        $partes = [];
+                        foreach ($props as $pname => $_pdef) {
+                            $partes[] = in_array($pname, $required, true) ? "{$pname}*" : $pname;
+                        }
+                        $paramsStr = ' (' . implode(', ', $partes) . ')';
+                    }
+
+                    $toolsDescritas[] = "  • `{$nombre}`{$paramsStr}\n    → {$desc}";
+                } else {
+                    $toolsDescritas[] = "  • `{$nombre}`";
+                }
+            }
+        }
+
         $contenido = "🎯 ORQUESTADOR DE FLUJO — PASO ACTUAL: `{$paso}`\n\n"
                    . $instruccion . "\n\n"
-                   . "🛠 TOOLS DISPONIBLES EN ESTE PASO: " . implode(', ', $permitidas) . ".\n"
-                   . "El sistema NO pasa al LLM otras tools — están ocultas en este paso. "
-                   . "El paso avanzará automáticamente cuando completes los datos requeridos.";
+                   . "🛠️ TOOLS DISPONIBLES EN ESTE PASO:\n";
+
+        if (!empty($toolsDescritas)) {
+            $contenido .= implode("\n", $toolsDescritas) . "\n";
+        } else {
+            $contenido .= "  " . implode(', ', $permitidas) . "\n";
+        }
+
+        $contenido .= "\nReglas:\n"
+                    . "• El sistema NO te pasa otras tools — están ocultas en este paso.\n"
+                    . "• Los parámetros marcados con `*` son obligatorios.\n"
+                    . "• El paso avanzará automáticamente cuando completes los datos requeridos.";
 
         return ['role' => 'system', 'content' => $contenido];
     }

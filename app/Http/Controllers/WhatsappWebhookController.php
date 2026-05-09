@@ -925,7 +925,7 @@ TXT;
             $estadoFlujoActual = $estadoSrv->obtener($conversacion);
             $pasoActualOrch    = $estadoFlujoActual->paso_actual;
             $reinforceFlujo[]  = app(\App\Services\FlujoPedidoOrchestrator::class)
-                ->systemMessageParaPaso($conversacion);
+                ->systemMessageParaPaso($conversacion, $this->getToolsDefinicion());
         } catch (\Throwable $e) {
             \Log::warning('No se pudo inyectar resumen/orquestador: ' . $e->getMessage());
         }
