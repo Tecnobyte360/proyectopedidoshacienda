@@ -141,6 +141,11 @@ Route::middleware(['no_super_sin_imp'])->group(function () {
     Route::get('/chat/estado/{conversacion}', \App\Livewire\Chat\EstadoPedido::class)
         ->middleware('permission:chat.usar')
         ->name('chat.estado-pedido');
+
+    // 📡 Monitor en vivo del bot (dashboard de comportamiento en tiempo real)
+    Route::get('/bot-monitor', \App\Livewire\Bot\Monitor::class)
+        ->middleware('permission:chat.usar')
+        ->name('bot.monitor');
     // Proxy autenticado para servir las medias de los estados de WhatsApp
     Route::get('/whatsapp-status/media/{filename}', \App\Http\Controllers\WhatsappStatusMediaController::class)
         ->where('filename', '[\w\-\.]+')
