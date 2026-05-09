@@ -28,6 +28,9 @@ class Index extends Component
     public string $nuevoChatNombre  = '';
     public string $nuevoChatMensaje = '';
 
+    // 📋 Modal "Estado del pedido" — datos estructurados que tiene el bot
+    public bool $pedidoEstadoModal = false;
+
     // Modal "Publicar estado de WhatsApp" (POST /status de TecnoByteApp)
     public bool   $estadoModal       = false;
     public string $estadoCaption     = '';
@@ -42,6 +45,47 @@ class Index extends Component
         $this->estadoCaption     = '';
         $this->estadoTab         = 'publicar';
         $this->estadosError      = null;
+    }
+
+    /**
+     * 📋 Abrir modal con el estado estructurado del pedido en BD.
+     * Muestra qué datos tiene el bot recolectados para la conversación
+     * activa (productos, dirección, cédula, sede, etc.).
+     */
+    public function abrirPedidoEstadoModal(): void
+    {
+        if (!$this->conversacionActivaId) {
+            $this->dispatch('notify', ['type' => 'warning', 'message' => 'Selecciona una conversación primero.']);
+            return;
+        }
+        $this->pedidoEstadoModal = true;
+    }
+
+    public function cerrarPedidoEstadoModal(): void
+    {
+        $this->pedidoEstadoModal = false;
+    }
+
+    /**
+     * 🔄 Resetear el estado del pedido — el bot empieza limpio en su próxima respuesta.
+     */
+    public function resetearEstadoPedido(): void
+    {
+        if (!$this->conversacionActivaId) return;
+
+        $conv = \App\Models\ConversacionWhatsapp::find($this->conversacionActivaId);
+        if (!$conv) return;
+
+        try {
+            app(\App\Services\EstadoPedidoService::class)
+                ->resetear($conv, 'reset_manual_admin_modal');
+            $this->dispatch('notify', [
+                'type'    => 'success',
+                'message' => '🔄 Estado del pedido reseteado. El bot empezará limpio en la próxima respuesta.',
+            ]);
+        } catch (\Throwable $e) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Error: ' . $e->getMessage()]);
+        }
     }
 
     public function cerrarEstadoModal(): void
@@ -1121,7 +1165,19 @@ class Index extends Component
             ? ConversacionWhatsapp::with(['cliente', 'mensajes', 'pedido'])->find($this->conversacionActivaId)
             : null;
 
-        return view('livewire.chat.index', compact('conversaciones', 'conversacionActiva'))
+        // 📋 Estado estructurado del pedido (para el modal). Solo se carga si
+        // el modal está abierto, para no consumir BD innecesariamente.
+        $pedidoEstado = null;
+        if ($this->pedidoEstadoModal && $conversacionActiva) {
+            try {
+                $pedidoEstado = app(\App\Services\EstadoPedidoService::class)
+                    ->obtener($conversacionActiva);
+            } catch (\Throwable $e) {
+                Log::warning('No se pudo cargar estado pedido para modal: ' . $e->getMessage());
+            }
+        }
+
+        return view('livewire.chat.index', compact('conversaciones', 'conversacionActiva', 'pedidoEstado'))
             ->layout('layouts.app');
     }
 }

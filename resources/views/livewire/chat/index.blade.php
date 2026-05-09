@@ -181,14 +181,14 @@
                 </div>
 
                 <div class="flex items-center gap-2">
-                    {{-- 🎯 Panel de estado del pedido en vivo --}}
-                    <a href="{{ route('chat.estado-pedido', $conversacionActiva->id) }}"
-                       target="_blank"
-                       title="Ver qué datos del pedido tiene el bot recopilados (auto-refresh en vivo)"
-                       class="rounded-xl bg-violet-500 px-3 py-2 text-xs font-bold text-white hover:bg-violet-600 transition inline-flex items-center gap-1">
+                    {{-- 📋 Modal de estado del pedido (datos estructurados) --}}
+                    <button type="button"
+                            wire:click="abrirPedidoEstadoModal"
+                            title="Ver qué datos del pedido tiene el bot recopilados"
+                            class="rounded-xl bg-violet-500 px-3 py-2 text-xs font-bold text-white hover:bg-violet-600 transition inline-flex items-center gap-1">
                         <i class="fa-solid fa-clipboard-list"></i>
                         <span>Estado del pedido</span>
-                    </a>
+                    </button>
 
                     @if($conversacionActiva->atendida_por_humano)
                         <button wire:click="devolverAlBot"
@@ -930,6 +930,218 @@
                     </button>
                 </div>
                 @endif
+            </div>
+        </div>
+    @endif
+
+    {{-- ╔═══════════════════════════════════════════════════════════════╗ --}}
+    {{-- ║ 📋 MODAL: Estado estructurado del pedido                      ║ --}}
+    {{-- ╚═══════════════════════════════════════════════════════════════╝ --}}
+    @if($pedidoEstadoModal && $conversacionActiva)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+             wire:click.self="cerrarPedidoEstadoModal"
+             wire:poll.5s>
+            <div class="w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-2xl">
+                {{-- Header --}}
+                <div class="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-gradient-to-r from-violet-50 to-white px-6 py-4">
+                    <div>
+                        <h3 class="text-lg font-extrabold text-slate-800">
+                            <i class="fa-solid fa-clipboard-list text-violet-600"></i>
+                            Estado del pedido
+                        </h3>
+                        <p class="text-xs text-slate-500">
+                            {{ $conversacionActiva->telefono_normalizado }}
+                            @if($conversacionActiva->cliente?->nombre)
+                                · {{ $conversacionActiva->cliente->nombre }}
+                            @endif
+                            · auto-refresh cada 5s
+                        </p>
+                    </div>
+                    <button wire:click="cerrarPedidoEstadoModal"
+                            class="rounded-full w-9 h-9 inline-flex items-center justify-center text-slate-500 hover:bg-slate-100">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+
+                {{-- Body --}}
+                @if($pedidoEstado)
+                    @php
+                        $pasoColores = [
+                            'inicio'         => 'bg-slate-100 text-slate-700',
+                            'producto'       => 'bg-blue-100 text-blue-700',
+                            'entrega'        => 'bg-cyan-100 text-cyan-700',
+                            'identificacion' => 'bg-amber-100 text-amber-700',
+                            'confirmacion'   => 'bg-violet-100 text-violet-700',
+                            'confirmado'     => 'bg-emerald-100 text-emerald-700',
+                            'abandonado'     => 'bg-rose-100 text-rose-700',
+                        ];
+                        $pasoColor = $pasoColores[$pedidoEstado->paso_actual] ?? 'bg-slate-100 text-slate-700';
+                        $faltantes = $pedidoEstado->camposFaltantes();
+                        $completo  = $pedidoEstado->estaCompleto();
+                    @endphp
+
+                    <div class="px-6 py-5 space-y-5">
+                        {{-- Paso actual + estado completo --}}
+                        <div class="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                            <div>
+                                <p class="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Paso actual</p>
+                                <span class="inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-bold {{ $pasoColor }} mt-1">
+                                    {{ ucfirst($pedidoEstado->paso_actual) }}
+                                </span>
+                            </div>
+                            <div class="text-right">
+                                @if($completo)
+                                    <span class="inline-flex items-center gap-1 text-emerald-600 font-bold text-sm">
+                                        <i class="fa-solid fa-circle-check"></i> Datos completos
+                                    </span>
+                                @else
+                                    <span class="inline-flex items-center gap-1 text-amber-600 font-bold text-sm">
+                                        <i class="fa-solid fa-triangle-exclamation"></i>
+                                        Falta {{ count($faltantes) }}
+                                    </span>
+                                @endif
+                            </div>
+                        </div>
+
+                        @if(!empty($faltantes))
+                            <div class="rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm text-amber-800">
+                                <strong>Pendientes:</strong> {{ implode(', ', $faltantes) }}
+                            </div>
+                        @endif
+
+                        @if($pedidoEstado->pedido_id)
+                            <div class="rounded-xl bg-emerald-50 border border-emerald-300 p-3 text-sm text-emerald-800">
+                                <i class="fa-solid fa-check-double mr-1"></i>
+                                <strong>Pedido #{{ $pedidoEstado->pedido_id }}</strong> creado el
+                                {{ $pedidoEstado->confirmado_at?->format('d/m/Y H:i') }}
+                            </div>
+                        @endif
+
+                        <div class="grid gap-4 md:grid-cols-2">
+                            {{-- 🛒 Productos --}}
+                            <div class="rounded-xl border border-slate-200 p-4">
+                                <h4 class="text-sm font-bold text-slate-800 mb-2">
+                                    <i class="fa-solid fa-cart-shopping text-blue-600 mr-1"></i> Productos
+                                </h4>
+                                @if(!empty($pedidoEstado->productos))
+                                    <ul class="space-y-1 text-sm">
+                                        @foreach($pedidoEstado->productos as $p)
+                                            <li class="flex items-center justify-between border-b border-slate-100 pb-1">
+                                                <span class="font-medium text-slate-700">{{ $p['name'] ?? '?' }}</span>
+                                                <span class="text-slate-500 text-xs">{{ $p['quantity'] ?? 1 }} {{ $p['unit'] ?? '' }}</span>
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                @else
+                                    <p class="text-xs text-slate-400 italic">— Sin productos —</p>
+                                @endif
+                            </div>
+
+                            {{-- 🚚 Entrega --}}
+                            <div class="rounded-xl border border-slate-200 p-4">
+                                <h4 class="text-sm font-bold text-slate-800 mb-2">
+                                    <i class="fa-solid fa-truck text-cyan-600 mr-1"></i> Entrega
+                                </h4>
+                                @if($pedidoEstado->metodo_entrega)
+                                    <p class="text-xs">
+                                        <strong>Método:</strong>
+                                        <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold">{{ $pedidoEstado->metodo_entrega }}</span>
+                                    </p>
+                                    @if($pedidoEstado->metodo_entrega === 'domicilio')
+                                        <p class="text-xs mt-1"><strong>Dirección:</strong> {{ $pedidoEstado->direccion ?: '—' }}</p>
+                                        @if($pedidoEstado->barrio)<p class="text-xs"><strong>Barrio:</strong> {{ $pedidoEstado->barrio }}</p>@endif
+                                        <p class="text-xs mt-1">
+                                            <strong>Cobertura:</strong>
+                                            @if($pedidoEstado->cobertura_validada)
+                                                <span class="text-emerald-600">✅</span>
+                                            @else
+                                                <span class="text-rose-600">❌</span>
+                                            @endif
+                                            @if($pedidoEstado->distancia_km) · {{ $pedidoEstado->distancia_km }} km @endif
+                                        </p>
+                                    @elseif($pedidoEstado->metodo_entrega === 'recoger')
+                                        <p class="text-xs mt-1">
+                                            <strong>Sede:</strong>
+                                            {{ $pedidoEstado->sede?->nombre ?: ($pedidoEstado->sede_id ? "ID #{$pedidoEstado->sede_id}" : '—') }}
+                                        </p>
+                                    @endif
+                                @else
+                                    <p class="text-xs text-slate-400 italic">— Sin método —</p>
+                                @endif
+                            </div>
+
+                            {{-- 👤 Identificación --}}
+                            <div class="rounded-xl border border-slate-200 p-4">
+                                <h4 class="text-sm font-bold text-slate-800 mb-2">
+                                    <i class="fa-solid fa-id-card text-amber-600 mr-1"></i> Identificación
+                                </h4>
+                                <p class="text-xs"><strong>Cédula:</strong> {{ $pedidoEstado->cedula ?: '—' }}</p>
+                                <p class="text-xs"><strong>Nombre:</strong> {{ $pedidoEstado->nombre_cliente ?: '—' }}</p>
+                                <p class="text-xs"><strong>Teléfono:</strong> {{ $pedidoEstado->telefono ?: '—' }}</p>
+                                <p class="text-xs mt-1">
+                                    <strong>En ERP:</strong>
+                                    @if($pedidoEstado->cliente_existe_erp)
+                                        <span class="text-emerald-600 font-semibold">✅ Sí</span>
+                                    @else
+                                        <span class="text-slate-500">No verificado</span>
+                                    @endif
+                                </p>
+                            </div>
+
+                            {{-- 💳 Pago --}}
+                            <div class="rounded-xl border border-slate-200 p-4">
+                                <h4 class="text-sm font-bold text-slate-800 mb-2">
+                                    <i class="fa-solid fa-credit-card text-violet-600 mr-1"></i> Pago / extras
+                                </h4>
+                                <p class="text-xs"><strong>Método:</strong> {{ $pedidoEstado->metodo_pago ?: '—' }}</p>
+                                @if($pedidoEstado->cupon_code)<p class="text-xs"><strong>Cupón:</strong> {{ $pedidoEstado->cupon_code }}</p>@endif
+                                @if($pedidoEstado->notas)
+                                    <p class="text-xs mt-1"><strong>Notas:</strong></p>
+                                    <p class="text-[11px] text-slate-600 italic">{{ \Illuminate\Support\Str::limit($pedidoEstado->notas, 120) }}</p>
+                                @endif
+                            </div>
+                        </div>
+
+                        {{-- Validaciones --}}
+                        @if(!empty($pedidoEstado->validaciones))
+                            <div class="rounded-xl bg-slate-50 border border-slate-200 p-3">
+                                <p class="text-[10px] font-semibold text-slate-600 uppercase tracking-wide mb-2">
+                                    <i class="fa-solid fa-clipboard-check mr-1"></i> Validaciones registradas
+                                </p>
+                                <div class="flex flex-wrap gap-1.5">
+                                    @foreach($pedidoEstado->validaciones as $clave => $valor)
+                                        <span class="rounded-full bg-white border border-slate-200 px-2.5 py-0.5 text-[10px]">
+                                            {{ $clave }}:
+                                            @if($valor)<span class="text-emerald-600 font-bold">✓</span>
+                                            @else<span class="text-rose-600 font-bold">✗</span>@endif
+                                        </span>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endif
+
+                        <p class="text-[10px] text-slate-400 text-center pt-1">
+                            Última actualización: {{ $pedidoEstado->updated_at?->format('d/m/Y H:i:s') }}
+                        </p>
+                    </div>
+                @else
+                    <div class="px-6 py-12 text-center text-sm text-slate-500">
+                        Cargando estado del pedido...
+                    </div>
+                @endif
+
+                {{-- Footer --}}
+                <div class="sticky bottom-0 flex items-center justify-between border-t border-slate-200 bg-white px-6 py-4">
+                    <button wire:click="resetearEstadoPedido"
+                            wire:confirm="¿Resetear todo el estado del pedido? El bot empezará limpio en su próxima respuesta."
+                            class="rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 px-4 py-2 text-xs font-semibold text-rose-700 transition inline-flex items-center gap-1.5">
+                        <i class="fa-solid fa-eraser"></i> Reset estado
+                    </button>
+                    <button wire:click="cerrarPedidoEstadoModal"
+                            class="rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 transition">
+                        Cerrar
+                    </button>
+                </div>
             </div>
         </div>
     @endif
