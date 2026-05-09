@@ -1151,6 +1151,10 @@ TXT;
                                 return [
                                     'sede'   => $s->nombre,
                                     'direccion' => $s->direccion,
+                                    // 💰 Datos de cobertura de la SEDE (defaults para todas sus zonas)
+                                    'pedido_minimo_sede'    => (float) ($s->cobertura_pedido_minimo ?? 0),
+                                    'costo_envio_default_sede' => (float) ($s->cobertura_costo_envio ?? 0),
+                                    'tiempo_default_sede_min'  => (int) ($s->cobertura_tiempo_min ?? 0),
                                     'zonas'  => $zonasSede->map(fn ($z) => [
                                         'nombre'  => $z->nombre,
                                         'tiempo_min' => $z->tiempo_estimado_min,
@@ -1162,7 +1166,12 @@ TXT;
 
                             return [
                                 'sedes' => $sedesPayload,
-                                'instruccion_para_bot' => 'Las zonas de cobertura se agrupan POR SEDE. Cada sede atiende sus zonas. Si una zona aparece marcada global=true, esa zona la atienden TODAS las sedes. Cuando el cliente pregunte por dónde llegan, agrupa la respuesta por sede.',
+                                'instruccion_para_bot' =>
+                                    'Las zonas de cobertura se agrupan POR SEDE. Cada sede tiene su propio '
+                                    . '`pedido_minimo_sede` (monto mínimo de compra para que esa sede acepte el pedido) '
+                                    . 'y `costo_envio_default_sede`. Las zonas pueden tener costos/tiempos propios '
+                                    . 'que sobrescriben el default. NUNCA inventes montos mínimos ni costos: usa '
+                                    . 'EXACTO los valores numéricos del payload (formatea $X.XXX al cliente).',
                             ];
                         })(),
 
@@ -5180,14 +5189,17 @@ PROMPT;
             ],
         ];
 
-        // 🗺️ Tool: consultar_zonas_cobertura — zonas de domicilio del tenant
+        // 🗺️ Tool: consultar_zonas_cobertura — zonas + montos mínimos + costos por sede
         $tools[] = [
             'type'     => 'function',
             'function' => [
                 'name'        => 'consultar_zonas_cobertura',
-                'description' => 'Devuelve las zonas/barrios donde se hace domicilio. ÚSALA cuando el cliente '
-                    . 'pregunte "¿hacen domicilios?", "¿llegan a X?", "¿qué zonas cubren?". Para validar UNA '
-                    . 'dirección concreta usa `validar_cobertura` (más precisa).',
+                'description' => 'Devuelve zonas de domicilio AGRUPADAS POR SEDE, con costos de envío, tiempos '
+                    . 'estimados y MONTO MÍNIMO de pedido por cada sede. ÚSALA cuando el cliente pregunte: '
+                    . '"¿hacen domicilios?", "¿llegan a X?", "¿qué zonas cubren?", "¿cuánto cobran de domicilio?", '
+                    . '"¿cuál es el pedido mínimo?", "¿cuánto cuesta el envío?". '
+                    . 'NUNCA inventes montos: usa exactos los valores del payload. Para validar UNA dirección '
+                    . 'concreta usa `validar_cobertura` (más precisa).',
                 'parameters'  => [
                     'type'       => 'object',
                     'properties' => new \stdClass(),
