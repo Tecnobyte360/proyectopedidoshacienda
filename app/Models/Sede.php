@@ -273,9 +273,10 @@ class Sede extends Model
     {
         $linea1 = "📍 {$this->nombre}" . ($this->direccion ? " — {$this->direccion}" : '');
 
-        // Agrupar días con mismo rango de horario
-        $diasAbreviados = ['lunes' => 'L', 'martes' => 'M', 'miercoles' => 'X', 'miércoles' => 'X',
-                           'jueves' => 'J', 'viernes' => 'V', 'sabado' => 'S', 'sábado' => 'S', 'domingo' => 'D'];
+        // Agrupar días con mismo rango de horario.
+        // Usamos 3 letras para evitar ambigüedad (L,M = Lunes,Martes? o L=Lun M=Mié?)
+        $diasAbreviados = ['lunes' => 'Lun', 'martes' => 'Mar', 'miercoles' => 'Mié', 'miércoles' => 'Mié',
+                           'jueves' => 'Jue', 'viernes' => 'Vie', 'sabado' => 'Sáb', 'sábado' => 'Sáb', 'domingo' => 'Dom'];
 
         $grupos = [];
         $grupoActual = null;
