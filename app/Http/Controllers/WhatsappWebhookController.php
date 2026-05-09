@@ -3869,7 +3869,7 @@ TXT;
       ];
   }
 
-  private function guardarPedidoDesdeToolCall(
+  public function guardarPedidoDesdeToolCall(
     array $orderData,
     string $from,
     string $name,

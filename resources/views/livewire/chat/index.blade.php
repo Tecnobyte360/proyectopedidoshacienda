@@ -181,6 +181,14 @@
                 </div>
 
                 <div class="flex items-center gap-2">
+                    {{-- 🛒 Crear pedido manual (precarga datos del estado) --}}
+                    <a href="{{ route('pedidos.crear-manual', ['conv' => $conversacionActiva->id]) }}"
+                       title="Crear pedido manualmente con datos del chat ya pre-cargados"
+                       class="rounded-xl bg-emerald-500 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-600 transition inline-flex items-center gap-1">
+                        <i class="fa-solid fa-cart-plus"></i>
+                        <span>Crear pedido</span>
+                    </a>
+
                     {{-- 📋 Modal de estado del pedido (datos estructurados) --}}
                     <button type="button"
                             wire:click="abrirPedidoEstadoModal"

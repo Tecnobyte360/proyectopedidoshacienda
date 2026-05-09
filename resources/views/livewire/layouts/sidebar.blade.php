@@ -45,6 +45,7 @@
                 'title' => 'Principal',
                 'items' => [
                     ['name' => 'Pedidos',      'icon' => 'fa-bag-shopping', 'route' => 'pedidos.index',      'badge' => null,  'permission' => 'pedidos.ver'],
+                    ['name' => 'Crear pedido', 'icon' => 'fa-cart-plus',    'route' => 'pedidos.crear-manual','badge' => null, 'permission' => 'pedidos.ver'],
                     ['name' => 'Chat en vivo', 'icon' => 'fa-headset',      'route' => 'chat.index',         'badge' => null,  'permission' => 'chat.usar'],
                     ['name' => 'Monitor bot',  'icon' => 'fa-tower-broadcast', 'route' => 'bot.monitor',     'badge' => 'EN VIVO', 'permission' => 'chat.usar'],
                     ['name' => 'Despachos',    'icon' => 'fa-paper-plane',  'route' => 'despachos.index',    'badge' => null,  'permission' => 'despachos.gestionar'],

@@ -1,0 +1,289 @@
+<?php
+
+namespace App\Livewire\Pedidos;
+
+use App\Http\Controllers\WhatsappWebhookController;
+use App\Models\Cliente;
+use App\Models\ConversacionWhatsapp;
+use App\Models\Producto;
+use App\Models\Sede;
+use App\Services\ConversacionService;
+use App\Services\EstadoPedidoService;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
+use Livewire\Attributes\Layout;
+use Livewire\Component;
+
+/**
+ * 🛒 CREAR PEDIDO MANUAL
+ *
+ * Permite al admin/operador crear un pedido directamente sin que pase por
+ * el bot. Reusa la lógica de WhatsappWebhookController::guardarPedidoDesdeToolCall
+ * para que se cree con los mismos eventos, exportación al ERP, etc.
+ *
+ * Modos de uso:
+ *  - Standalone (/pedidos/crear): formulario en blanco
+ *  - Desde chat (?conv=N): pre-carga datos del estado del pedido de esa
+ *    conversación para que el operador termine de cerrar lo que el bot
+ *    no pudo.
+ */
+class CrearManual extends Component
+{
+    // Origen
+    public ?int $conversacionId = null;
+
+    // Cliente
+    public string $telefono       = '';
+    public string $nombre_cliente = '';
+    public string $cedula         = '';
+    public string $email          = '';
+
+    // Productos
+    /** @var array<int, array{producto_id:int|null,nombre:string,cantidad:float,unidad:string,precio:float}> */
+    public array $productos = [];
+
+    // Entrega
+    public string $metodo_entrega = 'recoger'; // recoger | domicilio
+    public ?int   $sede_id        = null;
+    public string $direccion      = '';
+    public string $barrio         = '';
+    public string $ciudad         = '';
+
+    // Pago / extras
+    public string $metodo_pago = 'efectivo';
+    public string $cupon       = '';
+    public string $notas       = '';
+
+    // Productos disponibles para autocomplete
+    public string $busquedaProducto = '';
+
+    public function mount(?int $conv = null): void
+    {
+        $this->conversacionId = $conv;
+        if ($conv) {
+            $this->precargarDesdeConversacion($conv);
+        }
+    }
+
+    private function precargarDesdeConversacion(int $convId): void
+    {
+        $conv = ConversacionWhatsapp::with('cliente')->find($convId);
+        if (!$conv) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Conversación no encontrada.']);
+            return;
+        }
+
+        // Datos básicos
+        $this->telefono = $conv->telefono_normalizado;
+        $this->nombre_cliente = $conv->cliente?->nombre ?? '';
+
+        // Estado estructurado del pedido
+        try {
+            $estado = app(EstadoPedidoService::class)->obtener($conv);
+            if ($estado->cedula)        $this->cedula = $estado->cedula;
+            if ($estado->nombre_cliente && empty($this->nombre_cliente)) $this->nombre_cliente = $estado->nombre_cliente;
+            if ($estado->email)         $this->email = $estado->email;
+            if ($estado->metodo_entrega) $this->metodo_entrega = $estado->metodo_entrega;
+            if ($estado->sede_id)       $this->sede_id = $estado->sede_id;
+            if ($estado->direccion)     $this->direccion = $estado->direccion;
+            if ($estado->barrio)        $this->barrio = $estado->barrio;
+            if ($estado->ciudad)        $this->ciudad = $estado->ciudad;
+            if ($estado->metodo_pago)   $this->metodo_pago = $estado->metodo_pago;
+            if ($estado->cupon_code)    $this->cupon = $estado->cupon_code;
+            if ($estado->notas)         $this->notas = $estado->notas;
+
+            if (!empty($estado->productos)) {
+                foreach ($estado->productos as $p) {
+                    // Tratar de match con catálogo
+                    $prodMatch = Producto::where('nombre', 'LIKE', '%' . ($p['name'] ?? '') . '%')->first();
+                    $this->productos[] = [
+                        'producto_id' => $prodMatch?->id,
+                        'nombre'      => $p['name'] ?? '',
+                        'cantidad'    => (float) ($p['quantity'] ?? 1),
+                        'unidad'      => $p['unit'] ?? 'unidad',
+                        'precio'      => (float) ($prodMatch?->precio_base ?? 0),
+                    ];
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('No se pudo precargar estado: ' . $e->getMessage());
+        }
+    }
+
+    public function getProductosCatalogoProperty()
+    {
+        if (mb_strlen($this->busquedaProducto) < 2) {
+            return collect();
+        }
+        return Producto::where('activo', true)
+            ->where(function ($q) {
+                $q->where('nombre', 'LIKE', '%' . $this->busquedaProducto . '%')
+                  ->orWhere('codigo', 'LIKE', '%' . $this->busquedaProducto . '%');
+            })
+            ->limit(10)
+            ->get(['id', 'codigo', 'nombre', 'precio_base', 'unidad']);
+    }
+
+    public function getSedesProperty()
+    {
+        return Sede::where('activa', true)->orderBy('nombre')->get(['id', 'nombre']);
+    }
+
+    public function agregarProducto(int $productoId): void
+    {
+        $prod = Producto::find($productoId);
+        if (!$prod) return;
+
+        $this->productos[] = [
+            'producto_id' => $prod->id,
+            'nombre'      => $prod->nombre,
+            'cantidad'    => 1,
+            'unidad'      => $prod->unidad ?: 'unidad',
+            'precio'      => (float) ($prod->precio_base ?? 0),
+        ];
+        $this->busquedaProducto = '';
+    }
+
+    public function eliminarProducto(int $idx): void
+    {
+        unset($this->productos[$idx]);
+        $this->productos = array_values($this->productos);
+    }
+
+    public function getTotalProperty(): float
+    {
+        return collect($this->productos)->sum(fn ($p) => $p['cantidad'] * $p['precio']);
+    }
+
+    /**
+     * Buscar cliente por cédula en BD local (luego se podría extender a ERP).
+     */
+    public function buscarPorCedula(): void
+    {
+        if (mb_strlen($this->cedula) < 5) return;
+        $cliente = Cliente::where('cedula', $this->cedula)->first();
+        if ($cliente) {
+            $this->nombre_cliente = $cliente->nombre;
+            $this->telefono = $this->telefono ?: $cliente->telefono_normalizado;
+            $this->email = $this->email ?: ($cliente->email ?? '');
+            $this->dispatch('notify', ['type' => 'success', 'message' => '✅ Cliente encontrado: ' . $cliente->nombre]);
+        }
+    }
+
+    public function crearPedido()
+    {
+        // Validación mínima
+        if (empty($this->productos)) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Debes agregar al menos un producto.']);
+            return;
+        }
+        if (empty($this->telefono)) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Falta el teléfono del cliente.']);
+            return;
+        }
+        if (empty($this->nombre_cliente)) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Falta el nombre del cliente.']);
+            return;
+        }
+        if ($this->metodo_entrega === 'domicilio' && empty($this->direccion)) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Falta la dirección para domicilio.']);
+            return;
+        }
+        if ($this->metodo_entrega === 'recoger' && empty($this->sede_id)) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Falta la sede de recogida.']);
+            return;
+        }
+
+        // Construir orderData con el formato que entiende guardarPedidoDesdeToolCall
+        $orderData = [
+            'products' => array_values(array_map(fn ($p) => [
+                'name'     => $p['nombre'],
+                'quantity' => (float) $p['cantidad'],
+                'unit'     => $p['unidad'],
+            ], $this->productos)),
+            'customer_name'  => $this->nombre_cliente,
+            'cedula'         => $this->cedula,
+            'phone'          => $this->telefono,
+            'email'          => $this->email,
+            'payment_method' => $this->metodo_pago,
+            'coupon_code'    => $this->cupon,
+            'notes'          => trim(($this->notas ? $this->notas . "\n" : '') . '[CREADO MANUALMENTE]'),
+        ];
+
+        if ($this->metodo_entrega === 'domicilio') {
+            $orderData['address']      = $this->direccion;
+            $orderData['neighborhood'] = $this->barrio;
+            $orderData['location']     = $this->ciudad;
+        } else {
+            $orderData['address']  = '';
+            $orderData['location'] = Sede::find($this->sede_id)?->nombre ?? '';
+            $orderData['pickup']   = true;
+            $orderData['sede_id']  = $this->sede_id;
+        }
+
+        try {
+            // Encontrar o crear conversación para enganche
+            $conv = $this->conversacionId
+                ? ConversacionWhatsapp::find($this->conversacionId)
+                : ConversacionWhatsapp::firstOrCreate(
+                    ['telefono_normalizado' => $this->telefono],
+                    [
+                        'tenant_id' => app(\App\Services\TenantManager::class)->id(),
+                        'estado'    => 'activa',
+                        'canal'     => 'manual',
+                    ]
+                );
+
+            $convService = app(ConversacionService::class);
+            $cacheKey    = 'manual_' . Str::random(8);
+
+            $controller = app(WhatsappWebhookController::class);
+            $resultado = $controller->guardarPedidoDesdeToolCall(
+                $orderData,
+                $this->telefono,
+                $this->nombre_cliente,
+                [], // historial vacío
+                $cacheKey,
+                $conv->connection_id ? (string) $conv->connection_id : null,
+                $conv,
+                $convService
+            );
+
+            // Marcar el estado como confirmado
+            try {
+                // Buscar el último pedido del teléfono creado en los últimos 30s
+                $pedido = \App\Models\Pedido::where('telefono', $this->telefono)
+                    ->where('created_at', '>=', now()->subSeconds(30))
+                    ->orderByDesc('id')
+                    ->first();
+                if ($pedido) {
+                    app(EstadoPedidoService::class)->marcarConfirmado($conv, $pedido->id);
+                }
+            } catch (\Throwable $e) {
+                Log::warning('No se pudo marcar estado confirmado: ' . $e->getMessage());
+            }
+
+            $this->dispatch('notify', [
+                'type'    => 'success',
+                'message' => '✅ Pedido creado correctamente.',
+            ]);
+
+            return redirect()->route('pedidos.index');
+        } catch (\Throwable $e) {
+            Log::error('Error creando pedido manual: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
+            $this->dispatch('notify', [
+                'type'    => 'error',
+                'message' => '❌ Error: ' . $e->getMessage(),
+            ]);
+        }
+    }
+
+    #[Layout('layouts.app')]
+    public function render()
+    {
+        return view('livewire.pedidos.crear-manual', [
+            'productosCatalogo' => $this->productosCatalogo,
+            'sedes'             => $this->sedes,
+        ]);
+    }
+}
