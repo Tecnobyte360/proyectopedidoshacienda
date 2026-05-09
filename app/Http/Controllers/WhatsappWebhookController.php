@@ -2311,6 +2311,17 @@ TXT;
             'creando tu pedido',
             'anotando tu pedido',
             'anotando el pedido',
+            // ⏳ "voy a validar..." sin invocar validar_cobertura
+            'voy a validar',
+            'voy a verificar si',
+            'déjame validar',
+            'permíteme verificar',
+            'permiteme verificar',
+            'verifico la cobertura',
+            'consultando cobertura',
+            'revisando cobertura',
+            'voy a chequear',
+            'voy a consultar',
         ];
 
         $lower = mb_strtolower($reply);

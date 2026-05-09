@@ -285,7 +285,24 @@ class EstadoPedidoService
             }
         }
 
-        // 4. NOMBRE — heurística simple cuando estamos en paso identificación
+        // 4. MÉTODO DE ENTREGA — domicilio / recoger
+        if (empty($estado->metodo_entrega)) {
+            $msgLowerMe = mb_strtolower($msg);
+            // Patrones DOMICILIO
+            if (preg_match('/\b(domicilio|env[ií]o|env[ií]eme|env[ií]o\s+a|me\s+lo\s+env|me\s+lo\s+mand|m[áa]ndamelo|para\s+casa|a\s+mi\s+casa|env[ií]a)\b/iu', $msgLowerMe)) {
+                $estado->metodo_entrega = ConversacionPedidoEstado::METODO_DOMICILIO;
+                $cambio = true;
+                Log::info('🔍 Método entrega DOMICILIO capturado', ['conv_id' => $conv->id]);
+            }
+            // Patrones RECOGER
+            elseif (preg_match('/\b(recog[eo]|paso\s+a\s+recoger|paso\s+por|voy\s+a\s+pasar|yo\s+voy|reclamo|reclamar|recogerlo|en\s+la\s+sede|en\s+la\s+tienda)\b/iu', $msgLowerMe)) {
+                $estado->metodo_entrega = ConversacionPedidoEstado::METODO_RECOGER;
+                $cambio = true;
+                Log::info('🔍 Método entrega RECOGER capturado', ['conv_id' => $conv->id]);
+            }
+        }
+
+        // 5. NOMBRE — heurística simple cuando estamos en paso identificación
         //    o datos_cliente_nuevo y el cliente envía un texto que parece nombre
         if (
             empty($estado->nombre_cliente) &&
