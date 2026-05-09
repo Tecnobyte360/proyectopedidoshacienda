@@ -285,6 +285,26 @@ class EstadoPedidoService
             }
         }
 
+        // 3.5. DIRECCIÓN — patrones colombianos comunes
+        //      "cra 58bb #40c-34", "calle 50 #47-80", "carrera 80a #45-12",
+        //      "diagonal 67 # 32-15", "cl 79 sur #52-84", "trv 40 #30-20"
+        if (empty($estado->direccion)) {
+            $patronDir = '/\b(?:cra\.?|carrera|cl\.?|calle|cll|dg\.?|diagonal|diag|trv\.?|transversal|av\.?|avenida|cr|kr)\s*\d+[a-z]?\s*(?:sur|norte|este|oeste|n|s|e|o)?\s*#?\s*\d+[a-z]?\s*-\s*\d+/iu';
+            if (preg_match($patronDir, $msg, $mDir)) {
+                // Capturar la dirección con un poco de contexto extra (números siguientes)
+                $estado->direccion = trim($mDir[0]);
+                // Si menciona "envíame a X" o "para X", inferir despacho
+                if (empty($estado->metodo_entrega)) {
+                    $estado->metodo_entrega = ConversacionPedidoEstado::METODO_DOMICILIO;
+                }
+                $cambio = true;
+                Log::info('🔍 Dirección capturada del mensaje', [
+                    'conv_id'   => $conv->id,
+                    'direccion' => $estado->direccion,
+                ]);
+            }
+        }
+
         // 4. MÉTODO DE ENTREGA — despacho / recoger
         // (internamente METODO_DOMICILIO sigue siendo 'domicilio' para no
         // romper datos existentes, pero la UX habla de 'despacho')
@@ -301,6 +321,35 @@ class EstadoPedidoService
                 $estado->metodo_entrega = ConversacionPedidoEstado::METODO_RECOGER;
                 $cambio = true;
                 Log::info('🔍 Método entrega RECOGER capturado', ['conv_id' => $conv->id]);
+            }
+        }
+
+        // 4.5. PRODUCTOS — captura tentativa cuando cliente dice "N libras de X"
+        //      Si el bot luego corrige el nombre via buscar_productos, ese resultado
+        //      sobreescribe. Mejor tener algo en estado que nada.
+        if (empty($estado->productos)) {
+            $patronProd = '/\b(\d+)\s*(libras?|kilos?|kg|gramos?|gr|unidades?|porciones?|libritas?|kilitos?|cajas?|paquetes?|bolsas?|gallinas?)\s*(?:de\s+)?(.+?)(?=[,.;]|\s*$)/iu';
+            if (preg_match($patronProd, $msg, $mProd)) {
+                $cantidad = (int) $mProd[1];
+                $unidad   = mb_strtolower(rtrim($mProd[2], 's')); // singular
+                $nombre   = trim($mProd[3]);
+
+                // Limpiar nombre de palabras finales tipo "y de eso" / "por favor" / etc
+                $nombre = preg_replace('/\s+(por\s+favor|gracias|listo|dale)\s*$/iu', '', $nombre);
+                $nombre = trim($nombre);
+
+                if (!empty($nombre) && mb_strlen($nombre) >= 3) {
+                    $estado->productos = [[
+                        'name'     => mb_convert_case($nombre, MB_CASE_TITLE, 'UTF-8'),
+                        'quantity' => $cantidad,
+                        'unit'     => $unidad,
+                    ]];
+                    $cambio = true;
+                    Log::info('🔍 Producto capturado del mensaje', [
+                        'conv_id'  => $conv->id,
+                        'producto' => $estado->productos[0],
+                    ]);
+                }
             }
         }
 

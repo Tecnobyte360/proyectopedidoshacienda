@@ -995,6 +995,23 @@ TXT;
                 'role' => 'system',
                 'content' => "🚨 El cliente está mencionando un PRODUCTO o una CANTIDAD. ANTES DE RESPONDER, DEBES llamar `buscar_productos` con el texto literal del cliente. NO inventes productos ni precios — verifica en BD.",
             ];
+        } elseif (
+            $datosFinalesEnTexto &&
+            !empty($estadoActualBd?->direccion) &&
+            $estadoActualBd?->metodo_entrega === \App\Models\ConversacionPedidoEstado::METODO_DOMICILIO &&
+            !$estadoActualBd?->cobertura_validada
+        ) {
+            // ⭐ Caso especial: hay dirección + método=domicilio + cobertura NO validada
+            // → forzar tool_choice = validar_cobertura para no llamar otras tools
+            $toolChoiceInicial = ['type' => 'function', 'function' => ['name' => 'validar_cobertura']];
+            $allTools = $this->getToolsDefinicion();
+            $valTool = collect($allTools)->first(fn ($t) => ($t['function']['name'] ?? '') === 'validar_cobertura');
+            if ($valTool) $toolsFiltradas = [$valTool];
+            $razonForzado = 'cliente_dio_direccion_forzar_validar_cobertura';
+            $messages[] = [
+                'role' => 'system',
+                'content' => "🚨 El cliente dio una dirección de despacho ({$estadoActualBd->direccion}). INVOCA `validar_cobertura` con esa dirección AHORA. NO llames otras tools. NO respondas texto.",
+            ];
         } elseif ($datosFinalesEnTexto) {
             // Cliente dio datos clave (recoger, dirección, pago) pero estado aún no completo
             // Forzamos required para que llame validar_cobertura/buscar_productos/etc según faltante
