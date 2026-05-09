@@ -262,18 +262,46 @@ class Sede extends Model
     }
 
     /**
-     * Devuelve el horario completo de la semana en texto multilínea.
-     * Útil para inyectar al prompt del bot.
+     * Devuelve el horario completo de la semana en texto compacto, agrupando
+     * días con el mismo horario. Optimizado para minimizar tokens en prompt.
+     *
+     * Ejemplo de salida:
+     *   📍 Principal — Calle 50 #47-80
+     *   L-V 08:00-20:00 · S 07:00-16:00 · D cerrado
      */
     public function horariosFormateadosTexto(): string
     {
-        $lineas = ["📍 {$this->nombre}" . ($this->direccion ? " — {$this->direccion}" : '')];
+        $linea1 = "📍 {$this->nombre}" . ($this->direccion ? " — {$this->direccion}" : '');
+
+        // Agrupar días con mismo rango de horario
+        $diasAbreviados = ['lunes' => 'L', 'martes' => 'M', 'miercoles' => 'X', 'miércoles' => 'X',
+                           'jueves' => 'J', 'viernes' => 'V', 'sabado' => 'S', 'sábado' => 'S', 'domingo' => 'D'];
+
+        $grupos = [];
+        $grupoActual = null;
         foreach ($this->horariosCompletos() as $key => $h) {
-            $lineas[] = $h['abierto']
-                ? "  • {$h['label']}: {$h['abre']} a {$h['cierra']}"
-                : "  • {$h['label']}: cerrado";
+            $abrev = $diasAbreviados[mb_strtolower($key)] ?? $diasAbreviados[mb_strtolower($h['label'] ?? '')] ?? mb_substr($h['label'] ?? '?', 0, 1);
+            $rango = $h['abierto'] ? "{$h['abre']}-{$h['cierra']}" : 'cerrado';
+
+            if ($grupoActual && $grupoActual['rango'] === $rango) {
+                $grupoActual['dias'][] = $abrev;
+            } else {
+                if ($grupoActual) $grupos[] = $grupoActual;
+                $grupoActual = ['dias' => [$abrev], 'rango' => $rango];
+            }
         }
-        return implode("\n", $lineas);
+        if ($grupoActual) $grupos[] = $grupoActual;
+
+        // Formatear cada grupo: "L-V 08:00-20:00" o "L,X 08:00-20:00"
+        $partes = [];
+        foreach ($grupos as $g) {
+            $diasStr = count($g['dias']) >= 3
+                ? $g['dias'][0] . '-' . end($g['dias'])
+                : implode(',', $g['dias']);
+            $partes[] = "{$diasStr} {$g['rango']}";
+        }
+
+        return $linea1 . "\n  " . implode(' · ', $partes);
     }
 
     /**
