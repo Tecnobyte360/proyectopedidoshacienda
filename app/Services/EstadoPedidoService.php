@@ -184,6 +184,10 @@ class EstadoPedidoService
             if (empty($estado->telefono) && !empty($resultado['datos']['telefono'])) {
                 $estado->telefono = trim($resultado['datos']['telefono']);
             }
+        } else {
+            // Marcamos explícitamente como NO existente para que avanzarPaso
+            // pase a datos_cliente_nuevo
+            $estado->cliente_existe_erp = false;
         }
 
         $estado->marcarValidacion('cliente_erp', true);
@@ -447,14 +451,26 @@ class EstadoPedidoService
     {
         $nuevo = $estado->paso_actual;
 
+        // ¿Hay integración ERP activa con cliente_lookup?
+        $erpActivo  = $this->erpClienteLookupActivo();
+        $camposReqErp = $this->camposRequeridosErp();
+
         if (empty($estado->productos)) {
             $nuevo = ConversacionPedidoEstado::PASO_PRODUCTO;
         } elseif (empty($estado->metodo_entrega) ||
                   ($estado->metodo_entrega === ConversacionPedidoEstado::METODO_DOMICILIO && !$estado->cobertura_validada) ||
                   ($estado->metodo_entrega === ConversacionPedidoEstado::METODO_RECOGER && empty($estado->sede_id))) {
             $nuevo = ConversacionPedidoEstado::PASO_ENTREGA;
-        } elseif (empty($estado->cedula) && empty($estado->nombre_cliente)) {
+        } elseif (empty($estado->cedula)) {
+            // Aún no tenemos cédula → paso identificación
             $nuevo = ConversacionPedidoEstado::PASO_IDENTIFICACION;
+        } elseif ($erpActivo && !$estado->yaValidado('cliente_erp')) {
+            // Tenemos cédula pero NO hemos consultado ERP — sigue en identificación
+            // hasta que verificar_cliente_erp se ejecute
+            $nuevo = ConversacionPedidoEstado::PASO_IDENTIFICACION;
+        } elseif ($erpActivo && !$estado->cliente_existe_erp && !$this->datosClienteCompletos($estado, $camposReqErp)) {
+            // ERP consultado, NO existe, faltan datos → pedir datos del cliente nuevo
+            $nuevo = ConversacionPedidoEstado::PASO_DATOS_CLIENTE;
         } elseif ($estado->estaCompleto() && !$estado->confirmado_at) {
             $nuevo = ConversacionPedidoEstado::PASO_CONFIRMACION;
         }
@@ -463,6 +479,61 @@ class EstadoPedidoService
             $estado->paso_actual = $nuevo;
             $estado->save();
         }
+    }
+
+    /**
+     * ¿Tiene este tenant integración ERP con cliente_lookup activo?
+     */
+    private function erpClienteLookupActivo(): bool
+    {
+        try {
+            $tenantId = app(\App\Services\TenantManager::class)->id();
+            if (!$tenantId) return false;
+            return \App\Models\Integracion::where('tenant_id', $tenantId)
+                ->where('activo', true)
+                ->where('exporta_pedidos', true)
+                ->get()
+                ->contains(fn ($i) => $i->config['cliente_lookup']['activo'] ?? false);
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Lista de campos que SGI exige para crear un cliente nuevo.
+     */
+    public function camposRequeridosErp(): array
+    {
+        try {
+            $tenantId = app(\App\Services\TenantManager::class)->id();
+            if (!$tenantId) return [];
+            $integ = \App\Models\Integracion::where('tenant_id', $tenantId)
+                ->where('activo', true)
+                ->where('exporta_pedidos', true)
+                ->get()
+                ->first(fn ($i) => $i->config['cliente_lookup']['activo'] ?? false);
+            return $integ?->config['cliente_lookup']['campos_requeridos'] ?? [];
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
+    /**
+     * ¿Están todos los campos requeridos por ERP?
+     */
+    public function datosClienteCompletos(ConversacionPedidoEstado $estado, array $campos): bool
+    {
+        $mapa = [
+            'cedula'    => $estado->cedula,
+            'nombre'    => $estado->nombre_cliente,
+            'telefono'  => $estado->telefono,
+            'email'     => $estado->email,
+            'direccion' => $estado->direccion,
+        ];
+        foreach ($campos as $campo) {
+            if (empty($mapa[$campo] ?? null)) return false;
+        }
+        return true;
     }
 
     /**

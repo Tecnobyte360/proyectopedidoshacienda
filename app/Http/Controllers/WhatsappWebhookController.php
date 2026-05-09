@@ -3344,6 +3344,41 @@ TXT;
               if ($lookupActivo && !in_array('cedula', $activos, true)) {
                   $activos[] = 'cedula';
               }
+
+              // Si lookup activo + cliente NO existe en ERP, exigir TODOS los
+              // campos requeridos por la integración para crear el cliente nuevo.
+              if ($lookupActivo) {
+                  try {
+                      $integErp = \App\Models\Integracion::where('tenant_id', $tenantId)
+                          ->where('activo', true)
+                          ->where('exporta_pedidos', true)
+                          ->get()
+                          ->first(fn ($i) => $i->config['cliente_lookup']['activo'] ?? false);
+
+                      // Buscar al cliente: si existe, no exigimos sus datos
+                      // (se usan los del ERP). Si no existe, sí.
+                      if ($integErp && !empty(trim((string) ($orderData['cedula'] ?? '')))) {
+                          $clienteSrv = app(\App\Services\ClienteErpService::class);
+                          $existeEnErp = $clienteSrv->buscar(
+                              $integErp,
+                              (string) $orderData['cedula'],
+                              (string) ($orderData['phone'] ?? '')
+                          );
+
+                          if (!$existeEnErp) {
+                              // Agregar campos requeridos por SGI a los activos
+                              $reqErp = $integErp->config['cliente_lookup']['campos_requeridos'] ?? [];
+                              foreach ($reqErp as $campo) {
+                                  if (!in_array($campo, $activos, true)) {
+                                      $activos[] = $campo;
+                                  }
+                              }
+                          }
+                      }
+                  } catch (\Throwable $e) {
+                      \Log::warning('No se pudo verificar cliente en ERP para validación: ' . $e->getMessage());
+                  }
+              }
           }
 
           // Si el cliente local YA tiene cédula registrada, NO se la exigimos
@@ -3888,6 +3923,79 @@ TXT;
         $telNorm = $this->normalizarTelefono($from);
         $tenantId = app(\App\Services\TenantManager::class)->id() ?? 'none';
         $confirmKey = "pedido_confirmado_t{$tenantId}_" . $telNorm;
+
+        // 🆔 PASO PRE-PEDIDO: asegurar cliente en SGI/ERP antes de crear el pedido.
+        // Si ERP tiene lookup activo y el cliente NO existe, lo creamos con los
+        // datos del orderData. Si la creación falla o faltan datos requeridos,
+        // abortamos el pedido y avisamos.
+        if ($conversacion && !empty($orderData['cedula'])) {
+            try {
+                $integErp = \App\Models\Integracion::where('tenant_id', $conversacion->tenant_id)
+                    ->where('activo', true)
+                    ->where('exporta_pedidos', true)
+                    ->get()
+                    ->first(fn ($i) => $i->config['cliente_lookup']['activo'] ?? false);
+
+                if ($integErp) {
+                    $clienteSrv = app(\App\Services\ClienteErpService::class);
+
+                    // 1. Verificar si existe
+                    $clienteEnSgi = $clienteSrv->buscar(
+                        $integErp,
+                        (string) ($orderData['cedula'] ?? ''),
+                        (string) ($orderData['phone'] ?? $from)
+                    );
+
+                    if (!$clienteEnSgi) {
+                        // 2. NO existe → crear con los datos del orderData
+                        $datosCrear = [
+                            'cedula'    => $orderData['cedula'] ?? '',
+                            'nombre'    => $orderData['customer_name'] ?? '',
+                            'telefono'  => $orderData['phone'] ?? $from,
+                            'email'     => $orderData['email'] ?? '',
+                            'direccion' => $orderData['address'] ?? '',
+                        ];
+
+                        // Validar que tenemos todo lo requerido por ERP
+                        $reqErp = $integErp->config['cliente_lookup']['campos_requeridos'] ?? [];
+                        $faltantesErp = [];
+                        foreach ($reqErp as $campo) {
+                            if (empty(trim((string) ($datosCrear[$campo] ?? '')))) {
+                                $faltantesErp[] = $campo;
+                            }
+                        }
+
+                        if (!empty($faltantesErp)) {
+                            $listaFalt = implode(', ', $faltantesErp);
+                            Log::warning('🚨 No se puede crear cliente en ERP — faltan datos', [
+                                'cedula' => $orderData['cedula'],
+                                'faltan' => $faltantesErp,
+                            ]);
+                            return "Para registrarte en nuestro sistema y procesar tu pedido necesito estos datos: {$listaFalt}. ¿Me los compartes?";
+                        }
+
+                        // Crear cliente en SGI
+                        $okCrear = $clienteSrv->crear($integErp, $datosCrear);
+                        if (!$okCrear) {
+                            Log::error('❌ Falló creación de cliente en ERP', ['datos' => $datosCrear]);
+                            return "⚠️ Tuve un problema al registrarte en nuestro sistema. Intenta de nuevo en un momento o llama a la sede.";
+                        }
+
+                        Log::info('✅ Cliente creado en SGI antes del pedido', [
+                            'cedula' => $orderData['cedula'],
+                        ]);
+                    } else {
+                        Log::info('✅ Cliente ya existía en SGI', [
+                            'cedula' => $orderData['cedula'],
+                        ]);
+                    }
+                }
+            } catch (\Throwable $eClienteSgi) {
+                Log::error('❌ Error asegurando cliente en SGI: ' . $eClienteSgi->getMessage());
+                // No abortamos el pedido por esto — el bot puede continuar y
+                // los logs revelarán el problema al admin.
+            }
+        }
 
         if (Cache::has($confirmKey)) {
             // El cliente acaba de confirmar un pedido. Traemos el último pedido

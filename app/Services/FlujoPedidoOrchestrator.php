@@ -107,13 +107,31 @@ class FlujoPedidoOrchestrator
                     'verificar_cliente_erp',
                 ],
                 'tool_choice' => 'auto',
-                'instruccion' => "PASO IDENTIFICACIÓN: ya hay producto y entrega. Pide la cédula "
-                    . "al cliente en UN solo mensaje breve. Cuando te la dé, llama "
-                    . "INMEDIATAMENTE `verificar_cliente_erp` con esa cédula. "
-                    . "Si el ERP devuelve datos del cliente, NO le pidas más datos personales — "
-                    . "el sistema avanzará al siguiente paso. "
-                    . "Si no existe en ERP, pídele su nombre completo. "
+                'instruccion' => "PASO IDENTIFICACIÓN: ya hay producto y entrega. PIDE LA CÉDULA al "
+                    . "cliente en UN solo mensaje breve y natural. Cuando te la dé, llama "
+                    . "INMEDIATAMENTE `verificar_cliente_erp` con esa cédula.\n"
+                    . "Posibles resultados de la tool:\n"
+                    . "  • existe=true → el cliente YA está registrado en SGI. NO le pidas más "
+                    . "datos personales — el sistema avanzará automáticamente a confirmación.\n"
+                    . "  • existe=false → es cliente NUEVO. El sistema avanzará al paso "
+                    . "datos_cliente_nuevo y allí pedirás el resto de datos (nombre, email, "
+                    . "teléfono, dirección).\n"
                     . "PROHIBIDO: confirmar pedido en este paso. Solo verificar.",
+            ],
+
+            ConversacionPedidoEstado::PASO_DATOS_CLIENTE => [
+                'tools_permitidas' => [
+                    // verificar_cliente_erp por si el cliente da otra cédula
+                    'verificar_cliente_erp',
+                ],
+                'tool_choice' => 'auto',
+                'instruccion' => "PASO DATOS CLIENTE NUEVO: el cliente NO existe en SGI/ERP. "
+                    . "Pídele los datos faltantes en mensajes cortos y naturales: nombre completo, "
+                    . "email, teléfono (si aún no lo tienes), y dirección si aplica. Mira el "
+                    . "resumen del estado del pedido para saber EXACTAMENTE qué falta — pide solo "
+                    . "lo que no está. Una vez los tengas TODOS, el sistema avanzará a "
+                    . "confirmación automáticamente y al confirmar el pedido el sistema creará el "
+                    . "cliente en SGI antes de crear el pedido. PROHIBIDO confirmar pedido aún.",
             ],
 
             ConversacionPedidoEstado::PASO_CONFIRMACION => [

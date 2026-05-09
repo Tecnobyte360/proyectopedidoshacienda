@@ -23,6 +23,7 @@ class ConversacionPedidoEstado extends Model
     public const PASO_PRODUCTO       = 'producto';
     public const PASO_ENTREGA        = 'entrega';
     public const PASO_IDENTIFICACION = 'identificacion';
+    public const PASO_DATOS_CLIENTE  = 'datos_cliente_nuevo'; // cliente no está en ERP, pedir datos
     public const PASO_CONFIRMACION   = 'confirmacion';
     public const PASO_CONFIRMADO     = 'confirmado';
     public const PASO_ABANDONADO     = 'abandonado';
