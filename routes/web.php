@@ -138,6 +138,9 @@ Route::middleware(['no_super_sin_imp'])->group(function () {
     Route::get('/clientes',          ClientesIndex::class)->middleware('permission:clientes.ver')->name('clientes.index');
     Route::get('/conversaciones',    ConversacionesIndex::class)->middleware('permission:conversaciones.ver')->name('conversaciones.index');
     Route::get('/chat',              ChatIndex::class)->middleware('permission:chat.usar')->name('chat.index');
+    Route::get('/chat/estado/{conversacion}', \App\Livewire\Chat\EstadoPedido::class)
+        ->middleware('permission:chat.usar')
+        ->name('chat.estado-pedido');
     // Proxy autenticado para servir las medias de los estados de WhatsApp
     Route::get('/whatsapp-status/media/{filename}', \App\Http\Controllers\WhatsappStatusMediaController::class)
         ->where('filename', '[\w\-\.]+')

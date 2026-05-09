@@ -883,11 +883,31 @@ TXT;
             ];
         }
 
+        // 🎯 ESTADO ESTRUCTURADO: inyectar resumen del pedido en BD para que
+        // el LLM SIEMPRE sepa qué datos ya tiene, sin depender de leer chat.
+        $reinforceEstadoPedido = [];
+        try {
+            $estadoSrv = app(\App\Services\EstadoPedidoService::class);
+            $resumenEstado = $estadoSrv->resumenParaPrompt($conversacion);
+            if ($resumenEstado !== '') {
+                $reinforceEstadoPedido[] = [
+                    'role'    => 'system',
+                    'content' => $resumenEstado . "\n\n"
+                        . "🚨 Esta es la VERDAD ESTRUCTURADA del pedido. Úsala como input para confirmar_pedido. "
+                        . "Si dice 'DATOS COMPLETOS' debes invocar `confirmar_pedido` AHORA con estos datos. "
+                        . "No vuelvas a pedir lo que ya está aquí.",
+                ];
+            }
+        } catch (\Throwable $e) {
+            \Log::warning('No se pudo inyectar resumen de estado de pedido: ' . $e->getMessage());
+        }
+
         $messages = array_merge(
             [['role' => 'system', 'content' => $systemPrompt]],
             $reinforceAgent,
             $extraSystem,
-            $reinforceProgramado, // 📅 último system msg: pedidos programados
+            $reinforceProgramado, // 📅 pedidos programados
+            $reinforceEstadoPedido, // 🎯 estado estructurado en BD
             $conversationHistory
         );
 
@@ -1235,6 +1255,25 @@ TXT;
             $sedeId    = $this->obtenerSedeIdDesdeConexion($connectionId);
             $resultado = $this->validarCoberturaDireccion($direccion, $barrio, $ciudad, $sedeId, $from);
 
+            // 🎯 PERSISTIR resultado de cobertura en estado estructurado
+            try {
+                $estadoSrv2 = app(\App\Services\EstadoPedidoService::class);
+                $estadoActual = $estadoSrv2->obtener($conversacion);
+                if ($direccion && empty($estadoActual->direccion)) {
+                    $estadoActual->direccion = $direccion;
+                }
+                if ($barrio && empty($estadoActual->barrio)) {
+                    $estadoActual->barrio = $barrio;
+                }
+                if ($ciudad && empty($estadoActual->ciudad)) {
+                    $estadoActual->ciudad = $ciudad;
+                }
+                $estadoActual->save();
+                $estadoSrv2->captarCobertura($conversacion, $resultado);
+            } catch (\Throwable $e) {
+                Log::warning('No se pudo persistir cobertura: ' . $e->getMessage());
+            }
+
             // 🛡️ INSTRUCCIÓN INTERNA al LLM (NO al cliente): si cobertura OK,
             // el siguiente paso DEBE ser confirmar_pedido. Va como system msg
             // separado, NO dentro del JSON del tool result (porque el LLM
@@ -1363,6 +1402,14 @@ TXT;
                 }
             } else {
                 $resultado['mensaje'] = "Lookup no configurado en este tenant — continúa el flujo normal del pedido.";
+            }
+
+            // 🎯 PERSISTIR resultado del lookup ERP en estado estructurado
+            try {
+                app(\App\Services\EstadoPedidoService::class)
+                    ->captarClienteErp($conversacion, $resultado, $cedula);
+            } catch (\Throwable $e) {
+                Log::warning('No se pudo persistir lookup ERP: ' . $e->getMessage());
             }
 
             // Respuesta de la tool para OpenAI
@@ -1535,6 +1582,16 @@ TXT;
             }
 
             Log::info('🎯 CAPA 3: Function call confirmar_pedido', compact('from', 'orderData'));
+
+            // 🎯 PERSISTIR estado estructurado en BD ANTES de validar.
+            // Aunque el guard rechace por datos faltantes, lo que el bot
+            // recolectó queda guardado y el siguiente turno lo aprovecha.
+            try {
+                app(\App\Services\EstadoPedidoService::class)
+                    ->captarDeOrderData($conversacion, $orderData);
+            } catch (\Throwable $e) {
+                Log::warning('No se pudo persistir estado pedido: ' . $e->getMessage());
+            }
 
             // 🛡️ VALIDACIÓN DETERMINISTA: el bot debe enviar TODOS los datos
             // requeridos antes de confirmar. Si falta alguno, rechazamos y le
@@ -1714,6 +1771,29 @@ TXT;
             'contexto' => $contextoTool,
             'reply'    => mb_substr($reply, 0, 300),
         ]);
+
+        // 🎯 ATAJO DETERMINISTA: si el estado en BD ya está completo, NO
+        // necesitamos pedirle al LLM nada. Confirmamos el pedido directamente
+        // con los datos estructurados. Es más rápido y nunca falla.
+        try {
+            $estadoSrv3 = app(\App\Services\EstadoPedidoService::class);
+            $estadoBd = $estadoSrv3->obtener($conversacion);
+
+            if ($estadoBd->estaCompleto() && !$estadoBd->confirmado_at) {
+                Log::info('✅ Auto-recovery por ESTADO BD: datos completos, confirmando directo (sin LLM)', [
+                    'from' => $from,
+                    'estado_id' => $estadoBd->id,
+                ]);
+
+                $orderDataBd = $estadoBd->aOrderData();
+                return $this->guardarPedidoDesdeToolCall(
+                    $orderDataBd, $from, $name, $conversationHistory,
+                    $cacheKey, $connectionId, $conversacion, $convService
+                );
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Estado BD no usable para auto-confirmar: ' . $e->getMessage());
+        }
 
         try {
             $forzarMessages = $messages;
@@ -2802,6 +2882,15 @@ TXT;
               'umbral_horas'    => $horasMin,
               'mensaje'         => $mensajeActual,
           ]);
+
+          // 🎯 También resetear el estado estructurado del pedido
+          try {
+              app(\App\Services\EstadoPedidoService::class)
+                  ->resetear($conversacion, "auto_reset_{$horasInactividad}h_inactividad");
+          } catch (\Throwable $e) {
+              \Log::warning('No se pudo resetear estado pedido: ' . $e->getMessage());
+          }
+
           // Devolver historial vacío → bot empieza fresco
           return [];
       }
@@ -3972,6 +4061,15 @@ TXT;
             'whatsapp_id' => $whatsappId,
             'from' => $from,
         ]);
+
+        // 🎯 Marcar el estado como CONFIRMADO en BD para que el siguiente
+        // mensaje del cliente arranque limpio (no intentará re-confirmar).
+        try {
+            app(\App\Services\EstadoPedidoService::class)
+                ->marcarConfirmado($conversacion, $pedido->id);
+        } catch (\Throwable $e) {
+            Log::warning('No se pudo marcar estado pedido confirmado: ' . $e->getMessage());
+        }
 
         return $this->construirMensajeConfirmacionPedido($pedido, $orderData, $name, $beneficioAplicado);
     } catch (\Throwable $e) {
