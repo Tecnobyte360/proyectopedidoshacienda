@@ -52,9 +52,12 @@ class FlujoPedidoOrchestrator
                     'listar_categorias',
                 ],
                 'tool_choice' => 'auto',
-                'instruccion' => "PASO INICIO: el cliente acaba de empezar. "
-                    . "Salúdalo brevemente y pregúntale qué desea pedir. Si menciona un "
-                    . "producto, llama `buscar_productos` con sus palabras EXACTAS. "
+                'instruccion' => "PASO INICIO: el cliente acaba de empezar.\n"
+                    . "  • Si pregunta por HORARIOS, ZONAS, TELÉFONO, INFO de la empresa → "
+                    . "RESPONDE DIRECTO con los datos que tienes en el system prompt. "
+                    . "NO llames tools — esos datos están literales arriba.\n"
+                    . "  • Si menciona un PRODUCTO → llama `buscar_productos` con sus palabras.\n"
+                    . "  • Si solo saluda → saluda de vuelta y pregunta qué desea.\n"
                     . "NO confirmes pedido — aún no hay nada que confirmar.",
             ],
 
