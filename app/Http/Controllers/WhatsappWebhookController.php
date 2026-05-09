@@ -3970,7 +3970,18 @@ TXT;
 ): string {
     try {
         $telNorm = $this->normalizarTelefono($from);
-        $tenantId = app(\App\Services\TenantManager::class)->id() ?? 'none';
+
+        // 🛡️ MULTI-TENANT: si TenantManager NO tiene tenant seteado pero la
+        // conversación SÍ, hidratamos el contexto. Sin esto los pedidos
+        // creados desde tinker o jobs sin contexto quedan tenant_id=NULL
+        // y NO aparecen en /pedidos por el global scope BelongsToTenant.
+        $tm = app(\App\Services\TenantManager::class);
+        if (!$tm->id() && $conversacion?->tenant_id) {
+            $t = \App\Models\Tenant::find($conversacion->tenant_id);
+            if ($t) $tm->set($t);
+        }
+
+        $tenantId = $tm->id() ?? 'none';
         $confirmKey = "pedido_confirmado_t{$tenantId}_" . $telNorm;
 
         // 🆔 PASO PRE-PEDIDO: asegurar cliente en SGI/ERP antes de crear el pedido.
