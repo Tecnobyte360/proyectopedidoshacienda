@@ -1109,8 +1109,11 @@
                                                             </p>
                                                         </div>
                                                         @php
-                                                            $params = $tool['parametros']['properties'] ?? [];
+                                                            // properties puede venir como array o stdClass (objeto vacío)
+                                                            $paramsRaw = $tool['parametros']['properties'] ?? [];
+                                                            $params = is_array($paramsRaw) ? $paramsRaw : (array) $paramsRaw;
                                                             $required = $tool['parametros']['required'] ?? [];
+                                                            if (!is_array($required)) $required = (array) $required;
                                                         @endphp
                                                         @if(!empty($params))
                                                             <div>
