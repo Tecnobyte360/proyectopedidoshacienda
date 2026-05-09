@@ -42,14 +42,27 @@
                             {{ str_replace('_', ' ', $promo->tipo) }}
                         </span>
 
-                        @if($promo->estaVigente())
+                        @php
+                            $now = now();
+                            $vencida = $promo->fecha_fin && $promo->fecha_fin->lt($now);
+                            $futura  = $promo->fecha_inicio && $promo->fecha_inicio->gt($now);
+                        @endphp
+                        @if(!$promo->activa)
+                            <span class="inline-flex items-center rounded-full bg-slate-400 px-3 py-1 text-xs font-medium text-white">
+                                Inactiva
+                            </span>
+                        @elseif($vencida)
+                            <span class="inline-flex items-center rounded-full bg-orange-500 px-3 py-1 text-xs font-medium text-white" title="Está activada pero la fecha de fin ya pasó">
+                                ⚠ Vencida
+                            </span>
+                        @elseif($futura)
+                            <span class="inline-flex items-center rounded-full bg-blue-500 px-3 py-1 text-xs font-medium text-white">
+                                ⏳ Programada
+                            </span>
+                        @else
                             <span class="inline-flex items-center rounded-full bg-green-500 px-3 py-1 text-xs font-medium text-white">
                                 <span class="h-2 w-2 rounded-full bg-white animate-pulse mr-1.5"></span>
                                 Vigente
-                            </span>
-                        @else
-                            <span class="inline-flex items-center rounded-full bg-slate-400 px-3 py-1 text-xs font-medium text-white">
-                                Inactiva
                             </span>
                         @endif
                     </div>
@@ -124,10 +137,10 @@
 
     {{-- MODAL --}}
     @if($modalAbierto)
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto"
+        <div class="fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-4 overflow-y-auto"
              wire:click.self="cerrarModal">
-            <div class="w-full max-w-3xl rounded-2xl bg-white shadow-2xl my-8">
-                <div class="flex items-center justify-between border-b border-slate-100 px-6 py-4 sticky top-0 bg-white rounded-t-2xl">
+            <div class="w-full max-w-3xl rounded-2xl bg-white shadow-2xl my-8 max-h-[90vh] overflow-y-auto">
+                <div class="flex items-center justify-between border-b border-slate-100 px-6 py-4 sticky top-0 bg-white rounded-t-2xl z-10">
                     <h3 class="text-lg font-bold text-slate-800">
                         {{ $editandoId ? 'Editar promoción' : 'Nueva promoción' }}
                     </h3>
