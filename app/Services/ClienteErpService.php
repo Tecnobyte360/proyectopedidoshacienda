@@ -125,15 +125,38 @@ class ClienteErpService
             $sql = "INSERT INTO {$tabla} (" . implode(', ', array_keys($columnas)) . ")\n"
                  . "VALUES (" . implode(', ', array_map(fn ($c) => ':' . $c, array_keys($columnas))) . ")";
 
-            $stmt = $pdo->prepare($sql);
-            $stmt->execute($params);
-            $exitoso = true;
+            // 🔧 Mismo patrón que IntegracionExportService::ejecutarInserts:
+            // Desactivar triggers + constraints, hacer el INSERT, y reactivar.
+            // Sin esto, SGI aborta el batch con "transaction ended in the trigger".
+            try {
+                $pdo->exec("DISABLE TRIGGER ALL ON {$tabla}");
+                $pdo->exec("ALTER TABLE {$tabla} NOCHECK CONSTRAINT ALL");
+                Log::info("🔧 Triggers + Constraints DESACTIVADOS en {$tabla} (cliente)");
+            } catch (\Throwable $eDis) {
+                Log::warning("No se pudieron desactivar triggers en {$tabla}: " . $eDis->getMessage());
+            }
 
-            Log::info('✅ Cliente creado en ERP', [
-                'integracion_id' => $integracion->id,
-                'tabla'          => $tabla,
-                'datos'          => $datos,
-            ]);
+            try {
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute($params);
+                $exitoso = true;
+
+                Log::info('✅ Cliente creado en ERP', [
+                    'integracion_id' => $integracion->id,
+                    'tabla'          => $tabla,
+                    'datos'          => $datos,
+                ]);
+            } finally {
+                // Reactivar triggers SIEMPRE (incluso si el INSERT falla)
+                try {
+                    $pdo->exec("ENABLE TRIGGER ALL ON {$tabla}");
+                    $pdo->exec("ALTER TABLE {$tabla} CHECK CONSTRAINT ALL");
+                    Log::info("✓ Triggers + Constraints REACTIVADOS en {$tabla} (cliente)");
+                } catch (\Throwable $eEn) {
+                    Log::error("⚠️ NO SE PUDIERON REACTIVAR EN {$tabla}: " . $eEn->getMessage()
+                        . " — Reactiva manualmente: ENABLE TRIGGER ALL ON {$tabla}; ALTER TABLE {$tabla} CHECK CONSTRAINT ALL");
+                }
+            }
         } catch (\Throwable $e) {
             $error = $e->getMessage();
             Log::error('❌ Error al crear cliente en ERP: ' . $error, [
