@@ -806,6 +806,9 @@ class WhatsappWebhookController extends Controller
                     'sedes_cerradas'   => $sedesActivasG->count(),
                 ]);
 
+                // Flag para que aplicarGuardPedidosProgramados no reescriba este reply
+                request()->attributes->set('early_guard_handled', true);
+
                 try {
                     $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_ASSISTANT, $respuestaCierre);
                 } catch (\Throwable $e) {
@@ -3890,6 +3893,19 @@ TXT;
   private function aplicarGuardPedidosProgramados(string $reply): string
   {
       try {
+          // 🛡️ Si el EARLY GUARD ya respondió en este turno, NO reescribir.
+          // El EARLY GUARD ya genera un mensaje correcto (saludo + bienvenida
+          // + cierre + ofrecer programar) y este guard de fallback no debe
+          // mutilarlo a una versión más corta.
+          if (request()->attributes->get('early_guard_handled') === true) {
+              return $reply;
+          }
+
+          // 🛡️ Si el reply ya tiene formato "PROGRAMADO" + 📅, está bien — no tocar.
+          if (mb_stripos($reply, 'PROGRAMADO') !== false && str_contains($reply, '📅')) {
+              return $reply;
+          }
+
           $cfgBot = \App\Models\ConfiguracionBot::actual();
           if (!$cfgBot?->aceptar_pedidos_fuera_horario) return $reply;
 
