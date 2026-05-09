@@ -66,10 +66,36 @@ class EstadoPedidoService
         }
 
         // Entrega — detecta si es recogida o domicilio
-        if (!empty($orderData['pickup']) || !empty($orderData['sede_id'])) {
+        $esRecoger = !empty($orderData['pickup'])
+            || !empty($orderData['sede_id'])
+            || (empty($orderData['address']) && !empty($orderData['location']));
+
+        if ($esRecoger) {
             $estado->metodo_entrega = ConversacionPedidoEstado::METODO_RECOGER;
+
+            // 🎯 Resolver sede_id por varias vías:
+            //   1. Si vino sede_id explícito → usar
+            //   2. Si vino location con nombre de sede → buscar en BD por nombre
+            //   3. Si no, dejar NULL (se asignará la default de la conexión)
             if (!empty($orderData['sede_id'])) {
                 $estado->sede_id = (int) $orderData['sede_id'];
+            } elseif (!empty($orderData['location'])) {
+                $sedeBuscada = trim($orderData['location']);
+                $sedeMatch = \App\Models\Sede::query()
+                    ->where('activo', true)
+                    ->where(function ($q) use ($sedeBuscada) {
+                        $q->whereRaw('LOWER(nombre) = ?', [mb_strtolower($sedeBuscada)])
+                          ->orWhereRaw('LOWER(nombre) LIKE ?', ['%' . mb_strtolower($sedeBuscada) . '%']);
+                    })
+                    ->first();
+                if ($sedeMatch) {
+                    $estado->sede_id = $sedeMatch->id;
+                    Log::info('🏢 Sede resuelta por nombre', [
+                        'buscado' => $sedeBuscada,
+                        'sede_id' => $sedeMatch->id,
+                        'sede_nombre' => $sedeMatch->nombre,
+                    ]);
+                }
             }
         } elseif (!empty($orderData['address'])) {
             $estado->metodo_entrega = ConversacionPedidoEstado::METODO_DOMICILIO;

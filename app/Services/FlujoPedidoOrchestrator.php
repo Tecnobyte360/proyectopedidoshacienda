@@ -78,7 +78,6 @@ class FlujoPedidoOrchestrator
             ConversacionPedidoEstado::PASO_ENTREGA => [
                 'tools_permitidas' => [
                     'validar_cobertura',
-                    'listar_sedes',
                     'consultar_zonas_cobertura',
                     'buscar_productos', // por si quiere agregar más productos
                 ],
@@ -86,8 +85,10 @@ class FlujoPedidoOrchestrator
                 'instruccion' => "PASO ENTREGA: el cliente ya tiene productos. Define cómo se "
                     . "los entregan:\n"
                     . "  • Si dice 'a domicilio' o da una dirección → llama `validar_cobertura`.\n"
-                    . "  • Si dice 'recoger' / 'paso por él' → llama `listar_sedes` y deja "
-                    . "que escoja una.\n"
+                    . "  • Si dice 'recoger' / 'paso por él' → muéstrale las sedes disponibles "
+                    . "(tomadas del contexto de empresa que tienes en el system prompt) y deja "
+                    . "que escoja una. Una vez escoja, el sistema captura el nombre y resuelve "
+                    . "el sede_id automáticamente.\n"
                     . "Cuando esté validada cobertura O escogida sede, el sistema avanzará "
                     . "automáticamente. PROHIBIDO: pedir cédula o confirmar pedido en este paso.",
             ],
