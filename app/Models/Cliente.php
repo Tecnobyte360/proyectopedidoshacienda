@@ -119,12 +119,19 @@ class Cliente extends Model
         $cliente = self::where('telefono_normalizado', $telefonoNormalizado)->first();
 
         if ($cliente) {
-            // Si el nombre actual es genérico ("Cliente") y nos llegó uno mejor, lo actualizamos
+            // 🛡️ Validar que $nombre parezca un nombre real (no email, no tel, no cédula)
+            $nombreLimpio = trim((string) $nombre);
+            $pareceNombre = $nombreLimpio !== ''
+                && !str_contains($nombreLimpio, '@')
+                && !preg_match('/^\+?\d[\d\s\-]{6,}$/', $nombreLimpio)
+                && !preg_match('/^\d{6,12}$/', $nombreLimpio)
+                && preg_match('/[a-záéíóúñ]/iu', $nombreLimpio);
+
             if (
-                !empty($nombre)
+                $pareceNombre
                 && in_array(strtolower(trim($cliente->nombre)), ['cliente', 'usuario', ''], true)
             ) {
-                $cliente->update(['nombre' => $nombre]);
+                $cliente->update(['nombre' => $nombreLimpio]);
             }
             return $cliente;
         }

@@ -4841,8 +4841,29 @@ TXT;
         }
 
         // ── CLIENTE: actualizar datos (ya lo resolvimos arriba) ────────────
+        // 🛡️ Sanitizar customer_name: el LLM a veces mete emails, teléfonos o
+        // strings raros como customer_name. Solo aceptamos si parece un nombre.
+        $customerNameRaw = trim((string) ($orderData['customer_name'] ?? ''));
+        $nombreSeguro = $cliente->nombre; // default: mantener el actual
+        if ($customerNameRaw !== '') {
+            $esEmail   = filter_var($customerNameRaw, FILTER_VALIDATE_EMAIL) !== false || str_contains($customerNameRaw, '@');
+            $esTel     = preg_match('/^\+?\d[\d\s\-]{6,}$/', $customerNameRaw) === 1;
+            $esCedula  = preg_match('/^\d{6,12}$/', $customerNameRaw) === 1;
+            $tieneLetras = preg_match('/[a-záéíóúñ]/iu', $customerNameRaw) === 1;
+            $largoOk = mb_strlen($customerNameRaw) >= 2 && mb_strlen($customerNameRaw) <= 80;
+
+            if (!$esEmail && !$esTel && !$esCedula && $tieneLetras && $largoOk) {
+                $nombreSeguro = $customerNameRaw;
+            } else {
+                Log::warning('🛡️ customer_name del orderData rechazado (no parece un nombre)', [
+                    'customer_name' => $customerNameRaw,
+                    'cliente_id'    => $cliente->id,
+                ]);
+            }
+        }
+
         $datosClienteActualizar = [
-            'nombre'              => $orderData['customer_name'] ?? $cliente->nombre,
+            'nombre'              => $nombreSeguro,
             'direccion_principal' => $direccion ?: $cliente->direccion_principal,
             'barrio'              => $barrio ?: $cliente->barrio,
             'zona_cobertura_id'   => $zonaCobertura?->id ?? $cliente->zona_cobertura_id,
