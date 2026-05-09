@@ -73,23 +73,18 @@ class BotCatalogoService
                         return $row;
                     });
 
-                    // 2) Productos locales que NO estan en el ERP — los incluimos
-                    //    igual para que el bot no los pierda ("PIERNA A LA PARRILLA"
-                    //    en local, "PIERNA" en ERP, etc.).
-                    $codigosErp = $liveRows->pluck('codigo')
-                        ->filter(fn ($c) => $c !== null && $c !== '')
-                        ->map(fn ($c) => (string) $c)
-                        ->unique()
-                        ->values()
-                        ->all();
-
+                    // 2) Productos locales SIN código (virtuales — ej combos creados
+                    //    desde la plataforma que no existen en SGI). Los incluimos
+                    //    igual para no perderlos.
+                    //
+                    //    🛡️ ANTES: incluíamos TODOS los locales cuyo codigo no estaba
+                    //    en el ERP. Eso reintroducía productos descontinuados o de
+                    //    otras líneas (ej SUPERCOCO al filtrar SGI por StrLinea).
+                    //    AHORA: solo locales sin código (productos virtuales).
                     $localesExtras = Producto::with(['categoria'])
                         ->where('activo', true)
-                        ->where(function ($q) use ($codigosErp) {
+                        ->where(function ($q) {
                             $q->whereNull('codigo')->orWhere('codigo', '');
-                            if (!empty($codigosErp)) {
-                                $q->orWhereNotIn('codigo', $codigosErp);
-                            }
                         })
                         ->orderBy('orden')
                         ->orderBy('nombre')
