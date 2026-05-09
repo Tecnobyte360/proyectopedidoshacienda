@@ -4417,14 +4417,24 @@ TXT;
             $resueltoVia = null;
 
             if ($codeRaw !== '') {
-                $producto = $catalogo->resolverProducto($codeRaw, $sede?->id);
-                if ($producto) {
-                    $codigoResuelto = (string) ($producto->codigo ?? '');
-                    if (strcasecmp(trim($codigoResuelto), $codeRaw) === 0) {
-                        $resueltoVia = 'codigo_exacto';
-                    } else {
-                        // resolverProducto cayó a fuzzy a partir del code → no confiar
-                        $producto = null;
+                // 🛡️ Validar PRIMERO que el código existe en BD del tenant.
+                // Si el LLM inventó un code que no está en `productos.codigo`,
+                // ni siquiera intentamos el resolver — vamos directo al name.
+                $existeCodigo = \App\Models\Producto::where('codigo', $codeRaw)->exists();
+                if (!$existeCodigo) {
+                    Log::warning('🚫 Código inventado por LLM (no existe en BD)', [
+                        'code_inventado' => $codeRaw,
+                        'name'           => $nameRaw,
+                    ]);
+                } else {
+                    $producto = $catalogo->resolverProducto($codeRaw, $sede?->id);
+                    if ($producto) {
+                        $codigoResuelto = (string) ($producto->codigo ?? '');
+                        if (strcasecmp(trim($codigoResuelto), $codeRaw) === 0) {
+                            $resueltoVia = 'codigo_exacto';
+                        } else {
+                            $producto = null;
+                        }
                     }
                 }
             }

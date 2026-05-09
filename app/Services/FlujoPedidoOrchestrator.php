@@ -343,6 +343,50 @@ class FlujoPedidoOrchestrator
                     . "• Los parámetros marcados con `*` son obligatorios.\n"
                     . "• El paso avanzará automáticamente cuando completes los datos requeridos.";
 
+        // 🛡️ ANTI-ALUCINACIÓN: en pasos donde el LLM podría llamar
+        // confirmar_pedido, le inyectamos los productos del estado con
+        // sus códigos REALES de BD para que no invente.
+        $productosEstado = $estado->productos ?? [];
+        if (!empty($productosEstado) && in_array($paso, [
+            ConversacionPedidoEstado::PASO_PRODUCTO,
+            ConversacionPedidoEstado::PASO_ENTREGA,
+            ConversacionPedidoEstado::PASO_IDENTIFICACION,
+            ConversacionPedidoEstado::PASO_DATOS_CLIENTE,
+            ConversacionPedidoEstado::PASO_CONFIRMACION,
+        ], true)) {
+            $lineas = [];
+            foreach ($productosEstado as $pe) {
+                $code = trim((string) ($pe['code'] ?? $pe['codigo'] ?? ''));
+                $name = trim((string) ($pe['name'] ?? $pe['nombre'] ?? ''));
+                $qty  = $pe['quantity'] ?? $pe['cantidad'] ?? null;
+                $unit = $pe['unit'] ?? $pe['unidad'] ?? '';
+                if ($code === '' && $name === '') continue;
+
+                // Validamos que el code exista en BD; si no, lo blanqueamos
+                // y dejamos que el resolver lo busque por nombre.
+                $codeReal = '';
+                if ($code !== '') {
+                    $existe = \App\Models\Producto::where('codigo', $code)->exists();
+                    if ($existe) {
+                        $codeReal = $code;
+                    }
+                }
+                // Si no había code o estaba inventado, intentamos resolverlo por nombre
+                if ($codeReal === '' && $name !== '') {
+                    $prod = \App\Models\Producto::where('nombre', $name)
+                        ->orWhere('nombre', mb_strtoupper($name))
+                        ->first();
+                    if ($prod) $codeReal = (string) $prod->codigo;
+                }
+
+                $lineas[] = "  • code=`{$codeReal}` name=`{$name}` qty={$qty}" . ($unit ? " unit={$unit}" : '');
+            }
+            if (!empty($lineas)) {
+                $contenido .= "\n\n📦 PRODUCTOS DEL CARRITO ACTUAL (usa estos códigos EXACTOS, NO inventes otros):\n"
+                           . implode("\n", $lineas);
+            }
+        }
+
         return ['role' => 'system', 'content' => $contenido];
     }
 }
