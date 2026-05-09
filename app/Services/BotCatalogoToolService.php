@@ -26,6 +26,38 @@ class BotCatalogoToolService
      */
     public function buscarProductos(string $query, ?string $categoria = null, int $limite = 5, ?int $sedeId = null): array
     {
+        // 🛡️ PALABRAS QUE NO SON PRODUCTOS: si el cliente solo dice "domicilio",
+        // "despacho", "envío", "recoger", etc, NO buscar como producto.
+        // El catálogo SGI a veces tiene "DOMICILIO" como producto (cargo de envío)
+        // y eso causa que el bot facture un cargo cuando el cliente solo está
+        // diciendo el MÉTODO DE ENTREGA.
+        $qNorm = mb_strtolower(trim($query));
+        $palabrasNoProducto = [
+            // métodos de entrega
+            'domicilio', 'domicilios', 'domiicilio', 'dominicio', 'dominici',
+            'despacho', 'despachos',
+            'envio', 'envío', 'envios', 'envíos',
+            'recoger', 'recogerlo', 'reclamo', 'reclamar',
+            'entrega', 'entregas',
+            // pago / generales
+            'pago', 'efectivo', 'transferencia', 'tarjeta',
+            // saludos / despedidas
+            'hola', 'buenos dias', 'buenas tardes', 'buenas noches', 'gracias',
+            // confirmaciones
+            'si', 'no', 'dale', 'listo', 'ok',
+        ];
+
+        if (in_array($qNorm, $palabrasNoProducto, true)) {
+            \Log::info('🛡️ buscar_productos rechazó palabra que no es producto', [
+                'query' => $query,
+            ]);
+            return [
+                'encontrados'  => 0,
+                'productos'    => [],
+                'sugerencia_bot' => "El término '{$query}' no es un producto del catálogo — parece un método de entrega o palabra funcional. NO la presentes como producto. Si el cliente quiere ese método, captúralo en el flujo (sistema avanzará automáticamente).",
+            ];
+        }
+
         // Primer intento: buscar con sede filtrada
         $resultado = $this->buscarInternoConSede($query, $categoria, $limite, $sedeId);
 

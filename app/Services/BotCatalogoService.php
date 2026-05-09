@@ -530,6 +530,23 @@ class BotCatalogoService
         $entrada = $this->normalizar($nombreOCodigo);
         if ($entrada === '') return null;
 
+        // 🛡️ Si la entrada es solo una palabra de método de entrega o funcional,
+        // NO matchear como producto. El catálogo a veces tiene 'DOMICILIO' o
+        // similar como ítem (cargo de envío) y eso confunde.
+        $palabrasNoProducto = [
+            'domicilio', 'domicilios', 'domiicilio', 'dominicio', 'dominici',
+            'despacho', 'despachos', 'envio', 'envío', 'envios', 'envíos',
+            'recoger', 'recogerlo', 'reclamo', 'reclamar', 'entrega', 'entregas',
+            'pago', 'efectivo', 'transferencia', 'tarjeta',
+            'hola', 'gracias', 'si', 'no', 'dale', 'listo', 'ok',
+        ];
+        if (in_array($entrada, $palabrasNoProducto, true)) {
+            \Log::warning('🛡️ resolverProducto rechazó palabra no-producto', [
+                'entrada' => $nombreOCodigo,
+            ]);
+            return null;
+        }
+
         $productos = $this->productosActivos($sedeId);
 
         // 1) Match por código
