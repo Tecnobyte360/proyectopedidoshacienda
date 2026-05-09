@@ -1175,14 +1175,72 @@ TXT;
                             ];
                         })(),
 
-                        // 🎁 Devuelve promociones vigentes
+                        // 🎁 Promociones VIGENTES + AGRUPADAS POR SEDE (multi-tenant automático)
                         'consultar_promociones' => (function () {
-                            $promos = \App\Models\Promocion::where('activa', true)
-                                ->where(fn ($q) => $q->whereNull('vigencia_hasta')->orWhere('vigencia_hasta', '>=', now()))
-                                ->limit(15)->get(['nombre','descripcion','descuento_pct','descuento_valor']);
+                            $now = now();
+                            $sedesActivas = \App\Models\Sede::where('activa', true)->get();
+
+                            // Promociones vigentes del tenant actual (BelongsToTenant filtra por tenant_id)
+                            $promosVigentes = \App\Models\Promocion::where('activa', true)
+                                ->where(function ($q) use ($now) {
+                                    $q->whereNull('fecha_inicio')->orWhere('fecha_inicio', '<=', $now);
+                                })
+                                ->where(function ($q) use ($now) {
+                                    $q->whereNull('fecha_fin')->orWhere('fecha_fin', '>=', $now);
+                                })
+                                ->orderBy('orden')
+                                ->orderByDesc('id')
+                                ->limit(20)
+                                ->get();
+
+                            if ($promosVigentes->isEmpty()) {
+                                return [
+                                    'promociones_por_sede' => [],
+                                    'total_promociones' => 0,
+                                    'mensaje_si_vacio' => 'No hay promociones vigentes en este momento.',
+                                ];
+                            }
+
+                            // Cargar sedes vinculadas vía tabla pivot promocion_sede
+                            $sedesPorPromo = \DB::table('promocion_sede')
+                                ->whereIn('promocion_id', $promosVigentes->pluck('id'))
+                                ->get(['promocion_id', 'sede_id'])
+                                ->groupBy('promocion_id')
+                                ->map(fn ($rows) => $rows->pluck('sede_id')->all());
+
+                            $payloadPromo = function ($p) {
+                                return [
+                                    'nombre'        => $p->nombre,
+                                    'descripcion'   => $p->descripcion,
+                                    'tipo'          => $p->tipo,
+                                    'valor'         => (float) $p->valor,
+                                    'codigo_cupon'  => $p->codigo_cupon,
+                                    'compra_paga'   => ($p->compra && $p->paga) ? "{$p->compra}x{$p->paga}" : null,
+                                    'fecha_inicio'  => $p->fecha_inicio?->format('d/m/Y'),
+                                    'fecha_fin'     => $p->fecha_fin?->format('d/m/Y'),
+                                ];
+                            };
+
+                            $sedesPayload = $sedesActivas->map(function ($s) use ($promosVigentes, $sedesPorPromo, $payloadPromo) {
+                                $aplicables = $promosVigentes->filter(function ($p) use ($s, $sedesPorPromo) {
+                                    if ($p->aplica_todas_sedes) return true;
+                                    $vinculadas = $sedesPorPromo->get($p->id, []);
+                                    return in_array($s->id, $vinculadas, true);
+                                });
+                                return [
+                                    'sede'        => $s->nombre,
+                                    'promociones' => $aplicables->map($payloadPromo)->values()->all(),
+                                ];
+                            })->values()->all();
+
                             return [
-                                'promociones' => $promos->toArray(),
-                                'mensaje_si_vacio' => 'No hay promociones vigentes en este momento.',
+                                'promociones_por_sede' => $sedesPayload,
+                                'total_promociones'    => $promosVigentes->count(),
+                                'instruccion_para_bot' =>
+                                    'Las promociones se aplican POR SEDE. Si una promo aparece en varias sedes, '
+                                    . 'es porque está activa en todas (aplica_todas_sedes=true). NUNCA inventes '
+                                    . 'promociones — usa SOLO las que aparecen en este payload. Si el array '
+                                    . 'promociones de una sede está vacío, esa sede no tiene promos vigentes.',
                             ];
                         })(),
                     };
