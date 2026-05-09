@@ -58,13 +58,20 @@ class FlujoPedidoOrchestrator
                     'listar_categorias',
                 ],
                 'tool_choice' => 'auto',
-                'instruccion' => "PASO INICIO: el cliente acaba de empezar.\n"
-                    . "  • Si pregunta por HORARIOS, ZONAS, TELÉFONO, INFO de la empresa → "
-                    . "RESPONDE DIRECTO con los datos que tienes en el system prompt. "
-                    . "NO llames tools — esos datos están literales arriba.\n"
-                    . "  • Si menciona un PRODUCTO → llama `buscar_productos` con sus palabras.\n"
-                    . "  • Si solo saluda → saluda de vuelta y pregunta qué desea.\n"
-                    . "NO confirmes pedido — aún no hay nada que confirmar.",
+                'instruccion' =>
+                    "📍 PASO 0 — SALUDO\n"
+                    . "Acción única en este paso: dar la BIENVENIDA y preguntar qué desea pedir.\n\n"
+                    . "REGLAS:\n"
+                    . "1. Si solo saluda ('hola/buenos días/etc') → saluda cordial y pregunta:\n"
+                    . "   '¿En qué te ayudo? ¿Qué te provoca pedir hoy?'\n"
+                    . "2. Si pregunta por HORARIOS / ZONAS / EMPRESA → responde con datos del prompt.\n"
+                    . "3. Si menciona un PRODUCTO ('quiero pierna', 'tienen X') → llama "
+                    . "`buscar_productos` con sus palabras LITERALES.\n\n"
+                    . "PROHIBIDO en este paso:\n"
+                    . "  ❌ Pedir cédula\n"
+                    . "  ❌ Validar cobertura\n"
+                    . "  ❌ Confirmar pedido\n"
+                    . "  ❌ Pedir dirección o método de entrega",
             ],
 
             ConversacionPedidoEstado::PASO_PRODUCTO => [
@@ -76,33 +83,51 @@ class FlujoPedidoOrchestrator
                     'info_producto',
                 ],
                 'tool_choice' => 'auto',
-                'instruccion' => "PASO PRODUCTO: el cliente está eligiendo qué pedir. Tu único "
-                    . "objetivo es ayudarlo a definir productos y cantidades. Usa "
-                    . "`buscar_productos` cuando mencione algo concreto. Cuando ya "
-                    . "tenga producto + cantidad, pregunta cómo prefiere recibir el pedido: "
-                    . "'¿prefieres que te lo despachemos o vas a recogerlo en una de nuestras sedes?'. "
-                    . "Los DOS únicos métodos de entrega son: DESPACHO (entrega a domicilio) y "
-                    . "CLIENTE RECOGE (en una de nuestras sedes). "
-                    . "PROHIBIDO: validar cobertura, pedir cédula o confirmar pedido en este paso.",
+                'instruccion' =>
+                    "🛒 PASO 1 — PRODUCTOS (qué quiere)\n"
+                    . "Acción única en este paso: dejar CLAROS los productos y cantidades.\n\n"
+                    . "REGLAS:\n"
+                    . "1. Si menciona un producto → SIEMPRE llama `buscar_productos` antes de responder.\n"
+                    . "2. Si encuentras el producto, muestra opciones con precio y unidad.\n"
+                    . "3. Cuando el cliente confirme cantidad ('2 libras de X', 'dame ese mismo') → "
+                    . "el sistema captura los productos al estado.\n"
+                    . "4. Cuando ya hay producto + cantidad clara, pasa al PASO 2 preguntando:\n"
+                    . "   '¿Prefieres DESPACHO o pasarás a RECOGER en sede?'\n\n"
+                    . "PROHIBIDO en este paso:\n"
+                    . "  ❌ Pedir cédula (eso es PASO 3)\n"
+                    . "  ❌ Pedir dirección (eso es PASO 2)\n"
+                    . "  ❌ Validar cobertura (eso es PASO 2)\n"
+                    . "  ❌ Confirmar pedido (eso es PASO 4)",
             ],
 
             ConversacionPedidoEstado::PASO_ENTREGA => [
                 'tools_permitidas' => [
                     'validar_cobertura',
                     'consultar_zonas_cobertura',
-                    'buscar_productos', // por si quiere agregar más productos
+                    'buscar_productos',
                 ],
                 'tool_choice' => 'auto',
-                'instruccion' => "PASO ENTREGA: el cliente ya tiene productos. Define cómo se "
-                    . "los entregan. Los DOS únicos métodos disponibles son:\n"
-                    . "  • DESPACHO (a domicilio): si dice 'despacho', 'envío', 'a domicilio', "
-                    . "'me lo mandas', o da una dirección → llama `validar_cobertura` con esa "
-                    . "dirección.\n"
-                    . "  • CLIENTE RECOGE: si dice 'recoger', 'paso por él', 'yo voy', 'yo recojo' "
-                    . "→ muéstrale las sedes disponibles (del system prompt) y deja que escoja "
-                    . "una. El sistema captura el nombre o el número (1, 2) y resuelve sede_id.\n"
-                    . "Cuando esté validada cobertura O escogida sede, el sistema avanzará "
-                    . "automáticamente. PROHIBIDO: pedir cédula o confirmar pedido en este paso.",
+                'instruccion' =>
+                    "🚚 PASO 2 — MÉTODO DE ENTREGA (cómo lo recibe)\n"
+                    . "Acción única: definir DESPACHO o CLIENTE RECOGE.\n\n"
+                    . "Solo hay DOS métodos posibles:\n\n"
+                    . "  🅰️ DESPACHO (a domicilio):\n"
+                    . "     - Cliente dice 'despacho' / 'envío' / 'a domicilio' / 'me lo mandas'\n"
+                    . "     - O da una dirección directa ('cra X #Y-Z')\n"
+                    . "     - Acción: pídele la dirección si no la dio, luego llama "
+                    . "       `validar_cobertura(direccion, barrio, ciudad)`\n"
+                    . "     - Si cobertura OK → captura dirección + costo + tiempo, avanza\n"
+                    . "     - Si NO cubierta → ofrece la opción RECOGER\n\n"
+                    . "  🅱️ CLIENTE RECOGE (en sede):\n"
+                    . "     - Cliente dice 'recoger' / 'paso por él' / 'yo voy' / 'yo recojo'\n"
+                    . "     - Acción: lista las sedes activas (las tienes en el system prompt) "
+                    . "       y deja que el cliente escoja por nombre o número.\n"
+                    . "     - El sistema captura sede_id automáticamente.\n\n"
+                    . "PROHIBIDO en este paso:\n"
+                    . "  ❌ Pedir cédula (eso es PASO 3)\n"
+                    . "  ❌ Confirmar pedido\n"
+                    . "  ❌ Pedir email / teléfono\n"
+                    . "  ❌ Inventar costos de envío",
             ],
 
             ConversacionPedidoEstado::PASO_IDENTIFICACION => [
@@ -110,45 +135,68 @@ class FlujoPedidoOrchestrator
                     'verificar_cliente_erp',
                 ],
                 'tool_choice' => 'auto',
-                'instruccion' => "PASO IDENTIFICACIÓN: ya hay producto y entrega. PIDE LA CÉDULA al "
-                    . "cliente en UN solo mensaje breve y natural. Cuando te la dé, llama "
-                    . "INMEDIATAMENTE `verificar_cliente_erp` con esa cédula.\n"
-                    . "Posibles resultados de la tool:\n"
-                    . "  • existe=true → el cliente YA está registrado en SGI. NO le pidas más "
-                    . "datos personales — el sistema avanzará automáticamente a confirmación.\n"
-                    . "  • existe=false → es cliente NUEVO. El sistema avanzará al paso "
-                    . "datos_cliente_nuevo y allí pedirás el resto de datos (nombre, email, "
-                    . "teléfono, dirección).\n"
-                    . "PROHIBIDO: confirmar pedido en este paso. Solo verificar.",
+                'instruccion' =>
+                    "🪪 PASO 3 — IDENTIFICACIÓN (quién es)\n"
+                    . "Acción única: pedir CÉDULA y verificar en SGI.\n\n"
+                    . "FLUJO EXACTO:\n"
+                    . "1. Pide la cédula en UN solo mensaje breve:\n"
+                    . "   'Para registrar tu pedido, ¿me das tu número de cédula?'\n"
+                    . "2. Cuando te dé un número de 6-12 dígitos → llama INMEDIATAMENTE "
+                    . "`verificar_cliente_erp(cedula)`.\n\n"
+                    . "RESULTADOS POSIBLES:\n"
+                    . "  ✅ existe=true → el cliente YA está en SGI. El sistema usa sus datos del ERP "
+                    . "(nombre, dirección, teléfono). NO le pidas más nada — saltarás a confirmación.\n"
+                    . "  ❌ existe=false → es cliente NUEVO. El sistema avanzará al PASO 3.5 (datos "
+                    . "del cliente) y allí pedirás el resto.\n\n"
+                    . "PROHIBIDO en este paso:\n"
+                    . "  ❌ Confirmar pedido — solo verificar identidad\n"
+                    . "  ❌ Pedir email o teléfono antes de tener la cédula\n"
+                    . "  ❌ Inventar nombre del cliente",
             ],
 
             ConversacionPedidoEstado::PASO_DATOS_CLIENTE => [
                 'tools_permitidas' => [
-                    // verificar_cliente_erp por si el cliente da otra cédula
                     'verificar_cliente_erp',
                 ],
                 'tool_choice' => 'auto',
-                'instruccion' => "PASO DATOS CLIENTE NUEVO: el cliente NO existe en SGI/ERP. "
-                    . "Pídele los datos faltantes en mensajes cortos y naturales: nombre completo, "
-                    . "email, teléfono (si aún no lo tienes), y dirección si aplica. Mira el "
-                    . "resumen del estado del pedido para saber EXACTAMENTE qué falta — pide solo "
-                    . "lo que no está. Una vez los tengas TODOS, el sistema avanzará a "
-                    . "confirmación automáticamente y al confirmar el pedido el sistema creará el "
-                    . "cliente en SGI antes de crear el pedido. PROHIBIDO confirmar pedido aún.",
+                'instruccion' =>
+                    "📝 PASO 3.5 — DATOS DE CLIENTE NUEVO\n"
+                    . "Acción única: pedir los datos faltantes para registrar al cliente en SGI.\n\n"
+                    . "El cliente NO existe en SGI. Necesitas (mira el RESUMEN del estado para saber "
+                    . "qué falta exactamente):\n"
+                    . "  • nombre completo\n"
+                    . "  • email\n"
+                    . "  • teléfono (si no lo tenemos del WhatsApp)\n\n"
+                    . "REGLAS:\n"
+                    . "1. Pide los datos UNO POR UNO en mensajes cortos. NO los pidas todos juntos.\n"
+                    . "2. NO repitas un dato que ya está en el resumen.\n"
+                    . "3. Cuando estén TODOS, el sistema avanza solo a confirmación.\n\n"
+                    . "PROHIBIDO en este paso:\n"
+                    . "  ❌ Confirmar pedido aún\n"
+                    . "  ❌ Llamar `confirmar_pedido` antes de tener todos los datos",
             ],
 
             ConversacionPedidoEstado::PASO_CONFIRMACION => [
-                // 🚨 SOLO confirmar_pedido. NADA MÁS.
                 'tools_permitidas' => [
                     'confirmar_pedido',
                 ],
-                // 🔒 FORZADO: el LLM no puede responder texto. DEBE llamar la función.
                 'tool_choice' => ['type' => 'function', 'function' => ['name' => 'confirmar_pedido']],
-                'instruccion' => "🚨 PASO CONFIRMACIÓN — DATOS COMPLETOS, ACCIÓN OBLIGATORIA. "
-                    . "Tu ÚNICA acción válida es invocar `confirmar_pedido` con los datos "
-                    . "estructurados que aparecen en el resumen del estado del pedido. "
-                    . "PROHIBIDO responder texto. PROHIBIDO preguntar nada. "
-                    . "PROHIBIDO validar nada. INVOCA LA FUNCIÓN AHORA con todos los datos.",
+                'instruccion' =>
+                    "✅ PASO 4 — CONFIRMACIÓN (acción obligatoria)\n"
+                    . "TODOS LOS DATOS ESTÁN COMPLETOS. Tu ÚNICA acción válida es:\n"
+                    . "→ INVOCAR `confirmar_pedido` con los datos del resumen del estado.\n\n"
+                    . "🔒 PROHIBIDO ABSOLUTO en este paso:\n"
+                    . "  ❌ Responder texto\n"
+                    . "  ❌ Preguntar más datos\n"
+                    . "  ❌ Validar cobertura otra vez\n"
+                    . "  ❌ Verificar cédula otra vez\n"
+                    . "  ❌ Llamar cualquier otra tool\n\n"
+                    . "El sistema (NO tú):\n"
+                    . "  1. Crea cliente en SGI si es nuevo\n"
+                    . "  2. Crea pedido en BD\n"
+                    . "  3. Exporta pedido a SGI (TblDocumentos)\n"
+                    . "  4. Genera link de pago si aplica\n"
+                    . "  5. Te pasa el número de pedido para que respondas al cliente",
             ],
 
             ConversacionPedidoEstado::PASO_CONFIRMADO => [
