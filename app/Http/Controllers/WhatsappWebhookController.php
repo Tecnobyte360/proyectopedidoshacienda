@@ -890,6 +890,26 @@ TXT;
         $pasoActualOrch        = \App\Models\ConversacionPedidoEstado::PASO_INICIO;
         try {
             $estadoSrv = app(\App\Services\EstadoPedidoService::class);
+
+            // 🔁 AUTO-RESET para nuevo pedido del mismo cliente: si el estado
+            // está confirmado y el cliente menciona "otro pedido", "quiero más",
+            // etc → resetear estado y arrancar un flujo limpio.
+            $estadoVerif = $estadoSrv->obtener($conversacion);
+            if (
+                $estadoVerif->paso_actual === \App\Models\ConversacionPedidoEstado::PASO_CONFIRMADO &&
+                $estadoSrv->detectarIntencionNuevoPedido($message)
+            ) {
+                Log::info('🔁 Cliente quiere NUEVO pedido — reseteando estado', [
+                    'from'           => $from,
+                    'pedido_anterior'=> $estadoVerif->pedido_id,
+                    'mensaje'        => $message,
+                ]);
+                $estadoSrv->resetear(
+                    $conversacion,
+                    "nuevo_pedido_tras_{$estadoVerif->pedido_id}"
+                );
+            }
+
             $resumenEstado = $estadoSrv->resumenParaPrompt($conversacion);
             if ($resumenEstado !== '') {
                 $reinforceEstadoPedido[] = [

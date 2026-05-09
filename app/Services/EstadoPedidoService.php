@@ -206,11 +206,112 @@ class EstadoPedidoService
     }
 
     /**
+     * Detecta si el cliente está intentando iniciar un NUEVO pedido (después de
+     * uno ya confirmado). Frases que indican esto:
+     *   "quiero otro pedido", "agrégame otro", "para otro pedido", "uno más",
+     *   "ahora me das…", o si menciona un producto sin estar pidiendo seguimiento.
+     *
+     * NO se considera nuevo pedido si solo pregunta por el anterior:
+     *   "¿cuándo llega?", "¿ya salió?", "estado del pedido", etc.
+     */
+    public function detectarIntencionNuevoPedido(string $mensaje): bool
+    {
+        $m = mb_strtolower(trim($mensaje));
+        if ($m === '') return false;
+
+        // Patrones que CLARAMENTE indican nuevo pedido
+        $intencionNueva = [
+            'otro pedido',
+            'nuevo pedido',
+            'un pedido más',
+            'un pedido mas',
+            'agrégame',
+            'agregame',
+            'añadir',
+            'anadir',
+            'pedir algo más',
+            'pedir algo mas',
+            'quiero más',
+            'quiero mas',
+            'también quiero',
+            'tambien quiero',
+            'me das también',
+            'me das tambien',
+            'aparte quiero',
+            'también un',
+            'tambien un',
+            'también una',
+            'tambien una',
+            'agréguenme',
+            'agreguenme',
+            'sumar al pedido',
+            'pedir de nuevo',
+            'volver a pedir',
+        ];
+
+        foreach ($intencionNueva as $p) {
+            if (str_contains($m, $p)) return true;
+        }
+
+        // Patrones que indican SEGUIMIENTO del pedido anterior — NO es nuevo pedido
+        $seguimiento = [
+            'cuándo llega',
+            'cuando llega',
+            'ya salió',
+            'ya salio',
+            'dónde está',
+            'donde esta',
+            'mi pedido',
+            'el pedido',
+            'estado del pedido',
+            'cancelar',
+            'cancela',
+            'modificar el pedido',
+            'cambiar el pedido',
+            '¿llegó?',
+            'llegó?',
+            'llego?',
+            'recibí',
+            'recibi',
+            'gracias',
+            'perfecto',
+            'ok gracias',
+            'todo bien',
+        ];
+
+        foreach ($seguimiento as $s) {
+            if (str_contains($m, $s)) return false;
+        }
+
+        return false;
+    }
+
+    /**
      * Resetea el estado (al saludar tras inactividad, o tras confirmar pedido nuevo).
+     *
+     * IMPORTANTE: para clientes recurrentes (ya tenemos cédula + nombre + ERP),
+     * preservamos esos datos para que NO tenga que volver a darlos en el
+     * pedido nuevo. Solo limpiamos lo específico del pedido (productos, sede,
+     * dirección, etc.).
      */
     public function resetear(ConversacionWhatsapp $conv, ?string $motivo = null): void
     {
         $estado = $this->obtener($conv);
+
+        // 🎯 ¿Es un nuevo pedido del mismo cliente ya identificado?
+        $esNuevoPedidoConClienteIdentificado = (
+            $motivo
+            && str_starts_with((string) $motivo, 'nuevo_pedido_tras_')
+            && $estado->cedula
+            && $estado->cliente_existe_erp
+        );
+
+        $cedulaPreservar  = $esNuevoPedidoConClienteIdentificado ? $estado->cedula : null;
+        $nombrePreservar  = $esNuevoPedidoConClienteIdentificado ? $estado->nombre_cliente : null;
+        $erpExistePreserv = $esNuevoPedidoConClienteIdentificado ? true : false;
+        $datosErpPreserv  = $esNuevoPedidoConClienteIdentificado ? $estado->datos_erp : null;
+        $telefonoPreserv  = $estado->telefono ?: $conv->telefono_normalizado;
+
         $estado->fill([
             'paso_actual'        => ConversacionPedidoEstado::PASO_INICIO,
             'productos'          => null,
@@ -222,15 +323,18 @@ class EstadoPedidoService
             'cobertura_validada' => false,
             'distancia_km'       => null,
             'costo_envio'        => null,
-            'cedula'             => null,
-            'nombre_cliente'     => null,
+            'cedula'             => $cedulaPreservar,
+            'nombre_cliente'     => $nombrePreservar,
+            'telefono'           => $telefonoPreserv,
             'email'              => null,
-            'cliente_existe_erp' => false,
-            'datos_erp'          => null,
+            'cliente_existe_erp' => $erpExistePreserv,
+            'datos_erp'          => $datosErpPreserv,
             'metodo_pago'        => null,
             'cupon_code'         => null,
             'notas'              => null,
-            'validaciones'       => null,
+            'validaciones'       => $esNuevoPedidoConClienteIdentificado
+                ? ['cliente_erp' => true]
+                : null,
             'pedido_id'          => null,
             'confirmado_at'      => null,
             'abandonado_at'      => $motivo ? now() : null,
@@ -238,8 +342,9 @@ class EstadoPedidoService
         ])->save();
 
         Log::info('🔄 Estado pedido reseteado', [
-            'conv_id' => $conv->id,
-            'motivo'  => $motivo,
+            'conv_id'             => $conv->id,
+            'motivo'              => $motivo,
+            'cliente_preservado'  => $esNuevoPedidoConClienteIdentificado,
         ]);
     }
 

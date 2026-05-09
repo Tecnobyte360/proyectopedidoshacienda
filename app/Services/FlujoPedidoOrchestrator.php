@@ -126,12 +126,20 @@ class FlujoPedidoOrchestrator
                     'buscar_productos',
                     'consultar_horarios',
                     'info_producto',
+                    'productos_destacados',
                 ],
                 'tool_choice' => 'auto',
                 'instruccion' => "El pedido del cliente YA fue creado y registrado. "
-                    . "Si pregunta por su pedido, responde con el número y estado. "
-                    . "Si quiere agregar más productos, dile que cree un nuevo pedido. "
-                    . "PROHIBIDO llamar `confirmar_pedido` de nuevo — ya está cerrado.",
+                    . "Comportamiento según lo que diga el cliente:\n"
+                    . "  • Si pregunta por su pedido / cuándo llega / estado → responde con "
+                    . "    número y estado. NO llames confirmar_pedido.\n"
+                    . "  • Si dice 'otro pedido', 'quiero más', 'agrégame X' o menciona un "
+                    . "    producto nuevo → el sistema reseteará automáticamente el estado y "
+                    . "    arrancarás un flujo limpio en el siguiente turno. Tu respuesta debe "
+                    . "    ser: 'Claro {nombre}, ¿qué quieres pedir esta vez?' (sin volver a "
+                    . "    pedir cédula porque ya la tenemos guardada).\n"
+                    . "  • Si solo agradece o despide → responde cordial breve.\n"
+                    . "PROHIBIDO llamar `confirmar_pedido` de nuevo en este paso.",
             ],
 
             ConversacionPedidoEstado::PASO_ABANDONADO => [
