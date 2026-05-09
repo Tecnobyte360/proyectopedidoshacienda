@@ -223,16 +223,11 @@ class EstadoPedidoService
         // 1. CÉDULA — número de 6-12 dígitos, posiblemente con puntos
         //    Ej: "1098765432", "1.098.765.432", "Mi cédula es 1234567"
         if (empty($estado->cedula)) {
-            // Primero limpiar puntos y espacios para evaluar
             $clean = preg_replace('/[^\d]/', '', $msg);
-            // Si tiene 6-12 dígitos puros y el mensaje no es muy largo (no es texto con números)
             if (preg_match('/^\d{6,12}$/', $clean) && mb_strlen($msg) <= 25) {
                 $estado->cedula = $clean;
                 $cambio = true;
-                Log::info('🔍 Cédula capturada del mensaje', [
-                    'conv_id' => $conv->id,
-                    'cedula'  => $clean,
-                ]);
+                Log::info('🔍 Cédula capturada del mensaje', ['conv_id' => $conv->id, 'cedula' => $clean]);
             } elseif (preg_match('/\b(?:c[eé]dula|cc|documento|nit|ced|cédula)[\s:]*([\d.,]{6,15})\b/iu', $msg, $m)) {
                 $clean = preg_replace('/[^\d]/', '', $m[1]);
                 if (preg_match('/^\d{6,12}$/', $clean)) {
@@ -248,6 +243,69 @@ class EstadoPedidoService
             $estado->email = mb_strtolower($m[0]);
             $cambio = true;
             Log::info('🔍 Email capturado del mensaje', ['conv_id' => $conv->id, 'email' => $estado->email]);
+        }
+
+        // 3. SEDE — si el cliente está en flujo de recoger y aún no tiene sede
+        if (
+            empty($estado->sede_id) &&
+            $estado->metodo_entrega === ConversacionPedidoEstado::METODO_RECOGER
+        ) {
+            $sedes = \App\Models\Sede::where('activa', true)->orderBy('id')->get();
+
+            // 3a. Si el mensaje es solo un número (1, 2, 3...) → posición en lista
+            if (preg_match('/^\s*(\d{1,2})\s*\.?\s*$/', $msg, $m)) {
+                $idx = (int) $m[1] - 1;
+                if (isset($sedes[$idx])) {
+                    $estado->sede_id = $sedes[$idx]->id;
+                    $cambio = true;
+                    Log::info('🔍 Sede capturada por posición en lista', [
+                        'conv_id' => $conv->id,
+                        'opcion'  => $m[1],
+                        'sede_id' => $estado->sede_id,
+                        'nombre'  => $sedes[$idx]->nombre,
+                    ]);
+                }
+            }
+
+            // 3b. Si el mensaje contiene el nombre de una sede → match
+            if (!$cambio || empty($estado->sede_id)) {
+                $msgLower = mb_strtolower($msg);
+                foreach ($sedes as $s) {
+                    if (str_contains($msgLower, mb_strtolower($s->nombre))) {
+                        $estado->sede_id = $s->id;
+                        $cambio = true;
+                        Log::info('🔍 Sede capturada por nombre', [
+                            'conv_id' => $conv->id,
+                            'sede_id' => $s->id,
+                            'nombre'  => $s->nombre,
+                        ]);
+                        break;
+                    }
+                }
+            }
+        }
+
+        // 4. NOMBRE — heurística simple cuando estamos en paso identificación
+        //    o datos_cliente_nuevo y el cliente envía un texto que parece nombre
+        if (
+            empty($estado->nombre_cliente) &&
+            in_array($estado->paso_actual, [
+                ConversacionPedidoEstado::PASO_IDENTIFICACION,
+                ConversacionPedidoEstado::PASO_DATOS_CLIENTE,
+            ], true)
+        ) {
+            // Heurística: el mensaje es 2-5 palabras, sin números, sin @, sin frases típicas
+            $palabras = preg_split('/\s+/', trim($msg));
+            $tieneSoloLetras = preg_match('/^[A-Za-zÁÉÍÓÚáéíóúñÑ\s]+$/', $msg);
+            $noEsFraseFuncional = !preg_match('/(quier|tien|necesi|domicil|recog|pago|gracias|hola|buen|por\s*favor|si|no|listo|dale)/i', $msg);
+            if ($tieneSoloLetras && count($palabras) >= 2 && count($palabras) <= 5 && $noEsFraseFuncional) {
+                $estado->nombre_cliente = mb_convert_case(trim($msg), MB_CASE_TITLE, 'UTF-8');
+                $cambio = true;
+                Log::info('🔍 Nombre capturado heurísticamente', [
+                    'conv_id' => $conv->id,
+                    'nombre'  => $estado->nombre_cliente,
+                ]);
+            }
         }
 
         if ($cambio) {
