@@ -1765,34 +1765,50 @@ TXT;
         $frase = $this->detectarFalsaConfirmacion($reply);
         if (!$frase) return $reply;
 
-        Log::warning('⚠️ ALUCINACIÓN detectada — forzando retry confirmar_pedido', [
+        Log::warning('⚠️ ALUCINACIÓN detectada — delegando al BOT CIERRE', [
             'from'     => $from,
             'frase'    => $frase,
             'contexto' => $contextoTool,
             'reply'    => mb_substr($reply, 0, 300),
         ]);
 
-        // 🎯 ATAJO DETERMINISTA: si el estado en BD ya está completo, NO
-        // necesitamos pedirle al LLM nada. Confirmamos el pedido directamente
-        // con los datos estructurados. Es más rápido y nunca falla.
+        // 🤖 DELEGAR AL BOT CIERRE: agente especializado que solo cierra pedidos.
+        // Si tiene éxito (vía estado BD o LLM mini con tool_choice forzado),
+        // procesamos su orderData con guardarPedidoDesdeToolCall.
         try {
-            $estadoSrv3 = app(\App\Services\EstadoPedidoService::class);
-            $estadoBd = $estadoSrv3->obtener($conversacion);
+            $cierreResult = app(\App\Services\Bots\BotCierreService::class)
+                ->intentarCierre($conversacion);
 
-            if ($estadoBd->estaCompleto() && !$estadoBd->confirmado_at) {
-                Log::info('✅ Auto-recovery por ESTADO BD: datos completos, confirmando directo (sin LLM)', [
+            if ($cierreResult['ok']) {
+                Log::info('🤖✅ BotCierre tomó el control y cerró el pedido', [
                     'from' => $from,
-                    'estado_id' => $estadoBd->id,
+                    'via'  => $cierreResult['via'],
                 ]);
 
-                $orderDataBd = $estadoBd->aOrderData();
                 return $this->guardarPedidoDesdeToolCall(
-                    $orderDataBd, $from, $name, $conversationHistory,
+                    $cierreResult['orderData'], $from, $name, $conversationHistory,
                     $cacheKey, $connectionId, $conversacion, $convService
                 );
             }
+
+            // BotCierre dijo que no puede — registramos por qué
+            Log::info('🤖❌ BotCierre no pudo cerrar', [
+                'from'  => $from,
+                'razon' => $cierreResult['razon'] ?? '?',
+                'faltantes' => $cierreResult['faltantes'] ?? null,
+            ]);
+
+            // Si el motivo es "estado_incompleto", responder al cliente con qué falta
+            if (($cierreResult['razon'] ?? '') === 'estado_incompleto' && !empty($cierreResult['faltantes'])) {
+                $listaF = implode(', ', $cierreResult['faltantes']);
+                $replyFix = "Para cerrar tu pedido aún necesito: {$listaF}. ¿Me los compartes?";
+                $conversationHistory[] = ['role' => 'assistant', 'content' => $replyFix];
+                Cache::put($cacheKey, $conversationHistory, now()->addMinutes(45));
+                $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_ASSISTANT, $replyFix);
+                return $replyFix;
+            }
         } catch (\Throwable $e) {
-            Log::warning('Estado BD no usable para auto-confirmar: ' . $e->getMessage());
+            Log::error('🤖 BotCierre lanzó excepción: ' . $e->getMessage(), ['from' => $from]);
         }
 
         try {
@@ -1937,6 +1953,21 @@ TXT;
             // Cierre genérico
             'genial, te despachamos',
             'perfecto, queda',
+            // ⏳ Promesas vacías — el bot dice "ya lo hago" pero no llama tool
+            'un momento, verificando',
+            'un momento verificando',
+            'verificando tus datos',
+            'verificando datos',
+            'déjame verificar tus datos',
+            'dame un momento',
+            'estoy generando tu pedido',
+            'estoy creando tu pedido',
+            'voy a registrar tu pedido',
+            'procediendo a registrar',
+            'procederé a registrar',
+            'registrando tu pedido',
+            'creando el pedido',
+            'creando tu pedido',
         ];
 
         $lower = mb_strtolower($reply);
