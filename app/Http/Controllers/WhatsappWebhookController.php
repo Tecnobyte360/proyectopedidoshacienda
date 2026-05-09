@@ -1216,7 +1216,7 @@ TXT;
 
                             $idsProductos = $productosPorPromo->flatten()->pluck('producto_id')->unique()->all();
                             $productosCatalogo = \App\Models\Producto::whereIn('id', $idsProductos)
-                                ->get(['id', 'nombre', 'precio', 'unidad'])
+                                ->get(['id', 'nombre', 'precio_base', 'unidad'])
                                 ->keyBy('id');
 
                             $payloadPromo = function ($p) use ($productosPorPromo, $productosCatalogo) {
@@ -1231,7 +1231,7 @@ TXT;
                                         if (!$prod) continue;
                                         $productosPromo[] = [
                                             'nombre' => $prod->nombre,
-                                            'precio' => (float) ($prod->precio ?? 0),
+                                            'precio' => (float) ($prod->precio_base ?? 0),
                                             'unidad' => $prod->unidad,
                                         ];
                                     }
