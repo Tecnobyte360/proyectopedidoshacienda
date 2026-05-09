@@ -4906,7 +4906,7 @@ Tú: "Te entiendo 🙏 Si quieres algo más económico, los *muslos a \$9.800/lb
 PROMPT;
     }
 
-    private function getToolsDefinicion(): array
+    public function getToolsDefinicion(): array
     {
         $config = \App\Models\ConfiguracionBot::actual();
         $tools = [];

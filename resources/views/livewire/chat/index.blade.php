@@ -1036,6 +1036,107 @@
                                     </div>
                                 @endforeach
 
+                                {{-- 🛠️ TOOLS DISPONIBLES --}}
+                                @if(!empty($promptInspeccion['tools']))
+                                    <div class="rounded-xl border border-slate-200 bg-white overflow-hidden">
+                                        <button type="button"
+                                                @click="abierto = (abierto === 'tools' ? null : 'tools')"
+                                                class="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition text-left">
+                                            <div>
+                                                <div class="text-sm font-bold text-slate-800">
+                                                    🛠️ Tools disponibles ({{ $promptInspeccion['stats']['tools_total'] ?? count($promptInspeccion['tools']) }})
+                                                    <span class="text-[10px] font-normal text-slate-500 ml-1">
+                                                        — {{ $promptInspeccion['stats']['tools_paso'] ?? 0 }} habilitadas en este paso
+                                                    </span>
+                                                </div>
+                                                <div class="text-[10px] text-slate-500 font-mono">
+                                                    Funciones que el LLM puede invocar (function calling de OpenAI)
+                                                </div>
+                                            </div>
+                                            <i class="fa-solid fa-chevron-down text-slate-400 transition"
+                                               :class="abierto === 'tools' ? 'rotate-180' : ''"></i>
+                                        </button>
+                                        <div x-show="abierto === 'tools'" x-collapse class="border-t border-slate-100 p-3 space-y-2 max-h-[500px] overflow-y-auto"
+                                             x-data="{ tipoFiltro: 'todas', toolAbierta: null }">
+                                            {{-- Filtros --}}
+                                            <div class="flex gap-1 mb-2 sticky top-0 bg-white pb-2 border-b border-slate-100 z-10">
+                                                <button @click="tipoFiltro = 'todas'"
+                                                        :class="tipoFiltro === 'todas' ? 'bg-violet-100 text-violet-700' : 'bg-slate-100 text-slate-500'"
+                                                        class="rounded-full px-2.5 py-0.5 text-[10px] font-bold transition">
+                                                    Todas ({{ count($promptInspeccion['tools']) }})
+                                                </button>
+                                                <button @click="tipoFiltro = 'habilitadas'"
+                                                        :class="tipoFiltro === 'habilitadas' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'"
+                                                        class="rounded-full px-2.5 py-0.5 text-[10px] font-bold transition">
+                                                    ✓ Habilitadas ({{ $promptInspeccion['stats']['tools_paso'] ?? 0 }})
+                                                </button>
+                                                <button @click="tipoFiltro = 'bloqueadas'"
+                                                        :class="tipoFiltro === 'bloqueadas' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'"
+                                                        class="rounded-full px-2.5 py-0.5 text-[10px] font-bold transition">
+                                                    ✗ Bloqueadas ({{ count($promptInspeccion['tools']) - ($promptInspeccion['stats']['tools_paso'] ?? 0) }})
+                                                </button>
+                                            </div>
+
+                                            @foreach($promptInspeccion['tools'] as $idx => $tool)
+                                                <div x-show="tipoFiltro === 'todas' || (tipoFiltro === 'habilitadas' && {{ $tool['permitida_paso'] ? 'true' : 'false' }}) || (tipoFiltro === 'bloqueadas' && {{ $tool['permitida_paso'] ? 'false' : 'true' }})"
+                                                     class="rounded-lg border {{ $tool['permitida_paso'] ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-200 bg-slate-50/50 opacity-70' }}">
+                                                    <button type="button"
+                                                            @click="toolAbierta = (toolAbierta === {{ $idx }} ? null : {{ $idx }})"
+                                                            class="w-full flex items-center justify-between px-3 py-2 hover:bg-slate-50/50 text-left">
+                                                        <div class="flex items-center gap-2 min-w-0">
+                                                            <span class="text-xs">
+                                                                @if($tool['permitida_paso'])
+                                                                    <span class="text-emerald-600">●</span>
+                                                                @else
+                                                                    <span class="text-slate-400">○</span>
+                                                                @endif
+                                                            </span>
+                                                            <code class="text-[11px] font-mono font-bold text-slate-800">{{ $tool['nombre'] }}</code>
+                                                            @if($tool['permitida_paso'])
+                                                                <span class="rounded-full bg-emerald-100 text-emerald-700 px-1.5 py-0.5 text-[8px] font-bold uppercase">activa</span>
+                                                            @else
+                                                                <span class="rounded-full bg-slate-200 text-slate-500 px-1.5 py-0.5 text-[8px] font-bold uppercase">paso oculta</span>
+                                                            @endif
+                                                        </div>
+                                                        <i class="fa-solid fa-chevron-down text-slate-400 text-[10px] transition flex-shrink-0"
+                                                           :class="toolAbierta === {{ $idx }} ? 'rotate-180' : ''"></i>
+                                                    </button>
+                                                    <div x-show="toolAbierta === {{ $idx }}" x-collapse class="border-t border-slate-100 p-2.5 space-y-2 bg-white">
+                                                        <div>
+                                                            <div class="text-[9px] uppercase font-bold text-slate-500 tracking-wider mb-1">Descripción</div>
+                                                            <p class="text-[11px] text-slate-700 leading-relaxed">
+                                                                {{ \Illuminate\Support\Str::limit($tool['descripcion'], 400) }}
+                                                            </p>
+                                                        </div>
+                                                        @php
+                                                            $params = $tool['parametros']['properties'] ?? [];
+                                                            $required = $tool['parametros']['required'] ?? [];
+                                                        @endphp
+                                                        @if(!empty($params))
+                                                            <div>
+                                                                <div class="text-[9px] uppercase font-bold text-slate-500 tracking-wider mb-1">
+                                                                    Parámetros ({{ count($params) }})
+                                                                </div>
+                                                                <div class="space-y-1">
+                                                                    @foreach($params as $name => $def)
+                                                                        <div class="text-[10px] font-mono">
+                                                                            <span class="text-violet-700 font-bold">{{ $name }}</span><span class="text-slate-500">: {{ is_array($def) ? ($def['type'] ?? '?') : '?' }}</span>
+                                                                            @if(in_array($name, $required, true))<span class="text-rose-500 ml-1">*</span>@endif
+                                                                            @if(is_array($def) && !empty($def['description']))
+                                                                                <div class="ml-3 text-slate-500 text-[10px] leading-tight font-sans italic">{{ \Illuminate\Support\Str::limit($def['description'], 200) }}</div>
+                                                                            @endif
+                                                                        </div>
+                                                                    @endforeach
+                                                                </div>
+                                                            </div>
+                                                        @endif
+                                                    </div>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                @endif
+
                                 {{-- Historial --}}
                                 <div class="rounded-xl border border-slate-200 bg-white overflow-hidden">
                                     <button type="button"

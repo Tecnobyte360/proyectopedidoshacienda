@@ -88,7 +88,30 @@ class BotPromptInspectorService
             // ignorar
         }
 
-        // 4. Historial
+        // 4. Tools disponibles (todas las definidas) + cuáles permite el paso actual
+        $tools = [];
+        try {
+            $controller = app(\App\Http\Controllers\WhatsappWebhookController::class);
+            $todasTools = $controller->getToolsDefinicion();
+
+            $orch = app(FlujoPedidoOrchestrator::class);
+            $estado = app(EstadoPedidoService::class)->obtener($conv);
+            $permitidasEnPaso = $orch->toolsPermitidas($estado->paso_actual);
+
+            foreach ($todasTools as $t) {
+                $nombre = $t['function']['name'] ?? '?';
+                $tools[] = [
+                    'nombre'        => $nombre,
+                    'descripcion'   => $t['function']['description'] ?? '',
+                    'parametros'    => $t['function']['parameters'] ?? [],
+                    'permitida_paso'=> in_array($nombre, $permitidasEnPaso, true),
+                ];
+            }
+        } catch (\Throwable $e) {
+            // ignorar
+        }
+
+        // 5. Historial
         $historial = $conv->historialParaIA($ultimosMensajes);
 
         // Stats
@@ -107,11 +130,14 @@ class BotPromptInspectorService
                 'max_tokens'      => (int) ($config->max_tokens ?? 700),
             ],
             'bloques'   => $bloques,
+            'tools'     => $tools,
             'historial' => $historial,
             'stats'     => [
                 'caracteres'   => $totalChars,
                 'tokens_aprox' => $tokensAprox,
                 'mensajes'     => count($historial),
+                'tools_total'  => count($tools),
+                'tools_paso'   => count(array_filter($tools, fn ($t) => $t['permitida_paso'])),
             ],
         ];
     }
