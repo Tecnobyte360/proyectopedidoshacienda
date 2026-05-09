@@ -44,7 +44,10 @@ class BotMostrarPrompt extends Command
 
         // Set tenant context
         if ($conv->tenant_id) {
-            app(TenantManager::class)->setIdManual($conv->tenant_id);
+            $tenant = \App\Models\Tenant::find($conv->tenant_id);
+            if ($tenant) {
+                app(TenantManager::class)->set($tenant);
+            }
         }
 
         $config = ConfiguracionBot::actual();
