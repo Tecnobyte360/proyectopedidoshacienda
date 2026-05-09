@@ -30,6 +30,7 @@ class Index extends Component
 
     // 📋 Modal "Estado del pedido" — datos estructurados que tiene el bot
     public bool $pedidoEstadoModal = false;
+    public string $pedidoEstadoTab = 'estado'; // 'estado' | 'prompt'
 
     // Modal "Publicar estado de WhatsApp" (POST /status de TecnoByteApp)
     public bool   $estadoModal       = false;
@@ -59,11 +60,18 @@ class Index extends Component
             return;
         }
         $this->pedidoEstadoModal = true;
+        $this->pedidoEstadoTab = 'estado';
     }
 
     public function cerrarPedidoEstadoModal(): void
     {
         $this->pedidoEstadoModal = false;
+    }
+
+    public function cambiarTab(string $tab): void
+    {
+        if (!in_array($tab, ['estado', 'prompt'], true)) return;
+        $this->pedidoEstadoTab = $tab;
     }
 
     /**
@@ -1168,6 +1176,7 @@ class Index extends Component
         // 📋 Estado estructurado del pedido (para el modal). Solo se carga si
         // el modal está abierto, para no consumir BD innecesariamente.
         $pedidoEstado = null;
+        $promptInspeccion = null;
         if ($this->pedidoEstadoModal && $conversacionActiva) {
             try {
                 $pedidoEstado = app(\App\Services\EstadoPedidoService::class)
@@ -1175,9 +1184,24 @@ class Index extends Component
             } catch (\Throwable $e) {
                 Log::warning('No se pudo cargar estado pedido para modal: ' . $e->getMessage());
             }
+
+            // 🔍 Si la pestaña activa es "prompt", reconstruir el prompt completo.
+            if ($this->pedidoEstadoTab === 'prompt') {
+                try {
+                    $promptInspeccion = app(\App\Services\BotPromptInspectorService::class)
+                        ->inspeccionar($conversacionActiva, 10);
+                } catch (\Throwable $e) {
+                    Log::warning('No se pudo inspeccionar prompt: ' . $e->getMessage());
+                    $promptInspeccion = ['error' => $e->getMessage()];
+                }
+            }
         }
 
-        return view('livewire.chat.index', compact('conversaciones', 'conversacionActiva', 'pedidoEstado'))
-            ->layout('layouts.app');
+        return view('livewire.chat.index', compact(
+            'conversaciones',
+            'conversacionActiva',
+            'pedidoEstado',
+            'promptInspeccion'
+        ))->layout('layouts.app');
     }
 }

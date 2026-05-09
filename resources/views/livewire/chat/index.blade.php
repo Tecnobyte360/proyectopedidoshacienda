@@ -942,28 +942,145 @@
              wire:click.self="cerrarPedidoEstadoModal"
              wire:poll.5s>
             <div class="w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-2xl">
-                {{-- Header --}}
-                <div class="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-gradient-to-r from-violet-50 to-white px-6 py-4">
-                    <div>
-                        <h3 class="text-lg font-extrabold text-slate-800">
-                            <i class="fa-solid fa-clipboard-list text-violet-600"></i>
-                            Estado del pedido
-                        </h3>
-                        <p class="text-xs text-slate-500">
-                            {{ $conversacionActiva->telefono_normalizado }}
-                            @if($conversacionActiva->cliente?->nombre)
-                                · {{ $conversacionActiva->cliente->nombre }}
-                            @endif
-                            · auto-refresh cada 5s
-                        </p>
+                {{-- Header con tabs --}}
+                <div class="sticky top-0 z-10 border-b border-slate-200 bg-gradient-to-r from-violet-50 to-white">
+                    <div class="flex items-center justify-between px-6 pt-4">
+                        <div>
+                            <h3 class="text-lg font-extrabold text-slate-800">
+                                <i class="fa-solid fa-clipboard-list text-violet-600"></i>
+                                Estado del pedido
+                            </h3>
+                            <p class="text-xs text-slate-500">
+                                {{ $conversacionActiva->telefono_normalizado }}
+                                @if($conversacionActiva->cliente?->nombre)
+                                    · {{ $conversacionActiva->cliente->nombre }}
+                                @endif
+                            </p>
+                        </div>
+                        <button wire:click="cerrarPedidoEstadoModal"
+                                class="rounded-full w-9 h-9 inline-flex items-center justify-center text-slate-500 hover:bg-slate-100">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
                     </div>
-                    <button wire:click="cerrarPedidoEstadoModal"
-                            class="rounded-full w-9 h-9 inline-flex items-center justify-center text-slate-500 hover:bg-slate-100">
-                        <i class="fa-solid fa-xmark"></i>
-                    </button>
+
+                    {{-- Tabs --}}
+                    <div class="flex gap-1 mt-3 px-6">
+                        <button wire:click="cambiarTab('estado')"
+                                class="rounded-t-lg px-4 py-2 text-sm font-semibold transition border-b-2
+                                    {{ $pedidoEstadoTab === 'estado'
+                                        ? 'border-violet-500 text-violet-700 bg-white'
+                                        : 'border-transparent text-slate-500 hover:text-slate-700' }}">
+                            <i class="fa-solid fa-clipboard-list mr-1"></i> Datos del pedido
+                        </button>
+                        <button wire:click="cambiarTab('prompt')"
+                                class="rounded-t-lg px-4 py-2 text-sm font-semibold transition border-b-2
+                                    {{ $pedidoEstadoTab === 'prompt'
+                                        ? 'border-violet-500 text-violet-700 bg-white'
+                                        : 'border-transparent text-slate-500 hover:text-slate-700' }}">
+                            <i class="fa-solid fa-brain mr-1"></i> Prompt LLM
+                            <span class="ml-1 text-[9px] rounded-full bg-violet-100 text-violet-700 px-1.5">
+                                debug
+                            </span>
+                        </button>
+                    </div>
                 </div>
 
-                {{-- Body --}}
+                {{-- ═══ TAB: PROMPT LLM ═══ --}}
+                @if($pedidoEstadoTab === 'prompt')
+                    @if(!empty($promptInspeccion) && empty($promptInspeccion['error']))
+                        <div class="px-6 py-4 space-y-3">
+                            {{-- Stats --}}
+                            <div class="grid grid-cols-4 gap-2">
+                                <div class="rounded-xl bg-slate-50 border border-slate-200 p-3">
+                                    <div class="text-[9px] uppercase font-bold text-slate-500 tracking-wider">Modelo</div>
+                                    <div class="text-sm font-bold text-slate-800 mt-0.5">{{ $promptInspeccion['meta']['modelo'] }}</div>
+                                </div>
+                                <div class="rounded-xl bg-slate-50 border border-slate-200 p-3">
+                                    <div class="text-[9px] uppercase font-bold text-slate-500 tracking-wider">Caracteres</div>
+                                    <div class="text-sm font-bold text-slate-800 mt-0.5">{{ number_format($promptInspeccion['stats']['caracteres']) }}</div>
+                                </div>
+                                <div class="rounded-xl bg-slate-50 border border-slate-200 p-3">
+                                    <div class="text-[9px] uppercase font-bold text-slate-500 tracking-wider">Tokens aprox</div>
+                                    <div class="text-sm font-bold text-violet-700 mt-0.5">~{{ number_format($promptInspeccion['stats']['tokens_aprox']) }}</div>
+                                </div>
+                                <div class="rounded-xl bg-slate-50 border border-slate-200 p-3">
+                                    <div class="text-[9px] uppercase font-bold text-slate-500 tracking-wider">Mensajes hist.</div>
+                                    <div class="text-sm font-bold text-slate-800 mt-0.5">{{ $promptInspeccion['stats']['mensajes'] }}</div>
+                                </div>
+                            </div>
+
+                            {{-- Bloques colapsables --}}
+                            <div class="space-y-2" x-data="{ abierto: 0 }">
+                                @foreach($promptInspeccion['bloques'] as $idx => $bloque)
+                                    <div class="rounded-xl border border-slate-200 bg-white overflow-hidden">
+                                        <button type="button"
+                                                @click="abierto = (abierto === {{ $idx }} ? null : {{ $idx }})"
+                                                class="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition text-left">
+                                            <div>
+                                                <div class="text-sm font-bold text-slate-800">{{ $bloque['titulo'] }}</div>
+                                                @if(!empty($bloque['subtitulo']))
+                                                    <div class="text-[10px] text-slate-500 font-mono">{{ $bloque['subtitulo'] }}</div>
+                                                @endif
+                                            </div>
+                                            <div class="flex items-center gap-2">
+                                                <span class="text-[10px] text-slate-400">
+                                                    {{ number_format(mb_strlen($bloque['contenido'])) }} chars
+                                                </span>
+                                                <i class="fa-solid fa-chevron-down text-slate-400 transition"
+                                                   :class="abierto === {{ $idx }} ? 'rotate-180' : ''"></i>
+                                            </div>
+                                        </button>
+                                        <div x-show="abierto === {{ $idx }}" x-collapse class="border-t border-slate-100">
+                                            <pre class="text-[11px] leading-relaxed text-slate-700 bg-slate-50 p-4 overflow-x-auto whitespace-pre-wrap font-mono max-h-96 overflow-y-auto">{{ $bloque['contenido'] }}</pre>
+                                        </div>
+                                    </div>
+                                @endforeach
+
+                                {{-- Historial --}}
+                                <div class="rounded-xl border border-slate-200 bg-white overflow-hidden">
+                                    <button type="button"
+                                            @click="abierto = (abierto === 'hist' ? null : 'hist')"
+                                            class="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition text-left">
+                                        <div>
+                                            <div class="text-sm font-bold text-slate-800">
+                                                Historial — últimos {{ count($promptInspeccion['historial']) }} mensajes
+                                            </div>
+                                            <div class="text-[10px] text-slate-500 font-mono">
+                                                ConversacionWhatsapp::historialParaIA() — solo del día actual
+                                            </div>
+                                        </div>
+                                        <i class="fa-solid fa-chevron-down text-slate-400 transition"
+                                           :class="abierto === 'hist' ? 'rotate-180' : ''"></i>
+                                    </button>
+                                    <div x-show="abierto === 'hist'" x-collapse class="border-t border-slate-100 p-3 space-y-2 max-h-96 overflow-y-auto">
+                                        @foreach($promptInspeccion['historial'] as $i => $m)
+                                            <div class="rounded-lg p-2 text-[11px] {{ $m['role'] === 'user' ? 'bg-blue-50' : 'bg-emerald-50' }}">
+                                                <div class="text-[9px] font-bold uppercase {{ $m['role'] === 'user' ? 'text-blue-700' : 'text-emerald-700' }}">
+                                                    [{{ $i }}] {{ $m['role'] }}
+                                                </div>
+                                                <div class="text-slate-700 mt-0.5 font-mono whitespace-pre-wrap">{{ $m['content'] }}</div>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            </div>
+
+                            <p class="text-[10px] text-slate-400 text-center pt-1">
+                                ⚙️ Esta es exactamente la información que recibe OpenAI antes de generar la siguiente respuesta.
+                            </p>
+                        </div>
+                    @elseif(!empty($promptInspeccion['error']))
+                        <div class="px-6 py-12 text-center">
+                            <i class="fa-solid fa-circle-exclamation text-rose-500 text-3xl mb-2"></i>
+                            <p class="text-sm text-rose-600">Error al cargar prompt: {{ $promptInspeccion['error'] }}</p>
+                        </div>
+                    @else
+                        <div class="px-6 py-12 text-center text-sm text-slate-500">
+                            <i class="fa-solid fa-spinner fa-spin mr-1"></i> Cargando prompt...
+                        </div>
+                    @endif
+                @else
+                {{-- ═══ TAB: ESTADO (original) ═══ --}}
                 @if($pedidoEstado)
                     @php
                         $pasoColores = [
@@ -1129,6 +1246,7 @@
                         Cargando estado del pedido...
                     </div>
                 @endif
+                @endif {{-- /tab estado vs prompt --}}
 
                 {{-- Footer --}}
                 <div class="sticky bottom-0 flex items-center justify-between border-t border-slate-200 bg-white px-6 py-4">
