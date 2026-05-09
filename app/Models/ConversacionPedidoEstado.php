@@ -117,7 +117,7 @@ class ConversacionPedidoEstado extends Model
     {
         $f = [];
         if (empty($this->productos))         $f[] = 'producto y cantidad';
-        if (empty($this->metodo_entrega))    $f[] = 'método de entrega (domicilio o recoger)';
+        if (empty($this->metodo_entrega))    $f[] = 'método de entrega (despacho o cliente recoge)';
 
         if ($this->metodo_entrega === self::METODO_DOMICILIO) {
             if (empty($this->direccion))     $f[] = 'dirección';

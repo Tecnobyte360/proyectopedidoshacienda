@@ -159,10 +159,10 @@
                         <div class="rounded-lg bg-slate-50 p-2">
                             <div class="text-[9px] text-slate-500 font-bold uppercase">🚚 Entrega</div>
                             @if($estado->metodo_entrega === 'recoger')
-                                <div class="text-slate-700">Recoger</div>
+                                <div class="text-slate-700">Cliente recoge</div>
                                 <div class="text-[10px] text-slate-500 truncate">{{ $estado->sede?->nombre ?: '—' }}</div>
                             @elseif($estado->metodo_entrega === 'domicilio')
-                                <div class="text-slate-700">Domicilio</div>
+                                <div class="text-slate-700">Despacho</div>
                                 <div class="text-[10px] text-slate-500 truncate">{{ $estado->direccion ?: '—' }}</div>
                                 @if($estado->cobertura_validada)
                                     <div class="text-[10px] text-emerald-600">✓ {{ $estado->distancia_km }}km</div>

@@ -1272,9 +1272,14 @@
                                     <i class="fa-solid fa-truck text-cyan-600 mr-1"></i> Entrega
                                 </h4>
                                 @if($pedidoEstado->metodo_entrega)
+                                    @php
+                                        $metodoLabel = $pedidoEstado->metodo_entrega === 'domicilio'
+                                            ? '🚚 Despacho'
+                                            : '🏪 Cliente recoge';
+                                    @endphp
                                     <p class="text-xs">
                                         <strong>Método:</strong>
-                                        <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold">{{ $pedidoEstado->metodo_entrega }}</span>
+                                        <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold">{{ $metodoLabel }}</span>
                                     </p>
                                     @if($pedidoEstado->metodo_entrega === 'domicilio')
                                         <p class="text-xs mt-1"><strong>Dirección:</strong> {{ $pedidoEstado->direccion ?: '—' }}</p>

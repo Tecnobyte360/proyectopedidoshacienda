@@ -79,8 +79,10 @@ class FlujoPedidoOrchestrator
                 'instruccion' => "PASO PRODUCTO: el cliente está eligiendo qué pedir. Tu único "
                     . "objetivo es ayudarlo a definir productos y cantidades. Usa "
                     . "`buscar_productos` cuando mencione algo concreto. Cuando ya "
-                    . "tenga producto + cantidad, pregunta '¿es para entrega a domicilio "
-                    . "o quieres recogerlo en una de nuestras sedes?'. "
+                    . "tenga producto + cantidad, pregunta cómo prefiere recibir el pedido: "
+                    . "'¿prefieres que te lo despachemos o vas a recogerlo en una de nuestras sedes?'. "
+                    . "Los DOS únicos métodos de entrega son: DESPACHO (entrega a domicilio) y "
+                    . "CLIENTE RECOGE (en una de nuestras sedes). "
                     . "PROHIBIDO: validar cobertura, pedir cédula o confirmar pedido en este paso.",
             ],
 
@@ -92,12 +94,13 @@ class FlujoPedidoOrchestrator
                 ],
                 'tool_choice' => 'auto',
                 'instruccion' => "PASO ENTREGA: el cliente ya tiene productos. Define cómo se "
-                    . "los entregan:\n"
-                    . "  • Si dice 'a domicilio' o da una dirección → llama `validar_cobertura`.\n"
-                    . "  • Si dice 'recoger' / 'paso por él' → muéstrale las sedes disponibles "
-                    . "(tomadas del contexto de empresa que tienes en el system prompt) y deja "
-                    . "que escoja una. Una vez escoja, el sistema captura el nombre y resuelve "
-                    . "el sede_id automáticamente.\n"
+                    . "los entregan. Los DOS únicos métodos disponibles son:\n"
+                    . "  • DESPACHO (a domicilio): si dice 'despacho', 'envío', 'a domicilio', "
+                    . "'me lo mandas', o da una dirección → llama `validar_cobertura` con esa "
+                    . "dirección.\n"
+                    . "  • CLIENTE RECOGE: si dice 'recoger', 'paso por él', 'yo voy', 'yo recojo' "
+                    . "→ muéstrale las sedes disponibles (del system prompt) y deja que escoja "
+                    . "una. El sistema captura el nombre o el número (1, 2) y resuelve sede_id.\n"
                     . "Cuando esté validada cobertura O escogida sede, el sistema avanzará "
                     . "automáticamente. PROHIBIDO: pedir cédula o confirmar pedido en este paso.",
             ],

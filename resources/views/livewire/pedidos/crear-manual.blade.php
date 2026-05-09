@@ -160,12 +160,12 @@
                 <label class="flex items-center gap-2 cursor-pointer rounded-xl border-2 p-3 transition
                              {{ $metodo_entrega === 'recoger' ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200' }}">
                     <input type="radio" wire:model.live="metodo_entrega" value="recoger" class="text-emerald-600">
-                    <span class="text-sm font-semibold">🏪 Recoger en sede</span>
+                    <span class="text-sm font-semibold">🏪 Cliente recoge</span>
                 </label>
                 <label class="flex items-center gap-2 cursor-pointer rounded-xl border-2 p-3 transition
                              {{ $metodo_entrega === 'domicilio' ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200' }}">
                     <input type="radio" wire:model.live="metodo_entrega" value="domicilio" class="text-emerald-600">
-                    <span class="text-sm font-semibold">🚚 Domicilio</span>
+                    <span class="text-sm font-semibold">🚚 Despacho</span>
                 </label>
             </div>
 

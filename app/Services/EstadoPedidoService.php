@@ -285,17 +285,19 @@ class EstadoPedidoService
             }
         }
 
-        // 4. MÉTODO DE ENTREGA — domicilio / recoger
+        // 4. MÉTODO DE ENTREGA — despacho / recoger
+        // (internamente METODO_DOMICILIO sigue siendo 'domicilio' para no
+        // romper datos existentes, pero la UX habla de 'despacho')
         if (empty($estado->metodo_entrega)) {
             $msgLowerMe = mb_strtolower($msg);
-            // Patrones DOMICILIO
-            if (preg_match('/\b(domicilio|env[ií]o|env[ií]eme|env[ií]o\s+a|me\s+lo\s+env|me\s+lo\s+mand|m[áa]ndamelo|para\s+casa|a\s+mi\s+casa|env[ií]a)\b/iu', $msgLowerMe)) {
+            // Patrones DESPACHO (incluye 'domicilio' por si el cliente usa esa palabra)
+            if (preg_match('/\b(despach[oa]?|domicilio|env[ií]o|env[ií]eme|env[ií]o\s+a|me\s+lo\s+env|me\s+lo\s+mand|m[áa]ndamelo|para\s+casa|a\s+mi\s+casa|env[ií]a|env[ií]ar)\b/iu', $msgLowerMe)) {
                 $estado->metodo_entrega = ConversacionPedidoEstado::METODO_DOMICILIO;
                 $cambio = true;
-                Log::info('🔍 Método entrega DOMICILIO capturado', ['conv_id' => $conv->id]);
+                Log::info('🔍 Método entrega DESPACHO capturado', ['conv_id' => $conv->id]);
             }
-            // Patrones RECOGER
-            elseif (preg_match('/\b(recog[eo]|paso\s+a\s+recoger|paso\s+por|voy\s+a\s+pasar|yo\s+voy|reclamo|reclamar|recogerlo|en\s+la\s+sede|en\s+la\s+tienda)\b/iu', $msgLowerMe)) {
+            // Patrones RECOGER (cliente recoge)
+            elseif (preg_match('/\b(recog[eo]|paso\s+a\s+recoger|paso\s+por|voy\s+a\s+pasar|yo\s+voy|reclamo|reclamar|recogerlo|en\s+la\s+sede|en\s+la\s+tienda|cliente\s+recoge|yo\s+recojo)\b/iu', $msgLowerMe)) {
                 $estado->metodo_entrega = ConversacionPedidoEstado::METODO_RECOGER;
                 $cambio = true;
                 Log::info('🔍 Método entrega RECOGER capturado', ['conv_id' => $conv->id]);
@@ -645,7 +647,10 @@ class EstadoPedidoService
         }
 
         if ($estado->metodo_entrega) {
-            $partes[] = "  • Entrega: {$estado->metodo_entrega}";
+            $entregaLabel = $estado->metodo_entrega === ConversacionPedidoEstado::METODO_DOMICILIO
+                ? 'despacho'
+                : 'cliente recoge';
+            $partes[] = "  • Entrega: {$entregaLabel}";
             if ($estado->metodo_entrega === ConversacionPedidoEstado::METODO_DOMICILIO && $estado->direccion) {
                 $partes[] = "    Dirección: {$estado->direccion}" . ($estado->barrio ? ", {$estado->barrio}" : '');
                 $partes[] = "    Cobertura validada: " . ($estado->cobertura_validada ? '✅' : '❌');
