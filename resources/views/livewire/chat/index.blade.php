@@ -181,6 +181,15 @@
                 </div>
 
                 <div class="flex items-center gap-2">
+                    {{-- 🎯 Panel de estado del pedido en vivo --}}
+                    <a href="{{ route('chat.estado-pedido', $conversacionActiva->id) }}"
+                       target="_blank"
+                       title="Ver qué datos del pedido tiene el bot recopilados (auto-refresh en vivo)"
+                       class="rounded-xl bg-violet-500 px-3 py-2 text-xs font-bold text-white hover:bg-violet-600 transition inline-flex items-center gap-1">
+                        <i class="fa-solid fa-clipboard-list"></i>
+                        <span>Estado del pedido</span>
+                    </a>
+
                     @if($conversacionActiva->atendida_por_humano)
                         <button wire:click="devolverAlBot"
                                 title="El bot retomará automáticamente la conversación"
