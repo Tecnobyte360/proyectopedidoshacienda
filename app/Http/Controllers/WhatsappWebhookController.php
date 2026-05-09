@@ -1703,6 +1703,38 @@ TXT;
             $cedula   = trim((string) ($args['cedula'] ?? ''));
             $telefono = trim((string) ($args['telefono'] ?? $from));
 
+            // 🛡️ ASTUTO: validar que la cédula no sea el teléfono del cliente
+            // o un celular Colombia (3XXXXXXXXX). El LLM a veces se confunde
+            // cuando el cliente dice "transferencia 3216499744" y manda el
+            // número de Nequi como cédula.
+            $telCleaned = preg_replace('/[^\d]/', '', (string) $from);
+            $cedClean   = preg_replace('/[^\d]/', '', $cedula);
+            $esTelefono = $telCleaned !== '' && (
+                $cedClean === $telCleaned
+                || str_ends_with($telCleaned, $cedClean)
+                || str_ends_with($cedClean, $telCleaned)
+            );
+            $esCelularCol = preg_match('/^3\d{9}$/', $cedClean) === 1
+                          || preg_match('/^573\d{9}$/', $cedClean) === 1;
+
+            if ($cedClean !== '' && ($esTelefono || $esCelularCol)) {
+                Log::warning('🛡️ verificar_cliente_erp: cédula recibida parece teléfono — usando la del cliente local', [
+                    'cedula_llm' => $cedula,
+                    'from'       => $from,
+                ]);
+
+                // Intentar usar la cédula del cliente local (perfil) si existe
+                $clienteLocal = \App\Models\Cliente::where('telefono_normalizado', $telCleaned)->first();
+                if ($clienteLocal && !empty($clienteLocal->cedula)) {
+                    $cedula = $clienteLocal->cedula;
+                    Log::info('🛡️ Cédula corregida a la del cliente local', ['cedula' => $cedula]);
+                } else {
+                    // Sin cédula real → respuesta directa pidiéndola
+                    return "Disculpa, el número que me diste parece ser un celular/cuenta de Nequi. "
+                         . "¿Me puedes pasar tu *número de cédula* (sin puntos)? Así te registro bien el pedido.";
+                }
+            }
+
             Log::info('🔍 Tool call verificar_cliente_erp', compact('from', 'cedula', 'telefono'));
 
             $tenantId = app(\App\Services\TenantManager::class)->id();
