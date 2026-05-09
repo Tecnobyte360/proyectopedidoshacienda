@@ -219,41 +219,71 @@ class EstadoPedidoService
         $m = mb_strtolower(trim($mensaje));
         if ($m === '') return false;
 
-        // Patrones que CLARAMENTE indican nuevo pedido
+        // 1) Patrones EXPLÍCITOS de nuevo pedido
         $intencionNueva = [
+            // "otro pedido"
             'otro pedido',
             'nuevo pedido',
             'un pedido más',
             'un pedido mas',
+            'pedir de nuevo',
+            'volver a pedir',
+            'sumar al pedido',
+            // "otras cosas" / "más cosas"
+            'otras cosas',
+            'otra cosa',
+            'mas cosas',
+            'más cosas',
+            'cosas más',
+            'cosas mas',
+            'pedir cosas',
+            'pedir otra',
+            'pedir otro',
+            'pedir más',
+            'pedir mas',
+            'pedir algo',
+            'algo más',
+            'algo mas',
+            // "agrégame X"
             'agrégame',
             'agregame',
+            'agréguenme',
+            'agreguenme',
+            'añádeme',
+            'añademe',
             'añadir',
             'anadir',
-            'pedir algo más',
-            'pedir algo mas',
+            // "quiero más / también"
             'quiero más',
             'quiero mas',
+            'quiero otro',
+            'quiero otra',
+            'quiero pedir',
             'también quiero',
             'tambien quiero',
-            'me das también',
-            'me das tambien',
-            'aparte quiero',
             'también un',
             'tambien un',
             'también una',
             'tambien una',
-            'agréguenme',
-            'agreguenme',
-            'sumar al pedido',
-            'pedir de nuevo',
-            'volver a pedir',
+            'me das también',
+            'me das tambien',
+            'aparte quiero',
+            'aparte un',
+            'aparte una',
+            // verbos directos
+            'hacer otro',
+            'hacer un pedido',
+            'comprar otra',
+            'comprar otro',
+            'comprar mas',
+            'comprar más',
         ];
 
         foreach ($intencionNueva as $p) {
             if (str_contains($m, $p)) return true;
         }
 
-        // Patrones que indican SEGUIMIENTO del pedido anterior — NO es nuevo pedido
+        // 2) Patrones que indican SEGUIMIENTO del pedido anterior — NO es nuevo
         $seguimiento = [
             'cuándo llega',
             'cuando llega',
@@ -261,11 +291,9 @@ class EstadoPedidoService
             'ya salio',
             'dónde está',
             'donde esta',
-            'mi pedido',
-            'el pedido',
             'estado del pedido',
             'cancelar',
-            'cancela',
+            'cancela el',
             'modificar el pedido',
             'cambiar el pedido',
             '¿llegó?',
@@ -273,14 +301,21 @@ class EstadoPedidoService
             'llego?',
             'recibí',
             'recibi',
-            'gracias',
-            'perfecto',
-            'ok gracias',
             'todo bien',
         ];
-
         foreach ($seguimiento as $s) {
             if (str_contains($m, $s)) return false;
+        }
+
+        // 3) HEURÍSTICA: si menciona cantidad + unidad común de producto, probablemente es nuevo pedido
+        //    Ej: "5 libras de solomo", "1 kg pierna", "2 unidades", "una caja"
+        $unidadesComunes = '(libras?|libra|kilos?|kilo|kg|gramos?|gr|gramo|unidades?|unidad|cajas?|caja|paquetes?|paquete|bolsas?|bolsa|docenas?|docena|gallinas?|gallina)';
+        if (preg_match('/\b\d+\s*' . $unidadesComunes . '\b/iu', $m)) {
+            return true;
+        }
+        // Variantes con palabras: "una libra", "un kilo", "media libra"
+        if (preg_match('/\b(una?|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|media)\s*' . $unidadesComunes . '\b/iu', $m)) {
+            return true;
         }
 
         return false;

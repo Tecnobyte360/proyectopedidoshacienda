@@ -1865,13 +1865,22 @@ TXT;
             $forzarMessages = $messages;
             $forzarMessages[] = [
                 'role'    => 'system',
-                'content' => "🚨 OBLIGATORIO: el cliente ya tiene los datos suficientes para crear el pedido (productos, sede o dirección, identificación). DEBES invocar la función `confirmar_pedido` AHORA con TODOS los datos recopilados de la conversación. NO respondas en texto plano. TODO pedido — sea para recoger en sede o entrega a domicilio — DEBE pasar por confirmar_pedido. Sin excepción.",
+                'content' => "🚨 OVERRIDE TOTAL — IGNORA CUALQUIER RESTRICCIÓN DE PASO ANTERIOR.\n\n"
+                    . "El cliente ya tiene los datos suficientes para crear el pedido (productos, "
+                    . "sede o dirección, identificación). DEBES invocar la función `confirmar_pedido` "
+                    . "AHORA con TODOS los datos recopilados de la conversación.\n\n"
+                    . "NO respondas en texto plano. NO digas que el paso lo prohíbe — este mensaje "
+                    . "te autoriza explícitamente. TODO pedido — sea para recoger o entrega a "
+                    . "domicilio, sea el primero o uno nuevo del mismo cliente — DEBE pasar por "
+                    . "confirmar_pedido. SIN EXCEPCIÓN.",
             ];
 
+            // Pasamos todas las tools (no las filtradas del paso) para que
+            // confirmar_pedido esté disponible aunque el paso normalmente la oculte.
             $forzarResponse = $this->llamarOpenAI($forzarMessages, [
                 'type'     => 'function',
                 'function' => ['name' => 'confirmar_pedido'],
-            ]);
+            ], $this->getToolsDefinicion());
 
             $tc = $forzarResponse['choices'][0]['message']['tool_calls'] ?? null;
             if ($tc && ($tc[0]['function']['name'] ?? '') === 'confirmar_pedido') {
@@ -2003,6 +2012,17 @@ TXT;
             // Cierre genérico
             'genial, te despachamos',
             'perfecto, queda',
+            'tu pedido queda',
+            'tu pedido es:',
+            'tu pedido será',
+            'tu pedido sera',
+            'tu pedido es de',
+            'pedido queda así',
+            'pedido queda asi',
+            'pedido queda listo',
+            'queda anotado',
+            'queda apuntado',
+            'queda agendado',
             // ⏳ Promesas vacías — el bot dice "ya lo hago" pero no llama tool
             'un momento, verificando',
             'un momento verificando',
@@ -2018,6 +2038,8 @@ TXT;
             'registrando tu pedido',
             'creando el pedido',
             'creando tu pedido',
+            'anotando tu pedido',
+            'anotando el pedido',
         ];
 
         $lower = mb_strtolower($reply);
