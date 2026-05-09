@@ -2050,6 +2050,30 @@ TXT;
         $frase = $this->detectarFalsaConfirmacion($reply);
         if (!$frase) return $reply;
 
+        // 🛡️ WHITELIST CONTEXTUAL: si el estado tiene productos vacíos
+        // y el paso es 'inicio' (saludo/sin intención de pedido), las
+        // frases tipo "te despachamos mañana" en futuro condicional NO
+        // son alucinación — son saludos de cierre legítimos.
+        try {
+            $estadoBd = app(\App\Services\EstadoPedidoService::class)->obtener($conversacion);
+            $sinProductos = empty($estadoBd->productos);
+            $pasoInicial = in_array($estadoBd->paso_actual, [
+                \App\Models\ConversacionPedidoEstado::PASO_INICIO,
+                \App\Models\ConversacionPedidoEstado::PASO_ABANDONADO,
+            ], true);
+
+            if ($sinProductos && $pasoInicial) {
+                Log::info('🛡️ Guard de alucinación SUPRIMIDO (saludo sin intención de pedido)', [
+                    'from'  => $from,
+                    'frase' => $frase,
+                    'paso'  => $estadoBd->paso_actual,
+                ]);
+                return $reply; // dejar pasar — no es alucinación, es futuro condicional
+            }
+        } catch (\Throwable $e) {
+            // si falla la consulta, mantener comportamiento original
+        }
+
         Log::warning('⚠️ ALUCINACIÓN detectada — delegando al BOT CIERRE', [
             'from'     => $from,
             'frase'    => $frase,
@@ -4051,6 +4075,46 @@ TXT;
 
         $tenantId = $tm->id() ?? 'none';
         $confirmKey = "pedido_confirmado_t{$tenantId}_" . $telNorm;
+
+        // 🛡️ CORTAFUEGO ANTI-PEDIDO-FANTASMA:
+        // Si los productos del orderData NO aparecen mencionados en NINGUNO
+        // de los últimos 8 mensajes del cliente, RECHAZAR el pedido.
+        // Esto bloquea pedidos fabricados por el LLM mini desde el historial.
+        if ($conversacion) {
+            $productos = $orderData['products'] ?? [];
+            if (!empty($productos)) {
+                $ultimosUser = \App\Models\MensajeWhatsapp::query()
+                    ->where('conversacion_id', $conversacion->id)
+                    ->where('rol', 'user')
+                    ->orderByDesc('id')
+                    ->limit(8)
+                    ->pluck('contenido')
+                    ->all();
+                $textoUser = mb_strtolower(\Illuminate\Support\Str::ascii(implode(' ', $ultimosUser)));
+
+                $algunoMencionado = false;
+                foreach ($productos as $p) {
+                    $nombreP = mb_strtolower(\Illuminate\Support\Str::ascii((string) ($p['name'] ?? '')));
+                    $tokens = collect(preg_split('/\s+/', $nombreP))
+                        ->filter(fn ($t) => mb_strlen($t) >= 4)
+                        ->values();
+                    foreach ($tokens as $t) {
+                        if (str_contains($textoUser, $t)) { $algunoMencionado = true; break 2; }
+                    }
+                }
+
+                if (!$algunoMencionado) {
+                    Log::warning('🛡️ CORTAFUEGO: pedido bloqueado — productos NO mencionados por cliente', [
+                        'from' => $from,
+                        'productos_orderData' => array_map(fn ($p) => $p['name'] ?? '?', $productos),
+                        'ultimos_user_chars' => mb_substr($textoUser, 0, 200),
+                    ]);
+                    return "Disculpa {$name} 🙏 hubo un problema interpretando tu pedido. "
+                         . "¿Me puedes decir exactamente qué productos quieres y en qué cantidad? "
+                         . "Así te lo registro bien.";
+                }
+            }
+        }
 
         // 🆔 PASO PRE-PEDIDO: asegurar cliente en SGI/ERP antes de crear el pedido.
         // Si ERP tiene lookup activo y el cliente NO existe, lo creamos con los

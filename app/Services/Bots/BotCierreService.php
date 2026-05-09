@@ -64,6 +64,24 @@ class BotCierreService
 
         // Caso 3: estado incompleto → tratar de extraer faltantes con LLM mini
         $faltantes = $estado->camposFaltantes();
+
+        // 🛡️ PRE-CHECK ANTI-PEDIDO-FANTASMA:
+        // Si los productos están vacíos en estado Y el último mensaje del
+        // cliente NO menciona productos/intención de pedir → ABORTAR.
+        // Esto evita que el LLM mini, con tool_choice forzado, fabrique un
+        // pedido leyendo el historial cuando el cliente solo dijo "Hola".
+        if (empty($estado->productos) && !$this->mensajeRecienteMencionaPedido($conv)) {
+            Log::warning('🛡️ BotCierre ABORTADO: cliente no expresó intención de pedido en este turno', [
+                'conv_id'   => $conv->id,
+                'faltantes' => $faltantes,
+            ]);
+            return [
+                'ok'        => false,
+                'razon'     => 'sin_intencion_de_pedido',
+                'faltantes' => $faltantes,
+            ];
+        }
+
         Log::info('🤖 BotCierre: estado incompleto — intentando completar con LLM mini', [
             'conv_id'   => $conv->id,
             'faltantes' => $faltantes,
@@ -93,6 +111,69 @@ class BotCierreService
     }
 
     /**
+     * 🛡️ Verifica que el cliente haya expresado intención de pedido en
+     * los ÚLTIMOS 3 mensajes USER (post-reset si aplica).
+     *
+     * Heurística: busca verbos/sustantivos típicos de pedido:
+     *   "quiero", "necesito", "pídeme", "envíame", "mándame", "regálame",
+     *   "domicilio", "despacho", "pedido", "pídelo", "manda",
+     *   un número seguido de unidad (libra, kilo, kg, lb, unidad, paquete),
+     *   o nombre de producto del catálogo activo.
+     *
+     * Si el cliente solo dijo "hola", "gracias", emojis, etc → false.
+     */
+    private function mensajeRecienteMencionaPedido(ConversacionWhatsapp $conv): bool
+    {
+        $estado = app(EstadoPedidoService::class)->obtener($conv);
+        $resetAt = $estado->updated_at; // marca temporal del último reset/update
+
+        $msgs = MensajeWhatsapp::query()
+            ->where('conversacion_id', $conv->id)
+            ->where('rol', 'user')
+            ->when($resetAt, fn ($q) => $q->where('created_at', '>=', $resetAt->copy()->subMinutes(2)))
+            ->orderByDesc('id')
+            ->limit(3)
+            ->pluck('contenido')
+            ->all();
+
+        $texto = mb_strtolower(implode(' ', $msgs));
+
+        if (trim($texto) === '') return false;
+
+        // Patrones explícitos de intención
+        $patrones = [
+            '/\b(quiero|necesito|pideme|p[íi]deme|env[íi]ame|m[áa]ndame|reg[áa]lame|pedido|domicilio|despacho|pasame|p[áa]same|llevame|ll[ée]vame|haz|hag[áa]me|dame|regalame)\b/u',
+            '/\b\d+\s*(kg|kilo|kilos|lb|libra|libras|gr|gramos|paquete|paquetes|und|unidad|unidades|porcion|porciones|pack)\b/u',
+            '/\b(otro pedido|nuevo pedido|para un pedido|otra orden|hacer pedido)\b/u',
+        ];
+
+        foreach ($patrones as $p) {
+            if (preg_match($p, $texto)) return true;
+        }
+
+        // ¿Menciona algún producto del catálogo activo? (token >=4 chars)
+        try {
+            $catalogo = app(\App\Services\BotCatalogoService::class)->productosActivos();
+            $tokens = collect();
+            foreach ($catalogo as $p) {
+                $palabras = preg_split('/\s+/', mb_strtolower(\Illuminate\Support\Str::ascii((string) $p->nombre)));
+                foreach ($palabras as $w) {
+                    if (mb_strlen($w) >= 5) $tokens->push($w);
+                }
+            }
+            $tokensUnicos = $tokens->unique()->values();
+            $textoNorm = mb_strtolower(\Illuminate\Support\Str::ascii($texto));
+            foreach ($tokensUnicos as $t) {
+                if (str_contains($textoNorm, $t)) return true;
+            }
+        } catch (\Throwable $e) {
+            // Si el catálogo falla, ya con los patrones explícitos basta
+        }
+
+        return false;
+    }
+
+    /**
      * Llama a OpenAI con un prompt mini y tool_choice forzado a confirmar_pedido.
      * El LLM solo ve los datos del estado actual y los últimos 6 mensajes
      * de chat — no se le da contexto extra para que no se distraiga.
@@ -105,10 +186,15 @@ class BotCierreService
             return null;
         }
 
-        // Últimos 6 mensajes para que entienda el contexto inmediato
+        // 🛡️ Últimos 6 mensajes pero SOLO posteriores al último reset
+        // del estado. Así si hubo auto_reset, no contaminamos con el
+        // pedido anterior.
+        $resetAt = $estado->updated_at;
+
         $ultimos = MensajeWhatsapp::query()
             ->where('conversacion_id', $conv->id)
             ->whereIn('rol', ['user', 'assistant'])
+            ->when($resetAt, fn ($q) => $q->where('created_at', '>=', $resetAt->copy()->subMinutes(2)))
             ->orderByDesc('id')
             ->limit(6)
             ->get(['rol', 'contenido'])
