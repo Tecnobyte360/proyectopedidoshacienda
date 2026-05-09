@@ -1083,7 +1083,11 @@ TXT;
         // Si la primera tool call es una de las herramientas de consulta de
         // catálogo, las procesamos en bloque (potencialmente varias en paralelo)
         // y mandamos los results al LLM para que arme la respuesta final.
-        $catalogoTools = ['buscar_productos', 'listar_categorias', 'productos_de_categoria', 'info_producto', 'productos_destacados'];
+        $catalogoTools = [
+            'buscar_productos', 'listar_categorias', 'productos_de_categoria', 'info_producto', 'productos_destacados',
+            // Tools de info estática del tenant (datos de BD)
+            'consultar_horarios', 'consultar_zonas_cobertura', 'consultar_promociones',
+        ];
         if ($toolCalls && in_array($toolCalls[0]['function']['name'] ?? '', $catalogoTools, true)) {
             $catalogoSvc = app(\App\Services\BotCatalogoToolService::class);
             $sedeIdAct   = $this->obtenerSedeIdDesdeConexion($connectionId);
@@ -1119,6 +1123,41 @@ TXT;
                             min(20, max(1, (int) ($args['limite'] ?? 8))),
                             $sedeIdAct
                         ),
+
+                        // 🏪 Devuelve horarios REALES desde BD (no de la tabla legacy)
+                        'consultar_horarios' => (function () {
+                            $sedes = \App\Models\Sede::where('activa', true)->get();
+                            return [
+                                'sedes' => $sedes->map(fn ($s) => [
+                                    'nombre'    => $s->nombre,
+                                    'direccion' => $s->direccion,
+                                    'estado'    => $s->estaAbierta() ? 'ABIERTA AHORA' : 'CERRADA AHORA',
+                                    'hoy'       => $s->horarioHoyTexto(),
+                                    'semana'    => $s->horariosCompletos(),
+                                    'formato_legible' => $s->horariosFormateadosTexto(),
+                                ])->values()->all(),
+                                'instruccion_para_bot' => 'Usa el campo formato_legible TEXTUAL al cliente. NO conviertas los rangos a am/pm — están en 24h y así deben quedar. Si la sede está cerrada, dile la hora de apertura del día siguiente.',
+                            ];
+                        })(),
+
+                        // 🗺️ Devuelve zonas de cobertura
+                        'consultar_zonas_cobertura' => (function () {
+                            $zonas = \App\Models\ZonaCobertura::where('activa', true)
+                                ->orderBy('orden')->orderBy('nombre')
+                                ->get(['nombre','sede_id','tiempo_estimado_min','costo_envio']);
+                            return ['zonas' => $zonas->toArray()];
+                        })(),
+
+                        // 🎁 Devuelve promociones vigentes
+                        'consultar_promociones' => (function () {
+                            $promos = \App\Models\Promocion::where('activa', true)
+                                ->where(fn ($q) => $q->whereNull('vigencia_hasta')->orWhere('vigencia_hasta', '>=', now()))
+                                ->limit(15)->get(['nombre','descripcion','descuento_pct','descuento_valor']);
+                            return [
+                                'promociones' => $promos->toArray(),
+                                'mensaje_si_vacio' => 'No hay promociones vigentes en este momento.',
+                            ];
+                        })(),
                     };
                 } catch (\Throwable $e) {
                     $resultado = ['error' => $e->getMessage()];
@@ -5104,6 +5143,55 @@ PROMPT;
                 ],
             ];
         }
+
+        // 🏪 Tool: consultar_horarios — devuelve los horarios REALES de las
+        // sedes activas del tenant. Evita que el LLM invente horarios.
+        $tools[] = [
+            'type'     => 'function',
+            'function' => [
+                'name'        => 'consultar_horarios',
+                'description' => 'Devuelve los horarios REALES de atención de todas las sedes activas del tenant, '
+                    . 'desde la BD. ÚSALA SIEMPRE que el cliente pregunte "¿a qué horas?", "¿están abiertos?", '
+                    . '"horarios", "cuándo abren", "cuándo cierran", "cuándo atienden". '
+                    . 'NUNCA inventes horarios — siempre llama esta tool primero.',
+                'parameters'  => [
+                    'type'       => 'object',
+                    'properties' => new \stdClass(),
+                    'required'   => [],
+                ],
+            ],
+        ];
+
+        // 🗺️ Tool: consultar_zonas_cobertura — zonas de domicilio del tenant
+        $tools[] = [
+            'type'     => 'function',
+            'function' => [
+                'name'        => 'consultar_zonas_cobertura',
+                'description' => 'Devuelve las zonas/barrios donde se hace domicilio. ÚSALA cuando el cliente '
+                    . 'pregunte "¿hacen domicilios?", "¿llegan a X?", "¿qué zonas cubren?". Para validar UNA '
+                    . 'dirección concreta usa `validar_cobertura` (más precisa).',
+                'parameters'  => [
+                    'type'       => 'object',
+                    'properties' => new \stdClass(),
+                    'required'   => [],
+                ],
+            ],
+        ];
+
+        // 🎁 Tool: consultar_promociones — promociones vigentes del tenant
+        $tools[] = [
+            'type'     => 'function',
+            'function' => [
+                'name'        => 'consultar_promociones',
+                'description' => 'Devuelve las promociones vigentes del tenant. ÚSALA cuando el cliente pregunte '
+                    . '"¿qué promociones tienen?", "¿hay descuentos hoy?", "ofertas".',
+                'parameters'  => [
+                    'type'       => 'object',
+                    'properties' => new \stdClass(),
+                    'required'   => [],
+                ],
+            ],
+        ];
 
         return $tools;
     }
