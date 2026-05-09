@@ -1879,7 +1879,19 @@ TXT;
             // 🛡️ GUARD CRÍTICO ANTES DE GUARDAR: el bot llamó confirmar_pedido
             // pero ¿realmente el cliente pidió algo? Si el último mensaje del
             // cliente es solo un saludo, el bot está alucinando datos viejos.
-            if ($this->esIntentoConfirmacionFalsa($conversationHistory)) {
+            //
+            // EXCEPCIÓN: si el estado estructurado en BD tiene productos +
+            // entrega + identificación coherentes con el orderData, el pedido
+            // es LEGÍTIMO aunque los últimos mensajes sean datos finales como
+            // email o teléfono. NO bloquear.
+            $estadoBd = $conversacion ? app(\App\Services\EstadoPedidoService::class)->obtener($conversacion) : null;
+            $estadoCoherente = $estadoBd
+                && !empty($estadoBd->productos)
+                && !empty($estadoBd->metodo_entrega)
+                && (!empty($estadoBd->cedula) || !empty($estadoBd->nombre_cliente))
+                && !empty($orderData['products']);
+
+            if (!$estadoCoherente && $this->esIntentoConfirmacionFalsa($conversationHistory)) {
                 Log::warning('🚨 GUARD: bot intentó confirmar_pedido sin intención real del cliente', [
                     'from' => $from,
                     'orderData' => $orderData,
@@ -1889,6 +1901,15 @@ TXT;
                 $conversationHistory[] = ['role' => 'assistant', 'content' => $reply];
                 Cache::put($cacheKey, $conversationHistory, now()->addMinutes(45));
                 return $reply;
+            }
+
+            if ($estadoCoherente) {
+                Log::info('✅ Estado coherente — saltando guard de confirmación falsa', [
+                    'from'         => $from,
+                    'productos'    => count($estadoBd->productos ?: []),
+                    'metodo'       => $estadoBd->metodo_entrega,
+                    'tiene_cedula' => !empty($estadoBd->cedula),
+                ]);
             }
 
             return $this->guardarPedidoDesdeToolCall(
