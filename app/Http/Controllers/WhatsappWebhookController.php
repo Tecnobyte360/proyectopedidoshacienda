@@ -773,7 +773,7 @@ class WhatsappWebhookController extends Controller
 
             if (!$hayAlgunaAbiertaG && $sedesActivasG->isNotEmpty()
                 && !$yaAceptoProgramar
-                && $this->mensajeExpresaIntencionDePedidoOConsulta($message)) {
+                && !$this->mensajeEsAgradecimientoODespedida($message)) {
 
                 $sedePrincipal = $sedesActivasG->first();
                 $proximaApertura = $sedePrincipal->proximaApertura() ?: 'cuando abramos';
@@ -789,10 +789,14 @@ class WhatsappWebhookController extends Controller
                     $primerNombre = ''; // sin nombre antes que un email
                 }
 
-                $saludoNombre = $primerNombre !== '' ? "Hola {$primerNombre} 🙏 " : "Hola 🙏 ";
-                $respuestaCierre = $saludoNombre
-                    . "ahorita estamos cerrados. Abrimos {$proximaApertura}.\n\n"
-                    . "📅 Si quieres, te dejo el pedido *PROGRAMADO* para apenas abramos. "
+                // Saludo según hora del día
+                $hora = (int) now()->setTimezone('America/Bogota')->format('H');
+                $saludoHora = $hora < 12 ? 'Buenos días' : ($hora < 19 ? 'Buenas tardes' : 'Buenas noches');
+                $personalizar = $primerNombre !== '' ? " {$primerNombre}" : '';
+
+                $respuestaCierre = "{$saludoHora}{$personalizar} 🙏 bienvenid@ a *La Hacienda*.\n\n"
+                    . "Ahorita estamos cerrados. Abrimos {$proximaApertura}.\n\n"
+                    . "📅 Si quieres, déjame el pedido *PROGRAMADO* para apenas abramos. "
                     . "Cuéntame qué necesitas y lo dejo listo 😊";
 
                 Log::info('🛡️ EARLY GUARD: respuesta de cierre directa (sin LLM)', [
@@ -2442,6 +2446,32 @@ TXT;
             // O regex si tiene chars especiales (acentos)
             if (preg_match('/\b' . str_replace(['[ií]', '[áa]'], ['(i|í)', '(a|á)'], $p) . '\b/u', $m)) return true;
         }
+        return false;
+    }
+
+    /**
+     * 🛡️ ¿El mensaje es solo agradecimiento o despedida?
+     * En ese caso NO disparamos guard de cierre — dejamos que el LLM
+     * responda cordial y termine la conversación.
+     */
+    private function mensajeEsAgradecimientoODespedida(string $message): bool
+    {
+        $m = mb_strtolower(\Illuminate\Support\Str::ascii(trim($message)));
+        if ($m === '') return true; // mensaje vacío también: no disparar
+
+        $patrones = [
+            'gracias', 'muchas gracias', 'mil gracias', 'gracias!',
+            'chao', 'adios', 'adiós', 'bye', 'hasta luego', 'hasta mañana',
+            'nos vemos', 'cuídate', 'cuidate', 'buena noche', 'buenas',
+        ];
+
+        foreach ($patrones as $p) {
+            if ($m === $p) return true;
+        }
+
+        // Mensajes muy cortos sin verbos/sustantivos típicos: ej "ok", "ya"
+        if (mb_strlen($m) <= 4 && in_array($m, ['ok', 'ya', 'mmm', 'hmm', 'aja', 'ajá'], true)) return true;
+
         return false;
     }
 
