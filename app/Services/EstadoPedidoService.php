@@ -82,7 +82,7 @@ class EstadoPedidoService
             } elseif (!empty($orderData['location'])) {
                 $sedeBuscada = trim($orderData['location']);
                 $sedeMatch = \App\Models\Sede::query()
-                    ->where('activo', true)
+                    ->where('activa', true)
                     ->where(function ($q) use ($sedeBuscada) {
                         $q->whereRaw('LOWER(nombre) = ?', [mb_strtolower($sedeBuscada)])
                           ->orWhereRaw('LOWER(nombre) LIKE ?', ['%' . mb_strtolower($sedeBuscada) . '%']);
