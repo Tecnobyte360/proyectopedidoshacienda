@@ -886,6 +886,8 @@ TXT;
         // 🎯 ESTADO ESTRUCTURADO: inyectar resumen del pedido en BD para que
         // el LLM SIEMPRE sepa qué datos ya tiene, sin depender de leer chat.
         $reinforceEstadoPedido = [];
+        $reinforceFlujo        = [];
+        $pasoActualOrch        = \App\Models\ConversacionPedidoEstado::PASO_INICIO;
         try {
             $estadoSrv = app(\App\Services\EstadoPedidoService::class);
             $resumenEstado = $estadoSrv->resumenParaPrompt($conversacion);
@@ -898,38 +900,66 @@ TXT;
                         . "No vuelvas a pedir lo que ya está aquí.",
                 ];
             }
+
+            // 🎯 ORQUESTADOR DETERMINISTA: instrucción + tools restringidas al paso
+            $estadoFlujoActual = $estadoSrv->obtener($conversacion);
+            $pasoActualOrch    = $estadoFlujoActual->paso_actual;
+            $reinforceFlujo[]  = app(\App\Services\FlujoPedidoOrchestrator::class)
+                ->systemMessageParaPaso($conversacion);
         } catch (\Throwable $e) {
-            \Log::warning('No se pudo inyectar resumen de estado de pedido: ' . $e->getMessage());
+            \Log::warning('No se pudo inyectar resumen/orquestador: ' . $e->getMessage());
         }
 
         $messages = array_merge(
             [['role' => 'system', 'content' => $systemPrompt]],
             $reinforceAgent,
             $extraSystem,
-            $reinforceProgramado, // 📅 pedidos programados
-            $reinforceEstadoPedido, // 🎯 estado estructurado en BD
+            $reinforceProgramado,    // 📅 pedidos programados
+            $reinforceEstadoPedido,  // 🎯 estado estructurado en BD
+            $reinforceFlujo,         // 🚦 instrucción del paso actual (orquestador)
             $conversationHistory
         );
 
-        // 🎯 SHORT-CIRCUIT: si el cliente pidió EXPLÍCITAMENTE generar el pedido,
-        // forzamos al LLM a invocar confirmar_pedido sin pasar por otras tools.
-        $forzarConfirmar = $this->clientePidioGenerarPedido($message);
-        $toolChoiceInicial = $forzarConfirmar
-            ? ['type' => 'function', 'function' => ['name' => 'confirmar_pedido']]
-            : 'auto';
+        // 🚦 ORQUESTADOR: regla por paso (tools permitidas + tool_choice)
+        $orchestrator = app(\App\Services\FlujoPedidoOrchestrator::class);
+        $toolsFiltradas = $orchestrator->filtrarTools(
+            $this->getToolsDefinicion(),
+            $pasoActualOrch
+        );
+        $toolChoicePorPaso = $orchestrator->toolChoice($pasoActualOrch);
 
+        // 🎯 SHORT-CIRCUIT: si el cliente pidió EXPLÍCITAMENTE generar el pedido,
+        // forzamos confirmar_pedido aunque el paso del orquestador no lo permita.
+        $forzarConfirmar = $this->clientePidioGenerarPedido($message);
         if ($forzarConfirmar) {
-            Log::info('🎯 Cliente pidió generar pedido — forzando tool_choice=confirmar_pedido', [
-                'from' => $from,
-                'mensaje' => $message,
+            $toolChoiceInicial = ['type' => 'function', 'function' => ['name' => 'confirmar_pedido']];
+            // Asegurarnos que confirmar_pedido esté disponible aunque el paso lo oculte
+            $allTools = $this->getToolsDefinicion();
+            $confirmarTool = collect($allTools)->first(
+                fn ($t) => ($t['function']['name'] ?? '') === 'confirmar_pedido'
+            );
+            if ($confirmarTool) {
+                $toolsFiltradas = [$confirmarTool];
+            }
+            Log::info('🎯 Cliente pidió generar pedido — forzando confirmar_pedido', [
+                'from' => $from, 'mensaje' => $message,
             ]);
             $messages[] = [
                 'role' => 'system',
-                'content' => "🚨 OBLIGATORIO: el cliente acaba de pedir explícitamente que generes/confirmes el pedido. INVOCA `confirmar_pedido` AHORA con TODOS los datos recopilados de la conversación. NO llames otras tools. NO respondas en texto.",
+                'content' => "🚨 OBLIGATORIO: el cliente acaba de pedir explícitamente que generes/confirmes el pedido. INVOCA `confirmar_pedido` AHORA con TODOS los datos recopilados.",
             ];
+        } else {
+            $toolChoiceInicial = $toolChoicePorPaso;
+            Log::info('🚦 Orquestador en acción', [
+                'from'       => $from,
+                'paso'       => $pasoActualOrch,
+                'tool_choice'=> is_string($toolChoiceInicial) ? $toolChoiceInicial : 'function:'.($toolChoiceInicial['function']['name'] ?? '?'),
+                'tools_count'=> count($toolsFiltradas),
+                'tools'      => array_map(fn ($t) => $t['function']['name'] ?? '?', $toolsFiltradas),
+            ]);
         }
 
-        $response = $this->llamarOpenAI($messages, $toolChoiceInicial);
+        $response = $this->llamarOpenAI($messages, $toolChoiceInicial, $toolsFiltradas);
 
         if (!$response) {
             Cache::put($cacheKey, $conversationHistory, now()->addMinutes(45));
@@ -2280,10 +2310,12 @@ TXT;
 
     /**
      * @param array        $messages
-     * @param string|array $toolChoice 'auto' (default), 'none',
+     * @param string|array $toolChoice 'auto' (default), 'none', 'required',
      *                                 o ['type'=>'function','function'=>['name'=>'X']] para forzar
+     * @param ?array       $toolsCustom Si se pasa, se usan ESTAS tools en vez de
+     *                                  todas las definidas (para filtrar por paso).
      */
-    private function llamarOpenAI(array $messages, $toolChoice = 'auto'): ?array
+    private function llamarOpenAI(array $messages, $toolChoice = 'auto', ?array $toolsCustom = null): ?array
     {
         // 🛡️ PRE-FLIGHT: estimar tokens y recortar si excede el límite seguro.
         // gpt-4o-mini contexto max: 128k. TPM tier 2: 2M. Para evitar rate limits
@@ -2330,7 +2362,7 @@ TXT;
                         'frequency_penalty' => 0.4,
                         'presence_penalty'  => 0.4,
                         'max_tokens'        => (int) ($config->max_tokens ?? 700),
-                        'tools'       => $this->getToolsDefinicion(),
+                        'tools'       => $toolsCustom ?? $this->getToolsDefinicion(),
                         'tool_choice' => $toolChoice,
                     ]);
 
