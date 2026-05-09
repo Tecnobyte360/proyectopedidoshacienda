@@ -586,8 +586,14 @@ class BotCatalogoService
         if ($parcial) return $parcial;
 
         // 5) FUZZY MATCH — tolera typos comunes (Huayacan → Guayacán, etc)
-        // Usa similar_text + Levenshtein contra el nombre del producto.
-        // Umbral: similitud >= 70% O distancia Levenshtein <= 30% del largo.
+        // 🛡️ ENDURECIDO: además del threshold de similitud (>=85), EXIGIMOS
+        // que al menos UN token significativo (>=4 chars) de la entrada
+        // aparezca contenido o muy cercano (lev<=2) en el nombre del producto.
+        // Esto evita matches catastróficos tipo "Pierna de cerdo" → "SUPERCOCO".
+        $tokensEntrada = collect(explode(' ', $entrada))
+            ->filter(fn ($t) => mb_strlen($t) >= 4)
+            ->values();
+
         $mejor = null;
         $mejorScore = 0.0;
 
@@ -595,10 +601,24 @@ class BotCatalogoService
             $nombre = $this->normalizar((string) $p->nombre);
             if ($nombre === '') continue;
 
-            // similar_text: 0..100, mientras más alto mejor
+            // Guard de token compartido: si la entrada tiene tokens significativos,
+            // al menos uno debe estar en el nombre del producto (literal o lev<=2).
+            if ($tokensEntrada->isNotEmpty()) {
+                $palabrasNombre = explode(' ', $nombre);
+                $compartido = false;
+                foreach ($tokensEntrada as $tE) {
+                    if (str_contains($nombre, $tE)) { $compartido = true; break; }
+                    foreach ($palabrasNombre as $pN) {
+                        if (mb_strlen($pN) < 4) continue;
+                        if (abs(mb_strlen($pN) - mb_strlen($tE)) > 2) continue;
+                        if (levenshtein($tE, $pN) <= 2) { $compartido = true; break 2; }
+                    }
+                }
+                if (!$compartido) continue; // descarta candidato
+            }
+
             similar_text($entrada, $nombre, $similitud);
 
-            // También probar contra primer token del nombre (ej: "guayacan")
             $primerTokenNombre = explode(' ', $nombre)[0] ?? '';
             $primerTokenEntrada = explode(' ', $entrada)[0] ?? '';
             $sim2 = 0.0;
@@ -606,10 +626,10 @@ class BotCatalogoService
                 similar_text($primerTokenEntrada, $primerTokenNombre, $sim2);
             }
 
-            // Tomar la mejor de las dos similitudes
             $score = max($similitud, $sim2);
 
-            if ($score > $mejorScore && $score >= 70) {
+            // Threshold subido de 70 → 85
+            if ($score > $mejorScore && $score >= 85) {
                 $mejorScore = $score;
                 $mejor = $p;
             }
@@ -621,6 +641,11 @@ class BotCatalogoService
                 'producto' => $mejor->nombre,
                 'codigo'   => $mejor->codigo,
                 'score'    => round($mejorScore, 1),
+            ]);
+        } else {
+            \Log::info('🚫 Fuzzy match NO resolvió producto', [
+                'entrada' => $entrada,
+                'tokens_significativos' => $tokensEntrada->all(),
             ]);
         }
 

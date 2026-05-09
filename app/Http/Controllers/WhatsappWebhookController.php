@@ -4404,20 +4404,59 @@ TXT;
         $subtotalProductos = 0;
 
         foreach (($orderData['products'] ?? []) as $product) {
-            // 🐛 BUG FIX: el operador ?? solo reemplaza null, NO string vacío.
-            // El bot LLM frecuentemente manda code:"" (vacío) cuando no sabe el SKU
-            // y el nombre del producto. Antes el catálogo recibía "" y rechazaba.
-            // Ahora preferimos código solo si NO es vacío, sino el nombre.
-            $entrada = !empty(trim((string) ($product['code'] ?? '')))
-                ? trim((string) $product['code'])
-                : trim((string) ($product['name'] ?? ''));
-            $producto = $catalogo->resolverProducto($entrada, $sede?->id);
+            $codeRaw = trim((string) ($product['code'] ?? ''));
+            $nameRaw = trim((string) ($product['name'] ?? ''));
+
+            // 🛡️ ESTRATEGIA ANTI-ALUCINACIÓN:
+            // 1) Si el LLM proveyó `code`, intentamos resolverlo. Si NO existe,
+            //    NO hacemos fallback al name (porque "Pierna de cerdo" → SUPERCOCO).
+            //    En su lugar, intentamos resolver SOLO por name con guard de token.
+            // 2) Validamos que el producto resuelto comparta al menos un token
+            //    significativo (>=4 chars) con el name solicitado.
+            $producto = null;
+            $resueltoVia = null;
+
+            if ($codeRaw !== '') {
+                $producto = $catalogo->resolverProducto($codeRaw, $sede?->id);
+                if ($producto) {
+                    $codigoResuelto = (string) ($producto->codigo ?? '');
+                    if (strcasecmp(trim($codigoResuelto), $codeRaw) === 0) {
+                        $resueltoVia = 'codigo_exacto';
+                    } else {
+                        // resolverProducto cayó a fuzzy a partir del code → no confiar
+                        $producto = null;
+                    }
+                }
+            }
+            if (!$producto && $nameRaw !== '') {
+                $producto = $catalogo->resolverProducto($nameRaw, $sede?->id);
+                if ($producto) $resueltoVia = 'nombre';
+            }
+
+            // 🛡️ GUARD POST-RESOLVE: el nombre resuelto debe compartir
+            // al menos un token significativo (>=4 chars) con el name solicitado.
+            if ($producto && $nameRaw !== '') {
+                $tokensSolicitados = collect(preg_split('/\s+/', mb_strtolower(\Illuminate\Support\Str::ascii($nameRaw))))
+                    ->filter(fn ($t) => mb_strlen($t) >= 4)
+                    ->values();
+                if ($tokensSolicitados->isNotEmpty()) {
+                    $nombreResuelto = mb_strtolower(\Illuminate\Support\Str::ascii((string) ($producto->nombre ?? '')));
+                    $compartido = $tokensSolicitados->first(fn ($t) => str_contains($nombreResuelto, $t));
+                    if (!$compartido) {
+                        Log::warning('🛡️ Resolver matcheó producto sin tokens compartidos — descartado', [
+                            'solicitado' => $nameRaw,
+                            'resuelto'   => $producto->nombre ?? null,
+                            'codigo'     => $producto->codigo ?? null,
+                            'via'        => $resueltoVia,
+                        ]);
+                        $producto = null;
+                    }
+                }
+            }
 
             $cantidad = (float) ($product['quantity'] ?? 1);
 
             if ($producto) {
-                // 🛡️ El producto puede venir como Eloquent (Producto) o stdClass (catálogo live).
-                // Si tiene el método precioParaSede usalo; si no, usa precio_base como fallback.
                 $precio = method_exists($producto, 'precioParaSede')
                     ? $producto->precioParaSede($sede?->id)
                     : (float) ($producto->precio_base ?? $producto->precio ?? 0);
@@ -4434,12 +4473,24 @@ TXT;
                     'precio_unitario' => $precio,
                     'subtotal'        => $sub,
                 ];
+
+                Log::info('✅ Producto resuelto', [
+                    'solicitado_code' => $codeRaw,
+                    'solicitado_name' => $nameRaw,
+                    'resuelto_id'     => $producto->id ?? null,
+                    'resuelto_codigo' => $producto->codigo ?? null,
+                    'resuelto_nombre' => $producto->nombre ?? null,
+                    'precio'          => $precio,
+                    'cantidad'        => $cantidad,
+                    'via'             => $resueltoVia,
+                ]);
             } else {
                 Log::warning('⚠️ Producto del bot no está en catálogo — ABORTANDO pedido', [
-                    'entrada' => $entrada,
+                    'code' => $codeRaw,
+                    'name' => $nameRaw,
                     'producto_data' => $product,
                 ]);
-                $productosNoEncontrados[] = $entrada;
+                $productosNoEncontrados[] = $nameRaw !== '' ? $nameRaw : $codeRaw;
             }
         }
 
