@@ -229,6 +229,14 @@ class EstadoPedidoService
             'pedir de nuevo',
             'volver a pedir',
             'sumar al pedido',
+            // "para un pedido" / "para pedir"
+            'para un pedido',
+            'para pedir',
+            'para hacer un pedido',
+            'quisiera un pedido',
+            'voy a pedir',
+            'me gustaría pedir',
+            'me gustaria pedir',
             // "otras cosas" / "más cosas"
             'otras cosas',
             'otra cosa',
@@ -308,13 +316,14 @@ class EstadoPedidoService
         }
 
         // 3) HEURÍSTICA: si menciona cantidad + unidad común de producto, probablemente es nuevo pedido
-        //    Ej: "5 libras de solomo", "1 kg pierna", "2 unidades", "una caja"
-        $unidadesComunes = '(libras?|libra|kilos?|kilo|kg|gramos?|gr|gramo|unidades?|unidad|cajas?|caja|paquetes?|paquete|bolsas?|bolsa|docenas?|docena|gallinas?|gallina)';
+        //    Tolera typos comunes: libraa/libritas/kilitos/kilooo/etc
+        //    Ej: "5 libras de solomo", "4 libraa de pierna", "1 kg pierna"
+        $unidadesComunes = '(libra+s?|kilo+s?|kilito+s?|kg+|gramo+s?|gr+|unidade+s?|unidad+|caja+s?|paquete+s?|bolsa+s?|docena+s?|gallina+s?|porci[oó]n+s?|botella+s?|lata+s?)';
         if (preg_match('/\b\d+\s*' . $unidadesComunes . '\b/iu', $m)) {
             return true;
         }
         // Variantes con palabras: "una libra", "un kilo", "media libra"
-        if (preg_match('/\b(una?|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|media)\s*' . $unidadesComunes . '\b/iu', $m)) {
+        if (preg_match('/\b(una?|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|media|medio)\s*' . $unidadesComunes . '\b/iu', $m)) {
             return true;
         }
 
