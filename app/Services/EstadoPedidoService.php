@@ -22,7 +22,7 @@ class EstadoPedidoService
      */
     public function obtener(ConversacionWhatsapp $conv): ConversacionPedidoEstado
     {
-        return ConversacionPedidoEstado::firstOrCreate(
+        $estado = ConversacionPedidoEstado::firstOrCreate(
             ['conversacion_id' => $conv->id],
             [
                 'tenant_id'   => $conv->tenant_id,
@@ -30,6 +30,44 @@ class EstadoPedidoService
                 'telefono'    => $conv->telefono_normalizado,
             ]
         );
+
+        // 🛡️ ASTUTO: hidratar cédula/email/nombre desde el cliente local
+        // si están vacíos en el estado pero sí existen en el perfil del cliente.
+        // Esto evita que el bot vuelva a pedir datos que YA tenemos del cliente.
+        try {
+            $cliente = $conv->cliente;
+            if ($cliente) {
+                $touched = false;
+                if (empty($estado->cedula) && !empty($cliente->cedula)) {
+                    $estado->cedula = $cliente->cedula;
+                    $touched = true;
+                }
+                if (empty($estado->email) && !empty($cliente->email)) {
+                    $estado->email = $cliente->email;
+                    $touched = true;
+                }
+                if (empty($estado->nombre_cliente) && !empty($cliente->nombre)
+                    && !str_contains((string) $cliente->nombre, '@')
+                    && strtolower((string) $cliente->nombre) !== 'cliente'
+                ) {
+                    $estado->nombre_cliente = $cliente->nombre;
+                    $touched = true;
+                }
+                if ($touched) {
+                    $estado->save();
+                    Log::info('🛡️ Estado hidratado con datos del cliente local', [
+                        'conv_id' => $conv->id,
+                        'cedula'  => $estado->cedula,
+                        'email'   => $estado->email,
+                        'nombre'  => $estado->nombre_cliente,
+                    ]);
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('No se pudo hidratar estado desde cliente: ' . $e->getMessage());
+        }
+
+        return $estado;
     }
 
     /**
@@ -222,18 +260,59 @@ class EstadoPedidoService
 
         // 1. CÉDULA — número de 6-12 dígitos, posiblemente con puntos
         //    Ej: "1098765432", "1.098.765.432", "Mi cédula es 1234567"
+        // 🛡️ ASTUTO: rechazamos números que sean claramente teléfono o
+        //    que vengan con palabras de pago/transferencia.
         if (empty($estado->cedula)) {
+            $msgLower = mb_strtolower($msg);
+            $contextoPago = preg_match('/(transferencia|nequi|daviplata|bancolombia|pse|cuenta|consign|tarjeta|cel(ular)?|tel[eé]fono|whatsapp)/iu', $msgLower) === 1;
+            $telefonoCliente = preg_replace('/[^\d]/', '', (string) ($conv->telefono_normalizado ?? ''));
+
+            $esPosibleTelefono = function (string $clean) use ($telefonoCliente): bool {
+                // Coincide con el teléfono del cliente actual
+                if ($telefonoCliente !== '' && (
+                    $clean === $telefonoCliente
+                    || str_ends_with($telefonoCliente, $clean)
+                    || str_ends_with($clean, $telefonoCliente)
+                )) return true;
+                // Patrón clásico celular Colombia: 10 dígitos empezando con 3
+                if (preg_match('/^3\d{9}$/', $clean)) return true;
+                // Con prefijo país: 12 dígitos empezando con 573
+                if (preg_match('/^573\d{9}$/', $clean)) return true;
+                return false;
+            };
+
             $clean = preg_replace('/[^\d]/', '', $msg);
-            if (preg_match('/^\d{6,12}$/', $clean) && mb_strlen($msg) <= 25) {
+
+            // Caso A: el cliente escribió SOLO el número (sin palabras)
+            if (!$contextoPago
+                && preg_match('/^\d{6,12}$/', $clean)
+                && mb_strlen($msg) <= 25
+                && !$esPosibleTelefono($clean)
+            ) {
                 $estado->cedula = $clean;
                 $cambio = true;
                 Log::info('🔍 Cédula capturada del mensaje', ['conv_id' => $conv->id, 'cedula' => $clean]);
-            } elseif (preg_match('/\b(?:c[eé]dula|cc|documento|nit|ced|cédula)[\s:]*([\d.,]{6,15})\b/iu', $msg, $m)) {
-                $clean = preg_replace('/[^\d]/', '', $m[1]);
-                if (preg_match('/^\d{6,12}$/', $clean)) {
-                    $estado->cedula = $clean;
+            }
+            // Caso B: prefijo explícito ("mi cédula es 1234567")
+            elseif (preg_match('/\b(?:c[eé]dula|cc|documento|nit|ced)[\s:]*([\d.,]{6,15})\b/iu', $msg, $m)) {
+                $cleanB = preg_replace('/[^\d]/', '', $m[1]);
+                if (preg_match('/^\d{6,12}$/', $cleanB) && !$esPosibleTelefono($cleanB)) {
+                    $estado->cedula = $cleanB;
                     $cambio = true;
-                    Log::info('🔍 Cédula capturada con prefijo', ['conv_id' => $conv->id, 'cedula' => $clean]);
+                    Log::info('🔍 Cédula capturada con prefijo', ['conv_id' => $conv->id, 'cedula' => $cleanB]);
+                }
+            } else {
+                if ($contextoPago && preg_match('/^\d{6,12}$/', $clean)) {
+                    Log::info('🛡️ Número ignorado como cédula — contexto de pago/teléfono', [
+                        'conv_id' => $conv->id,
+                        'numero'  => $clean,
+                        'mensaje' => mb_substr($msg, 0, 80),
+                    ]);
+                } elseif ($clean !== '' && $esPosibleTelefono($clean)) {
+                    Log::info('🛡️ Número ignorado como cédula — parece teléfono', [
+                        'conv_id' => $conv->id,
+                        'numero'  => $clean,
+                    ]);
                 }
             }
         }

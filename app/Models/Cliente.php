@@ -211,6 +211,14 @@ class Cliente extends Model
             $partes[] = "Dirección habitual: {$this->direccion_principal}" . ($this->barrio ? ", {$this->barrio}" : '');
         }
 
+        // 🛡️ Datos clave que NO debemos volver a pedir si ya los tenemos
+        $yaTenemos = [];
+        if (!empty($this->cedula)) $yaTenemos[] = "cédula: *{$this->cedula}*";
+        if (!empty($this->email))  $yaTenemos[] = "email: *{$this->email}*";
+        if (!empty($yaTenemos)) {
+            $partes[] = "🟢 YA TENEMOS DATOS DEL CLIENTE — NO los pidas otra vez:\n  • " . implode("\n  • ", $yaTenemos);
+        }
+
         if (!empty($this->preferencias)) {
             $partes[] = "Preferencias: " . implode(', ', (array) $this->preferencias);
         }
