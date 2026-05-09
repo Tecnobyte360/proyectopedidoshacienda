@@ -105,7 +105,8 @@ class Monitor extends Component
                 'icon'      => '⚠️',
                 'color'     => 'amber',
                 'at'        => $a->created_at,
-            ]);
+            ])
+            ->toBase(); // Eloquent → Support Collection (evita errores de getKey en merge)
 
         // Tool invocaciones recientes
         $toolInvocaciones = collect();
@@ -140,7 +141,8 @@ class Monitor extends Component
                 'color'  => 'emerald',
                 'at'     => $p->created_at,
                 'meta'   => ['pedido_id' => $p->id],
-            ]);
+            ])
+            ->toBase(); // Eloquent → Support Collection
 
         return $alertas
             ->merge($toolInvocaciones)
