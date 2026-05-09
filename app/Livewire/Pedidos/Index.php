@@ -277,7 +277,14 @@ class Index extends Component
     {
         $pedidos = $this->pedidos;
 
-        if ($this->estado !== 'todos') {
+        if ($this->estado === 'programados') {
+            // Filtro especial: pedidos con fecha programada futura, no entregados ni cancelados
+            $pedidos = $pedidos->filter(function ($p) {
+                if (empty($p->programado_para)) return false;
+                if (in_array($p->estado, [Pedido::ESTADO_ENTREGADO, Pedido::ESTADO_CANCELADO], true)) return false;
+                return true;
+            });
+        } elseif ($this->estado !== 'todos') {
             // 'confirmado' es estado legacy → se trata como 'nuevo'
             $estadosBuscar = $this->estado === Pedido::ESTADO_NUEVO
                 ? [Pedido::ESTADO_NUEVO, 'confirmado']

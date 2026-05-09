@@ -135,6 +135,11 @@
             $despachados = $pedidos->where('estado', \App\Models\Pedido::ESTADO_REPARTIDOR_EN_CAMINO)->count();
             $entregados  = $pedidos->where('estado', \App\Models\Pedido::ESTADO_ENTREGADO)->count();
             $cancelados  = $pedidos->where('estado', \App\Models\Pedido::ESTADO_CANCELADO)->count();
+            // 📅 Programados: tienen fecha programada y aún no se han entregado/cancelado
+            $programados = $pedidos->filter(fn ($p) =>
+                !empty($p->programado_para)
+                && !in_array($p->estado, [\App\Models\Pedido::ESTADO_ENTREGADO, \App\Models\Pedido::ESTADO_CANCELADO], true)
+            )->count();
 
             $estadosMeta = [
                 \App\Models\Pedido::ESTADO_NUEVO => [
@@ -214,13 +219,14 @@
         </div>
 
         {{-- KPIS --}}
-        <div class="mt-3 grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 xl:grid-cols-5">
+        <div class="mt-3 grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 xl:grid-cols-6">
             @foreach([
-                ['label' => 'Nuevos',      'value' => $nuevos,      'icon' => 'fa-bell',         'iconBg' => 'bg-blue-50 text-blue-600',       'bar' => 'bg-blue-500'],
-                ['label' => 'En proceso',  'value' => $enProceso,   'icon' => 'fa-gears',        'iconBg' => 'bg-amber-50 text-amber-600',     'bar' => 'bg-amber-500'],
-                ['label' => 'Despachados', 'value' => $despachados, 'icon' => 'fa-motorcycle',   'iconBg' => 'bg-violet-50 text-violet-600',   'bar' => 'bg-violet-500'],
-                ['label' => 'Entregados',  'value' => $entregados,  'icon' => 'fa-circle-check', 'iconBg' => 'bg-emerald-50 text-emerald-600', 'bar' => 'bg-emerald-500'],
-                ['label' => 'Cancelados',  'value' => $cancelados,  'icon' => 'fa-ban',          'iconBg' => 'bg-rose-50 text-rose-600',       'bar' => 'bg-rose-500'],
+                ['label' => 'Nuevos',      'value' => $nuevos,      'icon' => 'fa-bell',           'iconBg' => 'bg-blue-50 text-blue-600',       'bar' => 'bg-blue-500'],
+                ['label' => 'Programados', 'value' => $programados, 'icon' => 'fa-calendar-check', 'iconBg' => 'bg-cyan-50 text-cyan-600',       'bar' => 'bg-cyan-500'],
+                ['label' => 'En proceso',  'value' => $enProceso,   'icon' => 'fa-gears',          'iconBg' => 'bg-amber-50 text-amber-600',     'bar' => 'bg-amber-500'],
+                ['label' => 'Despachados', 'value' => $despachados, 'icon' => 'fa-motorcycle',     'iconBg' => 'bg-violet-50 text-violet-600',   'bar' => 'bg-violet-500'],
+                ['label' => 'Entregados',  'value' => $entregados,  'icon' => 'fa-circle-check',   'iconBg' => 'bg-emerald-50 text-emerald-600', 'bar' => 'bg-emerald-500'],
+                ['label' => 'Cancelados',  'value' => $cancelados,  'icon' => 'fa-ban',            'iconBg' => 'bg-rose-50 text-rose-600',       'bar' => 'bg-rose-500'],
             ] as $kpi)
                 <div class="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
                     <div class="flex items-start justify-between gap-2">
@@ -252,6 +258,7 @@
                             $tabs = [
                                 ['key' => 'todos',                                              'label' => 'Todos',       'count' => $todos,       'icon' => 'fa-table-cells-large', 'active' => 'bg-slate-900 text-white'],
                                 ['key' => \App\Models\Pedido::ESTADO_NUEVO,                    'label' => 'Nuevos',      'count' => $nuevos,      'icon' => 'fa-bell',              'active' => 'bg-blue-600 text-white'],
+                                ['key' => 'programados',                                        'label' => 'Programados', 'count' => $programados, 'icon' => 'fa-calendar-check',    'active' => 'bg-cyan-600 text-white'],
                                 ['key' => \App\Models\Pedido::ESTADO_EN_PREPARACION,           'label' => 'En proceso',  'count' => $enProceso,   'icon' => 'fa-gears',             'active' => 'bg-amber-500 text-white'],
                                 ['key' => \App\Models\Pedido::ESTADO_REPARTIDOR_EN_CAMINO,     'label' => 'Despachados', 'count' => $despachados, 'icon' => 'fa-motorcycle',        'active' => 'bg-violet-600 text-white'],
                                 ['key' => \App\Models\Pedido::ESTADO_ENTREGADO,                'label' => 'Entregados',  'count' => $entregados,  'icon' => 'fa-circle-check',      'active' => 'bg-emerald-600 text-white'],
@@ -347,6 +354,15 @@
                                     <span class="h-1.5 w-1.5 rounded-full {{ $meta['dot'] }}"></span>
                                     <i class="fa-solid {{ $meta['icon'] }} text-[10px]"></i>
                                     {{ $meta['label'] }}
+                                </span>
+                            @endif
+
+                            {{-- 📅 Badge pedido programado --}}
+                            @if($pedido->programado_para)
+                                <span class="inline-flex items-center gap-1.5 rounded-full border border-cyan-200 bg-cyan-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-cyan-700"
+                                      title="Pedido programado para {{ $pedido->programado_para->format('d/m/Y H:i') }}">
+                                    <i class="fa-solid fa-calendar-check text-[10px]"></i>
+                                    Programado · {{ $pedido->programado_para->format('d/m H:i') }}
                                 </span>
                             @endif
 
@@ -595,12 +611,21 @@
 
                                 {{-- Estado --}}
                                 <td class="px-3 py-3.5 align-middle">
-                                    @if($meta)
-                                        <span class="inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-[10px] font-bold uppercase tracking-wider whitespace-nowrap {{ $meta['badge'] }}">
-                                            <span class="h-1.5 w-1.5 rounded-full {{ $meta['dot'] }}"></span>
-                                            {{ $meta['label'] }}
-                                        </span>
-                                    @endif
+                                    <div class="flex flex-col gap-1">
+                                        @if($meta)
+                                            <span class="inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-[10px] font-bold uppercase tracking-wider whitespace-nowrap {{ $meta['badge'] }}">
+                                                <span class="h-1.5 w-1.5 rounded-full {{ $meta['dot'] }}"></span>
+                                                {{ $meta['label'] }}
+                                            </span>
+                                        @endif
+                                        @if($pedido->programado_para)
+                                            <span class="inline-flex items-center gap-1 rounded-full border border-cyan-200 bg-cyan-50 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-cyan-700 whitespace-nowrap"
+                                                  title="Programado para {{ $pedido->programado_para->format('d/m/Y H:i') }}">
+                                                <i class="fa-solid fa-calendar-check text-[9px]"></i>
+                                                {{ $pedido->programado_para->format('d/m H:i') }}
+                                            </span>
+                                        @endif
+                                    </div>
                                 </td>
 
                                 {{-- Semáforo ANS --}}
