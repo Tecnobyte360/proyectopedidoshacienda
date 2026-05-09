@@ -2084,19 +2084,87 @@ TXT;
                 'pedido_id' => $cierreResult['pedido_id'] ?? null,
             ]);
 
-            // 🛡️ CASO CRÍTICO: el pedido YA estaba confirmado. NO se debe
-            // crear un duplicado. Reemplazamos la respuesta alucinada con
-            // un mensaje seguro y se acabó. RETORN, sin caer al retry forzado.
+            // 🔁 CASO: pedido anterior YA confirmado. PERO un cliente puede
+            // hacer N pedidos al día. Distinguir 2 escenarios:
+            //
+            //   A) Cliente saluda / dice algo ambiguo → bot alucina con datos
+            //      del pedido anterior → BLOQUEAR (es inercia/duplicado).
+            //
+            //   B) Cliente está pidiendo algo NUEVO (productos distintos a los
+            //      del pedido anterior, o claramente expresa que quiere otro)
+            //      → RESETEAR estado preservando identidad y dejar continuar
+            //      el flujo. NO bloquear.
             if (($cierreResult['razon'] ?? '') === 'ya_confirmado') {
-                $pedidoIdAnterior = $cierreResult['pedido_id'] ?? '?';
-                Log::warning('🛡️ Bloqueado pedido duplicado: pedido anterior aún existe', [
+                $pedidoIdAnterior = $cierreResult['pedido_id'] ?? null;
+
+                // Detectar si es nuevo pedido legítimo:
+                //   - El estado actual tiene productos distintos a los del pedido anterior
+                //   - El último mensaje del cliente expresa intención de continuar/confirmar
+                $esNuevoPedido = false;
+                try {
+                    $estadoBd = app(\App\Services\EstadoPedidoService::class)->obtener($conversacion);
+                    $productosEstado = collect($estadoBd->productos ?: [])
+                        ->map(fn ($p) => mb_strtolower(trim((string) ($p['name'] ?? ''))))
+                        ->filter()->all();
+
+                    $pedidoAnterior = $pedidoIdAnterior ? \App\Models\Pedido::with('detalles')->find($pedidoIdAnterior) : null;
+                    $productosAnterior = $pedidoAnterior
+                        ? collect($pedidoAnterior->detalles ?? [])
+                            ->map(fn ($d) => mb_strtolower(trim((string) ($d->descripcion ?? $d->nombre_producto ?? ''))))
+                            ->filter()->all()
+                        : [];
+
+                    // Si los productos NO coinciden → es nuevo pedido legítimo
+                    if (!empty($productosEstado) && $productosEstado !== $productosAnterior) {
+                        $esNuevoPedido = true;
+                    }
+
+                    // O si el último mensaje del cliente es claramente confirmación
+                    $ultMsgUser = collect($conversationHistory)
+                        ->where('role', 'user')->last()['content'] ?? '';
+                    if (mb_strlen(trim($ultMsgUser)) > 0 &&
+                        preg_match('/\b(s[ií]|dale|listo|confirmo|confirmado|ok|conf[ií]rmalo|otro|quiero)\b/iu', mb_strtolower($ultMsgUser))
+                    ) {
+                        $esNuevoPedido = true;
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning('No se pudo evaluar nuevo pedido tras ya_confirmado: ' . $e->getMessage());
+                }
+
+                if ($esNuevoPedido && $pedidoIdAnterior) {
+                    Log::info('🔁 ya_confirmado pero parece nuevo pedido — reseteando y procesando', [
+                        'from' => $from,
+                        'pedido_anterior' => $pedidoIdAnterior,
+                    ]);
+
+                    // Resetear estado preservando identidad (cédula/nombre/email/teléfono)
+                    try {
+                        app(\App\Services\EstadoPedidoService::class)
+                            ->resetear($conversacion, "nuevo_pedido_tras_{$pedidoIdAnterior}");
+                    } catch (\Throwable $e) {
+                        Log::warning('Error reset tras ya_confirmado: ' . $e->getMessage());
+                    }
+
+                    // Mensaje amistoso que invita a continuar el flujo nuevo
+                    $replyOk = "¡Perfecto! 😊 Tu pedido #{$pedidoIdAnterior} ya quedó listo. "
+                             . "Cuéntame qué quieres pedir esta vez y te lo armo de una.";
+                    $conversationHistory[] = ['role' => 'assistant', 'content' => $replyOk];
+                    Cache::put($cacheKey, $conversationHistory, now()->addMinutes(45));
+                    $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_ASSISTANT, $replyOk);
+                    return $replyOk;
+                }
+
+                // Bloqueo solo si parece inercia (mismo pedido)
+                Log::warning('🛡️ Bloqueado posible duplicado por inercia', [
                     'from' => $from,
                     'pedido_anterior' => $pedidoIdAnterior,
+                    'productos_estado' => $productosEstado ?? null,
+                    'productos_pedido_anterior' => $productosAnterior ?? null,
                     'reply_alucinado' => mb_substr($reply, 0, 200),
                 ]);
 
-                $replySafe = "¡Hola! 👋 Tu pedido #{$pedidoIdAnterior} ya está registrado y en preparación. "
-                           . "¿Necesitas algo más o quieres pedir otro producto?";
+                $replySafe = "¡Hola! 👋 Tu pedido #{$pedidoIdAnterior} ya está registrado. "
+                           . "¿Quieres pedir algo más? Dime qué necesitas y te ayudo.";
                 $conversationHistory[] = ['role' => 'assistant', 'content' => $replySafe];
                 Cache::put($cacheKey, $conversationHistory, now()->addMinutes(45));
                 $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_ASSISTANT, $replySafe);
