@@ -748,6 +748,53 @@ class WhatsappWebhookController extends Controller
         // y no se los pida de nuevo.
         request()->attributes->set('telefono_cliente_actual', $cliente->telefono_normalizado);
 
+        // ════════════════════════════════════════════════════════════════════
+        // 🛡️ EARLY GUARD — VALIDACIÓN DE HORARIO ANTES DE TODO
+        // ════════════════════════════════════════════════════════════════════
+        // Si TODAS las sedes están cerradas Y el cliente expresa intención
+        // de pedido (productos, cantidades, "domicilios?", "valor", "tienen",
+        // etc.), NO llamamos al LLM — respondemos directamente con mensaje
+        // cordial de cierre + ofrecimiento de programar.
+        //
+        // Saludos puros ("hola", "buenas") siguen el flujo normal del LLM
+        // para que pueda saludar cordial sin mencionar el cierre todavía.
+        try {
+            $sedesActivasG = \App\Models\Sede::where('activa', true)->get();
+            $hayAlgunaAbiertaG = $sedesActivasG->isNotEmpty()
+                && $sedesActivasG->contains(fn ($s) => $s->estaAbierta());
+
+            if (!$hayAlgunaAbiertaG && $sedesActivasG->isNotEmpty()
+                && $this->mensajeExpresaIntencionDePedidoOConsulta($message)) {
+
+                $sedePrincipal = $sedesActivasG->first();
+                $proximaApertura = $sedePrincipal->proximaApertura() ?: 'cuando abramos';
+                $primerNombre = explode(' ', trim($nombreParaPrompt))[0] ?? '';
+
+                $respuestaCierre = "Ay {$primerNombre} 🙏 ahorita estamos cerrados. "
+                    . "Te atendemos {$proximaApertura} y con mucho gusto te ayudo con tu pedido. "
+                    . "¿Quieres que te lo deje programado para apenas abramos? "
+                    . "Cuéntame qué necesitas y lo dejo listo 😊";
+
+                Log::info('🛡️ EARLY GUARD: respuesta de cierre directa (sin LLM)', [
+                    'from'             => $from,
+                    'message'          => mb_substr($message, 0, 100),
+                    'proxima_apertura' => $proximaApertura,
+                    'sedes_cerradas'   => $sedesActivasG->count(),
+                ]);
+
+                // Persistir como mensaje del asistente para coherencia del historial
+                try {
+                    $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_ASSISTANT, $respuestaCierre);
+                } catch (\Throwable $e) {
+                    Log::warning('No se pudo persistir respuesta de EARLY GUARD: ' . $e->getMessage());
+                }
+
+                return $respuestaCierre;
+            }
+        } catch (\Throwable $e) {
+            Log::warning('⚠️ EARLY GUARD horario falló (siguiendo flujo normal): ' . $e->getMessage());
+        }
+
         $systemPrompt = $this->getSystemPrompt($pedidosInfo, $this->infoEmpresa(), $nombreParaPrompt, $ansInfo, $sedeId);
 
         // ── NOTA DE RECHAZO RECIENTE DE COBERTURA ────────────────────────
@@ -2376,6 +2423,46 @@ TXT;
             // O regex si tiene chars especiales (acentos)
             if (preg_match('/\b' . str_replace(['[ií]', '[áa]'], ['(i|í)', '(a|á)'], $p) . '\b/u', $m)) return true;
         }
+        return false;
+    }
+
+    /**
+     * 🛡️ Detecta si el mensaje del cliente expresa intención de pedido
+     * o consulta comercial (productos, precios, domicilios, etc.).
+     *
+     * Devuelve TRUE si el mensaje merece la respuesta de "estamos cerrados".
+     * Devuelve FALSE para saludos puros, agradecimientos, despedidas.
+     */
+    private function mensajeExpresaIntencionDePedidoOConsulta(string $message): bool
+    {
+        $m = mb_strtolower(\Illuminate\Support\Str::ascii(trim($message)));
+        if ($m === '') return false;
+
+        // Saludo puro / despedida → NO disparar
+        $saludosPuros = ['hola', 'buenas', 'buenos dias', 'buenas tardes', 'buenas noches',
+                          'gracias', 'muchas gracias', 'mil gracias', 'chao', 'adios', 'bye',
+                          'ok', 'listo', 'dale', 'si', 'no'];
+        if (in_array($m, $saludosPuros, true)) return false;
+
+        // Patrones explícitos de intención de pedido / consulta comercial
+        $patrones = [
+            // Verbos de pedido
+            '/\b(quiero|necesito|pideme|p[íi]deme|pedido|domicilio|domicilios|despacho|despachos|comprar|compro|llevo|llevame|llevarme|reservar|encargar|encargo|ordenar|orden)\b/u',
+            // Verbos de consulta de catálogo / precio
+            '/\b(tienes|tienen|hay|venden|manejan|hacen)\b/u',
+            '/\b(valor|vale|cuanto|cuesta|precio|costo|cu[áa]nto)\b/u',
+            // Cantidad + unidad
+            '/\b\d+\s*(kg|kilo|kilos|lb|libra|libras|gr|gramos|paquete|paquetes|und|unidad|unidades|porcion|porciones|pack|tira|tiras)\b/u',
+            // Mención de tipos de carne
+            '/\b(carne|res|cerdo|pollo|pescado|salmon|salm[óo]n|trucha|tilapia|camaron|camar[óo]n|filete|pierna|costilla|chuleta|lomo|punta|brazo|asado|chicharron|chicharr[óo]n)\b/u',
+            // Frase típica de inicio de pedido
+            '/\b(otro pedido|nuevo pedido|para un pedido|hacer pedido|tomar pedido)\b/u',
+        ];
+
+        foreach ($patrones as $p) {
+            if (preg_match($p, $m)) return true;
+        }
+
         return false;
     }
 
