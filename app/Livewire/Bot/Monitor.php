@@ -95,13 +95,13 @@ class Monitor extends Component
         $alertas = BotAlerta::where('created_at', '>=', $desde)
             ->orderByDesc('created_at')
             ->limit(15)
-            ->get(['id', 'tipo', 'titulo', 'severidad', 'created_at', 'meta'])
+            ->get(['id', 'tipo', 'titulo', 'severidad', 'created_at', 'contexto'])
             ->map(fn ($a) => [
                 'tipo'      => 'alerta',
                 'subtipo'   => $a->tipo,
                 'titulo'    => $a->titulo,
                 'severidad' => $a->severidad,
-                'meta'      => $a->meta,
+                'meta'      => $a->contexto,
                 'icon'      => '⚠️',
                 'color'     => 'amber',
                 'at'        => $a->created_at,
