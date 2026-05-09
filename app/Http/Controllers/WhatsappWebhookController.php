@@ -4416,16 +4416,21 @@ TXT;
             $cantidad = (float) ($product['quantity'] ?? 1);
 
             if ($producto) {
-                $precio = $producto->precioParaSede($sede?->id);
+                // 🛡️ El producto puede venir como Eloquent (Producto) o stdClass (catálogo live).
+                // Si tiene el método precioParaSede usalo; si no, usa precio_base como fallback.
+                $precio = method_exists($producto, 'precioParaSede')
+                    ? $producto->precioParaSede($sede?->id)
+                    : (float) ($producto->precio_base ?? $producto->precio ?? 0);
+
                 $sub = $precio * $cantidad;
                 $subtotalProductos += $sub;
 
                 $productosValidados[] = [
-                    'producto_id'     => $producto->id,
-                    'codigo_producto' => $producto->codigo,
-                    'producto'        => $producto->nombre,
+                    'producto_id'     => $producto->id ?? null,
+                    'codigo_producto' => $producto->codigo ?? null,
+                    'producto'        => $producto->nombre ?? '',
                     'cantidad'        => $cantidad,
-                    'unidad'          => $product['unit'] ?? $producto->unidad,
+                    'unidad'          => $product['unit'] ?? ($producto->unidad ?? 'unidad'),
                     'precio_unitario' => $precio,
                     'subtotal'        => $sub,
                 ];
