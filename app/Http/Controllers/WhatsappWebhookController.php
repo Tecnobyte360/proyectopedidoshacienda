@@ -948,36 +948,67 @@ TXT;
         );
         $toolChoicePorPaso = $orchestrator->toolChoice($pasoActualOrch);
 
-        // 🎯 SHORT-CIRCUIT: si el cliente pidió EXPLÍCITAMENTE generar el pedido,
-        // forzamos confirmar_pedido aunque el paso del orquestador no lo permita.
-        $forzarConfirmar = $this->clientePidioGenerarPedido($message);
+        // 🎯 SHORT-CIRCUITS según intención detectada en el mensaje:
+        //   1. Pidió "generar pedido" → forzar confirmar_pedido
+        //   2. Preguntó por producto → forzar buscar_productos
+        //   3. Dió datos finales → forzar confirmar_pedido si estado completo, sino required
+        $forzarConfirmar    = $this->clientePidioGenerarPedido($message);
+        $preguntaProducto   = !$forzarConfirmar && $this->clientePreguntaProducto($message);
+        $estadoActualBd     = app(\App\Services\EstadoPedidoService::class)->obtener($conversacion);
+        $estadoYaCompleto   = $estadoActualBd && $estadoActualBd->estaCompleto() && !$estadoActualBd->confirmado_at;
+        $datosFinalesEnTexto= !$forzarConfirmar && $this->clienteDaDatosFinales($message);
+
+        $toolChoiceInicial  = $toolChoicePorPaso;
+        $razonForzado       = null;
+
         if ($forzarConfirmar) {
             $toolChoiceInicial = ['type' => 'function', 'function' => ['name' => 'confirmar_pedido']];
-            // Asegurarnos que confirmar_pedido esté disponible aunque el paso lo oculte
             $allTools = $this->getToolsDefinicion();
-            $confirmarTool = collect($allTools)->first(
-                fn ($t) => ($t['function']['name'] ?? '') === 'confirmar_pedido'
-            );
-            if ($confirmarTool) {
-                $toolsFiltradas = [$confirmarTool];
-            }
-            Log::info('🎯 Cliente pidió generar pedido — forzando confirmar_pedido', [
-                'from' => $from, 'mensaje' => $message,
-            ]);
+            $confirmarTool = collect($allTools)->first(fn ($t) => ($t['function']['name'] ?? '') === 'confirmar_pedido');
+            if ($confirmarTool) $toolsFiltradas = [$confirmarTool];
+            $razonForzado = 'cliente_pidio_generar_pedido';
             $messages[] = [
                 'role' => 'system',
                 'content' => "🚨 OBLIGATORIO: el cliente acaba de pedir explícitamente que generes/confirmes el pedido. INVOCA `confirmar_pedido` AHORA con TODOS los datos recopilados.",
             ];
-        } else {
-            $toolChoiceInicial = $toolChoicePorPaso;
-            Log::info('🚦 Orquestador en acción', [
-                'from'       => $from,
-                'paso'       => $pasoActualOrch,
-                'tool_choice'=> is_string($toolChoiceInicial) ? $toolChoiceInicial : 'function:'.($toolChoiceInicial['function']['name'] ?? '?'),
-                'tools_count'=> count($toolsFiltradas),
-                'tools'      => array_map(fn ($t) => $t['function']['name'] ?? '?', $toolsFiltradas),
-            ]);
+        } elseif ($estadoYaCompleto && $datosFinalesEnTexto) {
+            // Estado completo + cliente dio confirmación final → forzar confirmar_pedido
+            $toolChoiceInicial = ['type' => 'function', 'function' => ['name' => 'confirmar_pedido']];
+            $allTools = $this->getToolsDefinicion();
+            $confirmarTool = collect($allTools)->first(fn ($t) => ($t['function']['name'] ?? '') === 'confirmar_pedido');
+            if ($confirmarTool) $toolsFiltradas = [$confirmarTool];
+            $razonForzado = 'datos_completos_y_cliente_dio_confirmacion';
+            $messages[] = [
+                'role' => 'system',
+                'content' => "🚨 El estado del pedido está COMPLETO y el cliente acaba de dar la confirmación final. INVOCA `confirmar_pedido` AHORA con los datos del estado.",
+            ];
+        } elseif ($preguntaProducto) {
+            // Forzar buscar_productos cuando el cliente menciona producto/cantidad
+            $toolChoiceInicial = 'required'; // que invoque ALGUNA tool, no texto
+            $razonForzado = 'cliente_pregunto_producto';
+            $messages[] = [
+                'role' => 'system',
+                'content' => "🚨 El cliente está mencionando un PRODUCTO o una CANTIDAD. ANTES DE RESPONDER, DEBES llamar `buscar_productos` con el texto literal del cliente. NO inventes productos ni precios — verifica en BD.",
+            ];
+        } elseif ($datosFinalesEnTexto) {
+            // Cliente dio datos clave (recoger, dirección, pago) pero estado aún no completo
+            // Forzamos required para que llame validar_cobertura/buscar_productos/etc según faltante
+            $toolChoiceInicial = 'required';
+            $razonForzado = 'cliente_dio_datos_finales_estado_incompleto';
+            $messages[] = [
+                'role' => 'system',
+                'content' => "🚨 El cliente dio datos clave del pedido (entrega/dirección/pago). DEBES llamar la tool apropiada para registrar esos datos en el estado: validar_cobertura si dió dirección, o continúa el flujo. NO respondas en texto sin tool.",
+            ];
         }
+
+        Log::info('🚦 Orquestador en acción', [
+            'from'       => $from,
+            'paso'       => $pasoActualOrch,
+            'tool_choice'=> is_string($toolChoiceInicial) ? $toolChoiceInicial : 'function:'.($toolChoiceInicial['function']['name'] ?? '?'),
+            'tools_count'=> count($toolsFiltradas),
+            'forzado'    => $razonForzado,
+            'msg_lower'  => mb_substr(mb_strtolower($message), 0, 100),
+        ]);
 
         $response = $this->llamarOpenAI($messages, $toolChoiceInicial, $toolsFiltradas);
 
@@ -2155,6 +2186,60 @@ TXT;
 
         foreach ($patrones as $p) {
             if (str_contains($m, $p)) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Detecta si el cliente está preguntando o pidiendo un producto.
+     * Si retorna true, forzamos tool_choice a buscar_productos para que el
+     * LLM no invente "sí tengo X" sin verificar BD.
+     */
+    private function clientePreguntaProducto(string $mensaje): bool
+    {
+        $m = mb_strtolower(trim($mensaje));
+        if ($m === '') return false;
+
+        // Patrones explícitos: "tienes X?", "tienen X?", "quiero X", "necesito X"
+        $patrones = [
+            '/\b(tienes|tienen|tendr[áa]s|tendr[áa]n|hay|manejas|venden|vendes)\s+/iu',
+            '/\b(quiero|necesito|me das|d[áa]me|puede ser|me regal[áa]s|reg[áa]lame|qu[ií]siera)\s+/iu',
+            '/\b(\d+)\s+(libras?|kilos?|kg|gramos?|gr|unidades?|unidad|cajas?|caja|paquetes?|paquete|bolsas?|docenas?|gallinas?|porciones?|libritas?|kilitos?|cucharaditas?|botellas?|latas?)\b/iu',
+            '/\b(una?|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|media|medio)\s+(libras?|kilos?|kg|unidades?|cajas?|paquetes?|bolsas?|docenas?|porciones?|gallinas?|libritas?|kilitos?)\b/iu',
+        ];
+        foreach ($patrones as $p) {
+            if (preg_match($p, $m)) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Detecta si el cliente está dando datos finales para CERRAR el pedido
+     * (método entrega, dirección, "ya", "listo", "sí confirmo", etc).
+     * Si retorna true Y el estado tiene productos → forzar confirmar_pedido.
+     */
+    private function clienteDaDatosFinales(string $mensaje): bool
+    {
+        $m = mb_strtolower(trim($mensaje));
+        if ($m === '') return false;
+
+        $patrones = [
+            // método de entrega
+            'yo reclamo', 'lo reclamo', 'paso por', 'paso a recoger', 'voy a recoger',
+            'recojo', 'voy yo', 'recogerlo en', 'recogerlo',
+            'a domicilio', 'para domicilio', 'env[ií]ame', 'm[áa]ndame',
+            // confirmaciones cortas tras tener datos
+            'listo', 'dale', 's[ií] confirmo', 'confirmo', 'confirmado', 'as[ií] est[áa]',
+            'as[ií] queda', 'perfecto', 'cerremos',
+            // método de pago
+            'pago contado', 'pago de contado', 'efectivo contra', 'tarjeta', 'transferencia',
+            'pse', 'wompi', 'link de pago',
+        ];
+        foreach ($patrones as $p) {
+            // Match flexible: usar str_contains en lower
+            if (str_contains($m, $p)) return true;
+            // O regex si tiene chars especiales (acentos)
+            if (preg_match('/\b' . str_replace(['[ií]', '[áa]'], ['(i|í)', '(a|á)'], $p) . '\b/u', $m)) return true;
         }
         return false;
     }
