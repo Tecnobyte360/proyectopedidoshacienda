@@ -37,6 +37,12 @@ class FlujoPedidoOrchestrator
         'consultar_horarios',
         'consultar_promociones',
         'consultar_zonas_cobertura',
+        // Cliente puede dar cédula en CUALQUIER momento del flujo. El bot
+        // debe poder verificarla sin importar el paso actual.
+        'verificar_cliente_erp',
+        // Cliente puede pedir un producto en cualquier momento (incluso
+        // en paso=confirmado tras un pedido anterior).
+        'buscar_productos',
     ];
 
     /**

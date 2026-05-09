@@ -910,6 +910,11 @@ TXT;
                 );
             }
 
+            // 🔍 CAPTURA PROACTIVA: detecta cédula/email en el mensaje del cliente
+            // y los guarda en el estado ANTES de que el LLM procese. Así no se
+            // pierden aunque el bot no llame la tool correcta.
+            $estadoSrv->captarDelMensajeUsuario($conversacion, $message);
+
             $resumenEstado = $estadoSrv->resumenParaPrompt($conversacion);
             if ($resumenEstado !== '') {
                 $reinforceEstadoPedido[] = [

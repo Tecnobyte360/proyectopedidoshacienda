@@ -206,6 +206,53 @@ class EstadoPedidoService
     }
 
     /**
+     * 🔍 Captura PROACTIVA de datos del mensaje del usuario.
+     * Detecta y persiste cédula, email, etc. ANTES de que el bot procese.
+     * Así no se pierden datos aunque el LLM no llame la tool correcta.
+     */
+    public function captarDelMensajeUsuario(ConversacionWhatsapp $conv, string $mensaje): void
+    {
+        $estado = $this->obtener($conv);
+        $msg = trim($mensaje);
+        $cambio = false;
+
+        // 1. CÉDULA — número de 6-12 dígitos, posiblemente con puntos
+        //    Ej: "1098765432", "1.098.765.432", "Mi cédula es 1234567"
+        if (empty($estado->cedula)) {
+            // Primero limpiar puntos y espacios para evaluar
+            $clean = preg_replace('/[^\d]/', '', $msg);
+            // Si tiene 6-12 dígitos puros y el mensaje no es muy largo (no es texto con números)
+            if (preg_match('/^\d{6,12}$/', $clean) && mb_strlen($msg) <= 25) {
+                $estado->cedula = $clean;
+                $cambio = true;
+                Log::info('🔍 Cédula capturada del mensaje', [
+                    'conv_id' => $conv->id,
+                    'cedula'  => $clean,
+                ]);
+            } elseif (preg_match('/\b(?:c[eé]dula|cc|documento|nit|ced|cédula)[\s:]*([\d.,]{6,15})\b/iu', $msg, $m)) {
+                $clean = preg_replace('/[^\d]/', '', $m[1]);
+                if (preg_match('/^\d{6,12}$/', $clean)) {
+                    $estado->cedula = $clean;
+                    $cambio = true;
+                    Log::info('🔍 Cédula capturada con prefijo', ['conv_id' => $conv->id, 'cedula' => $clean]);
+                }
+            }
+        }
+
+        // 2. EMAIL
+        if (empty($estado->email) && preg_match('/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i', $msg, $m)) {
+            $estado->email = mb_strtolower($m[0]);
+            $cambio = true;
+            Log::info('🔍 Email capturado del mensaje', ['conv_id' => $conv->id, 'email' => $estado->email]);
+        }
+
+        if ($cambio) {
+            $estado->save();
+            $this->avanzarPaso($estado);
+        }
+    }
+
+    /**
      * Detecta si el cliente está intentando iniciar un NUEVO pedido (después de
      * uno ya confirmado). Frases que indican esto:
      *   "quiero otro pedido", "agrégame otro", "para otro pedido", "uno más",
