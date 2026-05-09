@@ -1846,7 +1846,27 @@ TXT;
                 'from'  => $from,
                 'razon' => $cierreResult['razon'] ?? '?',
                 'faltantes' => $cierreResult['faltantes'] ?? null,
+                'pedido_id' => $cierreResult['pedido_id'] ?? null,
             ]);
+
+            // 🛡️ CASO CRÍTICO: el pedido YA estaba confirmado. NO se debe
+            // crear un duplicado. Reemplazamos la respuesta alucinada con
+            // un mensaje seguro y se acabó. RETORN, sin caer al retry forzado.
+            if (($cierreResult['razon'] ?? '') === 'ya_confirmado') {
+                $pedidoIdAnterior = $cierreResult['pedido_id'] ?? '?';
+                Log::warning('🛡️ Bloqueado pedido duplicado: pedido anterior aún existe', [
+                    'from' => $from,
+                    'pedido_anterior' => $pedidoIdAnterior,
+                    'reply_alucinado' => mb_substr($reply, 0, 200),
+                ]);
+
+                $replySafe = "¡Hola! 👋 Tu pedido #{$pedidoIdAnterior} ya está registrado y en preparación. "
+                           . "¿Necesitas algo más o quieres pedir otro producto?";
+                $conversationHistory[] = ['role' => 'assistant', 'content' => $replySafe];
+                Cache::put($cacheKey, $conversationHistory, now()->addMinutes(45));
+                $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_ASSISTANT, $replySafe);
+                return $replySafe;
+            }
 
             // Si el motivo es "estado_incompleto", responder al cliente con qué falta
             if (($cierreResult['razon'] ?? '') === 'estado_incompleto' && !empty($cierreResult['faltantes'])) {

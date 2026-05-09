@@ -421,6 +421,17 @@ class EstadoPedidoService
             return '';
         }
 
+        // 🛡️ Si el pedido YA fue confirmado, NO mostrarle al LLM los productos
+        // y datos del pedido viejo. Solo decirle que ya hay uno cerrado.
+        // Esto evita que el LLM "re-confirme" el pedido viejo cuando el cliente
+        // saluda o pregunta cosas no relacionadas.
+        if ($estado->paso_actual === ConversacionPedidoEstado::PASO_CONFIRMADO) {
+            return "📋 ESTADO: el cliente {$estado->nombre_cliente} ya tiene un pedido confirmado "
+                . "(#{$estado->pedido_id}). NO vuelvas a confirmar nada. Si quiere otro pedido, "
+                . "pregúntale qué desea (el sistema reseteará el estado automáticamente). "
+                . "Si solo saluda o pregunta por su pedido, responde cordial sin re-confirmar nada.";
+        }
+
         $partes = ["📋 ESTADO ACTUAL DEL PEDIDO (BD — fuente de verdad):"];
         $partes[] = "  • Paso actual: {$estado->paso_actual}";
 
