@@ -751,28 +751,48 @@ class WhatsappWebhookController extends Controller
         // ════════════════════════════════════════════════════════════════════
         // 🛡️ EARLY GUARD — VALIDACIÓN DE HORARIO ANTES DE TODO
         // ════════════════════════════════════════════════════════════════════
-        // Si TODAS las sedes están cerradas Y el cliente expresa intención
-        // de pedido (productos, cantidades, "domicilios?", "valor", "tienen",
-        // etc.), NO llamamos al LLM — respondemos directamente con mensaje
-        // cordial de cierre + ofrecimiento de programar.
-        //
-        // Saludos puros ("hola", "buenas") siguen el flujo normal del LLM
-        // para que pueda saludar cordial sin mencionar el cierre todavía.
         try {
             $sedesActivasG = \App\Models\Sede::where('activa', true)->get();
             $hayAlgunaAbiertaG = $sedesActivasG->isNotEmpty()
                 && $sedesActivasG->contains(fn ($s) => $s->estaAbierta());
 
+            // Cache key para recordar si el cliente ya aceptó programar
+            $programadoKey = "wa_programar_aceptado_t{$tenantId}_{$telefonoNorm}";
+
+            // ¿Cliente está afirmando aceptación tras nuestra oferta de programar?
+            //    último assistant ofreció programar + user dice "si/ok/dale/listo"
+            $afirmoProgramar = $this->detectarAfirmacionProgramar($conversacion, $message);
+            if ($afirmoProgramar) {
+                Cache::put($programadoKey, true, now()->addHours(2));
+                Log::info('🛡️ EARLY GUARD: cliente aceptó programar — flag activado por 2h', [
+                    'from' => $from,
+                ]);
+            }
+
+            $yaAceptoProgramar = (bool) Cache::get($programadoKey, false);
+
             if (!$hayAlgunaAbiertaG && $sedesActivasG->isNotEmpty()
+                && !$yaAceptoProgramar
                 && $this->mensajeExpresaIntencionDePedidoOConsulta($message)) {
 
                 $sedePrincipal = $sedesActivasG->first();
                 $proximaApertura = $sedePrincipal->proximaApertura() ?: 'cuando abramos';
-                $primerNombre = explode(' ', trim($nombreParaPrompt))[0] ?? '';
 
-                $respuestaCierre = "Ay {$primerNombre} 🙏 ahorita estamos cerrados. "
-                    . "Te atendemos {$proximaApertura} y con mucho gusto te ayudo con tu pedido. "
-                    . "¿Quieres que te lo deje programado para apenas abramos? "
+                // 🛡️ Nombre seguro: si cliente.nombre es un email o muy raro,
+                // usar el nombre de WhatsApp.
+                $nombreSano = trim((string) $nombreParaPrompt);
+                if ($nombreSano === '' || str_contains($nombreSano, '@') || $nombreSano === 'Cliente') {
+                    $nombreSano = trim((string) $name);
+                }
+                $primerNombre = explode(' ', $nombreSano)[0] ?? '';
+                if ($primerNombre === '' || str_contains($primerNombre, '@')) {
+                    $primerNombre = ''; // sin nombre antes que un email
+                }
+
+                $saludoNombre = $primerNombre !== '' ? "Hola {$primerNombre} 🙏 " : "Hola 🙏 ";
+                $respuestaCierre = $saludoNombre
+                    . "ahorita estamos cerrados. Abrimos {$proximaApertura}.\n\n"
+                    . "📅 Si quieres, te dejo el pedido *PROGRAMADO* para apenas abramos. "
                     . "Cuéntame qué necesitas y lo dejo listo 😊";
 
                 Log::info('🛡️ EARLY GUARD: respuesta de cierre directa (sin LLM)', [
@@ -782,7 +802,6 @@ class WhatsappWebhookController extends Controller
                     'sedes_cerradas'   => $sedesActivasG->count(),
                 ]);
 
-                // Persistir como mensaje del asistente para coherencia del historial
                 try {
                     $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_ASSISTANT, $respuestaCierre);
                 } catch (\Throwable $e) {
@@ -2424,6 +2443,56 @@ TXT;
             if (preg_match('/\b' . str_replace(['[ií]', '[áa]'], ['(i|í)', '(a|á)'], $p) . '\b/u', $m)) return true;
         }
         return false;
+    }
+
+    /**
+     * 🛡️ ¿El cliente está afirmando que sí quiere programar el pedido?
+     * Mira el último mensaje del assistant (¿ofreció programar?) y el
+     * mensaje actual del cliente (¿afirma?).
+     */
+    private function detectarAfirmacionProgramar($conversacion, string $messageActual): bool
+    {
+        if (!$conversacion) return false;
+
+        $msgActual = mb_strtolower(\Illuminate\Support\Str::ascii(trim($messageActual)));
+        if ($msgActual === '') return false;
+
+        // Patrones de afirmación
+        $afirmaciones = [
+            'si', 'sí', 'si esta bien', 'sí está bien', 'esta bien', 'está bien',
+            'ok', 'okay', 'dale', 'dele', 'listo', 'bueno', 'perfecto', 'claro',
+            'hagamoslo', 'haga', 'hagale', 'há gale', 'sip', 'sii', 'siii',
+            'si por favor', 'sí por favor', 'si gracias', 'sí gracias',
+            'me parece', 'de acuerdo', 'va', 'va pues', 'vamos', 'si vamos',
+            'programalo', 'programado', 'programar', 'prográmalo', 'prográmalo',
+            'me lo programas', 'progr[áa]mamelo',
+        ];
+
+        $matchAfirma = false;
+        foreach ($afirmaciones as $a) {
+            if ($msgActual === $a || str_contains($msgActual, $a)) { $matchAfirma = true; break; }
+        }
+        if (!$matchAfirma) return false;
+
+        // Último mensaje del assistant
+        $ultAss = MensajeWhatsapp::query()
+            ->where('conversacion_id', $conversacion->id)
+            ->where('rol', 'assistant')
+            ->orderByDesc('id')
+            ->limit(1)
+            ->value('contenido');
+        if (!$ultAss) return false;
+
+        $ultAssN = mb_strtolower(\Illuminate\Support\Str::ascii($ultAss));
+        $ofrecioPrograma = str_contains($ultAssN, 'programar')
+            || str_contains($ultAssN, 'programad')
+            || str_contains($ultAssN, 'programalo')
+            || str_contains($ultAssN, 'cola para preparar')
+            || str_contains($ultAssN, 'apenas abramos')
+            || str_contains($ultAssN, 'te lo dejamos')
+            || str_contains($ultAssN, 'dejar el pedido');
+
+        return $ofrecioPrograma;
     }
 
     /**
