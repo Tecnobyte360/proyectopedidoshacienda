@@ -1140,12 +1140,30 @@ TXT;
                             ];
                         })(),
 
-                        // 🗺️ Devuelve zonas de cobertura
+                        // 🗺️ Zonas de cobertura AGRUPADAS por sede (cada sede tiene sus zonas)
                         'consultar_zonas_cobertura' => (function () {
+                            $sedes = \App\Models\Sede::where('activa', true)->get();
                             $zonas = \App\Models\ZonaCobertura::where('activa', true)
-                                ->orderBy('orden')->orderBy('nombre')
-                                ->get(['nombre','sede_id','tiempo_estimado_min','costo_envio']);
-                            return ['zonas' => $zonas->toArray()];
+                                ->orderBy('orden')->orderBy('nombre')->get();
+
+                            $sedesPayload = $sedes->map(function ($s) use ($zonas) {
+                                $zonasSede = $zonas->filter(fn ($z) => $z->sede_id === $s->id || $z->sede_id === null);
+                                return [
+                                    'sede'   => $s->nombre,
+                                    'direccion' => $s->direccion,
+                                    'zonas'  => $zonasSede->map(fn ($z) => [
+                                        'nombre'  => $z->nombre,
+                                        'tiempo_min' => $z->tiempo_estimado_min,
+                                        'costo_envio' => (float) ($z->costo_envio ?? 0),
+                                        'global' => $z->sede_id === null,
+                                    ])->values()->all(),
+                                ];
+                            })->values()->all();
+
+                            return [
+                                'sedes' => $sedesPayload,
+                                'instruccion_para_bot' => 'Las zonas de cobertura se agrupan POR SEDE. Cada sede atiende sus zonas. Si una zona aparece marcada global=true, esa zona la atienden TODAS las sedes. Cuando el cliente pregunte por dónde llegan, agrupa la respuesta por sede.',
+                            ];
                         })(),
 
                         // 🎁 Devuelve promociones vigentes
