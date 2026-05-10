@@ -17,35 +17,40 @@
 
         {{-- Header --}}
         <div class="p-4 border-b border-slate-200 bg-gradient-to-br from-brand to-brand-secondary text-white">
-            <div class="flex items-start justify-between gap-2">
-                <div>
-                    <h2 class="text-lg font-bold flex items-center gap-2">
-                        <i class="fa-solid fa-comments"></i> Chat en vivo
+            <div class="flex items-center justify-between gap-2 min-w-0">
+                <div class="min-w-0 flex-1">
+                    <h2 class="text-base font-bold flex items-center gap-2 whitespace-nowrap">
+                        <i class="fa-solid fa-comments"></i>
+                        <span class="truncate">Chat en vivo</span>
                     </h2>
-                    <p class="text-xs text-white/80">Atiende clientes en tiempo real</p>
+                    <p class="text-[11px] text-white/80 truncate">Atiende clientes en tiempo real</p>
                 </div>
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-1 shrink-0">
                     <button wire:click="sincronizarHistorial"
                             wire:loading.attr="disabled"
                             wire:target="sincronizarHistorial"
-                            title="Importar historial de WhatsApp del tenant actual"
-                            class="flex-shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-white/20 hover:bg-white/30 backdrop-blur px-3 py-2 text-xs font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed">
-                        <span wire:loading.remove wire:target="sincronizarHistorial">
-                            <i class="fa-solid fa-arrows-rotate"></i> Sincronizar
+                            title="Sincronizar historial de WhatsApp"
+                            class="inline-flex items-center justify-center h-8 w-8 lg:w-auto lg:px-2.5 lg:gap-1 rounded-lg bg-white/20 hover:bg-white/30 backdrop-blur text-[11px] font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed">
+                        <span wire:loading.remove wire:target="sincronizarHistorial" class="inline-flex items-center gap-1">
+                            <i class="fa-solid fa-arrows-rotate text-xs"></i>
+                            <span class="hidden lg:inline">Sincronizar</span>
                         </span>
-                        <span wire:loading wire:target="sincronizarHistorial" class="inline-flex items-center gap-1.5">
-                            <i class="fa-solid fa-spinner fa-spin"></i> Importando...
+                        <span wire:loading wire:target="sincronizarHistorial" class="inline-flex items-center gap-1">
+                            <i class="fa-solid fa-spinner fa-spin text-xs"></i>
+                            <span class="hidden lg:inline">…</span>
                         </span>
                     </button>
                     <button wire:click="abrirEstadoModal"
                             title="Publicar estado de WhatsApp"
-                            class="flex-shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-white/20 hover:bg-white/30 backdrop-blur px-3 py-2 text-xs font-semibold transition">
-                        <i class="fa-solid fa-circle-plus"></i> Estado
+                            class="inline-flex items-center justify-center h-8 w-8 lg:w-auto lg:px-2.5 lg:gap-1 rounded-lg bg-white/20 hover:bg-white/30 backdrop-blur text-[11px] font-semibold transition">
+                        <i class="fa-solid fa-circle-plus text-xs"></i>
+                        <span class="hidden lg:inline">Estado</span>
                     </button>
                     <button wire:click="abrirNuevoChat"
                             title="Iniciar chat con un número nuevo"
-                            class="flex-shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-white/20 hover:bg-white/30 backdrop-blur px-3 py-2 text-xs font-semibold transition">
-                        <i class="fa-solid fa-pen-to-square"></i> Nuevo
+                            class="inline-flex items-center justify-center h-8 w-8 lg:w-auto lg:px-2.5 lg:gap-1 rounded-lg bg-white/20 hover:bg-white/30 backdrop-blur text-[11px] font-semibold transition">
+                        <i class="fa-solid fa-pen-to-square text-xs"></i>
+                        <span class="hidden lg:inline">Nuevo</span>
                     </button>
                 </div>
             </div>
