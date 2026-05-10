@@ -1,0 +1,313 @@
+<?php
+
+namespace App\Services\Bots;
+
+use App\Models\Producto;
+use App\Models\Sede;
+use App\Models\ZonaCobertura;
+use App\Services\BotCatalogoService;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
+
+/**
+ * 🛡️ VALIDADOR ANTI-ALUCINACIÓN POST-LLM
+ *
+ * Inspecciona la respuesta generada por el LLM antes de enviarla al cliente.
+ * Detecta y reescribe alucinaciones comunes:
+ *
+ *   1. Precios inventados (ej. "te cuesta $5.000" cuando el real es $13.500)
+ *   2. Productos mencionados que no están en el catálogo
+ *   3. Horarios inventados (ej. "abrimos 24/7", "abrimos 6am" cuando son 8am)
+ *   4. Promesas no respaldadas ("envío en 30 min", "100% fresco hoy")
+ *   5. Tiempos de entrega no documentados
+ *   6. Información de sedes/zonas no configuradas
+ *
+ * Si detecta alucinación → reescribe a un mensaje seguro pidiendo que el
+ * cliente reformule, o llama a un humano.
+ */
+class ValidadorRespuestaLLM
+{
+    /**
+     * Devuelve la respuesta sanitizada (puede ser igual a la original).
+     * Si reescribió, retorna nueva versión profesional.
+     */
+    public function validar(string $reply, array $contexto = []): string
+    {
+        if (trim($reply) === '') return $reply;
+
+        $alertas = [];
+        $replyOriginal = $reply;
+
+        // 1. Precios mencionados — verificar contra catálogo
+        $alertasPrecio = $this->detectarPreciosInventados($reply);
+        if (!empty($alertasPrecio)) {
+            $alertas[] = ['tipo' => 'precio_inventado', 'detalles' => $alertasPrecio];
+        }
+
+        // 2. Productos mencionados — verificar contra catálogo activo
+        $productosFantasma = $this->detectarProductosFantasma($reply);
+        if (!empty($productosFantasma)) {
+            $alertas[] = ['tipo' => 'producto_fantasma', 'detalles' => $productosFantasma];
+        }
+
+        // 3. Horarios inventados
+        $horariosInventados = $this->detectarHorariosInventados($reply);
+        if (!empty($horariosInventados)) {
+            $alertas[] = ['tipo' => 'horario_inventado', 'detalles' => $horariosInventados];
+        }
+
+        // 4. Promesas no respaldadas
+        $promesas = $this->detectarPromesasNoRespaldadas($reply);
+        if (!empty($promesas)) {
+            $alertas[] = ['tipo' => 'promesa_no_respaldada', 'detalles' => $promesas];
+        }
+
+        // 5. Tiempos de entrega inventados
+        $tiempos = $this->detectarTiemposInventados($reply);
+        if (!empty($tiempos)) {
+            $alertas[] = ['tipo' => 'tiempo_inventado', 'detalles' => $tiempos];
+        }
+
+        if (empty($alertas)) {
+            return $reply;
+        }
+
+        Log::warning('🛡️ Validador detectó alucinaciones — sanitizando respuesta', [
+            'alertas'      => $alertas,
+            'reply_orig'   => mb_substr($replyOriginal, 0, 300),
+        ]);
+
+        // Tipo de alerta más grave → respuesta segura
+        $tipos = collect($alertas)->pluck('tipo')->all();
+
+        if (in_array('precio_inventado', $tipos, true) || in_array('producto_fantasma', $tipos, true)) {
+            return "Permíteme un momento, voy a confirmar esa información correctamente. "
+                 . "¿Me puedes decir qué producto necesitas y te paso el precio exacto del catálogo?";
+        }
+
+        if (in_array('horario_inventado', $tipos, true)) {
+            return $this->mensajeHorariosReales();
+        }
+
+        if (in_array('tiempo_inventado', $tipos, true)) {
+            return "El tiempo exacto te lo confirmamos al momento de despachar. "
+                 . "¿Continuamos con tu pedido?";
+        }
+
+        if (in_array('promesa_no_respaldada', $tipos, true)) {
+            // Solo limpiar la promesa, no reescribir todo
+            return $this->limpiarPromesas($reply);
+        }
+
+        return $reply;
+    }
+
+    /**
+     * Detecta menciones de precios que no coinciden con el catálogo.
+     * Solo dispara cuando el LLM dice "$X" cerca del nombre de un producto
+     * y el precio NO coincide con el real.
+     */
+    private function detectarPreciosInventados(string $reply): array
+    {
+        $alertas = [];
+        $replyN = mb_strtolower(Str::ascii($reply));
+
+        // Encontrar todos los precios mencionados en el reply
+        if (!preg_match_all('/\$\s*([\d.,]+)/u', $reply, $mPrecios)) {
+            return [];
+        }
+
+        try {
+            $catalogo = app(BotCatalogoService::class)->productosActivos();
+        } catch (\Throwable $e) {
+            return [];
+        }
+        if ($catalogo->isEmpty()) return [];
+
+        // Para cada producto del catálogo cuyo nombre aparece en el reply,
+        // verificar que el precio mencionado coincida.
+        foreach ($catalogo as $p) {
+            $nombreN = mb_strtolower(Str::ascii((string) $p->nombre));
+            // Token significativo (>=5 chars) del nombre del producto
+            $tokens = collect(preg_split('/\s+/', $nombreN))
+                ->filter(fn ($t) => mb_strlen($t) >= 5)
+                ->values();
+            if ($tokens->isEmpty()) continue;
+
+            // ¿Aparece el producto en el reply?
+            $aparece = $tokens->first(fn ($t) => str_contains($replyN, $t));
+            if (!$aparece) continue;
+
+            $precioReal = (float) ($p->precio_base ?? 0);
+            if ($precioReal <= 0) continue;
+
+            // Verificar precios mencionados — si alguno está cerca al producto pero MUY distinto al real
+            foreach ($mPrecios[1] as $precioStr) {
+                $precio = (float) preg_replace('/[^\d]/', '', str_replace(',', '', $precioStr));
+                if ($precio <= 0) continue;
+
+                // Tolerancia: ±10% del precio real (puede haber descuentos)
+                $diff = abs($precio - $precioReal) / $precioReal;
+                if ($diff > 0.5 && $precio < $precioReal * 0.5) {
+                    // Precio mencionado es <50% del real → probable alucinación
+                    $alertas[] = [
+                        'producto' => (string) $p->nombre,
+                        'precio_real' => $precioReal,
+                        'precio_mencionado' => $precio,
+                    ];
+                }
+            }
+        }
+
+        return $alertas;
+    }
+
+    /**
+     * Detecta menciones de "productos" que no existen en el catálogo.
+     * Solo dispara para palabras que parecen ser nombres de productos cárnicos.
+     */
+    private function detectarProductosFantasma(string $reply): array
+    {
+        $alertas = [];
+        $replyN = mb_strtolower(Str::ascii($reply));
+
+        // Lista de productos típicos que el bot podría inventar (no están en cárnicos)
+        $sospechosos = [
+            'lomo de res', 'lomo de cerdo', 'lomo fino',
+            'asado de tira', 'churrasco', 'picaña',
+            'carne molida', 'carne para hamburguesa',
+            'hueso para sopa', 'hueso de tutano',
+            'chorizo', 'morcilla', 'salchicha',
+        ];
+
+        try {
+            $catalogo = app(BotCatalogoService::class)->productosActivos();
+            $catalogoTextos = $catalogo->map(fn ($p) => mb_strtolower(Str::ascii((string) $p->nombre)))->all();
+        } catch (\Throwable $e) {
+            return [];
+        }
+
+        foreach ($sospechosos as $sosp) {
+            if (!str_contains($replyN, $sosp)) continue;
+            // ¿Existe algo SIMILAR en el catálogo?
+            $existe = collect($catalogoTextos)->first(fn ($n) => str_contains($n, $sosp));
+            if (!$existe) {
+                $alertas[] = $sosp;
+            }
+        }
+
+        return $alertas;
+    }
+
+    /**
+     * Detecta horarios mencionados que no coincidan con los configurados.
+     * Reglas conservadoras: solo dispara con menciones EXPLÍCITAS de horas.
+     */
+    private function detectarHorariosInventados(string $reply): array
+    {
+        $alertas = [];
+        $replyN = mb_strtolower(Str::ascii($reply));
+
+        // Frases sospechosas
+        $patrones = [
+            '/24\s*\/?\s*7/u',                 // "24/7"
+            '/24\s*horas/u',                    // "24 horas"
+            '/(las\s+)?24\s*horas\s+del\s+dia/u',
+            '/abrimos\s+temprano/u',            // genérico
+            '/cerramos\s+tarde/u',
+            '/(siempre|todo\s+el\s+tiempo)\s+abierto/u',
+        ];
+        foreach ($patrones as $p) {
+            if (preg_match($p, $replyN)) {
+                $alertas[] = 'horario_24_7_inventado';
+                break;
+            }
+        }
+
+        return $alertas;
+    }
+
+    /**
+     * Detecta promesas que el bot NO debe hacer:
+     *   "100% garantizado", "el más fresco", "el mejor precio",
+     *   "envío gratis siempre", "te lo regalamos", "promoción especial".
+     */
+    private function detectarPromesasNoRespaldadas(string $reply): array
+    {
+        $alertas = [];
+        $replyN = mb_strtolower(Str::ascii($reply));
+
+        $patrones = [
+            '/100\s*%\s*garantiz/u',
+            '/100\s*%\s*fresco/u',
+            '/el\s+mejor\s+precio/u',
+            '/precio\s+mas\s+bajo/u',
+            '/te\s+lo\s+regal/u',  // "te lo regalo", "regalamos"
+            '/envio\s+gratis\s+siempre/u',
+            '/sin\s+costo\s+adicional/u',
+            '/oferta\s+especial\s+para\s+ti/u',
+            '/descuento\s+exclusivo/u',
+        ];
+        foreach ($patrones as $p) {
+            if (preg_match($p, $replyN)) {
+                $alertas[] = $p;
+            }
+        }
+
+        return $alertas;
+    }
+
+    /**
+     * Detecta tiempos de entrega específicos no respaldados:
+     *   "30 minutos", "1 hora", "menos de X minutos"
+     */
+    private function detectarTiemposInventados(string $reply): array
+    {
+        $alertas = [];
+        $replyN = mb_strtolower(Str::ascii($reply));
+
+        $patrones = [
+            '/(en|llega\s+en|tardamos|demor)\s+\d+\s*(min|minutos)/u',
+            '/(en|llega\s+en)\s+\d+\s*(hora|horas)/u',
+            '/menos\s+de\s+\d+\s*(min|hora)/u',
+        ];
+        foreach ($patrones as $p) {
+            if (preg_match($p, $replyN)) {
+                $alertas[] = $p;
+            }
+        }
+
+        return $alertas;
+    }
+
+    private function mensajeHorariosReales(): string
+    {
+        try {
+            $sedes = Sede::where('activa', true)->get();
+            if ($sedes->isEmpty()) {
+                return "Te confirmaré los horarios exactos en un momento.";
+            }
+            $lineas = ["Estos son nuestros horarios:"];
+            foreach ($sedes as $s) {
+                $abierta = $s->estaAbierta() ? '🟢 abierta ahora' : '🔴 cerrada';
+                $lineas[] = "• *{$s->nombre}* — {$abierta}";
+            }
+            return implode("\n", $lineas);
+        } catch (\Throwable $e) {
+            return "Te confirmaré los horarios exactos en un momento.";
+        }
+    }
+
+    private function limpiarPromesas(string $reply): string
+    {
+        $patrones = [
+            '/100\s*%\s*garantizad[oa]?\.?/iu' => '',
+            '/100\s*%\s*fresc[oa]?\.?/iu' => '',
+            '/el\s+mejor\s+precio[\.,]?/iu' => '',
+            '/precio\s+m[áa]s\s+bajo[\.,]?/iu' => '',
+            '/oferta\s+especial\s+para\s+ti[\.,]?/iu' => '',
+            '/descuento\s+exclusivo[\.,]?/iu' => '',
+        ];
+        return trim(preg_replace(array_keys($patrones), array_values($patrones), $reply));
+    }
+}

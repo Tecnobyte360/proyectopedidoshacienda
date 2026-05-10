@@ -355,6 +355,15 @@ class WhatsappWebhookController extends Controller
             // Si detectamos esto, REEMPLAZAMOS por un mensaje seguro.
             $reply = $this->aplicarGuardPedidoFalsoConfirmado($reply, $toolCalls ?? []);
 
+            // 🛡️ VALIDADOR ANTI-ALUCINACIÓN POST-LLM (capa profesional):
+            //    Detecta precios/productos/horarios/promesas inventadas y
+            //    reescribe con respuestas seguras del catálogo real.
+            try {
+                $reply = app(\App\Services\Bots\ValidadorRespuestaLLM::class)->validar($reply);
+            } catch (\Throwable $e) {
+                Log::warning('Validador respuesta LLM falló (continúa con reply original): ' . $e->getMessage());
+            }
+
             Log::info('💬 RESPUESTA GENERADA', compact('reply', 'from', 'messageId', 'connectionId'));
 
             $sent = $this->enviarRespuestaWhatsapp($from, $reply, $connectionId);
@@ -794,10 +803,11 @@ class WhatsappWebhookController extends Controller
                 $saludoHora = $hora < 12 ? 'Buenos días' : ($hora < 19 ? 'Buenas tardes' : 'Buenas noches');
                 $personalizar = $primerNombre !== '' ? " {$primerNombre}" : '';
 
-                $respuestaCierre = "{$saludoHora}{$personalizar} 🙏 bienvenid@ a *La Hacienda*.\n\n"
-                    . "Ahorita estamos cerrados. Abrimos {$proximaApertura}.\n\n"
-                    . "📅 Si quieres, déjame el pedido *PROGRAMADO* para apenas abramos. "
-                    . "Cuéntame qué necesitas y lo dejo listo 😊";
+                $tenantNombre = optional(\App\Models\Tenant::find(app(\App\Services\TenantManager::class)->id()))->nombre ?? 'nuestro punto de venta';
+                $respuestaCierre = "{$saludoHora}{$personalizar}, bienvenid@ a *{$tenantNombre}*.\n\n"
+                    . "En este momento estamos cerrados. Próxima apertura: {$proximaApertura}.\n\n"
+                    . "📅 Puedo dejarte el pedido *PROGRAMADO* para que esté listo apenas abramos. "
+                    . "Indícame qué necesitas y lo registro.";
 
                 Log::info('🛡️ EARLY GUARD: respuesta de cierre directa (sin LLM)', [
                     'from'             => $from,
@@ -5512,6 +5522,62 @@ TXT;
                      . "INFORMACIONALES y deben ser ignoradas si no aparecen aquí. Para validar\n"
                      . "cualquier dirección concreta, llama `validar_cobertura`.\n";
         }
+
+        // ════════════════════════════════════════════════════════════════════
+        // 🛡️ REGLAS PROFESIONALES ANTI-ALUCINACIÓN (la última palabra)
+        // El LLM da MÁS peso a las últimas instrucciones. Estas son LEY.
+        // ════════════════════════════════════════════════════════════════════
+        $prompt .= "\n\n═══════════════════════════════════════════════════════════════════════════════\n"
+                 . "# 🛡️ REGLAS DE ORO — ANTI-ALUCINACIÓN PROFESIONAL\n\n"
+
+                 . "Eres un *asistente comercial profesional*. Comportamiento esperado:\n\n"
+
+                 . "## 1. NUNCA INVENTES INFORMACIÓN\n"
+                 . "  - NO inventes precios. Si necesitas un precio, llama `buscar_productos` o `info_producto`.\n"
+                 . "  - NO inventes códigos de productos. Usa el código EXACTO del catálogo.\n"
+                 . "  - NO inventes horarios. Si preguntan, llama `consultar_horarios` o di que vas a verificar.\n"
+                 . "  - NO inventes promociones, descuentos, ni 'ofertas especiales para ti'.\n"
+                 . "  - NO inventes tiempos de entrega (ej. '30 minutos'). El tiempo lo da el sistema al despachar.\n"
+                 . "  - NO inventes nombres de empleados, sedes, métodos de pago no configurados.\n"
+                 . "  - NO inventes dirección de la sede, NIT, datos del negocio.\n\n"
+
+                 . "## 2. SI NO SABES ALGO, DILO\n"
+                 . "  Cuando el cliente pregunte algo que NO está en tus tools ni en este contexto:\n"
+                 . "    > 'Esa información no la tengo a mano. ¿Quieres que un asesor te confirme?'\n"
+                 . "  NUNCA inventes una respuesta para parecer útil.\n\n"
+
+                 . "## 3. PROMESAS PROHIBIDAS\n"
+                 . "  - 'El más fresco', '100% garantizado', 'el mejor precio', 'precio especial'.\n"
+                 . "  - 'Envío gratis siempre', 'sin costo adicional' (a menos que el sistema lo confirme).\n"
+                 . "  - 'En menos de X minutos', 'antes de X hora'.\n"
+                 . "  - 'Te lo regalamos', 'oferta exclusiva'.\n\n"
+
+                 . "## 4. SOLO USA DATOS DE TU CONTEXTO\n"
+                 . "  Tienes en este prompt:\n"
+                 . "    • Catálogo (vía buscar_productos)\n"
+                 . "    • Horarios y sedes configurados\n"
+                 . "    • Zonas de cobertura\n"
+                 . "    • Promociones activas (si las hay)\n"
+                 . "    • Métodos de pago configurados\n"
+                 . "  Cualquier dato fuera de esto → 'Voy a verificarlo' o 'No tengo esa info, te paso con un asesor'.\n\n"
+
+                 . "## 5. ESTILO PROFESIONAL\n"
+                 . "  - Tono cordial pero profesional. Evita frases excesivamente coloquiales (\"ay parce\", \"qué chimba\").\n"
+                 . "  - Emojis con moderación: máximo 1-2 por mensaje.\n"
+                 . "  - Mensajes claros y al punto. NO sobreexplicar.\n"
+                 . "  - Si dudas, mejor pregunta antes que adivinar.\n\n"
+
+                 . "## 6. TOOLS COMO ÚNICA FUENTE DE DATOS\n"
+                 . "  - Para precios → `buscar_productos` o `info_producto`\n"
+                 . "  - Para cobertura → `validar_cobertura` o `consultar_zonas_cobertura`\n"
+                 . "  - Para horarios → `consultar_horarios`\n"
+                 . "  - Para promos → `consultar_promociones`\n"
+                 . "  - Para registrar cliente nuevo en SGI → `verificar_cliente_erp`\n"
+                 . "  - Para registrar pedido → `confirmar_pedido` (OBLIGATORIO al cerrar)\n"
+                 . "  Si no encuentras la respuesta en tus tools, NO la inventes.\n\n"
+
+                 . "## 7. RESPETO AL FLUJO\n"
+                 . "  Sigue el orden del orquestador. NO saltes pasos. NO confirmes pedidos sin todos los datos.\n";
 
         return $prompt;
     }

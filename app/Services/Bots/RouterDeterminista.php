@@ -79,6 +79,27 @@ class RouterDeterminista
             return ['accion' => 'llm'];
         }
 
+        // Si el mensaje es una consulta CLARAMENTE off-topic (no relacionada
+        // con el negocio: clima, política, fútbol, recetas, etc.) → respuesta
+        // segura sin LLM. Evita que el bot se ponga a hablar de cualquier cosa.
+        if ($this->esOffTopic($msgN)) {
+            Log::info('🛡️ Router: pregunta off-topic detectada — respuesta segura', [
+                'conv_id' => $conv->id,
+                'msg' => mb_substr($mensaje, 0, 100),
+            ]);
+            $nombreParte = $primerNombre ? " {$primerNombre}" : '';
+            return [
+                'accion' => 'reply',
+                'reply'  => "Hola{$nombreParte}, soy el asistente de pedidos. "
+                          . "Puedo ayudarte con:\n"
+                          . "• Catálogo y precios\n"
+                          . "• Domicilios y zonas de cobertura\n"
+                          . "• Horarios\n"
+                          . "• Tomar tu pedido\n\n"
+                          . "¿En qué te ayudo hoy?",
+            ];
+        }
+
         // Si el mensaje es consulta abierta (pregunta sobre catálogo / horarios / zonas)
         // → mejor LLM con tools de consulta
         if ($this->esConsultaAbierta($msgN)) {
@@ -128,6 +149,30 @@ class RouterDeterminista
         return false;
     }
 
+    /**
+     * Detecta preguntas claramente fuera del scope del negocio:
+     * clima, política, deportes, recetas, chistes, vida personal, etc.
+     */
+    private function esOffTopic(string $msg): bool
+    {
+        $patrones = [
+            '/\b(clima|temperatura|llueve|nublado|sol|llover)\b/u',
+            '/\b(politic|elecci|presidente|gobierno|congreso)\b/u',
+            '/\b(futbol|f[uú]tbol|partido|gol|nacional|millonarios|america|junior|mundial)\b/u',
+            '/\b(receta|cocinar|cocinero|chef|preparar|preparacion)\b/u',
+            '/\b(chiste|chistoso|gracioso|broma)\b/u',
+            '/\b(c[oó]mo\s+est[áa]s|qu[eé]\s+haces|d[oó]nde\s+vives|c[oó]mo\s+te\s+llamas)\b/u',
+            '/\b(novia|novio|esposa|esposo|hijos|familia)\b/u',
+            '/\b(eres\s+humano|eres\s+robot|eres\s+(una\s+)?ia|inteligencia\s+artificial|chatgpt|openai)\b/u',
+            '/\b(dolar|d[oó]lar|euro|bitcoin|criptomoneda)\b/u',
+            '/\b(remedios?\s+caseros?|salud|enfermedad|medicina|doctor)\b/u',
+        ];
+        foreach ($patrones as $p) {
+            if (preg_match($p, $msg)) return true;
+        }
+        return false;
+    }
+
     private function esConsultaAbierta(string $msg): bool
     {
         // Preguntas sobre info (no captura un dato concreto)
@@ -153,23 +198,23 @@ class RouterDeterminista
 
         return match (true) {
             str_contains($falta, 'método de entrega') =>
-                "Listo{$nombre}. ¿Cómo te lo llevamos? 🛵\n\n"
-                . "1️⃣ *Despacho* a tu dirección\n"
-                . "2️⃣ *Recoges* en nuestra sede\n\n"
-                . "Dime cuál prefieres.",
+                "Perfecto{$nombre}. ¿Cómo prefieres recibir tu pedido?\n\n"
+                . "1. *Despacho* a tu dirección\n"
+                . "2. *Recoges* en sede\n\n"
+                . "Indícame la opción.",
 
             str_contains($falta, 'dirección') =>
-                "Pásame por favor la *dirección* completa para el despacho 📍\n"
-                . "(Ejemplo: Cra 50 #63B-48, barrio Prado, Bello)",
+                "Por favor compárteme la *dirección completa* para el despacho.\n"
+                . "Ejemplo: _Cra 50 #63B-48, barrio Prado, Bello_",
 
             str_contains($falta, 'sede de recogida') =>
-                "¿En qué *sede* la recoges? Te paso las opciones disponibles.",
+                "¿En qué *sede* prefieres recoger tu pedido? Te confirmo las opciones disponibles.",
 
             str_contains($falta, 'validar cobertura') =>
-                "Permíteme validar la cobertura de esa dirección…",
+                "Permíteme validar la cobertura de esa dirección.",
 
             str_contains($falta, 'cédula') =>
-                "Para registrar tu pedido necesito tu *número de cédula* (sin puntos) 📝",
+                "Para registrar tu pedido necesito tu *número de cédula* (sin puntos).",
 
             str_contains($falta, 'nombre completo') =>
                 "Por favor pásame tu *nombre completo*.",
