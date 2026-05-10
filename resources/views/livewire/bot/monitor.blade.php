@@ -23,54 +23,95 @@
         </div>
     </div>
 
-    {{-- ╔═══ KPIs ═══╗ --}}
+    {{-- ╔═══ KPIs FILA 1 ═══╗ --}}
     @php $k = $this->kpisHoy; @endphp
-    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-3">
         <div class="rounded-2xl bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200 p-4">
-            <div class="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">Pedidos hoy</div>
+            <div class="text-[10px] font-bold text-emerald-700 uppercase tracking-wider"><i class="fa-solid fa-bag-shopping"></i> Pedidos hoy</div>
             <div class="text-3xl font-extrabold text-emerald-700 mt-1">{{ $k['pedidos_hoy'] }}</div>
             <div class="text-xs text-emerald-600 mt-1">${{ number_format($k['total_facturado'], 0, ',', '.') }}</div>
         </div>
 
         <div class="rounded-2xl bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 p-4">
-            <div class="text-[10px] font-bold text-blue-700 uppercase tracking-wider">Conv. activas (60m)</div>
+            <div class="text-[10px] font-bold text-blue-700 uppercase tracking-wider"><i class="fa-solid fa-comments"></i> Conv. activas</div>
             <div class="text-3xl font-extrabold text-blue-700 mt-1">{{ $k['conv_activas_60m'] }}</div>
             <div class="text-xs text-blue-600 mt-1">{{ $k['estados_en_curso'] }} en flujo</div>
         </div>
 
-        <div class="rounded-2xl bg-gradient-to-br from-amber-50 to-amber-100 border border-amber-200 p-4">
-            <div class="text-[10px] font-bold text-amber-700 uppercase tracking-wider">Alucinaciones</div>
-            <div class="text-3xl font-extrabold text-amber-700 mt-1">{{ $k['alucinaciones'] }}</div>
-            <div class="text-xs text-amber-600 mt-1">interceptadas</div>
-        </div>
-
-        <div class="rounded-2xl bg-gradient-to-br from-rose-50 to-rose-100 border border-rose-200 p-4">
-            <div class="text-[10px] font-bold text-rose-700 uppercase tracking-wider">Alertas total</div>
-            <div class="text-3xl font-extrabold text-rose-700 mt-1">{{ $k['alertas_total'] }}</div>
-            <div class="text-xs text-rose-600 mt-1">hoy</div>
-        </div>
-
         <div class="rounded-2xl bg-gradient-to-br from-violet-50 to-violet-100 border border-violet-200 p-4">
-            <div class="text-[10px] font-bold text-violet-700 uppercase tracking-wider">% éxito</div>
-            <div class="text-3xl font-extrabold text-violet-700 mt-1">
-                @php
-                    $exito = $k['pedidos_hoy'] > 0
-                        ? min(100, round(($k['pedidos_hoy'] / max(1, $k['pedidos_hoy'] + $k['alucinaciones'])) * 100))
-                        : 100;
-                @endphp
-                {{ $exito }}%
-            </div>
-            <div class="text-xs text-violet-600 mt-1">pedidos confirmados</div>
+            <div class="text-[10px] font-bold text-violet-700 uppercase tracking-wider"><i class="fa-solid fa-percent"></i> Tasa éxito 24h</div>
+            <div class="text-3xl font-extrabold text-violet-700 mt-1">{{ $k['tasa_exito_24h'] }}%</div>
+            <div class="text-xs text-violet-600 mt-1">conv → pedido</div>
         </div>
 
-        <div class="rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 p-4">
-            <div class="text-[10px] font-bold text-slate-700 uppercase tracking-wider">Sistema</div>
-            <div class="text-3xl font-extrabold text-emerald-600 mt-1">
-                <i class="fa-solid fa-circle-check"></i>
-            </div>
-            <div class="text-xs text-slate-600 mt-1">Operando</div>
+        <div class="rounded-2xl bg-gradient-to-br from-cyan-50 to-cyan-100 border border-cyan-200 p-4">
+            <div class="text-[10px] font-bold text-cyan-700 uppercase tracking-wider"><i class="fa-solid fa-message"></i> Mensajes/pedido</div>
+            <div class="text-3xl font-extrabold text-cyan-700 mt-1">{{ $k['promedio_mensajes'] ?? '—' }}</div>
+            <div class="text-xs text-cyan-600 mt-1">promedio (más bajo = mejor)</div>
+        </div>
+
+        <div class="rounded-2xl bg-gradient-to-br from-amber-50 to-amber-100 border border-amber-200 p-4">
+            <div class="text-[10px] font-bold text-amber-700 uppercase tracking-wider"><i class="fa-solid fa-shield-halved"></i> Alucinaciones</div>
+            <div class="text-3xl font-extrabold text-amber-700 mt-1">{{ $k['alucinaciones'] }}</div>
+            <div class="text-xs text-amber-600 mt-1">interceptadas hoy</div>
+        </div>
+
+        <div class="rounded-2xl bg-gradient-to-br {{ $k['requieren_humano'] > 0 ? 'from-rose-50 to-rose-100 border-rose-300 ring-2 ring-rose-300/40' : 'from-slate-50 to-slate-100 border-slate-200' }} border p-4">
+            <div class="text-[10px] font-bold {{ $k['requieren_humano'] > 0 ? 'text-rose-700' : 'text-slate-600' }} uppercase tracking-wider"><i class="fa-solid fa-user-tie"></i> Pendientes humano</div>
+            <div class="text-3xl font-extrabold {{ $k['requieren_humano'] > 0 ? 'text-rose-700' : 'text-slate-500' }} mt-1">{{ $k['requieren_humano'] }}</div>
+            <div class="text-xs {{ $k['requieren_humano'] > 0 ? 'text-rose-600' : 'text-slate-500' }} mt-1">{{ $k['requieren_humano'] > 0 ? '⚠️ requieren atención' : 'todo bajo control' }}</div>
         </div>
     </div>
+
+    {{-- ╔═══ Banner del proveedor IA activo ═══╗ --}}
+    <div class="rounded-2xl bg-white border border-slate-200 p-3 mb-6 flex items-center gap-3">
+        <span class="flex h-10 w-10 items-center justify-center rounded-xl
+            {{ $k['proveedor_ia'] === 'anthropic' ? 'bg-amber-500' : 'bg-emerald-500' }} text-white shadow-sm">
+            <i class="fa-solid {{ $k['proveedor_ia'] === 'anthropic' ? 'fa-feather' : 'fa-bolt' }}"></i>
+        </span>
+        <div class="flex-1 min-w-0">
+            <div class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Proveedor IA activo</div>
+            <div class="text-base font-bold text-slate-800">
+                {{ $k['proveedor_ia'] === 'anthropic' ? '🪶 Anthropic Claude' : '⚡ OpenAI GPT' }}
+                <span class="text-xs font-mono text-slate-500 ml-2">{{ $k['modelo_ia'] }}</span>
+            </div>
+        </div>
+        <a href="{{ route('configuracion.bot') ?? '/configuracion/bot' }}" class="text-xs text-slate-500 hover:text-slate-700">
+            <i class="fa-solid fa-gear"></i> Cambiar
+        </a>
+    </div>
+
+    {{-- ╔═══ Conversaciones que requieren humano ═══╗ --}}
+    @if($k['requieren_humano'] > 0)
+        <div class="rounded-2xl bg-gradient-to-br from-rose-50 to-amber-50 border-2 border-rose-200 p-5 mb-6">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="text-sm font-bold text-rose-700 uppercase tracking-wide flex items-center gap-2">
+                    <i class="fa-solid fa-circle-exclamation animate-pulse"></i>
+                    Conversaciones que necesitan ATENCIÓN HUMANA
+                </h3>
+                <span class="text-xs font-bold text-rose-600">{{ $k['requieren_humano'] }} pendiente(s)</span>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                @foreach($this->conversacionesHumano as $cvh)
+                    <a href="/chat?conv={{ $cvh->id }}"
+                       class="flex items-center gap-3 rounded-xl bg-white border border-rose-200 p-3 hover:bg-rose-50 transition">
+                        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-rose-100 text-rose-600">
+                            <i class="fa-solid fa-user"></i>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <div class="font-semibold text-slate-800 truncate">{{ $cvh->cliente?->nombre ?? $cvh->telefono_normalizado }}</div>
+                            <div class="text-[11px] text-slate-500">
+                                <i class="fa-solid fa-tag"></i>
+                                {{ $cvh->humano_motivo ?? 'sin motivo' }}
+                                · {{ $cvh->humano_solicitado_at?->diffForHumans() ?? '—' }}
+                            </div>
+                        </div>
+                        <i class="fa-solid fa-arrow-right text-rose-400"></i>
+                    </a>
+                @endforeach
+            </div>
+        </div>
+    @endif
 
     {{-- ╔═══ COLUMNAS PRINCIPALES ═══╗ --}}
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">

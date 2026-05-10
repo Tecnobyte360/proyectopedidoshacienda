@@ -862,6 +862,31 @@ class WhatsappWebhookController extends Controller
         }
 
         // ════════════════════════════════════════════════════════════════════
+        // 🤝 HANDOFF AUTOMÁTICO A HUMANO — antes de cualquier procesamiento IA
+        // Detecta si el cliente está frustrado, pide humano, o el bot está
+        // en bucle. Si sí: marca conversación + notifica equipo + responde
+        // mensaje cordial sin gastar tokens.
+        // ════════════════════════════════════════════════════════════════════
+        try {
+            $derivacionMsg = app(\App\Services\Bots\HandoffHumanoService::class)
+                ->evaluar($conversacion, $message);
+            if ($derivacionMsg !== null) {
+                $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_ASSISTANT, $derivacionMsg);
+                return $derivacionMsg;
+            }
+        } catch (\Throwable $e) {
+            Log::warning('⚠️ Handoff service falló (continúa flujo normal): ' . $e->getMessage());
+        }
+
+        // Si la conversación YA está marcada para humano, no procesar con IA
+        if ($conversacion->requiere_humano && !$conversacion->humano_atendido_at) {
+            Log::info('🤝 Conversación pendiente de humano — bot no responde', [
+                'conv_id' => $conversacion->id,
+            ]);
+            return ''; // no enviar respuesta automática
+        }
+
+        // ════════════════════════════════════════════════════════════════════
         // 🤖 ROUTER DETERMINISTA — decide acción sin LLM cuando es posible
         // ════════════════════════════════════════════════════════════════════
         try {

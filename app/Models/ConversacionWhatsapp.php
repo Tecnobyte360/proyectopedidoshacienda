@@ -34,10 +34,17 @@ class ConversacionWhatsapp extends Model
         'pedido_id',
         'primer_mensaje_at',
         'ultimo_mensaje_at',
+        'requiere_humano',
+        'humano_motivo',
+        'humano_solicitado_at',
+        'humano_atendido_at',
     ];
 
     protected $casts = [
         'atendida_por_humano' => 'boolean',
+        'requiere_humano'     => 'boolean',
+        'humano_solicitado_at'=> 'datetime',
+        'humano_atendido_at'  => 'datetime',
         'es_interna'          => 'boolean',
         'derivada_at'         => 'datetime',
         'ultima_vista_at'     => 'datetime',

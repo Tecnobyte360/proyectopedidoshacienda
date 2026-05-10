@@ -73,14 +73,64 @@ class Monitor extends Component
             ])
             ->count();
 
+        // Conversaciones que necesitan humano (handoff pendiente)
+        $requierenHumano = ConversacionWhatsapp::query()
+            ->where('requiere_humano', true)
+            ->where('ultimo_mensaje_at', '>=', now()->subHours(4))
+            ->count();
+
+        // Tasa de éxito últimas 24h: pedidos confirmados / conversaciones iniciadas
+        $convsUltDia = ConversacionWhatsapp::where('created_at', '>=', now()->subDay())->count();
+        $pedidosUltDia = Pedido::where('created_at', '>=', now()->subDay())->count();
+        $tasaExito = $convsUltDia > 0 ? round(($pedidosUltDia / $convsUltDia) * 100, 1) : 0;
+
+        // Proveedor IA actual + provider activo
+        $cfg = \App\Models\ConfiguracionBot::actual();
+        $proveedorActivo = $cfg?->ai_provider ?: 'openai';
+        $modeloActivo = $proveedorActivo === 'anthropic'
+            ? ($cfg?->modelo_anthropic ?: 'claude-sonnet-4-6')
+            : ($cfg?->modelo_openai ?: 'gpt-4o-mini');
+
+        // Tiempo promedio de cierre (mensajes hasta confirmar pedido)
+        $promedioMensajes = ConversacionPedidoEstado::query()
+            ->where('confirmado_at', '>=', now()->subDay())
+            ->whereNotNull('confirmado_at')
+            ->get()
+            ->map(function ($e) {
+                return MensajeWhatsapp::where('conversacion_id', $e->conversacion_id)
+                    ->where('created_at', '<=', $e->confirmado_at)
+                    ->where('rol', 'user')
+                    ->count();
+            })
+            ->avg();
+        $promedioMensajes = $promedioMensajes ? round($promedioMensajes, 1) : null;
+
         return [
-            'pedidos_hoy'      => $pedidosHoy,
-            'total_facturado'  => $totalPedidos,
-            'alucinaciones'    => $alucinacionesHoy,
-            'alertas_total'    => $alertasHoy,
-            'conv_activas_60m' => $convActivas,
-            'estados_en_curso' => $estadosActivos,
+            'pedidos_hoy'        => $pedidosHoy,
+            'total_facturado'    => $totalPedidos,
+            'alucinaciones'      => $alucinacionesHoy,
+            'alertas_total'      => $alertasHoy,
+            'conv_activas_60m'   => $convActivas,
+            'estados_en_curso'   => $estadosActivos,
+            'requieren_humano'   => $requierenHumano,
+            'tasa_exito_24h'     => $tasaExito,
+            'proveedor_ia'       => $proveedorActivo,
+            'modelo_ia'          => $modeloActivo,
+            'promedio_mensajes'  => $promedioMensajes,
         ];
+    }
+
+    /**
+     * Conversaciones que requieren atención humana — listado priorizado.
+     */
+    public function getConversacionesHumanoProperty()
+    {
+        return ConversacionWhatsapp::with(['cliente'])
+            ->where('requiere_humano', true)
+            ->where('ultimo_mensaje_at', '>=', now()->subHours(4))
+            ->orderByDesc('ultimo_mensaje_at')
+            ->limit(10)
+            ->get();
     }
 
     /**
