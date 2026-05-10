@@ -203,6 +203,9 @@ class AnthropicService
      * Traduce tools OpenAI → Anthropic.
      * OpenAI: [{type: "function", function: {name, description, parameters}}]
      * Anthropic: [{name, description, input_schema}]
+     *
+     * 🛡️ Anthropic es ESTRICTO con keys: solo [a-zA-Z0-9_.-] (max 64 chars).
+     * Las sanitizamos para evitar errores 400.
      */
     private function traducirTools(?array $tools): array
     {
@@ -210,13 +213,84 @@ class AnthropicService
         $out = [];
         foreach ($tools as $t) {
             $fn = $t['function'] ?? $t;
+            $rawName = (string) ($fn['name'] ?? 'tool');
+            $name = $this->sanitizarKey($rawName) ?: 'tool';
+
+            $schema = $fn['parameters'] ?? ['type' => 'object', 'properties' => new \stdClass()];
+            $schema = $this->sanitizarSchemaParaAnthropic($schema);
+
             $out[] = [
-                'name'         => $fn['name'] ?? 'tool',
-                'description'  => $fn['description'] ?? '',
-                'input_schema' => $fn['parameters'] ?? ['type' => 'object', 'properties' => new \stdClass()],
+                'name'         => $name,
+                'description'  => (string) ($fn['description'] ?? ''),
+                'input_schema' => $schema,
             ];
         }
         return $out;
+    }
+
+    /**
+     * Sanitiza un schema JSONSchema para Anthropic:
+     *   - Renombra keys de properties que no matchen [a-zA-Z0-9_.-]{1,64}.
+     *   - Trunca keys >64 chars.
+     *   - Sincroniza el array `required` con las nuevas keys.
+     */
+    private function sanitizarSchemaParaAnthropic($schema): array
+    {
+        if (!is_array($schema)) {
+            return ['type' => 'object', 'properties' => new \stdClass()];
+        }
+
+        // Ensure type
+        if (!isset($schema['type'])) $schema['type'] = 'object';
+
+        if (isset($schema['properties']) && (is_array($schema['properties']) || is_object($schema['properties']))) {
+            $props = (array) $schema['properties'];
+            $newProps = [];
+            $rename = [];
+            foreach ($props as $key => $val) {
+                $newKey = $this->sanitizarKey((string) $key);
+                if ($newKey === '') $newKey = 'param_' . count($newProps);
+                if ($newKey !== $key) $rename[$key] = $newKey;
+                // Recursivo si es schema anidado
+                if (is_array($val) && isset($val['properties'])) {
+                    $val = $this->sanitizarSchemaParaAnthropic($val);
+                }
+                if (is_array($val) && ($val['type'] ?? null) === 'array' && isset($val['items']['properties'])) {
+                    $val['items'] = $this->sanitizarSchemaParaAnthropic($val['items']);
+                }
+                $newProps[$newKey] = $val;
+            }
+            $schema['properties'] = $newProps;
+
+            // Sincronizar required
+            if (isset($schema['required']) && is_array($schema['required'])) {
+                $schema['required'] = array_map(
+                    fn ($r) => $rename[$r] ?? $this->sanitizarKey((string) $r),
+                    $schema['required']
+                );
+            }
+        } else {
+            // properties vacío debe ser objeto, no array
+            $schema['properties'] = new \stdClass();
+        }
+
+        return $schema;
+    }
+
+    /**
+     * Sanitiza una key para Anthropic: solo [a-zA-Z0-9_.-], máximo 64 chars.
+     */
+    private function sanitizarKey(string $key): string
+    {
+        // Reemplazar todo lo que no sea válido por _
+        $clean = preg_replace('/[^a-zA-Z0-9_.\-]/', '_', $key);
+        // Colapsar __
+        $clean = preg_replace('/_+/', '_', $clean);
+        // Trim _ del inicio/final
+        $clean = trim($clean, '_');
+        // Truncar
+        if (mb_strlen($clean) > 64) $clean = mb_substr($clean, 0, 64);
+        return $clean;
     }
 
     /**

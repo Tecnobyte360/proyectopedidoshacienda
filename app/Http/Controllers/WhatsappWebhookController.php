@@ -2969,7 +2969,8 @@ TXT;
                 if (!empty($cats)) {
                     $lineas[] = "Tenemos estas categorías:";
                     foreach (array_slice($cats, 0, 8) as $c) {
-                        $lineas[] = "• " . ($c['nombre'] ?? $c);
+                        $nom = is_array($c) ? ($c['nombre'] ?? json_encode($c)) : (string) $c;
+                        $lineas[] = "• " . $nom;
                     }
                 }
             } elseif ($tool === 'info_producto') {
