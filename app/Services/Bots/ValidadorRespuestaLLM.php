@@ -103,19 +103,17 @@ class ValidadorRespuestaLLM
     }
 
     /**
-     * Detecta menciones de precios que no coinciden con el catálogo.
-     * Solo dispara cuando el LLM dice "$X" cerca del nombre de un producto
-     * y el precio NO coincide con el real.
+     * Detecta precios INVENTADOS — solo dispara cuando, en la misma LÍNEA,
+     * aparece nombre de producto + precio, y el precio NO coincide con el
+     * del catálogo (con tolerancia de ±25%).
+     *
+     * 🛡️ PRECISO: itera línea por línea, asocia el precio al producto
+     * mencionado en esa línea. Evita falsos positivos cuando el reply
+     * lista múltiples productos con sus respectivos precios.
      */
     private function detectarPreciosInventados(string $reply): array
     {
         $alertas = [];
-        $replyN = mb_strtolower(Str::ascii($reply));
-
-        // Encontrar todos los precios mencionados en el reply
-        if (!preg_match_all('/\$\s*([\d.,]+)/u', $reply, $mPrecios)) {
-            return [];
-        }
 
         try {
             $catalogo = app(BotCatalogoService::class)->productosActivos();
@@ -124,36 +122,54 @@ class ValidadorRespuestaLLM
         }
         if ($catalogo->isEmpty()) return [];
 
-        // Para cada producto del catálogo cuyo nombre aparece en el reply,
-        // verificar que el precio mencionado coincida.
+        // Mapa nombre normalizado -> producto
+        $catalogoMap = [];
         foreach ($catalogo as $p) {
             $nombreN = mb_strtolower(Str::ascii((string) $p->nombre));
-            // Token significativo (>=5 chars) del nombre del producto
-            $tokens = collect(preg_split('/\s+/', $nombreN))
-                ->filter(fn ($t) => mb_strlen($t) >= 5)
-                ->values();
-            if ($tokens->isEmpty()) continue;
+            if ($nombreN === '') continue;
+            $catalogoMap[$nombreN] = [
+                'nombre' => (string) $p->nombre,
+                'precio' => (float) ($p->precio_base ?? 0),
+            ];
+        }
 
-            // ¿Aparece el producto en el reply?
-            $aparece = $tokens->first(fn ($t) => str_contains($replyN, $t));
-            if (!$aparece) continue;
+        // Procesar cada línea del reply
+        $lineas = preg_split('/[\n\r]+/', $reply);
+        foreach ($lineas as $linea) {
+            if (trim($linea) === '') continue;
 
-            $precioReal = (float) ($p->precio_base ?? 0);
-            if ($precioReal <= 0) continue;
+            // ¿Tiene precio en la línea?
+            if (!preg_match_all('/\$\s*([\d.,]+)/u', $linea, $mPrecios)) continue;
 
-            // Verificar precios mencionados — si alguno está cerca al producto pero MUY distinto al real
+            $lineaN = mb_strtolower(Str::ascii($linea));
+
+            // ¿Qué producto del catálogo aparece en esta línea?
+            //    Buscar match más largo: el nombre completo si está, sino tokens.
+            $productoMatch = null;
+            foreach ($catalogoMap as $nombreN => $info) {
+                // Match exacto del nombre del producto en la línea
+                if (str_contains($lineaN, $nombreN)) {
+                    $productoMatch = $info;
+                    break;
+                }
+            }
+            // Si no encontramos nombre completo, NO disparar — evita falsos positivos
+            if (!$productoMatch || $productoMatch['precio'] <= 0) continue;
+
+            $precioReal = $productoMatch['precio'];
+
             foreach ($mPrecios[1] as $precioStr) {
                 $precio = (float) preg_replace('/[^\d]/', '', str_replace(',', '', $precioStr));
                 if ($precio <= 0) continue;
 
-                // Tolerancia: ±10% del precio real (puede haber descuentos)
+                // Tolerancia ±25%: precios pueden variar por descuentos/sede
                 $diff = abs($precio - $precioReal) / $precioReal;
-                if ($diff > 0.5 && $precio < $precioReal * 0.5) {
-                    // Precio mencionado es <50% del real → probable alucinación
+                if ($diff > 0.25) {
                     $alertas[] = [
-                        'producto' => (string) $p->nombre,
+                        'producto' => $productoMatch['nombre'],
                         'precio_real' => $precioReal,
                         'precio_mencionado' => $precio,
+                        'linea' => mb_substr(trim($linea), 0, 100),
                     ];
                 }
             }

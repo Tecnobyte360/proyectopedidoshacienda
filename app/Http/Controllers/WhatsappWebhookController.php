@@ -358,10 +358,40 @@ class WhatsappWebhookController extends Controller
             // 🛡️ VALIDADOR ANTI-ALUCINACIÓN POST-LLM (capa profesional):
             //    Detecta precios/productos/horarios/promesas inventadas y
             //    reescribe con respuestas seguras del catálogo real.
+            $replyAntesValidador = $reply;
             try {
                 $reply = app(\App\Services\Bots\ValidadorRespuestaLLM::class)->validar($reply);
             } catch (\Throwable $e) {
                 Log::warning('Validador respuesta LLM falló (continúa con reply original): ' . $e->getMessage());
+            }
+
+            // 🛡️ Si el validador modificó el reply, actualizar el ÚLTIMO mensaje
+            // assistant persistido en BD (procesarConIA lo guardó con la versión
+            // original). Así la plataforma muestra lo mismo que recibe el cliente.
+            if ($reply !== $replyAntesValidador) {
+                try {
+                    $convForUpdate = isset($conversacion) ? $conversacion : null;
+                    if (!$convForUpdate) {
+                        $telNorm = $this->normalizarTelefono($from);
+                        $convForUpdate = \App\Models\ConversacionWhatsapp::where('telefono_normalizado', $telNorm)
+                            ->orderByDesc('id')->first();
+                    }
+                    if ($convForUpdate) {
+                        $ultMsg = \App\Models\MensajeWhatsapp::where('conversacion_id', $convForUpdate->id)
+                            ->where('rol', \App\Models\MensajeWhatsapp::ROL_ASSISTANT)
+                            ->orderByDesc('id')
+                            ->first();
+                        if ($ultMsg && $ultMsg->contenido === $replyAntesValidador) {
+                            $ultMsg->contenido = $reply;
+                            $ultMsg->save();
+                            Log::info('🛡️ Último mensaje assistant actualizado con reply post-validador', [
+                                'mensaje_id' => $ultMsg->id,
+                            ]);
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning('No se pudo actualizar último mensaje post-validador: ' . $e->getMessage());
+                }
             }
 
             Log::info('💬 RESPUESTA GENERADA', compact('reply', 'from', 'messageId', 'connectionId'));
