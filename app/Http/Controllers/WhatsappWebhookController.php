@@ -3072,12 +3072,20 @@ TXT;
     private function llamarOpenAI(array $messages, $toolChoice = 'auto', ?array $toolsCustom = null): ?array
     {
         // 🛡️ PRE-FLIGHT: estimar tokens y recortar si excede el límite seguro.
-        // gpt-4o-mini contexto max: 128k. TPM tier 2: 2M. Para evitar rate limits
-        // y errores de contexto, limitamos a 30k tokens por request (~120k chars).
         $messages = $this->recortarMessagesParaLLM($messages, 30000);
 
-        // 🔁 4 intentos con backoff exponencial (1s, 2s, 4s, 8s)
-        // Antes eran 2 con 1s — insuficiente para rate limits de OpenAI.
+        // 🤖 Delegar al AiClientService — decide entre OpenAI y Anthropic según
+        // la configuración del tenant. Mantiene formato OpenAI para no romper
+        // el resto del código.
+        $tools = $toolsCustom ?? $this->getToolsDefinicion();
+        return app(\App\Services\Ai\AiClientService::class)
+            ->chat($messages, $toolChoice, $tools);
+    }
+
+    /** @deprecated reservado por compatibilidad histórica */
+    private function llamarOpenAILegacy(array $messages, $toolChoice = 'auto', ?array $toolsCustom = null): ?array
+    {
+        $messages = $this->recortarMessagesParaLLM($messages, 30000);
         $intentos = 4;
         $ultimoStatus = null;
         $ultimoBody   = null;

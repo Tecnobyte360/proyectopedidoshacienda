@@ -52,6 +52,7 @@ class Tenant extends Model
         'color_primario',
         'color_secundario',
         'openai_api_key',
+        'anthropic_api_key',
         'whatsapp_config',
         'wompi_config',
         'wompi_modo',
@@ -67,6 +68,7 @@ class Tenant extends Model
         //    para no exponer cada una como columna independiente.
         'wompi_config'         => 'encrypted:array',
         'openai_api_key'       => \App\Casts\EncryptedTolerante::class,
+        'anthropic_api_key'    => \App\Casts\EncryptedTolerante::class,
         'google_maps_api_key'  => \App\Casts\EncryptedTolerante::class,
         'google_maps_server_api_key' => \App\Casts\EncryptedTolerante::class,
         'google_maps_activo'   => 'boolean',
@@ -77,6 +79,7 @@ class Tenant extends Model
 
     protected $hidden = [
         'openai_api_key',
+        'anthropic_api_key',
         'whatsapp_config',
         'wompi_config',
     ];
@@ -242,6 +245,31 @@ class Tenant extends Model
             return $tenant->openaiApiKey();
         }
         $global = trim((string) env('OPENAI_API_KEY'));
+        return $global !== '' ? $global : null;
+    }
+
+    /**
+     * Retorna la Anthropic API key del tenant (con fallback al .env).
+     */
+    public function anthropicApiKey(): ?string
+    {
+        try {
+            $propia = trim((string) $this->anthropic_api_key);
+        } catch (\Throwable $e) {
+            $propia = '';
+        }
+        if ($propia !== '') return $propia;
+        $global = trim((string) env('ANTHROPIC_API_KEY'));
+        return $global !== '' ? $global : null;
+    }
+
+    public static function resolverAnthropicKey(): ?string
+    {
+        $tenant = app(\App\Services\TenantManager::class)->current();
+        if ($tenant) {
+            return $tenant->anthropicApiKey();
+        }
+        $global = trim((string) env('ANTHROPIC_API_KEY'));
         return $global !== '' ? $global : null;
     }
 

@@ -238,29 +238,23 @@ class BotCierreService
         $tools = $this->definicionToolConfirmarPedido();
 
         try {
-            $response = Http::withToken($openaiKey)
-                ->timeout(25)
-                ->post('https://api.openai.com/v1/chat/completions', [
-                    'model'       => 'gpt-4o-mini',
-                    'temperature' => 0.1, // bajo: ser determinista
-                    'max_tokens'  => 500,
-                    'messages'    => [
-                        ['role' => 'system', 'content' => $systemPrompt],
-                        ['role' => 'user', 'content' => 'Cierra el pedido AHORA llamando a confirmar_pedido con los datos del estado y los últimos mensajes.'],
-                    ],
-                    'tools'       => $tools,
-                    'tool_choice' => ['type' => 'function', 'function' => ['name' => 'confirmar_pedido']],
-                ]);
+            // 🤖 Usar el AiClientService para que respete el proveedor configurado
+            // (OpenAI o Anthropic) según el tenant.
+            $data = app(\App\Services\Ai\AiClientService::class)->chat(
+                [
+                    ['role' => 'system', 'content' => $systemPrompt],
+                    ['role' => 'user', 'content' => 'Cierra el pedido AHORA llamando a confirmar_pedido con los datos del estado y los últimos mensajes.'],
+                ],
+                ['type' => 'function', 'function' => ['name' => 'confirmar_pedido']],
+                $tools,
+                ['temperature' => 0.1, 'max_tokens' => 500]
+            );
 
-            if (!$response->successful()) {
-                Log::warning('🤖 BotCierre: OpenAI falló', [
-                    'status' => $response->status(),
-                    'body'   => mb_substr($response->body(), 0, 500),
-                ]);
+            if (!$data) {
+                Log::warning('🤖 BotCierre: el proveedor IA falló');
                 return null;
             }
 
-            $data = $response->json();
             $toolCalls = $data['choices'][0]['message']['tool_calls'] ?? null;
 
             if (!$toolCalls || ($toolCalls[0]['function']['name'] ?? '') !== 'confirmar_pedido') {

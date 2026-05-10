@@ -519,18 +519,73 @@
                 <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
                     <i class="fa-solid fa-brain"></i>
                 </span>
-                <h3 class="text-lg font-bold text-slate-800">Motor de IA (OpenAI)</h3>
+                <h3 class="text-lg font-bold text-slate-800">Motor de IA</h3>
+            </div>
+
+            {{-- Selector de proveedor IA --}}
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                <label class="flex items-center gap-3 cursor-pointer rounded-xl border-2 p-4 transition
+                             {{ ($ai_provider ?? 'openai') === 'openai' ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-500/20' : 'border-slate-200 bg-white hover:border-slate-300' }}">
+                    <input type="radio" wire:model.live="ai_provider" value="openai" class="sr-only">
+                    <span class="flex h-10 w-10 items-center justify-center rounded-lg
+                        {{ ($ai_provider ?? 'openai') === 'openai' ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-500' }}">
+                        <i class="fa-solid fa-bolt"></i>
+                    </span>
+                    <div class="flex-1">
+                        <div class="text-sm font-bold text-slate-800">OpenAI (GPT)</div>
+                        <div class="text-xs text-slate-500">GPT-4o, 4o-mini, Turbo</div>
+                    </div>
+                    @if(($ai_provider ?? 'openai') === 'openai')
+                        <i class="fa-solid fa-circle-check text-emerald-500"></i>
+                    @endif
+                </label>
+
+                <label class="flex items-center gap-3 cursor-pointer rounded-xl border-2 p-4 transition
+                             {{ ($ai_provider ?? 'openai') === 'anthropic' ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-500/20' : 'border-slate-200 bg-white hover:border-slate-300' }}">
+                    <input type="radio" wire:model.live="ai_provider" value="anthropic" class="sr-only">
+                    <span class="flex h-10 w-10 items-center justify-center rounded-lg
+                        {{ ($ai_provider ?? 'openai') === 'anthropic' ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-500' }}">
+                        <i class="fa-solid fa-feather"></i>
+                    </span>
+                    <div class="flex-1">
+                        <div class="text-sm font-bold text-slate-800">Anthropic (Claude)</div>
+                        <div class="text-xs text-slate-500">Opus 4.7, Sonnet 4.6, Haiku 4.5</div>
+                    </div>
+                    @if(($ai_provider ?? 'openai') === 'anthropic')
+                        <i class="fa-solid fa-circle-check text-emerald-500"></i>
+                    @endif
+                </label>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div class="md:col-span-3">
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Modelo</label>
-                    <select wire:model="modelo_openai"
-                            class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand">
-                        @foreach($modelosDisponibles as $key => $label)
-                            <option value="{{ $key }}">{{ $label }}</option>
-                        @endforeach
-                    </select>
+                    @if(($ai_provider ?? 'openai') === 'anthropic')
+                        <label class="block text-sm font-medium text-slate-700 mb-1">
+                            <i class="fa-solid fa-robot mr-1"></i>Modelo Anthropic Claude
+                        </label>
+                        <select wire:model="modelo_anthropic"
+                                class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand">
+                            @foreach(\App\Services\Ai\AnthropicService::MODELOS as $key => $label)
+                                <option value="{{ $key }}">{{ $label }}</option>
+                            @endforeach
+                        </select>
+                        <p class="text-[11px] text-slate-500 mt-1">
+                            <i class="fa-solid fa-info-circle"></i>
+                            Asegúrate de tener configurada la API key de Anthropic en
+                            <a href="{{ route('admin.tenants.index') ?? '#' }}" class="text-emerald-600 hover:underline font-semibold">Tenants</a>
+                            o en <code>ANTHROPIC_API_KEY</code> del .env.
+                        </p>
+                    @else
+                        <label class="block text-sm font-medium text-slate-700 mb-1">
+                            <i class="fa-solid fa-robot mr-1"></i>Modelo OpenAI
+                        </label>
+                        <select wire:model="modelo_openai"
+                                class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand">
+                            @foreach($modelosDisponibles as $key => $label)
+                                <option value="{{ $key }}">{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    @endif
                 </div>
 
                 <div>

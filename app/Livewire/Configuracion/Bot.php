@@ -26,6 +26,8 @@ class Bot extends Component
     public int    $agrupar_mensajes_segundos = 5;
 
     public string $modelo_openai             = 'gpt-4o-mini';
+    public string $ai_provider               = 'openai';
+    public string $modelo_anthropic          = 'claude-sonnet-4-6';
     public float  $temperatura               = 0.85;
     public int    $max_tokens                = 700;
 
@@ -169,6 +171,8 @@ class Bot extends Component
         $this->agrupar_mensajes_activo   = (bool) ($cfg->agrupar_mensajes_activo ?? true);
         $this->agrupar_mensajes_segundos = (int) ($cfg->agrupar_mensajes_segundos ?? 5);
         $this->modelo_openai             = (string) ($cfg->modelo_openai ?? 'gpt-4o-mini');
+        $this->ai_provider               = (string) ($cfg->ai_provider ?? 'openai');
+        $this->modelo_anthropic          = (string) ($cfg->modelo_anthropic ?? 'claude-sonnet-4-6');
         $this->temperatura               = (float) $cfg->temperatura;
         $this->max_tokens                = (int) $cfg->max_tokens;
         $this->nombre_asesora            = (string) ($cfg->nombre_asesora ?? 'Sofía');
@@ -686,6 +690,8 @@ class Bot extends Component
             'agrupar_mensajes_activo'   => 'boolean',
             'agrupar_mensajes_segundos' => 'integer|min:1|max:30',
             'modelo_openai'             => 'required|string|max:60',
+            'ai_provider'               => 'required|in:openai,anthropic',
+            'modelo_anthropic'          => 'nullable|string|max:60',
             'temperatura'               => 'numeric|min:0|max:2',
             'max_tokens'                => 'integer|min:100|max:4000',
             'nombre_asesora'            => 'required|string|max:60',
