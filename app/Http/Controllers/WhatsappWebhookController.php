@@ -1597,6 +1597,35 @@ TXT;
                 // Si NO hay nuevas tool_calls → terminamos (caemos al fallback)
                 if (empty($nextToolCalls)) break;
 
+                // 🚨 Si Claude pide confirmar_pedido o registrar_datos_cliente,
+                // SALIR del loop y dejar que el flujo principal del controller
+                // procese esa tool (que sí crea pedido en BD + exporta SGI).
+                // El loop solo maneja tools de consulta/lectura.
+                $toolsCriticas = ['confirmar_pedido', 'registrar_datos_cliente'];
+                $piderToolCritica = collect($nextToolCalls)->first(
+                    fn ($tc) => in_array($tc['function']['name'] ?? '', $toolsCriticas, true)
+                );
+
+                if ($piderToolCritica) {
+                    $nombreCritica = $piderToolCritica['function']['name'];
+                    Log::info('🎯 LLM pidió tool crítica — delegando al flujo principal', [
+                        'tool' => $nombreCritica,
+                    ]);
+
+                    // Procesar la tool crítica como si fuera la PRIMERA del request.
+                    // Esto reusa toda la lógica de guardarPedidoDesdeToolCall.
+                    if ($nombreCritica === 'confirmar_pedido') {
+                        $orderData = json_decode($piderToolCritica['function']['arguments'] ?? '{}', true) ?: [];
+                        $nombreCliente = $nombreParaPrompt ?? ($conversacion?->cliente?->nombre ?? 'Cliente');
+                        return $this->guardarPedidoDesdeToolCall(
+                            $orderData, $from, $nombreCliente, $conversationHistory,
+                            $cacheKey, $connectionId, $conversacion, $convService
+                        );
+                    }
+                    // registrar_datos_cliente: pasa al flujo viejo
+                    break;
+                }
+
                 // Procesar nuevas tool_calls y agregarlas al thread
                 Log::info('🔄 LLM pidió otra tool — iterando', [
                     'iter'  => $iter + 1,
