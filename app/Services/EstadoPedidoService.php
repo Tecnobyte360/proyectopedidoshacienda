@@ -459,7 +459,13 @@ class EstadoPedidoService
         //      "cra 58bb #40c-34", "calle 50 #47-80", "carrera 80a #45-12",
         //      "diagonal 67 # 32-15", "cl 79 sur #52-84", "trv 40 #30-20"
         if (empty($estado->direccion)) {
-            $patronDir = '/\b(?:cra\.?|carrera|cl\.?|calle|cll|dg\.?|diagonal|diag|trv\.?|transversal|av\.?|avenida|cr|kr)\s*\d+[a-z]?\s*(?:sur|norte|este|oeste|n|s|e|o)?\s*#?\s*\d+[a-z]?\s*-\s*\d+/iu';
+            // 🛡️ Regex flexible para direcciones colombianas. Acepta:
+            //   "Calle 50 #63B-48"
+            //   "Cra 50 #45 23" (con espacio)
+            //   "Calle 41 #59bb 35"
+            //   "Diagonal 30 sur 15-20"
+            // Separador entre el segundo y tercer número puede ser - / o espacio.
+            $patronDir = '/\b(?:cra\.?|carrera|cl\.?|calle|cll|dg\.?|diagonal|diag|trv\.?|transversal|av\.?|avenida|cr|kr)\s*\d+[a-z]{0,3}\s*(?:sur|norte|este|oeste|n|s|e|o)?\s*#?\s*\d+[a-z]{0,3}\s*[-\s\/]\s*\d+[a-z]?/iu';
             if (preg_match($patronDir, $msg, $mDir)) {
                 // Capturar la dirección con un poco de contexto extra (números siguientes)
                 $estado->direccion = trim($mDir[0]);
