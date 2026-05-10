@@ -601,6 +601,20 @@ class EstadoPedidoService
         $msgN = mb_strtolower(\Illuminate\Support\Str::ascii(trim($msg)));
         if ($msgN === '') return [];
 
+        // 🛡️ Normalizar palabras de cantidad escritas a dígitos.
+        // "una pierna de cerdo" → "1 pierna de cerdo"
+        // "media libra"          → "0.5 libra"
+        $msgN = strtr($msgN, [
+            'una '  => '1 ',
+            'un '   => '1 ',
+            'dos '  => '2 ',
+            'tres ' => '3 ',
+            'cuatro ' => '4 ',
+            'cinco ' => '5 ',
+            'media ' => '0.5 ',
+            'medio ' => '0.5 ',
+        ]);
+
         // Cargar catálogo (tokens de nombres reales) para validar matches
         try {
             $catalogo = app(\App\Services\BotCatalogoService::class)->productosActivos();
@@ -662,6 +676,44 @@ class EstadoPedidoService
                         'unit'     => $producto['unidad'],
                     ];
                 }
+            }
+        }
+
+        // 🛡️ FALLBACK: "N producto" sin unidad explícita
+        // "1 pierna de cerdo", "2 muslos", "1 filete tilapia"
+        // Solo busca cuando NO se ha capturado nada antes.
+        if (empty($productos)) {
+            $patronNumProd = '/(?:^|[^\d])(\d+(?:[.,]\d+)?)\s+([a-záéíóúñ][a-záéíóúñ\s]+?)(?=[,.\n]|$)/iu';
+            if (preg_match_all($patronNumProd, $msgN, $m3, PREG_SET_ORDER)) {
+                foreach ($m3 as $m) {
+                    $cantidad = (float) str_replace(',', '.', $m[1]);
+                    $nombreCandidato = trim($m[2]);
+                    // Limpiar palabras de cierre típicas
+                    $nombreCandidato = preg_replace('/^(de\s+|del\s+)/iu', '', $nombreCandidato);
+                    $producto = $this->matchProductoEnCatalogo($nombreCandidato, $catalogoTokens);
+                    if ($producto) {
+                        $productos[] = [
+                            'code'     => $producto['codigo'],
+                            'name'     => (string) $producto['producto']->nombre,
+                            'quantity' => $cantidad,
+                            'unit'     => $producto['unidad'],
+                        ];
+                    }
+                }
+            }
+        }
+
+        // 🛡️ ÚLTIMO FALLBACK: solo nombre de producto sin cantidad
+        // "pierna de cerdo" sola → cantidad implícita 1
+        if (empty($productos)) {
+            $producto = $this->matchProductoEnCatalogo($msgN, $catalogoTokens);
+            if ($producto) {
+                $productos[] = [
+                    'code'     => $producto['codigo'],
+                    'name'     => (string) $producto['producto']->nombre,
+                    'quantity' => 1.0,
+                    'unit'     => $producto['unidad'],
+                ];
             }
         }
 

@@ -1575,17 +1575,58 @@ TXT;
                 $toolMessages
             );
 
-            $followUp = $this->llamarOpenAI($followUpMessages);
-            $reply    = $followUp['choices'][0]['message']['content'] ?? null;
+            // 🔄 LOOP DE TOOL CALLS: Claude puede llamar VARIAS tools en
+            // secuencia (ej: buscar_productos → validar_cobertura → confirmar_pedido).
+            // Iteramos hasta 4 veces o hasta que devuelva contenido de texto.
+            $reply = null;
+            $maxIter = 4;
+            $allToolMessages = $toolMessages; // acumular para fallback
 
-            // 🛡️ FALLBACK CRÍTICO: si el LLM falló (rate limit, timeout, etc),
-            // NO dejamos al cliente colgado con "déjame revisar".
-            // Generamos una respuesta directa con los datos de la(s) tool(s).
+            for ($iter = 0; $iter < $maxIter; $iter++) {
+                $followUp = $this->llamarOpenAI($followUpMessages);
+                $msg = $followUp['choices'][0]['message'] ?? null;
+
+                if (!$msg) break;
+
+                $reply        = $msg['content'] ?? null;
+                $nextToolCalls = $msg['tool_calls'] ?? null;
+
+                // Si Claude respondió texto → terminamos
+                if (!empty($reply)) break;
+
+                // Si NO hay nuevas tool_calls → terminamos (caemos al fallback)
+                if (empty($nextToolCalls)) break;
+
+                // Procesar nuevas tool_calls y agregarlas al thread
+                Log::info('🔄 LLM pidió otra tool — iterando', [
+                    'iter'  => $iter + 1,
+                    'tools' => array_map(fn ($tc) => $tc['function']['name'] ?? '?', $nextToolCalls),
+                ]);
+
+                $nextToolMessages = $this->ejecutarToolCallsBatch(
+                    $nextToolCalls, $conversacion, $connectionId, $from
+                );
+
+                // Push del assistant turn + tools results
+                $followUpMessages[] = [
+                    'role'       => 'assistant',
+                    'content'    => null,
+                    'tool_calls' => $nextToolCalls,
+                ];
+                foreach ($nextToolMessages as $tm) {
+                    $followUpMessages[] = $tm;
+                    $allToolMessages[]  = $tm;
+                }
+            }
+
+            // 🛡️ FALLBACK: si ninguna iteración produjo texto, mostrar
+            // un resumen de la primera tool (no de todas).
             if (empty($reply)) {
                 $reply = $this->respuestaFallbackDeTools($toolMessages);
-                Log::warning('🛡️ LLM falló en post-tool — usando fallback con datos de tool', [
-                    'from' => $from,
-                    'tools' => array_map(fn ($t) => $t['name'] ?? null, $toolMessages),
+                Log::warning('🛡️ LLM falló post-tool tras todas las iteraciones', [
+                    'from'        => $from,
+                    'iteraciones' => $maxIter,
+                    'tools'       => array_map(fn ($t) => $t['name'] ?? null, $allToolMessages),
                 ]);
             }
 
@@ -4154,6 +4195,191 @@ TXT;
           }
       }
       return null;
+  }
+
+  /**
+   * 🔄 Ejecuta un batch de tool_calls del LLM en una iteración del loop.
+   * Reusa la lógica de las tools existentes pero las invoca directamente
+   * según el nombre, sin volver a entrar al pipeline completo del webhook.
+   */
+  private function ejecutarToolCallsBatch(array $toolCalls, $conversacion, $connectionId, string $from): array
+  {
+      $resultados = [];
+      foreach ($toolCalls as $tc) {
+          $name    = $tc['function']['name']      ?? '';
+          $rawArgs = $tc['function']['arguments'] ?? '{}';
+          $args    = json_decode($rawArgs, true) ?: [];
+          $tcId    = $tc['id'] ?? ('call_' . uniqid());
+
+          $resultado = $this->ejecutarToolPorNombre($name, $args, $conversacion, $connectionId, $from);
+
+          $resultados[] = [
+              'role'         => 'tool',
+              'tool_call_id' => $tcId,
+              'name'         => $name,
+              'content'      => json_encode($resultado, JSON_UNESCAPED_UNICODE),
+          ];
+
+          try {
+              \App\Models\AgenteToolInvocacion::create([
+                  'tenant_id'        => $conversacion->tenant_id ?? null,
+                  'conversacion_id'  => $conversacion->id ?? null,
+                  'tool_name'        => $name,
+                  'connection_id'    => (string) ($connectionId ?? ''),
+                  'telefono_cliente' => $from ?? null,
+                  'args'             => $args,
+                  'resultado'        => $this->resumirResultadoTool($name, $resultado),
+                  'count_resultados' => (int) ($resultado['encontrados']
+                      ?? $resultado['total_categorias']
+                      ?? (isset($resultado['productos']) ? count($resultado['productos']) : 0)
+                      ?? 0),
+                  'exitoso'          => true,
+                  'latencia_ms'      => 0,
+              ]);
+          } catch (\Throwable $e) {
+              // ignore
+          }
+      }
+      return $resultados;
+  }
+
+  /**
+   * Ejecuta una tool por nombre y devuelve el resultado.
+   * Conoce todas las tools del bot principal.
+   */
+  private function ejecutarToolPorNombre(string $name, array $args, $conversacion, $connectionId, string $from): array
+  {
+      try {
+          $sedeId = $this->obtenerSedeIdDesdeConexion($connectionId);
+
+          return match ($name) {
+              'buscar_productos' => app(\App\Services\BotCatalogoToolService::class)
+                  ->buscarProductos(
+                      (string) ($args['query'] ?? ''),
+                      $args['categoria'] ?? null,
+                      (int) ($args['limite'] ?? 5),
+                      $sedeId
+                  ),
+
+              'productos_de_categoria' => app(\App\Services\BotCatalogoToolService::class)
+                  ->productosDeCategoria(
+                      (string) ($args['categoria'] ?? ''),
+                      (int) ($args['limite'] ?? 20),
+                      $sedeId
+                  ),
+
+              'listar_categorias' => app(\App\Services\BotCatalogoToolService::class)
+                  ->listarCategorias(),
+
+              'info_producto' => app(\App\Services\BotCatalogoToolService::class)
+                  ->infoProducto((string) ($args['producto'] ?? ''), $sedeId),
+
+              'productos_destacados' => app(\App\Services\BotCatalogoToolService::class)
+                  ->productosDestacados((int) ($args['limite'] ?? 5), $sedeId),
+
+              'consultar_horarios' => $this->resultadoHorarios(),
+
+              'consultar_zonas_cobertura' => $this->resultadoZonas(),
+
+              'consultar_promociones' => $this->resultadoPromociones(),
+
+              'validar_cobertura' => $this->validarCoberturaDireccion(
+                  (string) ($args['direccion'] ?? ''),
+                  $args['barrio'] ?? null,
+                  $args['ciudad'] ?? 'Bello',
+                  $sedeId,
+                  $from
+              ),
+
+              'verificar_cliente_erp' => $this->resultadoVerificarClienteErp(
+                  (string) ($args['cedula'] ?? ''),
+                  (string) ($args['telefono'] ?? $from)
+              ),
+
+              default => ['error' => "Tool '{$name}' no implementada en loop"],
+          };
+      } catch (\Throwable $e) {
+          Log::warning("Tool {$name} excepción en loop: " . $e->getMessage());
+          return ['error' => $e->getMessage()];
+      }
+  }
+
+  private function resultadoHorarios(): array
+  {
+      $sedes = \App\Models\Sede::where('activa', true)->get();
+      return [
+          'sedes' => $sedes->map(fn ($s) => [
+              'nombre'   => $s->nombre,
+              'abierta'  => $s->estaAbierta(),
+              'proxima'  => $s->proximaApertura(),
+              'horarios' => $s->horarios ?? null,
+          ])->all(),
+      ];
+  }
+
+  private function resultadoZonas(): array
+  {
+      $zonas = \App\Models\ZonaCobertura::where('activa', true)->get();
+      return [
+          'zonas' => $zonas->map(fn ($z) => [
+              'nombre'        => $z->nombre,
+              'descripcion'   => $z->descripcion ?? null,
+              'costo_envio'   => (float) $z->costo_envio,
+              'pedido_minimo' => (float) $z->pedido_minimo,
+              'tiempo'        => $z->tiempo_entrega_estimado ?? null,
+          ])->all(),
+      ];
+  }
+
+  private function resultadoPromociones(): array
+  {
+      $promos = \App\Models\Promocion::where('activa', true)
+          ->where('fecha_inicio', '<=', now())
+          ->where('fecha_fin', '>=', now())
+          ->get();
+      return [
+          'total' => $promos->count(),
+          'promociones' => $promos->map(fn ($p) => [
+              'nombre'      => $p->nombre,
+              'descripcion' => $p->descripcion,
+              'tipo'        => $p->tipo,
+              'valor'       => (float) $p->valor,
+              'codigo'      => $p->codigo_cupon,
+          ])->all(),
+      ];
+  }
+
+  private function resultadoVerificarClienteErp(string $cedula, string $telefono): array
+  {
+      $tenantId = app(\App\Services\TenantManager::class)->id();
+      $integ = \App\Models\Integracion::where('tenant_id', $tenantId)
+          ->where('activo', true)
+          ->where('exporta_pedidos', true)
+          ->get()
+          ->first(fn ($i) => $i->config['cliente_lookup']['activo'] ?? false);
+
+      if (!$integ || !$cedula) {
+          return ['existe' => false, 'mensaje' => 'Lookup no disponible'];
+      }
+
+      $clienteErp = app(\App\Services\ClienteErpService::class)->buscar($integ, $cedula, $telefono);
+      if ($clienteErp) {
+          return [
+              'existe' => true,
+              'datos'  => [
+                  'cedula'    => $cedula,
+                  'nombre'    => $clienteErp['StrNombre']    ?? null,
+                  'telefono'  => $clienteErp['StrCelular']   ?? null,
+                  'direccion' => $clienteErp['StrDireccion'] ?? null,
+              ],
+          ];
+      }
+
+      $req = $integ->config['cliente_lookup']['campos_requeridos'] ?? [];
+      return [
+          'existe' => false,
+          'campos_faltantes' => array_values(array_diff($req, ['cedula','telefono'])),
+      ];
   }
 
   /**
