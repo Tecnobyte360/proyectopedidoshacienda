@@ -31,6 +31,26 @@ class EstadoPedidoService
             ]
         );
 
+        // 🔄 AUTO-RESET POST-PEDIDO:
+        // Si el cliente tiene paso=confirmado (de un pedido anterior ya cerrado)
+        // y vuelve a escribir, reseteamos el estado para que arranque un flujo
+        // limpio (preservando identidad: cédula, nombre, email).
+        // Si NO hicieras esto, el cliente queda atrapado en paso=confirmado y
+        // el bot se confunde al recibir nuevos mensajes.
+        if ($estado->paso_actual === ConversacionPedidoEstado::PASO_CONFIRMADO
+            && $estado->confirmado_at
+            && $estado->confirmado_at->diffInMinutes(now()) > 1) {
+
+            Log::info('🔄 Auto-reset post-pedido: cliente vuelve tras pedido cerrado', [
+                'conv_id'        => $conv->id,
+                'pedido_anterior'=> $estado->pedido_id,
+                'confirmado_at'  => $estado->confirmado_at?->toDateTimeString(),
+            ]);
+            // Reset preservando identidad
+            $this->resetear($conv, "nuevo_pedido_tras_pedido_{$estado->pedido_id}");
+            $estado = $estado->fresh() ?: $estado;
+        }
+
         // 🛡️ HIDRATACIÓN CONDICIONAL desde el cliente local del NÚMERO.
         // CASO ESPECIAL: el titular del número WhatsApp puede estar haciendo
         // un pedido para OTRO cliente (ej. operador del negocio que envía
