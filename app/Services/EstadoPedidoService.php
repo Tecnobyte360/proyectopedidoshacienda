@@ -459,17 +459,24 @@ class EstadoPedidoService
         //      "cra 58bb #40c-34", "calle 50 #47-80", "carrera 80a #45-12",
         //      "diagonal 67 # 32-15", "cl 79 sur #52-84", "trv 40 #30-20"
         if (empty($estado->direccion)) {
-            // 🛡️ Regex flexible para direcciones colombianas. Acepta:
+            // 🛡️ DETECCIÓN ULTRA-PERMISIVA de direcciones colombianas.
+            // Cualquier mensaje con una palabra clave de VÍA + al menos UN
+            // número se trata como dirección. Captura desde la palabra
+            // clave hasta el final del mensaje o delimitador fuerte.
+            //
+            // Acepta TODOS estos formatos (y muchos más):
             //   "Calle 50 #63B-48"
-            //   "Cra 50 #45 23" (con espacio)
-            //   "Calle 41 #59bb 35"
+            //   "Cra 50 #45 23"
+            //   "Calle 41 #59bb 35, Apto 1214"
             //   "Diagonal 30 sur 15-20"
-            // Separador entre el segundo y tercer número puede ser - / o espacio.
-            $patronDir = '/\b(?:cra\.?|carrera|cl\.?|calle|cll|dg\.?|diagonal|diag|trv\.?|transversal|av\.?|avenida|cr|kr)\s*\d+[a-z]{0,3}\s*(?:sur|norte|este|oeste|n|s|e|o)?\s*#?\s*\d+[a-z]{0,3}\s*[-\s\/]\s*\d+[a-z]?/iu';
-            if (preg_match($patronDir, $msg, $mDir)) {
-                // Capturar la dirección con un poco de contexto extra (números siguientes)
-                $estado->direccion = trim($mDir[0]);
-                // Si menciona "envíame a X" o "para X", inferir despacho
+            //   "Cra 50 con calle 100"
+            //   "Vivo en la 50 #45-23"
+            //   "Mi dirección es calle 80 número 45, apartamento 502"
+            //   "Llevame a la cra 50 numero 23"
+            //   "Calle 50"  (solo vía + número)
+            $direccionCapturada = $this->detectarDireccionEnMensaje($msg);
+            if ($direccionCapturada) {
+                $estado->direccion = $direccionCapturada;
                 if (empty($estado->metodo_entrega)) {
                     $estado->metodo_entrega = ConversacionPedidoEstado::METODO_DOMICILIO;
                 }
@@ -545,6 +552,45 @@ class EstadoPedidoService
             $estado->save();
             $this->avanzarPaso($estado);
         }
+    }
+
+    /**
+     * 🛡️ Detector ULTRA-PERMISIVO de direcciones colombianas.
+     *
+     * Estrategia en 2 niveles:
+     *   1. Busca palabras clave de vía (calle, carrera, cra, av, etc.)
+     *      + al menos un número en el mensaje.
+     *   2. Si encuentra → captura desde la palabra clave hasta el final
+     *      del mensaje o un delimitador fuerte (salto de línea, "."
+     *      seguido de mayúscula).
+     *
+     * Acepta CASI cualquier formato razonable.
+     */
+    private function detectarDireccionEnMensaje(string $msg): ?string
+    {
+        // Palabras clave de vía colombianas (con/sin punto, abreviadas o no)
+        $palabrasVia = '(?:cra\.?|carrera|cl\.?|calle|cll|dg\.?|diagonal|diag|trv\.?|transversal|av\.?|avenida|cr|kr|circular|autopista|via|tv)';
+
+        // Patrón principal: palabra de vía + cualquier cosa con al menos un número
+        // hasta el final del mensaje o delimitador fuerte
+        $patron = '/\b' . $palabrasVia . '\s*\.?\s*\d[\w\s#\-\/\.,°áéíóúñ]*/iu';
+        if (preg_match($patron, $msg, $m)) {
+            $dir = trim($m[0]);
+            // Limpiar trailing common: comas, puntos sueltos al final
+            $dir = preg_replace('/[\s,.;]+$/u', '', $dir);
+            // Validar longitud mínima razonable
+            if (mb_strlen($dir) >= 6) {
+                return $dir;
+            }
+        }
+
+        // Fallback: si el mensaje es claramente solo dirección sin palabra de vía
+        // (ej. "#45-23, Belén") + al menos 2 números separados
+        if (preg_match('/^#?\s*\d+[a-z]?\s*[-#\s\/]\s*\d+/iu', trim($msg), $m)) {
+            return trim($msg);
+        }
+
+        return null;
     }
 
     /**
