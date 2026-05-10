@@ -158,10 +158,33 @@ class ValidadorRespuestaLLM
 
             $precioReal = $productoMatch['precio'];
 
+            // 🛡️ Detectar UNIDAD mencionada en la línea para ajustar precio esperado.
+            // El precio_base del catálogo es por KG. Si el LLM dice "X libras" o
+            // "Y gramos", el precio total escala según esa fracción.
+            $factorCantidad = $this->detectarFactorCantidadUnidad($lineaN);
+
             foreach ($mPrecios[1] as $precioStr) {
                 $precio = (float) preg_replace('/[^\d]/', '', str_replace(',', '', $precioStr));
                 if ($precio <= 0) continue;
 
+                // Si la línea tiene cantidad+unidad, comparar contra el precio escalado
+                if ($factorCantidad !== null) {
+                    $precioEsperado = $precioReal * $factorCantidad;
+                    $diff = abs($precio - $precioEsperado) / max($precioEsperado, 1);
+                    if ($diff > 0.30) { // tolerancia 30% por unidad fraccionaria
+                        $alertas[] = [
+                            'producto' => $productoMatch['nombre'],
+                            'precio_real_kg' => $precioReal,
+                            'factor_cantidad' => $factorCantidad,
+                            'precio_esperado' => $precioEsperado,
+                            'precio_mencionado' => $precio,
+                            'linea' => mb_substr(trim($linea), 0, 100),
+                        ];
+                    }
+                    continue;
+                }
+
+                // Sin cantidad/unidad explícita: comparar contra precio base por kg
                 // Tolerancia ±25%: precios pueden variar por descuentos/sede
                 $diff = abs($precio - $precioReal) / $precioReal;
                 if ($diff > 0.25) {
@@ -176,6 +199,42 @@ class ValidadorRespuestaLLM
         }
 
         return $alertas;
+    }
+
+    /**
+     * Detecta si la línea menciona "N kg/libras/gramos" y devuelve el factor
+     * de conversión vs precio_base (por kg). NULL si no hay cantidad detectable.
+     *
+     * Ej: "1 libra" → 0.5  (1 libra = 0.5 kg)
+     *     "2 kg"    → 2.0
+     *     "500 gramos" → 0.5
+     */
+    private function detectarFactorCantidadUnidad(string $lineaN): ?float
+    {
+        // Buscar pattern "N unidad" donde N es número y unidad es kg/lb/gr/...
+        if (!preg_match('/(\d+(?:[.,]\d+)?)\s*(libras?|libritas?|lb|kilos?|kilitos?|kg|gramos?|gr|onzas?|oz|unidades?|unds?|paquetes?)/iu', $lineaN, $m)) {
+            return null;
+        }
+        $cantidad = (float) str_replace(',', '.', $m[1]);
+        $unidad = mb_strtolower($m[2]);
+
+        // Conversiones a kg
+        return match (true) {
+            str_starts_with($unidad, 'libra')  => $cantidad * 0.5,    // libra ≈ 0.5 kg en Colombia
+            str_starts_with($unidad, 'librit') => $cantidad * 0.5,
+            $unidad === 'lb'                   => $cantidad * 0.5,
+            str_starts_with($unidad, 'kilo')   => $cantidad,
+            $unidad === 'kg'                   => $cantidad,
+            str_starts_with($unidad, 'gramo')  => $cantidad / 1000,
+            $unidad === 'gr'                   => $cantidad / 1000,
+            str_starts_with($unidad, 'onza')   => $cantidad * 0.0283,  // onza = 28.3g
+            $unidad === 'oz'                   => $cantidad * 0.0283,
+            // Para unidades/paquetes: precio fijo por unidad, factor = cantidad
+            str_starts_with($unidad, 'unidad'),
+            str_starts_with($unidad, 'paquete'),
+            $unidad === 'und', $unidad === 'unds' => $cantidad,
+            default => null,
+        };
     }
 
     /**
