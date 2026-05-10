@@ -905,6 +905,39 @@
                         </div>
                     </div>
 
+                    {{-- 🪶 Anthropic Claude API Key por tenant --}}
+                    <div class="rounded-xl border-2 border-amber-200 bg-amber-50/40 p-4 space-y-3">
+                        <div class="flex items-center gap-2">
+                            <i class="fa-solid fa-feather text-amber-600 text-xl"></i>
+                            <div>
+                                <h4 class="font-bold text-slate-800 text-sm">Anthropic Claude API Key (opcional)</h4>
+                                <p class="text-xs text-slate-500">
+                                    Si el bot de este tenant usa Claude (Anthropic), pega aquí su key.
+                                    Configúralo solo si seleccionaste <strong>Anthropic</strong> en Configuración del Bot.
+                                    Si queda vacío, usa la global (<code class="bg-white px-1 rounded">ANTHROPIC_API_KEY</code> del .env).
+                                </p>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">
+                                sk-ant-api03-... <span class="text-slate-400 font-normal">(https://console.anthropic.com/settings/keys)</span>
+                            </label>
+                            <input type="password"
+                                   wire:model="anthropic_api_key"
+                                   placeholder="sk-ant-api03-... (déjalo vacío para usar la key global)"
+                                   class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-mono focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
+                                   autocomplete="off">
+                            @error('anthropic_api_key')
+                                <p class="text-xs text-rose-600 mt-1">{{ $message }}</p>
+                            @enderror
+                            <p class="text-[11px] text-slate-500 mt-2 flex items-center gap-1">
+                                <i class="fa-solid fa-shield-halved text-slate-400"></i>
+                                La key se guarda cifrada en BD. El costo de tokens se factura a la cuenta Anthropic dueña de la key.
+                            </p>
+                        </div>
+                    </div>
+
                     {{-- 📱 WhatsApp del tenant: cada tenant tiene su PROPIA cuenta
                          TecnoByteApp + sus connection_ids. El sistema usa estas
                          credenciales para autenticarse y enviar/recibir mensajes

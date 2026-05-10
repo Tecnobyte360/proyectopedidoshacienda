@@ -64,6 +64,7 @@ class Index extends Component
     public ?string $favicon_data_url   = null;
     public ?string $favicon_nombre     = null;
     public string $openai_api_key      = '';    // Key propia del tenant (opcional — si vacía usa global)
+    public string $anthropic_api_key   = '';    // Key Anthropic Claude propia del tenant (opcional)
     public ?string $trial_ends_at        = null;
     public ?string $subscription_ends_at = null;
     public string $notas_internas      = '';
@@ -134,6 +135,7 @@ class Index extends Component
             'logo_data_url'       => 'nullable|string',
             'logo_nombre'         => 'nullable|string|max:150',
             'openai_api_key'      => 'nullable|string|max:255',
+            'anthropic_api_key'   => 'nullable|string|max:255',
             'trial_ends_at'       => 'nullable|date',
             'subscription_ends_at' => 'nullable|date',
             'notas_internas'      => 'nullable|string|max:2000',
@@ -214,6 +216,7 @@ class Index extends Component
         $this->favicon_url_actual   = $t->favicon_url ?? null;
         $this->favicon_data_url     = null;
         $this->openai_api_key       = (string) ($t->openai_api_key ?? '');
+        $this->anthropic_api_key    = (string) ($t->anthropic_api_key ?? '');
         $this->trial_ends_at        = $t->trial_ends_at?->format('Y-m-d');
         $this->subscription_ends_at = $t->subscription_ends_at?->format('Y-m-d');
         $this->notas_internas       = (string) $t->notas_internas;
@@ -888,6 +891,7 @@ class Index extends Component
         $this->favicon_data_url     = null;
         $this->favicon_nombre       = null;
         $this->openai_api_key       = '';
+        $this->anthropic_api_key    = '';
         $this->trial_ends_at        = null;
         $this->subscription_ends_at = null;
         $this->notas_internas       = '';
