@@ -403,32 +403,21 @@ class EstadoPedidoService
             }
         }
 
-        // 4.5. PRODUCTOS — captura tentativa cuando cliente dice "N libras de X"
-        //      Si el bot luego corrige el nombre via buscar_productos, ese resultado
-        //      sobreescribe. Mejor tener algo en estado que nada.
+        // 4.5. PRODUCTOS — captura robusta + validación contra catálogo
+        // Patrones soportados (todos validados contra catálogo del tenant):
+        //   "2 kilos de trucha"           → cantidad + unidad + producto
+        //   "trucha 2 kilos"              → producto + cantidad + unidad
+        //   "1 kilo de pollo y 2 kg cerdo" → multi-producto con "y"
+        //   "kilo de salmón"              → cantidad implícita = 1
         if (empty($estado->productos)) {
-            $patronProd = '/\b(\d+)\s*(libras?|kilos?|kg|gramos?|gr|unidades?|porciones?|libritas?|kilitos?|cajas?|paquetes?|bolsas?|gallinas?)\s*(?:de\s+)?(.+?)(?=[,.;]|\s*$)/iu';
-            if (preg_match($patronProd, $msg, $mProd)) {
-                $cantidad = (int) $mProd[1];
-                $unidad   = mb_strtolower(rtrim($mProd[2], 's')); // singular
-                $nombre   = trim($mProd[3]);
-
-                // Limpiar nombre de palabras finales tipo "y de eso" / "por favor" / etc
-                $nombre = preg_replace('/\s+(por\s+favor|gracias|listo|dale)\s*$/iu', '', $nombre);
-                $nombre = trim($nombre);
-
-                if (!empty($nombre) && mb_strlen($nombre) >= 3) {
-                    $estado->productos = [[
-                        'name'     => mb_convert_case($nombre, MB_CASE_TITLE, 'UTF-8'),
-                        'quantity' => $cantidad,
-                        'unit'     => $unidad,
-                    ]];
-                    $cambio = true;
-                    Log::info('🔍 Producto capturado del mensaje', [
-                        'conv_id'  => $conv->id,
-                        'producto' => $estado->productos[0],
-                    ]);
-                }
+            $productosCapturados = $this->extraerProductosDelMensaje($msg);
+            if (!empty($productosCapturados)) {
+                $estado->productos = $productosCapturados;
+                $cambio = true;
+                Log::info('🔍 Productos capturados del mensaje', [
+                    'conv_id'   => $conv->id,
+                    'productos' => $productosCapturados,
+                ]);
             }
         }
 
@@ -459,6 +448,134 @@ class EstadoPedidoService
             $estado->save();
             $this->avanzarPaso($estado);
         }
+    }
+
+    /**
+     * 🛡️ Extrae lista de productos del mensaje del cliente, validando contra
+     * el catálogo activo del tenant. Solo retorna productos que existen.
+     *
+     * Cada producto: ['name' => str, 'quantity' => float, 'unit' => str, 'code' => str]
+     */
+    private function extraerProductosDelMensaje(string $msg): array
+    {
+        $productos = [];
+        $msgN = mb_strtolower(\Illuminate\Support\Str::ascii(trim($msg)));
+        if ($msgN === '') return [];
+
+        // Cargar catálogo (tokens de nombres reales) para validar matches
+        try {
+            $catalogo = app(\App\Services\BotCatalogoService::class)->productosActivos();
+        } catch (\Throwable $e) {
+            $catalogo = collect();
+        }
+        if ($catalogo->isEmpty()) return [];
+
+        // Mapa nombre normalizado → producto (con tokens significativos)
+        $catalogoTokens = [];
+        foreach ($catalogo as $p) {
+            $nombreNorm = mb_strtolower(\Illuminate\Support\Str::ascii((string) $p->nombre));
+            $tokens = collect(preg_split('/\s+/', $nombreNorm))
+                ->filter(fn ($t) => mb_strlen($t) >= 4)
+                ->values()->all();
+            if (!empty($tokens)) {
+                $catalogoTokens[] = [
+                    'producto'  => $p,
+                    'tokens'    => $tokens,
+                    'nombre'    => $nombreNorm,
+                    'codigo'    => (string) ($p->codigo ?? ''),
+                    'unidad'    => (string) ($p->unidad ?? 'Und'),
+                ];
+            }
+        }
+
+        // Patrón base: cantidad + unidad + (de )? + nombre
+        // Ej: "2 kilos de trucha", "1 libra pierna", "kilo de pollo"
+        $patronCantidad = '/(?:^|[^\d])(\d+(?:[.,]\d+)?)\s*(libras?|libritas?|lb|kilos?|kg|kilitos?|gramos?|gr|unidades?|und?s?|porciones?|cajas?|paquetes?|pack|bolsas?)\s*(?:de\s+)?([a-záéíóúñ\s]+?)(?=\s+(?:y|,|\.|$)|\s+\d|$)/iu';
+        $patronCantidadImplicita = '/(?:^|\s)(libra|kilo|kilito|kg|lb)\s+(?:de\s+)?([a-záéíóúñ\s]+?)(?=\s+(?:y|,|\.|$)|$)/iu';
+
+        if (preg_match_all($patronCantidad, $msgN, $matches, PREG_SET_ORDER)) {
+            foreach ($matches as $m) {
+                $cantidad = (float) str_replace(',', '.', $m[1]);
+                $unidadRaw = mb_strtolower(rtrim($m[2], 's'));
+                $nombreCandidato = trim($m[3]);
+                $producto = $this->matchProductoEnCatalogo($nombreCandidato, $catalogoTokens);
+                if ($producto) {
+                    $productos[] = [
+                        'code'     => $producto['codigo'],
+                        'name'     => (string) $producto['producto']->nombre,
+                        'quantity' => $cantidad,
+                        'unit'     => $producto['unidad'],
+                    ];
+                }
+            }
+        }
+
+        // Si no hubo cantidad explícita, intentar cantidad implícita = 1
+        if (empty($productos) && preg_match_all($patronCantidadImplicita, $msgN, $m2, PREG_SET_ORDER)) {
+            foreach ($m2 as $m) {
+                $nombreCandidato = trim($m[2]);
+                $producto = $this->matchProductoEnCatalogo($nombreCandidato, $catalogoTokens);
+                if ($producto) {
+                    $productos[] = [
+                        'code'     => $producto['codigo'],
+                        'name'     => (string) $producto['producto']->nombre,
+                        'quantity' => 1.0,
+                        'unit'     => $producto['unidad'],
+                    ];
+                }
+            }
+        }
+
+        // Deduplicar por código
+        $unique = [];
+        foreach ($productos as $p) {
+            $unique[$p['code'] ?: $p['name']] = $p;
+        }
+        return array_values($unique);
+    }
+
+    /**
+     * Encuentra el producto del catálogo que mejor matchea el nombre dado.
+     * Requiere al menos un token compartido (>=4 chars).
+     */
+    private function matchProductoEnCatalogo(string $nombreCandidato, array $catalogoTokens): ?array
+    {
+        $cn = mb_strtolower(\Illuminate\Support\Str::ascii(trim($nombreCandidato)));
+        if (mb_strlen($cn) < 3) return null;
+
+        $tokensCandidato = collect(preg_split('/\s+/', $cn))
+            ->filter(fn ($t) => mb_strlen($t) >= 4)
+            ->values()->all();
+        if (empty($tokensCandidato)) {
+            // Si el candidato no tiene tokens largos, probar con tokens >= 3 (ej "res")
+            $tokensCandidato = collect(preg_split('/\s+/', $cn))
+                ->filter(fn ($t) => mb_strlen($t) >= 3)
+                ->values()->all();
+        }
+        if (empty($tokensCandidato)) return null;
+
+        $mejor = null;
+        $mejorScore = 0;
+
+        foreach ($catalogoTokens as $entry) {
+            // Match exacto del nombre
+            if ($entry['nombre'] === $cn) return $entry;
+
+            // Score: tokens compartidos
+            $score = 0;
+            foreach ($tokensCandidato as $tc) {
+                foreach ($entry['tokens'] as $te) {
+                    if ($tc === $te) { $score += 10; continue 2; }
+                    if (str_contains($te, $tc) || str_contains($tc, $te)) { $score += 5; continue 2; }
+                }
+            }
+            if ($score > $mejorScore) {
+                $mejorScore = $score;
+                $mejor = $entry;
+            }
+        }
+
+        return $mejorScore >= 5 ? $mejor : null;
     }
 
     /**

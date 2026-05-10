@@ -821,6 +821,45 @@ class WhatsappWebhookController extends Controller
             Log::warning('⚠️ EARLY GUARD horario falló (siguiendo flujo normal): ' . $e->getMessage());
         }
 
+        // ════════════════════════════════════════════════════════════════════
+        // 🤖 ROUTER DETERMINISTA — decide acción sin LLM cuando es posible
+        // ════════════════════════════════════════════════════════════════════
+        try {
+            $primerNombreRouter = explode(' ', trim($nombreParaPrompt))[0] ?? '';
+            if (str_contains($primerNombreRouter, '@')) $primerNombreRouter = '';
+
+            $decision = app(\App\Services\Bots\RouterDeterminista::class)
+                ->decidir($conversacion, $message, $primerNombreRouter);
+
+            if ($decision['accion'] === 'reply') {
+                $reply = $decision['reply'];
+                $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_ASSISTANT, $reply);
+                return $reply;
+            }
+
+            if ($decision['accion'] === 'cerrar_pedido') {
+                Log::info('🤖 Router: invocando guardarPedidoDesdeToolCall directo', [
+                    'from'  => $from,
+                    'razon' => $decision['razon'] ?? 'estado_completo',
+                ]);
+                $cacheKeyEstado = "whatsapp_chat_t{$tenantId}_{$from}";
+                return $this->guardarPedidoDesdeToolCall(
+                    $decision['orderData'],
+                    $from,
+                    $nombreParaPrompt,
+                    $conversationHistory,
+                    $cacheKeyEstado,
+                    $connectionId,
+                    $conversacion,
+                    $convService
+                );
+            }
+
+            // 'llm' → cae al flujo normal
+        } catch (\Throwable $e) {
+            Log::warning('⚠️ Router determinista falló (siguiendo a LLM): ' . $e->getMessage());
+        }
+
         $systemPrompt = $this->getSystemPrompt($pedidosInfo, $this->infoEmpresa(), $nombreParaPrompt, $ansInfo, $sedeId);
 
         // ── NOTA DE RECHAZO RECIENTE DE COBERTURA ────────────────────────
