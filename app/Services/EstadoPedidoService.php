@@ -537,10 +537,13 @@ class EstadoPedidoService
     /**
      * Encuentra el producto del catálogo que mejor matchea el nombre dado.
      *
-     * 🛡️ ESTRICTO: NO hace matches espurios cuando el cliente da términos
-     * genéricos. Si el candidato es solo "res", "cerdo", "pollo" (token de
-     * categoría general), retorna null — porque hay decenas de productos
-     * que contienen esa palabra. Mejor que el bot pida específico.
+     * 🛡️ ESTRICTO + ANTI-AMBIGÜEDAD:
+     *   1. Si hay match EXACTO de nombre normalizado → ese producto.
+     *   2. Si hay UN ÚNICO producto donde TODOS los tokens del cliente
+     *      coinciden Y el producto NO tiene tokens "extras" inventados
+     *      (cliente "tilapia" matchea "TILAPIA" pero NO "FILETE TILAPIA")
+     *      → ese producto.
+     *   3. Si hay ambigüedad (>1 candidato) → null. El LLM se encarga.
      */
     private function matchProductoEnCatalogo(string $nombreCandidato, array $catalogoTokens): ?array
     {
@@ -549,43 +552,65 @@ class EstadoPedidoService
 
         // 🛡️ Términos demasiado genéricos: si el cliente dice solo
         // "res", "cerdo", "pollo", "pescado" (categorías), NO matchear.
-        $genericos = ['res', 'cerdo', 'pollo', 'pescado', 'carne'];
+        $genericos = ['res', 'cerdo', 'pollo', 'pescado', 'carne', 'pez'];
         if (in_array($cn, $genericos, true)) return null;
 
-        // Tokens significativos del candidato (≥4 chars)
-        $tokensCandidato = collect(preg_split('/\s+/', $cn))
+        // Tokens significativos del cliente (≥4 chars)
+        $tokensCliente = collect(preg_split('/\s+/', $cn))
             ->filter(fn ($t) => mb_strlen($t) >= 4)
             ->values()->all();
-        if (empty($tokensCandidato)) return null;
+        if (empty($tokensCliente)) return null;
 
-        $mejor = null;
-        $mejorScore = 0;
-
+        // 1) Match exacto de nombre completo
         foreach ($catalogoTokens as $entry) {
-            // Match exacto del nombre
             if ($entry['nombre'] === $cn) return $entry;
-
-            // Score: cuenta tokens del candidato que existen en el producto
-            $matches = 0;
-            foreach ($tokensCandidato as $tc) {
-                foreach ($entry['tokens'] as $te) {
-                    if ($tc === $te) { $matches++; continue 2; }
-                    if (mb_strlen($tc) >= 5 && (str_contains($te, $tc) || str_contains($tc, $te))) {
-                        $matches += 0.5;
-                        continue 2;
-                    }
-                }
-            }
-
-            // 🛡️ Score >= 1: requerimos al menos UN token completo coincidente
-            if ($matches >= 1 && $matches > $mejorScore) {
-                $mejorScore = $matches;
-                $mejor = $entry;
-            }
         }
 
-        // 🛡️ Solo aceptar si el match es alto (no parcial)
-        return $mejorScore >= 1 ? $mejor : null;
+        // 2) Buscar candidatos donde TODOS los tokens del cliente aparezcan
+        $candidatos = [];
+        foreach ($catalogoTokens as $entry) {
+            $todosCoinciden = true;
+            foreach ($tokensCliente as $tc) {
+                $coincide = false;
+                foreach ($entry['tokens'] as $te) {
+                    if ($tc === $te) { $coincide = true; break; }
+                    if (mb_strlen($tc) >= 5 && (str_contains($te, $tc) || str_contains($tc, $te))) {
+                        $coincide = true;
+                        break;
+                    }
+                }
+                if (!$coincide) { $todosCoinciden = false; break; }
+            }
+            if ($todosCoinciden) $candidatos[] = $entry;
+        }
+
+        if (empty($candidatos)) return null;
+
+        // 3) De los candidatos, preferir el que tenga el MISMO número de
+        // tokens significativos (mismo nivel de especificidad).
+        $tokensClienteCount = count($tokensCliente);
+        $coincidenciasExactas = array_filter(
+            $candidatos,
+            fn ($e) => count($e['tokens']) === $tokensClienteCount
+        );
+
+        // Si hay UN solo match con misma especificidad → ese
+        if (count($coincidenciasExactas) === 1) {
+            return array_values($coincidenciasExactas)[0];
+        }
+
+        // 4) Si hay AMBIGÜEDAD (varios candidatos) → no auto-asignar.
+        //    El LLM debe llamar buscar_productos y mostrar opciones al cliente.
+        if (count($candidatos) > 1) {
+            \Illuminate\Support\Facades\Log::info('🛡️ Captador: ambigüedad detectada — pasando al LLM', [
+                'cliente_dijo'  => $nombreCandidato,
+                'candidatos'    => array_map(fn ($e) => $e['producto']->nombre ?? '?', $candidatos),
+            ]);
+            return null;
+        }
+
+        // 5) Si solo hay UN candidato (con todos los tokens del cliente) → ese
+        return $candidatos[0];
     }
 
     /**
