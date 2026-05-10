@@ -30,7 +30,7 @@ class RouterDeterminista
      *   ['accion' => 'cerrar_pedido', 'orderData' => …] → invocar guardarPedidoDesdeToolCall
      *   ['accion' => 'llm']                              → dejar pasar al LLM
      */
-    public function decidir(ConversacionWhatsapp $conv, string $mensaje, string $primerNombre = ''): array
+    public function decidir(ConversacionWhatsapp $conv, string $mensaje, string $primerNombre = '', ?int $connectionId = null): array
     {
         $estado = app(EstadoPedidoService::class)->obtener($conv);
 
@@ -40,6 +40,25 @@ class RouterDeterminista
             $estado->refresh();
         } catch (\Throwable $e) {
             Log::warning('Router: captador falló: ' . $e->getMessage());
+        }
+
+        // 🗺️ AGENTE DE COBERTURA: si tenemos dirección de despacho y la
+        // cobertura no se ha validado, ejecutar validación AHORA (sin LLM).
+        if (!empty($estado->direccion)
+            && $estado->metodo_entrega === \App\Models\ConversacionPedidoEstado::METODO_DOMICILIO
+            && !$estado->cobertura_validada) {
+            try {
+                $cob = app(\App\Services\Bots\AgenteCoberturaService::class)
+                    ->evaluar($conv, $connectionId);
+
+                if ($cob['accion'] === 'fuera_de_cobertura' && !empty($cob['reply'])) {
+                    return ['accion' => 'reply', 'reply' => $cob['reply']];
+                }
+                // Si quedó cubierta o no aplica → continúa flujo (refresh estado)
+                $estado = $estado->fresh() ?: $estado;
+            } catch (\Throwable $e) {
+                Log::warning('Router: agente cobertura falló: ' . $e->getMessage());
+            }
         }
 
         $msgN = mb_strtolower(Str::ascii(trim($mensaje)));

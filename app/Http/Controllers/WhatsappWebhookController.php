@@ -894,7 +894,7 @@ class WhatsappWebhookController extends Controller
             if (str_contains($primerNombreRouter, '@')) $primerNombreRouter = '';
 
             $decision = app(\App\Services\Bots\RouterDeterminista::class)
-                ->decidir($conversacion, $message, $primerNombreRouter);
+                ->decidir($conversacion, $message, $primerNombreRouter, $connectionId ? (int) $connectionId : null);
 
             if ($decision['accion'] === 'reply') {
                 $reply = $decision['reply'];
