@@ -122,7 +122,9 @@ class ValidadorRespuestaLLM
         }
         if ($catalogo->isEmpty()) return [];
 
-        // Mapa nombre normalizado -> producto
+        // Mapa nombre normalizado -> producto. ORDENADO POR LONGITUD DESC
+        // para que matches específicos (ej "MUSLO CAMPESINO") ganen sobre
+        // genéricos (ej "MUSLO").
         $catalogoMap = [];
         foreach ($catalogo as $p) {
             $nombreN = mb_strtolower(Str::ascii((string) $p->nombre));
@@ -132,6 +134,8 @@ class ValidadorRespuestaLLM
                 'precio' => (float) ($p->precio_base ?? 0),
             ];
         }
+        // Ordenar por longitud descendente para preferir matches específicos
+        uksort($catalogoMap, fn ($a, $b) => mb_strlen($b) - mb_strlen($a));
 
         // Procesar cada línea del reply
         $lineas = preg_split('/[\n\r]+/', $reply);
@@ -144,16 +148,19 @@ class ValidadorRespuestaLLM
             $lineaN = mb_strtolower(Str::ascii($linea));
 
             // ¿Qué producto del catálogo aparece en esta línea?
-            //    Buscar match más largo: el nombre completo si está, sino tokens.
+            // 🛡️ Buscar match de PALABRA COMPLETA (con \b) y tomar el
+            // MÁS LARGO. Esto evita que "MUSLO" matchee falsamente cuando
+            // la línea dice "MUSLO CAMPESINO" (que es otro producto).
             $productoMatch = null;
             foreach ($catalogoMap as $nombreN => $info) {
-                // Match exacto del nombre del producto en la línea
-                if (str_contains($lineaN, $nombreN)) {
+                // Pattern de palabra completa, escapando caracteres especiales
+                $pattern = '/(?<![a-z0-9])' . preg_quote($nombreN, '/') . '(?![a-z0-9])/u';
+                if (preg_match($pattern, $lineaN)) {
                     $productoMatch = $info;
-                    break;
+                    break; // ya está ordenado por longitud DESC, el primero es el más específico
                 }
             }
-            // Si no encontramos nombre completo, NO disparar — evita falsos positivos
+            // Si no encontramos match de palabra completa, NO disparar
             if (!$productoMatch || $productoMatch['precio'] <= 0) continue;
 
             $precioReal = $productoMatch['precio'];
