@@ -25,6 +25,18 @@
                     <p class="text-xs text-white/80">Atiende clientes en tiempo real</p>
                 </div>
                 <div class="flex items-center gap-2">
+                    <button wire:click="sincronizarHistorial"
+                            wire:loading.attr="disabled"
+                            wire:target="sincronizarHistorial"
+                            title="Importar historial de WhatsApp del tenant actual"
+                            class="flex-shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-white/20 hover:bg-white/30 backdrop-blur px-3 py-2 text-xs font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed">
+                        <span wire:loading.remove wire:target="sincronizarHistorial">
+                            <i class="fa-solid fa-arrows-rotate"></i> Sincronizar
+                        </span>
+                        <span wire:loading wire:target="sincronizarHistorial" class="inline-flex items-center gap-1.5">
+                            <i class="fa-solid fa-spinner fa-spin"></i> Importando...
+                        </span>
+                    </button>
                     <button wire:click="abrirEstadoModal"
                             title="Publicar estado de WhatsApp"
                             class="flex-shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-white/20 hover:bg-white/30 backdrop-blur px-3 py-2 text-xs font-semibold transition">
@@ -37,6 +49,26 @@
                     </button>
                 </div>
             </div>
+
+            {{-- Resultado de la última sincronización --}}
+            @if (!empty($resultadoSyncHistorial))
+                <div class="mt-2 rounded-lg bg-white/15 backdrop-blur px-3 py-2 text-[11px] flex items-center gap-2">
+                    @if (!empty($resultadoSyncHistorial['error']))
+                        <i class="fa-solid fa-circle-exclamation text-rose-200"></i>
+                        <span class="font-medium">{{ $resultadoSyncHistorial['error'] }}</span>
+                    @else
+                        <i class="fa-solid fa-circle-check text-emerald-200"></i>
+                        <span class="font-medium">
+                            {{ $resultadoSyncHistorial['tickets_procesados'] ?? 0 }} chats ·
+                            {{ $resultadoSyncHistorial['clientes_creados'] ?? 0 }} clientes nuevos ·
+                            {{ $resultadoSyncHistorial['mensajes_imp'] ?? 0 }} mensajes
+                        </span>
+                        <button wire:click="$set('resultadoSyncHistorial', null)" class="ml-auto text-white/60 hover:text-white">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    @endif
+                </div>
+            @endif
         </div>
 
         {{-- Filtros --}}

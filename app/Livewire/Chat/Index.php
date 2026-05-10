@@ -40,6 +40,49 @@ class Index extends Component
     public bool   $cargandoEstados   = false;
     public ?string $estadosError     = null;
 
+    // 🔄 Sincronización de historial de WhatsApp (por tenant)
+    public ?array $resultadoSyncHistorial = null;
+
+    /**
+     * Sincroniza TODO el historial de WhatsApp del tenant actual.
+     * Importa tickets, contactos y mensajes desde la API de TecnoByteApp.
+     * Es seguro: aislado por tenant_id, no toca data de otros tenants.
+     */
+    public function sincronizarHistorial(): void
+    {
+        $tm = app(\App\Services\TenantManager::class);
+        $tenantId = method_exists($tm, 'id') ? $tm->id() : null;
+
+        if (!$tenantId) {
+            $this->dispatch('notify', [
+                'type'    => 'error',
+                'message' => 'No hay tenant activo. Contacta al admin.',
+            ]);
+            return;
+        }
+
+        $this->resultadoSyncHistorial = null;
+
+        try {
+            $stats = app(\App\Services\WhatsappContactosService::class)
+                ->sincronizarHistorialCompleto();
+            $this->resultadoSyncHistorial = $stats;
+
+            $this->dispatch('notify', [
+                'type'    => 'success',
+                'message' => "✓ Historial sincronizado: {$stats['tickets_procesados']} chats, "
+                           . "{$stats['clientes_creados']} clientes nuevos, "
+                           . "{$stats['mensajes_imp']} mensajes importados.",
+            ]);
+        } catch (\Throwable $e) {
+            $this->resultadoSyncHistorial = ['error' => $e->getMessage()];
+            $this->dispatch('notify', [
+                'type'    => 'error',
+                'message' => '❌ Error al sincronizar: ' . $e->getMessage(),
+            ]);
+        }
+    }
+
     public function abrirEstadoModal(): void
     {
         $this->estadoModal       = true;
