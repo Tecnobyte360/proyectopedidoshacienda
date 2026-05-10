@@ -67,12 +67,7 @@ class WidgetChatService
             $systemPrompt .= "\n\n# 🔧 REGLAS ADICIONALES\n\n" . $this->promptService->renderizar($extra, $contexto);
         }
 
-        // Llamar a OpenAI
-        $apiKey = Tenant::resolverOpenaiKey() ?? env('OPENAI_API_KEY');
-        if (!$apiKey) {
-            return 'El servicio de mensajería está temporalmente no disponible. Por favor inténtalo más tarde.';
-        }
-
+        // Llamar al proveedor de IA configurado (OpenAI o Anthropic)
         $messages = array_merge(
             [['role' => 'system', 'content' => $systemPrompt]],
             $historial,
@@ -80,24 +75,24 @@ class WidgetChatService
         );
 
         try {
-            $resp = Http::withToken($apiKey)
-                ->timeout(30)
-                ->post('https://api.openai.com/v1/chat/completions', [
-                    'model'       => $config->modelo_openai ?: 'gpt-4o-mini',
+            $resp = app(\App\Services\Ai\AiClientService::class)->chat(
+                $messages,
+                'auto',
+                null,
+                [
                     'temperature' => (float) ($config->temperatura ?? 0.7),
                     'max_tokens'  => (int) ($config->max_tokens ?? 700),
-                    'messages'    => $messages,
-                ]);
+                ]
+            );
 
-            if (!$resp->successful()) {
-                Log::warning('Widget OpenAI no-200: ' . $resp->body());
+            if (!$resp) {
                 return 'Tuve un problemita procesando tu mensaje. ¿Podrías repetirlo?';
             }
 
-            $texto = trim((string) ($resp->json('choices.0.message.content') ?? ''));
+            $texto = trim((string) ($resp['choices'][0]['message']['content'] ?? ''));
             return $texto !== '' ? $texto : '¿Me das más detalles de lo que buscas?';
         } catch (\Throwable $e) {
-            Log::error('Widget OpenAI excepción: ' . $e->getMessage());
+            Log::error('Widget IA excepción: ' . $e->getMessage());
             return 'Uy, me quedé sin poder responderte. Intenta en un momento.';
         }
     }
