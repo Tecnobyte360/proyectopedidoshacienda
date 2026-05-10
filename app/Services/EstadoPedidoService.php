@@ -458,32 +458,28 @@ class EstadoPedidoService
         // 3.5. DIRECCIÓN — patrones colombianos comunes
         //      "cra 58bb #40c-34", "calle 50 #47-80", "carrera 80a #45-12",
         //      "diagonal 67 # 32-15", "cl 79 sur #52-84", "trv 40 #30-20"
-        if (empty($estado->direccion)) {
-            // 🛡️ DETECCIÓN ULTRA-PERMISIVA de direcciones colombianas.
-            // Cualquier mensaje con una palabra clave de VÍA + al menos UN
-            // número se trata como dirección. Captura desde la palabra
-            // clave hasta el final del mensaje o delimitador fuerte.
-            //
-            // Acepta TODOS estos formatos (y muchos más):
-            //   "Calle 50 #63B-48"
-            //   "Cra 50 #45 23"
-            //   "Calle 41 #59bb 35, Apto 1214"
-            //   "Diagonal 30 sur 15-20"
-            //   "Cra 50 con calle 100"
-            //   "Vivo en la 50 #45-23"
-            //   "Mi dirección es calle 80 número 45, apartamento 502"
-            //   "Llevame a la cra 50 numero 23"
-            //   "Calle 50"  (solo vía + número)
+        // 🛡️ Captura nueva o REEMPLAZA si la anterior fue rechazada por
+        // cobertura (cliente da otra dirección alternativa).
+        $puedeCapturarDireccion = empty($estado->direccion)
+            || (!empty($estado->direccion) && !$estado->cobertura_validada);
+
+        if ($puedeCapturarDireccion) {
             $direccionCapturada = $this->detectarDireccionEnMensaje($msg);
-            if ($direccionCapturada) {
+            if ($direccionCapturada && $direccionCapturada !== $estado->direccion) {
+                $direccionAnterior = $estado->direccion;
                 $estado->direccion = $direccionCapturada;
+                // Reset cobertura para forzar re-validación con la NUEVA dirección
+                $estado->cobertura_validada = false;
+                $estado->distancia_km = null;
+                $estado->costo_envio = null;
                 if (empty($estado->metodo_entrega)) {
                     $estado->metodo_entrega = ConversacionPedidoEstado::METODO_DOMICILIO;
                 }
                 $cambio = true;
                 Log::info('🔍 Dirección capturada del mensaje', [
-                    'conv_id'   => $conv->id,
-                    'direccion' => $estado->direccion,
+                    'conv_id'            => $conv->id,
+                    'direccion'          => $estado->direccion,
+                    'direccion_anterior' => $direccionAnterior,
                 ]);
             }
         }

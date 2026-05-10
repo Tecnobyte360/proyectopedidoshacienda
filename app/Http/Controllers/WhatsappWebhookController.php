@@ -4156,6 +4156,48 @@ TXT;
       return null;
   }
 
+  /**
+   * 🛡️ Limpia una dirección para que el geocoder (Google/Nominatim) la
+   * resuelva mejor. Quita partes que NO ayudan a localizar en el mapa:
+   *   - Apto/Apartamento/Torre/Bloque/Casa/Piso/Interior/Local
+   *   - Nombres de conjuntos residenciales ("Reserva de Búcaros")
+   * Conserva solo: <vía> <número> <barrio>
+   *
+   * Ej: "Calle 41 #59bb 35, Apto 1214, Reserva de Bucaros, Bello"
+   *  → "Calle 41 #59bb 35, Bello"
+   */
+  private function limpiarDireccionParaGeocoding(string $direccion): string
+  {
+      if ($direccion === '') return '';
+
+      $partes = preg_split('/\s*,\s*/u', $direccion);
+      $limpio = [];
+
+      $patronesEliminar = [
+          '/^(apto|apartamento|apt|apartment)\s*\.?\s*\d+\w*$/iu',
+          '/^(torre|bloque|blq)\s*\.?\s*\w+$/iu',
+          '/^(casa|cs)\s*\.?\s*\d+\w*$/iu',
+          '/^(piso|p)\s*\.?\s*\d+\w*$/iu',
+          '/^(interior|int)\s*\.?\s*\d+\w*$/iu',
+          '/^(local|loc)\s*\.?\s*\d+\w*$/iu',
+          '/^(oficina|of)\s*\.?\s*\d+\w*$/iu',
+          // Nombres de conjuntos: típicamente palabras con mayúsculas sin números
+          '/^(conjunto|conj|urbanizacion|urb|reserva|villa|villas|portal|portales|parque|parques)\s+[a-z\sñáéíóú]+$/iu',
+      ];
+
+      foreach ($partes as $p) {
+          $p = trim($p);
+          if ($p === '') continue;
+          $skip = false;
+          foreach ($patronesEliminar as $pat) {
+              if (preg_match($pat, $p)) { $skip = true; break; }
+          }
+          if (!$skip) $limpio[] = $p;
+      }
+
+      return implode(', ', $limpio);
+  }
+
   private function validarCoberturaDireccion(
       string $direccion,
       ?string $barrio = null,
@@ -4174,8 +4216,12 @@ TXT;
       // Cada sede tiene su propio polígono. SedeResolverService elige la
       // mejor sede (cercanía + abierto) automáticamente.
       if (!empty($direccion) || !empty($barrio)) {
+          // 🛡️ Limpiar dirección para geocoding: quitar Apto, Torre, etc.
+          // que confunden a los geocoders. Mantener solo vía + número + barrio.
+          $direccionLimpia = $this->limpiarDireccionParaGeocoding($direccion);
+
           $geocode = app(GeocodingService::class)->geocodificar(
-              $direccion ?: '',
+              $direccionLimpia ?: $direccion ?: '',
               $barrio,
               $ciudad ?: 'Bello'
           );
