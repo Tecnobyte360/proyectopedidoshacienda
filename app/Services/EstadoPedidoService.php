@@ -536,22 +536,26 @@ class EstadoPedidoService
 
     /**
      * Encuentra el producto del catálogo que mejor matchea el nombre dado.
-     * Requiere al menos un token compartido (>=4 chars).
+     *
+     * 🛡️ ESTRICTO: NO hace matches espurios cuando el cliente da términos
+     * genéricos. Si el candidato es solo "res", "cerdo", "pollo" (token de
+     * categoría general), retorna null — porque hay decenas de productos
+     * que contienen esa palabra. Mejor que el bot pida específico.
      */
     private function matchProductoEnCatalogo(string $nombreCandidato, array $catalogoTokens): ?array
     {
         $cn = mb_strtolower(\Illuminate\Support\Str::ascii(trim($nombreCandidato)));
         if (mb_strlen($cn) < 3) return null;
 
+        // 🛡️ Términos demasiado genéricos: si el cliente dice solo
+        // "res", "cerdo", "pollo", "pescado" (categorías), NO matchear.
+        $genericos = ['res', 'cerdo', 'pollo', 'pescado', 'carne'];
+        if (in_array($cn, $genericos, true)) return null;
+
+        // Tokens significativos del candidato (≥4 chars)
         $tokensCandidato = collect(preg_split('/\s+/', $cn))
             ->filter(fn ($t) => mb_strlen($t) >= 4)
             ->values()->all();
-        if (empty($tokensCandidato)) {
-            // Si el candidato no tiene tokens largos, probar con tokens >= 3 (ej "res")
-            $tokensCandidato = collect(preg_split('/\s+/', $cn))
-                ->filter(fn ($t) => mb_strlen($t) >= 3)
-                ->values()->all();
-        }
         if (empty($tokensCandidato)) return null;
 
         $mejor = null;
@@ -561,21 +565,27 @@ class EstadoPedidoService
             // Match exacto del nombre
             if ($entry['nombre'] === $cn) return $entry;
 
-            // Score: tokens compartidos
-            $score = 0;
+            // Score: cuenta tokens del candidato que existen en el producto
+            $matches = 0;
             foreach ($tokensCandidato as $tc) {
                 foreach ($entry['tokens'] as $te) {
-                    if ($tc === $te) { $score += 10; continue 2; }
-                    if (str_contains($te, $tc) || str_contains($tc, $te)) { $score += 5; continue 2; }
+                    if ($tc === $te) { $matches++; continue 2; }
+                    if (mb_strlen($tc) >= 5 && (str_contains($te, $tc) || str_contains($tc, $te))) {
+                        $matches += 0.5;
+                        continue 2;
+                    }
                 }
             }
-            if ($score > $mejorScore) {
-                $mejorScore = $score;
+
+            // 🛡️ Score >= 1: requerimos al menos UN token completo coincidente
+            if ($matches >= 1 && $matches > $mejorScore) {
+                $mejorScore = $matches;
                 $mejor = $entry;
             }
         }
 
-        return $mejorScore >= 5 ? $mejor : null;
+        // 🛡️ Solo aceptar si el match es alto (no parcial)
+        return $mejorScore >= 1 ? $mejor : null;
     }
 
     /**

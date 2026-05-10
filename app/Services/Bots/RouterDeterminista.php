@@ -106,6 +106,17 @@ class RouterDeterminista
             return ['accion' => 'llm'];
         }
 
+        // 🛡️ Caso especial: si solo falta "validar cobertura" Y ya tenemos
+        // dirección, pasar al LLM para que invoque validar_cobertura. NO
+        // responder con "permíteme validar..." sin acción real.
+        if ($cuantosFaltan === 1 && str_contains($faltantes[0], 'cobertura') && !empty($estado->direccion)) {
+            Log::info('🤖 Router: cobertura por validar, delegando al LLM con tools', [
+                'conv_id' => $conv->id,
+                'direccion' => $estado->direccion,
+            ]);
+            return ['accion' => 'llm'];
+        }
+
         // Si solo falta UN dato y el contexto lo amerita → preguntarlo
         if ($cuantosFaltan === 1 && $estado->productos) {
             $falta = $faltantes[0];
