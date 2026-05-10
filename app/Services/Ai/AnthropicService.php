@@ -260,14 +260,19 @@ class AnthropicService
                 }
                 $newProps[$newKey] = $val;
             }
-            $schema['properties'] = $newProps;
+
+            // 🛡️ Si properties queda VACÍO, debe ser objeto JSON ({}) no array ([])
+            // PHP serializa array vacío como [] pero Anthropic exige {}.
+            $schema['properties'] = empty($newProps) ? new \stdClass() : $newProps;
 
             // Sincronizar required
             if (isset($schema['required']) && is_array($schema['required'])) {
-                $schema['required'] = array_map(
+                $schema['required'] = array_values(array_filter(array_map(
                     fn ($r) => $rename[$r] ?? $this->sanitizarKey((string) $r),
                     $schema['required']
-                );
+                )));
+                // Si required queda vacío, removerlo (no enviarlo)
+                if (empty($schema['required'])) unset($schema['required']);
             }
         } else {
             // properties vacío debe ser objeto, no array
