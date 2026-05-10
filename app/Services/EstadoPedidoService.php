@@ -20,6 +20,9 @@ class EstadoPedidoService
     /**
      * Obtiene (o crea) el estado de la conversación.
      */
+    /** @var array<int,bool> Lock anti-recursión por conversación */
+    private static array $obteniendo = [];
+
     public function obtener(ConversacionWhatsapp $conv): ConversacionPedidoEstado
     {
         $estado = ConversacionPedidoEstado::firstOrCreate(
@@ -31,12 +34,27 @@ class EstadoPedidoService
             ]
         );
 
+        // 🛡️ Anti-recursión: si ya estamos dentro de obtener() para esta
+        // conversación (porque resetear() llama a obtener() internamente),
+        // devolver el estado sin disparar auto-reset ni hidratación.
+        if (!empty(self::$obteniendo[$conv->id])) {
+            return $estado;
+        }
+        self::$obteniendo[$conv->id] = true;
+
+        try {
+            return $this->procesarObtener($conv, $estado);
+        } finally {
+            unset(self::$obteniendo[$conv->id]);
+        }
+    }
+
+    private function procesarObtener(ConversacionWhatsapp $conv, ConversacionPedidoEstado $estado): ConversacionPedidoEstado
+    {
         // 🔄 AUTO-RESET POST-PEDIDO:
         // Si el cliente tiene paso=confirmado (de un pedido anterior ya cerrado)
         // y vuelve a escribir, reseteamos el estado para que arranque un flujo
         // limpio (preservando identidad: cédula, nombre, email).
-        // Si NO hicieras esto, el cliente queda atrapado en paso=confirmado y
-        // el bot se confunde al recibir nuevos mensajes.
         if ($estado->paso_actual === ConversacionPedidoEstado::PASO_CONFIRMADO
             && $estado->confirmado_at
             && $estado->confirmado_at->diffInMinutes(now()) > 1) {
@@ -46,7 +64,8 @@ class EstadoPedidoService
                 'pedido_anterior'=> $estado->pedido_id,
                 'confirmado_at'  => $estado->confirmado_at?->toDateTimeString(),
             ]);
-            // Reset preservando identidad
+            // Reset preservando identidad (resetear llama a obtener() pero
+            // el lock anti-recursión evita el ciclo infinito)
             $this->resetear($conv, "nuevo_pedido_tras_pedido_{$estado->pedido_id}");
             $estado = $estado->fresh() ?: $estado;
         }
