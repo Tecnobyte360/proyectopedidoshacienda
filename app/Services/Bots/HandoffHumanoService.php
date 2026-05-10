@@ -86,6 +86,13 @@ class HandoffHumanoService
             '/\b(esto\s+es\s+un\s+desastre|qu[eé]\s+lentitud|qu[eé]\s+demora)\b/u',
             '/\b(d[eé]jame\s+en\s+paz|me\s+aburres|me\s+cans[áa]s)\b/u',
             '/\b(no\s+haces\s+nada|in[úu]til|no\s+entiend[ee]s\s+nada)\b/u',
+            // 🆕 Frustración por repetición (el cliente ya dio info y el bot no la usa)
+            '/\b(ya\s+(te|le)\s+(hab[ií]a\s+)?(dicho|pedido|coment|expliq))\b/u',
+            '/\bte\s+lo\s+(repito|estoy\s+repitiendo|dije\s+ya)\b/u',
+            '/\bya\s+lo\s+(dije|te\s+(lo\s+)?dije|coment[eé])\b/u',
+            '/\b(esto|eso)\s+ya\s+te\s+lo/u',
+            '/\bpor\s+qu[eé]\s+me\s+pides\s+(otra\s+vez|de\s+nuevo|lo\s+mismo)/u',
+            '/\bpor\s+qu[eé]\s+(repites|repetis|preguntas)\s+(lo\s+mismo|otra\s+vez)/u',
         ];
         foreach ($patrones as $p) {
             if (preg_match($p, $msg)) return true;

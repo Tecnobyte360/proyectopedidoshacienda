@@ -211,6 +211,21 @@ class ValidadorRespuestaLLM
      */
     private function detectarFactorCantidadUnidad(string $lineaN): ?float
     {
+        // 🛡️ Convertir números escritos en palabras a dígitos para que el regex
+        // pille casos como "una libra", "media libra", "dos kilos".
+        $lineaN = strtr($lineaN, [
+            'una libra'   => '1 libra',
+            'un libra'    => '1 libra',
+            'media libra' => '0.5 libra',
+            'medio kilo'  => '0.5 kg',
+            'un kilo'     => '1 kg',
+            'una kilo'    => '1 kg',
+            'dos libras'  => '2 libras',
+            'dos kilos'   => '2 kg',
+            'tres libras' => '3 libras',
+            'tres kilos'  => '3 kg',
+        ]);
+
         // Buscar pattern "N unidad" donde N es número y unidad es kg/lb/gr/...
         if (!preg_match('/(\d+(?:[.,]\d+)?)\s*(libras?|libritas?|lb|kilos?|kilitos?|kg|gramos?|gr|onzas?|oz|unidades?|unds?|paquetes?)/iu', $lineaN, $m)) {
             return null;

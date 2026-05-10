@@ -31,12 +31,26 @@ class EstadoPedidoService
             ]
         );
 
-        // 🛡️ ASTUTO: hidratar cédula/email/nombre desde el cliente local
-        // si están vacíos en el estado pero sí existen en el perfil del cliente.
-        // Esto evita que el bot vuelva a pedir datos que YA tenemos del cliente.
+        // 🛡️ HIDRATACIÓN CONDICIONAL desde el cliente local del NÚMERO.
+        // CASO ESPECIAL: el titular del número WhatsApp puede estar haciendo
+        // un pedido para OTRO cliente (ej. operador del negocio que envía
+        // pedidos de terceros desde su número). En ese caso NO debemos
+        // hidratar con los datos del titular — debemos esperar a que el
+        // cliente nos dé los datos correctos.
+        //
+        // Estrategia: solo hidratar cuando el estado del pedido es
+        // claramente NUEVO (sin productos, sin cédula explícita capturada
+        // del mensaje actual). Una vez el cliente da una cédula distinta,
+        // NUNCA volvemos a hidratar con los del titular.
         try {
             $cliente = $conv->cliente;
-            if ($cliente) {
+            $estadoVacio = empty($estado->productos) && empty($estado->cedula)
+                && empty($estado->nombre_cliente) && empty($estado->direccion);
+            $primeraVez = $estado->paso_actual === ConversacionPedidoEstado::PASO_INICIO;
+
+            // Solo hidratar si el estado es completamente nuevo Y aún en paso INICIO.
+            // Esto evita pisar datos que un operador esté capturando para un tercero.
+            if ($cliente && $estadoVacio && $primeraVez) {
                 $touched = false;
                 if (empty($estado->cedula) && !empty($cliente->cedula)) {
                     $estado->cedula = $cliente->cedula;
@@ -68,6 +82,40 @@ class EstadoPedidoService
         }
 
         return $estado;
+    }
+
+    /**
+     * 🛡️ Si el cliente DA datos distintos (cédula, nombre, email) a los
+     * hidratados del titular, asume que es un PEDIDO PARA OTRO CLIENTE
+     * y resetea los datos hidratados antes de capturar los nuevos.
+     */
+    public function resetearSiPedidoParaTercero(ConversacionWhatsapp $conv, string $cedulaNueva): void
+    {
+        $estado = $this->obtener($conv);
+        if (empty($estado->cedula)) return;
+
+        $cedulaActual = preg_replace('/[^\d]/', '', (string) $estado->cedula);
+        $cedulaNueva  = preg_replace('/[^\d]/', '', $cedulaNueva);
+        if ($cedulaActual === $cedulaNueva) return;
+
+        // Cédula distinta → es para otro cliente
+        Log::warning('🔄 Pedido para OTRO cliente detectado — limpiando datos hidratados', [
+            'conv_id'        => $conv->id,
+            'cedula_antigua' => $cedulaActual,
+            'cedula_nueva'   => $cedulaNueva,
+        ]);
+
+        $estado->update([
+            'cedula'              => null,
+            'nombre_cliente'      => null,
+            'email'               => null,
+            'cliente_existe_erp'  => false,
+            'datos_erp'           => null,
+            'direccion'           => null,
+            'cobertura_validada'  => false,
+            'distancia_km'        => null,
+            'costo_envio'         => null,
+        ]);
     }
 
     /**
@@ -301,7 +349,11 @@ class EstadoPedidoService
                     $cambio = true;
                     Log::info('🔍 Cédula capturada con prefijo', ['conv_id' => $conv->id, 'cedula' => $cleanB]);
                 }
-            } else {
+            }
+            // Caso INTERNO: si la cédula que llega es distinta a la actual del estado
+            // (que pudo venir de hidratación), aplicar lógica de "pedido para otro".
+            // Esto se ejecuta ANTES del else.
+            else {
                 if ($contextoPago && preg_match('/^\d{6,12}$/', $clean)) {
                     Log::info('🛡️ Número ignorado como cédula — contexto de pago/teléfono', [
                         'conv_id' => $conv->id,
