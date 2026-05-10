@@ -35,67 +35,39 @@ class ValidadorRespuestaLLM
     {
         if (trim($reply) === '') return $reply;
 
-        $alertas = [];
-        $replyOriginal = $reply;
+        // 🛡️ FILOSOFÍA REVISADA:
+        // El validador antes era muy paranoide y bloqueaba respuestas
+        // correctas (ej. precios reales del catálogo) por falsos positivos.
+        // Eso degradaba la experiencia más que ayudaba.
+        //
+        // AHORA solo intervenimos en cosas CLARAMENTE inventadas y de bajo
+        // riesgo de falso positivo:
+        //   ✅ Horarios "24/7", "siempre abierto" → corregir
+        //   ✅ Promesas tipo "100% garantizado", "el mejor precio" → limpiar
+        //
+        // YA NO validamos:
+        //   ❌ Precios (vienen de buscar_productos / catálogo SGI real)
+        //   ❌ Productos fantasma (los códigos se validan en guardarPedido)
+        //   ❌ Tiempos de entrega (puede haber casos legítimos)
+        //
+        // Esto deja el flujo TRANSPARENTE: lo que el LLM genera basado en
+        // tools reales se envía tal cual. Solo bloqueamos invenciones obvias.
 
-        // 1. Precios mencionados — verificar contra catálogo
-        $alertasPrecio = $this->detectarPreciosInventados($reply);
-        if (!empty($alertasPrecio)) {
-            $alertas[] = ['tipo' => 'precio_inventado', 'detalles' => $alertasPrecio];
-        }
-
-        // 2. Productos mencionados — verificar contra catálogo activo
-        $productosFantasma = $this->detectarProductosFantasma($reply);
-        if (!empty($productosFantasma)) {
-            $alertas[] = ['tipo' => 'producto_fantasma', 'detalles' => $productosFantasma];
-        }
-
-        // 3. Horarios inventados
+        // 1. Horarios inventados (raros, claros)
         $horariosInventados = $this->detectarHorariosInventados($reply);
         if (!empty($horariosInventados)) {
-            $alertas[] = ['tipo' => 'horario_inventado', 'detalles' => $horariosInventados];
-        }
-
-        // 4. Promesas no respaldadas
-        $promesas = $this->detectarPromesasNoRespaldadas($reply);
-        if (!empty($promesas)) {
-            $alertas[] = ['tipo' => 'promesa_no_respaldada', 'detalles' => $promesas];
-        }
-
-        // 5. Tiempos de entrega inventados
-        $tiempos = $this->detectarTiemposInventados($reply);
-        if (!empty($tiempos)) {
-            $alertas[] = ['tipo' => 'tiempo_inventado', 'detalles' => $tiempos];
-        }
-
-        if (empty($alertas)) {
-            return $reply;
-        }
-
-        Log::warning('🛡️ Validador detectó alucinaciones — sanitizando respuesta', [
-            'alertas'      => $alertas,
-            'reply_orig'   => mb_substr($replyOriginal, 0, 300),
-        ]);
-
-        // Tipo de alerta más grave → respuesta segura
-        $tipos = collect($alertas)->pluck('tipo')->all();
-
-        if (in_array('precio_inventado', $tipos, true) || in_array('producto_fantasma', $tipos, true)) {
-            return "Permíteme un momento, voy a confirmar esa información correctamente. "
-                 . "¿Me puedes decir qué producto necesitas y te paso el precio exacto del catálogo?";
-        }
-
-        if (in_array('horario_inventado', $tipos, true)) {
+            Log::warning('🛡️ Validador: horario inventado detectado', [
+                'reply' => mb_substr($reply, 0, 200),
+            ]);
             return $this->mensajeHorariosReales();
         }
 
-        if (in_array('tiempo_inventado', $tipos, true)) {
-            return "El tiempo exacto te lo confirmamos al momento de despachar. "
-                 . "¿Continuamos con tu pedido?";
-        }
-
-        if (in_array('promesa_no_respaldada', $tipos, true)) {
-            // Solo limpiar la promesa, no reescribir todo
+        // 2. Promesas no respaldadas → limpiar, no reescribir todo
+        $promesas = $this->detectarPromesasNoRespaldadas($reply);
+        if (!empty($promesas)) {
+            Log::info('🛡️ Validador: promesas limpiadas', [
+                'cantidad' => count($promesas),
+            ]);
             return $this->limpiarPromesas($reply);
         }
 
