@@ -519,36 +519,59 @@ class EstadoPedidoService
             }
         }
 
-        // 4.5. PRODUCTOS — captura robusta + validación contra catálogo
-        // Patrones soportados (todos validados contra catálogo del tenant):
-        //   "2 kilos de trucha"           → cantidad + unidad + producto
-        //   "trucha 2 kilos"              → producto + cantidad + unidad
-        //   "1 kilo de pollo y 2 kg cerdo" → multi-producto con "y"
-        //   "kilo de salmón"              → cantidad implícita = 1
-        if (empty($estado->productos)) {
-            $productosCapturados = $this->extraerProductosDelMensaje($msg);
-            if (!empty($productosCapturados)) {
-                $estado->productos = $productosCapturados;
+        // 4.5. PRODUCTOS — captura robusta + ACUMULA productos nuevos.
+        // Si el cliente pide productos en mensajes separados, los AGREGAMOS
+        // a la lista en lugar de reemplazarla.
+        //   Mensaje 1: "3 libras de chicharrón" → [chicharrón]
+        //   Mensaje 2: "y 1 kilo de pollo"      → [chicharrón, pollo]
+        //   Mensaje 3: "y 2 kg de res"          → [chicharrón, pollo, res]
+        $productosCapturados = $this->extraerProductosDelMensaje($msg);
+        if (!empty($productosCapturados)) {
+            $existentes = $estado->productos ?? [];
+            $codigosExistentes = collect($existentes)
+                ->pluck('code')
+                ->filter()
+                ->all();
+
+            $nuevosAgregados = [];
+            foreach ($productosCapturados as $nuevo) {
+                $codigoNuevo = $nuevo['code'] ?? '';
+                if ($codigoNuevo === '' || !in_array($codigoNuevo, $codigosExistentes, true)) {
+                    $existentes[] = $nuevo;
+                    $nuevosAgregados[] = $nuevo;
+                }
+            }
+
+            if (!empty($nuevosAgregados)) {
+                $estado->productos = $existentes;
                 $cambio = true;
                 Log::info('🔍 Productos capturados del mensaje', [
-                    'conv_id'   => $conv->id,
-                    'productos' => $productosCapturados,
+                    'conv_id'         => $conv->id,
+                    'nuevos'          => $nuevosAgregados,
+                    'total_productos' => count($existentes),
                 ]);
             }
         }
 
-        // 5. NOMBRE — heurística mejorada que detecta nombres incluso si
-        //    el mensaje también tiene cédula/email/teléfono.
-        //    Ej: "Vanesa Castaño Sánchez 3155434093" → "Vanesa Castaño Sánchez"
-        //    Ej: "1038627191, Juan Pérez, jp@mail.com" → "Juan Pérez"
-        if (empty($estado->nombre_cliente)) {
+        // 5. NOMBRE — heurística que detecta nombres incluso mixtos.
+        //    Sobrescribe si el actual NO parece un nombre real (emoji, vacío,
+        //    'Cliente', email, número solo).
+        $nombreActualValido = !empty($estado->nombre_cliente)
+            && !str_contains((string) $estado->nombre_cliente, '@')
+            && preg_match('/[a-záéíóúñ]/iu', (string) $estado->nombre_cliente)
+            && preg_match('/^[a-záéíóúñA-ZÁÉÍÓÚÑ\s]+$/', (string) $estado->nombre_cliente)
+            && strtolower((string) $estado->nombre_cliente) !== 'cliente';
+
+        if (!$nombreActualValido) {
             $nombre = $this->extraerNombreDeMensaje($msg);
             if ($nombre) {
+                $anterior = $estado->nombre_cliente;
                 $estado->nombre_cliente = $nombre;
                 $cambio = true;
                 Log::info('🔍 Nombre capturado del mensaje', [
-                    'conv_id' => $conv->id,
-                    'nombre'  => $nombre,
+                    'conv_id'  => $conv->id,
+                    'nombre'   => $nombre,
+                    'anterior' => $anterior,
                 ]);
             }
         }
