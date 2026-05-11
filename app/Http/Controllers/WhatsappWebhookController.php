@@ -4725,41 +4725,79 @@ TXT;
         $confirmKey = "pedido_confirmado_t{$tenantId}_" . $telNorm;
 
         // 🛡️ CORTAFUEGO ANTI-PEDIDO-FANTASMA:
-        // Si los productos del orderData NO aparecen mencionados en NINGUNO
-        // de los últimos 8 mensajes del cliente, RECHAZAR el pedido.
-        // Esto bloquea pedidos fabricados por el LLM mini desde el historial.
+        // Si los productos del orderData NO aparecen mencionados en los
+        // últimos 8 mensajes del cliente Y TAMPOCO están en el estado
+        // persistente, RECHAZAR el pedido.
+        //
+        // El estado persistente es prueba de que en algún momento el
+        // captador detectó al cliente pidiendo ese producto. Es seguro.
         if ($conversacion) {
             $productos = $orderData['products'] ?? [];
             if (!empty($productos)) {
-                $ultimosUser = \App\Models\MensajeWhatsapp::query()
-                    ->where('conversacion_id', $conversacion->id)
-                    ->where('rol', 'user')
-                    ->orderByDesc('id')
-                    ->limit(8)
-                    ->pluck('contenido')
+                // PASO 1: ¿Los productos coinciden con el estado persistente?
+                $estado = app(\App\Services\EstadoPedidoService::class)->obtener($conversacion);
+                $productosEstado = collect($estado->productos ?? [])
+                    ->map(fn ($p) => mb_strtolower(\Illuminate\Support\Str::ascii(
+                        (string) ($p['name'] ?? $p['code'] ?? '')
+                    )))
+                    ->filter()
                     ->all();
-                $textoUser = mb_strtolower(\Illuminate\Support\Str::ascii(implode(' ', $ultimosUser)));
 
-                $algunoMencionado = false;
+                $coincideConEstado = false;
                 foreach ($productos as $p) {
                     $nombreP = mb_strtolower(\Illuminate\Support\Str::ascii((string) ($p['name'] ?? '')));
-                    $tokens = collect(preg_split('/\s+/', $nombreP))
-                        ->filter(fn ($t) => mb_strlen($t) >= 4)
-                        ->values();
-                    foreach ($tokens as $t) {
-                        if (str_contains($textoUser, $t)) { $algunoMencionado = true; break 2; }
+                    foreach ($productosEstado as $pe) {
+                        // Match si comparten algún token significativo (>=4 chars)
+                        $tokensP = collect(preg_split('/\s+/', $nombreP))
+                            ->filter(fn ($t) => mb_strlen($t) >= 4)
+                            ->all();
+                        foreach ($tokensP as $t) {
+                            if (str_contains($pe, $t) || str_contains($nombreP, $pe)) {
+                                $coincideConEstado = true;
+                                break 3;
+                            }
+                        }
                     }
                 }
 
-                if (!$algunoMencionado) {
-                    Log::warning('🛡️ CORTAFUEGO: pedido bloqueado — productos NO mencionados por cliente', [
-                        'from' => $from,
-                        'productos_orderData' => array_map(fn ($p) => $p['name'] ?? '?', $productos),
-                        'ultimos_user_chars' => mb_substr($textoUser, 0, 200),
+                // Si los productos del orderData coinciden con el estado,
+                // confiamos: el captador los detectó en algún momento real.
+                if ($coincideConEstado) {
+                    Log::info('🛡️ Cortafuego: pedido validado por estado persistente', [
+                        'productos' => array_map(fn ($p) => $p['name'] ?? '?', $productos),
                     ]);
-                    return "Disculpa {$name} 🙏 hubo un problema interpretando tu pedido. "
-                         . "¿Me puedes decir exactamente qué productos quieres y en qué cantidad? "
-                         . "Así te lo registro bien.";
+                } else {
+                    // PASO 2: ¿Aparecen en los últimos 8 mensajes del cliente?
+                    $ultimosUser = \App\Models\MensajeWhatsapp::query()
+                        ->where('conversacion_id', $conversacion->id)
+                        ->where('rol', 'user')
+                        ->orderByDesc('id')
+                        ->limit(15)
+                        ->pluck('contenido')
+                        ->all();
+                    $textoUser = mb_strtolower(\Illuminate\Support\Str::ascii(implode(' ', $ultimosUser)));
+
+                    $algunoMencionado = false;
+                    foreach ($productos as $p) {
+                        $nombreP = mb_strtolower(\Illuminate\Support\Str::ascii((string) ($p['name'] ?? '')));
+                        $tokens = collect(preg_split('/\s+/', $nombreP))
+                            ->filter(fn ($t) => mb_strlen($t) >= 4)
+                            ->values();
+                        foreach ($tokens as $t) {
+                            if (str_contains($textoUser, $t)) { $algunoMencionado = true; break 2; }
+                        }
+                    }
+
+                    if (!$algunoMencionado) {
+                        Log::warning('🛡️ CORTAFUEGO: pedido bloqueado — productos NO en estado NI mencionados por cliente', [
+                            'from' => $from,
+                            'productos_orderData' => array_map(fn ($p) => $p['name'] ?? '?', $productos),
+                            'productos_estado'    => $productosEstado,
+                        ]);
+                        return "Disculpa {$name} 🙏 hubo un problema interpretando tu pedido. "
+                             . "¿Me puedes decir exactamente qué productos quieres y en qué cantidad? "
+                             . "Así te lo registro bien.";
+                    }
                 }
             }
         }
