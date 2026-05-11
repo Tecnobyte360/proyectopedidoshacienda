@@ -68,11 +68,12 @@ class AuditoriaDiariaBot extends Command
 
         $problemas = [];
 
-        // 1. Pedidos sin cédula
-        $sinCedula = Pedido::where('tenant_id', $tenant->id)
-            ->whereDate('created_at', today())
+        // 1. Pedidos sin cédula (vía relación con clientes)
+        $sinCedula = Pedido::where('pedidos.tenant_id', $tenant->id)
+            ->whereDate('pedidos.created_at', today())
+            ->leftJoin('clientes', 'pedidos.cliente_id', '=', 'clientes.id')
             ->where(function ($q) {
-                $q->whereNull('cliente_cedula')->orWhere('cliente_cedula', '');
+                $q->whereNull('clientes.cedula')->orWhere('clientes.cedula', '');
             })
             ->count();
 

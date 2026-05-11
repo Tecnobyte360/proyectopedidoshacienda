@@ -59,8 +59,9 @@ class ValidadorPreExportSGI
             );
         }
 
-        // 4. Cédula del cliente válida
-        $cedula = trim((string) ($pedido->cliente_cedula ?? ''));
+        // 4. Cédula del cliente válida (via relación cliente)
+        $cliente = $pedido->cliente;
+        $cedula = trim((string) ($cliente?->cedula ?? ''));
         if ($cedula === '') {
             $errores[] = "Cliente SIN cédula registrada";
         } elseif (!preg_match('/^\d{6,12}$/', $cedula)) {
