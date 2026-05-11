@@ -4724,6 +4724,35 @@ TXT;
         $tenantId = $tm->id() ?? 'none';
         $confirmKey = "pedido_confirmado_t{$tenantId}_" . $telNorm;
 
+        // 🚨 GUARD CRÍTICO: CÉDULA OBLIGATORIA si hay lookup ERP activo.
+        // Sin cédula NO se puede crear el pedido (cliente no se puede
+        // registrar en SGI, no se puede trackear el pedido).
+        if ($conversacion) {
+            $integLookupActivo = \App\Models\Integracion::where('tenant_id', $conversacion->tenant_id)
+                ->where('activo', true)
+                ->where('exporta_pedidos', true)
+                ->get()
+                ->contains(fn ($i) => $i->config['cliente_lookup']['activo'] ?? false);
+
+            if ($integLookupActivo) {
+                $cedulaOrder = trim((string) ($orderData['cedula'] ?? ''));
+                if ($cedulaOrder === '' || !preg_match('/^\d{6,12}$/', $cedulaOrder)) {
+                    Log::warning('🚨 GUARD: pedido bloqueado — cédula NO presente o inválida', [
+                        'from'   => $from,
+                        'cedula' => $cedulaOrder,
+                    ]);
+
+                    $primerNombre = explode(' ', trim((string) $name))[0] ?? '';
+                    $saludo = $primerNombre !== '' && !str_contains($primerNombre, '@')
+                        ? " {$primerNombre}" : '';
+
+                    return "Antes de cerrar tu pedido{$saludo}, necesito tu *número de cédula* (sin puntos). "
+                         . "Es obligatorio para registrarte en el sistema. 🪪\n\n"
+                         . "Pásamela por favor.";
+                }
+            }
+        }
+
         // 🛡️ CORTAFUEGO ANTI-PEDIDO-FANTASMA:
         // Si los productos del orderData NO aparecen mencionados en los
         // últimos 8 mensajes del cliente Y TAMPOCO están en el estado
