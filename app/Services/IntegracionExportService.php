@@ -45,6 +45,27 @@ class IntegracionExportService
             return ['exportadas' => 0, 'resultados' => []];
         }
 
+        // 🛡️ VALIDACIÓN PRE-EXPORT — última línea de defensa.
+        // Si el pedido tiene errores de integridad (sin cédula, sin productos,
+        // subtotales que no cuadran), NO se exporta y se dispara alerta.
+        try {
+            $validacion = app(\App\Services\Bots\ValidadorPreExportSGI::class)->validar($pedido);
+            if (!$validacion['ok']) {
+                Log::error('🛡️ Export BLOQUEADO por ValidadorPreExportSGI', [
+                    'pedido_id' => $pedido->id,
+                    'errores'   => $validacion['errores'],
+                ]);
+                return [
+                    'exportadas' => 0,
+                    'resultados' => [],
+                    'bloqueado'  => true,
+                    'errores'    => $validacion['errores'],
+                ];
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Validador pre-export falló (continuando): ' . $e->getMessage());
+        }
+
         $resultados = [];
 
         foreach ($integraciones as $integracion) {

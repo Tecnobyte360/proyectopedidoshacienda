@@ -53,6 +53,13 @@ Schedule::command('campanas:procesar')
 // La cola la procesa el contenedor pedidos_hacienda_queue (queue:work
 // permanente). No duplicar aquí — los jobs los maneja ese worker.
 
+// 🔍 Auditoría diaria del bot — corre cada noche 23:55
+Schedule::command('bot:auditoria-diaria')
+    ->dailyAt('23:55')
+    ->timezone('America/Bogota')
+    ->withoutOverlapping()
+    ->runInBackground();
+
 Schedule::command('clientes:felicitar-cumpleanos')
     ->everyMinute()
     ->timezone('America/Bogota')
