@@ -191,8 +191,14 @@ class AnthropicService
             $out[] = ['role' => 'user', 'content' => $contentStr];
         }
 
+        // 🛡️ Anthropic exige AL MENOS UN mensaje. Si todos eran system o
+        // se filtraron, agregar uno user mínimo para no fallar con 400.
+        if (empty($out)) {
+            $out[] = ['role' => 'user', 'content' => 'Hola'];
+        }
+
         // Anthropic exige que el primer mensaje sea user
-        if (!empty($out) && ($out[0]['role'] ?? '') !== 'user') {
+        if (($out[0]['role'] ?? '') !== 'user') {
             array_unshift($out, ['role' => 'user', 'content' => 'Hola']);
         }
 
