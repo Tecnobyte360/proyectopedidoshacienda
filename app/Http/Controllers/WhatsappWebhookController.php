@@ -4844,12 +4844,30 @@ TXT;
                         }
 
                         if (!empty($faltantesErp)) {
-                            $listaFalt = implode(', ', $faltantesErp);
                             Log::warning('🚨 No se puede crear cliente en ERP — faltan datos', [
                                 'cedula' => $orderData['cedula'],
                                 'faltan' => $faltantesErp,
                             ]);
-                            return "Para registrarte en nuestro sistema y procesar tu pedido necesito estos datos: {$listaFalt}. ¿Me los compartes?";
+
+                            // 🛡️ Pedir TODOS los faltantes en un solo mensaje claro
+                            $etiquetas = [
+                                'cedula'    => 'Número de cédula (sin puntos)',
+                                'nombre'    => 'Nombre completo',
+                                'telefono'  => 'Teléfono de contacto',
+                                'email'     => 'Correo electrónico',
+                                'direccion' => 'Dirección de entrega',
+                            ];
+
+                            $lineas = ["Para crear tu cuenta y procesar el pedido, necesito estos datos:\n"];
+                            $i = 1;
+                            foreach ($faltantesErp as $campo) {
+                                $etiqueta = $etiquetas[$campo] ?? $campo;
+                                $lineas[] = "{$i}. *{$etiqueta}*";
+                                $i++;
+                            }
+                            $lineas[] = "\nPuedes pasármelos todos en un solo mensaje. 🙏";
+
+                            return implode("\n", $lineas);
                         }
 
                         // Crear cliente en SGI

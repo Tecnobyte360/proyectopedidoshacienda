@@ -537,25 +537,18 @@ class EstadoPedidoService
             }
         }
 
-        // 5. NOMBRE — heurística simple cuando estamos en paso identificación
-        //    o datos_cliente_nuevo y el cliente envía un texto que parece nombre
-        if (
-            empty($estado->nombre_cliente) &&
-            in_array($estado->paso_actual, [
-                ConversacionPedidoEstado::PASO_IDENTIFICACION,
-                ConversacionPedidoEstado::PASO_DATOS_CLIENTE,
-            ], true)
-        ) {
-            // Heurística: el mensaje es 2-5 palabras, sin números, sin @, sin frases típicas
-            $palabras = preg_split('/\s+/', trim($msg));
-            $tieneSoloLetras = preg_match('/^[A-Za-zÁÉÍÓÚáéíóúñÑ\s]+$/', $msg);
-            $noEsFraseFuncional = !preg_match('/(quier|tien|necesi|domicil|recog|pago|gracias|hola|buen|por\s*favor|si|no|listo|dale)/i', $msg);
-            if ($tieneSoloLetras && count($palabras) >= 2 && count($palabras) <= 5 && $noEsFraseFuncional) {
-                $estado->nombre_cliente = mb_convert_case(trim($msg), MB_CASE_TITLE, 'UTF-8');
+        // 5. NOMBRE — heurística mejorada que detecta nombres incluso si
+        //    el mensaje también tiene cédula/email/teléfono.
+        //    Ej: "Vanesa Castaño Sánchez 3155434093" → "Vanesa Castaño Sánchez"
+        //    Ej: "1038627191, Juan Pérez, jp@mail.com" → "Juan Pérez"
+        if (empty($estado->nombre_cliente)) {
+            $nombre = $this->extraerNombreDeMensaje($msg);
+            if ($nombre) {
+                $estado->nombre_cliente = $nombre;
                 $cambio = true;
-                Log::info('🔍 Nombre capturado heurísticamente', [
+                Log::info('🔍 Nombre capturado del mensaje', [
                     'conv_id' => $conv->id,
-                    'nombre'  => $estado->nombre_cliente,
+                    'nombre'  => $nombre,
                 ]);
             }
         }
@@ -564,6 +557,71 @@ class EstadoPedidoService
             $estado->save();
             $this->avanzarPaso($estado);
         }
+    }
+
+    /**
+     * 🛡️ Extrae un nombre persona del mensaje, ignorando cédulas, emails,
+     * teléfonos y frases funcionales que pueda contener.
+     *
+     * Estrategia:
+     *   1. Limpiar números, @, símbolos.
+     *   2. Detectar secuencias de 2-5 palabras alfabéticas seguidas.
+     *   3. Filtrar frases funcionales (hola, quiero, gracias, etc).
+     *   4. Devolver la secuencia más larga válida.
+     */
+    private function extraerNombreDeMensaje(string $msg): ?string
+    {
+        $msg = trim($msg);
+        if ($msg === '') return null;
+
+        // Quitar emails, URLs, números y símbolos no-letra
+        $limpio = preg_replace('/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i', ' ', $msg);
+        $limpio = preg_replace('/https?:\/\/\S+/i', ' ', $limpio);
+        $limpio = preg_replace('/\d+/', ' ', $limpio);
+        $limpio = preg_replace('/[^a-záéíóúñÁÉÍÓÚÑ\s]/iu', ' ', $limpio);
+        $limpio = preg_replace('/\s+/u', ' ', trim($limpio));
+
+        if ($limpio === '') return null;
+
+        // Frases funcionales a descartar
+        $stopwords = '/^(hola|buenas|buenos\s+dias|tardes|noches|gracias|si|no|listo|dale|quiero|necesito|tienes|tienen|para|de|del|los|las|el|la|por\s+favor|domicilio|despacho|recoger|aqui|alla|que|qué|cómo|como|cuanto|cuánto|cual|cuál)$/iu';
+
+        $palabras = explode(' ', $limpio);
+        $palabras = array_filter($palabras, fn ($p) => mb_strlen($p) >= 2);
+        $palabras = array_values($palabras);
+
+        // Buscar la secuencia más larga de palabras alfabéticas válidas (2-5)
+        $mejorNombre = null;
+        $mejorScore = 0;
+        $secuenciaActual = [];
+
+        foreach ($palabras as $p) {
+            $esFuncional = (bool) preg_match($stopwords, mb_strtolower($p));
+            if ($esFuncional) {
+                // Cerrar secuencia y evaluarla
+                if (count($secuenciaActual) >= 2 && count($secuenciaActual) <= 5) {
+                    $candidato = implode(' ', $secuenciaActual);
+                    if (count($secuenciaActual) > $mejorScore) {
+                        $mejorScore = count($secuenciaActual);
+                        $mejorNombre = $candidato;
+                    }
+                }
+                $secuenciaActual = [];
+            } else {
+                $secuenciaActual[] = $p;
+            }
+        }
+        // Evaluar secuencia final
+        if (count($secuenciaActual) >= 2 && count($secuenciaActual) <= 5) {
+            if (count($secuenciaActual) > $mejorScore) {
+                $mejorNombre = implode(' ', $secuenciaActual);
+            }
+        }
+
+        if (!$mejorNombre) return null;
+
+        // Capitalizar correctamente
+        return mb_convert_case(trim($mejorNombre), MB_CASE_TITLE, 'UTF-8');
     }
 
     /**
