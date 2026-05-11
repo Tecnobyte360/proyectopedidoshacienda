@@ -345,48 +345,64 @@ class EstadoPedidoService
         $msg = trim($mensaje);
         $cambio = false;
 
-        // 1. CÉDULA — número de 6-12 dígitos, posiblemente con puntos
-        //    Ej: "1098765432", "1.098.765.432", "Mi cédula es 1234567"
-        // 🛡️ ASTUTO: rechazamos números que sean claramente teléfono o
-        //    que vengan con palabras de pago/transferencia.
+        // 1. CÉDULA — número de 6-12 dígitos CONTIGUOS, no en dirección/pago.
+        //    Ej válidos: "1098765432", "Mi cédula es 1234567"
+        //    Ej INVÁLIDOS: "Cra 50 # 51-00" (dígitos separados), "transferencia 3216499744"
         if (empty($estado->cedula)) {
             $msgLower = mb_strtolower($msg);
             $contextoPago = preg_match('/(transferencia|nequi|daviplata|bancolombia|pse|cuenta|consign|tarjeta|cel(ular)?|tel[eé]fono|whatsapp)/iu', $msgLower) === 1;
+            // 🛡️ NUEVO: detectar si el mensaje contiene palabras de DIRECCIÓN
+            $contextoDireccion = preg_match('/\b(calle|cra|carrera|cl|cll|cr|kr|av|avenida|diag|diagonal|trv|transversal|via|autopista|circular|barrio|apto|apartamento|torre|bloque|casa|piso)\b/iu', $msgLower) === 1;
             $telefonoCliente = preg_replace('/[^\d]/', '', (string) ($conv->telefono_normalizado ?? ''));
 
             $esPosibleTelefono = function (string $clean) use ($telefonoCliente): bool {
-                // Coincide con el teléfono del cliente actual
                 if ($telefonoCliente !== '' && (
                     $clean === $telefonoCliente
                     || str_ends_with($telefonoCliente, $clean)
                     || str_ends_with($clean, $telefonoCliente)
                 )) return true;
-                // Patrón clásico celular Colombia: 10 dígitos empezando con 3
                 if (preg_match('/^3\d{9}$/', $clean)) return true;
-                // Con prefijo país: 12 dígitos empezando con 573
                 if (preg_match('/^573\d{9}$/', $clean)) return true;
                 return false;
             };
 
-            $clean = preg_replace('/[^\d]/', '', $msg);
+            // 🛡️ Caso A: el mensaje ES SOLO la cédula (puede tener puntos pero no espacios entre dígitos)
+            //    "1098765432" → ✅
+            //    "1.098.765.432" → ✅
+            //    "Cra 50 # 51-00" → ❌ (dígitos en grupos separados)
+            $msgTrim = trim($msg);
+            $soloDigitosYPuntos = preg_match('/^[\d.,]+$/', $msgTrim) === 1;
+            $clean = preg_replace('/[^\d]/', '', $msgTrim);
 
-            // Caso A: el cliente escribió SOLO el número (sin palabras)
-            if (!$contextoPago
+            if ($soloDigitosYPuntos
+                && !$contextoPago
+                && !$contextoDireccion
                 && preg_match('/^\d{6,12}$/', $clean)
-                && mb_strlen($msg) <= 25
                 && !$esPosibleTelefono($clean)
             ) {
                 $estado->cedula = $clean;
                 $cambio = true;
                 Log::info('🔍 Cédula capturada del mensaje', ['conv_id' => $conv->id, 'cedula' => $clean]);
             }
-            // Caso B: prefijo explícito ("mi cédula es 1234567")
+            // 🛡️ Caso B: prefijo explícito ("mi cédula es 1234567") — siempre confiable
             elseif (preg_match('/\b(?:c[eé]dula|cc|documento|nit|ced)[\s:]*([\d.,]{6,15})\b/iu', $msg, $m)) {
                 $cleanB = preg_replace('/[^\d]/', '', $m[1]);
                 if (preg_match('/^\d{6,12}$/', $cleanB) && !$esPosibleTelefono($cleanB)) {
                     $estado->cedula = $cleanB;
                     $cambio = true;
                     Log::info('🔍 Cédula capturada con prefijo', ['conv_id' => $conv->id, 'cedula' => $cleanB]);
+                }
+            }
+            // 🛡️ Caso C: dígitos CONTIGUOS de 7-12 chars en mensaje SIN contexto de dirección/pago
+            //    "Sí, mi cédula 1098765432 listo" → captura 1098765432
+            //    "Cra 50 # 51-00" → NO captura (contexto dirección)
+            elseif (!$contextoPago && !$contextoDireccion
+                && preg_match('/\b(\d{7,12})\b/', $msg, $m)) {
+                $cleanC = $m[1];
+                if (!$esPosibleTelefono($cleanC)) {
+                    $estado->cedula = $cleanC;
+                    $cambio = true;
+                    Log::info('🔍 Cédula capturada (dígitos contiguos)', ['conv_id' => $conv->id, 'cedula' => $cleanC]);
                 }
             }
             // Caso INTERNO: si la cédula que llega es distinta a la actual del estado
