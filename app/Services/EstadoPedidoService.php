@@ -601,6 +601,11 @@ class EstadoPedidoService
         $msgN = mb_strtolower(\Illuminate\Support\Str::ascii(trim($msg)));
         if ($msgN === '') return [];
 
+        // 🛡️ Limpiar caracteres de formato markdown que confunden al regex
+        // (asterisks, guion bajo, comillas que algunos clientes usan).
+        $msgN = preg_replace('/[\*_"`]/u', ' ', $msgN);
+        $msgN = preg_replace('/\s+/u', ' ', trim($msgN));
+
         // 🛡️ Normalizar palabras de cantidad escritas a dígitos.
         // "una pierna de cerdo" → "1 pierna de cerdo"
         // "media libra"          → "0.5 libra"
@@ -675,6 +680,30 @@ class EstadoPedidoService
                         'quantity' => 1.0,
                         'unit'     => $producto['unidad'],
                     ];
+                }
+            }
+        }
+
+        // 🛡️ FALLBACK B: "PRODUCTO + cantidad + unidad" (orden inverso)
+        //   "TILAPIA 1 kg"
+        //   "TILAPIA — 1 kg — $20.000"
+        //   "PIERNA DE CERDO 2 kilos"
+        if (empty($productos)) {
+            $patronProdCant = '/([a-záéíóúñ][a-záéíóúñ\s]+?)[\s\-—,]+(\d+(?:[.,]\d+)?)\s*(libras?|libritas?|lb|kilos?|kg|kilitos?|gramos?|gr|unidades?|unds?|porciones?|cajas?|paquetes?)/iu';
+            if (preg_match_all($patronProdCant, $msgN, $m4, PREG_SET_ORDER)) {
+                foreach ($m4 as $m) {
+                    $nombreCandidato = trim($m[1]);
+                    $cantidad = (float) str_replace(',', '.', $m[2]);
+                    $unidadRaw = mb_strtolower(rtrim($m[3], 's'));
+                    $producto = $this->matchProductoEnCatalogo($nombreCandidato, $catalogoTokens);
+                    if ($producto) {
+                        $productos[] = [
+                            'code'     => $producto['codigo'],
+                            'name'     => (string) $producto['producto']->nombre,
+                            'quantity' => $cantidad,
+                            'unit'     => $producto['unidad'],
+                        ];
+                    }
                 }
             }
         }
