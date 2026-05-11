@@ -107,8 +107,8 @@ class AuditoriaDiariaBot extends Command
         }
 
         // 4. Pedidos creados sin exportar a SGI
-        $sinExportar = Pedido::where('tenant_id', $tenant->id)
-            ->whereDate('created_at', today())
+        $sinExportar = Pedido::where('pedidos.tenant_id', $tenant->id)
+            ->whereDate('pedidos.created_at', today())
             ->leftJoin('integracion_export_logs', 'pedidos.id', '=', 'integracion_export_logs.pedido_id')
             ->whereNull('integracion_export_logs.id')
             ->count();
