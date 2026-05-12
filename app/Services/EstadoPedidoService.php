@@ -511,8 +511,8 @@ class EstadoPedidoService
                 $cambio = true;
                 Log::info('🔍 Método entrega DESPACHO capturado', ['conv_id' => $conv->id]);
             }
-            // Patrones RECOGER (cliente recoge)
-            elseif (preg_match('/\b(recog[eo]|paso\s+a\s+recoger|paso\s+por|voy\s+a\s+pasar|yo\s+voy|reclamo|reclamar|recogerlo|en\s+la\s+sede|en\s+la\s+tienda|cliente\s+recoge|yo\s+recojo)\b/iu', $msgLowerMe)) {
+            // Patrones RECOGER (cliente recoge) — incluye sinónimos cortos: sede, tienda, punto, almacen, paso, voy, recojo
+            elseif (preg_match('/\b(recog[eo]|recoger|recojo|recogerlo|reclamo|reclamar|paso\s+a\s+recoger|paso\s+por|paso|voy\s+a\s+pasar|voy|yo\s+voy|en\s+la\s+sede|en\s+sede|sede|tienda|punto|almac[eé]n|local|cliente\s+recoge|yo\s+recojo)\b/iu', $msgLowerMe)) {
                 $estado->metodo_entrega = ConversacionPedidoEstado::METODO_RECOGER;
                 $cambio = true;
                 Log::info('🔍 Método entrega RECOGER capturado', ['conv_id' => $conv->id]);
