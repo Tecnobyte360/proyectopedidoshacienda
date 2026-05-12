@@ -44,6 +44,28 @@ class Index extends Component
     public ?array $resultadoSyncHistorial = null;
 
     /**
+     * Permite abrir el chat directamente en una conversación específica
+     * vía query string: /chat?conv=123. Útil para el banner de handoff en
+     * /pedidos: cada botón "Atender" enlaza con su conv_id.
+     */
+    public function mount(\Illuminate\Http\Request $request): void
+    {
+        $convId = (int) $request->query('conv', 0);
+        if ($convId <= 0) return;
+
+        $conv = ConversacionWhatsapp::find($convId);
+        if (!$conv) return;
+
+        $this->seleccionar($conv->id);
+
+        // Si la conversación está en modo humano, asegurarse de que el
+        // operador la vea aunque tenga otro filtro activo.
+        if ($conv->atendida_por_humano) {
+            $this->filtroEstado = 'humano';
+        }
+    }
+
+    /**
      * Sincroniza TODO el historial de WhatsApp del tenant actual.
      * Importa tickets, contactos y mensajes desde la API de TecnoByteApp.
      * Es seguro: aislado por tenant_id, no toca data de otros tenants.
