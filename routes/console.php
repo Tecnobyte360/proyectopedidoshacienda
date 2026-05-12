@@ -60,6 +60,14 @@ Schedule::command('bot:auditoria-diaria')
     ->withoutOverlapping()
     ->runInBackground();
 
+// 🧹 Liberar conversaciones huérfanas (modo humano sin atención >2h)
+// Evita que clientes queden colgados sin respuesta del bot ni del equipo.
+Schedule::command('bot:liberar-conversaciones-huerfanas --horas=2')
+    ->everyThirtyMinutes()
+    ->timezone('America/Bogota')
+    ->withoutOverlapping()
+    ->runInBackground();
+
 Schedule::command('clientes:felicitar-cumpleanos')
     ->everyMinute()
     ->timezone('America/Bogota')

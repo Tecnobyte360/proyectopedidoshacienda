@@ -575,15 +575,24 @@ class WhatsappWebhookController extends Controller
             // del handoff ANTES de que un operador humano haya respondido,
             // devolvemos el control al bot. Evita pedidos perdidos cuando
             // el cliente cambia de opinión tras la derivación automática.
-            if ($this->clienteRetractaHandoff($convActiva, $message)) {
+            $retract = $this->clienteRetractaHandoff($convActiva, $message);
+
+            // 🔄 AUTO-REACTIVACIÓN POR TIEMPO: si la conversación lleva más
+            // de 2h en modo humano y nadie del equipo ha respondido, el bot
+            // retoma para no perder al cliente. Mide tiempo desde la
+            // derivación O desde el último mensaje del cliente.
+            $reactivarPorAbandono = $this->handoffAbandonado($convActiva);
+
+            if ($retract || $reactivarPorAbandono) {
                 $convActiva->update([
                     'atendida_por_humano' => false,
                     'departamento_id'     => null,
                     'derivada_at'         => null,
                 ]);
-                Log::info('🔄 Cliente retractó handoff — bot retoma', [
+                Log::info('🔄 Bot retoma conversación', [
                     'phone'   => $from,
                     'conv_id' => $convActiva->id,
+                    'motivo'  => $retract ? 'cliente_retracto' : 'handoff_abandonado',
                     'mensaje' => mb_substr($message, 0, 100),
                 ]);
                 // Continuar al flujo normal del bot (no retornar aquí)
@@ -2663,6 +2672,43 @@ TXT;
      * (método entrega, dirección, "ya", "listo", "sí confirmo", etc).
      * Si retorna true Y el estado tiene productos → forzar confirmar_pedido.
      */
+    /**
+     * 🔄 Detecta si un handoff fue abandonado por el equipo humano.
+     * Devuelve true si:
+     *   - La conversación está en modo humano
+     *   - Han pasado más de HORAS_HANDOFF_ABANDONADO desde la derivación
+     *   - Ningún operador (rol=assistant + meta.origen=operador) respondió
+     *     desde entonces
+     * Cuando esto pasa, el bot retoma para no dejar al cliente colgado.
+     */
+    private const HORAS_HANDOFF_ABANDONADO = 2;
+
+    private function handoffAbandonado(\App\Models\ConversacionWhatsapp $conv): bool
+    {
+        if (!$conv->atendida_por_humano) return false;
+
+        $referencia = $conv->derivada_at ?: $conv->updated_at;
+        if (!$referencia) return false;
+
+        $horasTranscurridas = now()->diffInMinutes($referencia) / 60;
+        if ($horasTranscurridas < self::HORAS_HANDOFF_ABANDONADO) return false;
+
+        // ¿Hubo respuesta de un operador humano desde la derivación?
+        $hayMensajeHumano = \App\Models\MensajeWhatsapp::where('conversacion_id', $conv->id)
+            ->where('rol', \App\Models\MensajeWhatsapp::ROL_ASSISTANT)
+            ->where('created_at', '>', $referencia)
+            ->whereJsonContains('meta->origen', 'operador')
+            ->exists();
+        if ($hayMensajeHumano) return false;
+
+        Log::info('⏰ Handoff abandonado detectado', [
+            'conv_id'  => $conv->id,
+            'horas'    => round($horasTranscurridas, 1),
+            'derivada_at' => optional($conv->derivada_at)?->format('Y-m-d H:i'),
+        ]);
+        return true;
+    }
+
     /**
      * 🔄 Detecta si el cliente está RETRACTANDO la razón del handoff.
      * Solo aplica si: (a) la conversación está en modo humano,
