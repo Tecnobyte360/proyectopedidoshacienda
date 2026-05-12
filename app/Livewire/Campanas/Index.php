@@ -6,12 +6,15 @@ use App\Models\CampanaWhatsapp;
 use App\Models\Sede;
 use App\Models\ZonaCobertura;
 use App\Services\CampanaSenderService;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 use Livewire\WithPagination;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class Index extends Component
 {
-    use WithPagination;
+    use WithPagination, WithFileUploads;
 
     protected $paginationTheme = 'tailwind';
 
@@ -25,6 +28,14 @@ class Index extends Component
     public ?int   $sedeId = null;
     public int    $minPedidos = 1;
     public string $telefonosManual = '';
+
+    /** Archivo Excel/CSV temporal (.xlsx, .xls, .csv) */
+    public $archivoExcel = null;
+    public int $numerosImportados = 0;
+
+    /** Imagen para envío masivo (Livewire temp file) */
+    public $imagen = null;
+    public ?string $mediaUrlExistente = null;
 
     public int    $intervaloMinSeg   = 8;
     public int    $intervaloMaxSeg   = 20;
@@ -47,7 +58,77 @@ class Index extends Component
             'descansoLoteMin'  => 'integer|min:0|max:1440',
             'ventanaDesde'     => 'string',
             'ventanaHasta'     => 'string',
+            'imagen'           => 'nullable|image|max:8192', // 8 MB
+            'archivoExcel'     => 'nullable|file|mimes:xlsx,xls,csv,txt|max:5120', // 5 MB
         ];
+    }
+
+    /**
+     * Cuando suben un Excel/CSV, lo parsea con PhpSpreadsheet y mete los
+     * teléfonos en el textarea manual. Detecta columna 'telefono', 'phone',
+     * 'celular' o usa la primera columna numérica.
+     */
+    public function updatedArchivoExcel(): void
+    {
+        $this->validate(['archivoExcel' => 'nullable|file|mimes:xlsx,xls,csv,txt|max:5120']);
+
+        if (!$this->archivoExcel) return;
+
+        try {
+            $path = $this->archivoExcel->getRealPath();
+            $spreadsheet = IOFactory::load($path);
+            $sheet = $spreadsheet->getActiveSheet();
+            $rows = $sheet->toArray(null, true, true, false);
+
+            if (empty($rows)) {
+                $this->dispatch('notify', ['type' => 'error', 'message' => 'El archivo está vacío.']);
+                return;
+            }
+
+            // Detectar columna de teléfono mirando la primera fila como header
+            $header = array_map(fn ($v) => mb_strtolower(trim((string) $v)), $rows[0]);
+            $colTel = null;
+            $colNom = null;
+            foreach ($header as $idx => $h) {
+                if ($colTel === null && preg_match('/(tel|cel|whats|phone|movil|m[oó]vil)/u', $h)) $colTel = $idx;
+                if ($colNom === null && preg_match('/(nombre|name|cliente)/u', $h)) $colNom = $idx;
+            }
+
+            // Si no hay header reconocible, asumimos col 0 = telefono
+            $skipFirst = ($colTel !== null);
+            if ($colTel === null) $colTel = 0;
+
+            $telefonos = [];
+            $nombres   = [];
+            foreach ($rows as $i => $row) {
+                if ($skipFirst && $i === 0) continue;
+                $rawTel = (string) ($row[$colTel] ?? '');
+                $tel = preg_replace('/\D+/', '', $rawTel);
+                if (mb_strlen($tel) < 7) continue;
+
+                // Anteponer 57 si parece celular CO sin código país (10 dígitos que empiezan en 3)
+                if (mb_strlen($tel) === 10 && str_starts_with($tel, '3')) $tel = '57' . $tel;
+
+                $telefonos[$tel] = $tel;
+                if ($colNom !== null) {
+                    $nombres[$tel] = trim((string) ($row[$colNom] ?? ''));
+                }
+            }
+
+            $this->telefonosManual = implode("\n", array_values($telefonos));
+            $this->audienciaTipo = 'manual';
+            $this->numerosImportados = count($telefonos);
+
+            $this->dispatch('notify', [
+                'type'    => 'success',
+                'message' => "✓ Importados {$this->numerosImportados} números. Audiencia cambiada a 'manual'.",
+            ]);
+        } catch (\Throwable $e) {
+            $this->dispatch('notify', [
+                'type'    => 'error',
+                'message' => 'No pude leer el archivo: ' . $e->getMessage(),
+            ]);
+        }
     }
 
     public function render()
@@ -62,7 +143,9 @@ class Index extends Component
 
     public function abrirCrear(): void
     {
-        $this->reset(['editandoId', 'nombre', 'mensaje', 'zonaId', 'sedeId', 'telefonosManual', 'programadaPara']);
+        $this->reset(['editandoId', 'nombre', 'mensaje', 'zonaId', 'sedeId',
+                      'telefonosManual', 'programadaPara', 'imagen',
+                      'archivoExcel', 'numerosImportados', 'mediaUrlExistente']);
         $this->audienciaTipo   = 'todos';
         $this->minPedidos      = 1;
         $this->intervaloMinSeg = 8;
@@ -93,6 +176,10 @@ class Index extends Component
         $this->ventanaDesde     = substr($c->ventana_desde ?: '08:00:00', 0, 5);
         $this->ventanaHasta     = substr($c->ventana_hasta ?: '20:00:00', 0, 5);
         $this->programadaPara   = $c->programada_para?->format('Y-m-d\TH:i');
+        $this->mediaUrlExistente= $c->media_url;
+        $this->imagen           = null;
+        $this->archivoExcel     = null;
+        $this->numerosImportados= 0;
         $this->modal = true;
     }
 
@@ -108,9 +195,17 @@ class Index extends Component
         if ($this->audienciaTipo === 'con_pedidos')                   $filtros['min_pedidos'] = $this->minPedidos;
         if ($this->audienciaTipo === 'manual')                        $filtros['telefonos'] = array_values(array_filter(array_map('trim', preg_split('/[\s,]+/', $this->telefonosManual))));
 
+        // Subir imagen al disco público si vino una nueva
+        $mediaUrl = $this->mediaUrlExistente;
+        if ($this->imagen) {
+            $path = $this->imagen->store('campanas', 'public');
+            $mediaUrl = Storage::disk('public')->url($path);
+        }
+
         $data = [
             'nombre'             => $this->nombre,
             'mensaje'            => $this->mensaje,
+            'media_url'          => $mediaUrl,
             'audiencia_tipo'     => $this->audienciaTipo,
             'audiencia_filtros'  => $filtros,
             'intervalo_min_seg'  => $this->intervaloMinSeg,

@@ -187,6 +187,57 @@
                         @endif
                     </div>
 
+                    {{-- 📊 Importar Excel/CSV --}}
+                    <div class="rounded-xl border-2 border-dashed border-emerald-300 bg-emerald-50/40 p-4">
+                        <h4 class="font-bold text-slate-800 text-sm mb-2">
+                            <i class="fa-solid fa-file-import text-emerald-600"></i> Importar Excel/CSV
+                        </h4>
+                        <p class="text-xs text-slate-600 mb-3">
+                            Sube un archivo <code class="bg-white px-1 rounded">.xlsx</code>, <code class="bg-white px-1 rounded">.xls</code> o
+                            <code class="bg-white px-1 rounded">.csv</code>. Detectará automáticamente la columna de teléfono (busca encabezados como
+                            "telefono", "celular", "phone"). Los números se cargan al campo manual de arriba.
+                        </p>
+                        <input type="file" wire:model="archivoExcel" accept=".xlsx,.xls,.csv,.txt"
+                               class="block w-full text-xs text-slate-600 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-emerald-600 file:text-white file:font-semibold file:cursor-pointer hover:file:bg-emerald-700">
+                        <div wire:loading wire:target="archivoExcel" class="text-xs text-emerald-700 mt-2">
+                            <i class="fa-solid fa-spinner fa-spin"></i> Procesando archivo…
+                        </div>
+                        @error('archivoExcel') <p class="text-rose-500 text-xs mt-1">{{ $message }}</p> @enderror
+                        @if($numerosImportados > 0)
+                            <p class="text-xs text-emerald-700 mt-2 font-semibold">
+                                ✓ {{ $numerosImportados }} números importados.
+                            </p>
+                        @endif
+                    </div>
+
+                    {{-- 🖼️ Imagen del envío --}}
+                    <div class="rounded-xl border-2 border-dashed border-sky-300 bg-sky-50/40 p-4">
+                        <h4 class="font-bold text-slate-800 text-sm mb-2">
+                            <i class="fa-solid fa-image text-sky-600"></i> Imagen (opcional)
+                        </h4>
+                        <p class="text-xs text-slate-600 mb-3">
+                            Se enviará a cada destinatario junto con el mensaje como caption. Tamaño máx: 8 MB.
+                        </p>
+                        <input type="file" wire:model="imagen" accept="image/*"
+                               class="block w-full text-xs text-slate-600 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-sky-600 file:text-white file:font-semibold file:cursor-pointer hover:file:bg-sky-700">
+                        <div wire:loading wire:target="imagen" class="text-xs text-sky-700 mt-2">
+                            <i class="fa-solid fa-spinner fa-spin"></i> Subiendo imagen…
+                        </div>
+                        @error('imagen') <p class="text-rose-500 text-xs mt-1">{{ $message }}</p> @enderror
+
+                        @if($imagen)
+                            <div class="mt-3 flex items-center gap-3">
+                                <img src="{{ $imagen->temporaryUrl() }}" alt="Preview" class="w-24 h-24 object-cover rounded-xl border border-slate-200">
+                                <button type="button" wire:click="$set('imagen', null)" class="text-xs text-rose-600 hover:underline">Quitar</button>
+                            </div>
+                        @elseif($mediaUrlExistente)
+                            <div class="mt-3 flex items-center gap-3">
+                                <img src="{{ $mediaUrlExistente }}" alt="Actual" class="w-24 h-24 object-cover rounded-xl border border-slate-200">
+                                <button type="button" wire:click="$set('mediaUrlExistente', null)" class="text-xs text-rose-600 hover:underline">Quitar</button>
+                            </div>
+                        @endif
+                    </div>
+
                     <div class="rounded-xl border-2 border-amber-200 bg-amber-50/30 p-4 space-y-3">
                         <h4 class="font-bold text-slate-800 text-sm"><i class="fa-solid fa-shield-halved text-amber-600"></i> Anti-baneo (throttle)</h4>
                         <div class="grid grid-cols-2 gap-3">

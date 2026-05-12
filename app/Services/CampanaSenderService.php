@@ -138,6 +138,21 @@ class CampanaSenderService
             return ['enviados' => 0, 'fallidos' => 0, 'omitidos' => 0, 'razon' => 'fuera_de_ventana'];
         }
 
+        // 🛡️ Anti-baneo: respetar descanso entre lotes (intersticial sin perder estado)
+        $ultimoLoteKey = "campana_{$c->id}_ultimo_lote_ts";
+        $ultimoLoteTs = \Illuminate\Support\Facades\Cache::get($ultimoLoteKey);
+        if ($ultimoLoteTs && $c->descanso_lote_min > 0) {
+            $segundosRequeridos = $c->descanso_lote_min * 60;
+            $transcurridos = now()->timestamp - (int) $ultimoLoteTs;
+            if ($transcurridos < $segundosRequeridos) {
+                $faltan = $segundosRequeridos - $transcurridos;
+                return [
+                    'enviados' => 0, 'fallidos' => 0, 'omitidos' => 0,
+                    'razon'    => "descanso_lote (faltan {$faltan}s)",
+                ];
+            }
+        }
+
         $tenant = \App\Models\Tenant::find($c->tenant_id);
         if (!$tenant) {
             $c->update(['estado' => CampanaWhatsapp::ESTADO_PAUSADA, 'notas' => 'Tenant no encontrado']);
@@ -170,7 +185,17 @@ class CampanaSenderService
             $mensaje = $this->renderizar($c->mensaje, $d);
 
             try {
-                $ok = $this->sender->enviarTexto($d->telefono, $mensaje, $c->connection_id);
+                // Si hay imagen adjunta → enviarImagen con caption; si no → texto
+                if (!empty($c->media_url)) {
+                    $ok = $this->sender->enviarImagen(
+                        $d->telefono,
+                        $c->media_url,
+                        $mensaje,
+                        $c->connection_id
+                    );
+                } else {
+                    $ok = $this->sender->enviarTexto($d->telefono, $mensaje, $c->connection_id);
+                }
                 if ($ok) {
                     $d->update([
                         'estado'              => CampanaDestinatario::ESTADO_ENVIADO,
@@ -215,6 +240,15 @@ class CampanaSenderService
         // Si ya no hay pendientes, marcar como completada
         if ($c->total_pendientes === 0) {
             $c->update(['estado' => CampanaWhatsapp::ESTADO_COMPLETADA, 'completada_at' => now()]);
+        }
+
+        // Marcar timestamp del lote para que el descanso_lote_min surta efecto
+        if ($enviados > 0 || $fallidos > 0) {
+            \Illuminate\Support\Facades\Cache::put(
+                "campana_{$c->id}_ultimo_lote_ts",
+                now()->timestamp,
+                now()->addHours(24)
+            );
         }
 
         Log::info("📨 Campaña #{$c->id} lote: {$enviados} enviados, {$fallidos} fallidos.");

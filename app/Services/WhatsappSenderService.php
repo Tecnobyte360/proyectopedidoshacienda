@@ -113,6 +113,87 @@ class WhatsappSenderService
     }
 
     /**
+     * Envía una imagen por URL pública con caption opcional.
+     * Dual provider: Meta primero, legacy (TecnoByteApp) como fallback.
+     *
+     * @param string $telefono     E.164 sin +
+     * @param string $imagenUrl    URL pública accesible
+     * @param string $caption      Texto opcional al pie
+     * @param int|null $connectionId  ID de conexión legacy (no aplica si va por Meta)
+     */
+    public function enviarImagen(
+        string $telefono,
+        string $imagenUrl,
+        string $caption = '',
+        ?int $connectionId = null,
+        bool $persistirEnConversacion = true,
+        array $metaExtra = []
+    ): bool {
+        // 📱 Dual provider: Meta primero
+        try {
+            $metaCfg = app(\App\Services\Meta\MetaWhatsappCloudService::class)->resolverConfig();
+            if ($metaCfg) {
+                $ok = app(\App\Services\Meta\MetaWhatsappCloudService::class)
+                    ->enviarImagen($telefono, $imagenUrl, $caption ?: null, $metaCfg->tenant_id);
+                if ($ok && $persistirEnConversacion) {
+                    $this->persistirEnConversacion(
+                        $telefono,
+                        $caption ?: '[imagen]',
+                        $connectionId,
+                        array_merge($metaExtra, ['provider' => 'meta', 'media_url' => $imagenUrl, 'tipo' => 'image'])
+                    );
+                }
+                return $ok;
+            }
+        } catch (\Throwable $e) {
+            Log::warning('WA Sender imagen: chequeo Meta falló, usando legacy: ' . $e->getMessage());
+        }
+
+        // Legacy: TecnoByteApp expone /api/messages/send-media o similar.
+        // Si tu API legacy no soporta media, este path retorna false.
+        $resolver = app(\App\Services\WhatsappResolverService::class);
+        $cred = $resolver->credenciales();
+        $cacheKey = $resolver->tokenCacheKey();
+        $token = $this->obtenerToken($cred, $cacheKey);
+        if (!$token) return false;
+
+        $payload = [
+            'number'   => $telefono,
+            'mediaUrl' => $imagenUrl,
+            'caption'  => $caption,
+        ];
+        if ($connectionId) $payload['whatsappId'] = $connectionId;
+
+        try {
+            $endpoint = rtrim($cred['api_base_url'], '/') . '/api/messages/send-media';
+            $resp = Http::withoutVerifying()
+                ->withToken($token)
+                ->timeout(30)
+                ->post($endpoint, $payload);
+
+            $ok = $resp->successful();
+            if (!$ok) {
+                Log::warning('WA Sender imagen legacy: falló', [
+                    'status' => $resp->status(),
+                    'body'   => mb_substr($resp->body(), 0, 300),
+                ]);
+            }
+            if ($ok && $persistirEnConversacion) {
+                $this->persistirEnConversacion(
+                    $telefono,
+                    $caption ?: '[imagen]',
+                    $connectionId,
+                    array_merge($metaExtra, ['provider' => 'legacy', 'media_url' => $imagenUrl, 'tipo' => 'image'])
+                );
+            }
+            return $ok;
+        } catch (\Throwable $e) {
+            Log::error('WA Sender imagen excepción: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
      * Guarda el mensaje enviado en la conversación del cliente.
      * Si no existe conversación activa, la crea. Así el mensaje aparece
      * en /chat como cualquier otro mensaje saliente.
