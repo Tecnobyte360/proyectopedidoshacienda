@@ -131,7 +131,10 @@ class AnthropicService
             Log::warning('🔄 Anthropic overloaded — fallback a Haiku', [
                 'modelo_original' => $model,
             ]);
-            return $this->chat($messages, $toolChoice, $tools, array_merge($opts, [
+            // Sanitizar mensajes para evitar tool_use sin tool_result inmediato
+            // (esto rompe Anthropic con error 400 al reintentar con otro modelo).
+            $messagesLimpios = $this->sanitizarMensajesParaFallback($messages);
+            return $this->chat($messagesLimpios, $toolChoice, $tools, array_merge($opts, [
                 'model'        => 'claude-haiku-4-5',
                 'intentos'     => 2,
                 '_isFallback'  => true,
@@ -139,6 +142,36 @@ class AnthropicService
         }
 
         return null;
+    }
+
+    /**
+     * Quita tool_calls del assistant si no hay un mensaje tool inmediato
+     * después. Anthropic exige que cada tool_use tenga su tool_result
+     * en el siguiente mensaje, si no, rechaza con 400.
+     */
+    private function sanitizarMensajesParaFallback(array $messages): array
+    {
+        $limpios = [];
+        $count = count($messages);
+        for ($i = 0; $i < $count; $i++) {
+            $msg = $messages[$i];
+            $role = $msg['role'] ?? '';
+            $hasToolCalls = $role === 'assistant' && !empty($msg['tool_calls']);
+            if ($hasToolCalls) {
+                $next = $messages[$i + 1] ?? null;
+                $nextEsTool = $next && ($next['role'] ?? '') === 'tool';
+                if (!$nextEsTool) {
+                    // Eliminar tool_calls — el assistant sigue solo con su content
+                    unset($msg['tool_calls']);
+                    if (empty(trim((string) ($msg['content'] ?? '')))) {
+                        // No hay nada que decir, saltarlo
+                        continue;
+                    }
+                }
+            }
+            $limpios[] = $msg;
+        }
+        return $limpios;
     }
 
     /**

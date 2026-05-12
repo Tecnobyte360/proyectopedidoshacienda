@@ -1287,7 +1287,12 @@ TXT;
 
         if (!$response) {
             Cache::put($cacheKey, $conversationHistory, now()->addMinutes(45));
-            return 'En este momento no logré procesar tu mensaje. ¿Me lo repites con un poquito más de detalle?';
+            Log::warning('🚨 LLM completamente caído — respuesta degradada al cliente', [
+                'from' => $from,
+            ]);
+            // Mensaje más útil cuando el LLM está completamente caído
+            return "Estamos teniendo un problema temporal con el sistema. 🙏 "
+                 . "Inténtalo en 1 minuto, o escribe *asesor* si necesitas ayuda inmediata.";
         }
 
         $toolCalls   = $response['choices'][0]['message']['tool_calls'] ?? null;
