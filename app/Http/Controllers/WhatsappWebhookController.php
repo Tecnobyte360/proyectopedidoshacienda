@@ -1197,10 +1197,18 @@ TXT;
         );
 
         // 🚦 ORQUESTADOR: regla por paso (tools permitidas + tool_choice)
+        // Forzar avanzar paso antes de filtrar tools — el estado puede haber
+        // cambiado tras el captador determinista y debe reflejarse en el flujo.
+        try {
+            $estadoSrv->avanzarPaso($estadoActualBd);
+            $pasoActualOrch = $estadoActualBd->fresh()->paso_actual ?? $pasoActualOrch;
+        } catch (\Throwable $e) { /* keep $pasoActualOrch */ }
+
         $orchestrator = app(\App\Services\FlujoPedidoOrchestrator::class);
         $toolsFiltradas = $orchestrator->filtrarTools(
             $this->getToolsDefinicion(),
-            $pasoActualOrch
+            $pasoActualOrch,
+            $estadoActualBd  // 🛡️ permite confirmar_pedido si estado completo
         );
         $toolChoicePorPaso = $orchestrator->toolChoice($pasoActualOrch);
 
@@ -2949,35 +2957,29 @@ TXT;
 
     private function detectarFalsaConfirmacion(string $reply): ?string
     {
-        // ⚠️ SOLO frases que afirman que el pedido YA está cerrado/enviado.
-        // NO incluir "verificando", "un momento", "voy a validar" — esas
-        // son frases legítimas mientras el bot llama una tool y producen
-        // falsos positivos que disparan loops del BotCierre.
-        $frases = [
-            // Confirmación inequívoca (el bot dice que el pedido está CREADO)
-            'pedido quedó registrado',
-            'pedido registrado',
-            'pedido confirmado',
-            'queda confirmado',
-            'quedó en preparación',
-            'tu pedido quedó listo',
-            'tu pedido #',
-            // Despacho ya en marcha (el bot afirma despacho YA ejecutado)
-            'va en camino',
-            'salió en camino',
-            'sale en camino',
-            'lo estamos preparando',
-            // Cierre en pasado/perfecto (acción completada)
-            'tu pedido queda registrado',
-            'pedido queda registrado',
-            'queda anotado',
-            'queda apuntado',
+        $lower = mb_strtolower($reply);
+
+        // 🛡️ REGEX flexibles que detectan variantes con palabras intermedias
+        // ("está", "ya está", "ha sido", "queda", "fue") que el LLM mete entre
+        // 'pedido' y 'confirmado/registrado'.
+        $regexes = [
+            // "pedido confirmado", "pedido está confirmado", "pedido ya quedó confirmado"
+            '/\bpedido\s+(?:[a-zñáéíóú]+\s+){0,4}(?:confirmado|registrado|listo|creado|guardado|procesado|recibido)\b/u',
+            // "tu pedido está/queda listo", "su pedido fue creado"
+            '/\b(?:tu|su)\s+pedido\s+(?:[a-zñáéíóú]+\s+){0,3}(?:está|queda|fue|ha sido|ya|listo|creado)\b/u',
+            // Despacho en pasado/presente afirmativo
+            '/\b(?:va|sale|salió)\s+(?:en\s+camino|para\s+(?:tu|su)\s+casa|hacia)\b/u',
+            // "ya lo despachamos", "ya lo enviamos"
+            '/\bya\s+(?:lo|la)\s+(?:despach|envi|entreg|mand)/u',
+            // "queda anotado/apuntado/agendado/registrado"
+            '/\bqueda\s+(?:anotado|apuntado|agendado|registrado|listo)\b/u',
+            // "tu pedido #N" (número de pedido)
+            '/\btu\s+pedido\s+#\d+/u',
         ];
 
-        $lower = mb_strtolower($reply);
-        foreach ($frases as $f) {
-            if (str_contains($lower, $f)) {
-                return $f;
+        foreach ($regexes as $r) {
+            if (preg_match($r, $lower, $m)) {
+                return $m[0];
             }
         }
         return null;

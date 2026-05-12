@@ -259,10 +259,23 @@ class FlujoPedidoOrchestrator
     /**
      * Filtra el array de definiciones de tools de OpenAI dejando solo
      * las permitidas en el paso actual.
+     *
+     * 🛡️ EXCEPCIÓN: si pasamos un $estado y este está COMPLETO + sin confirmar,
+     * permitimos también `confirmar_pedido` aunque el paso no sea CONFIRMACION.
+     * Esto evita que el LLM alucine "tu pedido está confirmado" sin llamar la
+     * tool, porque la tool no estaba disponible en su paso filtrado.
      */
-    public function filtrarTools(array $todasLasTools, string $paso): array
+    public function filtrarTools(array $todasLasTools, string $paso, ?ConversacionPedidoEstado $estado = null): array
     {
         $permitidas = $this->toolsPermitidas($paso);
+
+        // Si estado completo + sin confirmar → habilitar confirmar_pedido
+        // independientemente del paso reportado.
+        if ($estado && $estado->estaCompleto() && !$estado->confirmado_at) {
+            if (!in_array('confirmar_pedido', $permitidas, true)) {
+                $permitidas[] = 'confirmar_pedido';
+            }
+        }
 
         return array_values(array_filter($todasLasTools, function ($tool) use ($permitidas) {
             $nombre = $tool['function']['name'] ?? null;
