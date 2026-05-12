@@ -119,6 +119,25 @@ class AnthropicService
             'status' => $ultimoStatus,
             'modelo' => $model,
         ]);
+
+        // 🔄 FALLBACK AUTOMÁTICO: si el modelo principal está overloaded (529),
+        // probamos con Haiku que tiene más capacidad disponible. Solo si no
+        // estamos ya usando Haiku (para evitar recursión).
+        $esOverloaded = $ultimoStatus === 529
+            || (is_string($ultimoBody) && stripos($ultimoBody, 'overloaded') !== false);
+        $yaEsHaiku = stripos($model, 'haiku') !== false;
+
+        if ($esOverloaded && !$yaEsHaiku && empty($opts['_isFallback'])) {
+            Log::warning('🔄 Anthropic overloaded — fallback a Haiku', [
+                'modelo_original' => $model,
+            ]);
+            return $this->chat($messages, $toolChoice, $tools, array_merge($opts, [
+                'model'        => 'claude-haiku-4-5',
+                'intentos'     => 2,
+                '_isFallback'  => true,
+            ]));
+        }
+
         return null;
     }
 
