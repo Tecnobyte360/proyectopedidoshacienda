@@ -70,8 +70,25 @@ class AnthropicService
             'temperature' => $temperature,
             'messages'    => $messagesAnt,
         ];
-        if ($systemAnt !== '') $payload['system'] = $systemAnt;
+
+        // 💰 PROMPT CACHING — system prompt + tools se cachean 5 min en Anthropic.
+        // Reduce ~90% del costo y NO cuenta hacia el rate limit de input tokens.
+        // System debe ir como array con cache_control.
+        if ($systemAnt !== '') {
+            $payload['system'] = [
+                [
+                    'type'          => 'text',
+                    'text'          => $systemAnt,
+                    'cache_control' => ['type' => 'ephemeral'],
+                ],
+            ];
+        }
         if (!empty($toolsAnt)) {
+            // Cachear también la definición de tools (es grande y repetitiva)
+            $lastIdx = count($toolsAnt) - 1;
+            if ($lastIdx >= 0) {
+                $toolsAnt[$lastIdx]['cache_control'] = ['type' => 'ephemeral'];
+            }
             $payload['tools'] = $toolsAnt;
             if ($toolChoiceAnt) $payload['tool_choice'] = $toolChoiceAnt;
         }
