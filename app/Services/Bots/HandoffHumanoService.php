@@ -120,11 +120,37 @@ class HandoffHumanoService
     {
         if ($conv->genero_pedido) return false; // ya cerró pedido
 
-        $mensajesUser = MensajeWhatsapp::where('conversacion_id', $conv->id)
+        // Contar SOLO mensajes de la sesión actual (últimas 2h) — evita arrastrar
+        // mensajes de visitas anteriores que ya quedaron incompletas.
+        $desde = now()->subHours(2);
+
+        $mensajesUserSesion = MensajeWhatsapp::where('conversacion_id', $conv->id)
             ->where('rol', 'user')
+            ->where('created_at', '>=', $desde)
             ->count();
 
-        return $mensajesUser > 12;
+        // Umbral más realista: 20 mensajes en 2h sin pedido = bot atascado.
+        // Antes era 12 (muy estricto: flujos con varios productos + dirección +
+        // cédula + teléfono fácil llegan a 12 mensajes legítimos).
+        if ($mensajesUserSesion <= 20) return false;
+
+        // 🛡️ Si el bot está PROGRESANDO (hubo tool_call en los últimos 5 mensajes
+        // del bot), NO derivar — el flujo está avanzando normalmente.
+        $ultimosBot = MensajeWhatsapp::where('conversacion_id', $conv->id)
+            ->where('rol', 'assistant')
+            ->where('created_at', '>=', $desde)
+            ->orderByDesc('id')
+            ->limit(5)
+            ->get(['meta']);
+        foreach ($ultimosBot as $m) {
+            $meta = is_array($m->meta) ? $m->meta : (json_decode((string) $m->meta, true) ?: []);
+            $tipo = $meta['tipo'] ?? null;
+            if ($tipo === 'tool_call' || $tipo === 'tool_call_dinamica' || !empty($meta['tool_calls'])) {
+                return false; // bot ejecutó una tool reciente → progresando
+            }
+        }
+
+        return true;
     }
 
     private function derivar(ConversacionWhatsapp $conv, string $motivo, string $razon): string
