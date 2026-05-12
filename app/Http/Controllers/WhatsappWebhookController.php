@@ -2935,77 +2935,29 @@ TXT;
 
     private function detectarFalsaConfirmacion(string $reply): ?string
     {
+        // ⚠️ SOLO frases que afirman que el pedido YA está cerrado/enviado.
+        // NO incluir "verificando", "un momento", "voy a validar" — esas
+        // son frases legítimas mientras el bot llama una tool y producen
+        // falsos positivos que disparan loops del BotCierre.
         $frases = [
-            // Confirmación explícita
+            // Confirmación inequívoca (el bot dice que el pedido está CREADO)
             'pedido quedó registrado',
             'pedido registrado',
             'pedido confirmado',
             'queda confirmado',
-            'queda registrado',
-            'tu pedido #',
             'quedó en preparación',
             'tu pedido quedó listo',
-            // Despacho / domicilio
+            'tu pedido #',
+            // Despacho ya en marcha (el bot afirma despacho YA ejecutado)
             'va en camino',
             'salió en camino',
             'sale en camino',
             'lo estamos preparando',
-            'te despachamos',
-            'te lo despachamos',
-            'te lo enviamos',
-            'te lo entregamos',
-            'lo enviamos a',
-            'sale para tu casa',
-            // Recoger en sede
-            'lo recogerás',
-            'la recogerás',
-            'puedes recogerlo',
-            'puedes pasar a recoger',
-            'pasa a recoger',
-            'lista tu compra',
-            'listo para recoger',
-            // Cierre genérico
-            'genial, te despachamos',
-            'perfecto, queda',
-            'tu pedido queda',
-            'tu pedido es:',
-            'tu pedido será',
-            'tu pedido sera',
-            'tu pedido es de',
-            'pedido queda así',
-            'pedido queda asi',
-            'pedido queda listo',
+            // Cierre en pasado/perfecto (acción completada)
+            'tu pedido queda registrado',
+            'pedido queda registrado',
             'queda anotado',
             'queda apuntado',
-            'queda agendado',
-            // ⏳ Promesas vacías — el bot dice "ya lo hago" pero no llama tool
-            'un momento, verificando',
-            'un momento verificando',
-            'verificando tus datos',
-            'verificando datos',
-            'déjame verificar tus datos',
-            'dame un momento',
-            'estoy generando tu pedido',
-            'estoy creando tu pedido',
-            'voy a registrar tu pedido',
-            'procediendo a registrar',
-            'procederé a registrar',
-            'registrando tu pedido',
-            'creando el pedido',
-            'creando tu pedido',
-            'anotando tu pedido',
-            'anotando el pedido',
-            // ⏳ "voy a validar..." sin invocar validar_cobertura
-            'voy a validar',
-            'voy a verificar si',
-            'déjame validar',
-            'permíteme verificar',
-            'permiteme verificar',
-            'verifico la cobertura',
-            'consultando cobertura',
-            'revisando cobertura',
-            'voy a chequear',
-            'voy a consultar',
         ];
 
         $lower = mb_strtolower($reply);

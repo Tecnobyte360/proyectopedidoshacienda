@@ -82,26 +82,14 @@ class BotCierreService
             ];
         }
 
-        Log::info('🤖 BotCierre: estado incompleto — intentando completar con LLM mini', [
+        // 🚫 LLM MINI DESACTIVADO — generaba loops infinitos.
+        // Si el estado está incompleto, el bot principal pide los datos
+        // faltantes en su turno normal. No tiene sentido forzar otra
+        // llamada LLM aquí (terminaba pidiendo los mismos datos en bucle).
+        Log::info('🤖 BotCierre: estado incompleto — devolviendo faltantes al flujo principal', [
             'conv_id'   => $conv->id,
             'faltantes' => $faltantes,
         ]);
-
-        $orderDataLlm = $this->intentarConLlm($conv, $estado);
-        if ($orderDataLlm !== null) {
-            // Persistir lo que el LLM extrajo para futuras vueltas
-            try {
-                app(EstadoPedidoService::class)->captarDeOrderData($conv, $orderDataLlm);
-            } catch (\Throwable $e) {
-                Log::warning('No se pudo persistir orderData del BotCierre: ' . $e->getMessage());
-            }
-
-            return [
-                'ok'        => true,
-                'orderData' => $orderDataLlm,
-                'via'       => 'llm_forzado',
-            ];
-        }
 
         return [
             'ok'        => false,
