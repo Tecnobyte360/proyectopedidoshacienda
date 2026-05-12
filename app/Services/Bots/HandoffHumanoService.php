@@ -34,31 +34,15 @@ class HandoffHumanoService
 
         $msgN = mb_strtolower(Str::ascii(trim($mensajeCliente)));
 
-        // 1) Petición explícita de humano
+        // ÚNICA condición que derivamos automáticamente: el cliente lo pide
+        // EXPLÍCITAMENTE ("asesor", "humano", "persona real", "agente").
+        // Todas las demás heurísticas (frustración, bot en bucle, conversación
+        // larga) están DESACTIVADAS para que el LLM tenga libertad total
+        // de manejar el flujo. El LLM puede invocar `derivar_a_departamento`
+        // conscientemente si lo necesita.
         if ($this->piedeHumano($msgN)) {
             return $this->derivar($conv, 'peticion_explicita',
                 'El cliente solicitó hablar con un asesor humano.'
-            );
-        }
-
-        // 2) Frustración detectada
-        if ($this->expresoFrustracion($msgN)) {
-            return $this->derivar($conv, 'frustracion_cliente',
-                'El cliente expresó frustración con el bot.'
-            );
-        }
-
-        // 3) Bot en bucle (mismas respuestas 3 veces)
-        if ($this->botEnBucle($conv)) {
-            return $this->derivar($conv, 'bot_en_bucle',
-                'El bot repitió la misma respuesta 3+ veces — posible loop.'
-            );
-        }
-
-        // 4) Conversación demasiado larga sin cerrar pedido
-        if ($this->conversacionDemasiadoLarga($conv)) {
-            return $this->derivar($conv, 'conversacion_larga',
-                'Más de 12 mensajes del cliente sin cerrar pedido.'
             );
         }
 
