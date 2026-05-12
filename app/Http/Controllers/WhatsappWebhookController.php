@@ -1317,6 +1317,7 @@ TXT;
             'buscar_productos', 'listar_categorias', 'productos_de_categoria', 'info_producto', 'productos_destacados',
             // Tools de info estática del tenant (datos de BD)
             'consultar_horarios', 'consultar_zonas_cobertura', 'consultar_promociones',
+            'consultar_mis_pedidos',
         ];
         if ($toolCalls && in_array($toolCalls[0]['function']['name'] ?? '', $catalogoTools, true)) {
             $catalogoSvc = app(\App\Services\BotCatalogoToolService::class);
@@ -1510,6 +1511,9 @@ TXT;
                                     . 'menciona la promo pero acláralo: "aplica a productos seleccionados, consúltame por uno específico".',
                             ];
                         })(),
+
+                        // 📦 Pedidos del cliente que escribe (telefono whatsapp)
+                        'consultar_mis_pedidos' => $this->resultadoMisPedidos($from, (int) ($args['limite'] ?? 5)),
                     };
                 } catch (\Throwable $e) {
                     $resultado = ['error' => $e->getMessage()];
@@ -4312,6 +4316,8 @@ TXT;
 
               'consultar_promociones' => $this->resultadoPromociones(),
 
+              'consultar_mis_pedidos' => $this->resultadoMisPedidos($from, (int) ($args['limite'] ?? 5)),
+
               'validar_cobertura' => $this->validarCoberturaDireccion(
                   (string) ($args['direccion'] ?? ''),
                   $args['barrio'] ?? null,
@@ -5743,6 +5749,59 @@ TXT;
             ->get();
     }
 
+    /**
+     * Tool: consultar_mis_pedidos. Devuelve los pedidos del cliente que escribe,
+     * formateados como payload para el LLM.
+     */
+    private function resultadoMisPedidos(string $from, int $limite = 5): array
+    {
+        $limite  = max(1, min(10, $limite));
+        $pedidos = $this->pedidosDelCliente($from, $limite);
+
+        if ($pedidos->isEmpty()) {
+            return [
+                'pedidos'              => [],
+                'total_pedidos'        => 0,
+                'mensaje_si_vacio'     => 'No encontré pedidos asociados a este número.',
+                'instruccion_para_bot' => 'No hay pedidos. Dile al cliente que no encontraste pedidos a su nombre y ofrece ayudarlo a crear uno nuevo.',
+            ];
+        }
+
+        $base = rtrim((string) config('app.url', ''), '/');
+
+        $items = $pedidos->map(function ($p) use ($base) {
+            $detalles = ($p->detalles ?? collect())->map(fn ($d) => [
+                'producto' => $d->producto ?? $d->nombre_producto ?? '?',
+                'cantidad' => (float) ($d->cantidad ?? 0),
+                'unidad'   => $d->unidad ?? null,
+            ])->values()->all();
+
+            return [
+                'id'              => $p->id,
+                'estado'          => $p->estado,
+                'estado_pago'     => $p->estado_pago ?? null,
+                'fecha_pedido'    => optional($p->fecha_pedido)->format('Y-m-d H:i'),
+                'programado_para' => optional($p->programado_para)->format('Y-m-d H:i'),
+                'total'           => (float) ($p->total ?? 0),
+                'sede'            => $p->sede->nombre ?? null,
+                'productos'       => $detalles,
+                'seguimiento_url' => $p->seguimiento_token
+                    ? ($base ? "{$base}/seguimiento-pedido/{$p->seguimiento_token}" : null)
+                    : null,
+            ];
+        })->values()->all();
+
+        return [
+            'pedidos'              => $items,
+            'total_pedidos'        => count($items),
+            'instruccion_para_bot' =>
+                'Lista los pedidos al cliente de forma clara: número de pedido, estado, fecha, total y link de seguimiento si existe. '
+                . 'Si hay pedidos programados (programado_para) menciónalo. '
+                . 'NUNCA inventes datos: solo usa los del payload. '
+                . 'Si el cliente pregunta por "el último pedido", responde con el primero del array (vienen ordenados del más reciente al más antiguo).',
+        ];
+    }
+
     private function buscarPedidosClienteSQL(string $from, string $message): string
     {
         $msg = mb_strtolower($message);
@@ -6022,6 +6081,7 @@ TXT;
                  . "  - Para cobertura → `validar_cobertura` o `consultar_zonas_cobertura`\n"
                  . "  - Para horarios → `consultar_horarios`\n"
                  . "  - Para promos → `consultar_promociones`\n"
+                 . "  - Para pedidos del cliente (¿cuántos tengo? mis pedidos, último pedido, estado) → `consultar_mis_pedidos`\n"
                  . "  - Para registrar cliente nuevo en SGI → `verificar_cliente_erp`\n"
                  . "  - Para registrar pedido → `confirmar_pedido` (OBLIGATORIO al cerrar)\n"
                  . "  Si no encuentras la respuesta en tus tools, NO la inventes.\n\n"
@@ -6564,6 +6624,29 @@ PROMPT;
                 'parameters'  => [
                     'type'       => 'object',
                     'properties' => new \stdClass(),
+                    'required'   => [],
+                ],
+            ],
+        ];
+
+        // 📦 Tool: consultar_mis_pedidos — pedidos del cliente que escribe
+        $tools[] = [
+            'type'     => 'function',
+            'function' => [
+                'name'        => 'consultar_mis_pedidos',
+                'description' => 'Devuelve los pedidos del cliente que escribe por WhatsApp (identificado por su número). '
+                    . 'ÚSALA cuando el cliente pregunte "¿cuántos pedidos tengo?", "mis pedidos", "mi último pedido", '
+                    . '"estado de mi pedido", "qué pasó con mi pedido", "ya llegó mi pedido". '
+                    . 'Devuelve estado, total, fecha y link de seguimiento. NUNCA inventes pedidos: usa solo los del payload. '
+                    . 'Si el array está vacío, dile al cliente que no encontraste pedidos asociados a su número.',
+                'parameters'  => [
+                    'type'       => 'object',
+                    'properties' => [
+                        'limite' => [
+                            'type'        => 'integer',
+                            'description' => 'Cuántos pedidos devolver (máx 10, default 5)',
+                        ],
+                    ],
                     'required'   => [],
                 ],
             ],
