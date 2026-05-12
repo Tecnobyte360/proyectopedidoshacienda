@@ -1318,6 +1318,7 @@ TXT;
             // Tools de info estática del tenant (datos de BD)
             'consultar_horarios', 'consultar_zonas_cobertura', 'consultar_promociones',
             'consultar_mis_pedidos',
+            'crear_adicion_pedido',
         ];
         if ($toolCalls && in_array($toolCalls[0]['function']['name'] ?? '', $catalogoTools, true)) {
             $catalogoSvc = app(\App\Services\BotCatalogoToolService::class);
@@ -1514,6 +1515,14 @@ TXT;
 
                         // 📦 Pedidos del cliente que escribe (telefono whatsapp)
                         'consultar_mis_pedidos' => $this->resultadoMisPedidos($from, (int) ($args['limite'] ?? 5)),
+
+                        // 🛒 Crea una adicion ligada a un pedido existente
+                        'crear_adicion_pedido' => app(\App\Services\Bots\AdicionPedidoService::class)
+                            ->crear(
+                                (int) ($args['pedido_id_origen'] ?? 0),
+                                is_array($args['productos'] ?? null) ? $args['productos'] : [],
+                                $from
+                            ),
                     };
                 } catch (\Throwable $e) {
                     $resultado = ['error' => $e->getMessage()];
@@ -4318,6 +4327,13 @@ TXT;
 
               'consultar_mis_pedidos' => $this->resultadoMisPedidos($from, (int) ($args['limite'] ?? 5)),
 
+              'crear_adicion_pedido' => app(\App\Services\Bots\AdicionPedidoService::class)
+                  ->crear(
+                      (int) ($args['pedido_id_origen'] ?? 0),
+                      is_array($args['productos'] ?? null) ? $args['productos'] : [],
+                      $from
+                  ),
+
               'validar_cobertura' => $this->validarCoberturaDireccion(
                   (string) ($args['direccion'] ?? ''),
                   $args['barrio'] ?? null,
@@ -6082,6 +6098,10 @@ TXT;
                  . "  - Para horarios → `consultar_horarios`\n"
                  . "  - Para promos → `consultar_promociones`\n"
                  . "  - Para pedidos del cliente (¿cuántos tengo? mis pedidos, último pedido, estado) → `consultar_mis_pedidos`\n"
+                 . "  - Para ADICIONAR productos a un pedido existente (cliente dice 'agrégale X al pedido N', 'adiciono Y al 95') → "
+                 . "primero `consultar_mis_pedidos` si no sabes el ID, luego `buscar_productos` para validar precio/código real, "
+                 . "y finalmente `crear_adicion_pedido` con pedido_id_origen + productos. NO confirmes la adición antes de la tool: "
+                 . "el sistema valida la ventana ANS automáticamente y devuelve ok=false si expiró.\n"
                  . "  - Para registrar cliente nuevo en SGI → `verificar_cliente_erp`\n"
                  . "  - Para registrar pedido → `confirmar_pedido` (OBLIGATORIO al cerrar)\n"
                  . "  Si no encuentras la respuesta en tus tools, NO la inventes.\n\n"
@@ -6648,6 +6668,45 @@ PROMPT;
                         ],
                     ],
                     'required'   => [],
+                ],
+            ],
+        ];
+
+        // 🛒 Tool: crear_adicion_pedido — adiciona productos a un pedido existente
+        $tools[] = [
+            'type'     => 'function',
+            'function' => [
+                'name'        => 'crear_adicion_pedido',
+                'description' => 'Crea una ADICIÓN al pedido indicado: un pedido nuevo en BD ligado al original (pedido_origen_id) '
+                    . 'que se exporta a SGI como documento separado. ÚSALA cuando el cliente confirma productos para sumar a un '
+                    . 'pedido anterior (ej. "adiciona 2 libras de posta al pedido #95"). Antes de invocar: '
+                    . '1) confirma con el cliente a cuál pedido (consultar_mis_pedidos si no sabes), '
+                    . '2) confirma productos y cantidades exactas, '
+                    . '3) llama esta tool. El sistema valida ANS automáticamente (rechaza si pasaron más minutos de los permitidos). '
+                    . 'Usa SIEMPRE el campo `codigo` y `name` exactos que devolvió `buscar_productos` — NO inventes.',
+                'parameters'  => [
+                    'type'       => 'object',
+                    'properties' => [
+                        'pedido_id_origen' => [
+                            'type'        => 'integer',
+                            'description' => 'ID del pedido al que se adicionan productos (ej. 95)',
+                        ],
+                        'productos' => [
+                            'type'  => 'array',
+                            'description' => 'Productos a adicionar. Cada item: {code, name, qty, unit}',
+                            'items' => [
+                                'type'       => 'object',
+                                'properties' => [
+                                    'code' => ['type' => 'string', 'description' => 'Código del catálogo'],
+                                    'name' => ['type' => 'string', 'description' => 'Nombre EXACTO del catálogo'],
+                                    'qty'  => ['type' => 'number', 'description' => 'Cantidad'],
+                                    'unit' => ['type' => 'string', 'description' => 'Unidad (Kl, Lb, Und)'],
+                                ],
+                                'required' => ['name', 'qty'],
+                            ],
+                        ],
+                    ],
+                    'required' => ['pedido_id_origen', 'productos'],
                 ],
             ],
         ];

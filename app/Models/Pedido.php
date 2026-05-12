@@ -27,6 +27,7 @@ class Pedido extends Model
 
     protected $fillable = [
         'tenant_id',
+        'pedido_origen_id',
         'sede_id',
         'empresa_id',
         'fecha_pedido',
@@ -131,6 +132,16 @@ class Pedido extends Model
     public function sede()
     {
         return $this->belongsTo(Sede::class);
+    }
+
+    public function pedidoOrigen()
+    {
+        return $this->belongsTo(self::class, 'pedido_origen_id');
+    }
+
+    public function adiciones()
+    {
+        return $this->hasMany(self::class, 'pedido_origen_id')->orderBy('id');
     }
 
     public function detalles()

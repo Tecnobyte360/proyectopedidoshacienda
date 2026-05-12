@@ -46,6 +46,9 @@ class FlujoPedidoOrchestrator
         // Cliente puede preguntar por sus pedidos previos en cualquier momento
         // ("¿cuántos pedidos tengo?", "estado de mi pedido", "ya llegó").
         'consultar_mis_pedidos',
+        // Cliente puede adicionar productos a un pedido existente (dentro del
+        // ANS configurado). La tool valida tiempo + crea pedido ligado + SGI.
+        'crear_adicion_pedido',
     ];
 
     /**
