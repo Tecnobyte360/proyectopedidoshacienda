@@ -218,6 +218,83 @@
             </div>
         </div>
 
+        {{-- 🧍 ALERTA: conversaciones esperando atención humana --}}
+        @if($handoffTotal > 0)
+            <div x-data="{ abierto: false }"
+                 class="mt-3 rounded-2xl border-2 border-amber-300 bg-gradient-to-r from-amber-50 to-orange-50 shadow-sm overflow-hidden">
+                <div class="flex items-center justify-between gap-3 px-4 py-3">
+                    <div class="flex items-center gap-3 min-w-0">
+                        <div class="shrink-0 flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500 text-white text-base animate-pulse">
+                            <i class="fa-solid fa-user-headset"></i>
+                        </div>
+                        <div class="min-w-0">
+                            <p class="text-sm font-bold text-amber-900">
+                                {{ $handoffTotal }} conversación{{ $handoffTotal === 1 ? '' : 'es' }} esperando atención humana
+                            </p>
+                            <p class="text-xs text-amber-700">
+                                El bot derivó al humano. Revisa qué necesitan estos clientes antes de que abandonen.
+                            </p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <button @click="abierto = !abierto"
+                                class="text-xs font-semibold text-amber-800 hover:text-amber-900 inline-flex items-center gap-1">
+                            <span x-text="abierto ? 'Ocultar' : 'Ver lista'"></span>
+                            <i class="fa-solid" :class="abierto ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+                        </button>
+                        <a href="{{ route('chat.index') }}"
+                           class="rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-3 py-2 shadow-sm inline-flex items-center gap-1">
+                            <i class="fa-solid fa-comments"></i> Ir al chat
+                        </a>
+                    </div>
+                </div>
+
+                <div x-show="abierto" x-collapse class="border-t border-amber-200 bg-white/60">
+                    <ul class="divide-y divide-amber-100">
+                        @foreach($handoffPendientes as $conv)
+                            @php
+                                $nombreCliente = $conv->cliente?->nombre ?: 'Cliente';
+                                $telCliente    = $conv->cliente?->telefono_normalizado ?: $conv->telefono_normalizado;
+                                $depto         = $conv->departamento_id
+                                    ? \App\Models\Departamento::find($conv->departamento_id)?->nombre
+                                    : null;
+                                $hace          = $conv->derivada_at
+                                    ? $conv->derivada_at->diffForHumans(now(), \Carbon\CarbonInterface::DIFF_ABSOLUTE)
+                                    : '—';
+                            @endphp
+                            <li class="flex items-center justify-between gap-3 px-4 py-2 hover:bg-amber-50/50">
+                                <div class="flex items-center gap-3 min-w-0">
+                                    <div class="shrink-0 flex h-8 w-8 items-center justify-center rounded-lg bg-amber-100 text-amber-700 text-xs">
+                                        <i class="fa-solid fa-user"></i>
+                                    </div>
+                                    <div class="min-w-0">
+                                        <p class="text-sm font-semibold text-slate-800 truncate">{{ $nombreCliente }}</p>
+                                        <p class="text-[11px] text-slate-500">
+                                            <span class="font-mono">{{ $telCliente }}</span>
+                                            @if($depto)
+                                                · <span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">{{ $depto }}</span>
+                                            @endif
+                                            · hace {{ $hace }}
+                                        </p>
+                                    </div>
+                                </div>
+                                <a href="{{ route('chat.index') }}?conv={{ $conv->id }}"
+                                   class="shrink-0 rounded-lg border border-amber-300 bg-white hover:bg-amber-50 text-amber-800 text-xs font-semibold px-3 py-1.5 inline-flex items-center gap-1">
+                                    <i class="fa-solid fa-reply"></i> Atender
+                                </a>
+                            </li>
+                        @endforeach
+                        @if($handoffTotal > $handoffPendientes->count())
+                            <li class="px-4 py-2 text-center text-xs text-slate-500">
+                                Y {{ $handoffTotal - $handoffPendientes->count() }} más…
+                                <a href="{{ route('chat.index') }}" class="text-amber-700 font-semibold hover:underline">Ver todas</a>
+                            </li>
+                        @endif
+                    </ul>
+                </div>
+            </div>
+        @endif
+
         {{-- KPIS --}}
         <div class="mt-3 grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 xl:grid-cols-6">
             @foreach([

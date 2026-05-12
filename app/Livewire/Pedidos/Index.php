@@ -599,9 +599,24 @@ class Index extends Component
 
     public function render()
     {
+        // 🧍 Conversaciones en modo humano (handoff) — alerta al operador de pedidos
+        $handoffPendientes = \App\Models\ConversacionWhatsapp::query()
+            ->where('atendida_por_humano', true)
+            ->where('estado', \App\Models\ConversacionWhatsapp::ESTADO_ACTIVA)
+            ->with('cliente:id,nombre,telefono_normalizado')
+            ->orderByDesc('derivada_at')
+            ->limit(10)
+            ->get(['id', 'cliente_id', 'departamento_id', 'derivada_at', 'updated_at', 'telefono_normalizado']);
+
+        $handoffTotal = \App\Models\ConversacionWhatsapp::where('atendida_por_humano', true)
+            ->where('estado', \App\Models\ConversacionWhatsapp::ESTADO_ACTIVA)
+            ->count();
+
         // pedidos y pedidosFiltrados son #[Computed] → accesibles directamente en la vista
         return view('livewire.pedidos.index', [
-            'zonasDisponibles' => ZonaCobertura::activas()->orderBy('nombre')->get(),
+            'zonasDisponibles'   => ZonaCobertura::activas()->orderBy('nombre')->get(),
+            'handoffPendientes'  => $handoffPendientes,
+            'handoffTotal'       => $handoffTotal,
         ])->layout('layouts.app');
     }
 }
