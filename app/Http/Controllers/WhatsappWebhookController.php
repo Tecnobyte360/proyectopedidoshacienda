@@ -394,10 +394,10 @@ class WhatsappWebhookController extends Controller
                 }
             }
 
-            // 🛡️ ANTI-LOOP: si esta misma respuesta ya se envió EXACTAMENTE
-            // 2+ veces antes (sin que el cliente avance), pedimos al LLM una
-            // formulación alternativa o forzamos un mensaje de cierre.
-            // Solo activado cuando hay un mensaje (no en silencio).
+            // 🛡️ ANTI-LOOP: si esta misma respuesta ya se envió 2+ veces en los
+            // ÚLTIMOS 10 MINUTOS (ventana de sesión activa), intercepta. Antes
+            // contaba todos los mensajes históricos y disparaba con saludos
+            // legítimos como "Hola" cuando el cliente vuelve días después.
             try {
                 $telefonoNorm = $this->normalizarTelefono($from);
                 $convLoop = \App\Models\ConversacionWhatsapp::where('telefono_normalizado', $telefonoNorm)
@@ -405,27 +405,36 @@ class WhatsappWebhookController extends Controller
                     ->orderByDesc('id')->first();
                 if ($convLoop) {
                     $hashReply = md5(mb_substr(mb_strtolower(trim((string) $reply)), 0, 200));
+                    $ventanaDesde = now()->subMinutes(10);
                     $ultimosBot = \App\Models\MensajeWhatsapp::where('conversacion_id', $convLoop->id)
                         ->where('rol', \App\Models\MensajeWhatsapp::ROL_ASSISTANT)
+                        ->where('created_at', '>=', $ventanaDesde)
                         ->orderByDesc('id')
                         ->limit(3)
                         ->pluck('contenido');
-                    $repeticiones = 0;
-                    foreach ($ultimosBot as $c) {
-                        if (md5(mb_substr(mb_strtolower(trim((string) $c)), 0, 200)) === $hashReply) {
-                            $repeticiones++;
+
+                    // Saludos cortos (≤ 20 chars o solo "Hola") NO cuentan como loop.
+                    $replyLimpio = trim(mb_strtolower((string) $reply));
+                    $esSaludoBreve = mb_strlen($replyLimpio) <= 20
+                        || preg_match('/^(hola|buenas|buenos d[ií]as|buenas tardes|buenas noches)/u', $replyLimpio);
+
+                    if (!$esSaludoBreve) {
+                        $repeticiones = 0;
+                        foreach ($ultimosBot as $c) {
+                            if (md5(mb_substr(mb_strtolower(trim((string) $c)), 0, 200)) === $hashReply) {
+                                $repeticiones++;
+                            }
                         }
-                    }
-                    // 2 = ya enviaste lo mismo 2 veces antes → este sería el 3er envío
-                    if ($repeticiones >= 2) {
-                        Log::warning('🔁 ANTI-LOOP: respuesta repetida 3 veces — sustituyendo por mensaje neutral', [
-                            'conv_id'      => $convLoop->id,
-                            'reply_hash'   => $hashReply,
-                            'repeticiones' => $repeticiones,
-                        ]);
-                        $reply = "Disculpa, parece que hay algo que no estoy capturando bien. "
-                               . "¿Me puedes contar con tus palabras qué necesitas y lo retomamos? "
-                               . "Si prefieres, te paso con un asesor humano — solo escribe *asesor*.";
+                        if ($repeticiones >= 2) {
+                            Log::warning('🔁 ANTI-LOOP: respuesta repetida 3 veces en 10min — sustituyendo', [
+                                'conv_id'      => $convLoop->id,
+                                'reply_hash'   => $hashReply,
+                                'repeticiones' => $repeticiones,
+                            ]);
+                            $reply = "Disculpa, parece que hay algo que no estoy capturando bien. "
+                                   . "¿Me puedes contar con tus palabras qué necesitas y lo retomamos? "
+                                   . "Si prefieres, te paso con un asesor humano — solo escribe *asesor*.";
+                        }
                     }
                 }
             } catch (\Throwable $e) {
@@ -4021,7 +4030,12 @@ TXT;
                               (string) ($orderData['phone'] ?? '')
                           );
 
-                          if (!$existeEnErp) {
+                          if ($existeEnErp) {
+                              // 🛡️ Cliente YA en SGI — omitir campos opcionales del
+                              // perfil personal (email, nombre, telefono). El sistema
+                              // los lee del ERP al exportar. NO los exigimos.
+                              $activos = array_values(array_diff($activos, ['email', 'nombre', 'telefono']));
+                          } else {
                               // Agregar campos requeridos por SGI a los activos
                               $reqErp = $integErp->config['cliente_lookup']['campos_requeridos'] ?? [];
                               foreach ($reqErp as $campo) {
