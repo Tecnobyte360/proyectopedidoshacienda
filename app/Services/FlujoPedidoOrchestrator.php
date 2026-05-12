@@ -43,6 +43,9 @@ class FlujoPedidoOrchestrator
         // Cliente puede pedir un producto en cualquier momento (incluso
         // en paso=confirmado tras un pedido anterior).
         'buscar_productos',
+        // Cliente puede preguntar por sus pedidos previos en cualquier momento
+        // ("¿cuántos pedidos tengo?", "estado de mi pedido", "ya llegó").
+        'consultar_mis_pedidos',
     ];
 
     /**
