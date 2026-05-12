@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Cache;
 
 use App\Models\Pedido;
 use App\Http\Controllers\WhatsappWebhookController;
+use App\Http\Controllers\MetaWhatsappWebhookController;
 use App\Http\Controllers\Api\V1\CategoriaApiController;
 use App\Http\Controllers\Api\V1\ProductoApiController;
 use App\Http\Controllers\Api\V1\PromocionApiController;
@@ -22,6 +23,11 @@ Route::get('/whatsapp-webhook', function () {
 });
 
 Route::post('/whatsapp-webhook', [WhatsappWebhookController::class, 'receive']);
+
+// 📱 Meta WhatsApp Cloud API — webhook único multi-tenant.
+// Identifica el tenant por phone_number_id del payload.
+Route::get('/meta/whatsapp/webhook',  [MetaWhatsappWebhookController::class, 'verify']);
+Route::post('/meta/whatsapp/webhook', [MetaWhatsappWebhookController::class, 'receive']);
 
 // Webhook ESPECÍFICO POR TENANT — identifica al tenant por slug en la URL.
 // Recomendado en producción: cada tenant tiene su URL única que copia y

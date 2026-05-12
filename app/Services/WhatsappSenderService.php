@@ -30,7 +30,26 @@ class WhatsappSenderService
         bool $persistirEnConversacion = true,
         array $metaExtra = []
     ): bool {
-        // Resolver credenciales del tenant actual
+        // 📱 Dual provider: si el tenant tiene Meta WhatsApp activo, mandamos por ahí.
+        // Si no, sigue con la API legacy (TecnoByteApp) como hasta hoy.
+        try {
+            $metaCfg = app(\App\Services\Meta\MetaWhatsappCloudService::class)->resolverConfig();
+            if ($metaCfg) {
+                $ok = app(\App\Services\Meta\MetaWhatsappCloudService::class)
+                    ->enviarTexto($telefono, $mensaje, $metaCfg->tenant_id);
+                if ($ok && $persistirEnConversacion) {
+                    $this->persistirEnConversacion($telefono, $mensaje, $connectionId, array_merge(
+                        $metaExtra,
+                        ['provider' => 'meta']
+                    ));
+                }
+                return $ok;
+            }
+        } catch (\Throwable $e) {
+            Log::warning('WA Sender: chequeo Meta falló, usando legacy: ' . $e->getMessage());
+        }
+
+        // Resolver credenciales del tenant actual (provider legacy)
         $resolver = app(\App\Services\WhatsappResolverService::class);
         $cred = $resolver->credenciales();
         $cacheKey = $resolver->tokenCacheKey();
