@@ -281,12 +281,21 @@
                 <div class="p-5 space-y-4">
                     <div>
                         <label class="block text-xs font-semibold text-slate-700 mb-1">Acción <span class="text-rose-500">*</span></label>
-                        <select wire:model="bot_accion" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-brand focus:ring-2 focus:ring-brand/20">
+                        <input type="text" wire:model="bot_accion" list="acciones-bot-sugerencias"
+                               placeholder="ej: adicionar, cancelar, cambiar_direccion…"
+                               pattern="[a-z0-9_]+"
+                               title="Solo minúsculas, números y guiones bajos (snake_case)"
+                               class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-brand focus:ring-2 focus:ring-brand/20">
+                        <datalist id="acciones-bot-sugerencias">
                             @foreach($accionesBot as $key => $label)
                                 <option value="{{ $key }}">{{ $label }}</option>
                             @endforeach
-                        </select>
-                        <p class="text-[10px] text-slate-400 mt-1">Si necesitas otra acción no listada, edita el array $accionesBot en el componente.</p>
+                        </datalist>
+                        <p class="text-[10px] text-slate-400 mt-1">
+                            Escribe libremente o escoge una sugerencia. Usa <code class="bg-slate-100 px-1 rounded">snake_case</code> (sin espacios, sin tildes).
+                            Las acciones <code class="bg-slate-100 px-1 rounded">adicionar</code> y <code class="bg-slate-100 px-1 rounded">cancelar</code> ya las usa el bot automáticamente.
+                            Otras acciones quedan registradas para que el bot las explique al cliente vía su descripción.
+                        </p>
                     </div>
 
                     <div class="grid grid-cols-2 gap-3">

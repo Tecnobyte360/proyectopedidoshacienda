@@ -174,17 +174,29 @@ class Index extends Component
     public function guardarBot(): void
     {
         $data = $this->validate([
-            'bot_accion'          => 'required|string|max:60',
+            'bot_accion'          => ['required', 'string', 'max:60', 'regex:/^[a-z0-9_]+$/'],
             'bot_tiempo_minutos'  => 'required|integer|min:0|max:43200',
             'bot_tiempo_alerta'   => 'nullable|integer|min:0|max:43200',
             'bot_descripcion'     => 'nullable|string|max:1000',
             'bot_activo'          => 'boolean',
+        ], [
+            'bot_accion.regex' => 'La acción debe ser snake_case (solo minúsculas, números y guion bajo).',
         ]);
+
+        $accionNormalizada = mb_strtolower(trim($data['bot_accion']));
+
+        $duplicada = AnsPedido::where('accion', $accionNormalizada)
+            ->when($this->editandoBotId, fn ($q) => $q->where('id', '!=', $this->editandoBotId))
+            ->exists();
+        if ($duplicada) {
+            $this->addError('bot_accion', "Ya existe una regla con la acción '{$accionNormalizada}'.");
+            return;
+        }
 
         AnsPedido::updateOrCreate(
             ['id' => $this->editandoBotId],
             [
-                'accion'          => $data['bot_accion'],
+                'accion'          => $accionNormalizada,
                 'tiempo_minutos'  => $data['bot_tiempo_minutos'],
                 'tiempo_alerta'   => $data['bot_tiempo_alerta'] ?: null,
                 'descripcion'     => $data['bot_descripcion'] ?: null,
