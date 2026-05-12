@@ -1199,16 +1199,18 @@ TXT;
         // 🚦 ORQUESTADOR: regla por paso (tools permitidas + tool_choice)
         // Forzar avanzar paso antes de filtrar tools — el estado puede haber
         // cambiado tras el captador determinista y debe reflejarse en el flujo.
+        $estadoActualParaTools = null;
         try {
-            $estadoSrv->avanzarPaso($estadoActualBd);
-            $pasoActualOrch = $estadoActualBd->fresh()->paso_actual ?? $pasoActualOrch;
+            $estadoActualParaTools = $estadoSrv->obtener($conversacion);
+            $estadoSrv->avanzarPaso($estadoActualParaTools);
+            $pasoActualOrch = $estadoActualParaTools->fresh()->paso_actual ?? $pasoActualOrch;
         } catch (\Throwable $e) { /* keep $pasoActualOrch */ }
 
         $orchestrator = app(\App\Services\FlujoPedidoOrchestrator::class);
         $toolsFiltradas = $orchestrator->filtrarTools(
             $this->getToolsDefinicion(),
             $pasoActualOrch,
-            $estadoActualBd  // 🛡️ permite confirmar_pedido si estado completo
+            $estadoActualParaTools  // 🛡️ permite confirmar_pedido si estado completo
         );
         $toolChoicePorPaso = $orchestrator->toolChoice($pasoActualOrch);
 
