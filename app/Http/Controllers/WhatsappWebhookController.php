@@ -5093,7 +5093,16 @@ TXT;
         ]);
 
         $notas = implode(' | ', $partes) ?: 'Solicitud vía WhatsApp';
-        $pickupTime = !empty($orderData['pickup_time']) ? $orderData['pickup_time'] : null;
+        // 🛡️ Sanitizar pickup_time — la columna hora_entrega es TIME (HH:MM:SS).
+        // El LLM a veces pasa "60 min", "1 hora", "30 minutos" que rompen el INSERT.
+        // Si el valor no matchea HH:MM[:SS], lo dejamos null (se guarda igual el pedido).
+        $pickupTime = null;
+        $rawPickup  = trim((string) ($orderData['pickup_time'] ?? ''));
+        if ($rawPickup !== '' && preg_match('/^([01]?\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/', $rawPickup)) {
+            $pickupTime = $rawPickup;
+        } elseif ($rawPickup !== '') {
+            Log::info('🛡️ pickup_time ignorado (formato no válido)', ['raw' => $rawPickup]);
+        }
         $telefonoWhatsapp = $this->normalizarTelefono($from);
         $telefonoContacto = $this->normalizarTelefono($orderData['phone'] ?? $from);
 
