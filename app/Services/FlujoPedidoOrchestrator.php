@@ -393,6 +393,28 @@ class FlujoPedidoOrchestrator
             }
         }
 
+        // 🛡️ ANTI-LOOP: lista de datos del cliente ya capturados.
+        // Si el LLM vuelve a pedir uno de estos, está repitiendo lo que ya tiene.
+        $datosCapturados = [];
+        if (!empty($estado->nombre_cliente))   $datosCapturados[] = "  • nombre: `{$estado->nombre_cliente}`";
+        if (!empty($estado->cedula))           $datosCapturados[] = "  • cédula: `{$estado->cedula}`";
+        if (!empty($estado->email))            $datosCapturados[] = "  • email: `{$estado->email}`";
+        if (!empty($estado->telefono))         $datosCapturados[] = "  • teléfono: `{$estado->telefono}`";
+        if (!empty($estado->direccion))        $datosCapturados[] = "  • dirección: `{$estado->direccion}`";
+        if (!empty($estado->barrio))           $datosCapturados[] = "  • barrio: `{$estado->barrio}`";
+        if ($estado->cobertura_validada)       $datosCapturados[] = "  • cobertura: VALIDADA ✅ ("
+            . ($estado->distancia_km ? "{$estado->distancia_km} km" : '') . ")";
+        if (!empty($estado->metodo_entrega))   $datosCapturados[] = "  • método entrega: `{$estado->metodo_entrega}`";
+
+        if (!empty($datosCapturados)) {
+            $contenido .= "\n\n✅ DATOS DEL CLIENTE YA CAPTURADOS — NO LOS VUELVAS A PEDIR:\n"
+                       . implode("\n", $datosCapturados)
+                       . "\n\n🚫 PROHIBIDO repetir una pregunta sobre cualquiera de estos datos. "
+                       . "Si necesitas confirmar algo, usa los valores de arriba directamente."
+                       . "\n   Si te falta un dato que NO está en esta lista, pídelo UNA sola vez "
+                       . "y avanza al siguiente paso del flujo cuando lo recibas.";
+        }
+
         return ['role' => 'system', 'content' => $contenido];
     }
 }

@@ -424,11 +424,20 @@ class EstadoPedidoService
             }
         }
 
-        // 2. EMAIL
-        if (empty($estado->email) && preg_match('/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i', $msg, $m)) {
-            $estado->email = mb_strtolower($m[0]);
-            $cambio = true;
-            Log::info('🔍 Email capturado del mensaje', ['conv_id' => $conv->id, 'email' => $estado->email]);
+        // 2. EMAIL — captura o actualiza si llega uno nuevo válido.
+        //    Si el cliente da un email distinto al guardado, prevalece el nuevo.
+        if (preg_match('/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i', $msg, $m)) {
+            $nuevoEmail = mb_strtolower($m[0]);
+            if (filter_var($nuevoEmail, FILTER_VALIDATE_EMAIL) && $estado->email !== $nuevoEmail) {
+                $emailAnterior  = $estado->email;
+                $estado->email  = $nuevoEmail;
+                $cambio = true;
+                Log::info('🔍 Email capturado/actualizado', [
+                    'conv_id'   => $conv->id,
+                    'email'     => $nuevoEmail,
+                    'anterior'  => $emailAnterior,
+                ]);
+            }
         }
 
         // 3. SEDE — si el cliente está en flujo de recoger y aún no tiene sede

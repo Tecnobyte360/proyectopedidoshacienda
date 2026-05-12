@@ -394,6 +394,44 @@ class WhatsappWebhookController extends Controller
                 }
             }
 
+            // 🛡️ ANTI-LOOP: si esta misma respuesta ya se envió EXACTAMENTE
+            // 2+ veces antes (sin que el cliente avance), pedimos al LLM una
+            // formulación alternativa o forzamos un mensaje de cierre.
+            // Solo activado cuando hay un mensaje (no en silencio).
+            try {
+                $telefonoNorm = $this->normalizarTelefono($from);
+                $convLoop = \App\Models\ConversacionWhatsapp::where('telefono_normalizado', $telefonoNorm)
+                    ->where('estado', \App\Models\ConversacionWhatsapp::ESTADO_ACTIVA)
+                    ->orderByDesc('id')->first();
+                if ($convLoop) {
+                    $hashReply = md5(mb_substr(mb_strtolower(trim((string) $reply)), 0, 200));
+                    $ultimosBot = \App\Models\MensajeWhatsapp::where('conversacion_id', $convLoop->id)
+                        ->where('rol', \App\Models\MensajeWhatsapp::ROL_ASSISTANT)
+                        ->orderByDesc('id')
+                        ->limit(3)
+                        ->pluck('contenido');
+                    $repeticiones = 0;
+                    foreach ($ultimosBot as $c) {
+                        if (md5(mb_substr(mb_strtolower(trim((string) $c)), 0, 200)) === $hashReply) {
+                            $repeticiones++;
+                        }
+                    }
+                    // 2 = ya enviaste lo mismo 2 veces antes → este sería el 3er envío
+                    if ($repeticiones >= 2) {
+                        Log::warning('🔁 ANTI-LOOP: respuesta repetida 3 veces — sustituyendo por mensaje neutral', [
+                            'conv_id'      => $convLoop->id,
+                            'reply_hash'   => $hashReply,
+                            'repeticiones' => $repeticiones,
+                        ]);
+                        $reply = "Disculpa, parece que hay algo que no estoy capturando bien. "
+                               . "¿Me puedes contar con tus palabras qué necesitas y lo retomamos? "
+                               . "Si prefieres, te paso con un asesor humano — solo escribe *asesor*.";
+                    }
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Anti-loop chequeo falló: ' . $e->getMessage());
+            }
+
             Log::info('💬 RESPUESTA GENERADA', compact('reply', 'from', 'messageId', 'connectionId'));
 
             $sent = $this->enviarRespuestaWhatsapp($from, $reply, $connectionId);
