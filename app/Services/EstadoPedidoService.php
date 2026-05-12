@@ -339,6 +339,32 @@ class EstadoPedidoService
      * Detecta y persiste cédula, email, etc. ANTES de que el bot procese.
      * Así no se pierden datos aunque el LLM no llame la tool correcta.
      */
+    /**
+     * 🛡️ Setea la cédula en el estado. Si la cédula nueva es DISTINTA a la
+     * actual (probablemente venía de hidratación del titular), resetea nombre
+     * y email del estado para que el bot los pida al cliente correcto. Esto
+     * evita registrar pedidos a nombre de otra persona cuando alguien usa el
+     * celular de un familiar/amigo.
+     */
+    private function setCedulaConResetSiCambia(ConversacionPedidoEstado $estado, string $nuevaCedula, ConversacionWhatsapp $conv): void
+    {
+        $cedulaAnterior = trim((string) $estado->cedula);
+        if ($cedulaAnterior !== '' && $cedulaAnterior !== $nuevaCedula) {
+            // El cliente da una cédula DISTINTA a la guardada — es otra persona.
+            // Limpiar nombre y email para que el bot los pida.
+            Log::warning('🛡️ Cédula cambió — reseteando nombre/email para evitar identidad cruzada', [
+                'conv_id'   => $conv->id,
+                'anterior'  => $cedulaAnterior,
+                'nueva'     => $nuevaCedula,
+                'nombre_anterior' => $estado->nombre_cliente,
+                'email_anterior'  => $estado->email,
+            ]);
+            $estado->nombre_cliente = null;
+            $estado->email          = null;
+        }
+        $estado->cedula = $nuevaCedula;
+    }
+
     public function captarDelMensajeUsuario(ConversacionWhatsapp $conv, string $mensaje): void
     {
         $estado = $this->obtener($conv);
@@ -380,7 +406,7 @@ class EstadoPedidoService
                 && preg_match('/^\d{6,12}$/', $clean)
                 && !$esPosibleTelefono($clean)
             ) {
-                $estado->cedula = $clean;
+                $this->setCedulaConResetSiCambia($estado, $clean, $conv);
                 $cambio = true;
                 Log::info('🔍 Cédula capturada del mensaje', ['conv_id' => $conv->id, 'cedula' => $clean]);
             }
@@ -388,7 +414,7 @@ class EstadoPedidoService
             elseif (preg_match('/\b(?:c[eé]dula|cc|documento|nit|ced)[\s:]*([\d.,]{6,15})\b/iu', $msg, $m)) {
                 $cleanB = preg_replace('/[^\d]/', '', $m[1]);
                 if (preg_match('/^\d{6,12}$/', $cleanB) && !$esPosibleTelefono($cleanB)) {
-                    $estado->cedula = $cleanB;
+                    $this->setCedulaConResetSiCambia($estado, $cleanB, $conv);
                     $cambio = true;
                     Log::info('🔍 Cédula capturada con prefijo', ['conv_id' => $conv->id, 'cedula' => $cleanB]);
                 }
@@ -400,7 +426,7 @@ class EstadoPedidoService
                 && preg_match('/\b(\d{7,12})\b/', $msg, $m)) {
                 $cleanC = $m[1];
                 if (!$esPosibleTelefono($cleanC)) {
-                    $estado->cedula = $cleanC;
+                    $this->setCedulaConResetSiCambia($estado, $cleanC, $conv);
                     $cambio = true;
                     Log::info('🔍 Cédula capturada (dígitos contiguos)', ['conv_id' => $conv->id, 'cedula' => $cleanC]);
                 }
