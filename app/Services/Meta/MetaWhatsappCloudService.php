@@ -3,6 +3,7 @@
 namespace App\Services\Meta;
 
 use App\Models\MetaWhatsappConfig;
+use App\Models\MetaWhatsappPlantilla;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -93,6 +94,78 @@ class MetaWhatsappCloudService
             'type'              => 'image',
             'image'             => $imagen,
         ], 'imagen');
+    }
+
+    /**
+     * Sincroniza plantillas desde Meta (`GET /{waba_id}/message_templates`)
+     * hacia la tabla `meta_whatsapp_plantillas` (updateOrCreate por nombre+idioma).
+     *
+     * @return array{ok: bool, total: int, importadas: int, errores: string[]}
+     */
+    public function sincronizarPlantillas(?int $tenantId = null): array
+    {
+        $config = $this->resolverConfig($tenantId);
+        if (!$config) return ['ok' => false, 'total' => 0, 'importadas' => 0, 'errores' => ['Sin configuración Meta activa']];
+        if (empty($config->waba_id)) return ['ok' => false, 'total' => 0, 'importadas' => 0, 'errores' => ['Falta WABA ID en la configuración']];
+
+        $url = sprintf(
+            'https://graph.facebook.com/%s/%s/message_templates',
+            $config->api_version ?: 'v20.0',
+            $config->waba_id
+        );
+
+        try {
+            $resp = Http::withToken($config->access_token)
+                ->acceptJson()
+                ->timeout(20)
+                ->get($url, ['fields' => 'name,language,status,category,components', 'limit' => 100]);
+
+            if (!$resp->successful()) {
+                return [
+                    'ok' => false, 'total' => 0, 'importadas' => 0,
+                    'errores' => ["HTTP {$resp->status()}: " . mb_substr($resp->body(), 0, 200)],
+                ];
+            }
+
+            $data = $resp->json('data') ?? [];
+            $importadas = 0;
+            $estadoMap = ['APPROVED' => 'aprobada', 'REJECTED' => 'rechazada', 'PENDING' => 'pendiente'];
+
+            foreach ($data as $tpl) {
+                $body = collect($tpl['components'] ?? [])
+                    ->firstWhere('type', 'BODY')['text'] ?? null;
+                $footer = collect($tpl['components'] ?? [])
+                    ->firstWhere('type', 'FOOTER')['text'] ?? null;
+
+                MetaWhatsappPlantilla::updateOrCreate(
+                    [
+                        'tenant_id' => $config->tenant_id,
+                        'nombre'    => $tpl['name'],
+                        'idioma'    => $tpl['language'],
+                    ],
+                    [
+                        'categoria'     => $tpl['category'] ?? 'UTILITY',
+                        'estado'        => $estadoMap[$tpl['status'] ?? ''] ?? 'pendiente',
+                        'body_preview'  => $body,
+                        'footer'        => $footer,
+                        'num_variables' => MetaWhatsappPlantilla::contarVariables($body),
+                        'activa'        => ($tpl['status'] ?? '') === 'APPROVED',
+                    ]
+                );
+                $importadas++;
+            }
+
+            Log::info('🔄 Plantillas Meta sincronizadas', [
+                'tenant_id'  => $config->tenant_id,
+                'total'      => count($data),
+                'importadas' => $importadas,
+            ]);
+
+            return ['ok' => true, 'total' => count($data), 'importadas' => $importadas, 'errores' => []];
+        } catch (\Throwable $e) {
+            Log::error('❌ Sync plantillas Meta exception', ['error' => $e->getMessage()]);
+            return ['ok' => false, 'total' => 0, 'importadas' => 0, 'errores' => [$e->getMessage()]];
+        }
     }
 
     /**
