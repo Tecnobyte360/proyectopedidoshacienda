@@ -571,21 +571,39 @@ class WhatsappWebhookController extends Controller
             ->first();
 
         if ($convActiva && $convActiva->atendida_por_humano) {
-            // Persistir mensaje del cliente para que el operador lo vea
-            try {
-                $cliente = \App\Models\Cliente::encontrarOCrearPorTelefono($telefonoNorm, $name);
-                $convActiva->update(['cliente_id' => $convActiva->cliente_id ?? $cliente->id]);
-                app(\App\Services\ConversacionService::class)->agregarMensaje(
-                    $convActiva,
-                    \App\Models\MensajeWhatsapp::ROL_USER,
-                    $message
-                );
-            } catch (\Throwable $e) {
-                Log::warning('No se persistió mensaje en modo humano: ' . $e->getMessage());
-            }
+            // 🔄 AUTO-REVERT del handoff: si el cliente retracta la razón
+            // del handoff ANTES de que un operador humano haya respondido,
+            // devolvemos el control al bot. Evita pedidos perdidos cuando
+            // el cliente cambia de opinión tras la derivación automática.
+            if ($this->clienteRetractaHandoff($convActiva, $message)) {
+                $convActiva->update([
+                    'atendida_por_humano' => false,
+                    'departamento_id'     => null,
+                    'derivada_at'         => null,
+                ]);
+                Log::info('🔄 Cliente retractó handoff — bot retoma', [
+                    'phone'   => $from,
+                    'conv_id' => $convActiva->id,
+                    'mensaje' => mb_substr($message, 0, 100),
+                ]);
+                // Continuar al flujo normal del bot (no retornar aquí)
+            } else {
+                // Persistir mensaje del cliente para que el operador lo vea
+                try {
+                    $cliente = \App\Models\Cliente::encontrarOCrearPorTelefono($telefonoNorm, $name);
+                    $convActiva->update(['cliente_id' => $convActiva->cliente_id ?? $cliente->id]);
+                    app(\App\Services\ConversacionService::class)->agregarMensaje(
+                        $convActiva,
+                        \App\Models\MensajeWhatsapp::ROL_USER,
+                        $message
+                    );
+                } catch (\Throwable $e) {
+                    Log::warning('No se persistió mensaje en modo humano: ' . $e->getMessage());
+                }
 
-            Log::info('🧍 Modo humano activo — bot NO responde', ['phone' => $from]);
-            return '';   // sin respuesta automática
+                Log::info('🧍 Modo humano activo — bot NO responde', ['phone' => $from]);
+                return '';   // sin respuesta automática
+            }
         }
 
         // NOTA: la derivación por keywords fue REMOVIDA — ahora es 100% decisión
@@ -2645,6 +2663,50 @@ TXT;
      * (método entrega, dirección, "ya", "listo", "sí confirmo", etc).
      * Si retorna true Y el estado tiene productos → forzar confirmar_pedido.
      */
+    /**
+     * 🔄 Detecta si el cliente está RETRACTANDO la razón del handoff.
+     * Solo aplica si: (a) la conversación está en modo humano,
+     * (b) un operador humano NO ha respondido aún desde la derivación.
+     * Si ambas se cumplen + el mensaje del cliente sugiere cancelación
+     * o cambio de opinión, devolvemos el control al bot.
+     */
+    private function clienteRetractaHandoff(\App\Models\ConversacionWhatsapp $conv, string $mensaje): bool
+    {
+        if (!$conv->atendida_por_humano) return false;
+
+        // ¿Hubo un mensaje del operador (rol=assistant + meta.origen=operador)
+        // desde la derivación? Si sí, el humano ya está atendiendo y NO revertimos.
+        $derivadaAt = $conv->derivada_at;
+        if (!$derivadaAt) {
+            // Si no hay timestamp, asumimos derivación reciente — chequear contra
+            // ultimo mensaje assistant (bot) que la disparó.
+            $derivadaAt = $conv->updated_at;
+        }
+        $hayMensajeHumano = \App\Models\MensajeWhatsapp::where('conversacion_id', $conv->id)
+            ->where('rol', \App\Models\MensajeWhatsapp::ROL_ASSISTANT)
+            ->where('created_at', '>', $derivadaAt)
+            ->whereJsonContains('meta->origen', 'operador')
+            ->exists();
+        if ($hayMensajeHumano) return false;
+
+        // Patrones que sugieren retractación / cambio de opinión
+        $msg = mb_strtolower(\Illuminate\Support\Str::ascii(trim($mensaje)));
+        $patrones = [
+            'olvidalo', 'olvida', 'olvidate',
+            'entonces no', 'no importa', 'no necesito', 'no requiero', 'no quiero',
+            'sin eso', 'sin factura', 'sin facturacion',
+            'cancela esa', 'cancela eso', 'cancelalo',
+            'dejalo asi', 'dejalo as\xc3', 'dejame', 'asi esta bien',
+            'cambia', 'cambialo', 'cambiame',
+            'mejor no', 'no asi', 'no asesor', 'no humano',
+            'sigamos', 'continua', 'seguimos',
+        ];
+        foreach ($patrones as $p) {
+            if (str_contains($msg, $p)) return true;
+        }
+        return false;
+    }
+
     private function clienteDaDatosFinales(string $mensaje): bool
     {
         $m = mb_strtolower(trim($mensaje));
@@ -6107,7 +6169,24 @@ TXT;
                  . "  Si no encuentras la respuesta en tus tools, NO la inventes.\n\n"
 
                  . "## 7. RESPETO AL FLUJO\n"
-                 . "  Sigue el orden del orquestador. NO saltes pasos. NO confirmes pedidos sin todos los datos.\n";
+                 . "  Sigue el orden del orquestador. NO saltes pasos. NO confirmes pedidos sin todos los datos.\n\n"
+
+                 . "## 8. FACTURACIÓN ELECTRÓNICA — NO DERIVAR, CAPTURAR\n"
+                 . "  Si el cliente menciona 'factura', 'facturación electrónica', 'factura con NIT', etc:\n"
+                 . "    • NO llames `derivar_a_departamento`.\n"
+                 . "    • Pídele EN UN SOLO MENSAJE: número de NIT/cédula del facturado + razón social + correo.\n"
+                 . "    • Guarda esos datos en las notas del pedido (campo `notes` en confirmar_pedido).\n"
+                 . "    • Luego continúa con el flujo normal (cédula del cliente, confirmación, etc.).\n"
+                 . "  El equipo de facturación generará la factura desde el sistema admin con esos datos.\n"
+                 . "  Si el cliente SE RETRACTA ('sin factura', 'no, déjalo así', 'entonces no'), retoma el flujo de pedido directo.\n\n"
+
+                 . "## 9. TIEMPO DE ENTREGA — VALOR REAL DEL SISTEMA\n"
+                 . "  Si el cliente pregunta '¿en cuánto me entregan?', '¿cuánto demora?', '¿tiempo de entrega?':\n"
+                 . "    • Si YA validaste cobertura en este flujo → usa el `tiempo_min` que devolvió `validar_cobertura`.\n"
+                 . "    • Si NO → llama `consultar_zonas_cobertura` y usa el `tiempo_default_sede_min` o el `tiempo_min`\n"
+                 . "      de la zona donde está la dirección del cliente.\n"
+                 . "    • NUNCA digas '45 min', '1 hora', '30 minutos' sin haber consultado.\n"
+                 . "    • Si no tienes la dirección aún, responde: 'Apenas me compartas la dirección te confirmo el tiempo exacto'.\n";
 
         return $prompt;
     }
