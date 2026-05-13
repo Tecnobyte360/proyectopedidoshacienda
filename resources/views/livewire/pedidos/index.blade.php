@@ -2,6 +2,9 @@
      x-data="pedidosNotif()"
      x-init="init()">
 
+    {{-- Contenedor responsivo que NO sobrepasa el padding del layout --}}
+    <div class="max-w-full overflow-x-hidden">
+
     {{-- 🚀 BARRA FLOTANTE — aparece cuando hay pedidos seleccionados para despacho masivo --}}
     @php $cantSel = collect($seleccionadosMasivo)->filter()->count(); @endphp
     @if($cantSel > 0)
@@ -595,10 +598,10 @@
         </div>
 
         {{-- ╔═══ TABLA para desktop (>= lg) ═══╗ --}}
-        {{-- Scroll horizontal cuando no caiga; min-w fuerza que las columnas no se aplasten --}}
+        {{-- Scroll horizontal cuando no caiga, sin forzar min-w para no romper el layout --}}
         <div class="mt-3 hidden lg:block rounded-2xl border border-slate-200 bg-white shadow-sm">
             <div class="overflow-x-auto rounded-2xl">
-                <table class="w-full min-w-[1024px] xl:min-w-[1200px] 2xl:min-w-full">
+                <table class="w-full">
                     <thead class="bg-slate-50">
                         <tr>
                             <th class="px-3 py-3 w-10">
@@ -953,6 +956,8 @@
 
         {{-- AUDIO se mueve al layout para que no se reemplace en re-renders de Livewire --}}
     </div>
+
+    </div> {{-- /max-w-full overflow-x-hidden --}}
 </div>
 
 @push('styles')
