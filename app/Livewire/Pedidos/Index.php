@@ -276,6 +276,34 @@ class Index extends Component
         }
     }
 
+    /**
+     * Colección base con filtros de zona + tipo de entrega aplicados,
+     * pero SIN filtro de estado. Sirve para calcular KPIs que respondan
+     * al filtro de tipo de entrega sin perder la visión por estado.
+     */
+    #[Computed]
+    public function pedidosBase()
+    {
+        $pedidos = $this->pedidos;
+
+        if ($this->zona !== 'todas') {
+            if ($this->zona === 'sin_zona') {
+                $pedidos = $pedidos->whereNull('zona_cobertura_id');
+            } else {
+                $pedidos = $pedidos->where('zona_cobertura_id', (int) $this->zona);
+            }
+        }
+
+        if ($this->tipoEntrega !== 'todos') {
+            $pedidos = $pedidos->filter(function ($p) {
+                $tipo = $p->tipo_entrega ?? 'domicilio';
+                return $tipo === $this->tipoEntrega;
+            });
+        }
+
+        return $pedidos->values();
+    }
+
     #[Computed]
     public function pedidosFiltrados()
     {

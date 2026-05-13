@@ -125,7 +125,9 @@
     <div class="w-full px-3 py-4 sm:px-6 sm:py-6 lg:px-8">
 
         @php
-            $pedidos          = $this->pedidos;
+            // Los KPIs respetan zona + tipoEntrega pero NO el filtro de estado
+            // (porque los KPIs son justamente las pestañas de estado).
+            $pedidos          = $this->pedidosBase;
             $pedidosFiltrados = $this->pedidosFiltrados;
 
             $todos       = $pedidos->count();
@@ -295,15 +297,23 @@
             </div>
         @endif
 
-        {{-- KPIS --}}
+        {{-- KPIS — etiquetas/iconos cambian según si el filtro es "recoger" --}}
+        @php
+            $modoPickup = $tipoEntrega === 'recoger';
+            $lblEnProceso  = $modoPickup ? 'En preparación' : 'En proceso';
+            $lblDespachado = $modoPickup ? 'Listos p/ recoger' : 'Despachados';
+            $iconDespachado= $modoPickup ? 'fa-bag-shopping' : 'fa-motorcycle';
+            $iconBgDesp    = $modoPickup ? 'bg-orange-50 text-orange-600' : 'bg-violet-50 text-violet-600';
+            $barDesp       = $modoPickup ? 'bg-orange-500' : 'bg-violet-500';
+        @endphp
         <div class="mt-3 grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 xl:grid-cols-6">
             @foreach([
-                ['label' => 'Nuevos',      'value' => $nuevos,      'icon' => 'fa-bell',           'iconBg' => 'bg-blue-50 text-blue-600',       'bar' => 'bg-blue-500'],
-                ['label' => 'Programados', 'value' => $programados, 'icon' => 'fa-calendar-check', 'iconBg' => 'bg-cyan-50 text-cyan-600',       'bar' => 'bg-cyan-500'],
-                ['label' => 'En proceso',  'value' => $enProceso,   'icon' => 'fa-gears',          'iconBg' => 'bg-amber-50 text-amber-600',     'bar' => 'bg-amber-500'],
-                ['label' => 'Despachados', 'value' => $despachados, 'icon' => 'fa-motorcycle',     'iconBg' => 'bg-violet-50 text-violet-600',   'bar' => 'bg-violet-500'],
-                ['label' => 'Entregados',  'value' => $entregados,  'icon' => 'fa-circle-check',   'iconBg' => 'bg-emerald-50 text-emerald-600', 'bar' => 'bg-emerald-500'],
-                ['label' => 'Cancelados',  'value' => $cancelados,  'icon' => 'fa-ban',            'iconBg' => 'bg-rose-50 text-rose-600',       'bar' => 'bg-rose-500'],
+                ['label' => 'Nuevos',         'value' => $nuevos,      'icon' => 'fa-bell',           'iconBg' => 'bg-blue-50 text-blue-600',       'bar' => 'bg-blue-500'],
+                ['label' => 'Programados',    'value' => $programados, 'icon' => 'fa-calendar-check', 'iconBg' => 'bg-cyan-50 text-cyan-600',       'bar' => 'bg-cyan-500'],
+                ['label' => $lblEnProceso,    'value' => $enProceso,   'icon' => 'fa-gears',          'iconBg' => 'bg-amber-50 text-amber-600',     'bar' => 'bg-amber-500'],
+                ['label' => $lblDespachado,   'value' => $despachados, 'icon' => $iconDespachado,     'iconBg' => $iconBgDesp,                      'bar' => $barDesp],
+                ['label' => 'Entregados',     'value' => $entregados,  'icon' => 'fa-circle-check',   'iconBg' => 'bg-emerald-50 text-emerald-600', 'bar' => 'bg-emerald-500'],
+                ['label' => 'Cancelados',     'value' => $cancelados,  'icon' => 'fa-ban',            'iconBg' => 'bg-rose-50 text-rose-600',       'bar' => 'bg-rose-500'],
             ] as $kpi)
                 <div class="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
                     <div class="flex items-start justify-between gap-2">
@@ -333,13 +343,13 @@
                     <div class="flex gap-2 min-w-max">
                         @php
                             $tabs = [
-                                ['key' => 'todos',                                              'label' => 'Todos',       'count' => $todos,       'icon' => 'fa-table-cells-large', 'active' => 'bg-slate-900 text-white'],
-                                ['key' => \App\Models\Pedido::ESTADO_NUEVO,                    'label' => 'Nuevos',      'count' => $nuevos,      'icon' => 'fa-bell',              'active' => 'bg-blue-600 text-white'],
-                                ['key' => 'programados',                                        'label' => 'Programados', 'count' => $programados, 'icon' => 'fa-calendar-check',    'active' => 'bg-cyan-600 text-white'],
-                                ['key' => \App\Models\Pedido::ESTADO_EN_PREPARACION,           'label' => 'En proceso',  'count' => $enProceso,   'icon' => 'fa-gears',             'active' => 'bg-amber-500 text-white'],
-                                ['key' => \App\Models\Pedido::ESTADO_REPARTIDOR_EN_CAMINO,     'label' => 'Despachados', 'count' => $despachados, 'icon' => 'fa-motorcycle',        'active' => 'bg-violet-600 text-white'],
-                                ['key' => \App\Models\Pedido::ESTADO_ENTREGADO,                'label' => 'Entregados',  'count' => $entregados,  'icon' => 'fa-circle-check',      'active' => 'bg-emerald-600 text-white'],
-                                ['key' => \App\Models\Pedido::ESTADO_CANCELADO,                'label' => 'Cancelados',  'count' => $cancelados,  'icon' => 'fa-ban',               'active' => 'bg-rose-600 text-white'],
+                                ['key' => 'todos',                                              'label' => 'Todos',           'count' => $todos,       'icon' => 'fa-table-cells-large', 'active' => 'bg-slate-900 text-white'],
+                                ['key' => \App\Models\Pedido::ESTADO_NUEVO,                    'label' => 'Nuevos',          'count' => $nuevos,      'icon' => 'fa-bell',              'active' => 'bg-blue-600 text-white'],
+                                ['key' => 'programados',                                        'label' => 'Programados',     'count' => $programados, 'icon' => 'fa-calendar-check',    'active' => 'bg-cyan-600 text-white'],
+                                ['key' => \App\Models\Pedido::ESTADO_EN_PREPARACION,           'label' => $lblEnProceso,     'count' => $enProceso,   'icon' => 'fa-gears',             'active' => 'bg-amber-500 text-white'],
+                                ['key' => \App\Models\Pedido::ESTADO_REPARTIDOR_EN_CAMINO,     'label' => $lblDespachado,    'count' => $despachados, 'icon' => $iconDespachado,        'active' => $modoPickup ? 'bg-orange-600 text-white' : 'bg-violet-600 text-white'],
+                                ['key' => \App\Models\Pedido::ESTADO_ENTREGADO,                'label' => 'Entregados',      'count' => $entregados,  'icon' => 'fa-circle-check',      'active' => 'bg-emerald-600 text-white'],
+                                ['key' => \App\Models\Pedido::ESTADO_CANCELADO,                'label' => 'Cancelados',      'count' => $cancelados,  'icon' => 'fa-ban',               'active' => 'bg-rose-600 text-white'],
                             ];
                         @endphp
 
