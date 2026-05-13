@@ -479,47 +479,67 @@
                             @endif
                         </div>
 
-                        {{-- Info en grid --}}
+                        {{-- Info en grid — campos varían según tipo de entrega --}}
                         <div class="grid grid-cols-1 gap-1.5 text-xs text-slate-600 mt-2">
-                            @if(!$esRecoger && $pedido->zonaCobertura)
-                                <div class="flex items-center gap-2">
-                                    <i class="fa-solid fa-map-location-dot w-4 text-center" style="color: {{ $pedido->zonaCobertura->color }}"></i>
-                                    <span class="font-medium">{{ $pedido->zonaCobertura->nombre }}</span>
-                                </div>
+                            @if($esRecoger)
+                                {{-- ━━ RECOGE EN SEDE ━━ --}}
+                                @if($pedido->sede)
+                                    <div class="flex items-center gap-2">
+                                        <i class="fa-solid fa-store w-4 text-center text-amber-500"></i>
+                                        <span class="font-medium">Sede {{ $pedido->sede->nombre }}</span>
+                                    </div>
+                                    @if($pedido->sede->direccion)
+                                        <div class="flex items-start gap-2">
+                                            <i class="fa-solid fa-location-dot w-4 text-center text-slate-400 mt-0.5"></i>
+                                            <span class="text-slate-500">{{ $pedido->sede->direccion }}</span>
+                                        </div>
+                                    @endif
+                                @endif
+                                @if($pedido->hora_entrega)
+                                    <div class="flex items-center gap-2">
+                                        <i class="fa-regular fa-clock w-4 text-center text-amber-500"></i>
+                                        <span class="font-medium">Recoge a las {{ \Illuminate\Support\Carbon::parse($pedido->hora_entrega)->format('h:i a') }}</span>
+                                    </div>
+                                @endif
+                            @else
+                                {{-- ━━ DESPACHO A DOMICILIO ━━ --}}
+                                @if($pedido->zonaCobertura)
+                                    <div class="flex items-center gap-2">
+                                        <i class="fa-solid fa-map-location-dot w-4 text-center" style="color: {{ $pedido->zonaCobertura->color }}"></i>
+                                        <span class="font-medium">{{ $pedido->zonaCobertura->nombre }}</span>
+                                    </div>
+                                @endif
+                                @if($pedido->barrio)
+                                    <div class="flex items-center gap-2">
+                                        <i class="fa-solid fa-map-pin w-4 text-center text-slate-400"></i>
+                                        <span>{{ $pedido->barrio }}</span>
+                                    </div>
+                                @endif
+                                @if($pedido->direccion)
+                                    <div class="flex items-center gap-2">
+                                        <i class="fa-solid fa-location-dot w-4 text-center text-slate-400"></i>
+                                        <span class="truncate">{{ $pedido->direccion }}</span>
+                                    </div>
+                                @endif
+                                @if($pedido->domiciliario)
+                                    <div class="flex items-center gap-2">
+                                        <i class="fa-solid fa-motorcycle w-4 text-center text-violet-500"></i>
+                                        <span class="font-medium text-violet-700">{{ $pedido->domiciliario->nombre }}</span>
+                                    </div>
+                                @endif
+                                @if($pedido->token_entrega && $pedido->estado === \App\Models\Pedido::ESTADO_REPARTIDOR_EN_CAMINO)
+                                    <div class="flex items-center gap-2">
+                                        <i class="fa-solid fa-key w-4 text-center text-violet-500"></i>
+                                        <span class="font-mono font-bold tracking-widest text-violet-700">{{ $pedido->token_entrega }}</span>
+                                    </div>
+                                @endif
                             @endif
 
-                            @if($pedido->barrio)
-                                <div class="flex items-center gap-2">
-                                    <i class="fa-solid fa-map-pin w-4 text-center text-slate-400"></i>
-                                    <span>{{ $pedido->barrio }}</span>
-                                </div>
-                            @endif
-
-                            @if($pedido->direccion)
-                                <div class="flex items-center gap-2">
-                                    <i class="fa-solid fa-location-dot w-4 text-center text-slate-400"></i>
-                                    <span class="truncate">{{ $pedido->direccion }}</span>
-                                </div>
-                            @endif
-
+                            {{-- Teléfono: aplica para ambos --}}
                             @if($pedido->telefono_whatsapp || $pedido->telefono)
                                 <div class="flex items-center gap-2">
                                     <i class="fa-solid fa-phone w-4 text-center text-slate-400"></i>
                                     <span>{{ $pedido->telefono_whatsapp ?? $pedido->telefono }}</span>
-                                </div>
-                            @endif
-
-                            @if($pedido->domiciliario)
-                                <div class="flex items-center gap-2">
-                                    <i class="fa-solid fa-motorcycle w-4 text-center text-violet-500"></i>
-                                    <span class="font-medium text-violet-700">{{ $pedido->domiciliario->nombre }}</span>
-                                </div>
-                            @endif
-
-                            @if($pedido->token_entrega && $pedido->estado === \App\Models\Pedido::ESTADO_REPARTIDOR_EN_CAMINO)
-                                <div class="flex items-center gap-2">
-                                    <i class="fa-solid fa-key w-4 text-center text-violet-500"></i>
-                                    <span class="font-mono font-bold tracking-widest text-violet-700">{{ $pedido->token_entrega }}</span>
                                 </div>
                             @endif
                         </div>
@@ -610,7 +630,9 @@
                             @endphp
 
                             @php
-                                $despachable = in_array($pedido->estado, [
+                                // Solo pedidos de domicilio son despachables (los de recoger no necesitan domiciliario)
+                                $esDomicilio = ($pedido->tipo_entrega ?? 'domicilio') === 'domicilio';
+                                $despachable = $esDomicilio && in_array($pedido->estado, [
                                     \App\Models\Pedido::ESTADO_NUEVO,
                                     \App\Models\Pedido::ESTADO_EN_PREPARACION,
                                     'confirmado',
@@ -701,9 +723,15 @@
                                     @endif
                                 </td>
 
-                                {{-- Zona (xl+) --}}
+                                {{-- Zona / Sede (xl+) --}}
                                 <td class="px-3 py-3.5 align-middle hidden xl:table-cell">
-                                    @if($pedido->zonaCobertura)
+                                    @if($esRecogerRow)
+                                        <span class="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700 whitespace-nowrap"
+                                              title="Cliente recoge en sede">
+                                            <i class="fa-solid fa-store text-[10px]"></i>
+                                            {{ $pedido->sede?->nombre ?? 'Sede' }}
+                                        </span>
+                                    @elseif($pedido->zonaCobertura)
                                         <span class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 whitespace-nowrap">
                                             <span class="h-2 w-2 rounded-full" style="background-color: {{ $pedido->zonaCobertura->color }}"></span>
                                             {{ $pedido->zonaCobertura->nombre }}
@@ -764,9 +792,15 @@
                                     </span>
                                 </td>
 
-                                {{-- Domiciliario (xl+) --}}
+                                {{-- Domiciliario / Recoge (xl+) --}}
                                 <td class="px-3 py-3.5 align-middle hidden xl:table-cell">
-                                    @if($pedido->domiciliario)
+                                    @if($esRecogerRow)
+                                        <span class="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-700 whitespace-nowrap"
+                                              title="No requiere domiciliario — el cliente recoge">
+                                            <i class="fa-solid fa-store text-[10px]"></i>
+                                            No aplica
+                                        </span>
+                                    @elseif($pedido->domiciliario)
                                         <div class="min-w-0 max-w-[120px]">
                                             <div class="truncate text-xs font-semibold text-slate-800">{{ $pedido->domiciliario->nombre }}</div>
                                             <div class="truncate text-[10px] text-slate-500">

@@ -98,6 +98,8 @@ class Index extends Component
         $estadosDespachables = [Pedido::ESTADO_NUEVO, Pedido::ESTADO_EN_PREPARACION, 'confirmado'];
 
         foreach ($this->pedidosFiltrados as $p) {
+            // Excluir pedidos de recogida — no requieren domiciliario
+            if (($p->tipo_entrega ?? 'domicilio') !== 'domicilio') continue;
             if (in_array($p->estado, $estadosDespachables, true)) {
                 $this->seleccionadosMasivo[$p->id] = true;
             }
@@ -312,6 +314,98 @@ class Index extends Component
         }
 
         return $pedidos->values();
+    }
+
+    /**
+     * 🏪 Marca un pedido de RECOGIDA como listo para que el cliente lo recoja.
+     * Salta el flujo de domiciliario completo (no aplica).
+     */
+    public function marcarListoParaRecoger(int $pedidoId): void
+    {
+        try {
+            $pedido = Pedido::findOrFail($pedidoId);
+
+            if (($pedido->tipo_entrega ?? 'domicilio') !== 'recoger') {
+                $this->dispatch('notify', [
+                    'type' => 'warning',
+                    'message' => "El pedido #{$pedido->id} no es para recoger en sede.",
+                ]);
+                return;
+            }
+
+            if ($pedido->estado !== Pedido::ESTADO_EN_PREPARACION) {
+                $this->dispatch('notify', [
+                    'type' => 'warning',
+                    'message' => "Primero debe estar en preparación.",
+                ]);
+                return;
+            }
+
+            // Generar token corto para que el mostrador lo verifique al entregar
+            if (empty($pedido->token_entrega)) {
+                $pedido->generarTokenEntrega();
+            }
+
+            $usuario = Auth::user();
+            $pedido->cambiarEstado(
+                Pedido::ESTADO_REPARTIDOR_EN_CAMINO,
+                'Tu pedido está listo para que pases por la sede.',
+                'Listo para recoger',
+                $usuario?->name,
+                $usuario?->id
+            );
+
+            $this->refrescar();
+            $this->dispatch('notify', [
+                'type' => 'success',
+                'message' => "Pedido #{$pedido->id} marcado como listo para recoger.",
+            ]);
+        } catch (\Throwable $e) {
+            report($e);
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'No se pudo marcar como listo para recoger.',
+            ]);
+        }
+    }
+
+    /**
+     * 🏪 Confirma que el cliente recogió el pedido en sede.
+     */
+    public function confirmarRecogida(int $pedidoId): void
+    {
+        try {
+            $pedido = Pedido::findOrFail($pedidoId);
+
+            if (($pedido->tipo_entrega ?? 'domicilio') !== 'recoger') {
+                $this->dispatch('notify', [
+                    'type' => 'warning',
+                    'message' => "El pedido #{$pedido->id} no es para recoger en sede.",
+                ]);
+                return;
+            }
+
+            $usuario = Auth::user();
+            $pedido->cambiarEstado(
+                Pedido::ESTADO_ENTREGADO,
+                'Cliente recogió el pedido en la sede.',
+                'Pedido recogido por el cliente',
+                $usuario?->name,
+                $usuario?->id
+            );
+
+            $this->refrescar();
+            $this->dispatch('notify', [
+                'type' => 'success',
+                'message' => "Pedido #{$pedido->id} marcado como recogido.",
+            ]);
+        } catch (\Throwable $e) {
+            report($e);
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'No se pudo confirmar la recogida.',
+            ]);
+        }
     }
 
     public function marcarEnPreparacion(int $pedidoId): void

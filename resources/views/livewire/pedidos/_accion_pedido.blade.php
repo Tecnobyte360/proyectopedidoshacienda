@@ -17,25 +17,49 @@
     </button>
 
 @elseif($pedido->estado === \App\Models\Pedido::ESTADO_EN_PREPARACION)
-    {{-- Asignar y despachar: violeta-índigo profundo, transmite "movimiento" --}}
-    <button type="button"
-            wire:click="abrirModalDespacho({{ $pedido->id }})"
-            wire:loading.attr="disabled"
-            wire:target="abrirModalDespacho({{ $pedido->id }})"
-            class="{{ $btnBase }} bg-gradient-to-br from-violet-500 via-purple-600 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 shadow-violet-500/30 hover:shadow-violet-500/40">
-        <i class="fa-solid fa-motorcycle transition-transform group-hover:translate-x-0.5" wire:loading.class="hidden" wire:target="abrirModalDespacho({{ $pedido->id }})"></i>
-        <i class="fa-solid fa-spinner fa-spin hidden" wire:loading.class.remove="hidden" wire:target="abrirModalDespacho({{ $pedido->id }})"></i>
-        <span>{{ $pedido->domiciliario ? 'Reasignar y despachar' : 'Asignar y despachar' }}</span>
-    </button>
+    @if(($pedido->tipo_entrega ?? 'domicilio') === 'recoger')
+        {{-- RECOGE EN SEDE: marcar listo (no se asigna domiciliario) --}}
+        <button type="button"
+                wire:click="marcarListoParaRecoger({{ $pedido->id }})"
+                wire:loading.attr="disabled"
+                wire:target="marcarListoParaRecoger({{ $pedido->id }})"
+                class="{{ $btnBase }} bg-gradient-to-br from-amber-500 via-orange-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 shadow-orange-500/30 hover:shadow-orange-500/40">
+            <i class="fa-solid fa-bag-shopping transition-transform group-hover:scale-110" wire:loading.class="hidden" wire:target="marcarListoParaRecoger({{ $pedido->id }})"></i>
+            <i class="fa-solid fa-spinner fa-spin hidden" wire:loading.class.remove="hidden" wire:target="marcarListoParaRecoger({{ $pedido->id }})"></i>
+            <span>Listo para recoger</span>
+        </button>
+    @else
+        {{-- DOMICILIO: asignar y despachar --}}
+        <button type="button"
+                wire:click="abrirModalDespacho({{ $pedido->id }})"
+                wire:loading.attr="disabled"
+                wire:target="abrirModalDespacho({{ $pedido->id }})"
+                class="{{ $btnBase }} bg-gradient-to-br from-violet-500 via-purple-600 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 shadow-violet-500/30 hover:shadow-violet-500/40">
+            <i class="fa-solid fa-motorcycle transition-transform group-hover:translate-x-0.5" wire:loading.class="hidden" wire:target="abrirModalDespacho({{ $pedido->id }})"></i>
+            <i class="fa-solid fa-spinner fa-spin hidden" wire:loading.class.remove="hidden" wire:target="abrirModalDespacho({{ $pedido->id }})"></i>
+            <span>{{ $pedido->domiciliario ? 'Reasignar y despachar' : 'Asignar y despachar' }}</span>
+        </button>
+    @endif
 
 @elseif($pedido->estado === \App\Models\Pedido::ESTADO_REPARTIDOR_EN_CAMINO)
-    {{-- Confirmar entrega: verde esmeralda → teal, transmite "logro completo" --}}
-    <button type="button"
-            wire:click="abrirModalEntrega({{ $pedido->id }})"
-            class="{{ $btnBase }} bg-gradient-to-br from-emerald-400 via-emerald-500 to-teal-600 hover:from-emerald-500 hover:to-teal-700 shadow-emerald-500/30 hover:shadow-emerald-500/40">
-        <i class="fa-solid fa-circle-check transition-transform group-hover:scale-110"></i>
-        <span>Confirmar entrega</span>
-    </button>
+    @if(($pedido->tipo_entrega ?? 'domicilio') === 'recoger')
+        {{-- RECOGE: confirmar que el cliente recogió --}}
+        <button type="button"
+                wire:click="confirmarRecogida({{ $pedido->id }})"
+                wire:confirm="¿Confirmas que el cliente recogió el pedido?"
+                class="{{ $btnBase }} bg-gradient-to-br from-emerald-400 via-emerald-500 to-teal-600 hover:from-emerald-500 hover:to-teal-700 shadow-emerald-500/30 hover:shadow-emerald-500/40">
+            <i class="fa-solid fa-hand-holding-heart transition-transform group-hover:scale-110"></i>
+            <span>Confirmar recogida</span>
+        </button>
+    @else
+        {{-- DOMICILIO: confirmar entrega con token --}}
+        <button type="button"
+                wire:click="abrirModalEntrega({{ $pedido->id }})"
+                class="{{ $btnBase }} bg-gradient-to-br from-emerald-400 via-emerald-500 to-teal-600 hover:from-emerald-500 hover:to-teal-700 shadow-emerald-500/30 hover:shadow-emerald-500/40">
+            <i class="fa-solid fa-circle-check transition-transform group-hover:scale-110"></i>
+            <span>Confirmar entrega</span>
+        </button>
+    @endif
 
 @elseif($pedido->estado === \App\Models\Pedido::ESTADO_ENTREGADO)
     <span class="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-emerald-100/50 px-3 py-2.5 text-xs font-bold text-emerald-700 shadow-sm">
