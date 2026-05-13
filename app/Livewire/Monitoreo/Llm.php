@@ -40,7 +40,7 @@ class Llm extends Component
             ->selectRaw('SUM(COALESCE(tokens_input,0) + COALESCE(tokens_cache_creation,0)) as t')
             ->value('t');
 
-        $rateLimitTier = 30000; // Tier 1 default — TODO: leer de config
+        $rateLimitTier = 450000; // Tier 2 actual — sube a 1M+ en Tier 3
         $porcentajeUso = $rateLimitTier > 0
             ? min(100, round(($tokensUltimoMin / $rateLimitTier) * 100, 1))
             : 0;
