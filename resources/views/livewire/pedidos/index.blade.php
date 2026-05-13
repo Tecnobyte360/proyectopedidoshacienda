@@ -612,17 +612,17 @@
                                 </button>
                             </th>
                             @php
+                                // Tabla compacta: prioriza columnas críticas que SIEMPRE deben caber
+                                // sin scroll en lg+. Datos secundarios (telefono, hora) viven en cards mobile.
                                 $cols = [
                                     ['label' => 'Pedido',       'cls' => ''],
                                     ['label' => 'Cliente',      'cls' => ''],
-                                    ['label' => 'Productos',    'cls' => 'hidden xl:table-cell'],
+                                    ['label' => 'Productos',    'cls' => 'hidden 2xl:table-cell'],
                                     ['label' => 'Zona/Sede',    'cls' => ''],
-                                    ['label' => 'Teléfono',     'cls' => 'hidden 2xl:table-cell'],
                                     ['label' => 'Estado',       'cls' => ''],
-                                    ['label' => 'ANS',          'cls' => 'hidden xl:table-cell'],
-                                    ['label' => 'Hora',         'cls' => 'hidden 2xl:table-cell'],
+                                    ['label' => 'ANS',          'cls' => 'hidden 2xl:table-cell'],
                                     ['label' => 'Total',        'cls' => ''],
-                                    ['label' => 'Domiciliario', 'cls' => 'hidden 2xl:table-cell'],
+                                    ['label' => 'Domiciliario', 'cls' => 'hidden xl:table-cell'],
                                     ['label' => 'Acción',       'cls' => 'text-center'],
                                 ];
                             @endphp
@@ -705,8 +705,8 @@
                                     </div>
                                 </td>
 
-                                {{-- 🛒 Productos del pedido (xl+) --}}
-                                <td class="px-3 py-3.5 align-middle hidden xl:table-cell">
+                                {{-- 🛒 Productos del pedido (2xl+) --}}
+                                <td class="px-3 py-3.5 align-middle hidden 2xl:table-cell">
                                     @php
                                         $detalles = $pedido->detalles ?? collect();
                                         $totalLineas = $detalles->count();
@@ -758,13 +758,7 @@
                                     @endif
                                 </td>
 
-                                {{-- Teléfono (2xl+) --}}
-                                <td class="px-3 py-3.5 align-middle hidden 2xl:table-cell">
-                                    <span class="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 whitespace-nowrap">
-                                        <i class="fa-solid fa-phone text-slate-400 text-[10px]"></i>
-                                        {{ $pedido->telefono_whatsapp ?? $pedido->telefono ?? '—' }}
-                                    </span>
-                                </td>
+                                {{-- Teléfono se eliminó de la tabla; visible en cards mobile y en detalle --}}
 
                                 {{-- Estado --}}
                                 <td class="px-3 py-3.5 align-middle">
@@ -785,20 +779,13 @@
                                     </div>
                                 </td>
 
-                                {{-- Semáforo ANS (xl+) --}}
-                                <td class="px-3 py-3.5 align-middle hidden xl:table-cell">
+                                {{-- Semáforo ANS (2xl+) --}}
+                                <td class="px-3 py-3.5 align-middle hidden 2xl:table-cell">
                                     <div class="w-[110px]">
                                         @include('livewire.pedidos._semaforo', ['pedido' => $pedido, 'modo' => 'barra'])
                                     </div>
                                 </td>
-
-                                {{-- Hora (2xl+) --}}
-                                <td class="px-3 py-3.5 align-middle whitespace-nowrap hidden 2xl:table-cell">
-                                    <span class="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600">
-                                        <i class="fa-regular fa-clock text-slate-400 text-[10px]"></i>
-                                        {{ $pedido->created_at?->format('h:i a') }}
-                                    </span>
-                                </td>
+                                {{-- Hora se eliminó de la tabla --}}
 
                                 {{-- Total --}}
                                 <td class="px-3 py-3.5 align-middle">
@@ -807,8 +794,8 @@
                                     </span>
                                 </td>
 
-                                {{-- Domiciliario / Recoge (2xl+) --}}
-                                <td class="px-3 py-3.5 align-middle hidden 2xl:table-cell">
+                                {{-- Domiciliario / Recoge (xl+) --}}
+                                <td class="px-3 py-3.5 align-middle hidden xl:table-cell">
                                     @if($esRecogerRow)
                                         <span class="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-700 whitespace-nowrap"
                                               title="No requiere domiciliario — el cliente recoge">
@@ -834,7 +821,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="12" class="px-6 py-16 text-center">
+                                <td colspan="10" class="px-6 py-16 text-center">
                                     <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-slate-50 text-slate-400">
                                         <i class="fa-solid fa-inbox text-xl"></i>
                                     </div>
