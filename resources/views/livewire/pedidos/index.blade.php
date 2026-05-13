@@ -615,14 +615,14 @@
                                 $cols = [
                                     ['label' => 'Pedido',       'cls' => ''],
                                     ['label' => 'Cliente',      'cls' => ''],
-                                    ['label' => 'Productos',    'cls' => ''],
-                                    ['label' => 'Zona',         'cls' => 'hidden xl:table-cell'],
+                                    ['label' => 'Productos',    'cls' => 'hidden xl:table-cell'],
+                                    ['label' => 'Zona/Sede',    'cls' => ''],
                                     ['label' => 'Teléfono',     'cls' => 'hidden 2xl:table-cell'],
                                     ['label' => 'Estado',       'cls' => ''],
-                                    ['label' => 'Tiempo (ANS)', 'cls' => ''],
+                                    ['label' => 'ANS',          'cls' => 'hidden xl:table-cell'],
                                     ['label' => 'Hora',         'cls' => 'hidden 2xl:table-cell'],
                                     ['label' => 'Total',        'cls' => ''],
-                                    ['label' => 'Domiciliario', 'cls' => 'hidden xl:table-cell'],
+                                    ['label' => 'Domiciliario', 'cls' => 'hidden 2xl:table-cell'],
                                     ['label' => 'Acción',       'cls' => 'text-center'],
                                 ];
                             @endphp
@@ -705,8 +705,8 @@
                                     </div>
                                 </td>
 
-                                {{-- 🛒 Productos del pedido --}}
-                                <td class="px-3 py-3.5 align-middle">
+                                {{-- 🛒 Productos del pedido (xl+) --}}
+                                <td class="px-3 py-3.5 align-middle hidden xl:table-cell">
                                     @php
                                         $detalles = $pedido->detalles ?? collect();
                                         $totalLineas = $detalles->count();
@@ -738,8 +738,8 @@
                                     @endif
                                 </td>
 
-                                {{-- Zona / Sede (xl+) --}}
-                                <td class="px-3 py-3.5 align-middle hidden xl:table-cell">
+                                {{-- Zona / Sede (visible desde lg) --}}
+                                <td class="px-3 py-3.5 align-middle">
                                     @if($esRecogerRow)
                                         <span class="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700 whitespace-nowrap"
                                               title="Cliente recoge en sede">
@@ -785,8 +785,8 @@
                                     </div>
                                 </td>
 
-                                {{-- Semáforo ANS --}}
-                                <td class="px-3 py-3.5 align-middle">
+                                {{-- Semáforo ANS (xl+) --}}
+                                <td class="px-3 py-3.5 align-middle hidden xl:table-cell">
                                     <div class="w-[110px]">
                                         @include('livewire.pedidos._semaforo', ['pedido' => $pedido, 'modo' => 'barra'])
                                     </div>
@@ -807,8 +807,8 @@
                                     </span>
                                 </td>
 
-                                {{-- Domiciliario / Recoge (xl+) --}}
-                                <td class="px-3 py-3.5 align-middle hidden xl:table-cell">
+                                {{-- Domiciliario / Recoge (2xl+) --}}
+                                <td class="px-3 py-3.5 align-middle hidden 2xl:table-cell">
                                     @if($esRecogerRow)
                                         <span class="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-700 whitespace-nowrap"
                                               title="No requiere domiciliario — el cliente recoge">
@@ -834,7 +834,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="10" class="px-6 py-16 text-center">
+                                <td colspan="12" class="px-6 py-16 text-center">
                                     <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-slate-50 text-slate-400">
                                         <i class="fa-solid fa-inbox text-xl"></i>
                                     </div>
