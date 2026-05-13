@@ -303,14 +303,30 @@ class BotCatalogoToolService
             ? $p->precioParaSede($sedeId)
             : (float) ($p->precio_base ?? 0);
 
-        return [
+        $precioKg = (float) $precio;
+        $unidadCat = mb_strtolower((string) ($p->unidad ?? 'unidad'));
+        $vendePorPeso = in_array($unidadCat, ['kg', 'kilo', 'kilos', 'gr', 'gramo', 'gramos', 'lb', 'libra'], true);
+
+        $datos = [
             'codigo'    => (string) ($p->codigo ?? ''),
             'nombre'    => (string) ($p->nombre ?? ''),
             'categoria' => $this->getCategoriaNombre($p),
-            'precio'    => (float) $precio,
+            'precio'    => $precioKg,
             'unidad'    => (string) ($p->unidad ?? 'unidad'),
             'destacado' => (bool) ($p->destacado ?? false),
         ];
+
+        // 💰 Si el producto se vende por peso, devolver precios prácticos calculados
+        // para que el LLM NO tenga que multiplicar/dividir y se equivoque.
+        if ($vendePorPeso) {
+            $datos['precio_kg']         = (int) round($precioKg);
+            $datos['precio_libra']      = (int) round($precioKg * 0.5);
+            $datos['precio_500g']       = (int) round($precioKg * 0.5);
+            $datos['precio_media_lb']   = (int) round($precioKg * 0.25);
+            $datos['hint_precios']      = "Para calcular total: cantidad × precio de su unidad. Ej: 3 libras × precio_libra. NUNCA multipliques cantidad-en-libras por precio_kg.";
+        }
+
+        return $datos;
     }
 
     private function getCategoriaNombre($p): string
