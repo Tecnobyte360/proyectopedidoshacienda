@@ -37,18 +37,30 @@ class FlujoPedidoOrchestrator
         'consultar_horarios',
         'consultar_promociones',
         'consultar_zonas_cobertura',
+        'validar_cobertura',           // LLM debe poder validar en cualquier momento
         // Cliente puede dar cédula en CUALQUIER momento del flujo. El bot
         // debe poder verificarla sin importar el paso actual.
         'verificar_cliente_erp',
         // Cliente puede pedir un producto en cualquier momento (incluso
         // en paso=confirmado tras un pedido anterior).
         'buscar_productos',
+        'productos_destacados',
+        'listar_categorias',
+        'productos_de_categoria',
+        'info_producto',
         // Cliente puede preguntar por sus pedidos previos en cualquier momento
         // ("¿cuántos pedidos tengo?", "estado de mi pedido", "ya llegó").
         'consultar_mis_pedidos',
         // Cliente puede adicionar productos a un pedido existente (dentro del
         // ANS configurado). La tool valida tiempo + crea pedido ligado + SGI.
         'crear_adicion_pedido',
+        // 🆕 confirmar_pedido SIEMPRE disponible: el LLM decide cuándo llamarla.
+        // El GUARD validarDatosObligatoriosPedido() rechaza si faltan campos.
+        // Sin esto, el LLM queda atascado cuando el captador determinista no
+        // captura productos (que ahora está desactivado para evitar falsos
+        // positivos del fuzzy match).
+        'confirmar_pedido',
+        'registrar_datos_cliente',
     ];
 
     /**
