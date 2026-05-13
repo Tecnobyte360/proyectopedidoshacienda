@@ -339,7 +339,7 @@
 
         {{-- FILTROS --}}
         <div class="mt-4 rounded-2xl border border-slate-200 bg-white p-3 sm:p-4 shadow-sm">
-            <div class="flex flex-col gap-3 lg:flex-row lg:items-center">
+            <div class="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center">
 
                 {{-- Tabs scrollables horizontal --}}
                 <div class="flex-1 min-w-0 -mx-3 sm:-mx-4 lg:mx-0 px-3 sm:px-4 lg:px-0 overflow-x-auto pb-1 scrollbar-hide">
@@ -373,30 +373,31 @@
                     </div>
                 </div>
 
-                {{-- 🚚 Filtro tipo de entrega --}}
-                <div class="relative w-full lg:w-44 shrink-0">
-                    <i class="fa-solid fa-truck absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
-                    <select wire:model.live="tipoEntrega"
-                            class="h-10 w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-10 text-sm font-medium text-slate-700 focus:border-brand focus:bg-white focus:ring-2 focus:ring-brand/20">
-                        <option value="todos">Todos</option>
-                        <option value="domicilio">🛵 Despacho</option>
-                        <option value="recoger">🏪 Recoge en sede</option>
-                    </select>
-                    <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-                </div>
+                {{-- 🚚 Filtros secundarios (tipo entrega + zona) - en su propia fila para no competir con los tabs --}}
+                <div class="flex flex-col sm:flex-row gap-2 lg:basis-full lg:order-3 lg:mt-2">
+                    <div class="relative flex-1 min-w-0 sm:max-w-[180px]">
+                        <i class="fa-solid fa-truck absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none"></i>
+                        <select wire:model.live="tipoEntrega"
+                                class="h-10 w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-9 text-sm font-medium text-slate-700 focus:border-brand focus:bg-white focus:ring-2 focus:ring-brand/20">
+                            <option value="todos">Todos</option>
+                            <option value="domicilio">🛵 Despacho</option>
+                            <option value="recoger">🏪 Recoge en sede</option>
+                        </select>
+                        <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none"></i>
+                    </div>
 
-                {{-- Filtro de zona — alineado con los tabs --}}
-                <div class="relative w-full lg:w-56 shrink-0">
-                    <i class="fa-solid fa-location-dot absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
-                    <select wire:model.live="zona"
-                            class="h-10 w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-10 text-sm font-medium text-slate-700 focus:border-brand focus:bg-white focus:ring-2 focus:ring-brand/20">
-                        <option value="todas">Todas las zonas</option>
-                        @foreach($zonasDisponibles as $z)
-                            <option value="{{ $z->id }}">{{ $z->nombre }}</option>
-                        @endforeach
-                        <option value="sin_zona">Sin zona asignada</option>
-                    </select>
-                    <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                    <div class="relative flex-1 min-w-0 sm:max-w-[220px]">
+                        <i class="fa-solid fa-location-dot absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none"></i>
+                        <select wire:model.live="zona"
+                                class="h-10 w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-9 text-sm font-medium text-slate-700 focus:border-brand focus:bg-white focus:ring-2 focus:ring-brand/20">
+                            <option value="todas">Todas las zonas</option>
+                            @foreach($zonasDisponibles as $z)
+                                <option value="{{ $z->id }}">{{ $z->nombre }}</option>
+                            @endforeach
+                            <option value="sin_zona">Sin zona asignada</option>
+                        </select>
+                        <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none"></i>
+                    </div>
                 </div>
             </div>
         </div>
