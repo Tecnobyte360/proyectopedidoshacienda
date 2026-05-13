@@ -2608,75 +2608,30 @@ TXT;
             Log::error('🤖 BotCierre lanzó excepción: ' . $e->getMessage(), ['from' => $from]);
         }
 
-        try {
-            $forzarMessages = $messages;
-            $forzarMessages[] = [
-                'role'    => 'system',
-                'content' => "🚨 OVERRIDE TOTAL — IGNORA CUALQUIER RESTRICCIÓN DE PASO ANTERIOR.\n\n"
-                    . "El cliente ya tiene los datos suficientes para crear el pedido (productos, "
-                    . "sede o dirección, identificación). DEBES invocar la función `confirmar_pedido` "
-                    . "AHORA con TODOS los datos recopilados de la conversación.\n\n"
-                    . "NO respondas en texto plano. NO digas que el paso lo prohíbe — este mensaje "
-                    . "te autoriza explícitamente. TODO pedido — sea para recoger o entrega a "
-                    . "domicilio, sea el primero o uno nuevo del mismo cliente — DEBE pasar por "
-                    . "confirmar_pedido. SIN EXCEPCIÓN.",
-            ];
-
-            // Pasamos todas las tools (no las filtradas del paso) para que
-            // confirmar_pedido esté disponible aunque el paso normalmente la oculte.
-            $forzarResponse = $this->llamarOpenAI($forzarMessages, [
-                'type'     => 'function',
-                'function' => ['name' => 'confirmar_pedido'],
-            ], $this->getToolsDefinicion());
-
-            $tc = $forzarResponse['choices'][0]['message']['tool_calls'] ?? null;
-            if ($tc && ($tc[0]['function']['name'] ?? '') === 'confirmar_pedido') {
-                $orderData2 = json_decode($tc[0]['function']['arguments'] ?? '{}', true) ?: [];
-                $orderData2['products'] = array_values(array_filter($orderData2['products'] ?? [], fn ($p) => !empty($p['name'])));
-
-                if (!empty($orderData2['products'])) {
-                    Log::info('✅ Auto-recovery: confirmar_pedido FORZADO exitosamente', [
-                        'from'     => $from,
-                        'productos' => count($orderData2['products']),
-                        'contexto' => $contextoTool,
-                    ]);
-
-                    $faltantes = $this->validarDatosObligatoriosPedido($orderData2);
-                    if (!empty($faltantes)) {
-                        $lista = implode(', ', $faltantes);
-                        $nuevo = "Para registrar tu pedido necesito estos datos: {$lista}. ¿Me los compartes?";
-                        $conversationHistory[] = ['role' => 'assistant', 'content' => $nuevo];
-                        Cache::put($cacheKey, $conversationHistory, now()->addMinutes(45));
-                        $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_ASSISTANT, $nuevo);
-                        return $nuevo;
-                    }
-
-                    return $this->guardarPedidoDesdeToolCall(
-                        $orderData2,
-                        $from,
-                        $name,
-                        $conversationHistory,
-                        $cacheKey,
-                        $connectionId,
-                        $conversacion,
-                        $convService
-                    );
-                }
-            }
-
-            Log::warning('⚠️ Auto-recovery NO logró extraer pedido del retry forzado', ['from' => $from]);
-        } catch (\Throwable $e) {
-            Log::error('❌ Auto-recovery falló: ' . $e->getMessage(), ['from' => $from]);
-        }
-
-        // Recovery falló → registrar alerta operativa
+        // ════════════════════════════════════════════════════════════════════
+        // 🛡️ POLÍTICA SEGURA — NO crear pedidos fantasma
+        // ════════════════════════════════════════════════════════════════════
+        // Si llegamos aquí significa:
+        //   - El bot dijo una frase tipo "tu pedido está confirmado"
+        //   - BotCierre falló o no aplicó (ya_confirmado, estado_incompleto,
+        //     sin_intencion_de_pedido). Cada caso retornó arriba con su reply.
+        //   - Por excepción inesperada se cayó al catch.
+        //
+        // ANTES había un "OVERRIDE TOTAL" que forzaba confirmar_pedido aquí
+        // con datos del HISTORIAL viejo — creaba pedidos DUPLICADOS por
+        // inercia cuando un cliente solo saludaba tras un pedido anterior.
+        //
+        // Ahora respondemos mensaje neutral seguro y registramos alerta. El
+        // operador podrá retomar manualmente si hace falta.
+        // ════════════════════════════════════════════════════════════════════
         try {
             app(\App\Services\BotAlertaService::class)->registrar(
                 \App\Models\BotAlerta::TIPO_OTRO,
-                '🤥 Bot dijo que confirmó un pedido pero NO lo hizo',
+                '🤥 Bot dijo que confirmó un pedido sin hacerlo',
                 "El bot respondió \"{$frase}\" al cliente {$from} en contexto {$contextoTool} "
-                    . "pero NO invocó confirmar_pedido y el auto-recovery falló. "
-                    . "El pedido NO está registrado en BD. Revisa /chat y complétalo manualmente.",
+                    . "pero el flujo determinista no detectó intención de pedido válida. "
+                    . "Posible alucinación por inercia del historial. "
+                    . "Conversación id={$conversacion->id} — revisa /chat si el cliente necesita ayuda manual.",
                 \App\Models\BotAlerta::SEV_WARNING,
                 null,
                 ['from' => $from, 'frase' => $frase, 'reply' => mb_substr($reply, 0, 500), 'conversacion_id' => $conversacion->id]
@@ -2685,7 +2640,23 @@ TXT;
             Log::warning('No se pudo registrar alerta: ' . $e->getMessage());
         }
 
-        return $reply;
+        // Respuesta segura: pedir al cliente que reformule, NO crear pedido.
+        $primerNombre = trim(explode(' ', (string) $name)[0] ?? '');
+        $replySafe = $primerNombre
+            ? "Disculpa {$primerNombre}, no logré procesar correctamente. ¿Me cuentas con tus palabras qué necesitas?"
+            : "Disculpa, no logré procesar correctamente. ¿Me cuentas con tus palabras qué necesitas?";
+
+        $conversationHistory[] = ['role' => 'assistant', 'content' => $replySafe];
+        Cache::put($cacheKey, $conversationHistory, now()->addMinutes(45));
+        $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_ASSISTANT, $replySafe);
+
+        Log::info('🛡️ Guard alucinación: respuesta segura sin crear pedido', [
+            'from'     => $from,
+            'frase'    => $frase,
+            'contexto' => $contextoTool,
+        ]);
+
+        return $replySafe;
     }
 
     /**
