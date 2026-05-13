@@ -696,13 +696,24 @@ class EstadoPedidoService
      */
     private function detectarDireccionEnMensaje(string $msg): ?string
     {
+        // 🛡️ Pre-limpieza: si el cliente metió cédula/email en el mismo mensaje,
+        // los quitamos del texto ANTES de capturar la dirección. Antes la dirección
+        // quedaba sucia: "Cra 50 No. 51 00 Bello, mi cedula es 1007767612"
+        $msgLimpio = $msg;
+        // Quitar email
+        $msgLimpio = preg_replace('/\s*[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}\s*/iu', ' ', $msgLimpio);
+        // Quitar segmentos con "mi cedula es 12345", "cedula 12345", "cc 12345", "documento 12345"
+        $msgLimpio = preg_replace('/[,;]?\s*(?:mi\s+)?(?:c[eé]dula|cc|cédula|documento|nit|ced)[\s:]*\d{6,15}\.?/iu', '', $msgLimpio);
+        // Quitar mención sin prefijo de un número largo aislado (8+ dígitos) al final del mensaje
+        $msgLimpio = preg_replace('/[,;]?\s*\d{8,12}\s*\.?\s*$/u', '', $msgLimpio);
+
         // Palabras clave de vía colombianas (con/sin punto, abreviadas o no)
         $palabrasVia = '(?:cra\.?|carrera|cl\.?|calle|cll|dg\.?|diagonal|diag|trv\.?|transversal|av\.?|avenida|cr|kr|circular|autopista|via|tv)';
 
         // Patrón principal: palabra de vía + cualquier cosa con al menos un número
         // hasta el final del mensaje o delimitador fuerte
         $patron = '/\b' . $palabrasVia . '\s*\.?\s*\d[\w\s#\-\/\.,°áéíóúñ]*/iu';
-        if (preg_match($patron, $msg, $m)) {
+        if (preg_match($patron, $msgLimpio, $m)) {
             $dir = trim($m[0]);
             // Limpiar trailing common: comas, puntos sueltos al final
             $dir = preg_replace('/[\s,.;]+$/u', '', $dir);
@@ -714,8 +725,8 @@ class EstadoPedidoService
 
         // Fallback: si el mensaje es claramente solo dirección sin palabra de vía
         // (ej. "#45-23, Belén") + al menos 2 números separados
-        if (preg_match('/^#?\s*\d+[a-z]?\s*[-#\s\/]\s*\d+/iu', trim($msg), $m)) {
-            return trim($msg);
+        if (preg_match('/^#?\s*\d+[a-z]?\s*[-#\s\/]\s*\d+/iu', trim($msgLimpio), $m)) {
+            return trim($msgLimpio);
         }
 
         return null;
