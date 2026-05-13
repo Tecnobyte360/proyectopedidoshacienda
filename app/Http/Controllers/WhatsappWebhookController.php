@@ -2963,8 +2963,10 @@ TXT;
             '/\b(?:va|sale|salió)\s+(?:en\s+camino|para\s+(?:tu|su)\s+casa|hacia)\b/u',
             // "ya lo despachamos", "ya lo enviamos"
             '/\bya\s+(?:lo|la)\s+(?:despach|envi|entreg|mand)/u',
-            // "queda anotado/apuntado/agendado/registrado"
-            '/\bqueda\s+(?:anotado|apuntado|agendado|registrado|listo)\b/u',
+            // "tu/su PEDIDO queda anotado/apuntado/agendado/registrado/listo"
+            // (NO disparar con simples "queda anotado:" que el bot usa como checklist intermedio)
+            '/\b(?:tu|su|el)\s+pedido\s+queda\s+(?:anotado|apuntado|agendado|registrado|listo)\b/u',
+            '/\bqueda\s+(?:anotado|apuntado|agendado|registrado|listo)\s+(?:tu|su|el)\s+pedido\b/u',
             // "tu pedido #N" (número de pedido)
             '/\btu\s+pedido\s+#\d+/u',
         ];
