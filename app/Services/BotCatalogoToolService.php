@@ -305,7 +305,12 @@ class BotCatalogoToolService
 
         $precioKg = (float) $precio;
         $unidadCat = mb_strtolower((string) ($p->unidad ?? 'unidad'));
-        $vendePorPeso = in_array($unidadCat, ['kg', 'kilo', 'kilos', 'gr', 'gramo', 'gramos', 'lb', 'libra'], true);
+        // Unidades de peso aceptadas (incluye variantes del catálogo SGI: "Kl", "Klg", etc.)
+        $vendePorPeso = in_array($unidadCat, [
+            'kg', 'k', 'kl', 'klg', 'kgs', 'kilo', 'kilos', 'kilogramo', 'kilogramos',
+            'gr', 'g', 'gramo', 'gramos',
+            'lb', 'libra', 'libras',
+        ], true);
 
         $datos = [
             'codigo'    => (string) ($p->codigo ?? ''),
