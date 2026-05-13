@@ -15,6 +15,7 @@ class Index extends Component
 
     public string $estado = 'todos';
     public string $zona   = 'todas';   // 'todas' | id de zona | 'sin_zona'
+    public string $tipoEntrega = 'todos'; // 'todos' | 'domicilio' | 'recoger'
 
     // Modal token entrega
     public bool   $modalTokenAbierto  = false;
@@ -65,8 +66,9 @@ class Index extends Component
     }
 
     protected $queryString = [
-        'estado' => ['except' => 'todos'],
-        'zona'   => ['except' => 'todas'],
+        'estado'      => ['except' => 'todos'],
+        'zona'        => ['except' => 'todas'],
+        'tipoEntrega' => ['except' => 'todos'],
     ];
 
     public function refrescar(): void
@@ -299,6 +301,14 @@ class Index extends Component
             } else {
                 $pedidos = $pedidos->where('zona_cobertura_id', (int) $this->zona);
             }
+        }
+
+        // 🚚 Filtro tipo de entrega
+        if ($this->tipoEntrega !== 'todos') {
+            $pedidos = $pedidos->filter(function ($p) {
+                $tipo = $p->tipo_entrega ?? 'domicilio';
+                return $tipo === $this->tipoEntrega;
+            });
         }
 
         return $pedidos->values();

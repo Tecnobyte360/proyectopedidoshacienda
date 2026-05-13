@@ -52,6 +52,7 @@ class Pedido extends Model
         'observacion_estado',
         'direccion',
         'barrio',
+        'tipo_entrega',
         'lat',
         'lng',
         'zona_cobertura_id',

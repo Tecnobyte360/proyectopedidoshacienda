@@ -360,6 +360,18 @@
                     </div>
                 </div>
 
+                {{-- 🚚 Filtro tipo de entrega --}}
+                <div class="relative w-full lg:w-44 shrink-0">
+                    <i class="fa-solid fa-truck absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                    <select wire:model.live="tipoEntrega"
+                            class="h-10 w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-10 text-sm font-medium text-slate-700 focus:border-brand focus:bg-white focus:ring-2 focus:ring-brand/20">
+                        <option value="todos">Todos</option>
+                        <option value="domicilio">🛵 Despacho</option>
+                        <option value="recoger">🏪 Recoge en sede</option>
+                    </select>
+                    <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                </div>
+
                 {{-- Filtro de zona — alineado con los tabs --}}
                 <div class="relative w-full lg:w-56 shrink-0">
                     <i class="fa-solid fa-location-dot absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
@@ -451,9 +463,25 @@
                             @include('livewire.pedidos._semaforo', ['pedido' => $pedido, 'modo' => 'barra'])
                         </div>
 
+                        {{-- 🚚 Tipo de entrega: Despacho vs Recoger en sede --}}
+                        @php $esRecoger = ($pedido->tipo_entrega ?? 'domicilio') === 'recoger'; @endphp
+                        <div class="mt-2">
+                            @if($esRecoger)
+                                <span class="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-700">
+                                    <i class="fa-solid fa-store"></i>
+                                    Recoge en sede{{ $pedido->hora_entrega ? ' · '.\Illuminate\Support\Carbon::parse($pedido->hora_entrega)->format('h:i a') : '' }}
+                                </span>
+                            @else
+                                <span class="inline-flex items-center gap-1.5 rounded-lg border border-sky-200 bg-sky-50 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-sky-700">
+                                    <i class="fa-solid fa-motorcycle"></i>
+                                    Despacho a domicilio
+                                </span>
+                            @endif
+                        </div>
+
                         {{-- Info en grid --}}
                         <div class="grid grid-cols-1 gap-1.5 text-xs text-slate-600 mt-2">
-                            @if($pedido->zonaCobertura)
+                            @if(!$esRecoger && $pedido->zonaCobertura)
                                 <div class="flex items-center gap-2">
                                     <i class="fa-solid fa-map-location-dot w-4 text-center" style="color: {{ $pedido->zonaCobertura->color }}"></i>
                                     <span class="font-medium">{{ $pedido->zonaCobertura->nombre }}</span>
@@ -615,17 +643,26 @@
 
                                 {{-- Cliente --}}
                                 <td class="px-3 py-3.5 align-middle">
+                                    @php $esRecogerRow = ($pedido->tipo_entrega ?? 'domicilio') === 'recoger'; @endphp
                                     <div class="flex items-center gap-2.5">
                                         <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-xs font-bold text-white">
                                             {{ $iniciales ?: 'CL' }}
                                         </div>
-                                        <div class="min-w-0 max-w-[160px]">
+                                        <div class="min-w-0 max-w-[180px]">
                                             <div class="truncate font-semibold text-slate-900 text-sm">{{ $pedido->cliente_nombre }}</div>
-                                            <div class="text-[11px] text-slate-500 truncate">
-                                                {{ $pedido->created_at?->diffForHumans() }}
-                                                @if($pedido->barrio)
-                                                    <span class="xl:hidden"> · {{ $pedido->barrio }}</span>
+                                            <div class="text-[11px] text-slate-500 truncate flex items-center gap-1">
+                                                @if($esRecogerRow)
+                                                    <span class="inline-flex items-center gap-1 rounded-md bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-700 whitespace-nowrap"
+                                                          title="Cliente recoge en sede{{ $pedido->hora_entrega ? ' · '.\Illuminate\Support\Carbon::parse($pedido->hora_entrega)->format('h:i a') : '' }}">
+                                                        <i class="fa-solid fa-store text-[8px]"></i>RECOGE
+                                                    </span>
+                                                @else
+                                                    <span class="inline-flex items-center gap-1 rounded-md bg-sky-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-sky-700 whitespace-nowrap"
+                                                          title="Despacho a domicilio">
+                                                        <i class="fa-solid fa-motorcycle text-[8px]"></i>DESPACHO
+                                                    </span>
                                                 @endif
+                                                <span class="truncate">· {{ $pedido->created_at?->diffForHumans() }}</span>
                                             </div>
                                         </div>
                                     </div>
