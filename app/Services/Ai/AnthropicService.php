@@ -97,7 +97,11 @@ class AnthropicService
         $ultimoBody = null;
         $ultimaExc = null;
 
+        $tStart = microtime(true);
+        $intentosReales = 0;
+
         for ($i = 1; $i <= $intentos; $i++) {
+            $intentosReales = $i;
             try {
                 $response = Http::withHeaders([
                         'x-api-key'         => $apiKey,
@@ -108,6 +112,18 @@ class AnthropicService
                     ->post(self::API_URL, $payload);
 
                 if ($response->successful()) {
+                    $latMs = (int) ((microtime(true) - $tStart) * 1000);
+                    $this->registrarInvocacion(
+                        model: $model,
+                        httpStatus: 200,
+                        exitoso: true,
+                        latenciaMs: $latMs,
+                        intentos: $intentosReales,
+                        respuestaJson: $response->json(),
+                        messagesCount: count($messagesAnt),
+                        toolsCount: count($toolsAnt),
+                        esFallback: !empty($opts['_isFallback'])
+                    );
                     return $this->traducirRespuesta($response->json());
                 }
 
@@ -137,6 +153,20 @@ class AnthropicService
             'modelo' => $model,
         ]);
 
+        // Registrar fallo final
+        $latMs = (int) ((microtime(true) - $tStart) * 1000);
+        $this->registrarInvocacion(
+            model: $model,
+            httpStatus: $ultimoStatus,
+            exitoso: false,
+            latenciaMs: $latMs,
+            intentos: $intentosReales,
+            errorBody: $ultimoBody ?? $ultimaExc,
+            messagesCount: count($messagesAnt),
+            toolsCount: count($toolsAnt),
+            esFallback: !empty($opts['_isFallback'])
+        );
+
         // 🔄 FALLBACK AUTOMÁTICO: si el modelo principal está overloaded (529),
         // probamos con Haiku que tiene más capacidad disponible. Solo si no
         // estamos ya usando Haiku (para evitar recursión).
@@ -159,6 +189,63 @@ class AnthropicService
         }
 
         return null;
+    }
+
+    /**
+     * Registra cada llamada al modelo en `llm_invocaciones` para que la
+     * UI de monitoreo pueda mostrar paso a paso qué pasa con Anthropic.
+     */
+    private function registrarInvocacion(
+        string $model,
+        ?int $httpStatus,
+        bool $exitoso,
+        int $latenciaMs,
+        int $intentos,
+        ?array $respuestaJson = null,
+        ?string $errorBody = null,
+        int $messagesCount = 0,
+        int $toolsCount = 0,
+        bool $esFallback = false
+    ): void {
+        try {
+            $usage = $respuestaJson['usage'] ?? [];
+            $errorTipo = null;
+            $errorMsg = null;
+            if (!$exitoso && $errorBody) {
+                $decoded = json_decode($errorBody, true);
+                if (is_array($decoded)) {
+                    $errorTipo = $decoded['error']['type'] ?? null;
+                    $errorMsg  = $decoded['error']['message'] ?? null;
+                } else {
+                    $errorMsg = mb_substr((string) $errorBody, 0, 500);
+                }
+            }
+
+            $tm   = app(\App\Services\TenantManager::class);
+            $tenantId = method_exists($tm, 'id') ? $tm->id() : null;
+
+            \App\Models\LlmInvocacion::create([
+                'tenant_id'              => $tenantId,
+                'provider'               => 'anthropic',
+                'modelo'                 => $model,
+                'es_fallback'            => $esFallback,
+                'http_status'            => $httpStatus,
+                'exitoso'                => $exitoso,
+                'error_tipo'             => $errorTipo,
+                'error_mensaje'          => $errorMsg ? mb_substr($errorMsg, 0, 500) : null,
+                'tokens_input'           => $usage['input_tokens'] ?? null,
+                'tokens_output'          => $usage['output_tokens'] ?? null,
+                'tokens_cache_read'      => $usage['cache_read_input_tokens'] ?? null,
+                'tokens_cache_creation'  => $usage['cache_creation_input_tokens'] ?? null,
+                'latencia_ms'            => $latenciaMs,
+                'intentos'               => $intentos,
+                'messages_count'         => $messagesCount,
+                'tools_count'            => $toolsCount,
+            ]);
+        } catch (\Throwable $e) {
+            // No bloquear si falla el log de monitoreo
+            Log::warning('No se pudo registrar invocacion LLM: ' . $e->getMessage());
+        }
     }
 
     /**
