@@ -1161,6 +1161,53 @@ TXT;
                 );
             }
 
+            // 🆕 AUTO-RESET por saludo después de pedido confirmado:
+            // Si el cliente vuelve a saludar (Hola, Buenas, etc.) DESPUÉS de
+            // haber cerrado un pedido, también reseteamos para no arrastrar
+            // el flujo anterior. Si ya pasó >5 minutos del pedido, asumimos
+            // nuevo pedido.
+            if (
+                $estadoVerif->paso_actual === \App\Models\ConversacionPedidoEstado::PASO_CONFIRMADO &&
+                preg_match('/^(?:hola|buen[ao]s\s+(?:d[ií]as|tardes|noches)|hey|hola[!.]*|saludos|qu[eé]\s+tal|ey)\b/iu', trim($message))
+            ) {
+                $minutosDesdeConfirmado = $estadoVerif->confirmado_at
+                    ? now()->diffInMinutes($estadoVerif->confirmado_at)
+                    : 999;
+                if ($minutosDesdeConfirmado >= 5) {
+                    Log::info('🔁 Saludo tras pedido confirmado — reseteando para nuevo pedido', [
+                        'from'             => $from,
+                        'pedido_anterior'  => $estadoVerif->pedido_id,
+                        'minutos_desde'    => $minutosDesdeConfirmado,
+                    ]);
+                    $estadoSrv->resetear(
+                        $conversacion,
+                        "saludo_tras_pedido_{$estadoVerif->pedido_id}"
+                    );
+                }
+            }
+
+            // 🛡️ Si el estado FUE reseteado recientemente (motivo nuevo_pedido_tras_X
+            // o saludo_tras_X), inyectar instrucción AL LLM para que NO arrastre el
+            // flujo anterior. El LLM ve el historial completo en cache y si no le
+            // decimos, asume que sigue en medio del pedido viejo.
+            $estadoActualHist = $estadoSrv->obtener($conversacion);
+            $motivoReset = (string) ($estadoActualHist->motivo_abandono ?? '');
+            $reseteadoRecientemente = $estadoActualHist->abandonado_at
+                && now()->diffInMinutes($estadoActualHist->abandonado_at) <= 2
+                && (str_starts_with($motivoReset, 'nuevo_pedido_tras_')
+                    || str_starts_with($motivoReset, 'saludo_tras_pedido_'));
+            if ($reseteadoRecientemente) {
+                $pedidoAnteriorId = preg_replace('/\D/', '', $motivoReset);
+                $reinforceEstadoPedido[] = [
+                    'role'    => 'system',
+                    'content' => "🔄 NUEVO FLUJO: el cliente cerró el pedido #{$pedidoAnteriorId} antes. "
+                        . "Ahora está volviendo a hablarte para HACER OTRO PEDIDO. "
+                        . "NO asumas que sigues en el flujo del pedido #{$pedidoAnteriorId} — está cerrado. "
+                        . "Salúdalo y pregúntale qué quiere pedir esta vez. NO menciones método de entrega "
+                        . "ni dirección hasta que él te diga los productos del nuevo pedido.",
+                ];
+            }
+
             // 🔍 CAPTURA PROACTIVA: detecta cédula/email en el mensaje del cliente
             // y los guarda en el estado ANTES de que el LLM procese. Así no se
             // pierden aunque el bot no llame la tool correcta.
