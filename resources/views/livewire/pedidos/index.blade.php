@@ -407,7 +407,8 @@
         </div>
 
         {{-- ╔═══ CARDS para móvil/tablet (< lg) ═══╗ --}}
-        <div class="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 lg:hidden">
+        {{-- Responsivo: 1 col en mobile chico, 2 cols en sm, 2 cols hasta lg --}}
+        <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:hidden">
             @forelse($pedidosFiltrados as $pedido)
                 @php
                     $meta = $estadosMeta[$pedido->estado] ?? null;
@@ -583,7 +584,7 @@
                     </div>
                 </div>
             @empty
-                <div class="md:col-span-2 rounded-2xl border border-dashed border-slate-200 bg-white p-10 text-center">
+                <div class="sm:col-span-2 rounded-2xl border border-dashed border-slate-200 bg-white p-10 text-center">
                     <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-slate-50 text-slate-400">
                         <i class="fa-solid fa-inbox text-xl"></i>
                     </div>
@@ -594,9 +595,10 @@
         </div>
 
         {{-- ╔═══ TABLA para desktop (>= lg) ═══╗ --}}
-        <div class="mt-3 hidden lg:block overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <div class="overflow-x-auto">
-                <table class="min-w-full">
+        {{-- Scroll horizontal cuando no caiga; min-w fuerza que las columnas no se aplasten --}}
+        <div class="mt-3 hidden lg:block rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div class="overflow-x-auto rounded-2xl">
+                <table class="w-full min-w-[1024px] xl:min-w-[1200px] 2xl:min-w-full">
                     <thead class="bg-slate-50">
                         <tr>
                             <th class="px-3 py-3 w-10">
