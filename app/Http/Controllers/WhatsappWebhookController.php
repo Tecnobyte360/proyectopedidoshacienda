@@ -2585,6 +2585,25 @@ TXT;
                 $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_ASSISTANT, $replyFix);
                 return $replyFix;
             }
+
+            // 🛡️ Si el motivo es "sin_intencion_de_pedido", el cliente NO expresó
+            // querer pedir nada en sus últimos mensajes. NO se debe forzar la
+            // creación de un pedido fantasma con datos del historial viejo.
+            // Antes este caso caía al "OVERRIDE TOTAL" de abajo y creaba pedido
+            // duplicado por inercia. AHORA cortamos aquí con un saludo amigable.
+            if (($cierreResult['razon'] ?? '') === 'sin_intencion_de_pedido') {
+                $primerNombre = trim(explode(' ', (string) $name)[0] ?? '');
+                $replySafe = $primerNombre
+                    ? "¡Hola {$primerNombre}! 😊 ¿En qué te ayudo hoy?"
+                    : "¡Hola! 😊 ¿En qué te ayudo hoy?";
+                $conversationHistory[] = ['role' => 'assistant', 'content' => $replySafe];
+                Cache::put($cacheKey, $conversationHistory, now()->addMinutes(45));
+                $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_ASSISTANT, $replySafe);
+                Log::info('🛡️ BotCierre: sin intención de pedido — saludo seguro sin forzar', [
+                    'from' => $from,
+                ]);
+                return $replySafe;
+            }
         } catch (\Throwable $e) {
             Log::error('🤖 BotCierre lanzó excepción: ' . $e->getMessage(), ['from' => $from]);
         }
