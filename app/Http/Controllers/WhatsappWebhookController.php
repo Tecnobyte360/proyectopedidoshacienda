@@ -1161,50 +1161,63 @@ TXT;
                 );
             }
 
-            // 🆕 AUTO-RESET por saludo después de pedido confirmado:
-            // Si el cliente vuelve a saludar (Hola, Buenas, etc.) DESPUÉS de
-            // haber cerrado un pedido, también reseteamos para no arrastrar
-            // el flujo anterior. Si ya pasó >5 minutos del pedido, asumimos
-            // nuevo pedido.
-            if (
-                $estadoVerif->paso_actual === \App\Models\ConversacionPedidoEstado::PASO_CONFIRMADO &&
-                preg_match('/^(?:hola|buen[ao]s\s+(?:d[ií]as|tardes|noches)|hey|hola[!.]*|saludos|qu[eé]\s+tal|ey)\b/iu', trim($message))
-            ) {
-                $minutosDesdeConfirmado = $estadoVerif->confirmado_at
-                    ? now()->diffInMinutes($estadoVerif->confirmado_at)
-                    : 999;
-                if ($minutosDesdeConfirmado >= 5) {
-                    Log::info('🔁 Saludo tras pedido confirmado — reseteando para nuevo pedido', [
-                        'from'             => $from,
-                        'pedido_anterior'  => $estadoVerif->pedido_id,
-                        'minutos_desde'    => $minutosDesdeConfirmado,
-                    ]);
-                    $estadoSrv->resetear(
-                        $conversacion,
-                        "saludo_tras_pedido_{$estadoVerif->pedido_id}"
-                    );
-                }
+            // 🆕 DETECTAR NUEVO FLUJO TRAS PEDIDO CERRADO:
+            // Usamos la fuente de verdad MÁS ROBUSTA: la conversación tiene pedido_id
+            // o ha generado un pedido previamente. Si llega un saludo o mensaje
+            // de inicio, asumimos nuevo pedido.
+            $ultimoPedido = \App\Models\Pedido::where('telefono_whatsapp', $telNorm)
+                ->whereNotIn('estado', [\App\Models\Pedido::ESTADO_CANCELADO])
+                ->orderByDesc('id')
+                ->first();
+
+            $hayPedidoReciente = $ultimoPedido && $ultimoPedido->created_at >= now()->subDay();
+            $minutosDesdePedido = $hayPedidoReciente
+                ? now()->diffInMinutes($ultimoPedido->created_at)
+                : 9999;
+
+            $esSaludoOInicioNuevo = preg_match(
+                '/^(?:hola|ola|buen[ao]s?\s*(?:d[ií]as|tardes|noches)?|hey|hi|saludos|qu[eé]\s+tal|ey|holi|hola[!\.]*)\b/iu',
+                trim($message)
+            ) === 1 || $estadoSrv->detectarIntencionNuevoPedido($message);
+
+            // Si hay pedido cerrado reciente (>=2 min) Y cliente saluda/pide otro:
+            // resetear si no estaba ya en producto-vacío.
+            $tieneProductosEnEstado = !empty($estadoVerif->productos);
+            $debeResetear = $hayPedidoReciente
+                && $minutosDesdePedido >= 2
+                && $esSaludoOInicioNuevo
+                && (
+                    $estadoVerif->paso_actual === \App\Models\ConversacionPedidoEstado::PASO_CONFIRMADO
+                    || $tieneProductosEnEstado
+                );
+
+            if ($debeResetear) {
+                Log::info('🔁 Saludo/nuevo pedido tras pedido cerrado — reseteando', [
+                    'from'             => $from,
+                    'pedido_anterior'  => $ultimoPedido->id,
+                    'minutos_desde'    => $minutosDesdePedido,
+                    'paso_previo'      => $estadoVerif->paso_actual,
+                    'mensaje'          => $message,
+                ]);
+                $estadoSrv->resetear(
+                    $conversacion,
+                    "saludo_tras_pedido_{$ultimoPedido->id}"
+                );
             }
 
-            // 🛡️ Si el estado FUE reseteado recientemente (motivo nuevo_pedido_tras_X
-            // o saludo_tras_X), inyectar instrucción AL LLM para que NO arrastre el
-            // flujo anterior. El LLM ve el historial completo en cache y si no le
-            // decimos, asume que sigue en medio del pedido viejo.
+            // 🛡️ SIEMPRE que haya un pedido reciente (último 24h) y el estado esté
+            // limpio (sin productos), inyectar al LLM la nota de que ese pedido
+            // YA cerró. Así el LLM no arrastra el flujo anterior aunque tenga el
+            // historial en cache.
             $estadoActualHist = $estadoSrv->obtener($conversacion);
-            $motivoReset = (string) ($estadoActualHist->motivo_abandono ?? '');
-            $reseteadoRecientemente = $estadoActualHist->abandonado_at
-                && now()->diffInMinutes($estadoActualHist->abandonado_at) <= 2
-                && (str_starts_with($motivoReset, 'nuevo_pedido_tras_')
-                    || str_starts_with($motivoReset, 'saludo_tras_pedido_'));
-            if ($reseteadoRecientemente) {
-                $pedidoAnteriorId = preg_replace('/\D/', '', $motivoReset);
+            if ($hayPedidoReciente && empty($estadoActualHist->productos)) {
                 $reinforceEstadoPedido[] = [
                     'role'    => 'system',
-                    'content' => "🔄 NUEVO FLUJO: el cliente cerró el pedido #{$pedidoAnteriorId} antes. "
-                        . "Ahora está volviendo a hablarte para HACER OTRO PEDIDO. "
-                        . "NO asumas que sigues en el flujo del pedido #{$pedidoAnteriorId} — está cerrado. "
-                        . "Salúdalo y pregúntale qué quiere pedir esta vez. NO menciones método de entrega "
-                        . "ni dirección hasta que él te diga los productos del nuevo pedido.",
+                    'content' => "🔄 CONTEXTO IMPORTANTE: el cliente YA cerró el pedido #{$ultimoPedido->id} "
+                        . "(hace {$minutosDesdePedido} min, total \$" . number_format($ultimoPedido->total, 0, ',', '.') . "). "
+                        . "Ese pedido ESTÁ TERMINADO. Si está volviendo a hablarte, es para un PEDIDO NUEVO O para PREGUNTAR algo. "
+                        . "NO digas 'antes de cerrar tu pedido', 'método de entrega', 'dirección' u otros pasos "
+                        . "del pedido anterior. Empieza fresh: salúdalo y pregúntale qué necesita esta vez.",
                 ];
             }
 
