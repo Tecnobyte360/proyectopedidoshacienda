@@ -5338,6 +5338,31 @@ TXT;
         /** @var BotCatalogoService $catalogo */
         $catalogo = app(BotCatalogoService::class);
 
+        // 🚚 DETECTAR TIPO DE ENTREGA (domicilio vs recoger en sede)
+        // ─────────────────────────────────────────────────────────────
+        // El LLM no siempre envía `pickup:true`. Detectamos pickup también si:
+        //   - viene pickup_time válido (hora de recogida)
+        //   - viene sede_id explícita
+        //   - las notes o payment_method mencionan "recoger/recogida/sede"
+        //   - viene address pero NO viene neighborhood (sede usualmente sin barrio)
+        $textoEntrega = mb_strtolower(
+            (string) ($orderData['notes'] ?? '') . ' ' .
+            (string) ($orderData['payment_method'] ?? '')
+        );
+        $esPickup = !empty($orderData['pickup'])
+            || !empty($orderData['sede_id'])
+            || (isset($pickupTime) && $pickupTime !== null)
+            || preg_match('/\b(recog(?:er|erlo|erla|emos|ida|ido)|paso\s+por|pasar\s+por|en\s+sede|recoj[oa]|en\s+la\s+sede|recoge\s+en\s+sede)\b/iu', $textoEntrega) === 1;
+
+        if ($esPickup) {
+            Log::info('🚶 Pedido detectado como RECOGER EN SEDE', [
+                'pickup_flag' => $orderData['pickup'] ?? null,
+                'sede_id'     => $orderData['sede_id'] ?? null,
+                'pickup_time' => $pickupTime,
+                'notes'       => $orderData['notes'] ?? null,
+            ]);
+        }
+
         $productosValidados = [];
         $productosNoEncontrados = [];
         $subtotalProductos = 0;
@@ -5404,6 +5429,53 @@ TXT;
             }
 
             $cantidad = (float) ($product['quantity'] ?? 1);
+            $unidadRaw = mb_strtolower(trim((string) ($product['unit'] ?? '')));
+
+            // 🛡️ FIX BUG #1 — Cantidad inflada por "X N UND" del nombre del producto.
+            // El LLM a veces lee "TROCITOS X 180 Gr X 10 UND" y pone quantity=10
+            // cuando el cliente solo pidió 1 paquete. Si quantity coincide EXACTAMENTE
+            // con la N del nombre del producto (y unit es UND/Unidad), asumimos 1.
+            if ($producto && $cantidad > 1 && in_array($unidadRaw, ['und', 'unidad', 'unidades', 'u'], true)) {
+                $nombreProd = (string) ($producto->nombre ?? '');
+                if (preg_match('/x\s*(\d+)\s*und/iu', $nombreProd, $mUnd)) {
+                    $nUnd = (int) $mUnd[1];
+                    if ($nUnd === (int) $cantidad) {
+                        Log::warning('🛡️ Cantidad sospechosa: coincide con "X N UND" del nombre — asumiendo 1 paquete', [
+                            'producto'        => $nombreProd,
+                            'cantidad_origen' => $cantidad,
+                            'n_und_nombre'    => $nUnd,
+                        ]);
+                        $cantidad = 1;
+                    }
+                }
+            }
+
+            // 🛡️ FIX BUG #3 — Conversión libra → kilo automática.
+            // El catálogo guarda precio por kilo. Si el cliente pidió "1 libra" o
+            // "10 libras", debemos convertir cantidad (1 libra = 0.5 kg) para que
+            // el subtotal sea correcto. Antes guardábamos cantidad=1 con unidad=libra
+            // y multiplicábamos como si fuera 1 kg.
+            $unidadGuardar = $product['unit'] ?? ($producto->unidad ?? 'unidad');
+            if (in_array($unidadRaw, ['lb', 'libra', 'libras', 'librita', 'libritas'], true)) {
+                $cantidadKg = $cantidad * 0.5;
+                Log::info('🔄 Conversión libra→kg aplicada', [
+                    'producto'    => $producto->nombre ?? null,
+                    'libras'      => $cantidad,
+                    'kilos'       => $cantidadKg,
+                ]);
+                $cantidad = $cantidadKg;
+                $unidadGuardar = 'kg';
+            } elseif (in_array($unidadRaw, ['g', 'gr', 'gramo', 'gramos'], true)) {
+                // Gramos → kg
+                $cantidadKg = $cantidad / 1000.0;
+                Log::info('🔄 Conversión gramos→kg aplicada', [
+                    'producto'  => $producto->nombre ?? null,
+                    'gramos'    => $cantidad,
+                    'kilos'     => $cantidadKg,
+                ]);
+                $cantidad = $cantidadKg;
+                $unidadGuardar = 'kg';
+            }
 
             if ($producto) {
                 $precio = method_exists($producto, 'precioParaSede')
@@ -5418,7 +5490,7 @@ TXT;
                     'codigo_producto' => $producto->codigo ?? null,
                     'producto'        => $producto->nombre ?? '',
                     'cantidad'        => $cantidad,
-                    'unidad'          => $product['unit'] ?? ($producto->unidad ?? 'unidad'),
+                    'unidad'          => $unidadGuardar,
                     'precio_unitario' => $precio,
                     'subtotal'        => $sub,
                 ];
@@ -5452,9 +5524,64 @@ TXT;
                 'from'                  => $from,
                 'no_encontrados'        => $productosNoEncontrados,
             ]);
-            return "Ups, {$name} 🙏 no manejamos \"{$lista}\" en el catálogo. "
-                 . "¿Me confirmas qué productos *sí* llevas de los que te he mostrado? "
-                 . "Así te registro el pedido bien 💪";
+
+            // 🛡️ FIX BUG #4 — liberar lock, romper bucle, y avisar al LLM
+            // para que NO siga llamando confirmar_pedido con el mismo nombre.
+            Cache::forget($confirmKey);
+            DB::rollBack();
+
+            // Resetear el paso del estado del pedido para que el bot vuelva a
+            // pedir el producto correcto (en vez de quedarse en confirmacion).
+            try {
+                if ($conversacion && $convService) {
+                    $estadoP = app(\App\Services\EstadoPedidoService::class)->obtener($conversacion);
+                    if ($estadoP) {
+                        $estadoP->paso_actual = \App\Models\ConversacionPedidoEstado::PASO_PRODUCTO;
+                        $estadoP->productos = []; // limpiar productos inválidos
+                        $estadoP->save();
+                    }
+                }
+            } catch (\Throwable $e) {
+                Log::warning('No se pudo resetear estado tras producto inexistente: ' . $e->getMessage());
+            }
+
+            $mensaje = "Ups, {$name} 🙏 no manejamos \"{$lista}\" en el catálogo. "
+                     . "¿Me confirmas qué producto *sí* llevas? Te paso opciones si me dices "
+                     . "qué tipo de carne necesitas (res, cerdo, pollo, pescado...) 💪";
+
+            // Inyectar regla al historial para que el LLM NO repita el mismo nombre
+            $conversationHistory[] = [
+                'role'    => 'system',
+                'content' => "🚫 PRODUCTO INEXISTENTE: \"{$lista}\".\n"
+                    . "REGLA DURA: NO vuelvas a llamar `confirmar_pedido` con ese producto. "
+                    . "Llama `buscar_productos` con la palabra que dijo el cliente y muéstrale "
+                    . "EL NOMBRE EXACTO que aparece en el catálogo (no inventes variantes).",
+            ];
+            $conversationHistory[] = ['role' => 'assistant', 'content' => $mensaje];
+            Cache::put($cacheKey, $conversationHistory, now()->addMinutes(45));
+
+            // Persistir el mensaje en BD para que aparezca en Chat en vivo
+            if ($conversacion && $convService) {
+                try {
+                    $convService->agregarMensaje(
+                        $conversacion,
+                        \App\Models\MensajeWhatsapp::ROL_ASSISTANT,
+                        $mensaje,
+                        [
+                            'tipo' => 'tool_call',
+                            'meta' => [
+                                'tool'      => 'confirmar_pedido',
+                                'resultado' => 'rechazado_producto_inexistente',
+                                'productos' => $productosNoEncontrados,
+                            ],
+                        ]
+                    );
+                } catch (\Throwable $e) {
+                    Log::warning('No se pudo persistir mensaje de rechazo de producto: ' . $e->getMessage());
+                }
+            }
+
+            return $mensaje;
         }
 
         // Costo de envío de la zona (0 si no se resolvió)
@@ -5544,6 +5671,12 @@ TXT;
 
         // 🪪 Guardar cédula si vino en el orderData (desde 'cedula' o 'document_id')
         $cedulaNueva = trim((string) ($orderData['cedula'] ?? $orderData['document_id'] ?? ''));
+        if ($cedulaNueva !== '' && \App\Services\EstadoPedidoService::esCedulaTrivial($cedulaNueva)) {
+            Log::warning('🛡️ Cédula trivial en confirmar_pedido — ignorada al actualizar cliente', [
+                'cedula' => $cedulaNueva,
+            ]);
+            $cedulaNueva = '';
+        }
         if ($cedulaNueva !== '' && empty($cliente->cedula)) {
             $datosClienteActualizar['cedula'] = $cedulaNueva;
         }
@@ -5566,12 +5699,19 @@ TXT;
         $pedidoLat = $validacion['coordenadas']['lat'] ?? null;
         $pedidoLng = $validacion['coordenadas']['lng'] ?? null;
 
+        // 🚚 Si es pickup en sede, NO guardamos dirección de cliente
+        // (la dirección es la de la sede misma — no debemos despachar).
+        $direccionGuardar = $esPickup ? null : ($direccion ?: null);
+        $barrioGuardar    = $esPickup ? null : ($barrio ?: null);
+        $zonaGuardar      = $esPickup ? null : $zonaCobertura?->id;
+
         $pedido = Pedido::create([
             'sede_id'               => $sede?->id,
             'cliente_id'            => $cliente->id,
             'empresa_id'            => $empresaId,
             'fecha_pedido'          => now(),
             'hora_entrega'          => $pickupTime,
+            'tipo_entrega'          => $esPickup ? 'recoger' : 'domicilio',
             'estado'                => 'nuevo',
             'fecha_estado'          => now(),
             'programado_para'       => $programadoPara, // null si está abierto, timestamp si está cerrado y acepta programados
@@ -5581,11 +5721,11 @@ TXT;
             'total'                 => $totalCalculado,
             'notas'                 => $notas,
             'cliente_nombre'        => $orderData['customer_name'] ?? $name,
-            'direccion'             => $direccion ?: null,
-            'barrio'                => $barrio ?: null,
-            'lat'                   => $pedidoLat,
-            'lng'                   => $pedidoLng,
-            'zona_cobertura_id'     => $zonaCobertura?->id,
+            'direccion'             => $direccionGuardar,
+            'barrio'                => $barrioGuardar,
+            'lat'                   => $esPickup ? null : $pedidoLat,
+            'lng'                   => $esPickup ? null : $pedidoLng,
+            'zona_cobertura_id'     => $zonaGuardar,
             'telefono_whatsapp'     => $telefonoWhatsapp,
             'telefono_contacto'     => $telefonoContacto,
             'telefono'              => $telefonoWhatsapp,

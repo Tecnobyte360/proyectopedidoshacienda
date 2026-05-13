@@ -181,7 +181,15 @@ class EstadoPedidoService
             $estado->nombre_cliente = trim($orderData['customer_name']);
         }
         if (!empty($orderData['cedula'])) {
-            $estado->cedula = trim($orderData['cedula']);
+            $cedulaCandidata = trim((string) $orderData['cedula']);
+            if (!self::esCedulaTrivial($cedulaCandidata)) {
+                $estado->cedula = $cedulaCandidata;
+            } else {
+                Log::warning('🛡️ Cédula trivial en orderData rechazada', [
+                    'conv_id' => $conv->id,
+                    'cedula'  => $cedulaCandidata,
+                ]);
+            }
         }
         if (!empty($orderData['phone'])) {
             $estado->telefono = trim($orderData['phone']);
@@ -346,8 +354,34 @@ class EstadoPedidoService
      * evita registrar pedidos a nombre de otra persona cuando alguien usa el
      * celular de un familiar/amigo.
      */
+    /**
+     * 🛡️ Valida que una cédula no sea trivialmente falsa.
+     * Rechaza secuencias como "12345678", "11111111", "00000000".
+     */
+    public static function esCedulaTrivial(string $cedula): bool
+    {
+        $c = preg_replace('/\D/', '', $cedula);
+        if (strlen($c) < 7) return true;
+        // Todos los dígitos iguales (000, 1111, 99999)
+        if (preg_match('/^(\d)\1+$/', $c)) return true;
+        // Secuencias ascendentes desde 1: 12345, 123456, ..., 1234567890
+        if (in_array($c, ['1234567', '12345678', '123456789', '1234567890', '0123456789'], true)) return true;
+        // Secuencias descendentes: 9876543, 98765432, ...
+        if (preg_match('/^9876543[210]*$/', $c)) return true;
+        return false;
+    }
+
     private function setCedulaConResetSiCambia(ConversacionPedidoEstado $estado, string $nuevaCedula, ConversacionWhatsapp $conv): void
     {
+        // 🛡️ Rechazar cédulas obviamente falsas (12345678, 11111111, etc.)
+        if (self::esCedulaTrivial($nuevaCedula)) {
+            Log::warning('🛡️ Cédula trivial rechazada', [
+                'conv_id' => $conv->id,
+                'cedula'  => $nuevaCedula,
+            ]);
+            return; // no guardamos — el bot la pedirá de nuevo
+        }
+
         $cedulaAnterior = trim((string) $estado->cedula);
         if ($cedulaAnterior !== '' && $cedulaAnterior !== $nuevaCedula) {
             // El cliente da una cédula DISTINTA a la guardada — es otra persona.

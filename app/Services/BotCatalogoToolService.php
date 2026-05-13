@@ -158,6 +158,29 @@ class BotCatalogoToolService
         ->take($limite)
         ->values();
 
+        // 🛡️ Filtrar matches débiles (levenshtein lejano). Antes aceptaba score>0
+        // (incluía score 15 para distancia 3, que da "acero"→"cerdo"). Subimos a 30.
+        $ranked = $ranked->filter(fn ($r) => $r['score'] >= 30)->values();
+
+        // 🛡️ Si la query es CORTA (<=5 chars) y ningún token comparte primera letra
+        // con el nombre del producto, descartar. Evita "acero"→"cerdo", "hola"→"posta".
+        $qPrimeraLetra = mb_substr(trim($q), 0, 1);
+        if ($qPrimeraLetra !== '' && mb_strlen(trim($q)) <= 5) {
+            $ranked = $ranked->filter(function ($r) use ($qPrimeraLetra) {
+                $nombre = mb_strtolower((string) ($r['p']->nombre ?? ''));
+                // Buscar la primera letra de la query en alguna palabra del nombre
+                foreach (explode(' ', $nombre) as $palabra) {
+                    if (mb_substr($palabra, 0, 1) === $qPrimeraLetra) return true;
+                }
+                \Log::info('🛡️ Match descartado por primera-letra (query corta)', [
+                    'query'    => $q,
+                    'producto' => $r['p']->nombre ?? null,
+                    'score'    => $r['score'],
+                ]);
+                return false;
+            })->values();
+        }
+
         $resultado = $ranked->map(fn ($r) => array_merge(
             $this->formatearProducto($r['p'], $sedeId),
             ['_score' => $r['score']]

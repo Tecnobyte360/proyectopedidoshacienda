@@ -33,6 +33,15 @@ class AsignacionDomiciliarioService
             return null;
         }
 
+        // 🚶 NO asignar domiciliario si el pedido es para RECOGER en sede.
+        // Solo se asignan domiciliarios a pedidos de domicilio.
+        if (($pedido->tipo_entrega ?? 'domicilio') === 'recoger') {
+            Log::info('🚶 Auto-asignación: pedido es para recoger en sede — no se asigna domiciliario', [
+                'pedido_id' => $pedido->id,
+            ]);
+            return null;
+        }
+
         // No reasignar si el pedido ya tiene domiciliario
         if ($pedido->domiciliario_id) {
             return null;
