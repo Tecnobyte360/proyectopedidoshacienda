@@ -620,7 +620,7 @@
                                     ['label' => 'Productos',    'cls' => 'hidden 2xl:table-cell'],
                                     ['label' => 'Zona/Sede',    'cls' => ''],
                                     ['label' => 'Estado',       'cls' => ''],
-                                    ['label' => 'ANS',          'cls' => 'hidden 2xl:table-cell'],
+                                    ['label' => 'ANS',          'cls' => ''],
                                     ['label' => 'Total',        'cls' => ''],
                                     ['label' => 'Domiciliario', 'cls' => 'hidden xl:table-cell'],
                                     ['label' => 'Acción',       'cls' => 'text-center'],
@@ -779,9 +779,9 @@
                                     </div>
                                 </td>
 
-                                {{-- Semáforo ANS (2xl+) --}}
-                                <td class="px-3 py-3.5 align-middle hidden 2xl:table-cell">
-                                    <div class="w-[110px]">
+                                {{-- Semáforo ANS — siempre visible desde lg --}}
+                                <td class="px-3 py-3.5 align-middle">
+                                    <div class="w-[100px]">
                                         @include('livewire.pedidos._semaforo', ['pedido' => $pedido, 'modo' => 'barra'])
                                     </div>
                                 </td>
