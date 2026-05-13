@@ -554,39 +554,21 @@ class EstadoPedidoService
             }
         }
 
-        // 4.5. PRODUCTOS — captura robusta + ACUMULA productos nuevos.
-        // Si el cliente pide productos en mensajes separados, los AGREGAMOS
-        // a la lista en lugar de reemplazarla.
-        //   Mensaje 1: "3 libras de chicharrón" → [chicharrón]
-        //   Mensaje 2: "y 1 kilo de pollo"      → [chicharrón, pollo]
-        //   Mensaje 3: "y 2 kg de res"          → [chicharrón, pollo, res]
-        $productosCapturados = $this->extraerProductosDelMensaje($msg);
-        if (!empty($productosCapturados)) {
-            $existentes = $estado->productos ?? [];
-            $codigosExistentes = collect($existentes)
-                ->pluck('code')
-                ->filter()
-                ->all();
-
-            $nuevosAgregados = [];
-            foreach ($productosCapturados as $nuevo) {
-                $codigoNuevo = $nuevo['code'] ?? '';
-                if ($codigoNuevo === '' || !in_array($codigoNuevo, $codigosExistentes, true)) {
-                    $existentes[] = $nuevo;
-                    $nuevosAgregados[] = $nuevo;
-                }
-            }
-
-            if (!empty($nuevosAgregados)) {
-                $estado->productos = $existentes;
-                $cambio = true;
-                Log::info('🔍 Productos capturados del mensaje', [
-                    'conv_id'         => $conv->id,
-                    'nuevos'          => $nuevosAgregados,
-                    'total_productos' => count($existentes),
-                ]);
-            }
-        }
+        // 4.5. PRODUCTOS — 🚫 CAPTADOR DETERMINISTA DESACTIVADO.
+        //
+        // RAZÓN: el captador regex/fuzzy generaba matches incorrectos:
+        //   - Cliente dice "2 libras de pollo" → captador matcheaba "MOLIPOLLO"
+        //   - Cliente elige "pechuga blanca" después → captador NO sobreescribía
+        //   - El pedido se cerraba con producto equivocado
+        //
+        // SOLUCIÓN: dejar que el LLM gestione productos vía `buscar_productos`
+        // (muestra opciones al cliente) y `confirmar_pedido` (envía la lista
+        // FINAL con códigos exactos del catálogo). El LLM tiene contexto de
+        // qué se ofreció y qué eligió el cliente, no necesita captador.
+        //
+        // Si en el futuro se necesita captador, debe matchear SOLO con nombre
+        // EXACTO (no fuzzy), y reemplazar si el cliente elige específicamente
+        // después de ver opciones.
 
         // 5. NOMBRE — heurística que detecta nombres incluso mixtos.
         //    Sobrescribe si el actual NO parece un nombre real (emoji, vacío,
@@ -702,10 +684,15 @@ class EstadoPedidoService
         $msgLimpio = $msg;
         // Quitar email
         $msgLimpio = preg_replace('/\s*[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}\s*/iu', ' ', $msgLimpio);
-        // Quitar segmentos con "mi cedula es 12345", "cedula 12345", "cc 12345", "documento 12345"
-        $msgLimpio = preg_replace('/[,;]?\s*(?:mi\s+)?(?:c[eé]dula|cc|cédula|documento|nit|ced)[\s:]*\d{6,15}\.?/iu', '', $msgLimpio);
+        // Quitar "mi cedula es 12345" / "cedula: 12345" / etc CON número
+        $msgLimpio = preg_replace('/[,;]?\s*(?:mi\s+|tu\s+|el\s+|la\s+)?(?:c[eé]dula|cc|cédula|documento|nit|ced)[\s:]+(?:es\s+)?\d{6,15}\.?/iu', '', $msgLimpio);
+        // Quitar también el texto "mi cedula es" SIN número (residuo)
+        $msgLimpio = preg_replace('/[,;]?\s*(?:mi\s+|tu\s+|el\s+|la\s+)?(?:c[eé]dula|cc|cédula|documento|nit|ced)\s*(?:es|son|:)?\s*\.?/iu', '', $msgLimpio);
         // Quitar mención sin prefijo de un número largo aislado (8+ dígitos) al final del mensaje
         $msgLimpio = preg_replace('/[,;]?\s*\d{8,12}\s*\.?\s*$/u', '', $msgLimpio);
+        // Normalizar espacios y comas residuales
+        $msgLimpio = preg_replace('/\s*,\s*$|\s+,/u', '', $msgLimpio);
+        $msgLimpio = preg_replace('/\s+/u', ' ', trim($msgLimpio));
 
         // Palabras clave de vía colombianas (con/sin punto, abreviadas o no)
         $palabrasVia = '(?:cra\.?|carrera|cl\.?|calle|cll|dg\.?|diagonal|diag|trv\.?|transversal|av\.?|avenida|cr|kr|circular|autopista|via|tv)';
