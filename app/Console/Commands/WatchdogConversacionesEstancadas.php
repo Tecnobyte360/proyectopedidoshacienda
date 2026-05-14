@@ -40,15 +40,19 @@ class WatchdogConversacionesEstancadas extends Command
         // 5-12s en responder, y si el INSERT del mensaje assistant aún no se
         // commitea cuando corre el watchdog, ve solo el msg del user y dispara
         // rescate innecesario.
+        // Ventana de detección: 30s a 5 minutos.
+        // Mensajes >5 min sin respuesta del bot YA NO se rescatan: el cliente
+        // probablemente abandonó y rescatarlos genera "spam" (le llega respuesta
+        // de un mensaje viejo que él ya olvidó).
         $candidatas = ConversacionWhatsapp::query()
-            ->where('updated_at', '>=', now()->subDay())
+            ->where('updated_at', '>=', now()->subMinutes(10))
             // Excluir conversaciones que se actualizaron en los últimos 25s
             // (probable que el bot las esté procesando ahora mismo).
             ->where('updated_at', '<=', now()->subSeconds(25))
             ->whereHas('mensajes', function ($q) {
                 $q->where('rol', MensajeWhatsapp::ROL_USER)
                   ->where('created_at', '<=', now()->subSeconds(30))
-                  ->where('created_at', '>=', now()->subHours(2));
+                  ->where('created_at', '>=', now()->subMinutes(5)); // ventana 30s-5min
             })
             ->limit(30)
             ->get();
@@ -64,7 +68,9 @@ class WatchdogConversacionesEstancadas extends Command
             if ($ultimoMsg->rol !== MensajeWhatsapp::ROL_USER) continue;
 
             $segundosDesde = abs((int) now()->diffInSeconds($ultimoMsg->created_at));
-            if ($segundosDesde < 30 || $segundosDesde > 7200) continue; // 30s a 2h
+            // Ventana: 30s a 5 min. Mensajes mas viejos NO se rescatan para evitar
+            // spam al cliente con respuestas tardias a mensajes que ya olvido.
+            if ($segundosDesde < 30 || $segundosDesde > 300) continue;
 
             // Excepción: si es un mensaje watchdog previo, no entrar en loop.
             if (str_starts_with((string) ($ultimoMsg->mensaje_externo_id ?? ''), 'watchdog_')) continue;
@@ -127,7 +133,9 @@ class WatchdogConversacionesEstancadas extends Command
                 ];
 
                 $url = config('app.url') . '/api/whatsapp-webhook';
-                $resp = \Http::timeout(5)->post($url, $payload);
+                // Timeout 30s — el webhook puede tardar 10-20s en procesar (LLM call,
+                // tool calls, validar cobertura, etc.). 5s era muy poco.
+                $resp = \Http::timeout(30)->post($url, $payload);
                 $exitoso = $resp->successful();
 
                 // Registrar el rescate en BD para el panel de monitoreo
