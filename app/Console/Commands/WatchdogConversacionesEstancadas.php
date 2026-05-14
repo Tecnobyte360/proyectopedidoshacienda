@@ -35,11 +35,19 @@ class WatchdogConversacionesEstancadas extends Command
         //   A) Bot dijo "un momento" y no siguió (típico).
         //   B) Bot pidió "¿Confirmas?", cliente respondió, y por un error el bot no respondió.
         //   C) Cualquier otro caso donde el cliente envió mensaje y el bot quedó mudo.
+        // 🛡️ Ventana de detección: usuario sin respuesta entre 30s y 2h.
+        // Antes era 15s pero generaba race conditions: el bot a veces tarda
+        // 5-12s en responder, y si el INSERT del mensaje assistant aún no se
+        // commitea cuando corre el watchdog, ve solo el msg del user y dispara
+        // rescate innecesario.
         $candidatas = ConversacionWhatsapp::query()
             ->where('updated_at', '>=', now()->subDay())
+            // Excluir conversaciones que se actualizaron en los últimos 25s
+            // (probable que el bot las esté procesando ahora mismo).
+            ->where('updated_at', '<=', now()->subSeconds(25))
             ->whereHas('mensajes', function ($q) {
                 $q->where('rol', MensajeWhatsapp::ROL_USER)
-                  ->where('created_at', '<=', now()->subSeconds(15))
+                  ->where('created_at', '<=', now()->subSeconds(30))
                   ->where('created_at', '>=', now()->subHours(2));
             })
             ->limit(30)
@@ -56,7 +64,7 @@ class WatchdogConversacionesEstancadas extends Command
             if ($ultimoMsg->rol !== MensajeWhatsapp::ROL_USER) continue;
 
             $segundosDesde = abs((int) now()->diffInSeconds($ultimoMsg->created_at));
-            if ($segundosDesde < 15 || $segundosDesde > 7200) continue; // hasta 2h
+            if ($segundosDesde < 30 || $segundosDesde > 7200) continue; // 30s a 2h
 
             // Excepción: si es un mensaje watchdog previo, no entrar en loop.
             if (str_starts_with((string) ($ultimoMsg->mensaje_externo_id ?? ''), 'watchdog_')) continue;
