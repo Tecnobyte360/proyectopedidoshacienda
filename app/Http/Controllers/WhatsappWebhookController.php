@@ -3146,16 +3146,13 @@ TXT;
             $tenantId = app(\App\Services\TenantManager::class)->id();
             if (!$tenantId) return false;
 
-            // Buscar conversación del cliente
+            // Buscar conversación del cliente — solo tabla tiene telefono_normalizado
             $tel = preg_replace('/\D+/', '', $telefonoCliente);
             $conv = \App\Models\ConversacionWhatsapp::where('tenant_id', $tenantId)
-                ->where(function ($q) use ($tel, $telefonoCliente) {
-                    $q->where('telefono_normalizado', $tel)
-                      ->orWhere('telefono', $telefonoCliente);
-                })
+                ->where('telefono_normalizado', $tel)
                 ->orderByDesc('id')
                 ->first();
-            if (!$conv) return false;
+            if (!$conv) return true; // sin conv → no podemos confirmar, tratar como default
 
             // SOLO el ÚLTIMO mensaje del usuario (el actual). Los anteriores
             // no cuentan — el cliente puede estar dando una dirección nueva
@@ -3171,7 +3168,10 @@ TXT;
             if (str_contains($msgN, $ciudadNorm)) return false; // SÍ la mencionó en ESTE turno
             return true; // NO la mencionó en ESTE turno → es default del LLM
         } catch (\Throwable $e) {
-            return false;
+            // Ante cualquier error, mejor pecar de cautelosos: tratar como default
+            // (ambiguo) para forzar al bot a preguntar al cliente.
+            \Log::warning('ciudadEsDefaultNoMencionada falló: ' . $e->getMessage());
+            return true;
         }
     }
 
