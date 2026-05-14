@@ -100,6 +100,19 @@ class BotPromptService
             $horariosTexto = '(No hay sedes con horarios configurados)';
         }
 
+        // 🛑 Lista RESTRICTIVA de sedes para anti-alucinación
+        $sedesListaRestrictiva = "🛑 SEDES ACTIVAS — LAS ÚNICAS QUE EXISTEN (PROHIBIDO INVENTAR OTRAS):\n";
+        if ($sedes->isEmpty()) {
+            $sedesListaRestrictiva .= "  (Ninguna sede activa)\n";
+        } else {
+            foreach ($sedes as $s) {
+                $sedesListaRestrictiva .= "  • {$s->nombre}" . ($s->direccion ? " — {$s->direccion}" : '') . "\n";
+            }
+            $sedesListaRestrictiva .= "\n🛑 Si el cliente quiere recoger en sede y SOLO hay UNA sede activa, "
+                . "asume DIRECTAMENTE esa sede sin preguntar. NO inventes sedes que NO están en esta lista. "
+                . "PROHIBIDO mencionar 'Sabaneta', 'Sede Sur', 'Sede Norte' u otras que no aparezcan arriba.";
+        }
+
         // Estado actual de la primera sede activa
         $sedeRef = $sedeId
             ? \App\Models\Sede::find($sedeId)
@@ -128,7 +141,7 @@ class BotPromptService
             'cliente_primer_nombre' => $primerNombre,
             'cliente_es_conocido'   => $clienteConocido ? 'SI' : 'NO',
             'saludo_hora'           => $saludoHora,
-            'horarios_sedes'        => $horariosTexto,
+            'horarios_sedes'        => $horariosTexto . "\n\n" . $sedesListaRestrictiva,
             'sede_estado_actual'    => $estadoSedeTexto,
             'fecha_actual'      => $ahora->locale('es')->isoFormat('D [de] MMMM [de] YYYY'),
             'hora_actual'       => $ahora->format('h:i a'),  // 12h con AM/PM
