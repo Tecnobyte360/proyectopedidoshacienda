@@ -3127,8 +3127,15 @@ TXT;
 
     /**
      * 🛡️ ¿La ciudad pasada es solo un default (no confirmada por el cliente
-     * en su mensaje reciente)? Si el cliente NO la mencionó, no la podemos
-     * usar para geocodificar — la dirección puede ser de cualquier ciudad.
+     * EN ESTE TURNO junto con la dirección)?
+     *
+     * Razón: si el cliente dijo "Bello" hace 5 mensajes preguntando por cobertura
+     * GENERAL y AHORA da una dirección NUEVA "Calle 49 #50-05" sin volver a
+     * mencionar el municipio, esa dirección sigue siendo ambigua — podría ser
+     * en otra ciudad. Confiar en el contexto antiguo lleva a errores.
+     *
+     * Solo confiamos en la ciudad si el cliente la dijo en su ÚLTIMO mensaje
+     * (el que disparó la validación actual) O si la dirección misma la trae.
      */
     private function ciudadEsDefaultNoMencionada(?string $ciudad, ?string $telefonoCliente): bool
     {
@@ -3150,20 +3157,19 @@ TXT;
                 ->first();
             if (!$conv) return false;
 
-            // Últimos 5 mensajes del USUARIO
-            $msgsUser = \App\Models\MensajeWhatsapp::where('conversacion_id', $conv->id)
+            // SOLO el ÚLTIMO mensaje del usuario (el actual). Los anteriores
+            // no cuentan — el cliente puede estar dando una dirección nueva
+            // de otra ciudad sin volver a mencionarla.
+            $ultimoMsg = \App\Models\MensajeWhatsapp::where('conversacion_id', $conv->id)
                 ->where('rol', 'user')
                 ->orderByDesc('id')
-                ->limit(5)
-                ->pluck('contenido')
-                ->all();
+                ->value('contenido');
+            if (!$ultimoMsg) return true;
 
             $ciudadNorm = mb_strtolower(\Illuminate\Support\Str::ascii(trim($ciudad)));
-            foreach ($msgsUser as $msg) {
-                $msgN = mb_strtolower(\Illuminate\Support\Str::ascii((string) $msg));
-                if (str_contains($msgN, $ciudadNorm)) return false; // SÍ la mencionó
-            }
-            return true; // NO la mencionó → es default
+            $msgN = mb_strtolower(\Illuminate\Support\Str::ascii((string) $ultimoMsg));
+            if (str_contains($msgN, $ciudadNorm)) return false; // SÍ la mencionó en ESTE turno
+            return true; // NO la mencionó en ESTE turno → es default del LLM
         } catch (\Throwable $e) {
             return false;
         }
