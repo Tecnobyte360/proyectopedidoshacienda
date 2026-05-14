@@ -60,6 +60,11 @@ class RouterDeterminista
                 if ($cob['accion'] === 'fuera_de_cobertura' && !empty($cob['reply'])) {
                     return ['accion' => 'reply', 'reply' => $cob['reply']];
                 }
+                // 🛡️ Dirección ambigua sin ciudad → preguntar ciudad antes de validar
+                if (in_array($cob['accion'], ['necesita_ciudad', 'ambigua_pedir_clarificacion'], true)
+                    && !empty($cob['reply'])) {
+                    return ['accion' => 'reply', 'reply' => $cob['reply']];
+                }
                 // Si quedó cubierta o no aplica → continúa flujo (refresh estado)
                 $estado = $estado->fresh() ?: $estado;
             } catch (\Throwable $e) {
