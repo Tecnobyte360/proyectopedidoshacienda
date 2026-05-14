@@ -971,9 +971,39 @@ MSG;
      * @param string $tipo Uno de: en_preparacion, en_camino, entregado, pago_aprobado, pago_rechazado.
      * @param array $extras Variables adicionales para la plantilla (ej. ['token' => '1234'])
      */
+    /**
+     * ¿Este pedido es para RECOGER en sede (no despacho a domicilio)?
+     */
+    public function esRecogerEnSede(): bool
+    {
+        // 1. tipo_entrega explícito gana
+        if (!empty($this->tipo_entrega)) {
+            return $this->tipo_entrega === 'recoger';
+        }
+        // 2. Fallback heurístico: sin dirección + con sede → recoger
+        $sinDireccion = empty(trim((string) $this->direccion));
+        return $sinDireccion && !empty($this->sede_id);
+    }
+
     public function enviarNotificacionConfigurable(string $tipo, array $extras = []): void
     {
         $cfg = \App\Models\ConfiguracionBot::actual();
+
+        // 🛡️ NO enviar "en_camino" si el pedido es para RECOGER en sede.
+        // Sustituimos por una notificación apropiada de pickup-listo.
+        $esPickup = $this->esRecogerEnSede();
+        if ($tipo === 'en_camino' && $esPickup) {
+            \Log::info("📦 Pedido es RECOGER en sede — sustituyendo 'en_camino' por 'pickup_listo'", [
+                'pedido_id' => $this->id,
+                'sede_id'   => $this->sede_id,
+            ]);
+            $tipo = 'pickup_listo';
+        }
+        // Para 'en_preparacion' en pickup: ajustamos el mensaje default si
+        // no hay plantilla personalizada (no decir "salga para tu casa").
+        if ($tipo === 'en_preparacion' && $esPickup) {
+            $tipo = 'en_preparacion_pickup';
+        }
 
         $keyActivo  = "notif_{$tipo}_activa";
         $keyMsg     = "notif_{$tipo}_mensaje";

@@ -112,6 +112,8 @@ class ConfiguracionBot extends Model
         'pedido_confirmado' => "✨ ¡Pedido confirmado, {nombre}!\n\n🧾 *Pedido #{pedido}*\n{productos}\n\n📍 *Dirección:* {direccion}\n🏘️ *Barrio:* {barrio}\n☎️ *Contacto:* {telefono_contacto}\n{beneficio}💰 *Total:* {total}\n{bloque_pago}\n🔗 Seguir tu pedido aquí:\n{link_seguimiento}\n\nGuarda *#{pedido}* para futuras consultas. 🙌",
         'en_preparacion'  => "🍳 {nombre}, ya estamos preparando tu pedido.\nTe aviso apenas salga para tu casa.",
         'en_camino'       => "🛵 {nombre}, tu pedido va en camino.\n\nCuando llegue el domiciliario, dile este código para confirmar la entrega:\n\n🔐 *{token}*\n\n¡Ya casi llega! 🙌",
+        'pickup_listo'    => "📦 {nombre}, tu pedido #{pedido} ya está listo para que pases a recogerlo.\n\nCuando llegues a la sede, dile al cajero este código para confirmar la entrega:\n\n🔐 *{token}*\n\n¡Te esperamos! 🙌",
+        'en_preparacion_pickup' => "🍳 {nombre}, ya estamos preparando tu pedido #{pedido}.\nTe aviso apenas esté listo para que pases a recogerlo. 🙌",
         'entregado'       => "✅ Listo {nombre}.\n\nTu pedido fue entregado. ¡Gracias por confiar en nosotros!\n\nEn un momento te paso una encuesta cortica para saber cómo estuvo todo. 🌟",
         'pago_aprobado'   => "💳 {nombre}, recibimos tu pago de {total}.\n\nTu pedido *#{pedido}* ya quedó pagado. Procedemos a prepararlo y te avisamos cuando salga. 🛵",
         'pago_rechazado'  => "⚠️ Hola {nombre}, tu pago no se pudo procesar.\n\nTu pedido *#{pedido}* sigue activo. Puedes intentar de nuevo aquí:\n🔗 {link_pago}\n\nO escríbenos si prefieres pagar contra entrega. 🙌",
