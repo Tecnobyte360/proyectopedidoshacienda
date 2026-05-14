@@ -44,9 +44,15 @@ class RouterDeterminista
 
         // 🗺️ AGENTE DE COBERTURA: si tenemos dirección de despacho y la
         // cobertura no se ha validado, ejecutar validación AHORA (sin LLM).
+        //
+        // 🛡️ GATE: solo correr si la dirección está vinculada al MENSAJE ACTUAL
+        // (cliente acaba de darla o de mencionar dirección/domicilio). Si solo
+        // saludó, no tiene sentido re-validar una dirección heredada de un
+        // pedido anterior — el cliente puede estar empezando algo nuevo.
         if (!empty($estado->direccion)
             && $estado->metodo_entrega === \App\Models\ConversacionPedidoEstado::METODO_DOMICILIO
-            && !$estado->cobertura_validada) {
+            && !$estado->cobertura_validada
+            && $this->mensajeJustificaValidarCobertura($mensaje)) {
             try {
                 $cob = app(\App\Services\Bots\AgenteCoberturaService::class)
                     ->evaluar($conv, $connectionId);
@@ -87,6 +93,54 @@ class RouterDeterminista
         // Sin hardcoded responses para faltantes / off-topic. El LLM con el
         // system prompt y las tools sabe qué hacer mejor que un match rígido.
         return ['accion' => 'llm'];
+    }
+
+    /**
+     * 🛡️ ¿El mensaje actual justifica re-validar la cobertura?
+     *
+     * Razón: si el cliente solo saluda ("hola", "buenos días") pero el estado
+     * heredó una dirección + método=domicilio de un pedido anterior, NO
+     * queremos re-disparar la validación de cobertura y mandarle "fuera de
+     * zona" cuando no ha pedido nada. Solo validamos cuando el cliente:
+     *
+     *   - Acaba de dar/mencionar una dirección o barrio
+     *   - Pide explícitamente domicilio/despacho/envío
+     *   - Pregunta por cobertura
+     *   - Responde a una pregunta del bot sobre dirección/cobertura
+     */
+    private function mensajeJustificaValidarCobertura(string $mensaje): bool
+    {
+        $m = mb_strtolower(Str::ascii(trim($mensaje)));
+        if ($m === '') return false;
+
+        // Saludos puros / despedidas / agradecimientos → NO re-validar
+        $saludos = [
+            'hola', 'holaa', 'holaaa', 'hi', 'hey',
+            'buenas', 'buenos dias', 'buenas tardes', 'buenas noches',
+            'buen dia', 'saludos', 'que tal', 'que mas',
+            'gracias', 'muchas gracias', 'mil gracias', 'ok', 'listo',
+            'chao', 'adios', 'bye', 'hasta luego',
+        ];
+        if (in_array($m, $saludos, true)) return false;
+        if (preg_match('/^\s*(hola|holaa+|buenas|buen[oa]s\s+(dias|tardes|noches)|buen\s+dia)\s*[\.!?]*\s*$/i', $m)) {
+            return false;
+        }
+
+        // Patrones que SÍ justifican validar cobertura
+        $patrones = [
+            // Domicilio / despacho explícito
+            '/\b(domicilio|despacho|env[ií]o|env[ií]a|env[ií]ar|mand[áa]r|para\s+casa|a\s+mi\s+casa|me\s+lo\s+mand|m[áa]ndamelo|me\s+lo\s+env)\b/iu',
+            // Mención de dirección / barrio / ciudad
+            '/\b(direcci[oó]n|barrio|calle|carrera|cra|cl|cll|avenida|av\.?|diagonal|transversal|manzana|mz|apartament|apto|casa|edificio)\b/iu',
+            // Patrón típico de dirección colombiana: "CL 50 # 30-15", "carrera 50 # 30-15"
+            '/\b(cl|cll|calle|cra|carrera|kr|av|avenida|dg|diagonal|tv|transversal)\s*\d+/iu',
+            // Pregunta de cobertura
+            '/\b(cobertura|llegan|llegas|llevas|llevan|cubren|cubre|zona|reparten|reparto)\b/iu',
+        ];
+        foreach ($patrones as $p) {
+            if (preg_match($p, $m)) return true;
+        }
+        return false;
     }
 
     /**
