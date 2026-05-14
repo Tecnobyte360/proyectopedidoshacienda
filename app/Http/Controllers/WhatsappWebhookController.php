@@ -3405,6 +3405,41 @@ TXT;
     }
 
     /**
+     * 🛡️ Resuelve el tipo de entrega FINAL del pedido respetando el estado
+     * persistente. Prioridad:
+     *   1. Estado persistente dice 'recoger' → 'recoger' (gana sobre todo)
+     *   2. orderData tiene pickup=true o sede_id → 'recoger'
+     *   3. Mensajes con palabras de recoger → 'recoger'
+     *   4. Default → 'domicilio'
+     */
+    private function resolverTipoEntregaFinal(bool $esPickupDetectado, $conversacion, array $orderData): string
+    {
+        // Prioridad 1: estado persistente del pedido
+        try {
+            if ($conversacion) {
+                $estadoChk = app(\App\Services\EstadoPedidoService::class)->obtener($conversacion);
+                if ($estadoChk->metodo_entrega === \App\Models\ConversacionPedidoEstado::METODO_RECOGER) {
+                    return 'recoger';
+                }
+                if ($estadoChk->metodo_entrega === \App\Models\ConversacionPedidoEstado::METODO_DOMICILIO
+                    && !empty($estadoChk->direccion)) {
+                    // Si el estado dice DOMICILIO con dirección real → es domicilio.
+                    // PERO si esPickup detectado por orderData es muy fuerte (notes
+                    // dicen 'recoge') → puede ser cambio reciente, dejarlo pickup.
+                    if ($esPickupDetectado && (
+                        !empty($orderData['pickup']) || !empty($orderData['sede_id'])
+                    )) {
+                        return 'recoger';
+                    }
+                    return 'domicilio';
+                }
+            }
+        } catch (\Throwable $e) { /* ignore */ }
+
+        return $esPickupDetectado ? 'recoger' : 'domicilio';
+    }
+
+    /**
      * 🛡️ Distancia mínima en KM desde un punto a CUALQUIERA de las sedes
      * activas del tenant (usando haversine). Sirve para detectar si Google
      * geocodificó a otra parte del país (ambigüedad de nombres).
@@ -7176,7 +7211,10 @@ TXT;
             'empresa_id'            => $empresaId,
             'fecha_pedido'          => now(),
             'hora_entrega'          => $pickupTime,
-            'tipo_entrega'          => $esPickup ? 'recoger' : 'domicilio',
+            // 🛡️ tipo_entrega: respetar el estado PERSISTENTE del pedido como
+            // fuente de verdad final (captador determinista). Si el cliente dijo
+            // 'recoger', SIEMPRE pickup, sin importar otros campos.
+            'tipo_entrega'          => $this->resolverTipoEntregaFinal($esPickup, $conversacion, $orderData),
             'estado'                => 'nuevo',
             'fecha_estado'          => now(),
             'programado_para'       => $programadoPara, // null si está abierto, timestamp si está cerrado y acepta programados
