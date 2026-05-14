@@ -250,6 +250,23 @@ class Index extends Component
 
     public function render()
     {
+        // 🪞 En modo híbrido (fuente=integracion) cada visita a /productos
+        // dispara una lectura live del ERP, que a su vez refleja a la tabla
+        // local. Así el admin ve los productos del SGI sin tener que esperar
+        // a que el bot reciba un mensaje. Cache de 30s evita martillar.
+        try {
+            $cfg = \App\Models\ConfiguracionBot::actual();
+            if ($cfg
+                && $cfg->fuente_productos === \App\Models\ConfiguracionBot::FUENTE_INTEGRACION
+                && $cfg->integracion_productos_id) {
+                app(\App\Services\BotCatalogoService::class)->productosActivos();
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Mirror trigger en /productos falló', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+
         $productos = Producto::query()
             ->with(['categoria', 'sedes'])
             ->when($this->search, fn ($q) =>
