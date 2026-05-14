@@ -6798,6 +6798,23 @@ TXT;
             || (isset($pickupTime) && $pickupTime !== null)
             || preg_match('/\b(recog(?:er|erlo|erla|emos|ida|ido)|paso\s+por|pasar\s+por|en\s+sede|recoj[oa]|en\s+la\s+sede|recoge\s+en\s+sede)\b/iu', $textoEntrega) === 1;
 
+        // 🛡️ FUENTE DE VERDAD: el estado persistente. Si el captador determinista
+        //    detectó "recoger" en la conversación, gana sobre lo que el LLM
+        //    haya o no enviado en orderData.
+        if ($conversacion) {
+            try {
+                $estadoCheck = app(\App\Services\EstadoPedidoService::class)->obtener($conversacion);
+                if ($estadoCheck->metodo_entrega === \App\Models\ConversacionPedidoEstado::METODO_RECOGER) {
+                    $esPickup = true;
+                } elseif ($estadoCheck->metodo_entrega === \App\Models\ConversacionPedidoEstado::METODO_DOMICILIO
+                    && !empty($estadoCheck->direccion)) {
+                    // Si el estado dice DOMICILIO con dirección válida, fuerza domicilio
+                    // (a menos que orderData explícitamente diga pickup=true)
+                    if (empty($orderData['pickup'])) $esPickup = false;
+                }
+            } catch (\Throwable $e) { /* ignore */ }
+        }
+
         if ($esPickup) {
             Log::info('🚶 Pedido detectado como RECOGER EN SEDE', [
                 'pickup_flag' => $orderData['pickup'] ?? null,
