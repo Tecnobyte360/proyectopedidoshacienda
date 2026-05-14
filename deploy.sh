@@ -60,13 +60,19 @@ fi
 # ─── Paso 1: Descartar cambios locales en assets ───────────────────────────
 step "1/8  Descartando cambios locales del server en public/build/"
 git checkout public/build/ 2>/dev/null || warn "Nada que descartar en public/build/ (tracked)"
-# Borrar archivos sin trackear que también chocan con el merge
-rm -f public/build/assets/app-*.css public/build/assets/app-*.js 2>/dev/null || true
+# Borrar SOLO archivos sin trackear (untracked) que choquen con el merge.
+# 🛡️ NO uses `rm -f public/build/assets/app-*` — eso borra los assets tracked,
+# y si el siguiente commit no cambia public/build/, git pull NO los restaura.
+git clean -fd public/build/assets/ 2>/dev/null || true
 ok "Listo"
 
 # ─── Paso 2: Pull del repo ─────────────────────────────────────────────────
 step "2/8  Haciendo git pull origin main"
 git pull origin main || fail "Falló el git pull (revisa conflictos)"
+# Refuerzo: si por alguna razón los assets tracked no quedaron en disco
+# (típico cuando un commit anterior los borró sin reemplazo), restaurarlos
+# desde el árbol del HEAD actual.
+git checkout HEAD -- public/build/ 2>/dev/null || true
 LATEST_COMMIT=$(git log --oneline -1)
 ok "Último commit: ${LATEST_COMMIT}"
 
