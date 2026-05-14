@@ -513,17 +513,33 @@ class EstadoPedidoService
         $msg = trim($mensaje);
         $cambio = false;
 
-        // 🛡️ AUTO-VERIFICAR ERP si la cédula ya está en estado pero NO se ha consultado
-        // Esto cubre el caso donde la cédula se capturó ANTES del fix de auto-verificación.
-        // Cada mensaje del cliente fuerza la consulta ERP si falta.
+        // 🛡️ AUTO-VERIFICAR ERP si la cédula ya está en estado pero NO se ha consultado.
+        // Cubre conv donde la cédula se capturó antes del fix de auto-verificación.
         if (!empty($estado->cedula) && !$estado->yaValidado('cliente_erp')) {
             try {
                 if ($this->erpClienteLookupActivo()) {
                     $this->autoVerificarClienteErp($conv, $estado, $estado->cedula);
+                    $estado = $this->obtener($conv); // recargar tras la verificación
                 }
             } catch (\Throwable $e) {
                 Log::warning('Auto verificar ERP en captar: ' . $e->getMessage());
             }
+        }
+
+        // 🛡️ FALLBACK: si después de intentar ERP el flag sigue en NO validado
+        // PERO ya tenemos cédula + nombre del cliente (capturados de flujo previo),
+        // consideramos el cliente como "datos suficientes" y marcamos validado.
+        // Esto evita bucles cuando el ERP devuelve errores transitorios o cuando
+        // los datos del cliente ya fueron confirmados antes.
+        if (!empty($estado->cedula) && !empty($estado->nombre_cliente) && !$estado->yaValidado('cliente_erp')) {
+            Log::info('🛡️ Cliente con datos suficientes — marcando validado sin ERP', [
+                'conv_id' => $conv->id,
+                'cedula'  => $estado->cedula,
+                'nombre'  => $estado->nombre_cliente,
+            ]);
+            $estado->marcarValidacion('cliente_erp', true);
+            // No tocamos cliente_existe_erp — quedará en false (no confirmado por ERP)
+            // pero el flag de validación SÍ avanza el flujo.
         }
 
         // 1. CÉDULA — número de 6-12 dígitos CONTIGUOS, no en dirección/pago.
