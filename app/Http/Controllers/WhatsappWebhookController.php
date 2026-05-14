@@ -4857,19 +4857,47 @@ TXT;
       $productosEstado = is_array($estado->productos) ? $estado->productos : [];
       $capturados = 0;
 
-      // Patrones que indican que el bot está afirmando que YA agregó algo
-      // Ejemplos: "agregué 3 kilos de hígado", "anoté 10 kilos de patas",
-      //           "añadí 1 paquete de chuzo", "te sumé 2 libras de pechuga"
-      $patron = '/\b(?:agregu[ée]|a[ñn]ad[ií]|anot[ée]|sum[ée]|incluyo|incluido|listo,?\s+(?:tienes|son))\s+(?:los?\s+|las?\s+)?(\d+(?:[.,]\d+)?)\s+(libras?|libra|kilos?|kilo|kg|kl|gramos?|gr|unidades?|unidad|und|varas?|paquetes?|paquete|cajas?)\s+(?:de\s+)?([a-zñáéíóúA-ZÑÁÉÍÓÚ][a-zñáéíóúA-ZÑÁÉÍÓÚ\s\-]+?)(?=[\.\,\:\;\!\?\n]|\s*(?:a|por|\$|al)\s|\s+(?:y|tambi[eé]n)\s|$)/iu';
+      // Patrones que indican que el bot está afirmando que está/va a agregar algo
+      // Cubre presente y pasado: agrego/agregué/agregando, añado/añadí, anoto/anoté,
+      // sumo/sumé, te agrego, voy a agregar, agregado:, anotado:, listo (con lista)
+      // Y también listas con bullet/dash/check: "• 2 kg X", "- 1 kg X", "✅ 3 lb X"
+      $patrones = [
+          // Verbos en cualquier conjugación
+          '/\b(?:agreg(?:u[ée]|o|ando|amos|ado)|a[ñn]ad(?:[íi]|o|iendo|ido|amos)|anot(?:[ée]|o|ando|ado|amos)|sum(?:[ée]|o|ando|amos)|incluy(?:o|endo|ido|amos)|incorpor(?:o|ando|ado|amos)|te\s+(?:agrego|sumo|anoto|a[ñn]ado))\s*:?\s*(?:los?\s+|las?\s+)?(\d+(?:[.,]\d+)?)\s+(libras?|libra|kilos?|kilo|kg|kl|gramos?|gr|unidades?|unidad|und|varas?|paquetes?|paquete|cajas?)\s+(?:de\s+)?([a-zñáéíóúA-ZÑÁÉÍÓÚ][a-zñáéíóúA-ZÑÁÉÍÓÚ\s\-]+?)(?=[\.\,\:\;\!\?\n\*]|\s*(?:a|por|\$|al|—|-)\s|\s+(?:y|tambi[eé]n)\s|$)/iu',
+          // Lista con bullets/dashes/check: "• 2 kg Muslo de Pollo — $31.800"
+          // o "✅ 1 kg Milanesa de Res — $27.500"
+          // Solo se considera "agregado" si está dentro de bloque que diga "te agrego" o "agregado" o "tu pedido"
+      ];
 
-      if (!preg_match_all($patron, $respuestaBot, $matches, PREG_SET_ORDER)) {
+      $matches = [];
+      foreach ($patrones as $p) {
+          preg_match_all($p, $respuestaBot, $m, PREG_SET_ORDER);
+          $matches = array_merge($matches, $m);
+      }
+
+      // Patrón adicional: si hay bullets en una lista DESPUÉS de un verbo "agregar",
+      // capturar todos los items de la lista
+      if (preg_match('/\b(?:agreg(?:u[ée]|o|ando|amos)|a[ñn]ad(?:[íi]|o)|anot(?:[ée]|o)|te\s+(?:agrego|sumo|anoto)|tu\s+pedido|carrito|tienes)\b/iu', $respuestaBot)) {
+          // Buscar items tipo: • 2 kg Muslo de Pollo  o  - 1 kg Milanesa
+          $patronLista = '/(?:^|\n)\s*[•\*\-✅✓·]\s*(\d+(?:[.,]\d+)?)\s+(libras?|libra|kilos?|kilo|kg|kl|gramos?|gr|unidades?|unidad|und|varas?|paquetes?|paquete|cajas?)\s+(?:de\s+)?\*?\*?([a-zñáéíóúA-ZÑÁÉÍÓÚ][a-zñáéíóúA-ZÑÁÉÍÓÚ\s\-]+?)\*?\*?(?=\s*[—\-]|\s*\$|\s*\n|$)/iu';
+          preg_match_all($patronLista, $respuestaBot, $mLista, PREG_SET_ORDER);
+          $matches = array_merge($matches, $mLista);
+      }
+
+      if (empty($matches)) {
           return $productosEstado;
       }
 
+      $procesados = [];
       foreach ($matches as $m) {
           $cant   = (float) str_replace(',', '.', $m[1]);
           $unit   = mb_strtolower(trim($m[2]));
           $nombre = trim($m[3]);
+
+          // Evitar duplicar procesamientos de la misma match
+          $key = mb_strtolower($nombre) . '|' . $cant . '|' . $unit;
+          if (isset($procesados[$key])) continue;
+          $procesados[$key] = true;
 
           // Limpiar palabras conectoras al final
           $nombre = preg_replace('/\s+(con|para|en|al|del|de\s+los?|de\s+las?)\s*$/iu', '', $nombre);
