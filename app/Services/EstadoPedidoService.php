@@ -293,6 +293,28 @@ class EstadoPedidoService
     }
 
     /**
+     * 🛡️ Convierte recursivamente cualquier string mal codificado a UTF-8 válido.
+     * SGI (SQL Server) a veces devuelve latín-1 que rompe json_encode.
+     */
+    private function sanitizarUtf8Recursivo($valor)
+    {
+        if (is_array($valor)) {
+            $out = [];
+            foreach ($valor as $k => $v) {
+                $out[$k] = $this->sanitizarUtf8Recursivo($v);
+            }
+            return $out;
+        }
+        if (is_string($valor)) {
+            // Si ya es UTF-8 válido, devolver tal cual
+            if (mb_check_encoding($valor, 'UTF-8')) return $valor;
+            // Intentar convertir desde latín-1
+            return mb_convert_encoding($valor, 'UTF-8', 'ISO-8859-1, Windows-1252');
+        }
+        return $valor;
+    }
+
+    /**
      * Captura del resultado de verificar_cliente_erp.
      */
     public function captarClienteErp(ConversacionWhatsapp $conv, array $resultado, ?string $cedula = null): ConversacionPedidoEstado
@@ -305,17 +327,19 @@ class EstadoPedidoService
 
         if (($resultado['existe'] ?? false) === true) {
             $estado->cliente_existe_erp = true;
-            $estado->datos_erp = $resultado['datos'] ?? null;
+            // 🛡️ Sanitizar UTF-8 — SGI puede devolver latín-1 que rompe json_encode
+            $estado->datos_erp = $this->sanitizarUtf8Recursivo($resultado['datos'] ?? null);
 
-            // Auto-rellenar nombre y dirección si los tenemos del ERP
-            if (empty($estado->nombre_cliente) && !empty($resultado['datos']['nombre'])) {
-                $estado->nombre_cliente = trim($resultado['datos']['nombre']);
+            // Auto-rellenar nombre y dirección si los tenemos del ERP (ya sanitizados)
+            $datosSan = $estado->datos_erp ?? [];
+            if (empty($estado->nombre_cliente) && !empty($datosSan['nombre'])) {
+                $estado->nombre_cliente = trim($datosSan['nombre']);
             }
-            if (empty($estado->direccion) && !empty($resultado['datos']['direccion'])) {
-                $estado->direccion = trim($resultado['datos']['direccion']);
+            if (empty($estado->direccion) && !empty($datosSan['direccion'])) {
+                $estado->direccion = trim($datosSan['direccion']);
             }
-            if (empty($estado->telefono) && !empty($resultado['datos']['telefono'])) {
-                $estado->telefono = trim($resultado['datos']['telefono']);
+            if (empty($estado->telefono) && !empty($datosSan['telefono'])) {
+                $estado->telefono = trim($datosSan['telefono']);
             }
         } else {
             // Marcamos explícitamente como NO existente para que avanzarPaso
@@ -458,6 +482,19 @@ class EstadoPedidoService
         $estado = $this->obtener($conv);
         $msg = trim($mensaje);
         $cambio = false;
+
+        // 🛡️ AUTO-VERIFICAR ERP si la cédula ya está en estado pero NO se ha consultado
+        // Esto cubre el caso donde la cédula se capturó ANTES del fix de auto-verificación.
+        // Cada mensaje del cliente fuerza la consulta ERP si falta.
+        if (!empty($estado->cedula) && !$estado->yaValidado('cliente_erp')) {
+            try {
+                if ($this->erpClienteLookupActivo()) {
+                    $this->autoVerificarClienteErp($conv, $estado, $estado->cedula);
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Auto verificar ERP en captar: ' . $e->getMessage());
+            }
+        }
 
         // 1. CÉDULA — número de 6-12 dígitos CONTIGUOS, no en dirección/pago.
         //    Ej válidos: "1098765432", "Mi cédula es 1234567"
