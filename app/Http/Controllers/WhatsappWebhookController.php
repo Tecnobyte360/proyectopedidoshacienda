@@ -2618,6 +2618,55 @@ TXT;
                 ]);
             }
 
+            // 🛡️ GUARD: si el ÚLTIMO mensaje del cliente menciona un producto
+            // que NO está en el carrito, BLOQUEAR la confirmación. El bot
+            // probablemente alucinó "agregué X" sin llamar la tool.
+            try {
+                $ultMsgUser = \App\Models\MensajeWhatsapp::where('conversacion_id', $conversacion?->id)
+                    ->where('rol', 'user')
+                    ->orderByDesc('id')
+                    ->limit(1)
+                    ->value('contenido');
+
+                if ($ultMsgUser && !empty($estadoBd->productos)) {
+                    $productosEnCarrito = collect($estadoBd->productos)->map(fn($p) =>
+                        mb_strtolower((string) ($p['name'] ?? ''))
+                    )->all();
+
+                    $msgN = mb_strtolower(\Illuminate\Support\Str::ascii($ultMsgUser));
+                    $palabrasProducto = [
+                        'pierna','solomito','costilla','muslo','pollo','cerdo','res','milanesa',
+                        'pechuga','chuleta','posta','punta','lomo','bagre','basa','tilapia',
+                        'cañon','tocino','espinazo','tripa','hueso','pescado','carne','filete',
+                    ];
+
+                    $mencionadosNoEnCarrito = [];
+                    foreach ($palabrasProducto as $pp) {
+                        if (preg_match('/\b' . preg_quote($pp, '/') . '/iu', $msgN)) {
+                            $estaEnCarrito = false;
+                            foreach ($productosEnCarrito as $enCarrito) {
+                                if (str_contains($enCarrito, $pp)) { $estaEnCarrito = true; break; }
+                            }
+                            if (!$estaEnCarrito) $mencionadosNoEnCarrito[] = $pp;
+                        }
+                    }
+
+                    if (!empty($mencionadosNoEnCarrito) && !$this->mensajeEsConfirmacionPura($ultMsgUser)) {
+                        Log::warning('🚨 GUARD: cliente mencionó productos NO agregados al carrito — bloqueando confirmación', [
+                            'from' => $from,
+                            'productos_mencionados' => $mencionadosNoEnCarrito,
+                            'productos_en_carrito' => $productosEnCarrito,
+                        ]);
+                        // Responder pidiendo agregar los productos faltantes ANTES de confirmar
+                        $lista = implode(', ', $mencionadosNoEnCarrito);
+                        return "Espera, mencionaste *{$lista}* pero no los veo en tu carrito todavía. "
+                             . "¿Cuántos de cada uno quieres? Te los agrego y luego confirmamos. 🙏";
+                    }
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Guard productos faltantes falló: ' . $e->getMessage());
+            }
+
             return $this->guardarPedidoDesdeToolCall(
                 $orderData,
                 $from,
@@ -3473,6 +3522,31 @@ TXT;
         $dLng = deg2rad($lng2 - $lng1);
         $a = sin($dLat/2) ** 2 + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLng/2) ** 2;
         return 2 * $R * asin(sqrt($a));
+    }
+
+    /**
+     * 🛡️ ¿El mensaje del cliente es una confirmación PURA?
+     * "sí", "confirmo", "dale", "listo confirmo", etc. — sin productos nuevos.
+     */
+    private function mensajeEsConfirmacionPura(string $msg): bool
+    {
+        $m = mb_strtolower(\Illuminate\Support\Str::ascii(trim($msg)));
+        if ($m === '') return false;
+        $confirmaciones = [
+            'si', 'sí', 'confirmo', 'si confirmo', 'sí confirmo',
+            'dale', 'listo', 'ok', 'okay', 'va', 'va pues', 'perfecto',
+            'de acuerdo', 'si por favor', 'si gracias',
+            'genera el pedido', 'haz el pedido', 'cierra el pedido',
+            'confirmo el pedido', 'si confirmo el pedido', 'eso es todo',
+        ];
+        // Coincidencia exacta o cuasi-exacta (≤ 30 chars)
+        if (in_array($m, $confirmaciones, true)) return true;
+        if (mb_strlen($m) <= 30) {
+            foreach ($confirmaciones as $c) {
+                if (str_contains($m, $c)) return true;
+            }
+        }
+        return false;
     }
 
     /**
