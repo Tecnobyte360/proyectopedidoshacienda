@@ -34,20 +34,11 @@ class ReintentarMensajesSalida extends Command
     protected $signature = 'bot:reintentar-mensajes-salida';
     protected $description = 'Reintenta enviar mensajes WhatsApp que fallaron por desconexión';
 
-    private array $backoffSegundos = [
-        1 => 15,
-        2 => 30,
-        3 => 60,
-        4 => 120,
-        5 => 300,
-        6 => 900,
-        7 => 3600,
-        8 => 21600,
-        9 => 21600,
-        10 => 21600,
-        11 => 21600,
-        12 => 21600,
-    ];
+    /** Backoff default (segundos por intento) — usado si tenant no parametriza. */
+    private const BACKOFF_DEFAULT = [15, 30, 60, 120, 300, 900, 3600, 21600, 21600, 21600, 21600, 21600];
+
+    /** Máx intentos default — usado si tenant no parametriza. */
+    private const MAX_INTENTOS_DEFAULT = 12;
 
     public function handle(): int
     {
@@ -72,7 +63,12 @@ class ReintentarMensajesSalida extends Command
 
         foreach ($pendientes as $msg) {
             try {
-                // Cargar el tenant correcto
+                // Cargar el tenant correcto y su configuración de cola
+                $maxIntentos = self::MAX_INTENTOS_DEFAULT;
+                $backoff     = self::BACKOFF_DEFAULT;
+                $activa      = true;
+                $emailAlerta = null;
+
                 if ($msg->tenant_id) {
                     $tenant = Tenant::find($msg->tenant_id);
                     if (!$tenant) {
@@ -81,6 +77,26 @@ class ReintentarMensajesSalida extends Command
                         continue;
                     }
                     app(TenantManager::class)->set($tenant);
+
+                    try {
+                        $cfg = \App\Models\ConfiguracionBot::actual();
+                        if ($cfg) {
+                            $activa = (bool) ($cfg->cola_salida_activa ?? true);
+                            $maxIntentos = max(1, min(50, (int) ($cfg->cola_salida_max_intentos ?? self::MAX_INTENTOS_DEFAULT)));
+                            $bk = $cfg->cola_salida_backoff_segundos;
+                            if (is_array($bk) && !empty($bk)) {
+                                $backoff = array_values(array_map(fn ($v) => max(5, min(86400, (int) $v)), $bk));
+                            }
+                            $emailAlerta = $cfg->cola_salida_email_alerta ?: null;
+                        }
+                    } catch (\Throwable $e) { /* usar defaults */ }
+                }
+
+                if (!$activa) {
+                    // Si tenant desactivó la cola, marcar todo como fallido permanente
+                    $this->marcarFallidoPermanente($msg->id, 'cola_salida desactivada por tenant');
+                    $fallos++;
+                    continue;
                 }
 
                 $payload = is_array($msg->payload) ? $msg->payload : json_decode($msg->payload, true);
@@ -107,20 +123,25 @@ class ReintentarMensajesSalida extends Command
                     $exitos++;
                 } else {
                     $intentos = (int) $msg->intentos + 1;
-                    $backoff  = $this->backoffSegundos[$intentos] ?? null;
+                    // backoff: [0] para intento 1, [1] para intento 2, etc.
+                    $idxBackoff = $intentos - 1;
+                    $segundosEspera = $backoff[$idxBackoff] ?? end($backoff); // si excede el array, usa el último
 
-                    if ($intentos >= 12 || $backoff === null) {
-                        $this->marcarFallidoPermanente($msg->id, "12 intentos fallidos");
-                        Log::error('❌ Mensaje pendiente: fallido permanente tras 12 intentos', [
-                            'id'       => $msg->id,
-                            'telefono' => $msg->telefono,
+                    if ($intentos >= $maxIntentos) {
+                        $this->marcarFallidoPermanente($msg->id, "Máx intentos ({$maxIntentos}) agotados");
+                        Log::error('❌ Mensaje pendiente: fallido permanente', [
+                            'id'           => $msg->id,
+                            'telefono'     => $msg->telefono,
+                            'intentos'     => $intentos,
+                            'max_intentos' => $maxIntentos,
                         ]);
+                        $this->enviarEmailAlerta($emailAlerta, $msg, $intentos);
                     } else {
                         DB::table('mensajes_salida_pendientes')
                             ->where('id', $msg->id)
                             ->update([
                                 'intentos'           => $intentos,
-                                'proximo_intento_at' => now()->addSeconds($backoff),
+                                'proximo_intento_at' => now()->addSeconds($segundosEspera),
                                 'updated_at'         => now(),
                             ]);
                     }
@@ -167,5 +188,33 @@ class ReintentarMensajesSalida extends Command
                 'ultimo_error'          => mb_substr($razon, 0, 1000),
                 'updated_at'            => now(),
             ]);
+    }
+
+    /**
+     * 📧 Notifica por email al admin del tenant que un mensaje falló perm.
+     * Throttle: máx 1 email por hora por tenant para no spamear.
+     */
+    private function enviarEmailAlerta(?string $email, $msg, int $intentos): void
+    {
+        if (!$email || !filter_var($email, FILTER_VALIDATE_EMAIL)) return;
+
+        $key = "cola_salida_alerta_t{$msg->tenant_id}";
+        if (\Illuminate\Support\Facades\Cache::has($key)) return;
+        \Illuminate\Support\Facades\Cache::put($key, true, now()->addHour());
+
+        try {
+            $tel = $msg->telefono;
+            $payloadArr = is_array($msg->payload) ? $msg->payload : (json_decode($msg->payload, true) ?: []);
+            $body = mb_substr((string) ($payloadArr['body'] ?? ''), 0, 200);
+            $cuerpo = "🔴 Un mensaje de WhatsApp NO se pudo enviar tras {$intentos} intentos.\n\n"
+                   . "Destino: {$tel}\n"
+                   . "Mensaje: {$body}\n\n"
+                   . "Revisa /monitoreo/llm?tab=cola para más detalles o reintenta manualmente.";
+            \Mail::raw($cuerpo, function ($m) use ($email) {
+                $m->to($email)->subject('🔴 WhatsApp: mensaje fallido permanentemente');
+            });
+        } catch (\Throwable $e) {
+            Log::warning('No se pudo enviar email de alerta cola_salida: ' . $e->getMessage());
+        }
     }
 }

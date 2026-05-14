@@ -14,10 +14,84 @@ class Llm extends Component
     public int $minutos = 30;  // Ventana de análisis
     public string $tab = 'llm';  // 'llm' | 'watchdog' | 'agente' | 'envivo' | 'cola'
 
+    // 📬 Parámetros editables de cola de salida
+    public bool $coActiva = true;
+    public int $coMaxIntentos = 12;
+    public string $coBackoffTexto = '15,30,60,120,300,900,3600,21600,21600,21600,21600,21600';
+    public string $coEmailAlerta = '';
+
     protected $queryString = [
         'tab'     => ['except' => 'llm'],
         'minutos' => ['except' => 30],
     ];
+
+    public function mount(): void
+    {
+        $this->cargarParametrosCola();
+    }
+
+    private function cargarParametrosCola(): void
+    {
+        try {
+            $cfg = \App\Models\ConfiguracionBot::actual();
+            if ($cfg) {
+                $this->coActiva = (bool) ($cfg->cola_salida_activa ?? true);
+                $this->coMaxIntentos = (int) ($cfg->cola_salida_max_intentos ?? 12);
+                $bk = $cfg->cola_salida_backoff_segundos;
+                if (is_array($bk) && !empty($bk)) {
+                    $this->coBackoffTexto = implode(',', $bk);
+                }
+                $this->coEmailAlerta = (string) ($cfg->cola_salida_email_alerta ?? '');
+            }
+        } catch (\Throwable $e) { /* defaults */ }
+    }
+
+    /**
+     * 💾 Guarda parámetros de cola de salida desde el panel.
+     */
+    public function guardarParametrosCola(): void
+    {
+        try {
+            $cfg = \App\Models\ConfiguracionBot::actual();
+            if (!$cfg) {
+                $this->dispatch('notify', ['type' => 'error', 'message' => 'No hay config de bot para este tenant.']);
+                return;
+            }
+
+            // Parse + validate backoff
+            $backoff = array_values(array_filter(array_map(
+                fn ($v) => (int) trim($v),
+                explode(',', $this->coBackoffTexto)
+            ), fn ($v) => $v >= 5 && $v <= 86400));
+
+            if (empty($backoff)) {
+                $this->dispatch('notify', ['type' => 'error', 'message' => 'Backoff inválido. Usa al menos un número entre 5 y 86400.']);
+                return;
+            }
+
+            $maxIntentos = max(1, min(50, $this->coMaxIntentos));
+            $email = trim($this->coEmailAlerta) ?: null;
+            if ($email && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                $this->dispatch('notify', ['type' => 'error', 'message' => 'Email de alerta inválido.']);
+                return;
+            }
+
+            $cfg->update([
+                'cola_salida_activa'           => $this->coActiva,
+                'cola_salida_max_intentos'     => $maxIntentos,
+                'cola_salida_backoff_segundos' => $backoff,
+                'cola_salida_email_alerta'     => $email,
+            ]);
+
+            $this->coBackoffTexto = implode(',', $backoff);
+            $this->coMaxIntentos  = $maxIntentos;
+            $this->coEmailAlerta  = (string) ($email ?? '');
+
+            $this->dispatch('notify', ['type' => 'success', 'message' => '✅ Parámetros guardados.']);
+        } catch (\Throwable $e) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Error: ' . $e->getMessage()]);
+        }
+    }
 
     /**
      * 📬 Reintentar manualmente un mensaje pendiente.

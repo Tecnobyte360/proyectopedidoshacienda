@@ -100,6 +100,10 @@ class ConfiguracionBot extends Model
         'notif_entregado_delay',
         'notif_pago_aprobado_delay',
         'notif_pago_rechazado_delay',
+        'cola_salida_activa',
+        'cola_salida_max_intentos',
+        'cola_salida_backoff_segundos',
+        'cola_salida_email_alerta',
     ];
 
     /** Plantillas por defecto si el tenant no las personaliza. */
@@ -142,6 +146,9 @@ class ConfiguracionBot extends Model
         'watchdog_max_minutos'      => 'integer',
         'watchdog_skip_pedido_min'  => 'integer',
         'watchdog_cooldown_conv_min'=> 'integer',
+        'cola_salida_activa'          => 'boolean',
+        'cola_salida_max_intentos'    => 'integer',
+        'cola_salida_backoff_segundos'=> 'array',
         'auto_limpieza_max_msgs'    => 'integer',
         'auto_reset_horas_inactividad' => 'integer',
         'aislar_contexto_por_dia'   => 'boolean',

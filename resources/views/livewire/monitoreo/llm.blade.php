@@ -658,28 +658,83 @@
         </button>
     </div>
 
-    {{-- Parámetros configurables --}}
-    <details class="rounded-2xl border border-slate-200 bg-white p-4 mt-4">
+    {{-- Parámetros editables --}}
+    <details class="rounded-2xl border border-indigo-200 bg-white p-4 mt-4" open>
         <summary class="cursor-pointer text-sm font-bold text-slate-700 flex items-center gap-2">
             <i class="fa-solid fa-sliders text-indigo-600"></i>
-            Parámetros actuales (read-only)
+            Parámetros configurables
         </summary>
-        <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+
+        <form wire:submit.prevent="guardarParametrosCola" class="mt-4 space-y-4">
+            {{-- Toggle activa --}}
+            <label class="flex items-center gap-3 cursor-pointer">
+                <input type="checkbox" wire:model="coActiva"
+                       class="w-5 h-5 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300">
+                <div>
+                    <p class="text-sm font-bold text-slate-700">Cola de salida activa</p>
+                    <p class="text-[11px] text-slate-500">Si la apagas, los envíos fallidos NO se encolan (comportamiento legacy: el mensaje se pierde).</p>
+                </div>
+            </label>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {{-- Máx intentos --}}
+                <div>
+                    <label class="block text-xs font-bold uppercase text-slate-600 mb-1">
+                        Máx intentos antes de marcar fallido
+                    </label>
+                    <input type="number" wire:model="coMaxIntentos" min="1" max="50"
+                           class="w-full rounded-xl border-2 border-slate-200 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none">
+                    <p class="text-[11px] text-slate-500 mt-1">Entre 1 y 50. Default: 12.</p>
+                </div>
+
+                {{-- Email de alerta --}}
+                <div>
+                    <label class="block text-xs font-bold uppercase text-slate-600 mb-1">
+                        Email para alertas (opcional)
+                    </label>
+                    <input type="email" wire:model="coEmailAlerta" placeholder="admin@empresa.com"
+                           class="w-full rounded-xl border-2 border-slate-200 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none">
+                    <p class="text-[11px] text-slate-500 mt-1">Recibe email si un mensaje queda fallido permanente. Máx 1 por hora.</p>
+                </div>
+            </div>
+
+            {{-- Backoff --}}
+            <div>
+                <label class="block text-xs font-bold uppercase text-slate-600 mb-1">
+                    Backoff (segundos por intento, separados por coma)
+                </label>
+                <input type="text" wire:model="coBackoffTexto"
+                       placeholder="15,30,60,120,300,900,3600,21600"
+                       class="w-full rounded-xl border-2 border-slate-200 px-3 py-2 text-sm font-mono focus:border-indigo-500 focus:outline-none">
+                <p class="text-[11px] text-slate-500 mt-1">
+                    Cada número es el delay antes del siguiente intento. Ej:
+                    <code class="bg-slate-100 px-1 rounded">15,30,60</code> significa intento1→espera 15s, intento2→30s, intento3→60s.
+                    Si hay más intentos que valores, se usa el último.
+                </p>
+                <p class="text-[11px] text-slate-500 mt-1">
+                    Default: <code class="bg-slate-100 px-1 rounded">15,30,60,120,300,900,3600,21600</code>
+                    (15s → 30s → 1m → 2m → 5m → 15m → 1h → 6h)
+                </p>
+            </div>
+
+            <div class="flex items-center gap-2 pt-2 border-t border-slate-100">
+                <button type="submit"
+                        class="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 text-sm font-bold">
+                    <i class="fa-solid fa-save"></i>
+                    Guardar parámetros
+                </button>
+                <span class="text-[11px] text-slate-500">Se aplican al siguiente ciclo del scheduler (próximo minuto).</span>
+            </div>
+        </form>
+
+        <div class="mt-4 pt-4 border-t border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
             <div class="rounded-lg bg-slate-50 p-3">
                 <p class="font-bold text-slate-700 mb-1">⏰ Frecuencia de reintento</p>
-                <p class="text-slate-600">Cada <strong>1 minuto</strong> (scheduler)</p>
+                <p class="text-slate-600">Cada <strong>1 minuto</strong> (scheduler — no parametrizable)</p>
             </div>
             <div class="rounded-lg bg-slate-50 p-3">
-                <p class="font-bold text-slate-700 mb-1">📊 Backoff progresivo</p>
-                <p class="text-slate-600">15s → 30s → 1m → 2m → 5m → 15m → 1h → 6h ×5</p>
-            </div>
-            <div class="rounded-lg bg-slate-50 p-3">
-                <p class="font-bold text-slate-700 mb-1">🔁 Máx intentos</p>
-                <p class="text-slate-600"><strong>12</strong> antes de marcar fallido permanente</p>
-            </div>
-            <div class="rounded-lg bg-slate-50 p-3">
-                <p class="font-bold text-slate-700 mb-1">📡 Auto-reconexión WA</p>
-                <p class="text-slate-600">Cada <strong>1 min</strong> · 3 fallos → email admin</p>
+                <p class="font-bold text-slate-700 mb-1">📡 Auto-reconexión WhatsApp</p>
+                <p class="text-slate-600">Cada <strong>1 min</strong> · 3 fallos → email del tenant</p>
             </div>
         </div>
     </details>
