@@ -1285,12 +1285,14 @@ TXT;
         $estadoYaCompleto   = $estadoActualBd && $estadoActualBd->estaCompleto() && !$estadoActualBd->confirmado_at;
         $datosFinalesEnTexto= !$forzarConfirmar && $this->clienteDaDatosFinales($message);
 
+        $toolChoiceInicial  = $toolChoicePorPaso;
+        $razonForzado       = null;
+
         // 🎯 DETECCIÓN POR CONTEXTO (no por palabras hardcodeadas):
         // Si el último mensaje del bot pidió confirmación (contenía "¿Confirmas?" o
         // similar + Total + productos), entonces el LLM YA está esperando una
-        // respuesta de confirmación. Dejamos que el LLM identifique la intención
-        // del cliente, pero le damos un nudge para que NO responda en texto plano
-        // si es afirmativa.
+        // respuesta de confirmación. Le damos un nudge para que NO responda en
+        // texto plano si la respuesta del cliente es afirmativa.
         $botPidioConfirmacion = $this->ultimoMensajeBotPidioConfirmacion($conversationHistory);
         if ($botPidioConfirmacion && !$forzarConfirmar && !$preguntaProducto) {
             $messages[] = [
@@ -1298,23 +1300,18 @@ TXT;
                 'content' => "🎯 CONTEXTO CLAVE: en tu último mensaje le pediste al cliente que confirmara el pedido (mostraste resumen + ¿Confirmas?). "
                     . "La respuesta del cliente que viene es su decisión.\n\n"
                     . "Tú decides semánticamente qué quiso decir:\n"
-                    . "  - Si entiende COMO AFIRMATIVA (cualquier forma: 'sí', 'dale', 'listo', 'todo bien', 'oka', 'perfecto', 'super confirmado', '👍', 'hagale', etc.) → "
+                    . "  - Si entiendes COMO AFIRMATIVA (cualquier forma: 'sí', 'dale', 'listo', 'todo bien', 'oka', 'perfecto', 'super confirmado', '👍', 'hagale', etc.) → "
                     . "LLAMA `confirmar_pedido` AHORA con los datos del resumen que mostraste. NO respondas con texto plano.\n"
                     . "  - Si pide CAMBIO o tiene una NUEVA pregunta → ajusta el pedido y muestra el nuevo resumen.\n"
                     . "  - Si pide CANCELAR → confírmale que cancelaste, sin llamar tool.\n\n"
                     . "PROHIBIDO decir 'tu pedido quedó registrado' / 'va en camino' / 'queda listo' SIN llamar `confirmar_pedido`. "
                     . "Esa es la diferencia entre confirmar de verdad (con tool) e inventar (con texto, que el sistema bloqueará).",
             ];
-            // Permitir que el LLM use cualquier tool — pero con el contexto reforzado
-            // ya entenderá que debe llamar confirmar_pedido si la respuesta es afirmativa.
             if ($toolChoiceInicial === 'auto' || $toolChoiceInicial === null) {
                 $toolChoiceInicial = 'required'; // que invoque ALGUNA tool, no responda solo texto
                 $razonForzado = 'bot_pidio_confirmacion_cliente_respondio';
             }
         }
-
-        $toolChoiceInicial  = $toolChoicePorPaso;
-        $razonForzado       = null;
 
         if ($forzarConfirmar) {
             $toolChoiceInicial = ['type' => 'function', 'function' => ['name' => 'confirmar_pedido']];
