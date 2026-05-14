@@ -397,6 +397,60 @@ class EstadoPedidoService
             $estado->email          = null;
         }
         $estado->cedula = $nuevaCedula;
+        $estado->save();
+
+        // 🔍 AUTO-VERIFICAR EN ERP cuando capturamos cédula nueva:
+        // Si hay integración ERP con cliente_lookup activo y aún no se validó,
+        // disparar la consulta automáticamente para que cliente_existe_erp y
+        // datos_erp se llenen sin esperar a que el LLM lo haga.
+        try {
+            if ($this->erpClienteLookupActivo() && !$estado->yaValidado('cliente_erp')) {
+                $this->autoVerificarClienteErp($conv, $estado, $nuevaCedula);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Auto verificar cliente ERP falló: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * 🔍 Consulta el ERP por cédula y guarda el resultado en el estado.
+     * Replica la lógica del tool verificar_cliente_erp pero sin pasar por el LLM.
+     */
+    private function autoVerificarClienteErp(ConversacionWhatsapp $conv, ConversacionPedidoEstado $estado, string $cedula): void
+    {
+        $tenantId = $conv->tenant_id ?? app(\App\Services\TenantManager::class)->id();
+        if (!$tenantId) return;
+
+        $integ = \App\Models\Integracion::where('tenant_id', $tenantId)
+            ->where('activo', true)
+            ->where('exporta_pedidos', true)
+            ->get()
+            ->first(fn ($i) => $i->config['cliente_lookup']['activo'] ?? false);
+        if (!$integ) return;
+
+        try {
+            $erp = app(\App\Services\ClienteErpService::class);
+            $datos = $erp->buscar($integ, $cedula, $conv->telefono_normalizado);
+
+            $resultado = ['cedula' => $cedula];
+            if ($datos) {
+                $resultado['existe'] = true;
+                $resultado['datos']  = $datos;
+            } else {
+                $resultado['existe'] = false;
+            }
+
+            $this->captarClienteErp($conv, $resultado, $cedula);
+
+            Log::info('🔍 Auto verificar_cliente_erp ejecutado', [
+                'conv_id' => $conv->id,
+                'cedula'  => $cedula,
+                'existe'  => $resultado['existe'],
+                'nombre'  => $datos['nombre'] ?? null,
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('Auto verificar_cliente_erp falló: ' . $e->getMessage());
+        }
     }
 
     public function captarDelMensajeUsuario(ConversacionWhatsapp $conv, string $mensaje): void
