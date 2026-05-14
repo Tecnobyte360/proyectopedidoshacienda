@@ -100,7 +100,24 @@ class WatchdogConversacionesEstancadas extends Command
                 ];
 
                 $url = config('app.url') . '/api/whatsapp-webhook';
-                \Http::timeout(5)->post($url, $payload);
+                $resp = \Http::timeout(5)->post($url, $payload);
+                $exitoso = $resp->successful();
+
+                // Registrar el rescate en BD para el panel de monitoreo
+                try {
+                    \App\Models\WatchdogRescate::create([
+                        'tenant_id'          => $conv->tenant_id ?? null,
+                        'conversacion_id'    => $conv->id,
+                        'telefono'           => $conv->telefono_normalizado,
+                        'mensaje_origen_id'  => $ultimoMsg->id,
+                        'mensaje_contenido'  => mb_substr((string) $ultimoMsg->contenido, 0, 500),
+                        'segundos_estancada' => $segundosDesde,
+                        'exitoso'            => $exitoso,
+                        'error_mensaje'      => $exitoso ? null : mb_substr($resp->body(), 0, 500),
+                    ]);
+                } catch (\Throwable $e) {
+                    Log::warning('🐕 No se pudo registrar rescate watchdog: ' . $e->getMessage());
+                }
 
                 $rescatadas++;
             } catch (\Throwable $e) {
@@ -108,6 +125,19 @@ class WatchdogConversacionesEstancadas extends Command
                     'conversacion_id' => $conv->id,
                     'error'           => $e->getMessage(),
                 ]);
+
+                try {
+                    \App\Models\WatchdogRescate::create([
+                        'tenant_id'          => $conv->tenant_id ?? null,
+                        'conversacion_id'    => $conv->id,
+                        'telefono'           => $conv->telefono_normalizado,
+                        'mensaje_origen_id'  => $ultimoMsg->id ?? null,
+                        'mensaje_contenido'  => mb_substr((string) ($ultimoMsg->contenido ?? ''), 0, 500),
+                        'segundos_estancada' => $segundosDesde,
+                        'exitoso'            => false,
+                        'error_mensaje'      => mb_substr($e->getMessage(), 0, 500),
+                    ]);
+                } catch (\Throwable $e2) {}
             }
         }
 

@@ -136,6 +136,10 @@ Route::middleware(['no_super_sin_imp'])->group(function () {
         ->middleware('permission:bot.configurar')
         ->name('monitoreo.llm');
 
+    Route::get('/monitoreo/watchdog', \App\Livewire\Monitoreo\Watchdog::class)
+        ->middleware('permission:bot.configurar')
+        ->name('monitoreo.watchdog');
+
     Route::get('/rutas', \App\Livewire\Rutas\Index::class)
         ->middleware('permission:despachos.gestionar')
         ->name('rutas.index');
