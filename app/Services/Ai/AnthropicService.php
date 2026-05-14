@@ -392,6 +392,37 @@ class AnthropicService
      */
     private function garantizarToolResults(array $messages): array
     {
+        // 🛡️ PASO 1: deduplicar tool_result en cada user message.
+        // Si el flujo upstream agregó manualmente un tool_result Y luego el
+        // traductor procesó un role:tool con el mismo id, se duplica el bloque.
+        // Anthropic rechaza con 400: "each tool_use must have a single result".
+        foreach ($messages as $idx => $msg) {
+            if (($msg['role'] ?? '') !== 'user') continue;
+            if (!is_array($msg['content'] ?? null)) continue;
+
+            $visto = [];
+            $limpio = [];
+            $huboDup = false;
+            foreach ($msg['content'] as $b) {
+                if (is_array($b) && ($b['type'] ?? '') === 'tool_result' && !empty($b['tool_use_id'])) {
+                    $id = $b['tool_use_id'];
+                    if (isset($visto[$id])) {
+                        $huboDup = true;
+                        continue; // skip el duplicado
+                    }
+                    $visto[$id] = true;
+                }
+                $limpio[] = $b;
+            }
+            if ($huboDup) {
+                \Illuminate\Support\Facades\Log::warning('🛡️ tool_result duplicado(s) eliminado(s)', [
+                    'msg_index' => $idx,
+                    'ids_unicos' => array_keys($visto),
+                ]);
+                $messages[$idx]['content'] = $limpio;
+            }
+        }
+
         $count = count($messages);
 
         for ($i = 0; $i < $count; $i++) {

@@ -155,8 +155,8 @@ Route::middleware(['no_super_sin_imp'])->group(function () {
         ->middleware('permission:chat.usar')
         ->name('chat.estado-pedido');
 
-    // 📡 Monitor en vivo del bot (dashboard de comportamiento en tiempo real)
-    Route::get('/bot-monitor', \App\Livewire\Bot\Monitor::class)
+    // 📡 /bot-monitor redirige al tab 'envivo' dentro de Monitor LLM
+    Route::get('/bot-monitor', fn () => redirect('/monitoreo/llm?tab=envivo'))
         ->middleware('permission:chat.usar')
         ->name('bot.monitor');
 

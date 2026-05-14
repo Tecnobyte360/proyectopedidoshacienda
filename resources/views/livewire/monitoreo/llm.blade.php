@@ -57,6 +57,16 @@
                 {{ $agTotal }}
             </span>
         </button>
+        <button type="button" wire:click="$set('tab', 'envivo')"
+                class="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition
+                       {{ $tab === 'envivo' ? 'bg-gradient-to-r from-rose-500 to-red-600 text-white shadow' : 'text-slate-600 hover:bg-slate-50' }}">
+            <i class="fa-solid fa-tower-broadcast text-[12px]"></i>
+            En Vivo
+            <span class="inline-flex items-center justify-center px-1.5 h-[20px] rounded-full text-[9px] font-bold
+                         {{ $tab === 'envivo' ? 'bg-white/25 text-white' : 'bg-rose-200 text-rose-800' }}">
+                LIVE
+            </span>
+        </button>
     </div>
 
     @if($tab === 'llm')
@@ -569,6 +579,19 @@
             </div>
         @endif
     </div>
+
+    @elseif($tab === 'envivo')
+
+    {{-- 📡 TAB EN VIVO: Monitor del Bot --}}
+    <div class="rounded-2xl border border-rose-200 bg-rose-50/30 p-3 mb-4">
+        <p class="text-xs text-slate-600">
+            <i class="fa-solid fa-tower-broadcast mr-1 text-rose-600"></i>
+            <strong>Monitor en vivo del bot</strong> — KPIs del día, conversaciones activas, alucinaciones detectadas, timeline. Auto-refresca cada 3 segundos.
+        </p>
+    </div>
+
+    {{-- Embeber el componente Bot/Monitor que ya existe --}}
+    @livewire('bot.monitor', [], key('bot-monitor-livewire'))
 
     @endif
 </div>
