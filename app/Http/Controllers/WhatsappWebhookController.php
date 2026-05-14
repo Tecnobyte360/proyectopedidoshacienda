@@ -1285,6 +1285,34 @@ TXT;
         $estadoYaCompleto   = $estadoActualBd && $estadoActualBd->estaCompleto() && !$estadoActualBd->confirmado_at;
         $datosFinalesEnTexto= !$forzarConfirmar && $this->clienteDaDatosFinales($message);
 
+        // 🎯 DETECCIÓN POR CONTEXTO (no por palabras hardcodeadas):
+        // Si el último mensaje del bot pidió confirmación (contenía "¿Confirmas?" o
+        // similar + Total + productos), entonces el LLM YA está esperando una
+        // respuesta de confirmación. Dejamos que el LLM identifique la intención
+        // del cliente, pero le damos un nudge para que NO responda en texto plano
+        // si es afirmativa.
+        $botPidioConfirmacion = $this->ultimoMensajeBotPidioConfirmacion($conversationHistory);
+        if ($botPidioConfirmacion && !$forzarConfirmar && !$preguntaProducto) {
+            $messages[] = [
+                'role'    => 'system',
+                'content' => "🎯 CONTEXTO CLAVE: en tu último mensaje le pediste al cliente que confirmara el pedido (mostraste resumen + ¿Confirmas?). "
+                    . "La respuesta del cliente que viene es su decisión.\n\n"
+                    . "Tú decides semánticamente qué quiso decir:\n"
+                    . "  - Si entiende COMO AFIRMATIVA (cualquier forma: 'sí', 'dale', 'listo', 'todo bien', 'oka', 'perfecto', 'super confirmado', '👍', 'hagale', etc.) → "
+                    . "LLAMA `confirmar_pedido` AHORA con los datos del resumen que mostraste. NO respondas con texto plano.\n"
+                    . "  - Si pide CAMBIO o tiene una NUEVA pregunta → ajusta el pedido y muestra el nuevo resumen.\n"
+                    . "  - Si pide CANCELAR → confírmale que cancelaste, sin llamar tool.\n\n"
+                    . "PROHIBIDO decir 'tu pedido quedó registrado' / 'va en camino' / 'queda listo' SIN llamar `confirmar_pedido`. "
+                    . "Esa es la diferencia entre confirmar de verdad (con tool) e inventar (con texto, que el sistema bloqueará).",
+            ];
+            // Permitir que el LLM use cualquier tool — pero con el contexto reforzado
+            // ya entenderá que debe llamar confirmar_pedido si la respuesta es afirmativa.
+            if ($toolChoiceInicial === 'auto' || $toolChoiceInicial === null) {
+                $toolChoiceInicial = 'required'; // que invoque ALGUNA tool, no responda solo texto
+                $razonForzado = 'bot_pidio_confirmacion_cliente_respondio';
+            }
+        }
+
         $toolChoiceInicial  = $toolChoicePorPaso;
         $razonForzado       = null;
 
@@ -2752,6 +2780,42 @@ TXT;
      * pedido". En ese caso forzamos tool_choice a confirmar_pedido para
      * cortar el ciclo de validar_cobertura → texto → validar_cobertura.
      */
+    /**
+     * 🔍 Detecta si en el último mensaje del bot (assistant) se le pidió al
+     * cliente que confirmara el pedido. Indicios típicos:
+     *   - Mostró un resumen con "Total:" o "💰" o "$X"
+     *   - Pidió "¿Confirmas?", "¿correcto?", "¿está bien?"
+     *
+     * Usado para reforzar al LLM que la siguiente respuesta del cliente es una
+     * decisión de confirmación (no necesita lista hardcodeada de palabras).
+     */
+    private function ultimoMensajeBotPidioConfirmacion(array $conversationHistory): bool
+    {
+        for ($i = count($conversationHistory) - 1; $i >= 0; $i--) {
+            $msg = $conversationHistory[$i] ?? null;
+            if (!is_array($msg)) continue;
+            if (($msg['role'] ?? '') !== 'assistant') continue;
+
+            $content = is_string($msg['content'] ?? null) ? $msg['content'] : '';
+            if ($content === '') return false;
+
+            $lower = mb_strtolower($content);
+
+            // Señal 1: pregunta de confirmación
+            $tienePregunta = preg_match(
+                '/(?:¿\s*confirm(?:as|amos|o)\s*\??|confirmamos\?|esta\s+bien\??|esta\s+correcto\??|todo\s+(?:bien|correcto)\??|estamos\??|listo\s+as[ií]\??|de\s+acuerdo\??)/iu',
+                $lower
+            ) === 1;
+
+            // Señal 2: incluye un resumen con total o precio
+            $tieneResumen = preg_match('/\b(?:total|subtotal)\s*:?\s*\$?\s*[\d.,]+/iu', $lower) === 1
+                || preg_match('/💰|📋|resumen/u', $content) === 1;
+
+            return $tienePregunta && $tieneResumen;
+        }
+        return false;
+    }
+
     private function clientePidioGenerarPedido(string $mensaje): bool
     {
         $m = mb_strtolower(trim($mensaje));
@@ -2787,25 +2851,16 @@ TXT;
             if (str_contains($m, $p)) return true;
         }
 
-        // 🆕 Frases cortas de confirmación final (después de mostrar resumen)
-        // Las matcheamos de forma EXACTA para no caer con cualquier "si" en una oración.
-        $cortasExactas = [
-            'si confirmo', 'si confirmar', 'si comfirmo', 'si comfirmar',
-            'confirmo', 'confirmar', 'comfirmo', 'comfirmar',
-            'si dale', 'dale confirmo', 'dale listo', 'dale pues',
-            'si listo', 'listo dale', 'listo confirmo',
-            'si por favor', 'si gracias',
-            'asi es', 'esta bien asi', 'esta bien',
-            'todo bien', 'todo correcto', 'esta perfecto', 'perfecto si',
-            'si todo bien', 'si esta bien',
-            'oka', 'okay', 'ok dale', 'ok listo', 'ok confirmo',
-            'super', 'super confirmado',
+        // 🛡️ RED DE SEGURIDAD MÍNIMA: solo frases que SIEMPRE significan
+        // "registra el pedido ya". La detección semántica principal la hace
+        // el LLM con el system message inyectado cuando bot pidió confirmación.
+        $cortasInequivocas = [
+            'confirmo el pedido', 'confirma el pedido',
+            'haz el pedido', 'has el pedido',
+            'registra el pedido', 'genera el pedido',
         ];
-        if (in_array($m, $cortasExactas, true)) return true;
-
-        // Inicios de mensaje: "si, confirmo el pedido", "dale, confirma"
-        if (preg_match('/^(?:si|sí|dale|listo|ok|oka|okay|claro|vale|comfirmo|confirmo|perfecto|todo bien)[\s,.]+(?:dale|listo|confirmo|confirma|confirmar|comfirmar|por favor|gracias|hagale|haga|adelante)$/u', $m)) {
-            return true;
+        foreach ($cortasInequivocas as $c) {
+            if (str_contains($m, $c)) return true;
         }
 
         return false;
