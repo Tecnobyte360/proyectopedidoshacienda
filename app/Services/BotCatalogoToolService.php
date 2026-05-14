@@ -111,6 +111,17 @@ class BotCatalogoToolService
                 $score = 100;
             } elseif ($nombreN === $q) {
                 $score = 95;
+            }
+            // 🎯 BOOST: si el nombre del producto está completamente contenido en
+            // la query como prefijo+espacio (cliente dijo "muslo de pollo" y
+            // existe producto "MUSLO" exacto), dar score alto. Mejor que tokens
+            // parciales en productos con muchas palabras adicionales.
+            elseif ($nombreN !== '' && (
+                str_starts_with($q, $nombreN . ' ')
+                || str_ends_with($q, ' ' . $nombreN)
+                || str_contains($q, ' ' . $nombreN . ' ')
+            )) {
+                $score = 90;
             } else {
                 $tokens = collect(explode(' ', $q))->filter()->values();
                 $bag = collect($p->palabras_clave ?? [])
@@ -192,7 +203,7 @@ class BotCatalogoToolService
             'categoria'   => $categoria,
             'productos'   => $resultado,
             'nota'        => count($resultado) > 0
-                ? '✓ Productos encontrados que coinciden con "' . $query . '". Si el cliente escribió con typo, los resultados igualmente son válidos — preséntalos como SÍ tenemos ese producto.'
+                ? "✓ Productos encontrados que coinciden con \"{$query}\". 🛑 MUESTRA AL CLIENTE TODOS LOS RESULTADOS DE ESTA LISTA — no solo los primeros. Si hay un producto que coincide EXACTO con la query (ej. cliente pidió 'muslo' y aparece 'MUSLO' simple), DESTÁCALO PRIMERO antes de las variantes con palabras adicionales. Si el cliente escribió con typo, los resultados igualmente son válidos — preséntalos como SÍ tenemos ese producto."
                 : 'Sin coincidencias. Sí puedes decir "no manejamos eso".',
         ];
     }

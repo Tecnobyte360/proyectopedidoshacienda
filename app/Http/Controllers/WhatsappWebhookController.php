@@ -1219,17 +1219,18 @@ TXT;
                 );
 
             if ($debeResetear) {
-                Log::info('🔁 Saludo/nuevo pedido tras pedido cerrado — reseteando', [
+                Log::info('🔁 Saludo/nuevo pedido tras pedido cerrado — reseteando (preservando cliente)', [
                     'from'             => $from,
                     'pedido_anterior'  => $ultimoPedido->id,
                     'minutos_desde'    => $minutosDesdePedido,
                     'paso_previo'      => $estadoVerif->paso_actual,
                     'mensaje'          => $message,
                 ]);
-                $estadoSrv->resetear(
-                    $conversacion,
-                    "saludo_tras_pedido_{$ultimoPedido->id}"
-                );
+                // 🛡️ Usar reiniciarParaNuevoPedido() que SIEMPRE preserva
+                // cédula/nombre/email/teléfono del cliente. La función
+                // antigua resetear() borraba esos datos a menos que el
+                // motivo fuera 'nuevo_pedido_tras_*'.
+                $estadoSrv->reiniciarParaNuevoPedido($conversacion);
             }
 
             // 🛡️ SIEMPRE que haya un pedido reciente (último 24h) y el estado esté
@@ -6555,7 +6556,12 @@ TXT;
             Log::info('🛡️ pickup_time ignorado (formato no válido)', ['raw' => $rawPickup]);
         }
         $telefonoWhatsapp = $this->normalizarTelefono($from);
-        $telefonoContacto = $this->normalizarTelefono($orderData['phone'] ?? $from);
+        // 🛡️ orderData['phone'] puede ser "" string vacío — usar coalesce real
+        $telContactoRaw = trim((string) ($orderData['phone'] ?? ''));
+        if ($telContactoRaw === '') $telContactoRaw = $from;
+        $telefonoContacto = $this->normalizarTelefono($telContactoRaw);
+        // Última red de seguridad: si quedó vacío, usar el WhatsApp
+        if (empty($telefonoContacto)) $telefonoContacto = $telefonoWhatsapp;
 
         // Resolver dirección y barrio desde la respuesta del bot
         $direccion = trim((string) ($orderData['address'] ?? ''));

@@ -83,37 +83,58 @@ class EstadoPedidoService
         // NUNCA volvemos a hidratar con los del titular.
         try {
             $cliente = $conv->cliente;
-            $estadoVacio = empty($estado->productos) && empty($estado->cedula)
-                && empty($estado->nombre_cliente) && empty($estado->direccion);
-            $primeraVez = $estado->paso_actual === ConversacionPedidoEstado::PASO_INICIO;
 
-            // Solo hidratar si el estado es completamente nuevo Y aún en paso INICIO.
-            // Esto evita pisar datos que un operador esté capturando para un tercero.
-            if ($cliente && $estadoVacio && $primeraVez) {
-                $touched = false;
-                if (empty($estado->cedula) && !empty($cliente->cedula)) {
-                    $estado->cedula = $cliente->cedula;
-                    $touched = true;
-                }
-                if (empty($estado->email) && !empty($cliente->email)) {
-                    $estado->email = $cliente->email;
-                    $touched = true;
-                }
-                if (empty($estado->nombre_cliente) && !empty($cliente->nombre)
-                    && !str_contains((string) $cliente->nombre, '@')
-                    && strtolower((string) $cliente->nombre) !== 'cliente'
-                ) {
-                    $estado->nombre_cliente = $cliente->nombre;
-                    $touched = true;
-                }
-                if ($touched) {
-                    $estado->save();
-                    Log::info('🛡️ Estado hidratado con datos del cliente local', [
-                        'conv_id' => $conv->id,
-                        'cedula'  => $estado->cedula,
-                        'email'   => $estado->email,
-                        'nombre'  => $estado->nombre_cliente,
-                    ]);
+            // 🛡️ HIDRATACIÓN PERSISTENTE: si existe el cliente local registrado,
+            // SIEMPRE re-poblamos los campos que estén vacíos (cédula, nombre,
+            // email). NO requerimos estado vacío total — los datos del cliente
+            // son persistentes y deben re-hidratarse en CADA pedido. Antes
+            // requeríamos $estadoVacio lo cual significaba que en pedidos
+            // sucesivos (segundo, tercero) el bot pedía cédula otra vez.
+            //
+            // Guard: si en el ÚLTIMO mensaje del cliente menciona una cédula
+            // DISTINTA a la del titular, NO hidratamos (es pedido para tercero).
+            if ($cliente && !empty($cliente->cedula)) {
+                $cedulaTitular = trim((string) $cliente->cedula);
+                $clienteDioOtraCedula = false;
+                try {
+                    $ultMsg = \App\Models\MensajeWhatsapp::where('conversacion_id', $conv->id)
+                        ->where('rol', 'user')
+                        ->orderByDesc('id')
+                        ->value('contenido');
+                    if ($ultMsg && preg_match('/\b(\d{6,12})\b/', (string) $ultMsg, $m)) {
+                        $cedulaEnMsg = $m[1];
+                        if ($cedulaEnMsg !== $cedulaTitular && mb_strlen($cedulaEnMsg) >= 7) {
+                            $clienteDioOtraCedula = true;
+                        }
+                    }
+                } catch (\Throwable $e) { /* ignore */ }
+
+                if (!$clienteDioOtraCedula) {
+                    $touched = false;
+                    if (empty($estado->cedula)) {
+                        $estado->cedula = $cedulaTitular;
+                        $touched = true;
+                    }
+                    if (empty($estado->email) && !empty($cliente->email)) {
+                        $estado->email = $cliente->email;
+                        $touched = true;
+                    }
+                    if (empty($estado->nombre_cliente) && !empty($cliente->nombre)
+                        && !str_contains((string) $cliente->nombre, '@')
+                        && strtolower((string) $cliente->nombre) !== 'cliente'
+                    ) {
+                        $estado->nombre_cliente = $cliente->nombre;
+                        $touched = true;
+                    }
+                    if ($touched) {
+                        $estado->save();
+                        Log::info('🛡️ Estado hidratado con datos del cliente local', [
+                            'conv_id' => $conv->id,
+                            'cedula'  => $estado->cedula,
+                            'email'   => $estado->email,
+                            'nombre'  => $estado->nombre_cliente,
+                        ]);
+                    }
                 }
             }
         } catch (\Throwable $e) {
@@ -404,6 +425,60 @@ class EstadoPedidoService
         $estado->pedido_id     = $pedidoId;
         $estado->confirmado_at = now();
         $estado->save();
+    }
+
+    /**
+     * 🛒 Inicia un nuevo pedido tras uno ya confirmado.
+     * Limpia productos/dirección/método (datos por-pedido) PERO preserva
+     * cédula, nombre, email del cliente (datos del titular).
+     *
+     * Se llama cuando detectamos que el cliente quiere pedir algo NUEVO
+     * después de cerrar un pedido (ej. "quiero otro pedido", "ahora algo más").
+     */
+    public function reiniciarParaNuevoPedido(ConversacionWhatsapp $conv): void
+    {
+        $estado = $this->obtener($conv);
+        // Preservar datos del cliente
+        $cedula     = $estado->cedula;
+        $nombre     = $estado->nombre_cliente;
+        $email      = $estado->email;
+        $telefono   = $estado->telefono;
+        $clienteErp = $estado->cliente_existe_erp;
+        $datosErp   = $estado->datos_erp;
+        $validacs   = (array) ($estado->validaciones ?? []);
+
+        $estado->fill([
+            'paso_actual'        => ConversacionPedidoEstado::PASO_INICIO,
+            'productos'          => null,
+            'metodo_entrega'     => null,
+            'sede_id'            => null,
+            'direccion'          => null,
+            'barrio'             => null,
+            'ciudad'             => null,
+            'cobertura_validada' => false,
+            'distancia_km'       => null,
+            'costo_envio'        => null,
+            'metodo_pago'        => null,
+            'cupon_code'         => null,
+            'notas'              => null,
+            'pedido_id'          => null,
+            'confirmado_at'      => null,
+            // Restaurar datos del cliente
+            'cedula'             => $cedula,
+            'nombre_cliente'     => $nombre,
+            'email'              => $email,
+            'telefono'           => $telefono,
+            'cliente_existe_erp' => $clienteErp,
+            'datos_erp'          => $datosErp,
+            // Mantener validación de cliente_erp si la tenía
+            'validaciones'       => array_intersect_key($validacs, array_flip(['cliente_erp'])) ?: null,
+        ])->save();
+
+        Log::info('🛒 Estado reiniciado para nuevo pedido (preservando datos cliente)', [
+            'conv_id' => $conv->id,
+            'cedula'  => $cedula,
+            'nombre'  => $nombre,
+        ]);
     }
 
     /**
