@@ -283,6 +283,19 @@ class EstadoPedidoService
             if (isset($resultado['costo_envio'])) {
                 $estado->costo_envio = (float) $resultado['costo_envio'];
             }
+        } else {
+            // 🛡️ Fuera de cobertura → limpiar dirección/barrio/ciudad del estado.
+            //
+            // Razón: si dejamos los datos, cada mensaje siguiente vuelve a
+            // disparar el AgenteCoberturaService con la misma dirección
+            // y el cliente recibe el mismo mensaje "fuera de cobertura" en
+            // bucle. Al limpiar, el LLM le pide al cliente una NUEVA
+            // dirección o cambia a recoger en sede. Si el cliente quiere
+            // referenciar la anterior, queda en el historial de mensajes.
+            $estado->direccion          = null;
+            $estado->barrio             = null;
+            $estado->ciudad             = null;
+            $estado->cobertura_validada = false;
         }
 
         $estado->marcarValidacion('cobertura', (bool) ($resultado['cubierta'] ?? false));
