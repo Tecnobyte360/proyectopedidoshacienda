@@ -738,8 +738,20 @@ class EstadoPedidoService
         ) {
             $sedes = \App\Models\Sede::where('activa', true)->orderBy('id')->get();
 
+            // 🛡️ Auto-asignar sede si solo hay UNA activa (anti-alucinación)
+            //    No tiene sentido preguntar al cliente cuál sede si solo existe una.
+            if ($sedes->count() === 1) {
+                $estado->sede_id = $sedes->first()->id;
+                $cambio = true;
+                Log::info('🔍 Sede auto-asignada (única activa)', [
+                    'conv_id' => $conv->id,
+                    'sede_id' => $estado->sede_id,
+                    'nombre'  => $sedes->first()->nombre,
+                ]);
+            }
+
             // 3a. Si el mensaje es solo un número (1, 2, 3...) → posición en lista
-            if (preg_match('/^\s*(\d{1,2})\s*\.?\s*$/', $msg, $m)) {
+            elseif (preg_match('/^\s*(\d{1,2})\s*\.?\s*$/', $msg, $m)) {
                 $idx = (int) $m[1] - 1;
                 if (isset($sedes[$idx])) {
                     $estado->sede_id = $sedes[$idx]->id;
