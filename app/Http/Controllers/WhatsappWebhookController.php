@@ -451,10 +451,16 @@ class WhatsappWebhookController extends Controller
                     'reply' => mb_substr($reply, 0, 100),
                 ]);
                 try {
-                    $replyRecuperado = $this->autoEjecutarToolDePromesa($reply, $message, $conversacion, $connectionId, $from);
-                    if ($replyRecuperado) {
-                        $reply = $replyRecuperado;
-                        Log::info('✅ Promesa rota recuperada', ['from' => $from]);
+                    // 🛡️ Buscar la conversación por teléfono (scope local, no
+                    // depende de variables externas)
+                    $convPara = $convLoop ?? \App\Models\ConversacionWhatsapp::where('telefono_normalizado', $this->normalizarTelefono($from))
+                        ->orderByDesc('id')->first();
+                    if ($convPara) {
+                        $replyRecuperado = $this->autoEjecutarToolDePromesa($reply, $message, $convPara, $connectionId, $from);
+                        if ($replyRecuperado) {
+                            $reply = $replyRecuperado;
+                            Log::info('✅ Promesa rota recuperada', ['from' => $from]);
+                        }
                     }
                 } catch (\Throwable $e) {
                     Log::warning('No se pudo recuperar promesa rota: ' . $e->getMessage());
@@ -1318,27 +1324,29 @@ TXT;
         //   4. Dió datos finales → forzar confirmar_pedido si estado completo, sino required
         $forzarConfirmar    = $this->clientePidioGenerarPedido($message);
 
-        // 🗺️ Detección dinámica: si el mensaje menciona un LUGAR (Bello,
-        // Girardota, La Estrella, etc.) Y el contexto sugiere consulta de
-        // cobertura (acaba de hablar de domicilio/envío o el último bot
-        // respondió sobre cobertura), FORZAR validar_cobertura. Es 100%
-        // dinámico — no depende de cómo lo fraseó el cliente.
-        $lugarEnMsg = $this->extraerLugarDelMensaje($message);
-        $contextoEsCobertura = $lugarEnMsg && $this->contextoSugiereCobertura($conversacion, $message);
+        // 🛒 PRIMERO: ¿es pregunta de producto? Si sí, GANA sobre cobertura
+        // (evita falsos positivos como "tienes basa" → no es lugar, es
+        // producto, aunque "basa" parezca sustantivo propio).
+        $preguntaProducto = !$forzarConfirmar && $this->clientePreguntaProducto($message);
+
+        // 🗺️ Detección dinámica de cobertura — SOLO si NO es pregunta de
+        // producto. Si el mensaje menciona un LUGAR y el contexto sugiere
+        // consulta de cobertura, FORZAR validar_cobertura.
+        $lugarEnMsg = $preguntaProducto ? null : $this->extraerLugarDelMensaje($message);
+        $contextoEsCobertura = !$preguntaProducto && $lugarEnMsg && $this->contextoSugiereCobertura($conversacion, $message);
 
         // 🛡️ Caso especial: el bot acaba de pedir clarificación de ciudad
         // y el cliente está respondiendo. Si el cliente dice un lugar
         // CUALQUIERA (incluso sin frases típicas), DEBE disparar validación
         // — sino el LLM puede alucinar.
-        $respondiendoAClarificacionCiudad = $lugarEnMsg && $this->botPidioClarificacionCiudad($conversacion);
+        $respondiendoAClarificacionCiudad = !$preguntaProducto && $lugarEnMsg && $this->botPidioClarificacionCiudad($conversacion);
         if ($respondiendoAClarificacionCiudad) {
             $contextoEsCobertura = true;
         }
 
-        $preguntaProducto   = !$forzarConfirmar && !$contextoEsCobertura && $this->clientePreguntaProducto($message);
         $estadoActualBd     = app(\App\Services\EstadoPedidoService::class)->obtener($conversacion);
         $estadoYaCompleto   = $estadoActualBd && $estadoActualBd->estaCompleto() && !$estadoActualBd->confirmado_at;
-        $datosFinalesEnTexto= !$forzarConfirmar && !$contextoEsCobertura && $this->clienteDaDatosFinales($message);
+        $datosFinalesEnTexto= !$forzarConfirmar && !$contextoEsCobertura && !$preguntaProducto && $this->clienteDaDatosFinales($message);
 
         $toolChoiceInicial  = $toolChoicePorPaso;
         $razonForzado       = null;
