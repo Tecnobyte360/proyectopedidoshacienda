@@ -3147,6 +3147,122 @@ TXT;
     }
 
     /**
+     * 🛡️ ¿La ciudad dada tiene duplicados conocidos en otros departamentos
+     * de Colombia? Devuelve la lista de departamentos donde existe ese
+     * nombre, o array vacío si es única.
+     *
+     * Lista curada de los municipios colombianos más comunes con duplicados.
+     */
+    private function departamentosDeMunicipioAmbiguo(string $ciudad): array
+    {
+        $c = mb_strtolower(\Illuminate\Support\Str::ascii(trim($ciudad)));
+        if ($c === '') return [];
+
+        // Map ciudad → departamentos. Solo los más comunes/problemáticos.
+        // Si el array tiene >1 entrada, es ambigua.
+        $ambiguas = [
+            'barbosa'        => ['Antioquia', 'Santander'],
+            'san antonio'    => ['Antioquia (San Antonio de Prado)', 'Tolima', 'Cundinamarca', 'Huila', 'Valle del Cauca'],
+            'san carlos'     => ['Antioquia', 'Córdoba'],
+            'san francisco'  => ['Antioquia', 'Cundinamarca', 'Putumayo'],
+            'san jose'       => ['Caldas', 'Guaviare', 'Antioquia (varios)'],
+            'san juan'       => ['Boyacá', 'Cundinamarca', 'La Guajira', 'Cesar'],
+            'san luis'       => ['Antioquia', 'Tolima'],
+            'san martin'     => ['Cesar', 'Meta'],
+            'san miguel'     => ['Putumayo', 'Santander'],
+            'san pedro'      => ['Sucre', 'Valle del Cauca'],
+            'san vicente'    => ['Antioquia (de Chucurí)', 'Santander (Ferrer)', 'Caquetá', 'Cauca'],
+            'santa rosa'     => ['Risaralda (de Cabal)', 'Antioquia (de Osos)', 'Bolívar', 'Cauca'],
+            'santa barbara'  => ['Antioquia', 'Nariño', 'Santander'],
+            'santa catalina' => ['Bolívar', 'Antioquia (vereda)'],
+            'la estrella'    => ['Antioquia', 'Bolívar'],
+            'la union'       => ['Antioquia', 'Nariño', 'Valle del Cauca', 'Sucre'],
+            'la victoria'    => ['Boyacá', 'Valle del Cauca', 'Caldas'],
+            'la cruz'        => ['Nariño', 'Cauca'],
+            'la florida'     => ['Nariño', 'Valle'],
+            'la merced'      => ['Caldas', 'Cundinamarca'],
+            'la palma'       => ['Cundinamarca'],
+            'la plata'       => ['Huila'],
+            'belen'          => ['Boyacá', 'Caquetá', 'Nariño', 'Antioquia (de Bajirá)'],
+            'buenavista'     => ['Boyacá', 'Córdoba', 'Quindío', 'Sucre'],
+            'cabrera'        => ['Cundinamarca', 'Santander'],
+            'el carmen'      => ['Norte de Santander', 'Bolívar (de Bolívar)', 'Antioquia (de Viboral)'],
+            'el penol'       => ['Antioquia', 'Nariño'],
+            'el peñol'       => ['Antioquia', 'Nariño'],
+            'el tambo'       => ['Cauca', 'Nariño'],
+            'florencia'      => ['Caquetá', 'Cauca'],
+            'florida'        => ['Valle del Cauca'],
+            'granada'        => ['Antioquia', 'Cundinamarca', 'Meta'],
+            'guaduas'        => ['Cundinamarca'],
+            'guarne'         => ['Antioquia'],
+            'pueblo nuevo'   => ['Córdoba', 'Cundinamarca'],
+            'salamina'       => ['Caldas', 'Magdalena'],
+            'silvania'       => ['Cundinamarca'],
+            'soata'          => ['Boyacá'],
+            'sucre'          => ['Cauca', 'Santander', 'Sucre'],
+            'tame'           => ['Arauca'],
+            'tibu'           => ['Norte de Santander'],
+            'turbaco'        => ['Bolívar'],
+            'turbo'          => ['Antioquia'],
+            'venecia'        => ['Antioquia', 'Cundinamarca'],
+            'yacopi'         => ['Cundinamarca'],
+            'yopal'          => ['Casanare'],
+            'andes'          => ['Antioquia'],
+            'apartado'       => ['Antioquia'],
+            'armenia'        => ['Quindío', 'Antioquia'],
+            'caicedonia'     => ['Valle del Cauca'],
+        ];
+
+        // Quitar tildes y normalizar
+        $key = preg_replace('/\s+/', ' ', $c);
+        if (isset($ambiguas[$key]) && count($ambiguas[$key]) > 1) {
+            return $ambiguas[$key];
+        }
+        return [];
+    }
+
+    /**
+     * 🛡️ ¿El último mensaje del cliente contiene un departamento explícito?
+     * (ej "Barbosa Antioquia", "San Antonio Tolima").
+     */
+    private function mensajeContieneDepartamento(?string $telefonoCliente): bool
+    {
+        if (empty($telefonoCliente)) return false;
+        try {
+            $tenantId = app(\App\Services\TenantManager::class)->id();
+            if (!$tenantId) return false;
+            $tel = preg_replace('/\D+/', '', $telefonoCliente);
+            $conv = \App\Models\ConversacionWhatsapp::where('tenant_id', $tenantId)
+                ->where('telefono_normalizado', $tel)
+                ->orderByDesc('id')
+                ->first();
+            if (!$conv) return false;
+
+            $ult = \App\Models\MensajeWhatsapp::where('conversacion_id', $conv->id)
+                ->where('rol', 'user')
+                ->orderByDesc('id')
+                ->value('contenido');
+            if (!$ult) return false;
+
+            $n = mb_strtolower(\Illuminate\Support\Str::ascii((string) $ult));
+            $deptos = [
+                'antioquia', 'cundinamarca', 'tolima', 'huila', 'valle', 'cauca', 'narino', 'nariño',
+                'santander', 'norte de santander', 'cordoba', 'córdoba', 'sucre', 'bolivar', 'bolívar',
+                'magdalena', 'cesar', 'la guajira', 'guajira', 'atlantico', 'atlántico', 'choco', 'chocó',
+                'caldas', 'risaralda', 'quindio', 'quindío', 'meta', 'arauca', 'casanare', 'putumayo',
+                'caqueta', 'caquetá', 'amazonas', 'guaviare', 'guainia', 'guainía', 'vaupes', 'vaupés',
+                'vichada', 'boyaca', 'boyacá', 'san andres', 'san andrés',
+            ];
+            foreach ($deptos as $d) {
+                if (str_contains($n, $d)) return true;
+            }
+            return false;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
      * 🛡️ Distancia mínima en KM desde un punto a CUALQUIERA de las sedes
      * activas del tenant (usando haversine). Sirve para detectar si Google
      * geocodificó a otra parte del país (ambigüedad de nombres).
@@ -5656,6 +5772,31 @@ TXT;
           // que confunden a los geocoders. Mantener solo vía + número + barrio.
           $direccionLimpia = $this->limpiarDireccionParaGeocoding($direccion);
 
+          // 🛡️ CHECK PREVIO: si la ciudad pasada es de las que tienen duplicados
+          // en varios departamentos de Colombia (Barbosa, San Antonio, Santa Rosa,
+          // etc.) Y el cliente no especificó departamento → pedir clarificación
+          // ANTES de geocodificar para evitar adivinanzas.
+          $deptosDuplicados = $this->departamentosDeMunicipioAmbiguo($ciudad ?: '');
+          if (!empty($deptosDuplicados) && !$this->mensajeContieneDepartamento($telefonoCliente)) {
+              $listaDeptos = implode(', ', $deptosDuplicados);
+              Log::info('🛡️ Municipio con duplicados — pidiendo departamento', [
+                  'ciudad'        => $ciudad,
+                  'departamentos' => $deptosDuplicados,
+              ]);
+              return [
+                  'cubierta'              => false,
+                  'requiere_clarificacion'=> true,
+                  'mensaje_para_cliente'  => "🤔 *{$ciudad}* existe en varios departamentos: *{$listaDeptos}*.\n\n"
+                      . "¿En qué *departamento* queda exactamente?",
+                  'instruccion_para_bot'  => "🛑 La ciudad '{$ciudad}' tiene municipios con el mismo nombre en "
+                      . "varios departamentos ({$listaDeptos}). NO afirmes cubierto/fuera. Pide al cliente "
+                      . "que indique el departamento. Después llama validar_cobertura otra vez con "
+                      . "ciudad='{$ciudad}, [Departamento]'.",
+                  'mensaje_sugerido'      => "Hay {$ciudad} en varios departamentos — pedir confirmación.",
+                  'metodo_usado'          => 'pedir_clarificacion_departamento_municipio_ambiguo',
+              ];
+          }
+
           $geocode = app(GeocodingService::class)->geocodificar(
               $direccionLimpia ?: $direccion ?: '',
               $barrio,
@@ -5664,8 +5805,7 @@ TXT;
 
           if ($geocode) {
               // 🛡️ SANITY CHECK CROSS-DEPARTAMENTO: hay ciudades con el mismo
-              // nombre en varios departamentos de Colombia (ej "San Antonio"
-              // en Antioquia, Tolima, Cundinamarca, Valle). Si Google
+              // nombre en varios departamentos de Colombia. Si Google
               // geocodificó muy lejos de TODAS nuestras sedes (>80 km), es
               // muy probable que sea la ciudad equivocada — pedir confirmación
               // al cliente en vez de afirmar "fuera de cobertura".
