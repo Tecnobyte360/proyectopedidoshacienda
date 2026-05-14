@@ -1297,11 +1297,10 @@ TXT;
         //   3. Preguntó por producto → forzar buscar_productos
         //   4. Dió datos finales → forzar confirmar_pedido si estado completo, sino required
         $forzarConfirmar    = $this->clientePidioGenerarPedido($message);
-        $consultaCoberturaLugar = !$forzarConfirmar && $this->clienteConsultaCoberturaDeLugar($message);
-        $preguntaProducto   = !$forzarConfirmar && !$consultaCoberturaLugar && $this->clientePreguntaProducto($message);
+        $preguntaProducto   = !$forzarConfirmar && $this->clientePreguntaProducto($message);
         $estadoActualBd     = app(\App\Services\EstadoPedidoService::class)->obtener($conversacion);
         $estadoYaCompleto   = $estadoActualBd && $estadoActualBd->estaCompleto() && !$estadoActualBd->confirmado_at;
-        $datosFinalesEnTexto= !$forzarConfirmar && !$consultaCoberturaLugar && $this->clienteDaDatosFinales($message);
+        $datosFinalesEnTexto= !$forzarConfirmar && $this->clienteDaDatosFinales($message);
 
         $toolChoiceInicial  = $toolChoicePorPaso;
         $razonForzado       = null;
@@ -1360,23 +1359,6 @@ TXT;
             $messages[] = [
                 'role' => 'system',
                 'content' => "🚨 El estado del pedido está COMPLETO y el cliente acaba de dar la confirmación final. INVOCA `confirmar_pedido` AHORA con los datos del estado.",
-            ];
-        } elseif ($consultaCoberturaLugar) {
-            // ⭐ Cliente pregunta '¿cubren X?', '¿llegan a Y?' → forzar validar_cobertura
-            // con el lugar extraído. NUNCA inferir de zonas_cobertura (legacy).
-            $lugar = $this->extraerLugarDeConsultaCobertura($message);
-            $toolChoiceInicial = ['type' => 'function', 'function' => ['name' => 'validar_cobertura']];
-            $allTools = $this->getToolsDefinicion();
-            $valTool = collect($allTools)->first(fn ($t) => ($t['function']['name'] ?? '') === 'validar_cobertura');
-            if ($valTool) $toolsFiltradas = [$valTool];
-            $razonForzado = 'cliente_consulta_cobertura_lugar';
-            $messages[] = [
-                'role' => 'system',
-                'content' => "🚨 El cliente preguntó si cubrimos un lugar específico. "
-                    . "INVOCA `validar_cobertura(direccion='{$lugar}', ciudad='{$lugar}')` AHORA. "
-                    . "NO llames `consultar_zonas_cobertura` (esa tool no hace point-in-polygon). "
-                    . "NO respondas texto antes de la tool. La tool hará el test real contra "
-                    . "los polígonos dibujados de las sedes y te dirá si está cubierto.",
             ];
         } elseif ($preguntaProducto) {
             // Forzar buscar_productos cuando el cliente menciona producto/cantidad
@@ -1592,10 +1574,36 @@ TXT;
                         })(),
 
                         // 🗺️ Zonas de cobertura AGRUPADAS por sede (cada sede tiene sus zonas)
-                        'consultar_zonas_cobertura' => (function () {
+                        'consultar_zonas_cobertura' => (function () use ($from, $message) {
                             $sedes = \App\Models\Sede::where('activa', true)->get();
                             $zonas = \App\Models\ZonaCobertura::where('activa', true)
                                 ->orderBy('orden')->orderBy('nombre')->get();
+
+                            // 🗺️ Dinámico: si el mensaje actual del cliente menciona un lugar
+                            //    (ej "cubren Girardota?"), validamos AUTOMÁTICAMENTE ese lugar
+                            //    contra los polígonos reales y devolvemos la respuesta lista.
+                            //    Así el LLM no tiene que adivinar qué tool usar.
+                            $lugarMencionado = $this->extraerLugarDelMensaje($message);
+                            $validacionAutomatica = null;
+                            if ($lugarMencionado !== null) {
+                                try {
+                                    $sedeIdAuto = $this->obtenerSedeIdDesdeConexion($connectionId ?? null);
+                                    $valM = new \ReflectionMethod($this, 'validarCoberturaDireccion');
+                                    $valM->setAccessible(true);
+                                    $r = $valM->invoke($this, $lugarMencionado, '', $lugarMencionado, $sedeIdAuto);
+                                    $validacionAutomatica = [
+                                        'lugar_detectado' => $lugarMencionado,
+                                        'cubierto'        => (bool) ($r['cubierta'] ?? false),
+                                        'sede'            => $r['sede_sugerida'] ?? null,
+                                        'distancia_km'    => $r['distancia_km'] ?? null,
+                                        'costo_envio'     => $r['costo_envio'] ?? null,
+                                        'tiempo_min'      => $r['tiempo_min'] ?? null,
+                                        'mensaje_sugerido'=> $r['mensaje_sugerido'] ?? null,
+                                    ];
+                                } catch (\Throwable $e) {
+                                    Log::warning('Validación auto en consultar_zonas_cobertura falló: ' . $e->getMessage());
+                                }
+                            }
 
                             $sedesPayload = $sedes->map(function ($s) use ($zonas) {
                                 $zonasSede = $zonas->filter(fn ($z) => $z->sede_id === $s->id || $z->sede_id === null);
@@ -1647,25 +1655,32 @@ TXT;
                                 ];
                             })->values()->all();
 
-                            return [
+                            $resp = [
                                 'sedes' => $sedesPayload,
                                 'instruccion_para_bot' =>
-                                    "🛑 REGLA CRÍTICA — Esta tool NO sirve para responder "
-                                    . "'¿cubrimos X municipio?'.\n\n"
-                                    . "Para esa pregunta SIEMPRE usa `validar_cobertura(direccion='X', ciudad='X')`. "
-                                    . "Esta tool hace el test punto-en-polígono REAL contra los polígonos "
-                                    . "dibujados de la sede.\n\n"
-                                    . "Ejemplos:\n"
-                                    . "  • '¿llegan a Girardota?' → `validar_cobertura(direccion='Girardota', ciudad='Girardota')`\n"
-                                    . "  • '¿cubren Medellín?'    → `validar_cobertura(direccion='Medellín', ciudad='Medellín')`\n"
-                                    . "  • '¿a Bello?'            → `validar_cobertura(direccion='Bello', ciudad='Bello')`\n\n"
-                                    . "PROHIBIDO inferir 'no cubrimos X' del campo `zonas` (es legacy y suele estar vacío). "
-                                    . "Si `tiene_poligonos_cobertura=true`, esa sede SÍ tiene cobertura dibujada — "
-                                    . "valida cualquier dirección específica con `validar_cobertura`.\n\n"
-                                    . "Esta tool sirve para mostrar al cliente:\n"
-                                    . "  - Costo de envío, tiempo, pedido mínimo POR SEDE.\n"
-                                    . "  - Lista de barrios con tarifa especial (campo zonas).",
+                                    "Esta tool muestra costos/tiempos/mínimos de envío POR SEDE y "
+                                    . "barrios con tarifa especial (campo `zonas`).\n\n"
+                                    . "🛑 Para '¿cubren X municipio?' / '¿llegan a Y?' siempre usa "
+                                    . "`validar_cobertura(direccion='X', ciudad='X')` — esa hace el "
+                                    . "test punto-en-polígono real.\n\n"
+                                    . "PROHIBIDO concluir 'no cubrimos X' solo porque `zonas` esté vacío. "
+                                    . "Si `tiene_poligonos_cobertura=true`, esa sede tiene cobertura "
+                                    . "dibujada en el mapa — valida con `validar_cobertura`.",
                             ];
+
+                            // Si detectamos un lugar en el mensaje y lo validamos automáticamente,
+                            // incluimos el resultado para que el LLM lo use directamente sin
+                            // tener que hacer otra llamada.
+                            if ($validacionAutomatica) {
+                                $resp['validacion_automatica'] = $validacionAutomatica;
+                                $resp['nota_validacion'] = $validacionAutomatica['cubierto']
+                                    ? "✓ DETECTAMOS que el cliente preguntó por '{$validacionAutomatica['lugar_detectado']}' "
+                                      . "y SÍ está cubierto. Usa estos datos en tu respuesta. NO llames validar_cobertura otra vez."
+                                    : "✗ DETECTAMOS que el cliente preguntó por '{$validacionAutomatica['lugar_detectado']}' "
+                                      . "y NO está cubierto. Sugiere recoger en sede u otra dirección. NO inventes cobertura.";
+                            }
+
+                            return $resp;
                         })(),
 
                         // 🎁 Promociones VIGENTES + AGRUPADAS POR SEDE (multi-tenant automático)
@@ -3009,78 +3024,95 @@ TXT;
      * LLM no invente "sí tengo X" sin verificar BD.
      */
     /**
-     * 🗺️ Detecta si el cliente está preguntando si cubrimos un lugar específico.
-     * Ej: "¿cubren Girardota?", "¿llegan a Bello?", "tienes envío a Medellín?",
-     *     "ya tienes cobertura en Itagüí?", "¿hay domicilio a Sabaneta?"
+     * 🗺️ Extrae el nombre de un lugar (municipio/barrio/ciudad) mencionado
+     * en el mensaje del cliente. Devuelve null si no detecta lugar.
+     *
+     * Estrategia dinámica (no regex de patrones de pregunta):
+     *  1. Quitar palabras funcionales comunes (artículos, verbos, signos).
+     *  2. Identificar sustantivos propios (palabras capitalizadas o conocidas).
+     *  3. Devolver el candidato más probable.
+     *
+     * El LLM ya sabe que es pregunta de cobertura — esta función solo
+     * extrae el LUGAR para que la tool lo pueda validar.
      */
-    private function clienteConsultaCoberturaDeLugar(string $mensaje): bool
-    {
-        $m = mb_strtolower(\Illuminate\Support\Str::ascii(trim($mensaje)));
-        if ($m === '') return false;
-
-        // Patrones de pregunta de cobertura por lugar
-        $patrones = [
-            // "¿cubren X?", "¿cubres X?", "¿cubre X?"
-            '/\b(cubren|cubres|cubre|cubris)\s+\w+/iu',
-            // "¿llegan a X?", "¿llegas a X?"
-            '/\b(llegan|llegas|llega)\s+a\s+\w+/iu',
-            // "¿tienen envío/cobertura/domicilio a X?", "tienes X?"
-            '/\b(tienen|tienes|tiene)\s+(env[ií]o|domicilio|cobertura|reparto|despacho)s?\s+(a|en|hasta|para)\s+\w+/iu',
-            // "¿hay envío/cobertura/domicilio a X?"
-            '/\b(hay)\s+(env[ií]o|domicilio|cobertura|reparto|despacho)s?\s+(a|en|hasta|para)\s+\w+/iu',
-            // "ya tienen/tienes cobertura en X?"
-            '/\bya\s+(tienen|tienes|hay)\s+(cobertura|env[ií]o|domicilio|reparto|despacho)s?\s+(a|en|hasta|para)?\s*\w+/iu',
-            // "¿reparten a X?", "¿envían a X?"
-            '/\b(reparten|repartes|env[ií]an|env[ií]as)\s+(a|en|hasta|para)\s+\w+/iu',
-            // "¿llevan a X?", "¿llevas a X?"
-            '/\b(llevan|llevas|lleva)\s+(a|hasta)\s+\w+/iu',
-            // "cobertura en X", "envío a X"
-            '/\b(cobertura|domicilio|env[ií]o|reparto|despacho)s?\s+(en|a|hasta|para)\s+[A-ZÁÉÍÓÚ]\w+/u',
-        ];
-        foreach ($patrones as $p) {
-            if (preg_match($p, $m)) return true;
-        }
-        return false;
-    }
-
-    /**
-     * 🗺️ Extrae el nombre del lugar de una consulta de cobertura.
-     * Ej: "¿cubren Girardota?" → "Girardota"
-     *     "tienes envío a Bello?" → "Bello"
-     */
-    private function extraerLugarDeConsultaCobertura(string $mensaje): string
+    private function extraerLugarDelMensaje(string $mensaje): ?string
     {
         $m = trim($mensaje);
+        if ($m === '') return null;
 
-        // Limpiar signos y puntuación final
-        $m = preg_replace('/[¿?¡!.,;:]/u', ' ', $m);
+        // Quitar signos
+        $m = preg_replace('/[¿?¡!.,;:()"\']/u', ' ', $m);
         $m = preg_replace('/\s+/u', ' ', trim($m));
 
-        // Patrones de extracción — toman el último sustantivo propio o palabra >2 chars
-        $patrones = [
-            '/(?:cubren|cubres|cubre|llegan|llegas|llega|tienen|tienes|tiene|hay|reparten|repartes|env[ií]an|env[ií]as|llevan|llevas|lleva)\s+(?:env[ií]o|domicilio|cobertura|reparto|despacho)?s?\s*(?:a|en|hasta|para|hasta\s+a)?\s*([A-ZÁÉÍÓÚa-záéíóúñ][\wáéíóúñ\s]{2,40})/iu',
-            '/(?:cobertura|domicilio|env[ií]o|reparto|despacho)s?\s+(?:en|a|hasta|para)\s+([A-ZÁÉÍÓÚa-záéíóúñ][\wáéíóúñ\s]{2,40})/iu',
-            '/ya\s+(?:tienen|tienes|hay)\s+(?:cobertura|env[ií]o|domicilio|reparto)s?\s+(?:en|a|hasta|para)?\s*([A-ZÁÉÍÓÚa-záéíóúñ][\wáéíóúñ\s]{2,40})/iu',
+        // Palabras funcionales que NO son lugares (preposiciones, verbos,
+        // muletillas). Sin esto "envío" o "domicilio" podrían capturarse.
+        $stop = [
+            // Artículos / preposiciones
+            'a','de','del','la','el','los','las','un','una','y','o','en','por','para','con','si','no','sin','que',
+            // Verbos / preguntas comunes
+            'cubren','cubres','cubre','llegan','llegas','llega','tienen','tienes','tiene','hay','reparten',
+            'envian','enviar','envio','envías','manda','mandan','llevan','lleva','llevas','quiero','necesito',
+            'puedes','puede','puedo','dame','dale','listo','vamos','dime','mira','ya','también','tambien',
+            // Sustantivos NO-lugar comunes
+            'envio','envío','envios','envíos','domicilio','domicilios','cobertura','reparto','despacho',
+            'pedido','servicio','zona','area','área','barrio','ciudad','municipio','direccion','dirección',
+            'casa','hogar','aqui','aquí','alla','allá','aca','acá','mi','tu','su','nuestro',
+            // Saludos
+            'hola','holaa','hi','hey','buenos','buenas','dias','días','tardes','noches','dia','día',
+            'gracias','muchas','mil','por','favor','ok','okay','dale','perfecto','genial','bueno',
+            // Otros funcionales
+            'es','soy','son','estoy','está','esta','está','están','están','estamos','vivo','vive','queda',
         ];
-        foreach ($patrones as $p) {
-            if (preg_match($p, $m, $match)) {
-                $lugar = trim($match[1]);
-                // Quitar palabras de borde que no son lugar
-                $lugar = preg_replace('/\b(por\s+favor|gracias|si|no|ok)\b/iu', '', $lugar);
-                $lugar = trim($lugar);
-                if (mb_strlen($lugar) >= 3) {
-                    // Capitalizar primera letra de cada palabra
-                    return mb_convert_case($lugar, MB_CASE_TITLE, 'UTF-8');
-                }
+
+        // Tokenizar
+        $tokens = preg_split('/\s+/u', $m);
+        if (!$tokens) return null;
+
+        // Filtrar tokens que NO son stop-words y tienen ≥3 letras
+        $candidatos = [];
+        $idx = 0;
+        foreach ($tokens as $t) {
+            $tNorm = mb_strtolower(\Illuminate\Support\Str::ascii($t));
+            $tNorm = trim($tNorm);
+            if ($tNorm === '' || in_array($tNorm, $stop, true)) {
+                $idx++;
+                continue;
+            }
+            // Descartar números y palabras de <3 caracteres
+            if (mb_strlen($tNorm) < 3) { $idx++; continue; }
+            if (preg_match('/^\d+$/', $tNorm)) { $idx++; continue; }
+
+            $candidatos[] = ['token' => $t, 'norm' => $tNorm, 'pos' => $idx];
+            $idx++;
+        }
+
+        if (empty($candidatos)) return null;
+
+        // Heurística: si hay UN solo candidato, ese es el lugar.
+        // Si hay varios, preferir el último (típicamente el lugar va al final).
+        // Combinar tokens consecutivos para captar "la estrella", "puerto berrio".
+        $resultado = null;
+        $ultimo = end($candidatos);
+        $resultado = $ultimo['token'];
+
+        // ¿El anterior está adyacente y también es candidato? Concatenar (ej "La Estrella")
+        $idxFinal = $ultimo['pos'];
+        for ($i = count($candidatos) - 2; $i >= 0; $i--) {
+            if ($candidatos[$i]['pos'] === $idxFinal - 1) {
+                $resultado = $candidatos[$i]['token'] . ' ' . $resultado;
+                $idxFinal = $candidatos[$i]['pos'];
+            } else {
+                break;
             }
         }
 
-        // Fallback: última palabra capitalizada
-        if (preg_match('/([A-ZÁÉÍÓÚ][a-záéíóúñ]{3,})/u', $m, $match)) {
-            return $match[1];
-        }
+        // Capitalizar nombre
+        $resultado = mb_convert_case(trim($resultado), MB_CASE_TITLE, 'UTF-8');
 
-        return $m;
+        // Sanity check: longitud razonable
+        if (mb_strlen($resultado) < 3 || mb_strlen($resultado) > 60) return null;
+
+        return $resultado;
     }
 
     private function clientePreguntaProducto(string $mensaje): bool
