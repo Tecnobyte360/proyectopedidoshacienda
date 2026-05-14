@@ -681,24 +681,41 @@
 
                                 {{-- Cliente --}}
                                 <td class="px-3 py-3.5 align-middle">
-                                    @php $esRecogerRow = ($pedido->tipo_entrega ?? 'domicilio') === 'recoger'; @endphp
+                                    @php
+                                        $esRecogerRow = ($pedido->tipo_entrega ?? 'domicilio') === 'recoger';
+                                        $horaEntregaFmt = $pedido->hora_entrega
+                                            ? \Illuminate\Support\Carbon::parse($pedido->hora_entrega)->format('h:i a')
+                                            : null;
+                                    @endphp
                                     <div class="flex items-center gap-2.5">
                                         <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-xs font-bold text-white">
                                             {{ $iniciales ?: 'CL' }}
                                         </div>
-                                        <div class="min-w-0 max-w-[180px]">
+                                        <div class="min-w-0 max-w-[200px]">
                                             <div class="truncate font-semibold text-slate-900 text-sm">{{ $pedido->cliente_nombre }}</div>
-                                            <div class="text-[11px] text-slate-500 truncate flex items-center gap-1">
+                                            <div class="text-[11px] text-slate-500 truncate flex items-center gap-1 flex-wrap">
                                                 @if($esRecogerRow)
                                                     <span class="inline-flex items-center gap-1 rounded-md bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-700 whitespace-nowrap"
-                                                          title="Cliente recoge en sede{{ $pedido->hora_entrega ? ' · '.\Illuminate\Support\Carbon::parse($pedido->hora_entrega)->format('h:i a') : '' }}">
+                                                          title="Cliente recoge en sede{{ $horaEntregaFmt ? ' a las '.$horaEntregaFmt : '' }}">
                                                         <i class="fa-solid fa-store text-[8px]"></i>RECOGE
                                                     </span>
+                                                    @if($horaEntregaFmt)
+                                                        <span class="inline-flex items-center gap-1 rounded-md bg-amber-50 border border-amber-200 px-1.5 py-0.5 text-[9px] font-bold text-amber-700 whitespace-nowrap"
+                                                              title="Hora de recogida">
+                                                            <i class="fa-regular fa-clock text-[8px]"></i>{{ $horaEntregaFmt }}
+                                                        </span>
+                                                    @endif
                                                 @else
                                                     <span class="inline-flex items-center gap-1 rounded-md bg-sky-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-sky-700 whitespace-nowrap"
                                                           title="Despacho a domicilio">
                                                         <i class="fa-solid fa-motorcycle text-[8px]"></i>DESPACHO
                                                     </span>
+                                                    @if($horaEntregaFmt)
+                                                        <span class="inline-flex items-center gap-1 rounded-md bg-sky-50 border border-sky-200 px-1.5 py-0.5 text-[9px] font-bold text-sky-700 whitespace-nowrap"
+                                                              title="Hora estimada de entrega">
+                                                            <i class="fa-regular fa-clock text-[8px]"></i>{{ $horaEntregaFmt }}
+                                                        </span>
+                                                    @endif
                                                 @endif
                                                 <span class="truncate">· {{ $pedido->created_at?->diffForHumans() }}</span>
                                             </div>
@@ -742,11 +759,19 @@
                                 {{-- Zona / Sede (visible desde lg) --}}
                                 <td class="px-3 py-3.5 align-middle">
                                     @if($esRecogerRow)
-                                        <span class="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700 whitespace-nowrap"
-                                              title="Cliente recoge en sede">
-                                            <i class="fa-solid fa-store text-[10px]"></i>
-                                            {{ $pedido->sede?->nombre ?? 'Sede' }}
-                                        </span>
+                                        <div class="flex flex-col gap-1">
+                                            <span class="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700 whitespace-nowrap w-fit"
+                                                  title="Cliente recoge en sede">
+                                                <i class="fa-solid fa-store text-[10px]"></i>
+                                                {{ $pedido->sede?->nombre ?? 'Sede' }}
+                                            </span>
+                                            @if($horaEntregaFmt)
+                                                <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 whitespace-nowrap">
+                                                    <i class="fa-regular fa-clock text-[10px]"></i>
+                                                    Recoge {{ $horaEntregaFmt }}
+                                                </span>
+                                            @endif
+                                        </div>
                                     @elseif($pedido->zonaCobertura)
                                         <span class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 whitespace-nowrap">
                                             <span class="h-2 w-2 rounded-full" style="background-color: {{ $pedido->zonaCobertura->color }}"></span>
