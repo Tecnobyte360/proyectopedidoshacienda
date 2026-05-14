@@ -375,7 +375,90 @@ class AnthropicService
             array_unshift($out, ['role' => 'user', 'content' => 'Hola']);
         }
 
+        // 🛡️ FIX RAÍZ: garantizar que cada `tool_use` tenga su `tool_result` INMEDIATO.
+        // Anthropic exige: si un assistant message tiene N tool_use blocks, el
+        // siguiente user message DEBE contener N tool_result blocks (uno por cada id).
+        // Si falta alguno, agregamos un tool_result placeholder para evitar el 400.
+        $out = $this->garantizarToolResults($out);
+
         return [implode("\n\n", $systems), $out];
+    }
+
+    /**
+     * 🛡️ Recorre los mensajes ya traducidos a formato Anthropic y, para cada
+     * assistant con uno o más `tool_use`, verifica que el mensaje siguiente sea
+     * un user con tool_result blocks para TODOS los ids. Si falta alguno, lo
+     * inserta como tool_result vacío para que Anthropic no rechace con 400.
+     */
+    private function garantizarToolResults(array $messages): array
+    {
+        $count = count($messages);
+
+        for ($i = 0; $i < $count; $i++) {
+            $msg = $messages[$i];
+
+            if (($msg['role'] ?? '') !== 'assistant') continue;
+            $blocks = $msg['content'] ?? [];
+            if (!is_array($blocks)) continue;
+
+            $toolUseIds = [];
+            foreach ($blocks as $b) {
+                if (is_array($b) && ($b['type'] ?? '') === 'tool_use' && !empty($b['id'])) {
+                    $toolUseIds[] = $b['id'];
+                }
+            }
+            if (empty($toolUseIds)) continue;
+
+            $next = $messages[$i + 1] ?? null;
+            $nextEsUserConToolResult = $next
+                && ($next['role'] ?? '') === 'user'
+                && is_array($next['content'] ?? null)
+                && collect($next['content'])->contains(fn ($b) => is_array($b) && ($b['type'] ?? '') === 'tool_result');
+
+            $existentes = [];
+            if ($nextEsUserConToolResult) {
+                foreach ($next['content'] as $b) {
+                    if (is_array($b) && ($b['type'] ?? '') === 'tool_result' && !empty($b['tool_use_id'])) {
+                        $existentes[] = $b['tool_use_id'];
+                    }
+                }
+            }
+
+            $faltantes = array_values(array_diff($toolUseIds, $existentes));
+            if (empty($faltantes)) continue;
+
+            \Illuminate\Support\Facades\Log::warning('🛡️ Insertando tool_result placeholder para tool_use huérfanos', [
+                'tool_use_ids_total'     => $toolUseIds,
+                'tool_use_ids_faltantes' => $faltantes,
+                'tenia_user_siguiente'   => $nextEsUserConToolResult,
+            ]);
+
+            if ($nextEsUserConToolResult) {
+                $contentNext = $messages[$i + 1]['content'];
+                foreach ($faltantes as $idFalt) {
+                    $contentNext[] = [
+                        'type'        => 'tool_result',
+                        'tool_use_id' => $idFalt,
+                        'content'     => '(sin resultado disponible)',
+                    ];
+                }
+                $messages[$i + 1]['content'] = $contentNext;
+            } else {
+                // Insertar un nuevo user con tool_results dummy justo después del assistant
+                $nuevoUser = [
+                    'role'    => 'user',
+                    'content' => array_map(fn ($id) => [
+                        'type'        => 'tool_result',
+                        'tool_use_id' => $id,
+                        'content'     => '(sin resultado disponible)',
+                    ], $toolUseIds),
+                ];
+                array_splice($messages, $i + 1, 0, [$nuevoUser]);
+                $count++;
+            }
+        }
+
+        return $messages;
     }
 
     /**

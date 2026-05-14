@@ -2119,6 +2119,29 @@ TXT;
             }
 
             // Respuesta de la tool para OpenAI
+            // 🛡️ Si el LLM hizo MÚLTIPLES tool_calls en este turno, debemos agregar
+            // un tool message por CADA uno, no solo el primero — si no, Anthropic
+            // rechaza con 400 "tool_use sin tool_result inmediato".
+            $toolReplies = [];
+            foreach ($toolCalls as $idx => $tc) {
+                $nombreTool = $tc['function']['name'] ?? 'tool';
+                if ($idx === 0 && $nombreTool === 'verificar_cliente_erp') {
+                    $contentTool = json_encode($resultado, JSON_UNESCAPED_UNICODE);
+                } else {
+                    // Tool no manejada por este branch — placeholder para mantener el contrato
+                    $contentTool = json_encode([
+                        'omitido' => true,
+                        'razon'   => 'Esta tool no se procesó en este turno. Llámala de nuevo si la necesitas.',
+                    ], JSON_UNESCAPED_UNICODE);
+                }
+                $toolReplies[] = [
+                    'role'         => 'tool',
+                    'tool_call_id' => $tc['id'] ?? ('call_' . $idx),
+                    'name'         => $nombreTool,
+                    'content'      => $contentTool,
+                ];
+            }
+
             $toolResponseMessages = array_merge(
                 [['role' => 'system', 'content' => $systemPrompt]],
                 $conversationHistory,
@@ -2127,12 +2150,7 @@ TXT;
                     'content'    => null,
                     'tool_calls' => $toolCalls,
                 ]],
-                [[
-                    'role'         => 'tool',
-                    'tool_call_id' => $toolCalls[0]['id'] ?? 'call_1',
-                    'name'         => 'verificar_cliente_erp',
-                    'content'      => json_encode($resultado, JSON_UNESCAPED_UNICODE),
-                ]]
+                $toolReplies
             );
 
             $followUp = $this->llamarOpenAI($toolResponseMessages);
