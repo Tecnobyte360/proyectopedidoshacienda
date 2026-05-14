@@ -374,14 +374,22 @@
                 </div>
 
                 {{-- 🚚 Filtros secundarios (tipo entrega + zona) - en su propia fila para no competir con los tabs --}}
+                @php
+                    // Contadores por tipo de entrega — sobre TODOS los pedidos del tenant
+                    // (no respetan el filtro de tipoEntrega para que muestre el total global de cada uno)
+                    $todosLosPedidos = $this->pedidos;
+                    $totalAll        = $todosLosPedidos->count();
+                    $totalDomicilio  = $todosLosPedidos->filter(fn ($p) => ($p->tipo_entrega ?? 'domicilio') === 'domicilio')->count();
+                    $totalRecoger    = $todosLosPedidos->filter(fn ($p) => ($p->tipo_entrega ?? 'domicilio') === 'recoger')->count();
+                @endphp
                 <div class="flex flex-col sm:flex-row gap-2 lg:basis-full lg:order-3 lg:mt-2">
-                    <div class="relative flex-1 min-w-0 sm:max-w-[180px]">
+                    <div class="relative flex-1 min-w-0 sm:max-w-[260px]">
                         <i class="fa-solid fa-truck absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none"></i>
                         <select wire:model.live="tipoEntrega"
                                 class="h-10 w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-9 text-sm font-medium text-slate-700 focus:border-brand focus:bg-white focus:ring-2 focus:ring-brand/20">
-                            <option value="todos">Todos</option>
-                            <option value="domicilio">🛵 Despacho</option>
-                            <option value="recoger">🏪 Recoge en sede</option>
+                            <option value="todos">Todos ({{ $totalAll }})</option>
+                            <option value="domicilio">🛵 Despacho ({{ $totalDomicilio }})</option>
+                            <option value="recoger">🏪 Recoge en sede ({{ $totalRecoger }})</option>
                         </select>
                         <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none"></i>
                     </div>
@@ -402,11 +410,45 @@
             </div>
         </div>
 
-        {{-- CONTADOR DE RESULTADOS --}}
-        <div class="mt-3 flex items-center justify-between px-1">
+        {{-- CONTADOR DE RESULTADOS + DESGLOSE POR TIPO ENTREGA --}}
+        <div class="mt-3 flex items-center justify-between gap-3 px-1 flex-wrap">
             <div class="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-slate-600">
                 <i class="fa-solid fa-database text-[10px]"></i>
                 {{ $pedidosFiltrados->count() }} {{ Str::plural('pedido', $pedidosFiltrados->count()) }}
+            </div>
+
+            {{-- 🚚 Desglose visual: cuántos despacho vs cuántos recoge --}}
+            <div class="inline-flex items-center gap-2 flex-wrap">
+                <button type="button" wire:click="$set('tipoEntrega', 'domicilio')"
+                        class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold transition
+                               {{ $tipoEntrega === 'domicilio' ? 'bg-sky-600 text-white shadow' : 'bg-sky-50 text-sky-700 border border-sky-200 hover:bg-sky-100' }}">
+                    <i class="fa-solid fa-motorcycle text-[10px]"></i>
+                    Despacho
+                    <span class="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full text-[10px] font-bold
+                                 {{ $tipoEntrega === 'domicilio' ? 'bg-white/25 text-white' : 'bg-sky-200 text-sky-800' }}">
+                        {{ $totalDomicilio }}
+                    </span>
+                </button>
+
+                <button type="button" wire:click="$set('tipoEntrega', 'recoger')"
+                        class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold transition
+                               {{ $tipoEntrega === 'recoger' ? 'bg-amber-600 text-white shadow' : 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100' }}">
+                    <i class="fa-solid fa-store text-[10px]"></i>
+                    Recoge en sede
+                    <span class="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full text-[10px] font-bold
+                                 {{ $tipoEntrega === 'recoger' ? 'bg-white/25 text-white' : 'bg-amber-200 text-amber-800' }}">
+                        {{ $totalRecoger }}
+                    </span>
+                </button>
+
+                @if($tipoEntrega !== 'todos')
+                    <button type="button" wire:click="$set('tipoEntrega', 'todos')"
+                            class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-medium text-slate-500 hover:bg-slate-100"
+                            title="Limpiar filtro">
+                        <i class="fa-solid fa-xmark text-[9px]"></i>
+                        Limpiar
+                    </button>
+                @endif
             </div>
         </div>
 
