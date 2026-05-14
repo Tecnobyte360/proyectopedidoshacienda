@@ -6344,6 +6344,54 @@ TXT;
             }
         }
 
+        // 🚨 GUARD CRÍTICO: PEDIDO MAYOR AL UMBRAL → derivar a humano antes de confirmar.
+        // Caso real: bot confirmó $21M sin validación. Para pedidos grandes, SIEMPRE
+        // que el operador verifique antes de cerrar.
+        try {
+            $cfgUmbral = \App\Models\ConfiguracionBot::actual();
+            $umbralMax = (int) ($cfgUmbral?->pedido_max_auto ?? 500000); // default $500.000
+            if ($umbralMax > 0) {
+                $totalEstimado = 0;
+                foreach (($orderData['products'] ?? []) as $p) {
+                    $qty = (float) ($p['quantity'] ?? 0);
+                    $precio = (float) ($p['precio_unitario'] ?? $p['precio'] ?? 0);
+                    if ($precio > 0 && $qty > 0) {
+                        $totalEstimado += $qty * $precio;
+                    } else {
+                        $totalEstimado += (float) ($p['subtotal'] ?? 0);
+                    }
+                }
+                if ($totalEstimado > $umbralMax) {
+                    Log::warning('🚨 GUARD: pedido SUPERA umbral — derivando a humano', [
+                        'from'      => $from,
+                        'total'     => $totalEstimado,
+                        'umbral'    => $umbralMax,
+                        'productos' => array_map(fn ($p) => ($p['quantity'] ?? '?') . ' ' . ($p['unit'] ?? '') . ' ' . ($p['name'] ?? '?'), $orderData['products'] ?? []),
+                    ]);
+
+                    // Marcar handoff a humano sin crear el pedido
+                    if ($conversacion) {
+                        try {
+                            $conversacion->update([
+                                'modo'             => 'humano',
+                                'derivada_a'       => 'Comercial (pedido grande)',
+                                'derivada_at'      => now(),
+                                'razon_derivacion' => "Pedido por $" . number_format($totalEstimado, 0, ',', '.') . " excede umbral automático ($" . number_format($umbralMax, 0, ',', '.') . ")",
+                            ]);
+                        } catch (\Throwable $e) { /* ignore */ }
+                    }
+
+                    $primerNombre = explode(' ', trim((string) $name))[0] ?? '';
+                    $saludo = $primerNombre !== '' && !str_contains($primerNombre, '@') ? " {$primerNombre}" : '';
+                    $totalFmt = '$' . number_format($totalEstimado, 0, ',', '.');
+                    return "Listo{$saludo}, tu pedido suma *{$totalFmt}* — es una cantidad grande así que voy a pasarte con nuestro equipo *Comercial* 🙏\n\n"
+                         . "Ellos te confirman disponibilidad, precio final y forma de entrega para asegurar que todo salga bien. Te contactan en breve.";
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Guard pedido_max_auto falló: ' . $e->getMessage());
+        }
+
         // 🆔 PASO PRE-PEDIDO: asegurar cliente en SGI/ERP antes de crear el pedido.
         // Si ERP tiene lookup activo y el cliente NO existe, lo creamos con los
         // datos del orderData. Si la creación falla o faltan datos requeridos,
