@@ -1306,6 +1306,15 @@ TXT;
         $lugarEnMsg = $this->extraerLugarDelMensaje($message);
         $contextoEsCobertura = $lugarEnMsg && $this->contextoSugiereCobertura($conversacion, $message);
 
+        // 🛡️ Caso especial: el bot acaba de pedir clarificación de ciudad
+        // y el cliente está respondiendo. Si el cliente dice un lugar
+        // CUALQUIERA (incluso sin frases típicas), DEBE disparar validación
+        // — sino el LLM puede alucinar.
+        $respondiendoAClarificacionCiudad = $lugarEnMsg && $this->botPidioClarificacionCiudad($conversacion);
+        if ($respondiendoAClarificacionCiudad) {
+            $contextoEsCobertura = true;
+        }
+
         $preguntaProducto   = !$forzarConfirmar && !$contextoEsCobertura && $this->clientePreguntaProducto($message);
         $estadoActualBd     = app(\App\Services\EstadoPedidoService::class)->obtener($conversacion);
         $estadoYaCompleto   = $estadoActualBd && $estadoActualBd->estaCompleto() && !$estadoActualBd->confirmado_at;
@@ -3048,6 +3057,45 @@ TXT;
      * Si retorna true, forzamos tool_choice a buscar_productos para que el
      * LLM no invente "sí tengo X" sin verificar BD.
      */
+    /**
+     * 🛡️ ¿El bot acaba de pedir clarificación de ciudad/municipio?
+     * Si sí, cualquier mensaje del cliente con un lugar debe disparar
+     * validar_cobertura — no podemos dejar que el LLM alucine.
+     */
+    private function botPidioClarificacionCiudad($conversacion): bool
+    {
+        if (!$conversacion) return false;
+        try {
+            $ultBot = \App\Models\MensajeWhatsapp::where('conversacion_id', $conversacion->id)
+                ->where('rol', 'assistant')
+                ->orderByDesc('id')
+                ->limit(1)
+                ->value('contenido');
+            if (!$ultBot) return false;
+
+            $n = mb_strtolower(\Illuminate\Support\Str::ascii($ultBot));
+            // Patrones típicos del mensaje de clarificación
+            $patrones = [
+                'municipio o barrio',
+                'en qué municipio',
+                'en que municipio',
+                'en qué barrio',
+                'en que barrio',
+                'necesito el municipio',
+                'cual es el municipio',
+                'cuál es el municipio',
+                'en que ciudad',
+                'en qué ciudad',
+            ];
+            foreach ($patrones as $p) {
+                if (str_contains($n, $p)) return true;
+            }
+            return false;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
     /**
      * 🗺️ ¿El contexto de la conversación sugiere que el cliente está
      * preguntando por cobertura/domicilio?
