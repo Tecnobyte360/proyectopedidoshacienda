@@ -219,10 +219,20 @@ class EstadoPedidoService
             $estado->email = trim($orderData['email']);
         }
 
-        // Entrega — detecta si es recogida o domicilio
+        // Entrega — detecta si es recogida o domicilio.
+        // El LLM a veces no manda pickup:true pero pone address="Sede X" o
+        // address="Recogida en sede" o notes="cliente recoge". Detectarlos.
+        $addrCheck  = mb_strtolower((string) ($orderData['address'] ?? ''));
+        $notesCheck = mb_strtolower((string) ($orderData['notes'] ?? ''));
+        $combo = $addrCheck . ' ' . $notesCheck;
+        $addressEsSede = $addrCheck !== '' && preg_match('/\b(sede|recog[ie]|punto)\b/iu', $addrCheck) === 1;
+        $notesDicenRecoger = $notesCheck !== '' && preg_match('/\b(recog[eio]|en\s+sede|pasa(?:r|a|n)\s+a\s+recoger|pickup)\b/iu', $notesCheck) === 1;
+
         $esRecoger = !empty($orderData['pickup'])
             || !empty($orderData['sede_id'])
-            || (empty($orderData['address']) && !empty($orderData['location']));
+            || (empty($orderData['address']) && !empty($orderData['location']))
+            || $addressEsSede
+            || $notesDicenRecoger;
 
         if ($esRecoger) {
             $estado->metodo_entrega = ConversacionPedidoEstado::METODO_RECOGER;
