@@ -5992,7 +5992,33 @@ TXT;
       // (CL/CRA + número) Y la ciudad parece ser default (no la mencionó el
       // cliente), pedimos clarificación ANTES de geocodificar. Misma dirección
       // existe en muchos municipios.
-      if (!empty($direccion) && $this->direccionEsGenericaColombiana($direccion)
+      //
+      // 🛡️ EXCEPCIÓN: si la conversación YA validó cobertura previamente con
+      // esta misma dirección, NO volver a pedir clarificación. El cliente
+      // ya confirmó, no le hagamos perder tiempo.
+      $coberturaYaValidada = false;
+      try {
+          if ($telefonoCliente) {
+              $tenantId = app(\App\Services\TenantManager::class)->id();
+              if ($tenantId) {
+                  $tel = preg_replace('/\D+/', '', $telefonoCliente);
+                  $conv = \App\Models\ConversacionWhatsapp::where('tenant_id', $tenantId)
+                      ->where('telefono_normalizado', $tel)
+                      ->orderByDesc('id')->first();
+                  if ($conv) {
+                      $estadoChk = app(\App\Services\EstadoPedidoService::class)->obtener($conv);
+                      if ($estadoChk->cobertura_validada
+                          && !empty($estadoChk->direccion)
+                          && mb_stripos($direccion, $estadoChk->direccion) !== false) {
+                          $coberturaYaValidada = true;
+                      }
+                  }
+              }
+          }
+      } catch (\Throwable $e) { /* ignore */ }
+
+      if (!$coberturaYaValidada
+          && !empty($direccion) && $this->direccionEsGenericaColombiana($direccion)
           && empty($barrio) && $this->ciudadEsDefaultNoMencionada($ciudad, $telefonoCliente)) {
 
           Log::info('🛡️ Dirección genérica sin ciudad confirmada — pidiendo clarificación', [
