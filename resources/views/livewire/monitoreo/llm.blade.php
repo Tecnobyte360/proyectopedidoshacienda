@@ -47,6 +47,16 @@
                 {{ $wdTotal }}
             </span>
         </button>
+        <button type="button" wire:click="$set('tab', 'agente')"
+                class="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition
+                       {{ $tab === 'agente' ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow' : 'text-slate-600 hover:bg-slate-50' }}">
+            <i class="fa-solid fa-robot text-[12px]"></i>
+            Agente (Tools)
+            <span class="inline-flex items-center justify-center min-w-[20px] h-[20px] px-1.5 rounded-full text-[10px] font-bold
+                         {{ $tab === 'agente' ? 'bg-white/25 text-white' : 'bg-emerald-200 text-emerald-800' }}">
+                {{ $agTotal }}
+            </span>
+        </button>
     </div>
 
     @if($tab === 'llm')
@@ -384,6 +394,180 @@
             <li>• Cubre fallos transitorios: errores PHP, timeouts de Anthropic, tool_use huérfanos, etc.</li>
             <li>• Cooldown de 30 min por conversación y 24h por mensaje para evitar pedidos duplicados.</li>
         </ul>
+    </div>
+
+    @elseif($tab === 'agente')
+
+    {{-- ╔═══════════════ TAB AGENTE (TOOLS) ═══════════════╗ --}}
+
+    {{-- Estado general del agente --}}
+    @php
+        $agEstado = $agTasaExito >= 95 ? 'ok' : ($agTasaExito >= 80 ? 'amber' : 'fallidos');
+        $agColor = ['ok' => 'emerald', 'amber' => 'amber', 'fallidos' => 'rose'][$agEstado];
+    @endphp
+    <div class="rounded-2xl border-2 border-{{ $agColor }}-300 bg-{{ $agColor }}-50 p-4 flex items-center justify-between gap-4 flex-wrap">
+        <div>
+            <p class="text-xs font-bold uppercase text-{{ $agColor }}-700">Estado del Agente (uso de tools)</p>
+            <p class="text-2xl font-bold text-{{ $agColor }}-900 mt-1">
+                {{ $agTotal }} invocacion{{ $agTotal === 1 ? '' : 'es' }} en {{ $minutos }} min
+            </p>
+        </div>
+        <div class="text-right">
+            <p class="text-xs text-slate-500">Tasa de éxito</p>
+            <p class="text-3xl font-black text-{{ $agColor }}-700">{{ $agTasaExito }}%</p>
+        </div>
+    </div>
+
+    {{-- KPIs agente --}}
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div class="rounded-2xl border border-slate-200 bg-white p-4">
+            <p class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total invocaciones</p>
+            <h3 class="mt-2 text-3xl font-bold text-slate-900">{{ $agTotal }}</h3>
+            <p class="mt-1 text-[11px] text-slate-400">últimos {{ $minutos }} min</p>
+        </div>
+        <div class="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-4">
+            <p class="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Exitosas</p>
+            <h3 class="mt-2 text-3xl font-bold text-emerald-700">{{ $agExitosos }}</h3>
+            <p class="mt-1 text-[11px] text-emerald-600">{{ $agTasaExito }}% éxito</p>
+        </div>
+        <div class="rounded-2xl border border-amber-200 bg-amber-50/40 p-4">
+            <p class="text-[10px] font-bold uppercase tracking-wider text-amber-700">Latencia prom.</p>
+            <h3 class="mt-2 text-3xl font-bold text-amber-700">
+                {{ $agLatencia }}<span class="text-base font-normal">ms</span>
+            </h3>
+            <p class="mt-1 text-[11px] text-amber-600">por tool</p>
+        </div>
+        <div class="rounded-2xl border border-rose-200 bg-rose-50/40 p-4">
+            <p class="text-[10px] font-bold uppercase tracking-wider text-rose-700">Sin resultados</p>
+            <h3 class="mt-2 text-3xl font-bold text-rose-700">{{ $agSinResults }}</h3>
+            <p class="mt-1 text-[11px] text-rose-600">tools que devolvieron vacío</p>
+        </div>
+    </div>
+
+    {{-- Distribución por tool + Top queries --}}
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div class="rounded-2xl border border-slate-200 bg-white p-4">
+            <h3 class="text-sm font-bold text-slate-700 flex items-center gap-2 mb-3">
+                <i class="fa-solid fa-chart-bar text-slate-400"></i>
+                Distribución por tool
+            </h3>
+            @if($agPorTool->isEmpty())
+                <p class="text-xs text-slate-400 italic">Sin invocaciones en este rango.</p>
+            @else
+                <div class="space-y-2">
+                    @foreach($agPorTool as $t)
+                        @php $pct = round(($t->total / $agMaxPorTool) * 100); @endphp
+                        <div>
+                            <div class="flex items-center justify-between text-xs mb-0.5">
+                                <span class="font-semibold text-slate-700 truncate">{{ $t->tool_name }}</span>
+                                <span class="text-slate-500">
+                                    {{ $t->total }} <span class="text-slate-400">· {{ (int) $t->latencia }}ms</span>
+                                </span>
+                            </div>
+                            <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                                <div class="bg-emerald-500 h-full" style="width: {{ $pct }}%"></div>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            @endif
+        </div>
+
+        <div class="rounded-2xl border border-slate-200 bg-white p-4">
+            <h3 class="text-sm font-bold text-slate-700 flex items-center gap-2 mb-3">
+                <i class="fa-solid fa-magnifying-glass text-slate-400"></i>
+                Top búsquedas de productos
+            </h3>
+            @if($agTopQueries->isEmpty())
+                <p class="text-xs text-slate-400 italic">Sin búsquedas en este rango.</p>
+            @else
+                <div class="flex flex-wrap gap-1.5">
+                    @foreach($agTopQueries as $q => $c)
+                        <span class="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
+                            "{{ $q }}"
+                            <span class="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-slate-700 text-white text-[10px] font-bold">{{ $c }}</span>
+                        </span>
+                    @endforeach
+                </div>
+            @endif
+        </div>
+    </div>
+
+    {{-- Últimas invocaciones --}}
+    <div class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+        <div class="px-4 py-3 border-b border-slate-200">
+            <h2 class="text-sm font-bold text-slate-700 flex items-center gap-2">
+                <i class="fa-solid fa-clock-rotate-left text-slate-400"></i>
+                Últimas invocaciones de tools
+            </h2>
+        </div>
+        @if($agInvocaciones->isEmpty())
+            <div class="p-8 text-center text-sm text-slate-400 italic">
+                Sin invocaciones en los últimos {{ $minutos }} minutos.
+            </div>
+        @else
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-slate-50">
+                        <tr>
+                            <th class="px-3 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-slate-500">Hora</th>
+                            <th class="px-3 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-slate-500">Tool</th>
+                            <th class="px-3 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-slate-500">Teléfono</th>
+                            <th class="px-3 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-slate-500">Args</th>
+                            <th class="px-3 py-2.5 text-right text-[10px] font-bold uppercase tracking-wider text-slate-500">Resultados</th>
+                            <th class="px-3 py-2.5 text-right text-[10px] font-bold uppercase tracking-wider text-slate-500">Latencia</th>
+                            <th class="px-3 py-2.5 text-center text-[10px] font-bold uppercase tracking-wider text-slate-500">Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        @foreach($agInvocaciones as $inv)
+                            @php
+                                $argsStr = is_array($inv->args) ? json_encode($inv->args, JSON_UNESCAPED_UNICODE) : (string) $inv->args;
+                            @endphp
+                            <tr class="hover:bg-slate-50">
+                                <td class="px-3 py-2 align-middle whitespace-nowrap">
+                                    <div class="text-xs font-semibold text-slate-700">{{ $inv->created_at->format('h:i:s a') }}</div>
+                                </td>
+                                <td class="px-3 py-2 align-middle">
+                                    <span class="inline-flex items-center gap-1 rounded-md bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[11px] font-bold text-emerald-700">
+                                        {{ $inv->tool_name }}
+                                    </span>
+                                </td>
+                                <td class="px-3 py-2 align-middle">
+                                    <span class="text-[11px] text-slate-600 font-mono">{{ $inv->telefono_cliente ?? '—' }}</span>
+                                </td>
+                                <td class="px-3 py-2 align-middle">
+                                    <code class="text-[10px] text-slate-600 bg-slate-50 px-1.5 py-0.5 rounded truncate max-w-[220px] inline-block"
+                                          title="{{ $argsStr }}">
+                                        {{ \Illuminate\Support\Str::limit($argsStr, 60) }}
+                                    </code>
+                                </td>
+                                <td class="px-3 py-2 align-middle text-right">
+                                    <span class="text-xs font-bold {{ ($inv->count_resultados ?? 0) === 0 ? 'text-rose-600' : 'text-slate-700' }}">
+                                        {{ $inv->count_resultados ?? 0 }}
+                                    </span>
+                                </td>
+                                <td class="px-3 py-2 align-middle text-right">
+                                    <span class="text-xs text-slate-600">{{ $inv->latencia_ms }}ms</span>
+                                </td>
+                                <td class="px-3 py-2 align-middle text-center">
+                                    @if($inv->exitoso)
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                                            <i class="fa-solid fa-circle-check text-[9px]"></i>OK
+                                        </span>
+                                    @else
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-bold text-rose-700"
+                                              title="{{ $inv->error }}">
+                                            <i class="fa-solid fa-circle-xmark text-[9px]"></i>Falló
+                                        </span>
+                                    @endif
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @endif
     </div>
 
     @endif

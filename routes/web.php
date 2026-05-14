@@ -128,7 +128,8 @@ Route::middleware(['no_super_sin_imp'])->group(function () {
         ->middleware('permission:bot.configurar')
         ->name('configuracion.bot');
 
-    Route::get('/monitoreo/agente', \App\Livewire\Monitoreo\Agente::class)
+    // /monitoreo/agente redirige al tab Agente dentro de /monitoreo/llm
+    Route::get('/monitoreo/agente', fn () => redirect('/monitoreo/llm?tab=agente'))
         ->middleware('permission:bot.configurar')
         ->name('monitoreo.agente');
 

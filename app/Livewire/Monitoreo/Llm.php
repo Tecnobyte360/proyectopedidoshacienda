@@ -2,15 +2,17 @@
 
 namespace App\Livewire\Monitoreo;
 
+use App\Models\AgenteToolInvocacion;
 use App\Models\LlmInvocacion;
 use App\Models\WatchdogRescate;
+use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 use Livewire\Attributes\Computed;
 
 class Llm extends Component
 {
     public int $minutos = 30;  // Ventana de análisis
-    public string $tab = 'llm';  // 'llm' | 'watchdog'
+    public string $tab = 'llm';  // 'llm' | 'watchdog' | 'agente'
 
     protected $queryString = [
         'tab'     => ['except' => 'llm'],
@@ -62,6 +64,29 @@ class Llm extends Component
 
         $tasaExito = $total > 0 ? round(($exitosos / $total) * 100, 1) : 100;
 
+        // 🤖 AGENTE — KPIs e invocaciones de tools (misma ventana)
+        $agQuery = AgenteToolInvocacion::where('created_at', '>=', $desde);
+        $agTotal       = (clone $agQuery)->count();
+        $agExitosos    = (clone $agQuery)->where('exitoso', true)->count();
+        $agLatencia    = (int) (clone $agQuery)->avg('latencia_ms');
+        $agSinResults  = (clone $agQuery)->where('count_resultados', 0)->where('exitoso', true)->count();
+        $agTasaExito   = $agTotal > 0 ? round(($agExitosos / $agTotal) * 100, 1) : 100;
+        $agPorTool     = (clone $agQuery)
+            ->select('tool_name', DB::raw('COUNT(*) as total'), DB::raw('AVG(latencia_ms) as latencia'))
+            ->groupBy('tool_name')
+            ->orderByDesc('total')
+            ->get();
+        $agMaxPorTool  = $agPorTool->max('total') ?: 1;
+        $agTopQueries  = (clone $agQuery)
+            ->where('tool_name', 'buscar_productos')
+            ->get()
+            ->map(fn ($i) => trim((string) ($i->args['query'] ?? '')))
+            ->filter()
+            ->countBy()
+            ->sortDesc()
+            ->take(8);
+        $agInvocaciones = (clone $agQuery)->orderByDesc('id')->limit(40)->get();
+
         // 🐕 WATCHDOG — KPIs y rescates recientes (misma ventana que LLM)
         $wdQuery = WatchdogRescate::where('created_at', '>=', $desde);
         $wdTotal      = (clone $wdQuery)->count();
@@ -104,6 +129,16 @@ class Llm extends Component
             'wdTasaExito'       => $wdTasaExito,
             'wdUltimo'          => $wdUltimo,
             'wdRescates'        => $wdRescates,
+            // 🤖 Agente data
+            'agTotal'           => $agTotal,
+            'agExitosos'        => $agExitosos,
+            'agLatencia'        => $agLatencia,
+            'agSinResults'      => $agSinResults,
+            'agTasaExito'       => $agTasaExito,
+            'agPorTool'         => $agPorTool,
+            'agMaxPorTool'      => $agMaxPorTool,
+            'agTopQueries'      => $agTopQueries,
+            'agInvocaciones'    => $agInvocaciones,
         ])->layout('layouts.app');
     }
 }
