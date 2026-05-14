@@ -225,6 +225,7 @@
         @keyframes fadeUp { from { opacity:0; transform: translateY(20px); } to { opacity:1; transform: translateY(0); } }
         @keyframes fadeIn { from { opacity:0 } to { opacity:1 } }
         @keyframes float { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-10px) } }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         @keyframes pulse-glow {
             0%,100% { box-shadow: 0 8px 20px -4px rgba(var(--brand-rgb), 0.5); }
             50%     { box-shadow: 0 8px 30px -2px rgba(var(--brand-rgb), 0.8); }
@@ -291,6 +292,34 @@
             <div class="dots absolute top-16 right-20 w-32 h-32 opacity-70"></div>
             <div class="dots absolute bottom-32 left-16 w-24 h-24 opacity-60"></div>
             <div class="dots absolute top-1/2 right-1/3 w-16 h-16 opacity-50"></div>
+
+            {{-- Logo gigante flotante en el espacio derecho (decorativo, no clickeable) --}}
+            <div class="absolute pointer-events-none hide-on-short"
+                 style="top: 50%; right: clamp(3rem, 8vw, 8rem); transform: translateY(-50%); z-index: 5;">
+                <div class="relative float-slow">
+                    {{-- Halo de color brand detrás del logo --}}
+                    <div class="absolute inset-0 rounded-full"
+                         style="background: radial-gradient(circle, rgba(var(--brand-rgb), 0.35), transparent 65%); filter: blur(30px); transform: scale(1.3);"></div>
+
+                    @if($brandLogo)
+                        <div class="relative rounded-3xl bg-white shadow-2xl overflow-hidden border-4 border-white"
+                             style="height: clamp(10rem, 28vh, 18rem); width: clamp(10rem, 28vh, 18rem); box-shadow: 0 30px 60px -15px rgba(var(--brand-rgb), 0.4), 0 0 0 1px rgba(var(--brand-rgb), 0.1);">
+                            <img src="{{ $brandLogo }}" alt="{{ $brandName }}" class="h-full w-full object-contain p-4">
+                        </div>
+                    @else
+                        <div class="relative rounded-3xl flex items-center justify-center text-white shadow-2xl"
+                             style="height: clamp(10rem, 28vh, 18rem); width: clamp(10rem, 28vh, 18rem); background: linear-gradient(135deg, var(--brand-prim), var(--brand-sec)); box-shadow: 0 30px 60px -15px rgba(var(--brand-rgb), 0.4);">
+                            <i class="fa-solid fa-utensils" style="font-size: clamp(4rem, 10vh, 6rem);"></i>
+                        </div>
+                    @endif
+
+                    {{-- Anillos orbitando --}}
+                    <div class="absolute -inset-6 rounded-full border-2 border-dashed pointer-events-none opacity-30"
+                         style="border-color: var(--brand-prim); animation: spin 20s linear infinite;"></div>
+                    <div class="absolute -inset-12 rounded-full border border-dashed pointer-events-none opacity-20"
+                         style="border-color: var(--brand-sec); animation: spin 30s linear infinite reverse;"></div>
+                </div>
+            </div>
 
             {{-- Contenido — proporciones con clamp() para adaptarse a alturas --}}
             <div class="relative z-10 flex flex-col w-full"
