@@ -43,6 +43,18 @@ class BotCatalogoService
 
                     if ($liveRows->isEmpty()) return collect();
 
+                    // 🪞 Reflejo JIT a tabla local: cada lectura live mantiene
+                    // `productos` actualizada (solo campos del ERP — preserva
+                    // imagen, palabras_clave, destacado, orden, etc).
+                    // Corre dentro de try/catch para nunca romper el catálogo.
+                    try {
+                        $this->reflejarLiveEnLocal($liveRows, $integracion);
+                    } catch (\Throwable $e) {
+                        \Illuminate\Support\Facades\Log::warning('JIT mirror live→local falló', [
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+
                     // Lookup local por codigo (todos de un solo query)
                     $codigos = $liveRows->pluck('codigo')->filter()->unique()->values()->all();
                     $localesPorCodigo = collect();
@@ -645,6 +657,126 @@ class BotCatalogoService
         }
 
         return $mejor;
+    }
+
+    /**
+     * Refleja los productos leídos en vivo del ERP a la tabla local `productos`.
+     *
+     * Filosofía:
+     *  - Cada lectura live (cada 30s vía cache) mantiene la tabla local
+     *    "espejada" SIN tocar campos gestionados por el admin (imagen,
+     *    palabras_clave, destacado, orden, descripcion_corta).
+     *  - Solo escribe campos del ERP: nombre, descripcion, unidad, precio_base
+     *    y categoria_id.
+     *  - Crea categorías que no existan.
+     *  - El catálogo del bot SIGUE usando los precios live; la tabla local es
+     *    para que el admin pueda enlazar promociones, fotos, etc.
+     */
+    private function reflejarLiveEnLocal(Collection $liveRows, \App\Models\Integracion $integracion): void
+    {
+        $tenantId = app(\App\Services\TenantManager::class)->id();
+        if (!$tenantId) return;
+
+        // Cache de categorías local (1 query)
+        $categoriasCache = \App\Models\ProductoCategoria::where('tenant_id', $tenantId)
+            ->get()
+            ->keyBy(fn ($c) => mb_strtolower($c->nombre));
+
+        // Lookup local por código (1 query)
+        $codigos = $liveRows->pluck('codigo')->filter()->unique()->values()->all();
+        $localesPorCodigo = collect();
+        if (!empty($codigos)) {
+            $localesPorCodigo = \App\Models\Producto::where('tenant_id', $tenantId)
+                ->whereIn('codigo', $codigos)
+                ->get()
+                ->keyBy(fn ($p) => (string) $p->codigo);
+        }
+
+        foreach ($liveRows as $live) {
+            try {
+                $codigo = trim((string) ($live->codigo ?? ''));
+                $nombre = $this->limpiarUtf8(trim((string) ($live->nombre ?? '')));
+                if ($codigo === '' || $nombre === '') continue;
+
+                $descripcion = $this->limpiarUtf8((string) ($live->descripcion ?? ''));
+                $categoriaN  = $this->limpiarUtf8((string) ($live->categoria ?? ''));
+                $unidad      = trim((string) ($live->unidad ?? 'unidad')) ?: 'unidad';
+                $precio      = (float) ($live->precio_base ?? 0);
+
+                // Resolver/crear categoría
+                $categoriaId = null;
+                if ($categoriaN !== '') {
+                    $key = mb_strtolower($categoriaN);
+                    $cat = $categoriasCache->get($key);
+                    if (!$cat) {
+                        $cat = \App\Models\ProductoCategoria::create([
+                            'tenant_id' => $tenantId,
+                            'nombre'    => $categoriaN,
+                            'slug'      => Str::slug($categoriaN),
+                            'activo'    => true,
+                        ]);
+                        $categoriasCache->put($key, $cat);
+                    }
+                    $categoriaId = $cat->id;
+                }
+
+                $existente = $localesPorCodigo->get($codigo);
+
+                $datosErp = [
+                    'nombre'              => $nombre,
+                    'descripcion'         => $descripcion ?: null,
+                    'unidad'              => $unidad,
+                    'precio_base'         => $precio,
+                    'categoria_id'        => $categoriaId,
+                    'erp_integracion_id'  => $integracion->id,
+                    'erp_sincronizado_at' => now(),
+                ];
+
+                if ($existente) {
+                    // Detectar cambios reales (evita writes innecesarios)
+                    $cambio = false;
+                    foreach (['nombre', 'descripcion', 'unidad', 'precio_base', 'categoria_id'] as $f) {
+                        if ((string) $existente->{$f} !== (string) $datosErp[$f]) {
+                            $cambio = true;
+                            break;
+                        }
+                    }
+                    if ($cambio) {
+                        $existente->update($datosErp);
+                    } else {
+                        // Solo refrescar timestamp sin disparar observers
+                        $existente->forceFill([
+                            'erp_sincronizado_at' => now(),
+                            'erp_integracion_id'  => $integracion->id,
+                        ])->saveQuietly();
+                    }
+                } else {
+                    \App\Models\Producto::create(array_merge($datosErp, [
+                        'tenant_id' => $tenantId,
+                        'codigo'    => $codigo,
+                        'activo'    => true,
+                    ]));
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('JIT mirror: fila falló', [
+                    'codigo' => $codigo ?? null,
+                    'error'  => $e->getMessage(),
+                ]);
+            }
+        }
+    }
+
+    /**
+     * Sanitiza UTF-8 — SGI a veces devuelve Latin-1 con bytes de control.
+     */
+    private function limpiarUtf8(?string $s): ?string
+    {
+        if ($s === null || $s === '') return $s;
+        if (!mb_check_encoding($s, 'UTF-8')) {
+            $s = @mb_convert_encoding($s, 'UTF-8', 'ISO-8859-1, Windows-1252') ?: $s;
+        }
+        $s = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $s);
+        return trim($s) ?: null;
     }
 
     /**
