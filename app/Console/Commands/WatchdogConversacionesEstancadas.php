@@ -61,10 +61,29 @@ class WatchdogConversacionesEstancadas extends Command
             // Excepción: si es un mensaje watchdog previo, no entrar en loop.
             if (str_starts_with((string) ($ultimoMsg->mensaje_externo_id ?? ''), 'watchdog_')) continue;
 
-            // Evitar rescatar la misma conversación múltiples veces seguidas
-            $yaRescatadaKey = "watchdog_rescate_conv_{$conv->id}_msg_{$ultimoMsg->id}";
-            if (\Cache::has($yaRescatadaKey)) continue;
-            \Cache::put($yaRescatadaKey, true, now()->addMinutes(5));
+            // 🛡️ NO rescatar si la conv YA generó un pedido en los últimos 30 minutos.
+            // Sin este check, el watchdog crea pedidos duplicados cada vez que se dispara.
+            $tienePedidoReciente = \App\Models\Pedido::where('telefono_whatsapp', $conv->telefono_normalizado)
+                ->where('created_at', '>=', now()->subMinutes(30))
+                ->whereNotIn('estado', [\App\Models\Pedido::ESTADO_CANCELADO])
+                ->exists();
+            if ($tienePedidoReciente) {
+                Log::info('🐕 Watchdog: skipea conv con pedido reciente (<30min)', [
+                    'conversacion_id' => $conv->id,
+                    'telefono'        => $conv->telefono_normalizado,
+                ]);
+                continue;
+            }
+
+            // Evitar rescatar la misma conversación múltiples veces seguidas:
+            // - Cooldown POR CONVERSACIÓN (no por mensaje) de 30 minutos.
+            // - Cooldown POR MENSAJE de 24 horas (un mismo mensaje del cliente
+            //   solo se intenta rescatar UNA vez en el día).
+            $cooldownConv = "watchdog_rescate_conv_{$conv->id}";
+            $cooldownMsg  = "watchdog_rescate_msg_{$ultimoMsg->id}";
+            if (\Cache::has($cooldownConv) || \Cache::has($cooldownMsg)) continue;
+            \Cache::put($cooldownConv, true, now()->addMinutes(30));
+            \Cache::put($cooldownMsg,  true, now()->addHours(24));
 
             Log::info('🐕 Watchdog: rescatando conversación estancada', [
                 'conversacion_id'  => $conv->id,

@@ -5024,6 +5024,29 @@ TXT;
         $tenantId = $tm->id() ?? 'none';
         $confirmKey = "pedido_confirmado_t{$tenantId}_" . $telNorm;
 
+        // 🛡️ DEDUPLICACIÓN FUERTE: si este cliente YA tiene un pedido NO cancelado
+        // creado en los últimos 15 minutos, NO crear duplicado. Devolver info del
+        // pedido existente. Esto cubre los casos donde el watchdog (o el LLM) intenta
+        // confirmar dos veces el mismo pedido.
+        $pedidoRecienteCliente = \App\Models\Pedido::where('telefono_whatsapp', $telNorm)
+            ->where('created_at', '>=', now()->subMinutes(15))
+            ->whereNotIn('estado', [\App\Models\Pedido::ESTADO_CANCELADO])
+            ->orderByDesc('id')
+            ->first();
+        if ($pedidoRecienteCliente) {
+            $minDesde = (int) abs(now()->diffInMinutes($pedidoRecienteCliente->created_at));
+            Log::warning('🛡️ confirmar_pedido bloqueado — cliente ya tiene pedido reciente', [
+                'from'               => $from,
+                'pedido_existente'   => $pedidoRecienteCliente->id,
+                'total_existente'    => $pedidoRecienteCliente->total,
+                'minutos_desde'      => $minDesde,
+            ]);
+            $total = '$' . number_format((float) $pedidoRecienteCliente->total, 0, ',', '.');
+            return "Tu pedido #{$pedidoRecienteCliente->id} ya está registrado ✅\n\n"
+                . "💵 Total: {$total}\n"
+                . "Si necesitas algo distinto, cuéntame qué es y te ayudo 🙌";
+        }
+
         // 🚨 GUARD CRÍTICO: CÉDULA OBLIGATORIA si hay lookup ERP activo.
         // Sin cédula NO se puede crear el pedido (cliente no se puede
         // registrar en SGI, no se puede trackear el pedido).
