@@ -28,14 +28,17 @@ class Producto extends Model
         'activo',
         'destacado',
         'orden',
+        'erp_integracion_id',
+        'erp_sincronizado_at',
     ];
 
     protected $casts = [
-        'palabras_clave' => 'array',
-        'activo'         => 'boolean',
-        'destacado'      => 'boolean',
-        'precio_base'    => 'decimal:2',
-        'orden'          => 'integer',
+        'palabras_clave'      => 'array',
+        'activo'              => 'boolean',
+        'destacado'           => 'boolean',
+        'precio_base'         => 'decimal:2',
+        'orden'               => 'integer',
+        'erp_sincronizado_at' => 'datetime',
     ];
 
     protected static function booted(): void
