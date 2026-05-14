@@ -293,6 +293,27 @@ class EstadoPedidoService
     }
 
     /**
+     * 🛡️ Limpia un string del ERP a UTF-8 seguro. Maneja:
+     *   - Strings latín-1/Windows-1252 → convertidos a UTF-8
+     *   - Bytes binarios → filtrados (solo retiene caracteres imprimibles)
+     *   - null/empty → null
+     */
+    private function limpiarString($v): ?string
+    {
+        if ($v === null) return null;
+        $s = is_string($v) ? $v : (string) $v;
+        $s = trim($s);
+        if ($s === '') return null;
+        if (!mb_check_encoding($s, 'UTF-8')) {
+            $s = @mb_convert_encoding($s, 'UTF-8', 'ISO-8859-1, Windows-1252') ?: '';
+        }
+        // Quitar caracteres de control y bytes binarios
+        $s = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $s);
+        $s = trim($s);
+        return $s === '' ? null : $s;
+    }
+
+    /**
      * 🛡️ Convierte recursivamente cualquier string mal codificado a UTF-8 válido.
      * SGI (SQL Server) a veces devuelve latín-1 que rompe json_encode.
      */
@@ -458,8 +479,17 @@ class EstadoPedidoService
 
             $resultado = ['cedula' => $cedula];
             if ($datos) {
+                // 🛡️ Mapear SOLO campos útiles del SGI a nombres estándar.
+                // SGI tiene columnas binarias (IdSeguridad) que rompen json_encode.
+                $datosLimpios = [
+                    'cedula'    => $cedula,
+                    'nombre'    => $this->limpiarString($datos['StrNombre']    ?? $datos['nombre']    ?? null),
+                    'telefono'  => $this->limpiarString($datos['StrCelular']   ?? $datos['telefono']  ?? null),
+                    'direccion' => $this->limpiarString($datos['StrDireccion'] ?? $datos['direccion'] ?? null),
+                    'email'     => $this->limpiarString($datos['StrEmail']     ?? $datos['email']     ?? null),
+                ];
                 $resultado['existe'] = true;
-                $resultado['datos']  = $datos;
+                $resultado['datos']  = array_filter($datosLimpios, fn ($v) => $v !== null && $v !== '');
             } else {
                 $resultado['existe'] = false;
             }
