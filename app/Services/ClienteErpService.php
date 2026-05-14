@@ -196,9 +196,7 @@ class ClienteErpService
                 'telefono'          => $data['telefono']  ?? null,
                 'nombre'            => $data['nombre']    ?? null,
                 'direccion'         => $data['direccion'] ?? null,
-                'datos_cliente_erp' => isset($data['datos_cliente_erp'])
-                    ? json_encode($data['datos_cliente_erp'], JSON_UNESCAPED_UNICODE)
-                    : null,
+                'datos_cliente_erp' => $this->serializarJsonSeguro($data['datos_cliente_erp'] ?? null),
                 'error_mensaje'     => $data['error_mensaje'] ?? null,
                 'created_at'        => now(),
                 'updated_at'        => now(),
@@ -207,6 +205,53 @@ class ClienteErpService
             // No es crítico — solo log warning
             Log::warning('No se pudo registrar cliente_erp_lookup: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Serializa a JSON tolerando UTF-8 inválido y arrays con datos del SGI.
+     * Si por cualquier motivo no se puede serializar, devuelve null en vez
+     * de un string roto que MySQL rechaza como "Invalid JSON text".
+     */
+    private function serializarJsonSeguro($valor): ?string
+    {
+        if ($valor === null) return null;
+
+        // Si ya es un string que parece JSON válido, validar y devolver.
+        if (is_string($valor)) {
+            json_decode($valor);
+            return json_last_error() === JSON_ERROR_NONE ? $valor : null;
+        }
+
+        if (!is_array($valor) && !is_object($valor)) {
+            return json_encode((string) $valor);
+        }
+
+        // Sanitizar valores no-UTF8 dentro del array (SGI a veces devuelve Latin-1)
+        $limpio = $this->sanitizarRecursivo($valor);
+
+        $json = json_encode($limpio, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE | JSON_PARTIAL_OUTPUT_ON_ERROR);
+        if ($json === false) return null;
+
+        // Validar que MySQL lo aceptaría
+        json_decode($json);
+        return json_last_error() === JSON_ERROR_NONE ? $json : null;
+    }
+
+    private function sanitizarRecursivo($v)
+    {
+        if (is_array($v)) {
+            return array_map(fn ($x) => $this->sanitizarRecursivo($x), $v);
+        }
+        if (is_object($v)) {
+            return array_map(fn ($x) => $this->sanitizarRecursivo($x), (array) $v);
+        }
+        if (is_string($v)) {
+            if (!mb_check_encoding($v, 'UTF-8')) {
+                $v = @mb_convert_encoding($v, 'UTF-8', 'ISO-8859-1, Windows-1252') ?: '';
+            }
+            return preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $v);
+        }
+        return $v;
     }
 
     /**

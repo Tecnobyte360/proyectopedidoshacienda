@@ -3134,9 +3134,27 @@ TXT;
             'me lo programas', 'progr[áa]mamelo',
         ];
 
+        // 🛡️ Saludos puros NUNCA cuentan como afirmación, aunque contengan
+        //    palabras como "bueno" ("buenos días") o "si" ("sí, dime"). Si el
+        //    cliente está saludando, no está aceptando programar nada.
+        $saludosPuros = [
+            'hola', 'holaa', 'holaaa', 'hi', 'hey', 'que tal', 'que mas',
+            'buenas', 'buenos dias', 'buenas tardes', 'buenas noches',
+            'buen dia', 'saludos',
+        ];
+        if (in_array($msgActual, $saludosPuros, true)) return false;
+        if (preg_match('/^\s*(hola|holaa+|buenas|buen[oa]s\s+(dias|tardes|noches)|buen\s+dia)\s*[\.!?]*\s*$/i', $msgActual)) {
+            return false;
+        }
+
+        // Matching por palabra completa (word boundary), no por subcadena.
+        // Antes: str_contains("buenos dias","bueno")==true → falso positivo.
         $matchAfirma = false;
         foreach ($afirmaciones as $a) {
-            if ($msgActual === $a || str_contains($msgActual, $a)) { $matchAfirma = true; break; }
+            if ($msgActual === $a) { $matchAfirma = true; break; }
+            // Word boundary: la afirmación debe estar como palabra completa
+            $patron = '/\b' . preg_quote($a, '/') . '\b/u';
+            if (preg_match($patron, $msgActual)) { $matchAfirma = true; break; }
         }
         if (!$matchAfirma) return false;
 

@@ -351,17 +351,23 @@ class EstadoPedidoService
             // 🛡️ Sanitizar UTF-8 — SGI puede devolver latín-1 que rompe json_encode
             $estado->datos_erp = $this->sanitizarUtf8Recursivo($resultado['datos'] ?? null);
 
-            // Auto-rellenar nombre y dirección si los tenemos del ERP (ya sanitizados)
+            // Auto-rellenar SOLO datos del cliente que NO cambian por pedido
+            // (nombre, teléfono). La DIRECCIÓN nunca se auto-rellena: el cliente
+            // puede estar pidiendo a una dirección distinta, o ese pedido puede
+            // ser para que lo recojan. Hidratar dirección sin confirmación
+            // dispara validaciones de cobertura no solicitadas y respuestas
+            // confusas como "fuera de cobertura" cuando el cliente solo saludó.
             $datosSan = $estado->datos_erp ?? [];
             if (empty($estado->nombre_cliente) && !empty($datosSan['nombre'])) {
                 $estado->nombre_cliente = trim($datosSan['nombre']);
             }
-            if (empty($estado->direccion) && !empty($datosSan['direccion'])) {
-                $estado->direccion = trim($datosSan['direccion']);
-            }
             if (empty($estado->telefono) && !empty($datosSan['telefono'])) {
                 $estado->telefono = trim($datosSan['telefono']);
             }
+            // 🛡️ Dirección del ERP: la dejamos disponible en $estado->datos_erp
+            // (el LLM puede sugerirla al cliente: "¿enviamos a Calle X como la
+            // última vez?") pero NO la copiamos a $estado->direccion hasta que
+            // el cliente la confirme explícitamente.
         } else {
             // Marcamos explícitamente como NO existente para que avanzarPaso
             // pase a datos_cliente_nuevo
@@ -1285,6 +1291,12 @@ class EstadoPedidoService
         $datosErpPreserv  = $esNuevoPedidoConClienteIdentificado ? $estado->datos_erp : null;
         $telefonoPreserv  = $estado->telefono ?: $conv->telefono_normalizado;
 
+        // 🛡️ Si es AUTO-RESET por saludo+inactividad, limpiamos TODO incluyendo
+        // los flags de validación. Forzamos al flujo a re-verificar al cliente
+        // como si fuera la primera vez, así no arrastramos direcciones u otros
+        // datos que el cliente no acaba de confirmar.
+        $esAutoResetPorSaludo = $motivo && str_starts_with((string) $motivo, 'auto_reset_');
+
         $estado->fill([
             'paso_actual'        => ConversacionPedidoEstado::PASO_INICIO,
             'productos'          => null,
@@ -1313,6 +1325,19 @@ class EstadoPedidoService
             'abandonado_at'      => $motivo ? now() : null,
             'motivo_abandono'    => $motivo,
         ])->save();
+
+        // 🧹 Si es AUTO-RESET por saludo, también limpiamos la cache de
+        // "cliente aceptó programar" para que no se arrastre el flag de la
+        // conversación anterior.
+        if ($esAutoResetPorSaludo) {
+            try {
+                $tenantId = $conv->tenant_id;
+                $telefono = $conv->telefono_normalizado ?: $estado->telefono;
+                if ($tenantId && $telefono) {
+                    \Illuminate\Support\Facades\Cache::forget("wa_programar_aceptado_t{$tenantId}_{$telefono}");
+                }
+            } catch (\Throwable $e) { /* ignore */ }
+        }
 
         Log::info('🔄 Estado pedido reseteado', [
             'conv_id'             => $conv->id,
