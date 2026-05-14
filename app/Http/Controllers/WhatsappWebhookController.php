@@ -2819,10 +2819,8 @@ TXT;
     private function clientePidioGenerarPedido(string $mensaje): bool
     {
         $m = mb_strtolower(trim($mensaje));
-        // Normalizar: quitar tildes, signos de puntuación al final
-        $m = preg_replace('/[áéíóúÁÉÍÓÚ]/u', function ($x) {
-            return strtr($x[0], ['á'=>'a','é'=>'e','í'=>'i','ó'=>'o','ú'=>'u','Á'=>'a','É'=>'e','Í'=>'i','Ó'=>'o','Ú'=>'u']);
-        }, $m);
+        // Normalizar: quitar tildes y signos de puntuación al final
+        $m = strtr($m, ['á'=>'a','é'=>'e','í'=>'i','ó'=>'o','ú'=>'u','ñ'=>'n','ü'=>'u']);
         $m = trim($m, ".!¡?¿,; ");
         if ($m === '') return false;
 
