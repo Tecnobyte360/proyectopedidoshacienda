@@ -3099,6 +3099,77 @@ TXT;
     }
 
     /**
+     * 🛡️ ¿La dirección es un patrón colombiano genérico (CL/CRA + número)
+     * SIN nombre de ciudad/barrio incluido en el texto?
+     */
+    private function direccionEsGenericaColombiana(string $direccion): bool
+    {
+        $d = mb_strtolower(\Illuminate\Support\Str::ascii(trim($direccion)));
+        if ($d === '') return false;
+
+        // ¿Tiene patrón de vía colombiana + número?
+        $patronVia = '/\b(cra|carrera|kr|cr|cl|calle|cll|dg|diagonal|trv|transversal|tv|av|avenida|circular)\s*\.?\s*\d/iu';
+        if (!preg_match($patronVia, $d)) return false;
+
+        // ¿Menciona alguna ciudad/barrio conocidos?
+        $municipiosBarrios = [
+            'bello', 'medellin', 'medellín', 'girardota', 'copacabana', 'sabaneta',
+            'envigado', 'itagui', 'itagüí', 'caldas', 'la estrella', 'barbosa',
+            'rionegro', 'marinilla', 'guarne', 'la ceja', 'el retiro', 'el carmen',
+            'prado', 'niquia', 'niquía', 'fontidueño', 'rincon santo', 'cabañas',
+            'paris', 'parís', 'la gabriela', 'altamira', 'la mota', 'suárez', 'suarez',
+        ];
+        foreach ($municipiosBarrios as $loc) {
+            if (str_contains($d, $loc)) return false;
+        }
+        return true;
+    }
+
+    /**
+     * 🛡️ ¿La ciudad pasada es solo un default (no confirmada por el cliente
+     * en su mensaje reciente)? Si el cliente NO la mencionó, no la podemos
+     * usar para geocodificar — la dirección puede ser de cualquier ciudad.
+     */
+    private function ciudadEsDefaultNoMencionada(?string $ciudad, ?string $telefonoCliente): bool
+    {
+        if (empty($ciudad)) return true; // sin ciudad → default
+        if (empty($telefonoCliente)) return true; // sin teléfono no podemos verificar
+
+        try {
+            $tenantId = app(\App\Services\TenantManager::class)->id();
+            if (!$tenantId) return false;
+
+            // Buscar conversación del cliente
+            $tel = preg_replace('/\D+/', '', $telefonoCliente);
+            $conv = \App\Models\ConversacionWhatsapp::where('tenant_id', $tenantId)
+                ->where(function ($q) use ($tel, $telefonoCliente) {
+                    $q->where('telefono_normalizado', $tel)
+                      ->orWhere('telefono', $telefonoCliente);
+                })
+                ->orderByDesc('id')
+                ->first();
+            if (!$conv) return false;
+
+            // Últimos 5 mensajes del USUARIO
+            $msgsUser = \App\Models\MensajeWhatsapp::where('conversacion_id', $conv->id)
+                ->where('rol', 'user')
+                ->orderByDesc('id')
+                ->limit(5)
+                ->pluck('contenido')
+                ->all();
+
+            $ciudadNorm = mb_strtolower(\Illuminate\Support\Str::ascii(trim($ciudad)));
+            foreach ($msgsUser as $msg) {
+                $msgN = mb_strtolower(\Illuminate\Support\Str::ascii((string) $msg));
+                if (str_contains($msgN, $ciudadNorm)) return false; // SÍ la mencionó
+            }
+            return true; // NO la mencionó → es default
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
      * 🗺️ Extrae el nombre de un lugar (municipio/barrio/ciudad) mencionado
      * en el mensaje del cliente. Devuelve null si no detecta lugar.
      *
@@ -5459,6 +5530,33 @@ TXT;
       $zona   = null;
       $metodo = null;
       $coord  = null;
+
+      // 🛡️ ANTI-AMBIGÜEDAD: si la dirección es patrón colombiano genérico
+      // (CL/CRA + número) Y la ciudad parece ser default (no la mencionó el
+      // cliente), pedimos clarificación ANTES de geocodificar. Misma dirección
+      // existe en muchos municipios.
+      if (!empty($direccion) && $this->direccionEsGenericaColombiana($direccion)
+          && empty($barrio) && $this->ciudadEsDefaultNoMencionada($ciudad, $telefonoCliente)) {
+
+          Log::info('🛡️ Dirección genérica sin ciudad confirmada — pidiendo clarificación', [
+              'direccion' => $direccion,
+              'ciudad_llm' => $ciudad,
+              'telefono'  => $telefonoCliente,
+          ]);
+
+          return [
+              'cubierta'              => false,
+              'requiere_clarificacion'=> true,
+              'mensaje_para_cliente'  => "Necesito el *municipio* o *barrio* exacto para validar `{$direccion}` 🙏. "
+                  . "La misma dirección puede existir en Bello, Rionegro, Medellín, etc. "
+                  . "¿En qué municipio o barrio queda?",
+              'instruccion_para_bot'  => "🛑 NO digas 'cubierto' ni 'fuera de cobertura'. El cliente dio una "
+                  . "dirección AMBIGUA sin especificar municipio. PIDE al cliente que confirme el municipio o barrio. "
+                  . "Usa el mensaje_para_cliente literal. Después llama validar_cobertura otra vez con la ciudad correcta.",
+              'mensaje_sugerido'      => "Necesito el municipio o barrio exacto para validar esa dirección 🙏.",
+              'metodo_usado'          => 'pedir_clarificacion_ciudad',
+          ];
+      }
 
       // 🌟 ESTRATEGIA NUEVA (PREFERIDA): cobertura DIRECTA en sedes
       // Cada sede tiene su propio polígono. SedeResolverService elige la
