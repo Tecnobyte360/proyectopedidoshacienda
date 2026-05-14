@@ -441,6 +441,26 @@ class WhatsappWebhookController extends Controller
                 Log::warning('Anti-loop chequeo falló: ' . $e->getMessage());
             }
 
+            // 🛡️ ANTI-PROMESA-ROTA: si el bot dijo "déjame buscar X" o
+            //    "voy a verificar" SIN llamar tool, ejecutar la tool faltante
+            //    y reemplazar el reply ANTES de enviarlo. El cliente NO debe
+            //    quedar esperando una promesa sin cumplir.
+            if ($this->respuestaEsPromesaRota($reply, $toolMessages ?? [])) {
+                Log::warning('🛡️ PROMESA ROTA detectada — auto-recuperando', [
+                    'from'  => $from,
+                    'reply' => mb_substr($reply, 0, 100),
+                ]);
+                try {
+                    $replyRecuperado = $this->autoEjecutarToolDePromesa($reply, $message, $conversacion, $connectionId, $from);
+                    if ($replyRecuperado) {
+                        $reply = $replyRecuperado;
+                        Log::info('✅ Promesa rota recuperada', ['from' => $from]);
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning('No se pudo recuperar promesa rota: ' . $e->getMessage());
+                }
+            }
+
             Log::info('💬 RESPUESTA GENERADA', compact('reply', 'from', 'messageId', 'connectionId'));
 
             $sent = $this->enviarRespuestaWhatsapp($from, $reply, $connectionId);
@@ -3259,6 +3279,119 @@ TXT;
             return false;
         } catch (\Throwable $e) {
             return false;
+        }
+    }
+
+    /**
+     * 🛡️ ¿La respuesta del bot es una "promesa rota"? Es decir, texto que
+     * promete una acción ("déjame buscar X") sin que se haya ejecutado
+     * ninguna tool útil que lo respalde.
+     */
+    private function respuestaEsPromesaRota(string $reply, array $toolMessages): bool
+    {
+        $n = mb_strtolower(\Illuminate\Support\Str::ascii(trim($reply)));
+        if ($n === '') return false;
+
+        // Texto demasiado corto sin verbos de cierre → probable promesa
+        $patronesPromesa = [
+            'dejame buscar', 'déjame buscar', 'voy a buscar', 'permíteme buscar', 'permiteme buscar',
+            'dejame verificar', 'déjame verificar', 'voy a verificar', 'verifico',
+            'dejame revisar', 'déjame revisar', 'voy a revisar',
+            'un momento por favor', 'un momento por fa', 'dame un momento', 'dame un segundo',
+            'espera un momento', 'espera un segundo',
+            'te confirmo en un momento', 'te confirmo enseguida',
+            'consulto y te aviso', 'consulto y te digo',
+            'busco esa información', 'busco esa info',
+            'déjame ver', 'dejame ver',
+        ];
+        $tienePromesa = false;
+        foreach ($patronesPromesa as $p) {
+            if (str_contains($n, $p)) { $tienePromesa = true; break; }
+        }
+        if (!$tienePromesa) return false;
+
+        // Si la respuesta tiene MÁS contenido que solo la promesa (>120 chars o
+        // contiene listas/precios), entonces ya cumplió. Una promesa "rota"
+        // típicamente es CORTA y NO trae info concreta.
+        if (mb_strlen($n) > 120) return false;
+        if (preg_match('/\$\s?\d|\d+\s*(kg|kl|lb|libra|kilo|unidad)|•|\*\*[a-z]/iu', $reply)) return false;
+
+        // Si se ejecutaron tools útiles, la promesa fue cumplida.
+        $toolsUtiles = ['buscar_productos', 'productos_de_categoria', 'productos_destacados',
+                        'info_producto', 'consultar_promociones', 'consultar_zonas_cobertura',
+                        'validar_cobertura'];
+        foreach ($toolMessages as $tm) {
+            $name = $tm['name'] ?? '';
+            if (in_array($name, $toolsUtiles, true)) {
+                $content = (string) ($tm['content'] ?? '');
+                if (mb_strlen($content) > 30 && !str_contains($content, '"encontrados":0')) {
+                    return false; // tool útil con resultados → promesa cumplida
+                }
+            }
+        }
+
+        return true; // promesa sin tool útil que la respalde
+    }
+
+    /**
+     * 🛡️ Ejecuta la tool que el bot prometió y devuelve un reply con
+     * el resultado real. Si no puede determinar la tool, devuelve null.
+     */
+    private function autoEjecutarToolDePromesa(string $replyPromesa, string $mensajeCliente, $conversacion, $connectionId, string $from): ?string
+    {
+        $msgN = mb_strtolower(\Illuminate\Support\Str::ascii(trim($mensajeCliente)));
+        if ($msgN === '') return null;
+
+        // Determinar qué buscar según contexto:
+        // El último mensaje del cliente + lo que el bot prometió buscar.
+        $combinado = $msgN . ' ' . mb_strtolower(\Illuminate\Support\Str::ascii($replyPromesa));
+
+        // Intentar extraer un producto mencionado (palabra clave significativa)
+        // Tomamos sustantivos del mensaje del cliente
+        $palabras = preg_split('/[\s,.\?!¡¿]+/u', $msgN);
+        $stopwords = ['cuanto','cuánto','que','qué','tienes','hay','dame','quiero','necesito',
+                      'es','el','la','los','las','un','una','de','del','para','por','con',
+                      'el','la','solomito','informacion','información','maximo','máximo'];
+        $producto = null;
+        foreach ($palabras as $p) {
+            $p = trim($p);
+            if (mb_strlen($p) >= 4 && !in_array($p, $stopwords, true)) {
+                $producto = $producto ? $producto . ' ' . $p : $p;
+            }
+        }
+        // Si no encontramos producto en el mensaje del cliente, buscar en el reply del bot
+        if (!$producto || mb_strlen($producto) < 4) {
+            if (preg_match('/(?:solomito|pollo|res|cerdo|costilla|milanesa|cañon|caño|pierna|pescado|basa|bagre|hueso|carne|pechuga|muslo|chuleta|posta|punta|lomo|bocadillo|chorizo|filete)\s*\w*/iu', $combinado, $m)) {
+                $producto = trim($m[0]);
+            }
+        }
+
+        if (!$producto) return null;
+
+        try {
+            // Ejecutar buscar_productos directamente
+            app(\App\Services\TenantManager::class)->set($conversacion->tenant);
+            $sedeId = $this->obtenerSedeIdDesdeConexion($connectionId);
+            $svc = app(\App\Services\BotCatalogoToolService::class);
+            $r = $svc->buscarProductos($producto, null, 5, $sedeId);
+
+            $productos = $r['productos'] ?? [];
+            if (empty($productos)) return null;
+
+            // Formatear respuesta con los resultados
+            $lineas = ["Esto es lo que tenemos:"];
+            foreach (array_slice($productos, 0, 5) as $p) {
+                $nombre = $p['nombre'] ?? '?';
+                $precio = $p['precio'] ?? 0;
+                $unidad = $p['unidad'] ?? 'unidad';
+                $lineas[] = "• **{$nombre}** — $" . number_format($precio, 0, ',', '.') . "/{$unidad}";
+            }
+            $lineas[] = "";
+            $lineas[] = "¿Cuál te llevas y cuánto? 😊";
+            return implode("\n", $lineas);
+        } catch (\Throwable $e) {
+            Log::warning('autoEjecutarToolDePromesa falló: ' . $e->getMessage());
+            return null;
         }
     }
 
