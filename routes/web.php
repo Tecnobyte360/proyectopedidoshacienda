@@ -136,7 +136,8 @@ Route::middleware(['no_super_sin_imp'])->group(function () {
         ->middleware('permission:bot.configurar')
         ->name('monitoreo.llm');
 
-    Route::get('/monitoreo/watchdog', \App\Livewire\Monitoreo\Watchdog::class)
+    // /monitoreo/watchdog redirige al tab Watchdog dentro de /monitoreo/llm
+    Route::get('/monitoreo/watchdog', fn () => redirect('/monitoreo/llm?tab=watchdog'))
         ->middleware('permission:bot.configurar')
         ->name('monitoreo.watchdog');
 

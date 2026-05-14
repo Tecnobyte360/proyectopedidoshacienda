@@ -3,12 +3,19 @@
 namespace App\Livewire\Monitoreo;
 
 use App\Models\LlmInvocacion;
+use App\Models\WatchdogRescate;
 use Livewire\Component;
 use Livewire\Attributes\Computed;
 
 class Llm extends Component
 {
     public int $minutos = 30;  // Ventana de análisis
+    public string $tab = 'llm';  // 'llm' | 'watchdog'
+
+    protected $queryString = [
+        'tab'     => ['except' => 'llm'],
+        'minutos' => ['except' => 30],
+    ];
 
     public function render()
     {
@@ -55,6 +62,21 @@ class Llm extends Component
 
         $tasaExito = $total > 0 ? round(($exitosos / $total) * 100, 1) : 100;
 
+        // 🐕 WATCHDOG — KPIs y rescates recientes (misma ventana que LLM)
+        $wdQuery = WatchdogRescate::where('created_at', '>=', $desde);
+        $wdTotal      = (clone $wdQuery)->count();
+        $wdExitosos   = (clone $wdQuery)->where('exitoso', true)->count();
+        $wdFallidos   = $wdTotal - $wdExitosos;
+        $wdPromSegs   = (int) round((clone $wdQuery)->avg('segundos_estancada') ?: 0);
+        $wdClientes   = (clone $wdQuery)->distinct('telefono')->count('telefono');
+        $wdTasaExito  = $wdTotal > 0 ? round(($wdExitosos / $wdTotal) * 100, 1) : 100;
+        $wdUltimo     = (clone $wdQuery)->orderByDesc('id')->first();
+        $wdRescates   = (clone $wdQuery)
+            ->with(['conversacion:id,cliente_id,telefono_normalizado', 'conversacion.cliente:id,nombre'])
+            ->orderByDesc('id')
+            ->limit(50)
+            ->get();
+
         return view('livewire.monitoreo.llm', [
             'invocaciones'      => $invocaciones,
             'total'             => $total,
@@ -73,6 +95,15 @@ class Llm extends Component
             'porcentajeUso'     => $porcentajeUso,
             'estado'            => $estado,
             'tasaExito'         => $tasaExito,
+            // 🐕 Watchdog data
+            'wdTotal'           => $wdTotal,
+            'wdExitosos'        => $wdExitosos,
+            'wdFallidos'        => $wdFallidos,
+            'wdPromSegs'        => $wdPromSegs,
+            'wdClientes'        => $wdClientes,
+            'wdTasaExito'       => $wdTasaExito,
+            'wdUltimo'          => $wdUltimo,
+            'wdRescates'        => $wdRescates,
         ])->layout('layouts.app');
     }
 }
