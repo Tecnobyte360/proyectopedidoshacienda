@@ -29,30 +29,27 @@ class WatchdogConversacionesEstancadas extends Command
 
     public function handle(): int
     {
-        // Recolectar todas las conversaciones donde el ÚLTIMO mensaje sea del usuario
-        // y haya pasado >=15s sin respuesta del bot (en las últimas 24h).
-        // Eso cubre dos casos:
-        //   A) Bot dijo "un momento" y no siguió (típico).
-        //   B) Bot pidió "¿Confirmas?", cliente respondió, y por un error el bot no respondió.
-        //   C) Cualquier otro caso donde el cliente envió mensaje y el bot quedó mudo.
-        // 🛡️ Ventana de detección: usuario sin respuesta entre 30s y 2h.
-        // Antes era 15s pero generaba race conditions: el bot a veces tarda
-        // 5-12s en responder, y si el INSERT del mensaje assistant aún no se
-        // commitea cuando corre el watchdog, ve solo el msg del user y dispara
-        // rescate innecesario.
-        // Ventana de detección: 30s a 5 minutos.
-        // Mensajes >5 min sin respuesta del bot YA NO se rescatan: el cliente
-        // probablemente abandonó y rescatarlos genera "spam" (le llega respuesta
-        // de un mensaje viejo que él ya olvidó).
+        // 🎛️ Configuración desde BD — editable en /configuracion-bot
+        $cfgGlobal = \App\Models\ConfiguracionBot::actual();
+        $activo    = (bool) ($cfgGlobal->watchdog_activo ?? true);
+        if (!$activo) {
+            Log::info('🐕 Watchdog: desactivado por configuración');
+            return self::SUCCESS;
+        }
+
+        $minSegs     = max(10, min(300, (int) ($cfgGlobal->watchdog_min_segundos ?? 30)));
+        $maxMins     = max(1,  min(120, (int) ($cfgGlobal->watchdog_max_minutos ?? 5)));
+        $skipPedMin  = max(0,  min(180, (int) ($cfgGlobal->watchdog_skip_pedido_min ?? 30)));
+        $cooldownMin = max(1,  min(180, (int) ($cfgGlobal->watchdog_cooldown_conv_min ?? 30)));
+
+        // Ventana configurable. Mensajes >X min YA NO se rescatan (evita spam).
         $candidatas = ConversacionWhatsapp::query()
-            ->where('updated_at', '>=', now()->subMinutes(10))
-            // Excluir conversaciones que se actualizaron en los últimos 25s
-            // (probable que el bot las esté procesando ahora mismo).
+            ->where('updated_at', '>=', now()->subMinutes($maxMins + 5))
             ->where('updated_at', '<=', now()->subSeconds(25))
-            ->whereHas('mensajes', function ($q) {
+            ->whereHas('mensajes', function ($q) use ($minSegs, $maxMins) {
                 $q->where('rol', MensajeWhatsapp::ROL_USER)
-                  ->where('created_at', '<=', now()->subSeconds(30))
-                  ->where('created_at', '>=', now()->subMinutes(5)); // ventana 30s-5min
+                  ->where('created_at', '<=', now()->subSeconds($minSegs))
+                  ->where('created_at', '>=', now()->subMinutes($maxMins));
             })
             ->limit(30)
             ->get();
@@ -68,17 +65,15 @@ class WatchdogConversacionesEstancadas extends Command
             if ($ultimoMsg->rol !== MensajeWhatsapp::ROL_USER) continue;
 
             $segundosDesde = abs((int) now()->diffInSeconds($ultimoMsg->created_at));
-            // Ventana: 30s a 5 min. Mensajes mas viejos NO se rescatan para evitar
-            // spam al cliente con respuestas tardias a mensajes que ya olvido.
-            if ($segundosDesde < 30 || $segundosDesde > 300) continue;
+            $maxSegs       = $maxMins * 60;
+            if ($segundosDesde < $minSegs || $segundosDesde > $maxSegs) continue;
 
             // Excepción: si es un mensaje watchdog previo, no entrar en loop.
             if (str_starts_with((string) ($ultimoMsg->mensaje_externo_id ?? ''), 'watchdog_')) continue;
 
-            // 🛡️ NO rescatar si la conv YA generó un pedido en los últimos 30 minutos.
-            // Sin este check, el watchdog crea pedidos duplicados cada vez que se dispara.
-            $tienePedidoReciente = \App\Models\Pedido::where('telefono_whatsapp', $conv->telefono_normalizado)
-                ->where('created_at', '>=', now()->subMinutes(30))
+            // 🛡️ NO rescatar si la conv YA generó un pedido reciente (configurable).
+            $tienePedidoReciente = $skipPedMin > 0 && \App\Models\Pedido::where('telefono_whatsapp', $conv->telefono_normalizado)
+                ->where('created_at', '>=', now()->subMinutes($skipPedMin))
                 ->whereNotIn('estado', [\App\Models\Pedido::ESTADO_CANCELADO])
                 ->exists();
             if ($tienePedidoReciente) {
@@ -96,7 +91,7 @@ class WatchdogConversacionesEstancadas extends Command
             $cooldownConv = "watchdog_rescate_conv_{$conv->id}";
             $cooldownMsg  = "watchdog_rescate_msg_{$ultimoMsg->id}";
             if (\Cache::has($cooldownConv) || \Cache::has($cooldownMsg)) continue;
-            \Cache::put($cooldownConv, true, now()->addMinutes(30));
+            \Cache::put($cooldownConv, true, now()->addMinutes($cooldownMin));
             \Cache::put($cooldownMsg,  true, now()->addHours(24));
 
             Log::info('🐕 Watchdog: rescatando conversación estancada', [

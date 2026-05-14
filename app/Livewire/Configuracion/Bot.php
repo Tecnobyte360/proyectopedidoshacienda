@@ -143,6 +143,13 @@ class Bot extends Component
     public int    $auto_reset_horas_inactividad  = 3;
     public bool   $aislar_contexto_por_dia       = true;
 
+    // 🐕 Watchdog — rescate de conversaciones donde el bot no respondió
+    public bool $watchdog_activo            = true;
+    public int  $watchdog_min_segundos      = 30;
+    public int  $watchdog_max_minutos       = 5;
+    public int  $watchdog_skip_pedido_min   = 30;
+    public int  $watchdog_cooldown_conv_min = 30;
+
     // Editor de prompt por bloques
     public bool  $vistaPorBloques = true;
     public array $bloquesPrompt   = [];   // [{titulo, contenido}]
@@ -267,6 +274,13 @@ class Bot extends Component
         $this->auto_limpieza_max_msgs       = (int) ($cfg->auto_limpieza_max_msgs ?? 100);
         $this->auto_reset_horas_inactividad = (int) ($cfg->auto_reset_horas_inactividad ?? 3);
         $this->aislar_contexto_por_dia      = (bool) ($cfg->aislar_contexto_por_dia ?? true);
+
+        // 🐕 Watchdog
+        $this->watchdog_activo            = (bool) ($cfg->watchdog_activo ?? true);
+        $this->watchdog_min_segundos      = (int) ($cfg->watchdog_min_segundos ?? 30);
+        $this->watchdog_max_minutos       = (int) ($cfg->watchdog_max_minutos ?? 5);
+        $this->watchdog_skip_pedido_min   = (int) ($cfg->watchdog_skip_pedido_min ?? 30);
+        $this->watchdog_cooldown_conv_min = (int) ($cfg->watchdog_cooldown_conv_min ?? 30);
 
         // Parsear el system_prompt en bloques editables
         $this->bloquesPrompt = $this->parsearBloques($this->system_prompt);
@@ -757,6 +771,11 @@ class Bot extends Component
             'auto_limpieza_max_msgs'                => 'integer|min:10|max:5000',
             'auto_reset_horas_inactividad'          => 'integer|min:0|max:168',
             'aislar_contexto_por_dia'               => 'boolean',
+            'watchdog_activo'                       => 'boolean',
+            'watchdog_min_segundos'                 => 'integer|min:10|max:300',
+            'watchdog_max_minutos'                  => 'integer|min:1|max:120',
+            'watchdog_skip_pedido_min'              => 'integer|min:0|max:180',
+            'watchdog_cooldown_conv_min'            => 'integer|min:1|max:180',
         ];
     }
 

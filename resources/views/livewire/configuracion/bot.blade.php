@@ -2007,6 +2007,97 @@
             </div>
         </section>
 
+        {{-- 🐕 SECCIÓN: Watchdog (rescate de conversaciones) --}}
+        <section class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 class="text-lg font-bold text-slate-800 mb-1">
+                <i class="fa-solid fa-dog mr-2 text-amber-500"></i> Watchdog · Rescate automático
+            </h2>
+            <p class="text-xs text-slate-500 mb-5">
+                El watchdog corre cada minuto y rescata conversaciones donde el cliente envió un mensaje
+                pero el bot no respondió (por errores transitorios de Anthropic, timeouts, etc.).
+            </p>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {{-- Toggle --}}
+                <div class="md:col-span-2">
+                    <label class="flex items-start gap-3 cursor-pointer rounded-xl border-2 p-4 transition {{ $watchdog_activo ? 'border-amber-500 bg-amber-50' : 'border-slate-200 hover:bg-slate-50' }}">
+                        <input type="checkbox" wire:model.live="watchdog_activo" class="mt-1 h-5 w-5 rounded text-amber-600">
+                        <div class="flex-1">
+                            <div class="font-semibold text-slate-800">
+                                <i class="fa-solid fa-power-off mr-1"></i> Activar watchdog
+                            </div>
+                            <p class="text-xs text-slate-600 mt-0.5">
+                                Si está activo, cada minuto se rescatan conversaciones donde el bot
+                                no haya respondido al cliente. <strong>Recomendado: activo.</strong>
+                            </p>
+                        </div>
+                    </label>
+                </div>
+
+                {{-- Min segundos --}}
+                <div>
+                    <label class="text-xs font-semibold text-slate-700 mb-1 block uppercase tracking-wide">
+                        <i class="fa-regular fa-clock mr-1"></i> Esperar antes de rescatar (segundos)
+                    </label>
+                    <input type="number" min="10" max="300" wire:model="watchdog_min_segundos"
+                           class="w-full rounded-xl border-slate-300 focus:border-brand focus:ring-brand">
+                    <p class="text-xs text-slate-500 mt-1">
+                        Tiempo mínimo desde el último mensaje del cliente antes de rescatar.
+                        Recomendado: <strong>30s</strong>. Muy bajo causa duplicados, muy alto demora.
+                    </p>
+                </div>
+
+                {{-- Max minutos --}}
+                <div>
+                    <label class="text-xs font-semibold text-slate-700 mb-1 block uppercase tracking-wide">
+                        <i class="fa-solid fa-hourglass-end mr-1"></i> No rescatar después de (minutos)
+                    </label>
+                    <input type="number" min="1" max="120" wire:model="watchdog_max_minutos"
+                           class="w-full rounded-xl border-slate-300 focus:border-brand focus:ring-brand">
+                    <p class="text-xs text-slate-500 mt-1">
+                        Si pasaron más de X minutos sin que el bot responda, NO se rescata —
+                        el cliente ya olvidó el chat. Recomendado: <strong>5 minutos</strong>.
+                    </p>
+                </div>
+
+                {{-- Skip si pedido reciente --}}
+                <div>
+                    <label class="text-xs font-semibold text-slate-700 mb-1 block uppercase tracking-wide">
+                        <i class="fa-solid fa-shield-halved mr-1"></i> No rescatar si pedido en últimos (min)
+                    </label>
+                    <input type="number" min="0" max="180" wire:model="watchdog_skip_pedido_min"
+                           class="w-full rounded-xl border-slate-300 focus:border-brand focus:ring-brand">
+                    <p class="text-xs text-slate-500 mt-1">
+                        Si el cliente ya tiene pedido reciente, NO rescatar — evita duplicados.
+                        Recomendado: <strong>30 min</strong>. (0 = desactivado).
+                    </p>
+                </div>
+
+                {{-- Cooldown por conversación --}}
+                <div>
+                    <label class="text-xs font-semibold text-slate-700 mb-1 block uppercase tracking-wide">
+                        <i class="fa-solid fa-arrows-rotate mr-1"></i> Cooldown por conversación (min)
+                    </label>
+                    <input type="number" min="1" max="180" wire:model="watchdog_cooldown_conv_min"
+                           class="w-full rounded-xl border-slate-300 focus:border-brand focus:ring-brand">
+                    <p class="text-xs text-slate-500 mt-1">
+                        Tiempo mínimo entre rescates de la <em>misma</em> conversación.
+                        Evita loops. Recomendado: <strong>30 min</strong>.
+                    </p>
+                </div>
+            </div>
+
+            <div class="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                <p class="text-xs text-amber-800">
+                    <i class="fa-solid fa-lightbulb mr-1"></i>
+                    <strong>Tip:</strong> puedes ver el watchdog en acción en
+                    <a href="{{ route('monitoreo.llm') }}?tab=watchdog" class="underline font-semibold">
+                        Monitor LLM → tab Watchdog
+                    </a>. Cada rescate se registra ahí con detalle (cliente, mensaje, segundos de espera).
+                </p>
+            </div>
+        </section>
+
         <div class="flex justify-end pt-4">
             <button type="submit"
                     class="rounded-2xl bg-brand px-8 py-3 text-white font-bold shadow hover:bg-brand-dark transition">
