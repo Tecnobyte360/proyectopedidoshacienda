@@ -68,6 +68,16 @@ Schedule::command('bot:liberar-conversaciones-huerfanas --horas=2')
     ->withoutOverlapping()
     ->runInBackground();
 
+// 🐕 Watchdog — rescata conversaciones donde el bot dijo "un momento" y no
+// continuó la respuesta (ej. Anthropic falló, tool_use huérfano).
+// Corre cada minuto, busca convs con últimos 20s-10min de espera del bot
+// y dispara un retry virtual para forzar al bot a responder.
+Schedule::command('bot:watchdog-estancadas')
+    ->everyMinute()
+    ->timezone('America/Bogota')
+    ->withoutOverlapping(5)
+    ->runInBackground();
+
 Schedule::command('clientes:felicitar-cumpleanos')
     ->everyMinute()
     ->timezone('America/Bogota')

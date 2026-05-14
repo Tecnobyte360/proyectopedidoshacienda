@@ -137,6 +137,23 @@ class AnthropicService
 
                 // 401/403: no reintentar
                 if (in_array($ultimoStatus, [401, 403], true)) break;
+
+                // 🛡️ 400 con "tool_use" sin "tool_result" → sanitizar y reintentar
+                // INMEDIATAMENTE (no esperar a fallar todos los intentos).
+                // Sin sanitizar, los 4 reintentos fallan exactamente igual.
+                if ($ultimoStatus === 400
+                    && stripos($ultimoBody, 'tool_use') !== false
+                    && stripos($ultimoBody, 'tool_result') !== false
+                    && empty($opts['_sanitizedRetry'])) {
+                    Log::warning('🛡️ 400 tool_use huérfano detectado — sanitizando y reintentando una vez', [
+                        'status' => $ultimoStatus,
+                    ]);
+                    $messagesLimpios = $this->sanitizarMensajesParaFallback($messages);
+                    return $this->chat($messagesLimpios, $toolChoice, $tools, array_merge($opts, [
+                        '_sanitizedRetry' => true,
+                        'intentos'        => 2,
+                    ]));
+                }
             } catch (\Throwable $e) {
                 $ultimaExc = $e->getMessage();
                 Log::warning("⚠️ Anthropic excepción intento {$i}", ['error' => $ultimaExc]);

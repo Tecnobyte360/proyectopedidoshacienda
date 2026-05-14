@@ -1165,7 +1165,8 @@ TXT;
             // Usamos la fuente de verdad MÁS ROBUSTA: la conversación tiene pedido_id
             // o ha generado un pedido previamente. Si llega un saludo o mensaje
             // de inicio, asumimos nuevo pedido.
-            $ultimoPedido = \App\Models\Pedido::where('telefono_whatsapp', $telNorm)
+            $telNormLocal = $this->normalizarTelefono($from);
+            $ultimoPedido = \App\Models\Pedido::where('telefono_whatsapp', $telNormLocal)
                 ->whereNotIn('estado', [\App\Models\Pedido::ESTADO_CANCELADO])
                 ->orderByDesc('id')
                 ->first();
