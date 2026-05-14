@@ -677,13 +677,35 @@ class BotCatalogoService
         $tenantId = app(\App\Services\TenantManager::class)->id();
         if (!$tenantId) return;
 
+        // 🔒 Lock por tenant — evita que dos procesos en paralelo (ej. /productos
+        // y el webhook del bot) creen duplicados. TTL corto (60s) por si crashea.
+        $lock = Cache::lock("bot_mirror_productos_t{$tenantId}", 60);
+        if (!$lock->get()) {
+            // Otro proceso ya está espejando — saltamos sin bloquear.
+            return;
+        }
+
+        try {
+            $this->reflejarLiveEnLocalProtegido($liveRows, $integracion, $tenantId);
+        } finally {
+            optional($lock)->release();
+        }
+    }
+
+    private function reflejarLiveEnLocalProtegido(Collection $liveRows, \App\Models\Integracion $integracion, $tenantId): void
+    {
         // Cache de categorías local (1 query)
         $categoriasCache = \App\Models\ProductoCategoria::where('tenant_id', $tenantId)
             ->get()
             ->keyBy(fn ($c) => mb_strtolower($c->nombre));
 
-        // Lookup local por código (1 query)
-        $codigos = $liveRows->pluck('codigo')->filter()->unique()->values()->all();
+        // Normalizador de código: quita espacios y ceros a la izquierda — SGI
+        // a veces devuelve "0306" y otras "306" → si no los igualamos, creamos
+        // duplicados.
+        $normCodigo = fn ($c) => ltrim(trim((string) $c), '0');
+
+        // Lookup local por código (1 query). Trabajamos con códigos normalizados.
+        $codigos = $liveRows->pluck('codigo')->filter()->map($normCodigo)->filter()->unique()->values()->all();
         $localesPorCodigo = collect();
         if (!empty($codigos)) {
             $localesPorCodigo = \App\Models\Producto::where('tenant_id', $tenantId)
@@ -694,7 +716,7 @@ class BotCatalogoService
 
         foreach ($liveRows as $live) {
             try {
-                $codigo = trim((string) ($live->codigo ?? ''));
+                $codigo = $normCodigo($live->codigo ?? '');
                 $nombre = $this->limpiarUtf8(trim((string) ($live->nombre ?? '')));
                 if ($codigo === '' || $nombre === '') continue;
 
