@@ -6793,10 +6793,14 @@ TXT;
             (string) ($orderData['notes'] ?? '') . ' ' .
             (string) ($orderData['payment_method'] ?? '')
         );
+        // 🛡️ ADEMÁS de notes/payment_method, detectar pickup en address si contiene
+        // "sede" o "recoger" — el LLM a veces pone "Sede Principal" como address
+        $addressForDetect = (string) ($orderData['address'] ?? '');
         $esPickup = !empty($orderData['pickup'])
             || !empty($orderData['sede_id'])
             || (isset($pickupTime) && $pickupTime !== null)
-            || preg_match('/\b(recog(?:er|erlo|erla|emos|ida|ido)|paso\s+por|pasar\s+por|en\s+sede|recoj[oa]|en\s+la\s+sede|recoge\s+en\s+sede)\b/iu', $textoEntrega) === 1;
+            || preg_match('/\b(recog(?:er|erlo|erla|emos|ida|ido)|paso\s+por|pasar\s+por|en\s+sede|recoj[oa]|en\s+la\s+sede|recoge\s+en\s+sede)\b/iu', $textoEntrega) === 1
+            || preg_match('/^\s*sede(\s|$|:)/iu', $addressForDetect) === 1; // address comienza con "Sede X"
 
         // 🛡️ FUENTE DE VERDAD: el estado persistente. Si el captador determinista
         //    detectó "recoger" en la conversación, gana sobre lo que el LLM
