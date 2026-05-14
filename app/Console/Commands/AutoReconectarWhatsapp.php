@@ -72,9 +72,36 @@ class AutoReconectarWhatsapp extends Command
         // Listar conexiones del tenant
         $resp = Http::withoutVerifying()->withToken($token)->timeout(15)->get("{$apiBase}/whatsapp/");
         if (!$resp->successful()) {
+            Log::warning('🔁 Auto-reconectar: listado WA falló', [
+                'tenant_id' => $tenant->id,
+                'status'    => $resp->status(),
+            ]);
             return ['intentos' => 0, 'exitos' => 0];
         }
-        $whatsapps = collect($resp->json() ?: []);
+
+        // 🛡️ La API devuelve {whatsapps: [...], count, hasMore} en respuestas nuevas
+        //    o un array plano en versiones legacy. Normalizamos ambos casos.
+        $body = $resp->json() ?: [];
+        if (isset($body['whatsapps']) && is_array($body['whatsapps'])) {
+            $whatsapps = collect($body['whatsapps']);
+        } elseif (is_array($body) && array_is_list($body)) {
+            $whatsapps = collect($body);
+        } else {
+            // Último recurso: buscar la primera lista de objetos con 'id'
+            $whatsapps = collect();
+            foreach ($body as $v) {
+                if (is_array($v) && isset($v[0]['id'])) {
+                    $whatsapps = collect($v);
+                    break;
+                }
+            }
+        }
+
+        Log::info('🔁 Auto-reconectar: listado WA', [
+            'tenant_id' => $tenant->id,
+            'total_conexiones' => $whatsapps->count(),
+            'estados' => $whatsapps->pluck('status')->all(),
+        ]);
 
         // Filtrar a las conexiones que pertenecen a este tenant
         // (connection_ids vive dentro de whatsapp_config como JSON)
