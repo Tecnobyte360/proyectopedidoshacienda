@@ -6381,12 +6381,14 @@ TXT;
                     if ($conversacion) {
                         try {
                             $conversacion->update([
-                                'modo'             => 'humano',
-                                'derivada_a'       => 'Comercial (pedido grande)',
-                                'derivada_at'      => now(),
-                                'razon_derivacion' => "Pedido por $" . number_format($totalEstimado, 0, ',', '.') . " excede umbral automático ($" . number_format($umbralMax, 0, ',', '.') . ")",
+                                'requiere_humano'        => true,
+                                'humano_motivo'          => 'Pedido grande $' . number_format($totalEstimado, 0, ',', '.') . ' (umbral $' . number_format($umbralMax, 0, ',', '.') . ')',
+                                'humano_solicitado_at'   => now(),
+                                'derivada_at'            => now(),
                             ]);
-                        } catch (\Throwable $e) { /* ignore */ }
+                        } catch (\Throwable $e) {
+                            Log::warning('No se pudo marcar handoff por pedido grande: ' . $e->getMessage());
+                        }
                     }
 
                     $primerNombre = explode(' ', trim((string) $name))[0] ?? '';
