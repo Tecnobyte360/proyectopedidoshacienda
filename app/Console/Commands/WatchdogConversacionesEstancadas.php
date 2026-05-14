@@ -40,7 +40,7 @@ class WatchdogConversacionesEstancadas extends Command
             ->whereHas('mensajes', function ($q) {
                 $q->where('rol', MensajeWhatsapp::ROL_USER)
                   ->where('created_at', '<=', now()->subSeconds(15))
-                  ->where('created_at', '>=', now()->subMinutes(10));
+                  ->where('created_at', '>=', now()->subHours(2));
             })
             ->limit(30)
             ->get();
@@ -56,7 +56,7 @@ class WatchdogConversacionesEstancadas extends Command
             if ($ultimoMsg->rol !== MensajeWhatsapp::ROL_USER) continue;
 
             $segundosDesde = now()->diffInSeconds($ultimoMsg->created_at);
-            if ($segundosDesde < 15 || $segundosDesde > 600) continue;
+            if ($segundosDesde < 15 || $segundosDesde > 7200) continue; // hasta 2h
 
             // Excepción: si es un mensaje watchdog previo, no entrar en loop.
             if (str_starts_with((string) ($ultimoMsg->mensaje_externo_id ?? ''), 'watchdog_')) continue;
