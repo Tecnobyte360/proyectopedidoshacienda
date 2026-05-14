@@ -68,6 +68,7 @@ class BotPromptService
         string $infoEmpresa,
         string $historialCliente,
         string $ansInfo,
+        ?string $telefonoCliente = null,
     ): array {
         $config = ConfiguracionBot::actual();
         // Forzar timezone Bogotá para que coincida con Sede::estaAbierta()
@@ -81,6 +82,10 @@ class BotPromptService
         $notaImagenes = $config->enviar_imagenes_productos
             ? "📸 Tienes la función `enviar_imagen_producto` disponible. Úsala cuando el cliente pida ver el producto, dude entre opciones, o quieras destacar algo. Máx {$config->max_imagenes_por_mensaje} imágenes por llamada. Usa códigos SKU del catálogo."
             : '';
+
+        // 🧠 MEMORIA DEL CLIENTE: si tenemos su teléfono, armamos un resumen
+        // con sus pedidos previos, productos favoritos, dirección habitual, etc.
+        $memoriaCliente = $this->construirMemoriaCliente($telefonoCliente);
 
         // Calcular primer nombre (más natural para WhatsApp informal)
         $nombreLimpio = trim($clienteNombre);
@@ -142,6 +147,7 @@ class BotPromptService
             'cliente_es_conocido'   => $clienteConocido ? 'SI' : 'NO',
             'saludo_hora'           => $saludoHora,
             'horarios_sedes'        => $horariosTexto . "\n\n" . $sedesListaRestrictiva,
+            'memoria_cliente'       => $memoriaCliente,
             'sede_estado_actual'    => $estadoSedeTexto,
             'fecha_actual'      => $ahora->locale('es')->isoFormat('D [de] MMMM [de] YYYY'),
             'hora_actual'       => $ahora->format('h:i a'),  // 12h con AM/PM
@@ -737,6 +743,8 @@ cualquier cosa que sugiera que no eres humana. Si te lo preguntan directo:
 **¿Ya lo conocemos?:** {cliente_es_conocido}
 **Primer nombre (úsalo así):** {cliente_primer_nombre}
 
+{memoria_cliente}
+
 🎯 **REGLA DE ORO DE PERSONALIZACIÓN:**
 - Si `cliente_es_conocido = SI` → DEBES usar `{cliente_primer_nombre}` al saludar Y al menos 1 vez más
   durante la conversación. Suena más cálido y muestra que lo conocemos.
@@ -1040,5 +1048,115 @@ Después de confirmar un pedido, despídete cálido y deja la puerta abierta:
 
 Varía siempre. Sé breve y humano.
 PROMPT;
+    }
+
+    /**
+     * 🧠 Construye un resumen de la "memoria" del cliente — sus pedidos
+     * previos, productos favoritos, dirección habitual, sede preferida.
+     * Esto se inyecta en el system prompt para que el bot sepa quién es
+     * el cliente desde el primer mensaje y pueda saludar/sugerir mejor.
+     *
+     * Ejemplo del texto generado:
+     *   🧠 MEMORIA DEL CLIENTE:
+     *     • Edgar Stiven Madrid Londoño — cliente desde 04/05/2026
+     *     • 7 pedidos totales · último hace 3 días por $35.500
+     *     • Productos frecuentes: Milanesa de Res (5), Pechuga Blanca (3)
+     *     • Última dirección: Cra 50 #51-00, Bello
+     *     • Suele pedir DESPACHO
+     */
+    private function construirMemoriaCliente(?string $telefono): string
+    {
+        if (empty($telefono)) return '';
+
+        try {
+            $tenantId = app(\App\Services\TenantManager::class)->id();
+            if (!$tenantId) return '';
+
+            $telNorm = preg_replace('/\D+/', '', $telefono);
+            $cliente = \App\Models\Cliente::where('tenant_id', $tenantId)
+                ->where('telefono_normalizado', $telNorm)
+                ->first();
+
+            if (!$cliente) return '';
+
+            $partes = ["🧠 MEMORIA DEL CLIENTE — USA ESTOS DATOS PARA SER MÁS ÚTIL:"];
+            $partes[] = "  • Nombre: {$cliente->nombre}";
+            if ($cliente->cedula) $partes[] = "  • Cédula: {$cliente->cedula} (ya está en SGI)";
+            if ($cliente->email)  $partes[] = "  • Email: {$cliente->email}";
+
+            // Antigüedad
+            if ($cliente->created_at) {
+                $dias = $cliente->created_at->diffInDays(now());
+                $partes[] = "  • Cliente desde: {$cliente->created_at->locale('es')->isoFormat('D MMM YYYY')} ({$dias} días)";
+            }
+
+            // Pedidos previos
+            $pedidos = \App\Models\Pedido::where('telefono_whatsapp', $telNorm)
+                ->where('estado', '!=', 'cancelado')
+                ->orderByDesc('id')
+                ->limit(10)
+                ->get();
+
+            if ($pedidos->isEmpty()) {
+                $partes[] = "  • Pedidos previos: NINGUNO (es su primera vez ✨)";
+                $partes[] = "";
+                $partes[] = "📌 INSTRUCCIÓN: Es un cliente nuevo en pedidos. Trátalo cordialmente, "
+                          . "explícale opciones si pregunta. Su cédula/email ya están registrados.";
+            } else {
+                $totalPedidos = $pedidos->count();
+                $totalGastado = $pedidos->sum('total');
+                $ultimo = $pedidos->first();
+                $diasUlt = $ultimo->created_at->diffInDays(now());
+
+                $partes[] = "  • Pedidos previos (últimos): {$totalPedidos} | Total gastado: $" . number_format($totalGastado, 0, ',', '.');
+                $partes[] = "  • Último pedido: #{$ultimo->id} hace {$diasUlt} día(s) por $" . number_format($ultimo->total, 0, ',', '.')
+                          . " (" . ($ultimo->tipo_entrega ?: 'domicilio') . ")";
+
+                // Productos más frecuentes
+                $detalles = \App\Models\DetallePedido::whereIn('pedido_id', $pedidos->pluck('id'))
+                    ->select('producto', \DB::raw('SUM(cantidad) as cant'), \DB::raw('COUNT(*) as veces'))
+                    ->groupBy('producto')
+                    ->orderByDesc('veces')
+                    ->limit(4)
+                    ->get();
+
+                if ($detalles->isNotEmpty()) {
+                    $top = $detalles->map(fn ($d) => "{$d->producto} ({$d->veces}x)")->implode(', ');
+                    $partes[] = "  • Productos frecuentes: {$top}";
+                }
+
+                // Dirección habitual (no pickup)
+                $ultDespacho = $pedidos->firstWhere(function ($p) {
+                    return $p->tipo_entrega !== 'recoger' && !empty($p->direccion);
+                });
+                if ($ultDespacho) {
+                    $partes[] = "  • Última dirección de despacho: {$ultDespacho->direccion}"
+                              . ($ultDespacho->barrio ? ", {$ultDespacho->barrio}" : '');
+                }
+
+                // Modo preferido (despacho vs recoger)
+                $countDespacho = $pedidos->where('tipo_entrega', '!=', 'recoger')->count();
+                $countRecoger  = $pedidos->where('tipo_entrega', 'recoger')->count();
+                if ($countDespacho > $countRecoger) {
+                    $partes[] = "  • Suele pedir: DESPACHO ({$countDespacho} de {$totalPedidos})";
+                } elseif ($countRecoger > $countDespacho) {
+                    $partes[] = "  • Suele pedir: RECOGER EN SEDE ({$countRecoger} de {$totalPedidos})";
+                }
+
+                $partes[] = "";
+                $partes[] = "📌 INSTRUCCIONES PARA USAR ESTA MEMORIA:";
+                $partes[] = "  ✓ Salúdalo por su nombre (primer nombre, informal).";
+                $partes[] = "  ✓ Si saluda corto ('hola'), pregunta '¿lo mismo de la última vez?' "
+                          . "ofreciéndole los productos frecuentes.";
+                $partes[] = "  ✓ Si va a despachar, pregunta si es a la misma dirección habitual.";
+                $partes[] = "  ✓ NUNCA repitas pedirle cédula/email — ya los tienes.";
+                $partes[] = "  ✓ Si pide algo similar a productos frecuentes, ajusta cantidad y confirma.";
+            }
+
+            return implode("\n", $partes);
+        } catch (\Throwable $e) {
+            \Log::warning('construirMemoriaCliente falló: ' . $e->getMessage());
+            return '';
+        }
     }
 }

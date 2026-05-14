@@ -1065,7 +1065,8 @@ class WhatsappWebhookController extends Controller
                     $sedeId,
                     $this->infoEmpresa(),
                     $pedidosInfo,
-                    $ansInfo
+                    $ansInfo,
+                    $from
                 );
 
                 // Variable adicional específica de esta alerta
@@ -6794,7 +6795,8 @@ TXT;
                     $sede->id,
                     $this->infoEmpresa(),
                     '',
-                    ''
+                    '',
+                    $from
                 );
                 $contexto['proxima_apertura'] = $sede->proximaApertura() ?: 'cuando abramos';
                 $contexto['mensaje_cerrado_sede'] = trim((string) $sede->mensaje_cerrado);
@@ -7815,7 +7817,8 @@ TXT;
             $sedeId,
             $infoEmpresa,
             $pedidosInfo,
-            $ansInfo
+            $ansInfo,
+            $from
         );
 
         $config = \App\Models\ConfiguracionBot::actual();
