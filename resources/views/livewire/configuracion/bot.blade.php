@@ -2007,6 +2007,49 @@
             </div>
         </section>
 
+        {{-- 🧠 SECCIÓN: Memoria conversacional --}}
+        <section class="rounded-3xl border border-purple-200 bg-purple-50/30 p-6 shadow-sm">
+            <h2 class="text-lg font-bold text-slate-800 mb-1">
+                <i class="fa-solid fa-brain mr-2 text-purple-500"></i> Memoria conversacional
+            </h2>
+            <p class="text-xs text-slate-600 mb-5">
+                Cuántos mensajes recientes del chat ve el bot al responder. Más mensajes = más contexto pero más tokens consumidos.
+                <strong>Recomendado: 50.</strong>
+            </p>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold uppercase text-slate-600 mb-1">
+                        Mensajes a recordar
+                    </label>
+                    <input type="number" min="10" max="200" wire:model="memoria_msgs_max"
+                           class="w-full rounded-xl border-2 border-slate-200 px-3 py-2 text-sm focus:border-purple-500 focus:outline-none">
+                    <p class="text-[11px] text-slate-500 mt-1">
+                        Cantidad de mensajes recientes que el LLM ve. Min: 10 (poca memoria) · Max: 200 (mucha memoria).
+                        <strong>50 = ideal para pedidos largos.</strong>
+                    </p>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold uppercase text-slate-600 mb-1">
+                        Caracteres máx (~tokens × 4)
+                    </label>
+                    <input type="number" min="10000" max="300000" step="10000" wire:model="memoria_chars_max"
+                           class="w-full rounded-xl border-2 border-slate-200 px-3 py-2 text-sm focus:border-purple-500 focus:outline-none">
+                    <p class="text-[11px] text-slate-500 mt-1">
+                        Límite duro de tamaño total. 80.000 chars ≈ 20.000 tokens. Si pasas → se cortan los más viejos.
+                    </p>
+                </div>
+            </div>
+
+            <div class="mt-4 rounded-xl bg-purple-100/50 border border-purple-200 p-3 text-xs text-slate-700">
+                <strong>📌 Memoria adicional siempre activa:</strong>
+                <ul class="list-disc list-inside mt-1 space-y-0.5">
+                    <li><strong>Historial del cliente</strong> — pedidos previos, productos favoritos, dirección habitual (siempre).</li>
+                    <li><strong>Estado estructurado del pedido</strong> — carrito, dirección, sede, cédula (siempre, no se borra).</li>
+                </ul>
+            </div>
+        </section>
+
         {{-- 🐕 SECCIÓN: Watchdog (rescate de conversaciones) --}}
         <section class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 class="text-lg font-bold text-slate-800 mb-1">

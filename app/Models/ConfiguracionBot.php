@@ -105,6 +105,8 @@ class ConfiguracionBot extends Model
         'cola_salida_backoff_segundos',
         'cola_salida_email_alerta',
         'pedido_max_auto',
+        'memoria_msgs_max',
+        'memoria_chars_max',
     ];
 
     /** Plantillas por defecto si el tenant no las personaliza. */
@@ -153,6 +155,8 @@ class ConfiguracionBot extends Model
         'cola_salida_max_intentos'    => 'integer',
         'cola_salida_backoff_segundos'=> 'array',
         'pedido_max_auto'             => 'integer',
+        'memoria_msgs_max'            => 'integer',
+        'memoria_chars_max'           => 'integer',
         'auto_limpieza_max_msgs'    => 'integer',
         'auto_reset_horas_inactividad' => 'integer',
         'aislar_contexto_por_dia'   => 'boolean',

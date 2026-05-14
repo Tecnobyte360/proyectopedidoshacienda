@@ -115,8 +115,23 @@ class ConversacionWhatsapp extends Model
      */
     public function historialParaIA(int $cantidad = 50): array
     {
-        $maxBloque = 80000; // 80k chars total max (~20k tokens)
-        $maxMsg    = 3000;  // cada mensaje truncado a 3k chars
+        // 🧠 Configurable desde ConfiguracionBot
+        try {
+            $cfg = ConfiguracionBot::actual();
+            if ($cfg) {
+                $cantidad  = (int) ($cfg->memoria_msgs_max ?? 50);
+                $maxBloque = (int) ($cfg->memoria_chars_max ?? 80000);
+            } else {
+                $maxBloque = 80000;
+            }
+        } catch (\Throwable $e) {
+            $maxBloque = 80000;
+        }
+        $maxMsg = 3000; // cada mensaje truncado a 3k chars
+
+        // Clamp para evitar valores extremos
+        $cantidad  = max(10, min(200, $cantidad));
+        $maxBloque = max(10000, min(300000, $maxBloque));
 
         $query = MensajeWhatsapp::query()
             ->where('conversacion_id', $this->id)

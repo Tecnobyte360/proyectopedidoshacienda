@@ -143,6 +143,10 @@ class Bot extends Component
     public int    $auto_reset_horas_inactividad  = 3;
     public bool   $aislar_contexto_por_dia       = true;
 
+    // 🧠 Memoria conversacional del bot
+    public int    $memoria_msgs_max              = 50;
+    public int    $memoria_chars_max             = 80000;
+
     // 🐕 Watchdog — rescate de conversaciones donde el bot no respondió
     public bool $watchdog_activo            = true;
     public int  $watchdog_min_segundos      = 30;
@@ -274,6 +278,10 @@ class Bot extends Component
         $this->auto_limpieza_max_msgs       = (int) ($cfg->auto_limpieza_max_msgs ?? 100);
         $this->auto_reset_horas_inactividad = (int) ($cfg->auto_reset_horas_inactividad ?? 3);
         $this->aislar_contexto_por_dia      = (bool) ($cfg->aislar_contexto_por_dia ?? true);
+
+        // 🧠 Memoria conversacional
+        $this->memoria_msgs_max  = (int) ($cfg->memoria_msgs_max  ?? 50);
+        $this->memoria_chars_max = (int) ($cfg->memoria_chars_max ?? 80000);
 
         // 🐕 Watchdog
         $this->watchdog_activo            = (bool) ($cfg->watchdog_activo ?? true);
@@ -770,6 +778,8 @@ class Bot extends Component
             'auto_limpieza_dias'                    => 'integer|min:1|max:365',
             'auto_limpieza_max_msgs'                => 'integer|min:10|max:5000',
             'auto_reset_horas_inactividad'          => 'integer|min:0|max:168',
+            'memoria_msgs_max'                      => 'integer|min:10|max:200',
+            'memoria_chars_max'                     => 'integer|min:10000|max:300000',
             'aislar_contexto_por_dia'               => 'boolean',
             'watchdog_activo'                       => 'boolean',
             'watchdog_min_segundos'                 => 'integer|min:10|max:300',
