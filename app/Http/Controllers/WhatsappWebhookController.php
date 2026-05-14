@@ -1580,6 +1580,34 @@ TXT;
 
                             $sedesPayload = $sedes->map(function ($s) use ($zonas) {
                                 $zonasSede = $zonas->filter(fn ($z) => $z->sede_id === $s->id || $z->sede_id === null);
+
+                                // 🗺️ Resumen de cobertura por POLÍGONOS reales (no solo legacy
+                                //    ZonaCobertura). Si la sede tiene 2 polígonos en
+                                //    cobertura_poligono, el bot debe SABERLO para no
+                                //    decir "no cubrimos" cuando sí lo hace.
+                                $tieneCoberturaPoligono = false;
+                                $resumenPoligonos = [];
+                                try {
+                                    if ($s->cobertura_activa && $s->tieneCobertura()) {
+                                        $polys = $s->poligonosNormalizados();
+                                        $tieneCoberturaPoligono = count($polys) > 0;
+                                        foreach ($polys as $idx => $poly) {
+                                            $lats = array_column($poly, 0);
+                                            $lngs = array_column($poly, 1);
+                                            if (empty($lats)) continue;
+                                            $resumenPoligonos[] = [
+                                                'zona_num'  => $idx + 1,
+                                                'vertices'  => count($poly),
+                                                'centro'    => [
+                                                    'lat' => round((min($lats) + max($lats)) / 2, 4),
+                                                    'lng' => round((min($lngs) + max($lngs)) / 2, 4),
+                                                ],
+                                                'extension_aprox' => round(max(max($lats) - min($lats), max($lngs) - min($lngs)) * 111, 1) . ' km',
+                                            ];
+                                        }
+                                    }
+                                } catch (\Throwable $e) { /* ignore */ }
+
                                 return [
                                     'sede'   => $s->nombre,
                                     'direccion' => $s->direccion,
@@ -1587,6 +1615,10 @@ TXT;
                                     'pedido_minimo_sede'    => (float) ($s->cobertura_pedido_minimo ?? 0),
                                     'costo_envio_default_sede' => (float) ($s->cobertura_costo_envio ?? 0),
                                     'tiempo_default_sede_min'  => (int) ($s->cobertura_tiempo_min ?? 0),
+                                    // 🗺️ Polígonos REALES dibujados en el editor de cobertura
+                                    'tiene_poligonos_cobertura' => $tieneCoberturaPoligono,
+                                    'poligonos_resumen' => $resumenPoligonos,
+                                    // 📍 Zonas legacy (tabla zonas_cobertura por barrios)
                                     'zonas'  => $zonasSede->map(fn ($z) => [
                                         'nombre'  => $z->nombre,
                                         'tiempo_min' => $z->tiempo_estimado_min,
@@ -1599,11 +1631,21 @@ TXT;
                             return [
                                 'sedes' => $sedesPayload,
                                 'instruccion_para_bot' =>
-                                    'Las zonas de cobertura se agrupan POR SEDE. Cada sede tiene su propio '
-                                    . '`pedido_minimo_sede` (monto mínimo de compra para que esa sede acepte el pedido) '
-                                    . 'y `costo_envio_default_sede`. Las zonas pueden tener costos/tiempos propios '
-                                    . 'que sobrescriben el default. NUNCA inventes montos mínimos ni costos: usa '
-                                    . 'EXACTO los valores numéricos del payload (formatea $X.XXX al cliente).',
+                                    "🛑 REGLA CRÍTICA — Esta tool NO sirve para responder "
+                                    . "'¿cubrimos X municipio?'.\n\n"
+                                    . "Para esa pregunta SIEMPRE usa `validar_cobertura(direccion='X', ciudad='X')`. "
+                                    . "Esta tool hace el test punto-en-polígono REAL contra los polígonos "
+                                    . "dibujados de la sede.\n\n"
+                                    . "Ejemplos:\n"
+                                    . "  • '¿llegan a Girardota?' → `validar_cobertura(direccion='Girardota', ciudad='Girardota')`\n"
+                                    . "  • '¿cubren Medellín?'    → `validar_cobertura(direccion='Medellín', ciudad='Medellín')`\n"
+                                    . "  • '¿a Bello?'            → `validar_cobertura(direccion='Bello', ciudad='Bello')`\n\n"
+                                    . "PROHIBIDO inferir 'no cubrimos X' del campo `zonas` (es legacy y suele estar vacío). "
+                                    . "Si `tiene_poligonos_cobertura=true`, esa sede SÍ tiene cobertura dibujada — "
+                                    . "valida cualquier dirección específica con `validar_cobertura`.\n\n"
+                                    . "Esta tool sirve para mostrar al cliente:\n"
+                                    . "  - Costo de envío, tiempo, pedido mínimo POR SEDE.\n"
+                                    . "  - Lista de barrios con tarifa especial (campo zonas).",
                             ];
                         })(),
 
