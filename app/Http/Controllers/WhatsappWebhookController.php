@@ -8215,17 +8215,9 @@ PROMPT;
                 'phone'  => $from,
             ]);
 
-            $this->notificarFallaWhatsapp(
-                'ERROR ENVÍO WHATSAPP',
-                'Ocurrió un error al enviar un mensaje de WhatsApp.',
-                [
-                    'from' => $from,
-                    'connectionId' => $connectionId,
-                    'status' => $response->status(),
-                    'body' => $rawBody,
-                    'payload' => $payload,
-                ]
-            );
+            // 🛡️ Guardar en cola para reintentar cuando WhatsApp esté CONNECTED.
+            // No se pierde el mensaje aunque la sesión esté caída.
+            $this->encolarMensajeSalida($from, $connectionId, $payload, "HTTP {$response->status()}: " . mb_substr((string) $rawBody, 0, 500));
 
             return false;
         } catch (\Throwable $e) {
@@ -8234,16 +8226,8 @@ PROMPT;
                 'phone' => $from,
             ]);
 
-            $this->notificarFallaWhatsapp(
-                'EXCEPCIÓN ENVÍO WHATSAPP',
-                'Se produjo una excepción enviando un mensaje de WhatsApp.',
-                [
-                    'from' => $from,
-                    'connectionId' => $connectionId,
-                    'error' => $e->getMessage(),
-                    'payload' => $payload ?? [],
-                ]
-            );
+            // 🛡️ Excepción de red/timeout → encolar para reintentar
+            $this->encolarMensajeSalida($from, $connectionId, $payload ?? [], 'Excepción: ' . $e->getMessage());
 
             return false;
         }
@@ -8794,6 +8778,53 @@ PROMPT;
         return fmod($cantidad, 1.0) == 0.0
             ? number_format($cantidad, 0, ',', '.')
             : number_format($cantidad, 2, ',', '.');
+    }
+
+    /**
+     * 🛡️ Encola un mensaje saliente que falló para reintentarlo después
+     * (cuando WhatsApp vuelva a CONNECTED). Evita perder mensajes durante
+     * cortes de la sesión.
+     */
+    private function encolarMensajeSalida(string $telefono, $connectionId, array $payload, string $error): void
+    {
+        try {
+            $tenantId = app(\App\Services\TenantManager::class)->id();
+
+            // Buscar conversación asociada por teléfono (para poder mostrarla en monitoreo)
+            $convId = null;
+            try {
+                $telNorm = preg_replace('/\D+/', '', $telefono);
+                $convId = \App\Models\ConversacionWhatsapp::where('tenant_id', $tenantId)
+                    ->where(function ($q) use ($telNorm, $telefono) {
+                        $q->where('telefono_normalizado', $telNorm)
+                          ->orWhere('telefono', $telefono);
+                    })
+                    ->orderByDesc('id')
+                    ->value('id');
+            } catch (\Throwable $e) { /* ignore */ }
+
+            \Illuminate\Support\Facades\DB::table('mensajes_salida_pendientes')->insert([
+                'tenant_id'         => $tenantId,
+                'conversacion_id'   => $convId,
+                'telefono'          => $telefono,
+                'connection_id'     => is_numeric($connectionId) ? (int) $connectionId : null,
+                'whatsapp_id'       => $payload['whatsappId'] ?? null,
+                'payload'           => json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE),
+                'intentos'          => 0,
+                'ultimo_error'      => mb_substr($error, 0, 1000),
+                'proximo_intento_at'=> now()->addSeconds(15), // primer reintento en 15s
+                'created_at'        => now(),
+                'updated_at'        => now(),
+            ]);
+
+            Log::info('📬 Mensaje saliente encolado para reintento', [
+                'telefono' => $telefono,
+                'conv_id'  => $convId,
+                'error'    => mb_substr($error, 0, 200),
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('No se pudo encolar mensaje saliente: ' . $e->getMessage());
+        }
     }
 
     private function notificarFallaWhatsapp(

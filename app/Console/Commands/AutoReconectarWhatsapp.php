@@ -121,10 +121,11 @@ class AutoReconectarWhatsapp extends Command
             $needsReconnect = in_array($status, ['PAIRING', 'DISCONNECTED', 'TIMEOUT', 'NOT_CONNECTED'], true);
             if (!$needsReconnect) continue;
 
-            // Throttle: máximo 1 intento cada 3 min por conexión
+            // Throttle: máximo 1 intento por minuto por conexión (evita martillar
+            // la API si la sesión necesita varios segundos para regenerar)
             $throttleKey = "auto_reconnect_tenant{$tenant->id}_conn{$id}";
             if (Cache::has($throttleKey)) continue;
-            Cache::put($throttleKey, true, now()->addMinutes(3));
+            Cache::put($throttleKey, true, now()->addMinute());
 
             $intentos++;
             Log::info('🔁 Auto-reconectar: intentando', [

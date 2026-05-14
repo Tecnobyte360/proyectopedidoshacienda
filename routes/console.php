@@ -78,13 +78,22 @@ Schedule::command('bot:watchdog-estancadas')
     ->withoutOverlapping(5)
     ->runInBackground();
 
-// 🔁 Auto-reconectar WhatsApp — si la conexión está en PAIRING o DISCONNECTED
-// por más de 2 minutos, intenta POST/PUT a /whatsappsession/{id} para regenerar
-// QR/sesión. Si tras 3 intentos sigue caída, envía alerta por email.
+// 🔁 Auto-reconectar WhatsApp — cada minuto. Si la conexión cae a PAIRING o
+// DISCONNECTED, intentamos POST/PUT a /whatsappsession/{id} para regenerar
+// sesión. Throttle interno de 1 min por conexión evita martillar la API.
+// Tras 3 fallos consecutivos → email al admin del tenant.
 Schedule::command('bot:auto-reconectar-whatsapp')
-    ->everyThreeMinutes()
+    ->everyMinute()
     ->timezone('America/Bogota')
-    ->withoutOverlapping(5)
+    ->withoutOverlapping(2)
+    ->runInBackground();
+
+// 📬 Reintentar mensajes salientes que fallaron por desconexión.
+// Backoff progresivo (15s, 30s, 1m, 2m, 5m, 15m, 1h, 6h). 12 intentos máx.
+Schedule::command('bot:reintentar-mensajes-salida')
+    ->everyMinute()
+    ->timezone('America/Bogota')
+    ->withoutOverlapping(2)
     ->runInBackground();
 
 Schedule::command('clientes:felicitar-cumpleanos')
