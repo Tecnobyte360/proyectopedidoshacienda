@@ -55,7 +55,7 @@ class WatchdogConversacionesEstancadas extends Command
             // Solo rescatar si el último mensaje fue del USUARIO (no del bot).
             if ($ultimoMsg->rol !== MensajeWhatsapp::ROL_USER) continue;
 
-            $segundosDesde = now()->diffInSeconds($ultimoMsg->created_at);
+            $segundosDesde = abs((int) now()->diffInSeconds($ultimoMsg->created_at));
             if ($segundosDesde < 15 || $segundosDesde > 7200) continue; // hasta 2h
 
             // Excepción: si es un mensaje watchdog previo, no entrar en loop.
