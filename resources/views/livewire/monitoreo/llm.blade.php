@@ -67,6 +67,16 @@
                 LIVE
             </span>
         </button>
+        <button type="button" wire:click="$set('tab', 'cola')"
+                class="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition
+                       {{ $tab === 'cola' ? 'bg-gradient-to-r from-indigo-500 to-blue-600 text-white shadow' : 'text-slate-600 hover:bg-slate-50' }}">
+            <i class="fa-solid fa-envelope-circle-check text-[12px]"></i>
+            Cola Salida
+            <span class="inline-flex items-center justify-center min-w-[20px] h-[20px] px-1.5 rounded-full text-[10px] font-bold
+                         {{ $tab === 'cola' ? 'bg-white/25 text-white' : ($coPendientes > 0 ? 'bg-rose-200 text-rose-800 animate-pulse' : 'bg-indigo-200 text-indigo-800') }}">
+                {{ $coPendientes }}
+            </span>
+        </button>
     </div>
 
     @if($tab === 'llm')
@@ -592,6 +602,184 @@
 
     {{-- Embeber el componente Bot/Monitor que ya existe --}}
     @livewire('bot.monitor', [], key('bot-monitor-livewire'))
+
+    @elseif($tab === 'cola')
+
+    {{-- ═════════════════════════════════════════════════════════════
+         📬 TAB COLA SALIDA — Mensajes pendientes de envío a WhatsApp
+         ═════════════════════════════════════════════════════════════ --}}
+    <div class="rounded-2xl border border-indigo-200 bg-indigo-50/40 p-3 mb-4">
+        <p class="text-xs text-slate-600">
+            <i class="fa-solid fa-envelope-circle-check mr-1 text-indigo-600"></i>
+            <strong>Cola de mensajes salientes</strong> — Cuando WhatsApp se desconecta, las respuestas del bot
+            entran a esta cola y se reintentan automáticamente (backoff progresivo: 15s, 30s, 1m, 2m, 5m, 15m, 1h, 6h).
+            Tras 12 intentos sin éxito → marcado como fallido permanente.
+        </p>
+    </div>
+
+    {{-- KPIs cola --}}
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div class="rounded-2xl border border-slate-200 bg-white p-4">
+            <p class="text-[11px] uppercase font-bold text-slate-500">Pendientes</p>
+            <p class="text-3xl font-black {{ $coPendientes > 0 ? 'text-rose-700' : 'text-emerald-700' }} mt-1">{{ $coPendientes }}</p>
+            <p class="text-xs text-slate-500 mt-1">Esperan envío</p>
+        </div>
+        <div class="rounded-2xl border border-slate-200 bg-white p-4">
+            <p class="text-[11px] uppercase font-bold text-slate-500">Listos ahora</p>
+            <p class="text-3xl font-black text-indigo-700 mt-1">{{ $coReady }}</p>
+            <p class="text-xs text-slate-500 mt-1">próximo_intento ≤ now</p>
+        </div>
+        <div class="rounded-2xl border border-slate-200 bg-white p-4">
+            <p class="text-[11px] uppercase font-bold text-slate-500">Enviados ({{ $minutos }}m)</p>
+            <p class="text-3xl font-black text-emerald-700 mt-1">{{ $coEnviadosVentana }}</p>
+            <p class="text-xs text-slate-500 mt-1">recuperados tras caída</p>
+        </div>
+        <div class="rounded-2xl border border-slate-200 bg-white p-4">
+            <p class="text-[11px] uppercase font-bold text-slate-500">Fallidos perm. ({{ $minutos }}m)</p>
+            <p class="text-3xl font-black {{ $coFallidosPerm > 0 ? 'text-rose-700' : 'text-slate-700' }} mt-1">{{ $coFallidosPerm }}</p>
+            <p class="text-xs text-slate-500 mt-1">12 intentos agotados</p>
+        </div>
+    </div>
+
+    {{-- Acciones --}}
+    <div class="rounded-2xl border border-slate-200 bg-white p-4 mt-4 flex items-center gap-2 flex-wrap">
+        <p class="text-sm text-slate-600 mr-auto">
+            <i class="fa-solid fa-screwdriver-wrench text-indigo-600"></i>
+            <strong>Acciones rápidas:</strong>
+        </p>
+        <button type="button" wire:click="$refresh"
+                class="inline-flex items-center gap-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700">
+            <i class="fa-solid fa-arrows-rotate"></i> Refrescar
+        </button>
+        <button type="button" wire:click="limpiarColaSalida"
+                wire:confirm="¿Eliminar mensajes enviados/fallidos de más de 7 días?"
+                class="inline-flex items-center gap-1.5 rounded-xl bg-amber-100 hover:bg-amber-200 px-3 py-1.5 text-xs font-bold text-amber-800">
+            <i class="fa-solid fa-broom"></i> Limpiar antiguos (>7d)
+        </button>
+    </div>
+
+    {{-- Parámetros configurables --}}
+    <details class="rounded-2xl border border-slate-200 bg-white p-4 mt-4">
+        <summary class="cursor-pointer text-sm font-bold text-slate-700 flex items-center gap-2">
+            <i class="fa-solid fa-sliders text-indigo-600"></i>
+            Parámetros actuales (read-only)
+        </summary>
+        <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+            <div class="rounded-lg bg-slate-50 p-3">
+                <p class="font-bold text-slate-700 mb-1">⏰ Frecuencia de reintento</p>
+                <p class="text-slate-600">Cada <strong>1 minuto</strong> (scheduler)</p>
+            </div>
+            <div class="rounded-lg bg-slate-50 p-3">
+                <p class="font-bold text-slate-700 mb-1">📊 Backoff progresivo</p>
+                <p class="text-slate-600">15s → 30s → 1m → 2m → 5m → 15m → 1h → 6h ×5</p>
+            </div>
+            <div class="rounded-lg bg-slate-50 p-3">
+                <p class="font-bold text-slate-700 mb-1">🔁 Máx intentos</p>
+                <p class="text-slate-600"><strong>12</strong> antes de marcar fallido permanente</p>
+            </div>
+            <div class="rounded-lg bg-slate-50 p-3">
+                <p class="font-bold text-slate-700 mb-1">📡 Auto-reconexión WA</p>
+                <p class="text-slate-600">Cada <strong>1 min</strong> · 3 fallos → email admin</p>
+            </div>
+        </div>
+    </details>
+
+    {{-- Tabla últimos mensajes --}}
+    <div class="rounded-2xl border border-slate-200 bg-white overflow-hidden mt-4">
+        <div class="px-4 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+            <h3 class="text-sm font-bold text-slate-700">
+                <i class="fa-solid fa-list text-indigo-600 mr-1"></i>
+                Últimos 50 mensajes en cola
+            </h3>
+            <span class="text-xs text-slate-500">{{ $coUltimosMensajes->count() }} registros</span>
+        </div>
+
+        @if($coUltimosMensajes->isEmpty())
+            <div class="p-8 text-center text-slate-500">
+                <i class="fa-solid fa-inbox text-3xl mb-2 opacity-50"></i>
+                <p class="text-sm">No hay mensajes en la cola.</p>
+                <p class="text-xs text-slate-400 mt-1">Cuando WhatsApp se caiga y un envío falle, aparecerá aquí.</p>
+            </div>
+        @else
+            <div class="overflow-x-auto">
+                <table class="w-full text-xs">
+                    <thead class="bg-slate-50 text-slate-600 uppercase text-[10px]">
+                        <tr>
+                            <th class="px-3 py-2 text-left">ID</th>
+                            <th class="px-3 py-2 text-left">Tel</th>
+                            <th class="px-3 py-2 text-left">Estado</th>
+                            <th class="px-3 py-2 text-left">Intentos</th>
+                            <th class="px-3 py-2 text-left">Próximo</th>
+                            <th class="px-3 py-2 text-left">Mensaje</th>
+                            <th class="px-3 py-2 text-left">Error</th>
+                            <th class="px-3 py-2"></th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        @foreach($coUltimosMensajes as $m)
+                            @php
+                                $payloadArr = is_array($m->payload) ? $m->payload : (json_decode($m->payload, true) ?: []);
+                                $bodyPreview = mb_substr((string) ($payloadArr['body'] ?? ''), 0, 80);
+                                if ($m->enviado_at) {
+                                    $estado = ['emerald', '✅ Enviado'];
+                                } elseif ($m->fallido_permanente_at) {
+                                    $estado = ['rose', '❌ Fallido'];
+                                } elseif ($m->proximo_intento_at && \Carbon\Carbon::parse($m->proximo_intento_at)->isFuture()) {
+                                    $estado = ['amber', '⏳ Esperando'];
+                                } else {
+                                    $estado = ['indigo', '🔄 Listo'];
+                                }
+                            @endphp
+                            <tr class="hover:bg-slate-50">
+                                <td class="px-3 py-2 font-mono text-[10px] text-slate-500">{{ $m->id }}</td>
+                                <td class="px-3 py-2 font-mono text-[11px]">{{ $m->telefono }}</td>
+                                <td class="px-3 py-2">
+                                    <span class="inline-flex items-center gap-1 rounded-full bg-{{ $estado[0] }}-100 text-{{ $estado[0] }}-800 px-2 py-0.5 text-[10px] font-bold">
+                                        {{ $estado[1] }}
+                                    </span>
+                                </td>
+                                <td class="px-3 py-2 font-mono text-[11px]">{{ $m->intentos }}</td>
+                                <td class="px-3 py-2 text-[11px] text-slate-600">
+                                    @if($m->enviado_at)
+                                        <span class="text-emerald-700">{{ \Carbon\Carbon::parse($m->enviado_at)->diffForHumans() }}</span>
+                                    @elseif($m->fallido_permanente_at)
+                                        <span class="text-rose-700">{{ \Carbon\Carbon::parse($m->fallido_permanente_at)->diffForHumans() }}</span>
+                                    @elseif($m->proximo_intento_at)
+                                        {{ \Carbon\Carbon::parse($m->proximo_intento_at)->diffForHumans() }}
+                                    @else
+                                        —
+                                    @endif
+                                </td>
+                                <td class="px-3 py-2 max-w-[300px] truncate text-slate-700" title="{{ $payloadArr['body'] ?? '' }}">
+                                    {{ $bodyPreview ?: '(sin texto)' }}
+                                </td>
+                                <td class="px-3 py-2 max-w-[200px] truncate text-rose-700 text-[11px]" title="{{ $m->ultimo_error }}">
+                                    {{ mb_substr((string) $m->ultimo_error, 0, 60) }}
+                                </td>
+                                <td class="px-3 py-2 text-right whitespace-nowrap">
+                                    @if(!$m->enviado_at && !$m->fallido_permanente_at)
+                                        <button type="button"
+                                                wire:click="reintentarMensajePendiente({{ $m->id }})"
+                                                class="inline-flex items-center gap-1 rounded-lg bg-indigo-100 hover:bg-indigo-200 px-2 py-1 text-[10px] font-bold text-indigo-700"
+                                                title="Reintentar ahora">
+                                            <i class="fa-solid fa-paper-plane"></i>
+                                        </button>
+                                        <button type="button"
+                                                wire:click="descartarMensajePendiente({{ $m->id }})"
+                                                wire:confirm="¿Descartar este mensaje? El cliente no lo recibirá."
+                                                class="inline-flex items-center gap-1 rounded-lg bg-rose-100 hover:bg-rose-200 px-2 py-1 text-[10px] font-bold text-rose-700"
+                                                title="Descartar">
+                                            <i class="fa-solid fa-trash"></i>
+                                        </button>
+                                    @endif
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @endif
+    </div>
 
     @endif
 </div>

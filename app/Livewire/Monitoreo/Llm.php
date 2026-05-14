@@ -12,12 +12,58 @@ use Livewire\Attributes\Computed;
 class Llm extends Component
 {
     public int $minutos = 30;  // Ventana de análisis
-    public string $tab = 'llm';  // 'llm' | 'watchdog' | 'agente'
+    public string $tab = 'llm';  // 'llm' | 'watchdog' | 'agente' | 'envivo' | 'cola'
 
     protected $queryString = [
         'tab'     => ['except' => 'llm'],
         'minutos' => ['except' => 30],
     ];
+
+    /**
+     * 📬 Reintentar manualmente un mensaje pendiente.
+     */
+    public function reintentarMensajePendiente(int $id): void
+    {
+        DB::table('mensajes_salida_pendientes')
+            ->where('id', $id)
+            ->whereNull('enviado_at')
+            ->update([
+                'proximo_intento_at' => now()->subSecond(),
+                'updated_at' => now(),
+            ]);
+        \Artisan::call('bot:reintentar-mensajes-salida');
+        $this->dispatch('notify', ['type' => 'success', 'message' => 'Reintento ejecutado.']);
+    }
+
+    /**
+     * 🗑️ Descartar un mensaje pendiente (marcarlo como fallido_permanente).
+     */
+    public function descartarMensajePendiente(int $id): void
+    {
+        DB::table('mensajes_salida_pendientes')
+            ->where('id', $id)
+            ->whereNull('enviado_at')
+            ->update([
+                'fallido_permanente_at' => now(),
+                'ultimo_error' => 'Descartado manualmente desde panel',
+                'updated_at' => now(),
+            ]);
+        $this->dispatch('notify', ['type' => 'success', 'message' => 'Mensaje descartado.']);
+    }
+
+    /**
+     * 🧹 Limpiar mensajes enviados/fallidos antiguos (>7 días).
+     */
+    public function limpiarColaSalida(): void
+    {
+        $borrados = DB::table('mensajes_salida_pendientes')
+            ->where(function ($q) {
+                $q->whereNotNull('enviado_at')->orWhereNotNull('fallido_permanente_at');
+            })
+            ->where('updated_at', '<', now()->subDays(7))
+            ->delete();
+        $this->dispatch('notify', ['type' => 'success', 'message' => "Eliminados {$borrados} registros antiguos."]);
+    }
 
     public function render()
     {
@@ -102,6 +148,40 @@ class Llm extends Component
             ->limit(50)
             ->get();
 
+        // 📬 COLA DE SALIDA — KPIs y mensajes recientes
+        $coTabla = 'mensajes_salida_pendientes';
+        $coPendientes = DB::table($coTabla)
+            ->whereNull('enviado_at')
+            ->whereNull('fallido_permanente_at')
+            ->count();
+        $coReady = DB::table($coTabla)
+            ->whereNull('enviado_at')
+            ->whereNull('fallido_permanente_at')
+            ->where(function ($q) {
+                $q->whereNull('proximo_intento_at')
+                  ->orWhere('proximo_intento_at', '<=', now());
+            })
+            ->count();
+        $coEnviadosVentana = DB::table($coTabla)
+            ->whereNotNull('enviado_at')
+            ->where('updated_at', '>=', $desde)
+            ->count();
+        $coFallidosPerm = DB::table($coTabla)
+            ->whereNotNull('fallido_permanente_at')
+            ->where('updated_at', '>=', $desde)
+            ->count();
+        $coUltimosMensajes = DB::table($coTabla)
+            ->orderByDesc('id')
+            ->limit(50)
+            ->get();
+        // Estados WhatsApp por conexión (lo que vemos de la API)
+        $coEstadoWa = DB::table($coTabla)
+            ->selectRaw('connection_id, COUNT(*) as total')
+            ->whereNull('enviado_at')
+            ->whereNull('fallido_permanente_at')
+            ->groupBy('connection_id')
+            ->get();
+
         return view('livewire.monitoreo.llm', [
             'invocaciones'      => $invocaciones,
             'total'             => $total,
@@ -139,6 +219,13 @@ class Llm extends Component
             'agMaxPorTool'      => $agMaxPorTool,
             'agTopQueries'      => $agTopQueries,
             'agInvocaciones'    => $agInvocaciones,
+            // 📬 Cola de salida data
+            'coPendientes'      => $coPendientes,
+            'coReady'           => $coReady,
+            'coEnviadosVentana' => $coEnviadosVentana,
+            'coFallidosPerm'    => $coFallidosPerm,
+            'coUltimosMensajes' => $coUltimosMensajes,
+            'coEstadoWa'        => $coEstadoWa,
         ])->layout('layouts.app');
     }
 }
