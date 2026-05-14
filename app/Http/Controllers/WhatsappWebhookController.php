@@ -2952,12 +2952,20 @@ TXT;
         $m = mb_strtolower(trim($mensaje));
         if ($m === '') return false;
 
-        // Patrones explícitos: "tienes X?", "tienen X?", "quiero X", "necesito X"
+        // Patrones explícitos: "tienes X?", "quiero X", "a como X?", "cuánto vale X?"
         $patrones = [
-            '/\b(tienes|tienen|tendr[áa]s|tendr[áa]n|hay|manejas|venden|vendes)\s+/iu',
-            '/\b(quiero|necesito|me das|d[áa]me|puede ser|me regal[áa]s|reg[áa]lame|qu[ií]siera)\s+/iu',
-            '/\b(\d+)\s+(libras?|kilos?|kg|gramos?|gr|unidades?|unidad|cajas?|caja|paquetes?|paquete|bolsas?|docenas?|gallinas?|porciones?|libritas?|kilitos?|cucharaditas?|botellas?|latas?)\b/iu',
+            // Tener / disponer
+            '/\b(tienes|tienen|tendr[áa]s|tendr[áa]n|hay|manejas|venden|vendes|consigues|consiguen)\s+/iu',
+            // Querer / pedir
+            '/\b(quiero|necesito|me das|d[áa]me|puede ser|me regal[áa]s|reg[áa]lame|qu[ií]siera|busco|tr[áa]eme|me traes|me llevo|me lleva|ll[ée]vame|alc[áa]nzame|me alcanzas)\s+/iu',
+            // Preguntas de precio: "a como", "cuánto vale", "qué precio", "precio de"
+            '/\b(a\s+c[óo]mo|a\s+cuanto|a\s+cu[áa]nto|cu[áa]nto\s+(vale|cuesta|sale|est[áa]|tiene|tienes)|cu[áa]nto\s+es|precio\s+(de|del)|qu[eé]\s+precio)\b/iu',
+            // Cantidades con unidad (números)
+            '/\b(\d+)\s+(libras?|lbs?|kilos?|kls?|kg|gramos?|gr|unidades?|unidad|cajas?|caja|paquetes?|paquete|bolsas?|docenas?|gallinas?|porciones?|libritas?|kilitos?|cucharaditas?|botellas?|latas?)\b/iu',
+            // Cantidades en letras
             '/\b(una?|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|media|medio)\s+(libras?|kilos?|kg|unidades?|cajas?|paquetes?|bolsas?|docenas?|porciones?|gallinas?|libritas?|kilitos?)\b/iu',
+            // Pregunta contextual de continuación: "y hueso?", "y la basa?", "y un kilo de X"
+            '/^y\s+(el|la|los|las|un|una|unos|unas)?\s*\w{3,}/iu',
         ];
         foreach ($patrones as $p) {
             if (preg_match($p, $m)) return true;
