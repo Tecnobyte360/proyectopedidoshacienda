@@ -29,19 +29,20 @@ class WatchdogConversacionesEstancadas extends Command
 
     public function handle(): int
     {
+        // Recolectar todas las conversaciones donde el ÚLTIMO mensaje sea del usuario
+        // y haya pasado >=15s sin respuesta del bot (en las últimas 24h).
+        // Eso cubre dos casos:
+        //   A) Bot dijo "un momento" y no siguió (típico).
+        //   B) Bot pidió "¿Confirmas?", cliente respondió, y por un error el bot no respondió.
+        //   C) Cualquier otro caso donde el cliente envió mensaje y el bot quedó mudo.
         $candidatas = ConversacionWhatsapp::query()
-            ->whereDoesntHave('mensajes', function ($q) {
-                // Excluir si ya hay un mensaje del bot DESPUÉS del último mensaje de espera
-                $q->where('rol', MensajeWhatsapp::ROL_ASSISTANT)
-                  ->where('created_at', '>=', now()->subMinutes(10));
-            }, '>=', 2)
+            ->where('updated_at', '>=', now()->subDay())
             ->whereHas('mensajes', function ($q) {
-                $q->where('rol', MensajeWhatsapp::ROL_ASSISTANT)
-                  ->where('created_at', '<=', now()->subSeconds(20))
-                  ->where('created_at', '>=', now()->subMinutes(10))
-                  ->where('contenido', 'REGEXP', '(un momento|verificando|d[eé]jame|consultando|revisando|enseguida|ya te respondo)');
+                $q->where('rol', MensajeWhatsapp::ROL_USER)
+                  ->where('created_at', '<=', now()->subSeconds(15))
+                  ->where('created_at', '>=', now()->subMinutes(10));
             })
-            ->limit(20)
+            ->limit(30)
             ->get();
 
         $rescatadas = 0;
@@ -50,37 +51,33 @@ class WatchdogConversacionesEstancadas extends Command
                 ->orderByDesc('id')
                 ->first();
 
-            if (!$ultimoMsg || $ultimoMsg->rol !== MensajeWhatsapp::ROL_ASSISTANT) continue;
-            if (!preg_match(self::FRASES_ESPERA_REGEX, (string) $ultimoMsg->contenido)) continue;
+            if (!$ultimoMsg) continue;
+            // Solo rescatar si el último mensaje fue del USUARIO (no del bot).
+            if ($ultimoMsg->rol !== MensajeWhatsapp::ROL_USER) continue;
 
             $segundosDesde = now()->diffInSeconds($ultimoMsg->created_at);
-            if ($segundosDesde < 20 || $segundosDesde > 600) continue;
+            if ($segundosDesde < 15 || $segundosDesde > 600) continue;
+
+            // Excepción: si es un mensaje watchdog previo, no entrar en loop.
+            if (str_starts_with((string) ($ultimoMsg->mensaje_externo_id ?? ''), 'watchdog_')) continue;
 
             // Evitar rescatar la misma conversación múltiples veces seguidas
-            $yaRescatadaKey = "watchdog_rescate_conv_{$conv->id}";
+            $yaRescatadaKey = "watchdog_rescate_conv_{$conv->id}_msg_{$ultimoMsg->id}";
             if (\Cache::has($yaRescatadaKey)) continue;
-            \Cache::put($yaRescatadaKey, true, now()->addMinutes(3));
+            \Cache::put($yaRescatadaKey, true, now()->addMinutes(5));
 
             Log::info('🐕 Watchdog: rescatando conversación estancada', [
                 'conversacion_id'  => $conv->id,
                 'telefono'         => $conv->telefono_normalizado,
                 'segundos_desde'   => $segundosDesde,
-                'ultima_frase'     => mb_substr((string) $ultimoMsg->contenido, 0, 100),
+                'ultimo_mensaje'   => mb_substr((string) $ultimoMsg->contenido, 0, 100),
+                'mensaje_id'       => $ultimoMsg->id,
             ]);
 
             try {
-                // Inyectar mensaje virtual del usuario para forzar continuación.
-                // Lo marcamos con meta para diagnosticar después.
-                MensajeWhatsapp::create([
-                    'conversacion_id'    => $conv->id,
-                    'rol'                => MensajeWhatsapp::ROL_USER,
-                    'tipo'               => 'text',
-                    'contenido'          => '¿Sigues ahí? Por favor continúa con mi pedido.',
-                    'meta'               => ['watchdog' => true, 'segundos_estancada' => $segundosDesde],
-                    'mensaje_externo_id' => 'watchdog_' . now()->timestamp,
-                ]);
-
-                // Disparar webhook simulado para que el flujo normal procese el mensaje
+                // Re-enviar al webhook el ÚLTIMO mensaje del usuario para que el bot
+                // lo procese (ahora que el código ya está arreglado o que las condiciones
+                // que causaron el silencio ya pasaron).
                 $payload = [
                     'usuario'  => ['id' => 0, 'name' => 'Watchdog', 'email' => ''],
                     'conexion' => ['id' => $conv->connection_id ?? 0, 'name' => 'WATCHDOG', 'status' => 'CONNECTED'],
@@ -93,8 +90,8 @@ class WatchdogConversacionesEstancadas extends Command
                         'unreadMessages' => 1,
                     ],
                     'mensaje'  => [
-                        'id'        => 'watchdog_' . now()->timestamp,
-                        'body'      => '¿Sigues ahí? Por favor continúa con mi pedido.',
+                        'id'        => 'watchdog_retry_' . $ultimoMsg->id,
+                        'body'      => (string) $ultimoMsg->contenido,
                         'fromMe'    => false,
                         'read'      => false,
                         'mediaType' => 'chat',
