@@ -87,6 +87,11 @@ class BotPromptService
         // con sus pedidos previos, productos favoritos, dirección habitual, etc.
         $memoriaCliente = $this->construirMemoriaCliente($telefonoCliente);
 
+        // 🧠 MEMORIA CONVERSACIONAL: resumen estructurado de lo que se ha
+        // hablado en la conversación actual (productos mencionados, lugares,
+        // negociaciones, etc.). Permite que el LLM mantenga contexto.
+        $memoriaConversacion = $this->construirMemoriaConversacional($telefonoCliente);
+
         // Calcular primer nombre (más natural para WhatsApp informal)
         $nombreLimpio = trim($clienteNombre);
         $primerNombre = '';
@@ -148,6 +153,7 @@ class BotPromptService
             'saludo_hora'           => $saludoHora,
             'horarios_sedes'        => $horariosTexto . "\n\n" . $sedesListaRestrictiva,
             'memoria_cliente'       => $memoriaCliente,
+            'memoria_conversacion'  => $memoriaConversacion,
             'sede_estado_actual'    => $estadoSedeTexto,
             'fecha_actual'      => $ahora->locale('es')->isoFormat('D [de] MMMM [de] YYYY'),
             'hora_actual'       => $ahora->format('h:i a'),  // 12h con AM/PM
@@ -745,6 +751,8 @@ cualquier cosa que sugiera que no eres humana. Si te lo preguntan directo:
 
 {memoria_cliente}
 
+{memoria_conversacion}
+
 🎯 **REGLA DE ORO DE PERSONALIZACIÓN:**
 - Si `cliente_es_conocido = SI` → DEBES usar `{cliente_primer_nombre}` al saludar Y al menos 1 vez más
   durante la conversación. Suena más cálido y muestra que lo conocemos.
@@ -1048,6 +1056,116 @@ Después de confirmar un pedido, despídete cálido y deja la puerta abierta:
 
 Varía siempre. Sé breve y humano.
 PROMPT;
+    }
+
+    /**
+     * 🧠 Construye un resumen ESTRUCTURADO de la conversación actual.
+     * Extrae los hechos clave que el bot debe recordar siempre:
+     *   - Productos mencionados por el cliente
+     *   - Cantidades
+     *   - Lugares (direcciones, municipios)
+     *   - Negociaciones, cambios de opinión
+     *   - Preferencias expresadas
+     *
+     * Esto se inyecta al prompt EN ADICIÓN al historial completo de mensajes.
+     * Aún si el LLM olvida un mensaje, ve el resumen estructurado.
+     */
+    private function construirMemoriaConversacional(?string $telefono): string
+    {
+        if (empty($telefono)) return '';
+        try {
+            $tenantId = app(\App\Services\TenantManager::class)->id();
+            if (!$tenantId) return '';
+
+            $telNorm = preg_replace('/\D+/', '', $telefono);
+            $conv = \App\Models\ConversacionWhatsapp::where('tenant_id', $tenantId)
+                ->where('telefono_normalizado', $telNorm)
+                ->orderByDesc('id')->first();
+            if (!$conv) return '';
+
+            // Estado actual del pedido (fuente estructurada de verdad)
+            $estado = app(\App\Services\EstadoPedidoService::class)->obtener($conv);
+
+            $partes = [];
+            $tieneAlgo = false;
+
+            $partes[] = "🧠 MEMORIA DE ESTA CONVERSACIÓN (lo ya hablado en este chat):";
+
+            // Productos ya en carrito
+            if (!empty($estado->productos) && is_array($estado->productos)) {
+                $tieneAlgo = true;
+                $partes[] = "  📦 CARRITO ACTUAL:";
+                foreach ($estado->productos as $p) {
+                    $cant = $p['quantity'] ?? '?';
+                    $unit = $p['unit'] ?? '';
+                    $name = $p['name'] ?? '?';
+                    $sub  = isset($p['subtotal']) ? ' — $' . number_format((float) $p['subtotal'], 0, ',', '.') : '';
+                    $partes[] = "     • {$cant} {$unit} {$name}{$sub}";
+                }
+            }
+
+            // Método de entrega
+            if (!empty($estado->metodo_entrega)) {
+                $tieneAlgo = true;
+                $metodo = $estado->metodo_entrega === 'recoger' ? 'RECOGER EN SEDE' : 'DESPACHO A DOMICILIO';
+                $partes[] = "  🚚 Método de entrega: {$metodo}";
+            }
+
+            // Dirección
+            if (!empty($estado->direccion)) {
+                $tieneAlgo = true;
+                $partes[] = "  📍 Dirección: {$estado->direccion}" . ($estado->barrio ? " · barrio {$estado->barrio}" : '')
+                          . ($estado->ciudad ? " · {$estado->ciudad}" : '')
+                          . ($estado->cobertura_validada ? " ✅ (cobertura validada)" : ' ❌ (cobertura NO validada)');
+            }
+
+            // Sede (si pickup)
+            if ($estado->metodo_entrega === 'recoger' && $estado->sede_id) {
+                try {
+                    $sedeName = \App\Models\Sede::find($estado->sede_id)?->nombre;
+                    if ($sedeName) {
+                        $tieneAlgo = true;
+                        $partes[] = "  🏪 Sede para recoger: {$sedeName}";
+                    }
+                } catch (\Throwable $e) {}
+            }
+
+            // Datos del cliente capturados
+            if (!empty($estado->cedula)) {
+                $tieneAlgo = true;
+                $partes[] = "  🪪 Cédula confirmada: {$estado->cedula}" . ($estado->cliente_existe_erp ? ' ✅ (existe en SGI)' : '');
+            }
+            if (!empty($estado->nombre_cliente)) {
+                $tieneAlgo = true;
+                $partes[] = "  👤 Nombre confirmado: {$estado->nombre_cliente}";
+            }
+            if (!empty($estado->email)) {
+                $tieneAlgo = true;
+                $partes[] = "  📧 Email: {$estado->email}";
+            }
+
+            // Paso actual del flujo
+            if ($estado->paso_actual && $estado->paso_actual !== 'inicio') {
+                $tieneAlgo = true;
+                $partes[] = "  🔄 Paso actual del pedido: {$estado->paso_actual}";
+            }
+
+            if (!$tieneAlgo) {
+                // Conversación nueva, sin datos persistidos aún
+                return "🧠 MEMORIA DE ESTA CONVERSACIÓN: (conversación nueva, sin datos capturados aún)\n"
+                     . "📌 Lo que el cliente diga AHORA es información fresca. Captúrala con cuidado.";
+            }
+
+            $partes[] = "";
+            $partes[] = "📌 ESTA ES LA VERDAD ESTRUCTURADA del pedido en curso. ÚSALA siempre.";
+            $partes[] = "   NUNCA olvides estos datos, NUNCA preguntes algo que ya está aquí.";
+            $partes[] = "   Si el cliente CAMBIA algo (ej. nueva dirección), actualiza el carrito.";
+
+            return implode("\n", $partes);
+        } catch (\Throwable $e) {
+            \Log::warning('construirMemoriaConversacional falló: ' . $e->getMessage());
+            return '';
+        }
     }
 
     /**

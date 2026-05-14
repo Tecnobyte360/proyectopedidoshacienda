@@ -868,7 +868,11 @@ class WhatsappWebhookController extends Controller
 
         // ── HISTORIAL: reducido a últimos 10 (en vez de 20) para evitar
         // que historial viejo confunda al bot. 10 = ~5 turnos = suficiente.
-        $conversationHistory = $conversacion->fresh()->historialParaIA(10);
+        // 🧠 Memoria conversacional ampliada: 50 mensajes (~20k tokens).
+        // Esto permite que el bot recuerde TODO lo que se ha hablado en la
+        // conversación actual: productos mencionados, dirección, preferencias,
+        // negociaciones, cambios de opinión, etc.
+        $conversationHistory = $conversacion->fresh()->historialParaIA(50);
 
         // ⏰ AUTO-RESET: si el cliente saluda Y la última actividad fue
         // hace más de 3 horas, reseteamos el historial. Esto evita que

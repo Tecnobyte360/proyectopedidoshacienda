@@ -113,10 +113,10 @@ class ConversacionWhatsapp extends Model
      * IMPORTANTE: trunca cada mensaje a 2000 chars y todo el bloque a 30k chars
      * MAX para evitar requests gigantes a OpenAI (rate_limit_exceeded).
      */
-    public function historialParaIA(int $cantidad = 20): array
+    public function historialParaIA(int $cantidad = 50): array
     {
-        $maxBloque = 30000; // 30k chars total max (~7.5k tokens)
-        $maxMsg    = 2000;  // cada mensaje truncado a 2k chars
+        $maxBloque = 80000; // 80k chars total max (~20k tokens)
+        $maxMsg    = 3000;  // cada mensaje truncado a 3k chars
 
         $query = MensajeWhatsapp::query()
             ->where('conversacion_id', $this->id)
