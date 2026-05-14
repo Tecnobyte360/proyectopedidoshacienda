@@ -63,10 +63,29 @@
             --brand-rgb2: {{ $rgbSec }};
         }
         * { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
-        html, body { height: 100%; }
+        html, body {
+            height: 100%;
+            overflow: hidden; /* sin scroll global — todo cabe en viewport */
+        }
         body {
             background: #f8fafc;
-            overflow-x: hidden;
+        }
+        .app-shell {
+            height: 100dvh;       /* viewport real con barra de URL móvil */
+            min-height: 100dvh;
+            max-height: 100dvh;
+            overflow: hidden;
+        }
+        .col-scroll {
+            /* Si en una pantalla minúscula el contenido aún no cabe, scroll interno
+               por columna en vez de la página entera. */
+            overflow-y: auto;
+            scrollbar-width: thin;
+        }
+        .col-scroll::-webkit-scrollbar { width: 6px; }
+        .col-scroll::-webkit-scrollbar-thumb {
+            background: rgba(var(--brand-rgb), 0.3);
+            border-radius: 3px;
         }
 
         /* ═══════ COLUMNA IZQUIERDA — Brand Side ═══════ */
@@ -228,6 +247,14 @@
             color: transparent;
         }
 
+        /* Adaptación a pantallas BAJITAS — oculta elementos no esenciales */
+        @media (max-height: 700px) {
+            .hide-on-short { display: none !important; }
+        }
+        @media (max-height: 600px) {
+            .hide-on-very-short { display: none !important; }
+        }
+
         /* Badge "online" */
         .live-dot {
             position: relative;
@@ -248,12 +275,12 @@
 </head>
 <body>
 
-    <div class="min-h-screen grid lg:grid-cols-5">
+    <div class="app-shell grid lg:grid-cols-5">
 
         {{-- ═══════════════════════════════════════════════════════════════
              COLUMNA IZQUIERDA — BRAND SIDE (3/5 en desktop)
              ═══════════════════════════════════════════════════════════════ --}}
-        <div class="brand-side hidden lg:flex lg:col-span-3 relative grid-lines">
+        <div class="brand-side hidden lg:flex lg:col-span-3 relative grid-lines col-scroll">
 
             {{-- Arcos curvos de fondo --}}
             <div class="brand-arc brand-arc-1"></div>
@@ -265,76 +292,79 @@
             <div class="dots absolute bottom-32 left-16 w-24 h-24 opacity-60"></div>
             <div class="dots absolute top-1/2 right-1/3 w-16 h-16 opacity-50"></div>
 
-            {{-- Contenido --}}
-            <div class="relative z-10 flex flex-col justify-between p-12 xl:p-16 w-full">
+            {{-- Contenido — proporciones con clamp() para adaptarse a alturas --}}
+            <div class="relative z-10 flex flex-col w-full"
+                 style="padding: clamp(1.5rem, 3vh, 3.5rem) clamp(2rem, 4vw, 4rem); gap: clamp(1rem, 3vh, 2.5rem);">
 
                 {{-- Header: Logo + Marca --}}
-                <div class="fade-up">
-                    <div class="flex items-center gap-4">
-                        @if($brandLogo)
-                            <div class="h-16 w-16 rounded-2xl bg-white shadow-xl overflow-hidden border-2 border-white pulse-glow">
-                                <img src="{{ $brandLogo }}" alt="{{ $brandName }}" class="h-full w-full object-contain">
-                            </div>
-                        @else
-                            <div class="h-16 w-16 rounded-2xl flex items-center justify-center text-white shadow-xl pulse-glow"
-                                 style="background: linear-gradient(135deg, var(--brand-prim), var(--brand-sec));">
-                                <i class="fa-solid fa-utensils text-2xl"></i>
-                            </div>
-                        @endif
-                        <div>
-                            <h1 class="text-2xl font-black text-slate-900 leading-tight">{{ $brandName }}</h1>
-                            <p class="text-sm text-slate-600 font-medium">{{ $tagline }}</p>
+                <div class="fade-up flex items-center" style="gap: clamp(0.75rem, 1.5vw, 1rem);">
+                    @if($brandLogo)
+                        <div class="rounded-2xl bg-white shadow-xl overflow-hidden border-2 border-white pulse-glow shrink-0"
+                             style="height: clamp(3rem, 6vh, 4rem); width: clamp(3rem, 6vh, 4rem);">
+                            <img src="{{ $brandLogo }}" alt="{{ $brandName }}" class="h-full w-full object-contain">
                         </div>
+                    @else
+                        <div class="rounded-2xl flex items-center justify-center text-white shadow-xl pulse-glow shrink-0"
+                             style="height: clamp(3rem, 6vh, 4rem); width: clamp(3rem, 6vh, 4rem); background: linear-gradient(135deg, var(--brand-prim), var(--brand-sec));">
+                            <i class="fa-solid fa-utensils" style="font-size: clamp(1.1rem, 2.5vh, 1.5rem);"></i>
+                        </div>
+                    @endif
+                    <div class="min-w-0">
+                        <h1 class="font-black text-slate-900 leading-tight truncate"
+                            style="font-size: clamp(1.1rem, 2.5vh, 1.5rem);">{{ $brandName }}</h1>
+                        <p class="text-slate-600 font-medium truncate"
+                           style="font-size: clamp(0.75rem, 1.5vh, 0.875rem);">{{ $tagline }}</p>
                     </div>
                 </div>
 
-                {{-- Hero central --}}
-                <div class="my-auto py-12">
-                    <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/70 backdrop-blur-sm border border-white/80 shadow-sm fade-up d-1 mb-6">
+                {{-- Hero central (flex-1 ocupa el espacio sobrante) --}}
+                <div class="flex-1 flex flex-col justify-center" style="gap: clamp(0.75rem, 2vh, 1.5rem); min-height: 0;">
+                    <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/70 backdrop-blur-sm border border-white/80 shadow-sm fade-up d-1 self-start">
                         <span class="live-dot inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
                         <span class="text-xs font-bold text-slate-700">Sistema operativo · 24/7</span>
                     </div>
 
-                    <h2 class="text-5xl xl:text-6xl font-black text-slate-900 leading-[1.05] mb-6 fade-up d-2 tracking-tight">
-                        Gestiona tus<br>
-                        pedidos<br>
+                    <h2 class="font-black text-slate-900 fade-up d-2 tracking-tight"
+                        style="font-size: clamp(2rem, 6.5vh, 4rem); line-height: 1.05;">
+                        Gestiona tus pedidos<br>
                         <span class="gradient-text">de forma inteligente</span>
                     </h2>
 
-                    <p class="text-lg text-slate-600 max-w-lg leading-relaxed fade-up d-3">
+                    <p class="text-slate-600 max-w-lg leading-relaxed fade-up d-3"
+                       style="font-size: clamp(0.85rem, 1.8vh, 1.05rem);">
                         Todo lo que necesitas para administrar tu negocio en un solo lugar.
                         <strong class="text-slate-800">Pedidos, clientes, despachos y reportes</strong> — sin complicaciones.
                     </p>
 
                     {{-- Stat strip --}}
-                    <div class="stat-strip mt-8 rounded-2xl p-1.5 flex gap-1 fade-up d-3 max-w-lg">
-                        <div class="flex-1 px-4 py-3 text-center">
-                            <div class="text-2xl font-black gradient-text">99.9%</div>
+                    <div class="stat-strip rounded-2xl p-1.5 flex gap-1 fade-up d-3 max-w-lg">
+                        <div class="flex-1 px-4 py-2.5 text-center">
+                            <div class="font-black gradient-text" style="font-size: clamp(1.2rem, 2.8vh, 1.6rem);">99.9%</div>
                             <div class="text-[10px] uppercase tracking-wider font-bold text-slate-500">Uptime</div>
                         </div>
                         <div class="w-px bg-slate-200/80"></div>
-                        <div class="flex-1 px-4 py-3 text-center">
-                            <div class="text-2xl font-black gradient-text">&lt;1s</div>
+                        <div class="flex-1 px-4 py-2.5 text-center">
+                            <div class="font-black gradient-text" style="font-size: clamp(1.2rem, 2.8vh, 1.6rem);">&lt;1s</div>
                             <div class="text-[10px] uppercase tracking-wider font-bold text-slate-500">Respuesta</div>
                         </div>
                         <div class="w-px bg-slate-200/80"></div>
-                        <div class="flex-1 px-4 py-3 text-center">
-                            <div class="text-2xl font-black gradient-text">24/7</div>
+                        <div class="flex-1 px-4 py-2.5 text-center">
+                            <div class="font-black gradient-text" style="font-size: clamp(1.2rem, 2.8vh, 1.6rem);">24/7</div>
                             <div class="text-[10px] uppercase tracking-wider font-bold text-slate-500">Soporte</div>
                         </div>
                     </div>
                 </div>
 
-                {{-- Feature cards en grid 2x2 --}}
-                <div class="grid grid-cols-2 gap-3 max-w-lg fade-up d-4">
+                {{-- Feature cards en grid 2x2 — se ocultan si la pantalla es muy bajita --}}
+                <div class="grid grid-cols-2 gap-3 max-w-lg fade-up d-4 hide-on-short">
                     @foreach($features as $f)
-                        <div class="feature-card rounded-2xl p-4 flex items-center gap-3">
-                            <div class="feature-card-icon h-11 w-11 rounded-xl flex items-center justify-center text-white shrink-0">
-                                <i class="fa-solid {{ $f['icon'] }}"></i>
+                        <div class="feature-card rounded-2xl p-3 flex items-center gap-3">
+                            <div class="feature-card-icon h-10 w-10 rounded-xl flex items-center justify-center text-white shrink-0">
+                                <i class="fa-solid {{ $f['icon'] }} text-sm"></i>
                             </div>
                             <div class="min-w-0">
-                                <div class="text-sm font-bold text-slate-900 leading-tight">{{ $f['label'] }}</div>
-                                <div class="text-xs text-slate-500 leading-tight">{{ $f['sublabel'] }}</div>
+                                <div class="text-sm font-bold text-slate-900 leading-tight truncate">{{ $f['label'] }}</div>
+                                <div class="text-[11px] text-slate-500 leading-tight truncate">{{ $f['sublabel'] }}</div>
                             </div>
                         </div>
                     @endforeach
@@ -345,40 +375,44 @@
         {{-- ═══════════════════════════════════════════════════════════════
              COLUMNA DERECHA — LOGIN SIDE (2/5 en desktop)
              ═══════════════════════════════════════════════════════════════ --}}
-        <div class="login-side lg:col-span-2 flex items-center justify-center p-6 sm:p-10 lg:p-12 relative">
+        <div class="login-side lg:col-span-2 flex items-center justify-center relative col-scroll"
+             style="padding: clamp(1rem, 3vh, 3rem);">
 
             {{-- Decoración esquina --}}
             <div class="absolute top-0 right-0 w-64 h-64 rounded-full opacity-30 pointer-events-none"
                  style="background: radial-gradient(circle, rgba(var(--brand-rgb), 0.4), transparent 70%); transform: translate(30%, -30%);"></div>
 
-            <div class="w-full max-w-md relative">
+            <div class="w-full max-w-md relative my-auto">
 
                 {{-- Mobile brand --}}
-                <div class="lg:hidden text-center mb-8 fade-up">
+                <div class="lg:hidden text-center fade-up" style="margin-bottom: clamp(1rem, 3vh, 2rem);">
                     @if($brandLogo)
-                        <div class="inline-flex h-20 w-20 items-center justify-center rounded-2xl bg-white shadow-xl mb-3 overflow-hidden border-2 border-slate-100">
+                        <div class="inline-flex items-center justify-center rounded-2xl bg-white shadow-xl mb-2 overflow-hidden border-2 border-slate-100"
+                             style="height: clamp(3.5rem, 8vh, 5rem); width: clamp(3.5rem, 8vh, 5rem);">
                             <img src="{{ $brandLogo }}" alt="{{ $brandName }}" class="h-full w-full object-contain">
                         </div>
                     @else
-                        <div class="inline-flex h-20 w-20 items-center justify-center rounded-2xl text-white shadow-xl mb-3"
-                             style="background: linear-gradient(135deg, var(--brand-prim), var(--brand-sec));">
-                            <i class="fa-solid fa-utensils text-3xl"></i>
+                        <div class="inline-flex items-center justify-center rounded-2xl text-white shadow-xl mb-2"
+                             style="height: clamp(3.5rem, 8vh, 5rem); width: clamp(3.5rem, 8vh, 5rem); background: linear-gradient(135deg, var(--brand-prim), var(--brand-sec));">
+                            <i class="fa-solid fa-utensils" style="font-size: clamp(1.25rem, 3vh, 1.75rem);"></i>
                         </div>
                     @endif
-                    <h1 class="text-2xl font-black text-slate-900">{{ $brandName }}</h1>
-                    <p class="text-sm text-slate-500">{{ $tagline }}</p>
+                    <h1 class="font-black text-slate-900" style="font-size: clamp(1.1rem, 2.5vh, 1.5rem);">{{ $brandName }}</h1>
+                    <p class="text-slate-500" style="font-size: clamp(0.75rem, 1.6vh, 0.875rem);">{{ $tagline }}</p>
                 </div>
 
-                <div class="login-card bg-white rounded-3xl p-8 sm:p-10 border border-slate-100/80 fade-up d-1 relative">
+                <div class="login-card bg-white rounded-3xl border border-slate-100/80 fade-up d-1 relative"
+                     style="padding: clamp(1.5rem, 3.5vh, 2.5rem);">
 
                     {{-- Header card --}}
-                    <div class="mb-8">
-                        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 mb-4">
+                    <div style="margin-bottom: clamp(1rem, 3vh, 2rem);">
+                        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 mb-3 hide-on-short">
                             <i class="fa-solid fa-shield-halved text-xs" style="color: var(--brand-prim)"></i>
                             <span class="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Acceso seguro</span>
                         </div>
-                        <h2 class="text-3xl font-black text-slate-900 mb-2">Bienvenido</h2>
-                        <p class="text-sm text-slate-500">Ingresa con tus credenciales para continuar</p>
+                        <h2 class="font-black text-slate-900 mb-1"
+                            style="font-size: clamp(1.5rem, 3.5vh, 1.875rem);">Bienvenido</h2>
+                        <p class="text-slate-500" style="font-size: clamp(0.8rem, 1.6vh, 0.875rem);">Ingresa con tus credenciales para continuar</p>
                     </div>
 
                     @if($errors->any())
@@ -395,7 +429,7 @@
                         </div>
                     @endif
 
-                    <form method="POST" action="{{ route('login') }}" class="space-y-5">
+                    <form method="POST" action="{{ route('login') }}" class="flex flex-col" style="gap: clamp(0.85rem, 2vh, 1.25rem);">
                         @csrf
 
                         <div>
@@ -407,7 +441,8 @@
                                     <i class="fa-solid fa-envelope text-sm"></i>
                                 </span>
                                 <input type="email" name="email" id="email" value="{{ old('email') }}" required autofocus
-                                       class="brand-input w-full rounded-xl border-2 border-slate-200 pl-11 pr-4 py-3.5 text-sm font-medium text-slate-900"
+                                       class="brand-input w-full rounded-xl border-2 border-slate-200 pl-11 pr-4 text-sm font-medium text-slate-900"
+                                       style="padding-top: clamp(0.7rem, 1.6vh, 0.875rem); padding-bottom: clamp(0.7rem, 1.6vh, 0.875rem);"
                                        placeholder="{{ 'tucorreo@' . $emailDomain }}">
                             </div>
                         </div>
@@ -428,7 +463,8 @@
                                     <i class="fa-solid fa-lock text-sm"></i>
                                 </span>
                                 <input type="password" name="password" id="password" required
-                                       class="brand-input w-full rounded-xl border-2 border-slate-200 pl-11 pr-12 py-3.5 text-sm font-medium text-slate-900"
+                                       class="brand-input w-full rounded-xl border-2 border-slate-200 pl-11 pr-12 text-sm font-medium text-slate-900"
+                                       style="padding-top: clamp(0.7rem, 1.6vh, 0.875rem); padding-bottom: clamp(0.7rem, 1.6vh, 0.875rem);"
                                        placeholder="••••••••">
                                 <button type="button" onclick="togglePwd()"
                                         class="absolute right-3 top-1/2 -translate-y-1/2 h-9 w-9 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition flex items-center justify-center"
@@ -446,30 +482,33 @@
                         </label>
 
                         <button type="submit"
-                                class="brand-btn w-full rounded-xl text-white font-bold py-4 text-sm tracking-wide">
+                                class="brand-btn w-full rounded-xl text-white font-bold text-sm tracking-wide"
+                                style="padding-top: clamp(0.85rem, 1.8vh, 1rem); padding-bottom: clamp(0.85rem, 1.8vh, 1rem);">
                             Entrar
                             <i class="fa-solid fa-arrow-right ml-1"></i>
                         </button>
                     </form>
 
-                    {{-- Divisor --}}
-                    <div class="flex items-center gap-3 my-6">
-                        <div class="flex-1 h-px bg-slate-200"></div>
-                        <span class="text-[10px] uppercase tracking-widest font-bold text-slate-400">o</span>
-                        <div class="flex-1 h-px bg-slate-200"></div>
-                    </div>
+                    {{-- Divisor + soporte (se oculta en pantallas bajitas) --}}
+                    <div class="hide-on-short">
+                        <div class="flex items-center gap-3" style="margin: clamp(1rem, 2.5vh, 1.5rem) 0;">
+                            <div class="flex-1 h-px bg-slate-200"></div>
+                            <span class="text-[10px] uppercase tracking-widest font-bold text-slate-400">o</span>
+                            <div class="flex-1 h-px bg-slate-200"></div>
+                        </div>
 
-                    {{-- Soporte --}}
-                    <div class="flex items-center justify-center gap-2 text-sm text-slate-500">
-                        <i class="fa-solid fa-headset" style="color: var(--brand-prim)"></i>
-                        <span>¿Problemas para entrar?</span>
-                        <a href="mailto:soporte@tecnobyte360.com"
-                           class="font-bold hover:underline"
-                           style="color: var(--brand-prim);">Contactar soporte</a>
+                        <div class="flex items-center justify-center gap-2 text-sm text-slate-500 flex-wrap">
+                            <i class="fa-solid fa-headset" style="color: var(--brand-prim)"></i>
+                            <span>¿Problemas para entrar?</span>
+                            <a href="mailto:soporte@tecnobyte360.com"
+                               class="font-bold hover:underline"
+                               style="color: var(--brand-prim);">Contactar soporte</a>
+                        </div>
                     </div>
                 </div>
 
-                <p class="text-center text-xs text-slate-400 mt-6 fade-up d-2">
+                <p class="text-center text-xs text-slate-400 fade-up d-2 hide-on-very-short"
+                   style="margin-top: clamp(1rem, 2vh, 1.5rem);">
                     © {{ date('Y') }} <span class="font-semibold text-slate-500">{{ $brandName }}</span> · Todos los derechos reservados
                 </p>
             </div>
