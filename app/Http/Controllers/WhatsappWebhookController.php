@@ -1293,13 +1293,15 @@ TXT;
 
         // 🎯 SHORT-CIRCUITS según intención detectada en el mensaje:
         //   1. Pidió "generar pedido" → forzar confirmar_pedido
-        //   2. Preguntó por producto → forzar buscar_productos
-        //   3. Dió datos finales → forzar confirmar_pedido si estado completo, sino required
+        //   2. Preguntó por cobertura de MUNICIPIO → forzar validar_cobertura
+        //   3. Preguntó por producto → forzar buscar_productos
+        //   4. Dió datos finales → forzar confirmar_pedido si estado completo, sino required
         $forzarConfirmar    = $this->clientePidioGenerarPedido($message);
-        $preguntaProducto   = !$forzarConfirmar && $this->clientePreguntaProducto($message);
+        $consultaCoberturaLugar = !$forzarConfirmar && $this->clienteConsultaCoberturaDeLugar($message);
+        $preguntaProducto   = !$forzarConfirmar && !$consultaCoberturaLugar && $this->clientePreguntaProducto($message);
         $estadoActualBd     = app(\App\Services\EstadoPedidoService::class)->obtener($conversacion);
         $estadoYaCompleto   = $estadoActualBd && $estadoActualBd->estaCompleto() && !$estadoActualBd->confirmado_at;
-        $datosFinalesEnTexto= !$forzarConfirmar && $this->clienteDaDatosFinales($message);
+        $datosFinalesEnTexto= !$forzarConfirmar && !$consultaCoberturaLugar && $this->clienteDaDatosFinales($message);
 
         $toolChoiceInicial  = $toolChoicePorPaso;
         $razonForzado       = null;
@@ -1358,6 +1360,23 @@ TXT;
             $messages[] = [
                 'role' => 'system',
                 'content' => "🚨 El estado del pedido está COMPLETO y el cliente acaba de dar la confirmación final. INVOCA `confirmar_pedido` AHORA con los datos del estado.",
+            ];
+        } elseif ($consultaCoberturaLugar) {
+            // ⭐ Cliente pregunta '¿cubren X?', '¿llegan a Y?' → forzar validar_cobertura
+            // con el lugar extraído. NUNCA inferir de zonas_cobertura (legacy).
+            $lugar = $this->extraerLugarDeConsultaCobertura($message);
+            $toolChoiceInicial = ['type' => 'function', 'function' => ['name' => 'validar_cobertura']];
+            $allTools = $this->getToolsDefinicion();
+            $valTool = collect($allTools)->first(fn ($t) => ($t['function']['name'] ?? '') === 'validar_cobertura');
+            if ($valTool) $toolsFiltradas = [$valTool];
+            $razonForzado = 'cliente_consulta_cobertura_lugar';
+            $messages[] = [
+                'role' => 'system',
+                'content' => "🚨 El cliente preguntó si cubrimos un lugar específico. "
+                    . "INVOCA `validar_cobertura(direccion='{$lugar}', ciudad='{$lugar}')` AHORA. "
+                    . "NO llames `consultar_zonas_cobertura` (esa tool no hace point-in-polygon). "
+                    . "NO respondas texto antes de la tool. La tool hará el test real contra "
+                    . "los polígonos dibujados de las sedes y te dirá si está cubierto.",
             ];
         } elseif ($preguntaProducto) {
             // Forzar buscar_productos cuando el cliente menciona producto/cantidad
@@ -2989,6 +3008,81 @@ TXT;
      * Si retorna true, forzamos tool_choice a buscar_productos para que el
      * LLM no invente "sí tengo X" sin verificar BD.
      */
+    /**
+     * 🗺️ Detecta si el cliente está preguntando si cubrimos un lugar específico.
+     * Ej: "¿cubren Girardota?", "¿llegan a Bello?", "tienes envío a Medellín?",
+     *     "ya tienes cobertura en Itagüí?", "¿hay domicilio a Sabaneta?"
+     */
+    private function clienteConsultaCoberturaDeLugar(string $mensaje): bool
+    {
+        $m = mb_strtolower(\Illuminate\Support\Str::ascii(trim($mensaje)));
+        if ($m === '') return false;
+
+        // Patrones de pregunta de cobertura por lugar
+        $patrones = [
+            // "¿cubren X?", "¿cubres X?", "¿cubre X?"
+            '/\b(cubren|cubres|cubre|cubris)\s+\w+/iu',
+            // "¿llegan a X?", "¿llegas a X?"
+            '/\b(llegan|llegas|llega)\s+a\s+\w+/iu',
+            // "¿tienen envío/cobertura/domicilio a X?", "tienes X?"
+            '/\b(tienen|tienes|tiene)\s+(env[ií]o|domicilio|cobertura|reparto|despacho)s?\s+(a|en|hasta|para)\s+\w+/iu',
+            // "¿hay envío/cobertura/domicilio a X?"
+            '/\b(hay)\s+(env[ií]o|domicilio|cobertura|reparto|despacho)s?\s+(a|en|hasta|para)\s+\w+/iu',
+            // "ya tienen/tienes cobertura en X?"
+            '/\bya\s+(tienen|tienes|hay)\s+(cobertura|env[ií]o|domicilio|reparto|despacho)s?\s+(a|en|hasta|para)?\s*\w+/iu',
+            // "¿reparten a X?", "¿envían a X?"
+            '/\b(reparten|repartes|env[ií]an|env[ií]as)\s+(a|en|hasta|para)\s+\w+/iu',
+            // "¿llevan a X?", "¿llevas a X?"
+            '/\b(llevan|llevas|lleva)\s+(a|hasta)\s+\w+/iu',
+            // "cobertura en X", "envío a X"
+            '/\b(cobertura|domicilio|env[ií]o|reparto|despacho)s?\s+(en|a|hasta|para)\s+[A-ZÁÉÍÓÚ]\w+/u',
+        ];
+        foreach ($patrones as $p) {
+            if (preg_match($p, $m)) return true;
+        }
+        return false;
+    }
+
+    /**
+     * 🗺️ Extrae el nombre del lugar de una consulta de cobertura.
+     * Ej: "¿cubren Girardota?" → "Girardota"
+     *     "tienes envío a Bello?" → "Bello"
+     */
+    private function extraerLugarDeConsultaCobertura(string $mensaje): string
+    {
+        $m = trim($mensaje);
+
+        // Limpiar signos y puntuación final
+        $m = preg_replace('/[¿?¡!.,;:]/u', ' ', $m);
+        $m = preg_replace('/\s+/u', ' ', trim($m));
+
+        // Patrones de extracción — toman el último sustantivo propio o palabra >2 chars
+        $patrones = [
+            '/(?:cubren|cubres|cubre|llegan|llegas|llega|tienen|tienes|tiene|hay|reparten|repartes|env[ií]an|env[ií]as|llevan|llevas|lleva)\s+(?:env[ií]o|domicilio|cobertura|reparto|despacho)?s?\s*(?:a|en|hasta|para|hasta\s+a)?\s*([A-ZÁÉÍÓÚa-záéíóúñ][\wáéíóúñ\s]{2,40})/iu',
+            '/(?:cobertura|domicilio|env[ií]o|reparto|despacho)s?\s+(?:en|a|hasta|para)\s+([A-ZÁÉÍÓÚa-záéíóúñ][\wáéíóúñ\s]{2,40})/iu',
+            '/ya\s+(?:tienen|tienes|hay)\s+(?:cobertura|env[ií]o|domicilio|reparto)s?\s+(?:en|a|hasta|para)?\s*([A-ZÁÉÍÓÚa-záéíóúñ][\wáéíóúñ\s]{2,40})/iu',
+        ];
+        foreach ($patrones as $p) {
+            if (preg_match($p, $m, $match)) {
+                $lugar = trim($match[1]);
+                // Quitar palabras de borde que no son lugar
+                $lugar = preg_replace('/\b(por\s+favor|gracias|si|no|ok)\b/iu', '', $lugar);
+                $lugar = trim($lugar);
+                if (mb_strlen($lugar) >= 3) {
+                    // Capitalizar primera letra de cada palabra
+                    return mb_convert_case($lugar, MB_CASE_TITLE, 'UTF-8');
+                }
+            }
+        }
+
+        // Fallback: última palabra capitalizada
+        if (preg_match('/([A-ZÁÉÍÓÚ][a-záéíóúñ]{3,})/u', $m, $match)) {
+            return $match[1];
+        }
+
+        return $m;
+    }
+
     private function clientePreguntaProducto(string $mensaje): bool
     {
         $m = mb_strtolower(trim($mensaje));
