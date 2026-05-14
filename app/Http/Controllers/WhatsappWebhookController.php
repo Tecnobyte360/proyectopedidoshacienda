@@ -1962,6 +1962,63 @@ TXT;
             return $reply;
         }
 
+        // ── 🛒 Tool call: agregar_producto_al_pedido ───────────────────────────
+        // Persiste un producto en estado.productos con validación de catálogo
+        // y conversión de unidades (libra → kg). Devuelve carrito actualizado.
+        if ($toolCalls && ($toolCalls[0]['function']['name'] ?? '') === 'agregar_producto_al_pedido') {
+            $rawArgs = $toolCalls[0]['function']['arguments'] ?? '{}';
+            $args    = json_decode($rawArgs, true) ?: [];
+
+            $action   = strtolower(trim((string) ($args['action'] ?? 'add')));
+            $name     = trim((string) ($args['name'] ?? ''));
+            $code     = trim((string) ($args['code'] ?? ''));
+            $quantity = (float) ($args['quantity'] ?? 0);
+            $unitRaw  = strtolower(trim((string) ($args['unit'] ?? '')));
+
+            Log::info('🛒 Tool call agregar_producto_al_pedido', compact('from', 'action', 'name', 'quantity', 'unitRaw', 'code'));
+
+            $resultado = $this->procesarAgregarProductoAlPedido(
+                $conversacion,
+                $action,
+                $name,
+                $code,
+                $quantity,
+                $unitRaw,
+                $connectionId
+            );
+
+            // Respuesta de la tool para que el LLM la incorpore en su siguiente turn
+            $toolResponseMessages = array_merge(
+                [['role' => 'system', 'content' => $systemPrompt]],
+                $conversationHistory,
+                [[
+                    'role'       => 'assistant',
+                    'content'    => null,
+                    'tool_calls' => $toolCalls,
+                ]],
+                [[
+                    'role'         => 'tool',
+                    'tool_call_id' => $toolCalls[0]['id'] ?? 'call_1',
+                    'name'         => 'agregar_producto_al_pedido',
+                    'content'      => json_encode($resultado, JSON_UNESCAPED_UNICODE),
+                ]]
+            );
+
+            $followUp = $this->llamarOpenAI($toolResponseMessages);
+            $reply    = $followUp['choices'][0]['message']['content']
+                ?? ($resultado['mensaje_sugerido'] ?? 'Listo, agregado a tu pedido ✅');
+
+            $conversationHistory[] = ['role' => 'assistant', 'content' => $reply];
+            Cache::put($cacheKey, $conversationHistory, now()->addMinutes(45));
+
+            $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_ASSISTANT, $reply, [
+                'tipo' => 'tool_call',
+                'meta' => ['tool' => 'agregar_producto_al_pedido', 'resultado' => $resultado],
+            ]);
+
+            return $reply;
+        }
+
         // ── Tool call: validar_cobertura ──────────────────────────────────────
         // El bot pregunta si una dirección está cubierta. NO confirma pedido.
         // Devuelve un "tool result" como mensaje del bot y guarda en el historial
@@ -4769,6 +4826,223 @@ TXT;
       return implode(', ', $limpio);
   }
 
+  /**
+   * 🛒 Procesa la tool agregar_producto_al_pedido — la primitiva del carrito.
+   *
+   * Acciones soportadas:
+   *   - add    : agregar producto (o sumar si ya existe el mismo)
+   *   - update : reemplazar la cantidad de un producto ya en el carrito
+   *   - remove : quitar un producto del carrito
+   *   - clear  : vaciar el carrito
+   *
+   * Valida que el producto exista en el catálogo (vía BotCatalogoService::resolverProducto),
+   * convierte libras→kg si aplica, y persiste en `estado.productos`. Devuelve el
+   * carrito actualizado con totales para que el LLM pueda responderle al cliente.
+   */
+  private function procesarAgregarProductoAlPedido(
+      \App\Models\ConversacionWhatsapp $conv,
+      string $action,
+      string $name,
+      string $code,
+      float $quantity,
+      string $unitRaw,
+      ?int $connectionId
+  ): array {
+      $estadoSrv  = app(\App\Services\EstadoPedidoService::class);
+      $catalogo   = app(\App\Services\BotCatalogoService::class);
+      $sedeId     = $this->obtenerSedeIdDesdeConexion($connectionId);
+      $estado     = $estadoSrv->obtener($conv);
+      $productos  = is_array($estado->productos) ? $estado->productos : [];
+
+      // ── Acción CLEAR: vaciar el carrito ────────────────────────────────
+      if ($action === 'clear') {
+          $estado->productos = [];
+          $estado->save();
+          return [
+              'ok'              => true,
+              'action'          => 'clear',
+              'mensaje_sugerido'=> 'Listo, vacié tu carrito. ¿Empezamos de nuevo? 🙌',
+              'carrito'         => [],
+              'subtotal'        => 0,
+              'total_items'     => 0,
+          ];
+      }
+
+      // ── Validar nombre presente para add/update/remove ─────────────────
+      if ($name === '' && $code === '') {
+          return [
+              'ok'              => false,
+              'action'          => $action,
+              'error'           => 'Falta el nombre del producto. Llama buscar_productos primero.',
+              'mensaje_sugerido'=> 'Necesito que me digas qué producto querías. ¿Me lo repites?',
+          ];
+      }
+
+      // ── Resolver producto contra catálogo (igual lógica que confirmar_pedido) ──
+      $producto = null;
+      $resueltoVia = null;
+
+      if ($code !== '') {
+          $existeCode = \App\Models\Producto::where('codigo', $code)->exists();
+          if ($existeCode) {
+              $producto = $catalogo->resolverProducto($code, $sedeId);
+              if ($producto && strcasecmp(trim((string) $producto->codigo), $code) === 0) {
+                  $resueltoVia = 'codigo';
+              } else {
+                  $producto = null;
+              }
+          }
+      }
+      if (!$producto && $name !== '') {
+          $producto = $catalogo->resolverProducto($name, $sedeId);
+          if ($producto) $resueltoVia = 'nombre';
+      }
+
+      // Guard de tokens compartidos (anti-alucinación)
+      if ($producto && $name !== '') {
+          $tokensSolicitados = collect(preg_split('/\s+/', mb_strtolower(\Illuminate\Support\Str::ascii($name))))
+              ->filter(fn ($t) => mb_strlen($t) >= 4)
+              ->values();
+          if ($tokensSolicitados->isNotEmpty()) {
+              $nombreResuelto = mb_strtolower(\Illuminate\Support\Str::ascii((string) ($producto->nombre ?? '')));
+              $compartido = $tokensSolicitados->first(fn ($t) => str_contains($nombreResuelto, $t));
+              if (!$compartido) {
+                  Log::warning('🛡️ [agregar_producto] resolver matcheó sin tokens compartidos — descartado', [
+                      'solicitado' => $name,
+                      'resuelto'   => $producto->nombre ?? null,
+                  ]);
+                  $producto = null;
+              }
+          }
+      }
+
+      if (!$producto) {
+          return [
+              'ok'              => false,
+              'action'          => $action,
+              'error'           => "Producto '{$name}' no está en el catálogo. Llama buscar_productos para ver opciones reales.",
+              'mensaje_sugerido'=> "Mmm, '{$name}' no lo veo en mi catálogo 🤔. Te muestro qué tengo similar.",
+          ];
+      }
+
+      // ── Conversión de unidades (igual lógica que confirmar_pedido) ─────
+      $unitNorm = $unitRaw;
+      $cantidadFinal = $quantity;
+
+      if (in_array($unitRaw, ['lb', 'libra', 'libras', 'librita', 'libritas'], true)) {
+          $cantidadFinal = $quantity * 0.5;
+          $unitNorm      = 'kg';
+      } elseif (in_array($unitRaw, ['g', 'gr', 'gramo', 'gramos'], true)) {
+          $cantidadFinal = $quantity / 1000.0;
+          $unitNorm      = 'kg';
+      } elseif (in_array($unitRaw, ['kg', 'k', 'kl', 'kilo', 'kilos', 'kilogramo'], true)) {
+          $unitNorm = 'kg';
+      }
+
+      $precioKg = method_exists($producto, 'precioParaSede')
+          ? $producto->precioParaSede($sedeId)
+          : (float) ($producto->precio_base ?? $producto->precio ?? 0);
+
+      // ── Aplicar acción ────────────────────────────────────────────────
+      $codigoProd = (string) ($producto->codigo ?? '');
+      $nombreProd = (string) ($producto->nombre ?? $name);
+      $idxExist   = null;
+      foreach ($productos as $i => $p) {
+          if ((string) ($p['code'] ?? '') === $codigoProd && $codigoProd !== '') {
+              $idxExist = $i;
+              break;
+          }
+          if (mb_strtolower((string) ($p['name'] ?? '')) === mb_strtolower($nombreProd)) {
+              $idxExist = $i;
+              break;
+          }
+      }
+
+      if ($action === 'remove') {
+          if ($idxExist !== null) {
+              array_splice($productos, $idxExist, 1);
+          }
+      } elseif ($action === 'update') {
+          if ($idxExist !== null) {
+              $productos[$idxExist]['quantity'] = $cantidadFinal;
+              $productos[$idxExist]['unit']     = $unitNorm;
+          } else {
+              // Si no estaba, lo agregamos
+              $productos[] = $this->armarLineaProducto($producto, $cantidadFinal, $unitNorm, $precioKg);
+          }
+      } else { // add (default)
+          if ($idxExist !== null) {
+              // Sumar a la cantidad existente
+              $productos[$idxExist]['quantity'] = (float) ($productos[$idxExist]['quantity'] ?? 0) + $cantidadFinal;
+          } else {
+              $productos[] = $this->armarLineaProducto($producto, $cantidadFinal, $unitNorm, $precioKg);
+          }
+      }
+
+      // Recalcular subtotal y guardar
+      $subtotal = 0;
+      foreach ($productos as $p) {
+          $subtotal += (float) ($p['subtotal'] ?? ((float) ($p['quantity'] ?? 0) * (float) ($p['precio_unitario'] ?? 0)));
+      }
+
+      $estado->productos = $productos;
+      $estado->save();
+      $estadoSrv->avanzarPaso($estado);
+
+      Log::info('🛒 Producto procesado en carrito', [
+          'conv_id'   => $conv->id,
+          'action'    => $action,
+          'producto'  => $nombreProd,
+          'cantidad'  => $cantidadFinal,
+          'unit'      => $unitNorm,
+          'subtotal'  => $subtotal,
+          'carrito_n' => count($productos),
+          'via'       => $resueltoVia,
+      ]);
+
+      // Resumen para el LLM
+      $resumenCarrito = collect($productos)->map(fn ($p) =>
+          ($p['quantity'] ?? 0) . ' ' . ($p['unit'] ?? '') . ' ' . ($p['name'] ?? '')
+          . ' — $' . number_format((float) ($p['subtotal'] ?? 0), 0, ',', '.')
+      )->implode("\n");
+
+      return [
+          'ok'               => true,
+          'action'           => $action,
+          'producto_agregado' => [
+              'name'     => $nombreProd,
+              'quantity' => $cantidadFinal,
+              'unit'     => $unitNorm,
+              'precio_kg'=> $precioKg,
+          ],
+          'carrito'          => $productos,
+          'subtotal'         => (int) round($subtotal),
+          'subtotal_fmt'     => '$' . number_format($subtotal, 0, ',', '.'),
+          'total_items'      => count($productos),
+          'mensaje_sugerido' => count($productos) > 0
+              ? "✅ Carrito actualizado:\n{$resumenCarrito}\n\nSubtotal: $" . number_format($subtotal, 0, ',', '.') . "\n¿Algo más?"
+              : 'Tu carrito quedó vacío.',
+      ];
+  }
+
+  /**
+   * Arma la estructura de una línea de producto para guardar en estado.productos.
+   */
+  private function armarLineaProducto($producto, float $cantidad, string $unidad, float $precioKg): array
+  {
+      // Si la unidad es kg, el subtotal es cantidad × precio_kg.
+      // Si es unidad/paquete, asumimos precio_kg como precio por unidad.
+      $subtotal = $cantidad * $precioKg;
+      return [
+          'code'            => (string) ($producto->codigo ?? ''),
+          'name'            => (string) ($producto->nombre ?? ''),
+          'quantity'        => $cantidad,
+          'unit'            => $unidad,
+          'precio_unitario' => (float) $precioKg,
+          'subtotal'        => $subtotal,
+      ];
+  }
+
   private function validarCoberturaDireccion(
       string $direccion,
       ?string $barrio = null,
@@ -6809,6 +7083,54 @@ PROMPT;
                         'required' => ['products', 'customer_name', 'phone', 'address', 'neighborhood'],
                     ],
                 ],
+        ];
+
+        // 🛒 Tool: agregar_producto_al_pedido — siempre disponible
+        // CADA vez que el cliente confirma un producto + cantidad + unidad, el LLM
+        // DEBE llamar esta tool para persistir en el carrito. Sin esto el estado
+        // queda vacío y el pedido al final falla o crea duplicados.
+        $tools[] = [
+            'type'     => 'function',
+            'function' => [
+                'name'        => 'agregar_producto_al_pedido',
+                'description' => '🛒 Persiste un producto en el carrito del cliente DESPUÉS de confirmar nombre+cantidad+unidad. '
+                    . 'LLAMA SIEMPRE cuando el cliente confirme un producto. Sin esto el pedido queda vacío. '
+                    . 'Acciones soportadas: '
+                    . '`add` = agregar producto al carrito (default), '
+                    . '`update` = actualizar la cantidad de un producto ya agregado, '
+                    . '`remove` = quitar un producto del carrito, '
+                    . '`clear` = vaciar el carrito completo. '
+                    . 'El sistema valida que el producto exista en el catálogo, convierte libras→kg si aplica '
+                    . 'y devuelve el resumen del carrito actual con total. NO debes decirle al cliente '
+                    . '"agregado" antes de invocar la tool; el sistema te devuelve el subtotal real.',
+                'parameters'  => [
+                    'type'       => 'object',
+                    'properties' => [
+                        'name' => [
+                            'type'        => 'string',
+                            'description' => 'Nombre EXACTO del producto del catálogo (devuelto por buscar_productos). Si no llamaste buscar_productos primero, NO inventes el nombre.',
+                        ],
+                        'quantity' => [
+                            'type'        => 'number',
+                            'description' => 'Cantidad numérica que pidió el cliente. Para "media libra" → 0.5. Para "3 kilos y medio" → 3.5.',
+                        ],
+                        'unit' => [
+                            'type'        => 'string',
+                            'description' => 'Unidad tal cual la dijo el cliente: "libra", "kilo", "kg", "gramo", "unidad", "paquete". El backend convierte a kg si es por peso.',
+                        ],
+                        'code' => [
+                            'type'        => 'string',
+                            'description' => 'Código SKU del producto del catálogo (opcional pero recomendado para precisión).',
+                        ],
+                        'action' => [
+                            'type'        => 'string',
+                            'enum'        => ['add', 'update', 'remove', 'clear'],
+                            'description' => 'Acción a realizar. Default: add.',
+                        ],
+                    ],
+                    'required' => ['action'],
+                ],
+            ],
         ];
 
         // Tool: validar_cobertura — siempre disponible

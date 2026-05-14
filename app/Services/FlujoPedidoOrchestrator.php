@@ -61,6 +61,10 @@ class FlujoPedidoOrchestrator
         // positivos del fuzzy match).
         'confirmar_pedido',
         'registrar_datos_cliente',
+        // 🛒 Carrito: el LLM debe poder agregar/quitar/actualizar productos
+        // del pedido en cualquier momento del flujo (incluso en confirmación
+        // si el cliente cambia de opinión).
+        'agregar_producto_al_pedido',
     ];
 
     /**
