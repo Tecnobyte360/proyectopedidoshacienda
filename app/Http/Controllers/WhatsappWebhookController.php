@@ -1297,10 +1297,19 @@ TXT;
         //   3. Preguntó por producto → forzar buscar_productos
         //   4. Dió datos finales → forzar confirmar_pedido si estado completo, sino required
         $forzarConfirmar    = $this->clientePidioGenerarPedido($message);
-        $preguntaProducto   = !$forzarConfirmar && $this->clientePreguntaProducto($message);
+
+        // 🗺️ Detección dinámica: si el mensaje menciona un LUGAR (Bello,
+        // Girardota, La Estrella, etc.) Y el contexto sugiere consulta de
+        // cobertura (acaba de hablar de domicilio/envío o el último bot
+        // respondió sobre cobertura), FORZAR validar_cobertura. Es 100%
+        // dinámico — no depende de cómo lo fraseó el cliente.
+        $lugarEnMsg = $this->extraerLugarDelMensaje($message);
+        $contextoEsCobertura = $lugarEnMsg && $this->contextoSugiereCobertura($conversacion, $message);
+
+        $preguntaProducto   = !$forzarConfirmar && !$contextoEsCobertura && $this->clientePreguntaProducto($message);
         $estadoActualBd     = app(\App\Services\EstadoPedidoService::class)->obtener($conversacion);
         $estadoYaCompleto   = $estadoActualBd && $estadoActualBd->estaCompleto() && !$estadoActualBd->confirmado_at;
-        $datosFinalesEnTexto= !$forzarConfirmar && $this->clienteDaDatosFinales($message);
+        $datosFinalesEnTexto= !$forzarConfirmar && !$contextoEsCobertura && $this->clienteDaDatosFinales($message);
 
         $toolChoiceInicial  = $toolChoicePorPaso;
         $razonForzado       = null;
@@ -1359,6 +1368,22 @@ TXT;
             $messages[] = [
                 'role' => 'system',
                 'content' => "🚨 El estado del pedido está COMPLETO y el cliente acaba de dar la confirmación final. INVOCA `confirmar_pedido` AHORA con los datos del estado.",
+            ];
+        } elseif ($contextoEsCobertura && $lugarEnMsg) {
+            // ⭐ Mensaje menciona un lugar Y el contexto es cobertura/domicilio
+            // → forzar validar_cobertura con ese lugar. Sin importar el fraseo.
+            $toolChoiceInicial = ['type' => 'function', 'function' => ['name' => 'validar_cobertura']];
+            $allTools = $this->getToolsDefinicion();
+            $valTool = collect($allTools)->first(fn ($t) => ($t['function']['name'] ?? '') === 'validar_cobertura');
+            if ($valTool) $toolsFiltradas = [$valTool];
+            $razonForzado = 'lugar_mencionado_en_contexto_cobertura';
+            $messages[] = [
+                'role' => 'system',
+                'content' => "🚨 El cliente mencionó el lugar '{$lugarEnMsg}' en un contexto de "
+                    . "cobertura/domicilio. INVOCA `validar_cobertura(direccion='{$lugarEnMsg}', "
+                    . "ciudad='{$lugarEnMsg}')` AHORA. Hace test punto-en-polígono real contra "
+                    . "los polígonos dibujados. NO respondas texto antes. NO supongas que está/no "
+                    . "está cubierto basado en mensajes anteriores.",
             ];
         } elseif ($preguntaProducto) {
             // Forzar buscar_productos cuando el cliente menciona producto/cantidad
@@ -3023,6 +3048,56 @@ TXT;
      * Si retorna true, forzamos tool_choice a buscar_productos para que el
      * LLM no invente "sí tengo X" sin verificar BD.
      */
+    /**
+     * 🗺️ ¿El contexto de la conversación sugiere que el cliente está
+     * preguntando por cobertura/domicilio?
+     *
+     * True si:
+     *   - El mensaje actual contiene palabras de domicilio/envío/cobertura, O
+     *   - El último mensaje del bot habló de cobertura/zona/despacho/envío
+     *     (continuación natural — ej cliente dice "y a Girardota?" tras
+     *      bot diciendo "Sabaneta no está cubierto")
+     */
+    private function contextoSugiereCobertura($conversacion, string $mensajeActual): bool
+    {
+        $m = mb_strtolower(\Illuminate\Support\Str::ascii(trim($mensajeActual)));
+        if ($m === '') return false;
+
+        // 1) El mensaje actual menciona palabras de cobertura/envío
+        $palabrasCobertura = [
+            'domicilio', 'domicilios', 'env[ií]o', 'env[ií]os', 'env[ií]a', 'env[ií]an',
+            'env[ií]ar', 'cobertura', 'reparto', 'reparten', 'despacho', 'despachan',
+            'llegan', 'llegas', 'lleva', 'llevan', 'manda', 'mandan', 'cubren', 'cubre',
+            'cubris', 'cubrir', 'zona', 'tiene', 'tienen', 'hay',
+        ];
+        foreach ($palabrasCobertura as $p) {
+            if (preg_match('/\b' . $p . '\b/iu', $m)) return true;
+        }
+
+        // 2) El último mensaje del bot habló de cobertura/zona/despacho
+        try {
+            $ultBot = \App\Models\MensajeWhatsapp::where('conversacion_id', $conversacion->id ?? 0)
+                ->where('rol', 'assistant')
+                ->orderByDesc('id')
+                ->limit(1)
+                ->value('contenido');
+            if ($ultBot) {
+                $ultN = mb_strtolower(\Illuminate\Support\Str::ascii($ultBot));
+                $palabrasBotCobertura = [
+                    'cubierto', 'cubierta', 'cubrimos', 'cobertura', 'zona',
+                    'despacho', 'despachamos', 'despachar', 'env[ií]o', 'env[ií]a',
+                    'reparto', 'domicilio', 'fuera de cobertura', 'fuera de zona',
+                    'recoger en sede', 'recoger en la sede',
+                ];
+                foreach ($palabrasBotCobertura as $p) {
+                    if (preg_match('/\b' . $p . '\b/iu', $ultN)) return true;
+                }
+            }
+        } catch (\Throwable $e) { /* ignore */ }
+
+        return false;
+    }
+
     /**
      * 🗺️ Extrae el nombre de un lugar (municipio/barrio/ciudad) mencionado
      * en el mensaje del cliente. Devuelve null si no detecta lugar.
