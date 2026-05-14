@@ -6329,7 +6329,46 @@ TXT;
             Log::warning('No se pudo marcar estado pedido confirmado: ' . $e->getMessage());
         }
 
-        return $this->construirMensajeConfirmacionPedido($pedido, $orderData, $name, $beneficioAplicado);
+        $mensajeFinal = $this->construirMensajeConfirmacionPedido($pedido, $orderData, $name, $beneficioAplicado);
+
+        // 💾 PERSISTIR el mensaje de confirmación en mensajes_whatsapp.
+        // Sin esto el cliente recibe el mensaje por WhatsApp pero NO queda
+        // registrado en la conversación interna (Chat en vivo, auditoría, etc.).
+        try {
+            if ($conversacion && $convService) {
+                $convService->agregarMensaje(
+                    $conversacion,
+                    \App\Models\MensajeWhatsapp::ROL_ASSISTANT,
+                    $mensajeFinal,
+                    [
+                        'tipo' => 'tool_call',
+                        'meta' => [
+                            'tool'      => 'confirmar_pedido',
+                            'resultado' => 'pedido_creado',
+                            'pedido_id' => $pedido->id,
+                            'total'     => (float) $pedido->total,
+                            'wompi_ref' => $pedido->wompi_reference,
+                        ],
+                    ]
+                );
+            }
+        } catch (\Throwable $e) {
+            Log::warning('No se pudo persistir mensaje de confirmación: ' . $e->getMessage());
+        }
+
+        // También al cache de historial de conversación (para que el LLM no
+        // intente re-confirmar en el siguiente turno)
+        try {
+            if (isset($cacheKey) && $cacheKey) {
+                $hist = Cache::get($cacheKey, []);
+                $hist[] = ['role' => 'assistant', 'content' => $mensajeFinal];
+                Cache::put($cacheKey, $hist, now()->addMinutes(45));
+            }
+        } catch (\Throwable $e) {
+            Log::warning('No se pudo actualizar cache historial post-confirmación: ' . $e->getMessage());
+        }
+
+        return $mensajeFinal;
     } catch (\Throwable $e) {
         DB::rollBack();
         $tenantId = app(\App\Services\TenantManager::class)->id() ?? 'none';
