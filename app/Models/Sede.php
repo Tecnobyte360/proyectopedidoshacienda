@@ -203,6 +203,12 @@ class Sede extends Model
 
     /**
      * ¿La sede está abierta AHORA según los horarios configurados?
+     *
+     * Soporta 3 casos:
+     *  - Normal:        abre=08:00 cierra=20:00  → abierta si 08:00 ≤ ahora ≤ 20:00
+     *  - Hasta medianoche: cierra=00:00          → tratado como 24:00 (fin del día)
+     *  - Cruza medianoche: abre=18:00 cierra=02:00 → abierta si ahora ≥ 18:00 (hoy)
+     *                                              o si ahora ≤ 02:00 (madrugada del día siguiente)
      */
     public function estaAbierta(?Carbon $momento = null): bool
     {
@@ -211,8 +217,22 @@ class Sede extends Model
 
         if (!$hoy['abierto']) return false;
 
-        $ahora = $momento->format('H:i');
-        return $ahora >= $hoy['abre'] && $ahora <= $hoy['cierra'];
+        $ahora  = $momento->format('H:i');
+        $abre   = (string) $hoy['abre'];
+        $cierra = (string) $hoy['cierra'];
+
+        // Cierra a medianoche (00:00) → tratamos como "hasta fin del día".
+        if ($cierra === '00:00') {
+            return $ahora >= $abre;
+        }
+
+        // Horario que cruza medianoche (ej. 18:00 → 02:00).
+        if ($cierra < $abre) {
+            return $ahora >= $abre || $ahora <= $cierra;
+        }
+
+        // Horario normal.
+        return $ahora >= $abre && $ahora <= $cierra;
     }
 
     /**
