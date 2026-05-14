@@ -2580,6 +2580,14 @@ TXT;
         $conversationHistory[] = ['role' => 'assistant', 'content' => $reply];
         Cache::put($cacheKey, $conversationHistory, now()->addMinutes(45));
 
+        // 🛡️ Guard: si el bot dijo "agregué N kilos de X" pero NO llamó la tool,
+        // capturar el producto automáticamente para no perderlo.
+        try {
+            $this->capturarAgregadosImplicitos($conversacion, $reply, $connectionId);
+        } catch (\Throwable $e) {
+            Log::warning('Guard capturar agregados implícitos falló: ' . $e->getMessage());
+        }
+
         // Persistir respuesta del bot en BD
         $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_ASSISTANT, $reply);
 
@@ -4824,6 +4832,104 @@ TXT;
       }
 
       return implode(', ', $limpio);
+  }
+
+  /**
+   * 🛡️ GUARD ANTI-ALUCINACIÓN DE AGREGADO:
+   * Cuando el LLM responde con frases como "agregué X kilos de Y" pero NO llamó
+   * la tool agregar_producto_al_pedido, el producto queda fuera del carrito y
+   * el pedido se cierra incompleto.
+   *
+   * Este parser detecta esas frases en la respuesta y compara con estado.productos.
+   * Si el producto mencionado NO está en el estado, llama al handler internamente.
+   *
+   * Retorna el carrito final (puede haber cambiado si hubo capturas).
+   */
+  private function capturarAgregadosImplicitos(
+      \App\Models\ConversacionWhatsapp $conv,
+      string $respuestaBot,
+      ?int $connectionId
+  ): array {
+      $estadoSrv  = app(\App\Services\EstadoPedidoService::class);
+      $catalogo   = app(\App\Services\BotCatalogoService::class);
+      $sedeId     = $this->obtenerSedeIdDesdeConexion($connectionId);
+      $estado     = $estadoSrv->obtener($conv);
+      $productosEstado = is_array($estado->productos) ? $estado->productos : [];
+      $capturados = 0;
+
+      // Patrones que indican que el bot está afirmando que YA agregó algo
+      // Ejemplos: "agregué 3 kilos de hígado", "anoté 10 kilos de patas",
+      //           "añadí 1 paquete de chuzo", "te sumé 2 libras de pechuga"
+      $patron = '/\b(?:agregu[ée]|a[ñn]ad[ií]|anot[ée]|sum[ée]|incluyo|incluido|listo,?\s+(?:tienes|son))\s+(?:los?\s+|las?\s+)?(\d+(?:[.,]\d+)?)\s+(libras?|libra|kilos?|kilo|kg|kl|gramos?|gr|unidades?|unidad|und|varas?|paquetes?|paquete|cajas?)\s+(?:de\s+)?([a-zñáéíóúA-ZÑÁÉÍÓÚ][a-zñáéíóúA-ZÑÁÉÍÓÚ\s\-]+?)(?=[\.\,\:\;\!\?\n]|\s*(?:a|por|\$|al)\s|\s+(?:y|tambi[eé]n)\s|$)/iu';
+
+      if (!preg_match_all($patron, $respuestaBot, $matches, PREG_SET_ORDER)) {
+          return $productosEstado;
+      }
+
+      foreach ($matches as $m) {
+          $cant   = (float) str_replace(',', '.', $m[1]);
+          $unit   = mb_strtolower(trim($m[2]));
+          $nombre = trim($m[3]);
+
+          // Limpiar palabras conectoras al final
+          $nombre = preg_replace('/\s+(con|para|en|al|del|de\s+los?|de\s+las?)\s*$/iu', '', $nombre);
+          $nombre = trim($nombre);
+          if (mb_strlen($nombre) < 3) continue;
+
+          // ¿Ya está en el estado?
+          $yaEsta = false;
+          foreach ($productosEstado as $p) {
+              $nameEst = mb_strtolower((string) ($p['name'] ?? ''));
+              $needle  = mb_strtolower($nombre);
+              if (str_contains($nameEst, $needle) || str_contains($needle, $nameEst)) {
+                  $yaEsta = true;
+                  break;
+              }
+          }
+          if ($yaEsta) continue;
+
+          // Validar contra catálogo
+          $producto = $catalogo->resolverProducto($nombre, $sedeId);
+          if (!$producto) continue;
+
+          // Guard tokens compartidos
+          $tokensSolicitados = collect(preg_split('/\s+/', mb_strtolower(\Illuminate\Support\Str::ascii($nombre))))
+              ->filter(fn ($t) => mb_strlen($t) >= 4)
+              ->values();
+          if ($tokensSolicitados->isNotEmpty()) {
+              $nombreResuelto = mb_strtolower(\Illuminate\Support\Str::ascii((string) ($producto->nombre ?? '')));
+              $compartido = $tokensSolicitados->first(fn ($t) => str_contains($nombreResuelto, $t));
+              if (!$compartido) continue;
+          }
+
+          Log::warning('🛡️ GUARD: bot alucinó agregado — capturando automáticamente', [
+              'conv_id'  => $conv->id,
+              'frase'    => $m[0],
+              'nombre'   => $nombre,
+              'cantidad' => $cant,
+              'unidad'   => $unit,
+              'matcheado'=> $producto->nombre ?? null,
+          ]);
+
+          // Persistir vía el handler oficial (con conversión de unidades)
+          $this->procesarAgregarProductoAlPedido(
+              $conv,
+              'add',
+              (string) ($producto->nombre ?? $nombre),
+              (string) ($producto->codigo ?? ''),
+              $cant,
+              $unit,
+              $connectionId
+          );
+          $capturados++;
+      }
+
+      if ($capturados > 0) {
+          $estado = $estadoSrv->obtener($conv);
+          $productosEstado = is_array($estado->productos) ? $estado->productos : [];
+      }
+
+      return $productosEstado;
   }
 
   /**
