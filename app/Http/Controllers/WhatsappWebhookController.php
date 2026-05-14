@@ -1296,7 +1296,16 @@ TXT;
             $razonForzado = 'cliente_pidio_generar_pedido';
             $messages[] = [
                 'role' => 'system',
-                'content' => "🚨 OBLIGATORIO: el cliente acaba de pedir explícitamente que generes/confirmes el pedido. INVOCA `confirmar_pedido` AHORA con TODOS los datos recopilados.",
+                'content' => "🚨 OBLIGATORIO: el cliente acaba de CONFIRMAR el pedido (dijo 'si confirmo' / 'dale' / 'listo' o similar). INVOCA `confirmar_pedido` AHORA.\n\n"
+                    . "Si el estado estructurado NO tiene todos los datos, EXTRAE del historial de mensajes:\n"
+                    . "  - **products**: los productos exactos que mostraste en el último RESUMEN al cliente (nombre EXACTO, cantidad, unidad).\n"
+                    . "  - **address**: dirección que el cliente confirmó, o vacío si es pickup.\n"
+                    . "  - **neighborhood**: barrio del cliente.\n"
+                    . "  - **pickup**: true si dijo 'recoger en sede'.\n"
+                    . "  - **customer_name**: nombre del cliente confirmado.\n"
+                    . "  - **cedula**: cédula que el cliente dio.\n"
+                    . "  - **email**: email si lo dio.\n\n"
+                    . "PROHIBIDO responder con texto. PROHIBIDO decir 'tu pedido quedó registrado' sin llamar la tool. SOLO la tool.",
             ];
         } elseif ($estadoYaCompleto && $datosFinalesEnTexto) {
             // Estado completo + cliente dio confirmación final → forzar confirmar_pedido
@@ -2746,6 +2755,11 @@ TXT;
     private function clientePidioGenerarPedido(string $mensaje): bool
     {
         $m = mb_strtolower(trim($mensaje));
+        // Normalizar: quitar tildes, signos de puntuación al final
+        $m = preg_replace('/[áéíóúÁÉÍÓÚ]/u', function ($x) {
+            return strtr($x[0], ['á'=>'a','é'=>'e','í'=>'i','ó'=>'o','ú'=>'u','Á'=>'a','É'=>'e','Í'=>'i','Ó'=>'o','Ú'=>'u']);
+        }, $m);
+        $m = trim($m, ".!¡?¿,; ");
         if ($m === '') return false;
 
         $patrones = [
@@ -2772,6 +2786,28 @@ TXT;
         foreach ($patrones as $p) {
             if (str_contains($m, $p)) return true;
         }
+
+        // 🆕 Frases cortas de confirmación final (después de mostrar resumen)
+        // Las matcheamos de forma EXACTA para no caer con cualquier "si" en una oración.
+        $cortasExactas = [
+            'si confirmo', 'si confirmar', 'si comfirmo', 'si comfirmar',
+            'confirmo', 'confirmar', 'comfirmo', 'comfirmar',
+            'si dale', 'dale confirmo', 'dale listo', 'dale pues',
+            'si listo', 'listo dale', 'listo confirmo',
+            'si por favor', 'si gracias',
+            'asi es', 'esta bien asi', 'esta bien',
+            'todo bien', 'todo correcto', 'esta perfecto', 'perfecto si',
+            'si todo bien', 'si esta bien',
+            'oka', 'okay', 'ok dale', 'ok listo', 'ok confirmo',
+            'super', 'super confirmado',
+        ];
+        if (in_array($m, $cortasExactas, true)) return true;
+
+        // Inicios de mensaje: "si, confirmo el pedido", "dale, confirma"
+        if (preg_match('/^(?:si|sí|dale|listo|ok|oka|okay|claro|vale|comfirmo|confirmo|perfecto|todo bien)[\s,.]+(?:dale|listo|confirmo|confirma|confirmar|comfirmar|por favor|gracias|hagale|haga|adelante)$/u', $m)) {
+            return true;
+        }
+
         return false;
     }
 
