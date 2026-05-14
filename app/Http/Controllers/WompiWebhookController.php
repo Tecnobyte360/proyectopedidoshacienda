@@ -118,6 +118,34 @@ class WompiWebhookController extends Controller
             return response()->json(['ok' => false, 'reason' => 'firma_invalida'], 401);
         }
 
+        // 🛡️ GUARD: si el pedido ya está CANCELADO o el pago fue ANULADO,
+        // NO actualizar estado_pago a 'aprobado'. Solo registrar el intento.
+        if (in_array($pedido->estado, [\App\Models\Pedido::ESTADO_CANCELADO], true)
+            || $pedido->estado_pago === 'anulado') {
+            Log::warning('⚠️ Wompi intentó aprobar pago en pedido CANCELADO/ANULADO — bloqueado', [
+                'pedido_id'        => $pedido->id,
+                'estado_pedido'    => $pedido->estado,
+                'estado_pago'      => $pedido->estado_pago,
+                'wompi_status'     => $status,
+                'wompi_tx_id'      => $txId,
+                'reference'        => $reference,
+            ]);
+
+            // Aún así guardamos la transacción para auditoría
+            if ($txId && empty($pedido->wompi_transaction_id)) {
+                $pedido->wompi_transaction_id = $txId;
+                $pedido->observacion_estado = (string) $pedido->observacion_estado
+                    . " | ⚠️ Pago Wompi recibido tras cancelación (tx: {$txId}, status: {$status}) — REEMBOLSAR MANUAL.";
+                $pedido->saveQuietly();
+            }
+
+            return response()->json([
+                'ok'     => false,
+                'reason' => 'pedido_cancelado_no_aceptamos_pago',
+                'note'   => 'El pedido está cancelado. Si el cliente pagó por error, se debe reembolsar manualmente.',
+            ], 200);
+        }
+
         // Actualizar pedido
         $estadoInterno = $wompi->mapearEstadoTransaccion($status);
         $pedido->estado_pago         = $estadoInterno;

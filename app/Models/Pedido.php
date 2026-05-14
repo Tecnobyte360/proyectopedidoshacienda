@@ -223,6 +223,22 @@ class Pedido extends Model
 
     if ($nuevoEstado === self::ESTADO_CANCELADO) {
         $this->fecha_cancelado = now();
+
+        // 💳 PROPAGAR cancelación al estado de pago:
+        // Si el pago estaba pendiente, marcarlo como 'anulado' para que el
+        // webhook de Wompi rechace cualquier intento posterior de aprobarlo.
+        // Si el pago ya estaba 'aprobado', NO lo tocamos — se debe gestionar
+        // un reembolso manualmente (logueamos advertencia para el admin).
+        if (in_array($this->estado_pago, ['pendiente', null, ''], true)) {
+            $this->estado_pago = 'anulado';
+        } elseif ($this->estado_pago === 'aprobado') {
+            \Log::warning('⚠️ Pedido cancelado pero PAGO YA APROBADO — gestionar reembolso manualmente', [
+                'pedido_id'            => $this->id,
+                'wompi_transaction_id' => $this->wompi_transaction_id,
+                'total'                => $this->total,
+                'cliente'              => $this->cliente_nombre,
+            ]);
+        }
     }
 
     $this->save();
