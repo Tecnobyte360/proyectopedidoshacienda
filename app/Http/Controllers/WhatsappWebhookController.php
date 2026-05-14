@@ -1173,7 +1173,7 @@ TXT;
 
             $hayPedidoReciente = $ultimoPedido && $ultimoPedido->created_at >= now()->subDay();
             $minutosDesdePedido = $hayPedidoReciente
-                ? now()->diffInMinutes($ultimoPedido->created_at)
+                ? abs((int) now()->diffInMinutes($ultimoPedido->created_at))
                 : 9999;
 
             $esSaludoOInicioNuevo = preg_match(
@@ -1274,6 +1274,22 @@ TXT;
             $estadoActualParaTools  // 🛡️ permite confirmar_pedido si estado completo
         );
         $toolChoicePorPaso = $orchestrator->toolChoice($pasoActualOrch);
+
+        // 🛡️ BLOQUEO ANTI-DUPLICADOS: si el cliente ya tiene un pedido NO cancelado
+        // creado en los últimos 30 min, REMOVER `confirmar_pedido` de las tools
+        // disponibles. Esto previene que el LLM por inercia confirme dos veces
+        // el mismo pedido cuando el cliente solo saluda después.
+        if (isset($hayPedidoReciente) && $hayPedidoReciente && $minutosDesdePedido < 30) {
+            $toolsFiltradas = array_values(array_filter(
+                $toolsFiltradas,
+                fn ($t) => ($t['function']['name'] ?? '') !== 'confirmar_pedido'
+            ));
+            Log::info('🛡️ confirmar_pedido REMOVIDO de tools (pedido reciente)', [
+                'pedido_id'  => $ultimoPedido->id,
+                'minutos'    => $minutosDesdePedido,
+                'tools_left' => count($toolsFiltradas),
+            ]);
+        }
 
         // 🎯 SHORT-CIRCUITS según intención detectada en el mensaje:
         //   1. Pidió "generar pedido" → forzar confirmar_pedido
@@ -5025,11 +5041,11 @@ TXT;
         $confirmKey = "pedido_confirmado_t{$tenantId}_" . $telNorm;
 
         // 🛡️ DEDUPLICACIÓN FUERTE: si este cliente YA tiene un pedido NO cancelado
-        // creado en los últimos 15 minutos, NO crear duplicado. Devolver info del
+        // creado en los últimos 30 minutos, NO crear duplicado. Devolver info del
         // pedido existente. Esto cubre los casos donde el watchdog (o el LLM) intenta
         // confirmar dos veces el mismo pedido.
         $pedidoRecienteCliente = \App\Models\Pedido::where('telefono_whatsapp', $telNorm)
-            ->where('created_at', '>=', now()->subMinutes(15))
+            ->where('created_at', '>=', now()->subMinutes(30))
             ->whereNotIn('estado', [\App\Models\Pedido::ESTADO_CANCELADO])
             ->orderByDesc('id')
             ->first();
