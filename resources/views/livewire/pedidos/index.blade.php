@@ -601,20 +601,29 @@
                             @endif
                         </div>
 
-                        {{-- 🛒 Detalle de productos --}}
+                        {{-- 🛒 Detalle de productos (mobile/card) --}}
                         @if($pedido->detalles && $pedido->detalles->count() > 0)
-                            <div class="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-2">
-                                <div class="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                                    <i class="fa-solid fa-cart-shopping mr-1"></i>Productos
+                            <div class="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-2.5">
+                                <div class="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 flex items-center justify-between">
+                                    <span><i class="fa-solid fa-cart-shopping mr-1"></i>Productos ({{ $pedido->detalles->count() }})</span>
+                                    <span class="text-slate-400 normal-case font-normal text-[9px]">Subtotal</span>
                                 </div>
-                                <div class="space-y-0.5">
+                                <div class="space-y-1">
                                     @foreach($pedido->detalles as $detalle)
-                                        <div class="flex items-center justify-between text-xs">
-                                            <span class="text-slate-700">
-                                                <strong>{{ (int)($detalle->cantidad ?: 1) }}×</strong>
-                                                {{ $detalle->producto }}
-                                            </span>
-                                            <span class="font-mono text-slate-600 text-[11px]">
+                                        @php
+                                            $cant = (float) ($detalle->cantidad ?? 1);
+                                            $cantFmt = fmod($cant, 1) == 0 ? (int) $cant : rtrim(rtrim(number_format($cant, 2, '.', ''), '0'), '.');
+                                            $unit = $detalle->unidad ?? '';
+                                            $unitLbl = in_array(strtolower($unit), ['kg','kl']) ? 'kg' : (in_array(strtolower($unit), ['lb','libra','libras']) ? 'lb' : (in_array(strtolower($unit), ['und','unidad']) ? '' : $unit));
+                                        @endphp
+                                        <div class="flex items-start justify-between gap-2 text-xs">
+                                            <div class="flex items-start gap-1.5 flex-1 min-w-0">
+                                                <span class="inline-flex items-center justify-center min-w-[32px] h-[18px] rounded bg-slate-900 text-white text-[10px] font-bold shrink-0 mt-0.5">
+                                                    {{ $cantFmt }}{{ $unitLbl }}
+                                                </span>
+                                                <span class="text-slate-800 font-medium leading-tight">{{ $detalle->producto }}</span>
+                                            </div>
+                                            <span class="font-mono text-slate-700 text-[11px] font-semibold whitespace-nowrap">
                                                 ${{ number_format((float) $detalle->subtotal, 0, ',', '.') }}
                                             </span>
                                         </div>
@@ -660,7 +669,7 @@
                                 $cols = [
                                     ['label' => 'Pedido',       'cls' => ''],
                                     ['label' => 'Cliente',      'cls' => ''],
-                                    ['label' => 'Productos',    'cls' => 'hidden 2xl:table-cell'],
+                                    ['label' => 'Productos',    'cls' => 'hidden xl:table-cell'],
                                     ['label' => 'Zona/Sede',    'cls' => ''],
                                     ['label' => 'Estado',       'cls' => ''],
                                     ['label' => 'ANS',          'cls' => ''],
@@ -765,32 +774,65 @@
                                     </div>
                                 </td>
 
-                                {{-- 🛒 Productos del pedido (2xl+) --}}
-                                <td class="px-3 py-3.5 align-middle hidden 2xl:table-cell">
+                                {{-- 🛒 Productos del pedido (visible desde xl, antes era 2xl) --}}
+                                <td class="px-3 py-3.5 align-middle hidden xl:table-cell">
                                     @php
-                                        $detalles = $pedido->detalles ?? collect();
+                                        $detalles    = $pedido->detalles ?? collect();
                                         $totalLineas = $detalles->count();
-                                        $resumenCorto = $detalles->take(2)->map(function ($d) {
-                                            $cant = (int) $d->cantidad ?: 1;
-                                            return "{$cant}× " . \Illuminate\Support\Str::limit($d->producto ?? 'item', 18);
-                                        })->implode(' · ');
-                                        $masItems = $totalLineas > 2 ? ' +' . ($totalLineas - 2) . ' más' : '';
+                                        // Tooltip texto plano completo (para hover)
                                         $tooltipDetalle = $detalles->map(function ($d) {
-                                            $cant = (int) $d->cantidad ?: 1;
+                                            $cant = (float) ($d->cantidad ?? 1);
+                                            $cantFmt = fmod($cant, 1) == 0 ? (int) $cant : rtrim(rtrim(number_format($cant, 3, '.', ''), '0'), '.');
+                                            $unit = $d->unidad ?? '';
                                             $sub  = number_format((float) $d->subtotal, 0, ',', '.');
-                                            return "• {$cant}× {$d->producto} — \${$sub}";
+                                            return "• {$cantFmt} {$unit} {$d->producto} — \${$sub}";
                                         })->implode("\n");
                                     @endphp
 
                                     @if($totalLineas > 0)
-                                        <div class="min-w-0 max-w-[230px]"
+                                        <div class="min-w-0 max-w-[280px]"
+                                             x-data="{ open: false }"
                                              title="{{ $tooltipDetalle }}">
-                                            <div class="truncate text-xs font-medium text-slate-800">
-                                                <i class="fa-solid fa-cart-shopping text-[10px] text-slate-400 mr-1"></i>
-                                                {{ $resumenCorto }}{{ $masItems }}
+
+                                            {{-- Lista compacta de TODOS los productos (siempre visible, sin truncar) --}}
+                                            <div class="space-y-0.5">
+                                                @foreach($detalles as $i => $d)
+                                                    @php
+                                                        $cant = (float) ($d->cantidad ?? 1);
+                                                        $cantFmt = fmod($cant, 1) == 0 ? (int) $cant : rtrim(rtrim(number_format($cant, 2, '.', ''), '0'), '.');
+                                                        $unit = $d->unidad ?? '';
+                                                        $sub  = number_format((float) $d->subtotal, 0, ',', '.');
+                                                    @endphp
+                                                    {{-- Mostrar siempre los primeros 3, el resto al expandir --}}
+                                                    <div class="flex items-start gap-1 text-[11px] leading-tight {{ $i >= 3 ? 'hidden' : '' }}"
+                                                         x-show="{{ $i >= 3 ? 'open' : 'true' }}"
+                                                         @if($i >= 3) x-cloak @endif>
+                                                        <span class="inline-flex items-center justify-center min-w-[24px] h-[16px] rounded bg-slate-900 text-white text-[9px] font-bold shrink-0 mt-0.5">
+                                                            {{ $cantFmt }}{{ in_array(strtolower($unit), ['kg','kl']) ? 'kg' : (in_array(strtolower($unit), ['lb','libra','libras']) ? 'lb' : '') }}
+                                                        </span>
+                                                        <span class="font-medium text-slate-800 leading-tight">
+                                                            {{ \Illuminate\Support\Str::limit($d->producto ?? 'item', 26) }}
+                                                        </span>
+                                                        <span class="ml-auto font-mono text-[10px] text-slate-500 whitespace-nowrap shrink-0">
+                                                            ${{ $sub }}
+                                                        </span>
+                                                    </div>
+                                                @endforeach
+
+                                                @if($totalLineas > 3)
+                                                    <button type="button" @click="open = !open"
+                                                            class="text-[10px] font-semibold text-brand hover:text-brand-dark mt-0.5 flex items-center gap-1"
+                                                            x-text="open ? '▴ Mostrar menos' : '▾ Ver {{ $totalLineas - 3 }} más'">
+                                                        ▾ Ver {{ $totalLineas - 3 }} más
+                                                    </button>
+                                                @endif
                                             </div>
-                                            <div class="text-[10px] text-slate-500">
-                                                {{ $totalLineas }} {{ $totalLineas === 1 ? 'producto' : 'productos' }}
+
+                                            <div class="mt-1 pt-1 border-t border-slate-100 text-[10px] text-slate-400 flex items-center justify-between">
+                                                <span>
+                                                    <i class="fa-solid fa-cart-shopping text-[9px]"></i>
+                                                    {{ $totalLineas }} {{ $totalLineas === 1 ? 'producto' : 'productos' }}
+                                                </span>
                                             </div>
                                         </div>
                                     @else
