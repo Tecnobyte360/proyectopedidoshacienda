@@ -3147,6 +3147,42 @@ TXT;
     }
 
     /**
+     * 🛡️ Distancia mínima en KM desde un punto a CUALQUIERA de las sedes
+     * activas del tenant (usando haversine). Sirve para detectar si Google
+     * geocodificó a otra parte del país (ambigüedad de nombres).
+     */
+    private function distanciaMinimaASedesActivas(float $lat, float $lng, ?int $tenantId): ?float
+    {
+        if (!$tenantId) return null;
+        try {
+            $sedes = \App\Models\Sede::where('tenant_id', $tenantId)
+                ->where('activa', true)
+                ->whereNotNull('latitud')
+                ->whereNotNull('longitud')
+                ->get(['latitud', 'longitud']);
+            if ($sedes->isEmpty()) return null;
+
+            $min = PHP_INT_MAX;
+            foreach ($sedes as $s) {
+                $d = $this->haversineKm($lat, $lng, (float) $s->latitud, (float) $s->longitud);
+                if ($d < $min) $min = $d;
+            }
+            return $min === PHP_INT_MAX ? null : (float) $min;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    private function haversineKm(float $lat1, float $lng1, float $lat2, float $lng2): float
+    {
+        $R = 6371; // radio Tierra km
+        $dLat = deg2rad($lat2 - $lat1);
+        $dLng = deg2rad($lng2 - $lng1);
+        $a = sin($dLat/2) ** 2 + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLng/2) ** 2;
+        return 2 * $R * asin(sqrt($a));
+    }
+
+    /**
      * 🛡️ ¿La dirección es un patrón colombiano genérico (CL/CRA + número)
      * SIN nombre de ciudad/barrio incluido en el texto?
      */
@@ -5627,8 +5663,44 @@ TXT;
           );
 
           if ($geocode) {
-              $coord = $geocode;
+              // 🛡️ SANITY CHECK CROSS-DEPARTAMENTO: hay ciudades con el mismo
+              // nombre en varios departamentos de Colombia (ej "San Antonio"
+              // en Antioquia, Tolima, Cundinamarca, Valle). Si Google
+              // geocodificó muy lejos de TODAS nuestras sedes (>80 km), es
+              // muy probable que sea la ciudad equivocada — pedir confirmación
+              // al cliente en vez de afirmar "fuera de cobertura".
               $tenantId = app(\App\Services\TenantManager::class)->id();
+              $distMinSede = $this->distanciaMinimaASedesActivas($geocode['lat'], $geocode['lng'], $tenantId);
+
+              if ($distMinSede !== null && $distMinSede > 80) {
+                  $displayName = (string) ($geocode['display'] ?? '');
+                  Log::warning('🛡️ Geocoding muy lejano — posible ambigüedad cross-departamento', [
+                      'direccion'    => $direccion,
+                      'ciudad_input' => $ciudad,
+                      'distancia_km' => round($distMinSede, 1),
+                      'display'      => $displayName,
+                  ]);
+                  return [
+                      'cubierta'              => false,
+                      'requiere_clarificacion'=> true,
+                      'distancia_km'          => round($distMinSede, 1),
+                      'mensaje_para_cliente'  => "Encontré tu dirección en *{$displayName}*, pero queda a "
+                          . round($distMinSede) . " km de nuestras sedes 🤔\n\n"
+                          . "Hay ciudades con el mismo nombre en varios departamentos de Colombia. "
+                          . "¿Confirmas que es esa ubicación exacta? O dime el *departamento* "
+                          . "(Antioquia, Cundinamarca, etc.) si quisiste otra.",
+                      'instruccion_para_bot'  => "🛑 Google geocodificó la dirección MUY LEJOS de nuestras sedes "
+                          . "({$distMinSede} km). Probable ambigüedad: existe ciudad con el mismo nombre en otro "
+                          . "departamento. Usa mensaje_para_cliente literal. Si el cliente confirma → es realmente "
+                          . "fuera. Si dice 'no, es en Antioquia' → llama validar_cobertura otra vez con el "
+                          . "departamento explícito en la ciudad (ej. 'Girardota, Antioquia').",
+                      'mensaje_sugerido'      => 'Posible ambigüedad de departamento — pedir confirmación.',
+                      'metodo_usado'          => 'pedir_clarificacion_departamento',
+                      'coordenadas'           => $geocode,
+                  ];
+              }
+
+              $coord = $geocode;
               $resultado = $sedeResolver->resolverParaPunto($geocode['lat'], $geocode['lng'], $tenantId);
 
               if ($resultado['cubierta'] && $resultado['sede']) {
