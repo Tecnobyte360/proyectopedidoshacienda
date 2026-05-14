@@ -166,7 +166,7 @@ class BotCatalogoToolService
         // con el nombre del producto, descartar. Evita "acero"→"cerdo", "hola"→"posta".
         $qPrimeraLetra = mb_substr(trim($q), 0, 1);
         if ($qPrimeraLetra !== '' && mb_strlen(trim($q)) <= 5) {
-            $ranked = $ranked->filter(function ($r) use ($qPrimeraLetra) {
+            $ranked = $ranked->filter(function ($r) use ($qPrimeraLetra, $q) {
                 $nombre = mb_strtolower((string) ($r['p']->nombre ?? ''));
                 // Buscar la primera letra de la query en alguna palabra del nombre
                 foreach (explode(' ', $nombre) as $palabra) {
