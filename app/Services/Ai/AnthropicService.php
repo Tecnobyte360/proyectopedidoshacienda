@@ -320,16 +320,46 @@ class AnthropicService
             }
 
             if ($role === 'tool') {
-                // Anthropic: tool_result va como user message con content array
+                // 🛡️ BUG-PARALLEL: Anthropic exige que TODOS los tool_results
+                // de un mismo turno vayan en UN SOLO user message. Si el último
+                // mensaje agregado ya es un user con tool_results, AÑADIMOS este
+                // tool_result al mismo bloque en lugar de crear otro user.
                 $toolCallId = $m['tool_call_id'] ?? '';
-                $out[] = [
-                    'role' => 'user',
-                    'content' => [[
-                        'type'        => 'tool_result',
-                        'tool_use_id' => $toolCallId,
-                        'content'     => is_string($content) ? $content : json_encode($content),
-                    ]],
+                $toolResultBlock = [
+                    'type'        => 'tool_result',
+                    'tool_use_id' => $toolCallId,
+                    'content'     => is_string($content) ? $content : json_encode($content),
                 ];
+
+                $ultimoIdx = count($out) - 1;
+                $ultimo    = $ultimoIdx >= 0 ? $out[$ultimoIdx] : null;
+                $ultimoEsUserToolResult = $ultimo
+                    && ($ultimo['role'] ?? '') === 'user'
+                    && is_array($ultimo['content'] ?? null)
+                    && !empty($ultimo['content'])
+                    && is_array($ultimo['content'][0] ?? null)
+                    && (($ultimo['content'][0]['type'] ?? '') === 'tool_result');
+
+                if ($ultimoEsUserToolResult) {
+                    // Consolidar: agregar este tool_result al user anterior
+                    // (evitando duplicar el mismo tool_use_id).
+                    $yaTieneEsteId = false;
+                    foreach ($out[$ultimoIdx]['content'] as $b) {
+                        if (is_array($b) && ($b['tool_use_id'] ?? null) === $toolCallId) {
+                            $yaTieneEsteId = true;
+                            break;
+                        }
+                    }
+                    if (!$yaTieneEsteId) {
+                        $out[$ultimoIdx]['content'][] = $toolResultBlock;
+                    }
+                } else {
+                    // Nuevo user con un tool_result
+                    $out[] = [
+                        'role'    => 'user',
+                        'content' => [$toolResultBlock],
+                    ];
+                }
                 continue;
             }
 
