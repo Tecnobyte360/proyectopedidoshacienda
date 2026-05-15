@@ -2710,8 +2710,50 @@ TXT;
             );
         }
 
-        $reply = $textContent
-            ?? 'En este momento no logré procesar tu mensaje. ¿Me lo repites con un poquito más de detalle?';
+        // 🛡️ FIX: cuando el LLM responde sin texto (solo tool_calls que no
+        // procesamos o respuesta vacía), antes caíamos a un mensaje genérico
+        // "no logré procesar". Eso es mala UX. Ahora hacemos un retry forzando
+        // texto, y si aún así falla, damos un mensaje contextual basado en el
+        // último mensaje del cliente.
+        $reply = $textContent;
+        if (empty(trim((string) $reply))) {
+            Log::warning('🛡️ LLM respondió sin texto — retry forzando respuesta', [
+                'from'           => $from,
+                'tenia_toolcalls'=> !empty($toolCalls),
+                'ultimo_msg'     => mb_substr($message, 0, 100),
+            ]);
+
+            try {
+                // Retry SIN tools, forzando respuesta de texto
+                $retryMessages = array_merge(
+                    [['role' => 'system', 'content' => $systemPrompt
+                        . "\n\n⚠️ INSTRUCCIÓN URGENTE: en este turn responde SOLO con texto al cliente. NO llames ninguna tool. "
+                        . "Responde de forma natural y útil al último mensaje del cliente. Máximo 2-3 líneas."]],
+                    $conversationHistory
+                );
+                $retryResponse = $this->llamarOpenAI($retryMessages);
+                $retryText = $retryResponse['choices'][0]['message']['content'] ?? null;
+                if (!empty(trim((string) $retryText))) {
+                    $reply = $retryText;
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Retry sin tools también falló: ' . $e->getMessage());
+            }
+
+            // Fallback contextual si el retry tampoco devolvió texto
+            if (empty(trim((string) $reply))) {
+                $msgLower = mb_strtolower(trim($message));
+                if (preg_match('/\b(domicilio|despacho|envi[oa]|env[íi]ame|env[íi]en)\b/iu', $msgLower)) {
+                    $reply = "Perfecto, te lo enviamos a domicilio. ¿Qué productos te gustaría pedir y a qué dirección? 😊";
+                } elseif (preg_match('/\b(recoger|recojo|recoge|paso|pasa[rs])\b/iu', $msgLower)) {
+                    $reply = "Listo, vienes por él. ¿Qué productos quieres? Cuéntame y te lo dejo listo. 👍";
+                } elseif (preg_match('/\b(hola|buenas|buenos|saludos|qu[eé]\s*tal)\b/iu', $msgLower)) {
+                    $reply = "¡Hola! 😊 ¿En qué te puedo ayudar hoy?";
+                } else {
+                    $reply = "Te escucho. ¿Me cuentas qué necesitas pedir? Carnes, pollo, cerdo o pescado. 🥩";
+                }
+            }
+        }
 
         // 🎯 DETECTOR DE ALUCINACIÓN DE DERIVACIÓN:
         // Si el bot dice "voy a derivar" / "te paso con..." SIN haber llamado la tool,
