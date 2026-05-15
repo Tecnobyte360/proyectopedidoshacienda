@@ -16,6 +16,76 @@
 
 <div class="px-6 lg:px-10 py-8" wire:poll.30s="refrescar">
 
+    {{-- ════════════════════════════════════════════════════════════════
+         🛵 PANEL PERSONAL DEL DOMICILIARIO (cuando es solo rol 'domiciliario')
+         Se muestra ARRIBA del view admin estándar. El view admin se filtra
+         automáticamente a sus pedidos.
+         ════════════════════════════════════════════════════════════════ --}}
+    @if($esDomiciliarioPuro && $domiActual)
+        <div class="mb-6 max-w-5xl">
+            {{-- Welcome card con stats --}}
+            <div class="rounded-3xl bg-gradient-to-br from-brand to-brand-dark text-white p-6 shadow-xl">
+                <div class="flex items-center gap-4 mb-5">
+                    <div class="h-14 w-14 rounded-full bg-white/20 flex items-center justify-center text-2xl font-extrabold">
+                        {{ mb_substr($domiActual->nombre, 0, 1) }}
+                    </div>
+                    <div>
+                        <h2 class="text-2xl font-extrabold">¡Hola {{ explode(' ', $domiActual->nombre)[0] }}!</h2>
+                        <p class="text-white/80 text-sm">
+                            <i class="fa-solid fa-motorcycle"></i>
+                            {{ $domiActual->vehiculo ?: 'Vehículo' }} · {{ $domiActual->placa ?: '—' }}
+                        </p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-3">
+                    <div class="rounded-2xl bg-white/15 backdrop-blur-sm p-3 text-center">
+                        <div class="text-2xl font-black">{{ $statsDomi['pendientes'] }}</div>
+                        <div class="text-[10px] uppercase tracking-wider text-white/80">Pendientes</div>
+                    </div>
+                    <div class="rounded-2xl bg-white/15 backdrop-blur-sm p-3 text-center">
+                        <div class="text-2xl font-black">{{ $statsDomi['entregados'] }}</div>
+                        <div class="text-[10px] uppercase tracking-wider text-white/80">Entregados</div>
+                    </div>
+                    <div class="rounded-2xl bg-white/15 backdrop-blur-sm p-3 text-center">
+                        <div class="text-2xl font-black">{{ $statsDomi['total_hoy'] }}</div>
+                        <div class="text-[10px] uppercase tracking-wider text-white/80">Total hoy</div>
+                    </div>
+                </div>
+            </div>
+
+            {{-- Botón ruta óptima --}}
+            @if($rutaOptimaUrl && $pedidosOrdenados->count() > 0)
+                <a href="{{ $rutaOptimaUrl }}" target="_blank" rel="noopener"
+                   class="mt-3 flex items-center justify-between rounded-2xl border-2 border-emerald-300 bg-emerald-50 p-4 hover:bg-emerald-100 transition group">
+                    <div class="flex items-center gap-3">
+                        <div class="h-10 w-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center">
+                            <i class="fa-solid fa-route"></i>
+                        </div>
+                        <div>
+                            <div class="font-bold text-emerald-900">Ver ruta óptima en Google Maps</div>
+                            <div class="text-[11px] text-emerald-700">{{ $pedidosOrdenados->count() }} parada(s) · Optimizado por cercanía</div>
+                        </div>
+                    </div>
+                    <i class="fa-brands fa-google text-xl text-emerald-600 group-hover:scale-110 transition"></i>
+                </a>
+            @endif
+        </div>
+    @elseif($esDomiciliarioPuro)
+        <div class="mb-6 rounded-2xl border-2 border-amber-200 bg-amber-50 p-5 max-w-2xl">
+            <div class="flex items-start gap-3">
+                <i class="fa-solid fa-triangle-exclamation text-2xl text-amber-500"></i>
+                <div>
+                    <h3 class="font-bold text-slate-800">Tu cuenta no está vinculada</h3>
+                    <p class="text-sm text-slate-600 mt-1">
+                        Tu usuario tiene rol <strong>domiciliario</strong> pero no está vinculado a un perfil.
+                        Pide a un administrador que te vincule en <code>/domiciliarios</code>.
+                    </p>
+                </div>
+            </div>
+        </div>
+    @endif
+
     {{-- HEADER --}}
     <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
