@@ -165,7 +165,14 @@
                                 </span>
                             @endif
                         </div>
-                        <div class="text-[10px] text-slate-400">{{ $c->total_mensajes }} mensajes</div>
+                        <div class="flex items-center justify-between gap-2 mt-0.5">
+                            <div class="text-[10px] text-slate-400">{{ $c->total_mensajes }} mensajes</div>
+                            @if($c->departamento)
+                                <span class="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-700 border border-violet-200" title="Derivada a {{ $c->departamento->nombre }}">
+                                    {!! $c->departamento->icono_emoji ?: '🏢' !!} {{ $c->departamento->nombre }}
+                                </span>
+                            @endif
+                        </div>
                     </div>
                 </button>
             @empty

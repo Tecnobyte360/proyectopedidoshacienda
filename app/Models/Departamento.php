@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\BelongsToTenant;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Departamento extends Model
@@ -28,6 +29,16 @@ class Departamento extends Model
     public function usuarios(): HasMany
     {
         return $this->hasMany(UsuarioInternoWhatsapp::class, 'departamento_id');
+    }
+
+    /**
+     * Usuarios (User) asignados a este departamento.
+     * Cuando el bot deriva al depto, estos usuarios podrán ver el chat.
+     */
+    public function miembros(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'departamento_user')
+            ->withTimestamps();
     }
 
     /**

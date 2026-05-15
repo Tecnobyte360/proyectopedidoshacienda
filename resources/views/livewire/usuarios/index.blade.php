@@ -142,14 +142,30 @@
                                         @endforelse
                                     </td>
                                     <td class="px-4 py-3.5 hidden md:table-cell">
-                                        @if($u->sede)
-                                            <span class="inline-flex items-center gap-1 text-xs text-slate-600">
-                                                <i class="fa-solid fa-shop text-brand"></i>
-                                                {{ $u->sede->nombre }}
-                                            </span>
-                                        @else
-                                            <span class="text-xs text-slate-400">—</span>
-                                        @endif
+                                        <div class="flex flex-col gap-1">
+                                            @if($u->sede)
+                                                <span class="inline-flex items-center gap-1 text-xs text-slate-600">
+                                                    <i class="fa-solid fa-shop text-brand"></i>
+                                                    {{ $u->sede->nombre }}
+                                                </span>
+                                            @endif
+                                            @if($u->departamentos->isNotEmpty())
+                                                <div class="flex flex-wrap gap-1 mt-0.5">
+                                                    @foreach($u->departamentos as $d)
+                                                        <span class="inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-200" title="Departamento">
+                                                            {!! $d->icono_emoji ?: '🏢' !!} {{ $d->nombre }}
+                                                        </span>
+                                                    @endforeach
+                                                </div>
+                                            @elseif(!$u->sede)
+                                                <span class="text-xs text-slate-400">—</span>
+                                            @endif
+                                            @if($u->departamentos->isEmpty() && $u->hasPermissionTo('chat.usar'))
+                                                <span class="text-[10px] text-amber-600 italic" title="Ve TODAS las conversaciones (sin filtro)">
+                                                    <i class="fa-solid fa-eye"></i> Ve todo
+                                                </span>
+                                            @endif
+                                        </div>
                                     </td>
                                     <td class="px-4 py-3.5">
                                         @if($u->activo)
@@ -286,6 +302,39 @@
                             @if(!$editandoId)
                                 <p class="text-xs text-slate-500 mt-1">Mínimo 6 caracteres</p>
                             @endif
+                        </div>
+
+                        {{-- 🏢 Departamentos: cuando el bot deriva una conversación, solo
+                              los usuarios asignados a ese departamento la verán en el chat. --}}
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-slate-700 mb-1.5">
+                                <i class="fa-solid fa-building text-violet-500 mr-1"></i> Departamentos
+                            </label>
+                            @if($departamentos->isEmpty())
+                                <p class="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                                    Aún no hay departamentos creados.
+                                    <a href="{{ route('departamentos.index') }}" class="text-brand underline hover:text-brand-dark">Crear departamentos</a>
+                                </p>
+                            @else
+                                <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                                    @foreach($departamentos as $d)
+                                        <label class="flex items-center gap-2 cursor-pointer rounded-lg bg-white border border-slate-200 px-3 py-2 hover:border-brand transition">
+                                            <input type="checkbox"
+                                                   wire:model="departamentos_ids"
+                                                   value="{{ $d->id }}"
+                                                   class="rounded border-slate-300 text-brand focus:ring-brand">
+                                            <span class="text-sm text-slate-700 truncate">
+                                                {!! $d->icono_emoji ?: '🏢' !!} {{ $d->nombre }}
+                                            </span>
+                                        </label>
+                                    @endforeach
+                                </div>
+                                <p class="text-xs text-slate-500 mt-1.5">
+                                    <i class="fa-solid fa-info-circle"></i>
+                                    Si no seleccionas ninguno, el usuario verá <strong>TODAS</strong> las conversaciones (típico admin/supervisor).
+                                </p>
+                            @endif
+                            @error('departamentos_ids') <p class="text-xs text-rose-600 mt-1">{{ $message }}</p> @enderror
                         </div>
                     </div>
 

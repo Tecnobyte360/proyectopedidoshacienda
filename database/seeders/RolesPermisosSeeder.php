@@ -59,6 +59,9 @@ class RolesPermisosSeeder extends Seeder
         ],
         'chat' => [
             'chat.usar',
+            // 🛡️ Permite ver TODAS las conversaciones (sin filtro por departamento).
+            // Útil para supervisores/gerentes que necesitan vista global.
+            'chat.ver-todos',
         ],
         'domiciliarios' => [
             'domiciliarios.gestionar',
@@ -147,7 +150,7 @@ class RolesPermisosSeeder extends Seeder
             'productos.ver', 'productos.crear', 'productos.editar',
             'categorias.gestionar', 'promociones.gestionar',
             'clientes.ver', 'clientes.editar',
-            'conversaciones.ver', 'chat.usar',
+            'conversaciones.ver', 'chat.usar', 'chat.ver-todos',
             'domiciliarios.gestionar', 'zonas.gestionar', 'despachos.gestionar',
             'reportes.ver', 'ans.gestionar',
             'felicitaciones.ver', 'alertas.ver',

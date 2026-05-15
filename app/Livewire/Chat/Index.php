@@ -1215,9 +1215,25 @@ class Index extends Component
 
     public function render()
     {
+        // 🛡️ Filtro por departamento del usuario actual.
+        // - Si el usuario puede ver todas (super-admin / chat.ver-todos / sin dept) → no filtra.
+        // - Si tiene departamentos asignados → ve SOLO conversaciones derivadas a esos departamentos
+        //   más las NO derivadas (departamento_id NULL → conversaciones del bot sin derivar).
+        $user = auth()->user();
+        $deptoIds = $user?->departamentos()->pluck('departamentos.id')->all() ?? [];
+        $verTodas = $user?->puedeVerTodasLasConversaciones() ?? true;
+
         $conversaciones = ConversacionWhatsapp::query()
-            ->with('cliente')
+            ->with(['cliente', 'departamento'])
             ->where('estado', '!=', 'archivada')
+            ->when(!$verTodas && !empty($deptoIds), function ($q) use ($deptoIds) {
+                // Mostrar: conversaciones del depto del usuario + conversaciones sin derivar (NULL).
+                // De esta forma agentes pueden tomar conversaciones nuevas Y atender las suyas.
+                $q->where(function ($qq) use ($deptoIds) {
+                    $qq->whereIn('departamento_id', $deptoIds)
+                       ->orWhereNull('departamento_id');
+                });
+            })
             ->when($this->busqueda, function ($q) {
                 $q->where(function ($qq) {
                     $qq->where('telefono_normalizado', 'like', "%{$this->busqueda}%")

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Usuarios;
 
+use App\Models\Departamento;
 use App\Models\Sede;
 use App\Models\User;
 use App\Services\TenantManager;
@@ -26,6 +27,8 @@ class Index extends Component
     public string $password  = '';
     public string $rol       = '';
     public bool   $activo    = true;
+    /** @var int[] IDs de departamentos seleccionados para el usuario */
+    public array  $departamentos_ids = [];
 
     // Modal de reset de contraseña
     public bool   $modalResetAbierto   = false;
@@ -57,6 +60,7 @@ class Index extends Component
         $this->activo     = (bool) $u->activo;
         $this->rol        = $u->roles->first()?->name ?? '';
         $this->password   = ''; // no precargar
+        $this->departamentos_ids = $u->departamentos()->pluck('departamentos.id')->all();
 
         $this->modalAbierto = true;
     }
@@ -70,13 +74,15 @@ class Index extends Component
     protected function rules(): array
     {
         return [
-            'name'     => 'required|string|max:120',
-            'email'    => 'required|email|unique:users,email,' . ($this->editandoId ?? 'NULL'),
-            'telefono' => 'nullable|string|max:30',
-            'sede_id'  => 'nullable|exists:sedes,id',
-            'password' => $this->editandoId ? 'nullable|string|min:6' : 'required|string|min:6',
-            'rol'      => 'required|exists:roles,name',
-            'activo'   => 'boolean',
+            'name'                => 'required|string|max:120',
+            'email'               => 'required|email|unique:users,email,' . ($this->editandoId ?? 'NULL'),
+            'telefono'            => 'nullable|string|max:30',
+            'sede_id'             => 'nullable|exists:sedes,id',
+            'password'            => $this->editandoId ? 'nullable|string|min:6' : 'required|string|min:6',
+            'rol'                 => 'required|exists:roles,name',
+            'activo'              => 'boolean',
+            'departamentos_ids'   => 'array',
+            'departamentos_ids.*' => 'integer|exists:departamentos,id',
         ];
     }
 
@@ -84,7 +90,8 @@ class Index extends Component
     {
         $data = $this->validate();
         $rol  = $data['rol'];
-        unset($data['rol']);
+        $deptos = $data['departamentos_ids'] ?? [];
+        unset($data['rol'], $data['departamentos_ids']);
 
         // 🔒 Bloqueo de privilegio: super-admin solo se puede asignar
         // - desde el dominio principal
@@ -125,6 +132,14 @@ class Index extends Component
 
         $user = User::updateOrCreate(['id' => $this->editandoId], $data);
         $user->syncRoles([$rol]);
+
+        // 🛡️ Sincronizar departamentos: solo permitir IDs del tenant actual
+        // (defensa adicional contra IPC cross-tenant si alguien manipula el form).
+        $tenantId = app(TenantManager::class)->id();
+        $deptosValidos = $tenantId
+            ? Departamento::where('tenant_id', $tenantId)->whereIn('id', $deptos)->pluck('id')->all()
+            : [];
+        $user->departamentos()->sync($deptosValidos);
 
         $this->cerrarModal();
         $this->dispatch('notify', [
@@ -259,6 +274,7 @@ class Index extends Component
         $this->password  = '';
         $this->rol       = '';
         $this->activo    = true;
+        $this->departamentos_ids = [];
         $this->resetValidation();
     }
 
@@ -277,7 +293,7 @@ class Index extends Component
 
     public function render()
     {
-        $usuarios = $this->aplicarFiltroTenant(User::with(['roles', 'sede']))
+        $usuarios = $this->aplicarFiltroTenant(User::with(['roles', 'sede', 'departamentos']))
             ->when($this->busqueda, function ($q) {
                 $b = $this->busqueda;
                 $q->where(fn ($qq) => $qq->where('name', 'like', "%{$b}%")
@@ -318,10 +334,11 @@ class Index extends Component
         }
 
         return view('livewire.usuarios.index', [
-            'usuarios' => $usuarios,
-            'roles'    => $rolesQuery->get(),
-            'sedes'    => Sede::orderBy('nombre')->get(),
-            'kpis'     => $kpis,
+            'usuarios'      => $usuarios,
+            'roles'         => $rolesQuery->get(),
+            'sedes'         => Sede::orderBy('nombre')->get(),
+            'departamentos' => Departamento::where('activo', true)->orderBy('orden')->orderBy('nombre')->get(),
+            'kpis'          => $kpis,
         ])->layout('layouts.app');
     }
 }

@@ -73,6 +73,11 @@ class ConversacionWhatsapp extends Model
         return $this->belongsTo(Pedido::class);
     }
 
+    public function departamento(): BelongsTo
+    {
+        return $this->belongsTo(Departamento::class);
+    }
+
     public function mensajes(): HasMany
     {
         // Orden cronológico estable: created_at + id como tiebreaker

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Spatie\Permission\Traits\HasRoles;
@@ -68,6 +69,40 @@ class User extends Authenticatable
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);
+    }
+
+    /**
+     * Departamentos a los que pertenece el usuario.
+     * Cuando el bot deriva una conversación a un departamento, solo los
+     * usuarios asignados a ese departamento verán el chat (vía filtro
+     * en Chat\Index). Usuarios sin departamentos ven TODOS.
+     */
+    public function departamentos(): BelongsToMany
+    {
+        return $this->belongsToMany(Departamento::class, 'departamento_user')
+            ->withTimestamps();
+    }
+
+    /**
+     * IDs de departamentos del usuario (cacheado en la request).
+     */
+    public function departamentoIds(): array
+    {
+        return $this->departamentos()->pluck('departamentos.id')->all();
+    }
+
+    /**
+     * ¿Puede ver TODAS las conversaciones del tenant, sin importar departamento?
+     * Aplica si:
+     *  - Es super-admin, O
+     *  - Tiene permiso `chat.ver-todos`, O
+     *  - No tiene ningún departamento asignado (típicamente admins locales).
+     */
+    public function puedeVerTodasLasConversaciones(): bool
+    {
+        if ($this->isSuperAdmin()) return true;
+        if ($this->can('chat.ver-todos')) return true;
+        return $this->departamentos()->count() === 0;
     }
 
     /**
