@@ -110,12 +110,12 @@
 
                         <div class="text-[11px] text-slate-400 space-y-0.5 mt-auto">
                             @if(!empty($estado['createdAt']))
-                                <div><i class="fa-regular fa-calendar text-[9px] mr-1"></i> Creado: {{ \Carbon\Carbon::parse($estado['createdAt'])->format('d/m/Y h:i a') }}</div>
+                                <div><i class="fa-regular fa-calendar text-[9px] mr-1"></i> Creado: {{ \Carbon\Carbon::parse($estado['createdAt'])->setTimezone('America/Bogota')->format('d/m/Y h:i a') }}</div>
                             @endif
                             @if($programado && !empty($estado['scheduledFor']))
-                                <div><i class="fa-solid fa-clock text-[9px] mr-1"></i> Programado: {{ \Carbon\Carbon::parse($estado['scheduledFor'])->format('d/m/Y h:i a') }}</div>
+                                <div><i class="fa-solid fa-clock text-[9px] mr-1"></i> Programado: {{ \Carbon\Carbon::parse($estado['scheduledFor'])->setTimezone('America/Bogota')->format('d/m/Y h:i a') }}</div>
                             @elseif(!empty($estado['expiresAt']))
-                                <div><i class="fa-solid fa-hourglass-end text-[9px] mr-1"></i> Expira: {{ \Carbon\Carbon::parse($estado['expiresAt'])->format('d/m/Y h:i a') }}</div>
+                                <div><i class="fa-solid fa-hourglass-end text-[9px] mr-1"></i> Expira: {{ \Carbon\Carbon::parse($estado['expiresAt'])->setTimezone('America/Bogota')->format('d/m/Y h:i a') }}</div>
                             @endif
                         </div>
                     </div>
