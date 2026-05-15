@@ -855,6 +855,22 @@ MSG;
     }
 
     /**
+     * La conversación de WhatsApp que generó este pedido.
+     */
+    public function conversacionWhatsapp()
+    {
+        return $this->hasOne(ConversacionWhatsapp::class, 'pedido_id');
+    }
+
+    /**
+     * El estado de conversación/pedido (datos capturados por el bot).
+     */
+    public function estadoPedidoBot()
+    {
+        return $this->hasOne(ConversacionPedidoEstado::class, 'pedido_id');
+    }
+
+    /**
      * Calcula el semáforo del pedido según el tiempo transcurrido
      * en el estado actual versus el ANS configurado.
      *

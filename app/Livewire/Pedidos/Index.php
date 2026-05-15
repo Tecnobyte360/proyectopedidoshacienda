@@ -28,6 +28,13 @@ class Index extends Component
     public int $pedidoIdDespacho = 0;
     public ?int $domiciliarioSeleccionado = null;
 
+    // Modal conversación IA
+    public bool  $modalConversacionAbierto = false;
+    public int   $pedidoIdConversacion     = 0;
+    public array $mensajesConversacion     = [];
+    public ?bool $clienteExisteErp         = null;
+    public ?string $cedulaCliente          = null;
+
     // 🚀 DESPACHO MASIVO: selección múltiple + asignación por zona
     public array $seleccionadosMasivo = [];     // [pedido_id => true]
     public bool  $modalMasivoAbierto = false;
@@ -267,7 +274,7 @@ class Index extends Component
     public function pedidos()
     {
         try {
-            return Pedido::with(['detalles', 'sede', 'domiciliario', 'zonaCobertura'])
+            return Pedido::with(['detalles', 'sede', 'domiciliario', 'zonaCobertura', 'estadoPedidoBot'])
                 ->latest()
                 ->get();
         } catch (\Throwable $e) {
@@ -682,6 +689,70 @@ class Index extends Component
                 'message' => 'Ocurrió un error al confirmar la entrega.',
             ]);
         }
+    }
+
+    /**
+     * Abre modal con el resumen de conversación IA del pedido + estado SGI.
+     */
+    public function verConversacion(int $pedidoId): void
+    {
+        $pedido = Pedido::find($pedidoId);
+        if (!$pedido) return;
+
+        $this->pedidoIdConversacion = $pedidoId;
+        $this->mensajesConversacion = [];
+        $this->clienteExisteErp     = null;
+        $this->cedulaCliente        = null;
+
+        // 1. Intentar cargar mensajes desde la relación conversacionWhatsapp
+        $conv = \App\Models\ConversacionWhatsapp::where('pedido_id', $pedidoId)->first();
+        if ($conv) {
+            $this->mensajesConversacion = $conv->mensajes()
+                ->whereIn('rol', ['user', 'assistant'])
+                ->where('tipo', 'text')
+                ->whereNotNull('contenido')
+                ->where('contenido', '!=', '')
+                ->orderBy('created_at')
+                ->orderBy('id')
+                ->limit(100)
+                ->get()
+                ->map(fn ($m) => [
+                    'rol'       => $m->rol,
+                    'contenido' => $m->contenido,
+                    'hora'      => $m->created_at?->format('h:i a'),
+                ])
+                ->toArray();
+
+            // 2. Obtener estado ERP desde ConversacionPedidoEstado
+            $estado = \App\Models\ConversacionPedidoEstado::where('conversacion_id', $conv->id)->first();
+            if ($estado) {
+                $this->clienteExisteErp = $estado->cliente_existe_erp;
+                $this->cedulaCliente    = $estado->cedula;
+            }
+        }
+
+        // 3. Fallback: si no hay mensajes en BD, intentar desde conversacion_completa JSON
+        if (empty($this->mensajesConversacion) && !empty($pedido->conversacion_completa)) {
+            $historial = json_decode($pedido->conversacion_completa, true) ?? [];
+            $this->mensajesConversacion = collect($historial)
+                ->filter(fn ($m) => in_array($m['role'] ?? '', ['user', 'assistant']) && !empty($m['content'] ?? ''))
+                ->map(fn ($m) => [
+                    'rol'       => $m['role'],
+                    'contenido' => is_string($m['content']) ? $m['content'] : json_encode($m['content']),
+                    'hora'      => null,
+                ])
+                ->values()
+                ->toArray();
+        }
+
+        $this->modalConversacionAbierto = true;
+    }
+
+    public function cerrarModalConversacion(): void
+    {
+        $this->modalConversacionAbierto = false;
+        $this->pedidoIdConversacion     = 0;
+        $this->mensajesConversacion     = [];
     }
 
     public function cancelarPedido(int $pedidoId): void

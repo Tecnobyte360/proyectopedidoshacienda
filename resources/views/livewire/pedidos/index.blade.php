@@ -478,7 +478,20 @@
                                 <div class="text-[10px] font-mono text-slate-400">
                                     PED-{{ str_pad($pedido->id, 3, '0', STR_PAD_LEFT) }}
                                 </div>
-                                <div class="font-bold text-slate-800 truncate">{{ $pedido->cliente_nombre }}</div>
+                                <div class="font-bold text-slate-800 truncate flex items-center gap-1.5">
+                                    {{ $pedido->cliente_nombre }}
+                                    @if($pedido->estadoPedidoBot && $pedido->estadoPedidoBot->cliente_existe_erp)
+                                        <span class="inline-flex items-center gap-0.5 rounded bg-emerald-100 px-1 py-0.5 text-[8px] font-bold uppercase text-emerald-700 shrink-0"
+                                              title="Verificado en SGI">
+                                            <i class="fa-solid fa-building text-[7px]"></i>SGI
+                                        </span>
+                                    @elseif($pedido->estadoPedidoBot && $pedido->estadoPedidoBot->cedula && !$pedido->estadoPedidoBot->cliente_existe_erp)
+                                        <span class="inline-flex items-center gap-0.5 rounded bg-amber-100 px-1 py-0.5 text-[8px] font-bold uppercase text-amber-700 shrink-0"
+                                              title="No encontrado en SGI">
+                                            <i class="fa-solid fa-building text-[7px]"></i>Nuevo
+                                        </span>
+                                    @endif
+                                </div>
                                 <div class="text-xs text-slate-500">{{ $pedido->created_at?->diffForHumans() }}</div>
                             </div>
                         </div>
@@ -634,8 +647,16 @@
                     </div>
 
                     {{-- Acción --}}
-                    <div class="px-4 pb-4">
+                    <div class="px-4 pb-4 space-y-2">
                         @include('livewire.pedidos._accion_pedido', ['pedido' => $pedido])
+                        @if($pedido->canal === 'whatsapp')
+                            <button type="button"
+                                    wire:click="verConversacion({{ $pedido->id }})"
+                                    class="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition">
+                                <i class="fa-solid fa-robot text-violet-500"></i>
+                                Ver conversación IA
+                            </button>
+                        @endif
                     </div>
                 </div>
             @empty
@@ -743,7 +764,20 @@
                                             {{ $iniciales ?: 'CL' }}
                                         </div>
                                         <div class="min-w-0 max-w-[200px]">
-                                            <div class="truncate font-semibold text-slate-900 text-sm">{{ $pedido->cliente_nombre }}</div>
+                                            <div class="truncate font-semibold text-slate-900 text-sm flex items-center gap-1.5">
+                                                {{ $pedido->cliente_nombre }}
+                                                @if($pedido->estadoPedidoBot && $pedido->estadoPedidoBot->cliente_existe_erp)
+                                                    <span class="inline-flex items-center gap-0.5 rounded bg-emerald-100 px-1 py-0.5 text-[8px] font-bold uppercase text-emerald-700 whitespace-nowrap shrink-0"
+                                                          title="Cliente verificado en SGI (ERP)">
+                                                        <i class="fa-solid fa-building text-[7px]"></i>SGI
+                                                    </span>
+                                                @elseif($pedido->estadoPedidoBot && $pedido->estadoPedidoBot->cedula && !$pedido->estadoPedidoBot->cliente_existe_erp)
+                                                    <span class="inline-flex items-center gap-0.5 rounded bg-amber-100 px-1 py-0.5 text-[8px] font-bold uppercase text-amber-700 whitespace-nowrap shrink-0"
+                                                          title="Cédula dada pero NO encontrado en SGI">
+                                                        <i class="fa-solid fa-building text-[7px]"></i>Nuevo
+                                                    </span>
+                                                @endif
+                                            </div>
                                             <div class="text-[11px] text-slate-500 truncate flex items-center gap-1 flex-wrap">
                                                 @if($esRecogerRow)
                                                     <span class="inline-flex items-center gap-1 rounded-md bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-700 whitespace-nowrap"
@@ -926,7 +960,18 @@
 
                                 {{-- Acción --}}
                                 <td class="px-3 py-3.5 text-center align-middle">
-                                    @include('livewire.pedidos._accion_pedido', ['pedido' => $pedido])
+                                    <div class="flex flex-col items-center gap-1.5">
+                                        @include('livewire.pedidos._accion_pedido', ['pedido' => $pedido])
+                                        @if($pedido->canal === 'whatsapp')
+                                            <button type="button"
+                                                    wire:click="verConversacion({{ $pedido->id }})"
+                                                    title="Ver conversación con IA"
+                                                    class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[10px] font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-800 transition">
+                                                <i class="fa-solid fa-robot text-[10px] text-violet-500"></i>
+                                                Chat IA
+                                            </button>
+                                        @endif
+                                    </div>
                                 </td>
                             </tr>
                         @empty
@@ -1045,6 +1090,98 @@
                             <i class="fa-solid fa-circle-check" wire:loading.class="hidden" wire:target="confirmarEntregaConToken"></i>
                             <i class="fa-solid fa-spinner fa-spin hidden" wire:loading.class.remove="hidden" wire:target="confirmarEntregaConToken"></i>
                             Confirmar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        @endif
+
+        {{-- MODAL CONVERSACIÓN IA --}}
+        @if($modalConversacionAbierto)
+            <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4"
+                 style="background: rgba(15,23,42,0.55); backdrop-filter: blur(4px);"
+                 @click="$wire.cerrarModalConversacion()">
+
+                <div class="w-full sm:max-w-xl rounded-t-2xl sm:rounded-2xl border border-slate-200 bg-white shadow-2xl max-h-[90vh] flex flex-col" @click.stop>
+                    {{-- Header --}}
+                    <div class="flex items-center gap-3 border-b border-slate-100 px-4 sm:px-5 py-4 shrink-0">
+                        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-100 text-violet-600">
+                            <i class="fa-solid fa-robot"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-sm font-bold text-slate-800">Conversación con IA</h3>
+                            <p class="text-xs text-slate-500">Pedido #{{ str_pad($pedidoIdConversacion, 3, '0', STR_PAD_LEFT) }}</p>
+                        </div>
+                        {{-- SGI Badge en header --}}
+                        @if($clienteExisteErp === true)
+                            <span class="inline-flex items-center gap-1.5 rounded-lg bg-emerald-100 border border-emerald-200 px-2.5 py-1.5 text-[10px] font-bold text-emerald-700">
+                                <i class="fa-solid fa-building text-emerald-500"></i>
+                                SGI Verificado
+                                @if($cedulaCliente)
+                                    <span class="font-mono">{{ $cedulaCliente }}</span>
+                                @endif
+                            </span>
+                        @elseif($clienteExisteErp === false && $cedulaCliente)
+                            <span class="inline-flex items-center gap-1.5 rounded-lg bg-amber-100 border border-amber-200 px-2.5 py-1.5 text-[10px] font-bold text-amber-700">
+                                <i class="fa-solid fa-user-plus text-amber-500"></i>
+                                Cliente nuevo
+                                <span class="font-mono">{{ $cedulaCliente }}</span>
+                            </span>
+                        @elseif($cedulaCliente === null)
+                            <span class="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 border border-slate-200 px-2.5 py-1.5 text-[10px] font-bold text-slate-500">
+                                <i class="fa-solid fa-circle-question text-slate-400"></i>
+                                Sin validar
+                            </span>
+                        @endif
+                        <button wire:click="cerrarModalConversacion"
+                                class="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+
+                    {{-- Mensajes --}}
+                    <div class="flex-1 overflow-y-auto px-4 sm:px-5 py-4 space-y-3" style="max-height: 60vh;">
+                        @if(empty($mensajesConversacion))
+                            <div class="text-center py-10 text-slate-400">
+                                <i class="fa-solid fa-comments text-3xl mb-3"></i>
+                                <p class="text-sm">No hay mensajes de conversación registrados para este pedido.</p>
+                            </div>
+                        @else
+                            @foreach($mensajesConversacion as $msg)
+                                <div class="flex {{ $msg['rol'] === 'user' ? 'justify-end' : 'justify-start' }}">
+                                    <div class="max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed shadow-sm
+                                                {{ $msg['rol'] === 'user'
+                                                    ? 'bg-emerald-500 text-white rounded-br-md'
+                                                    : 'bg-slate-100 text-slate-800 rounded-bl-md border border-slate-200' }}">
+                                        {{-- Icono de rol --}}
+                                        <div class="flex items-center gap-1.5 mb-1">
+                                            @if($msg['rol'] === 'user')
+                                                <i class="fa-solid fa-user text-[9px] text-emerald-200"></i>
+                                                <span class="text-[10px] font-bold text-emerald-200">Cliente</span>
+                                            @else
+                                                <i class="fa-solid fa-robot text-[9px] text-violet-500"></i>
+                                                <span class="text-[10px] font-bold text-violet-600">Asistente IA</span>
+                                            @endif
+                                            @if(!empty($msg['hora']))
+                                                <span class="text-[9px] {{ $msg['rol'] === 'user' ? 'text-emerald-200' : 'text-slate-400' }} ml-auto">{{ $msg['hora'] }}</span>
+                                            @endif
+                                        </div>
+                                        {{-- Contenido --}}
+                                        <div class="whitespace-pre-line break-words">{{ $msg['contenido'] }}</div>
+                                    </div>
+                                </div>
+                            @endforeach
+                        @endif
+                    </div>
+
+                    {{-- Footer --}}
+                    <div class="flex items-center justify-between border-t border-slate-100 px-4 sm:px-5 py-3 shrink-0">
+                        <div class="text-[10px] text-slate-400">
+                            {{ count($mensajesConversacion) }} mensajes
+                        </div>
+                        <button wire:click="cerrarModalConversacion"
+                                class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition">
+                            Cerrar
                         </button>
                     </div>
                 </div>
