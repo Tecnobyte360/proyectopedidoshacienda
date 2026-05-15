@@ -18,6 +18,7 @@ class DetallePedido extends Model
         'codigo_producto',
         'cantidad',
         'unidad',
+        'corte_nombre',
         'precio_unitario',
         'subtotal',
     ];

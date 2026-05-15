@@ -2133,8 +2133,9 @@ TXT;
                 $code     = trim((string) ($args['code'] ?? ''));
                 $quantity = (float) ($args['quantity'] ?? 0);
                 $unitRaw  = strtolower(trim((string) ($args['unit'] ?? '')));
+                $corte    = trim((string) ($args['corte'] ?? '')); // ✂️ Corte solicitado por el cliente
 
-                Log::info('🛒 Tool call agregar_producto_al_pedido', compact('from', 'action', 'name', 'quantity', 'unitRaw', 'code'));
+                Log::info('🛒 Tool call agregar_producto_al_pedido', compact('from', 'action', 'name', 'quantity', 'unitRaw', 'code', 'corte'));
 
                 $resultado = $this->procesarAgregarProductoAlPedido(
                     $conversacion,
@@ -2143,7 +2144,8 @@ TXT;
                     $code,
                     $quantity,
                     $unitRaw,
-                    $connectionId
+                    $connectionId,
+                    $corte
                 );
                 $resultados[] = $resultado;
                 $ultimoResultado = $resultado;
@@ -5954,7 +5956,8 @@ TXT;
       string $code,
       float $quantity,
       string $unitRaw,
-      ?int $connectionId
+      ?int $connectionId,
+      string $corte = ''
   ): array {
       $estadoSrv  = app(\App\Services\EstadoPedidoService::class);
       $catalogo   = app(\App\Services\BotCatalogoService::class);
@@ -6098,6 +6101,40 @@ TXT;
           }
       }
 
+      // ✂️ Validar corte si el producto tiene cortes configurados
+      $corteValidado = '';
+      if ($producto && $action !== 'remove') {
+          try {
+              $cortesProd = $producto->cortes()->where('activo', true)->pluck('nombre')->all();
+              if (!empty($cortesProd)) {
+                  // El producto SÍ tiene cortes — el cliente debe especificar uno
+                  if (empty($corte)) {
+                      return [
+                          'ok'              => false,
+                          'action'          => $action,
+                          'error'           => 'Este producto requiere especificar un CORTE. Pregunta al cliente cuál prefiere.',
+                          'cortes_disponibles' => $cortesProd,
+                          'mensaje_sugerido'=> "Tengo *{$producto->nombre}* pero te lo puedo cortar de varias formas: " . implode(', ', $cortesProd) . ". ¿Cuál te tinca?",
+                      ];
+                  }
+                  // Buscar match case-insensitive contra los cortes disponibles
+                  $matchCorte = collect($cortesProd)->first(fn ($c) => mb_strtolower($c) === mb_strtolower($corte));
+                  if (!$matchCorte) {
+                      return [
+                          'ok'              => false,
+                          'action'          => $action,
+                          'error'           => "Corte '{$corte}' no disponible para este producto.",
+                          'cortes_disponibles' => $cortesProd,
+                          'mensaje_sugerido'=> "Ese corte no lo manejamos para {$producto->nombre}. Los cortes disponibles son: " . implode(', ', $cortesProd),
+                      ];
+                  }
+                  $corteValidado = $matchCorte;
+              }
+          } catch (\Throwable $e) {
+              // Si falla la consulta de cortes, continuar sin corte
+          }
+      }
+
       if ($action === 'remove') {
           if ($idxExist !== null) {
               array_splice($productos, $idxExist, 1);
@@ -6106,16 +6143,24 @@ TXT;
           if ($idxExist !== null) {
               $productos[$idxExist]['quantity'] = $cantidadFinal;
               $productos[$idxExist]['unit']     = $unitNorm;
+              if ($corteValidado !== '') $productos[$idxExist]['corte'] = $corteValidado;
           } else {
               // Si no estaba, lo agregamos
-              $productos[] = $this->armarLineaProducto($producto, $cantidadFinal, $unitNorm, $precioKg);
+              $linea = $this->armarLineaProducto($producto, $cantidadFinal, $unitNorm, $precioKg);
+              if ($corteValidado !== '') $linea['corte'] = $corteValidado;
+              $productos[] = $linea;
           }
       } else { // add (default)
           if ($idxExist !== null) {
               // Sumar a la cantidad existente
               $productos[$idxExist]['quantity'] = (float) ($productos[$idxExist]['quantity'] ?? 0) + $cantidadFinal;
+              if ($corteValidado !== '' && empty($productos[$idxExist]['corte'])) {
+                  $productos[$idxExist]['corte'] = $corteValidado;
+              }
           } else {
-              $productos[] = $this->armarLineaProducto($producto, $cantidadFinal, $unitNorm, $precioKg);
+              $linea = $this->armarLineaProducto($producto, $cantidadFinal, $unitNorm, $precioKg);
+              if ($corteValidado !== '') $linea['corte'] = $corteValidado;
+              $productos[] = $linea;
           }
       }
 
@@ -7346,12 +7391,18 @@ TXT;
                     ]);
                 }
 
+                // ✂️ Corte: leerlo del estado del pedido si está guardado allí.
+                // El bot lo persiste en estado.productos[].corte cuando procesa
+                // agregar_producto_al_pedido con el parámetro corte.
+                $corteLinea = trim((string) ($product['corte'] ?? ''));
+
                 $productosValidados[] = [
                     'producto_id'     => $producto->id ?? null,
                     'codigo_producto' => $producto->codigo ?? null,
                     'producto'        => $nombreProducto,
                     'cantidad'        => $cantidad,
                     'unidad'          => $unidadGuardar,
+                    'corte_nombre'    => $corteLinea ?: null,
                     'precio_unitario' => $precio,
                     'subtotal'        => $sub,
                 ];
@@ -8603,6 +8654,13 @@ PROMPT;
                         'code' => [
                             'type'        => 'string',
                             'description' => 'Código SKU del producto del catálogo (opcional pero recomendado para precisión).',
+                        ],
+                        'corte' => [
+                            'type'        => 'string',
+                            'description' => '✂️ CORTE solicitado por el cliente (ej: "Entero", "Mariposa", "Medallones", "Goulash"). '
+                                . 'OBLIGATORIO si el producto tiene cortes_disponibles (devueltos por buscar_productos o info_producto). '
+                                . 'Si NO sabes el corte y el producto los tiene, NO llames esta tool aún — primero pregunta al cliente. '
+                                . 'Si el producto NO tiene cortes (ej: chorizo, salchichas), deja este campo vacío.',
                         ],
                         'action' => [
                             'type'        => 'string',

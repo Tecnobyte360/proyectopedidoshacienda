@@ -69,25 +69,65 @@ class IntegracionExportService
         $resultados = [];
 
         foreach ($integraciones as $integracion) {
-            try {
-                $r = $this->exportarA($integracion, $pedido);
-                $resultados[$integracion->id] = $r;
-            } catch (\Throwable $e) {
-                Log::error('❌ Export pedido falló', [
+            // 🔄 Reintento automático con backoff para errores transitorios.
+            // Errores típicos: "DBPROCESS is dead", "connection timeout",
+            // "could not connect", "deadlock". El primer intento es inmediato;
+            // si falla con error transitorio, espera 2s, 5s, 10s antes de fallar.
+            $intentos = 0;
+            $maxIntentos = 3;
+            $ultimoError = null;
+            $exitoso = false;
+
+            while ($intentos < $maxIntentos && !$exitoso) {
+                try {
+                    if ($intentos > 0) {
+                        // Backoff: 2s, 5s, 10s
+                        $delay = [2, 5, 10][$intentos - 1] ?? 10;
+                        Log::info("🔄 Reintentando export SGI (intento {$intentos}/{$maxIntentos}) tras {$delay}s", [
+                            'pedido_id' => $pedido->id,
+                            'error_prev' => mb_substr((string) $ultimoError, 0, 100),
+                        ]);
+                        sleep($delay);
+                    }
+
+                    $r = $this->exportarA($integracion, $pedido);
+                    $resultados[$integracion->id] = $r;
+                    $exitoso = true;
+
+                    if ($intentos > 0) {
+                        Log::info("✅ Export SGI exitoso tras {$intentos} reintento(s)", [
+                            'pedido_id' => $pedido->id,
+                            'integracion_id' => $integracion->id,
+                        ]);
+                    }
+                } catch (\Throwable $e) {
+                    $ultimoError = $e->getMessage();
+                    $intentos++;
+
+                    // Solo reintentar si el error es transitorio
+                    if (!$this->esErrorTransitorio($ultimoError) || $intentos >= $maxIntentos) {
+                        break;
+                    }
+                }
+            }
+
+            if (!$exitoso) {
+                Log::error('❌ Export pedido falló tras ' . $intentos . ' intento(s)', [
                     'integracion_id' => $integracion->id,
                     'pedido_id'      => $pedido->id,
-                    'error'          => $e->getMessage(),
+                    'error'          => $ultimoError,
+                    'transitorio'    => $this->esErrorTransitorio((string) $ultimoError),
                 ]);
                 DB::table('integracion_export_logs')->insert([
                     'tenant_id'      => $pedido->tenant_id,
                     'integracion_id' => $integracion->id,
                     'pedido_id'      => $pedido->id,
                     'estado'         => 'error',
-                    'error_mensaje'  => $e->getMessage(),
+                    'error_mensaje'  => '[intentos: ' . $intentos . '] ' . $ultimoError,
                     'created_at'     => now(),
                     'updated_at'     => now(),
                 ]);
-                $resultados[$integracion->id] = ['estado' => 'error', 'mensaje' => $e->getMessage()];
+                $resultados[$integracion->id] = ['estado' => 'error', 'mensaje' => $ultimoError, 'intentos' => $intentos];
             }
         }
 
@@ -95,6 +135,48 @@ class IntegracionExportService
             'exportadas' => count($resultados),
             'resultados' => $resultados,
         ];
+    }
+
+    /**
+     * 🔄 Detecta si un error es TRANSITORIO (vale la pena reintentar) o
+     * PERMANENTE (no reintentar porque siempre va a fallar).
+     *
+     * Transitorios típicos:
+     *  - DBPROCESS is dead (SQL Server pierde conexión)
+     *  - connection timeout
+     *  - server has gone away (MySQL)
+     *  - deadlock
+     *  - too many connections
+     *
+     * Permanentes (NO reintentar):
+     *  - constraint violation (FK, unique)
+     *  - column not found
+     *  - syntax error
+     *  - data too long
+     */
+    private function esErrorTransitorio(string $mensaje): bool
+    {
+        $lower = mb_strtolower($mensaje);
+        $patronesTransitorios = [
+            'dbprocess is dead',
+            'connection timed out',
+            'connection refused',
+            'server has gone away',
+            'deadlock found',
+            'lock wait timeout',
+            'too many connections',
+            'could not connect',
+            'lost connection',
+            'timeout waiting',
+            'broken pipe',
+            'connection reset',
+            'sqlstate[hy000]: general error: 20047', // SQL Server transitorio
+            'sqlstate[08', // PostgreSQL conexión
+        ];
+        foreach ($patronesTransitorios as $p) {
+            if (str_contains($lower, $p)) return true;
+        }
+        return false;
     }
 
     /**

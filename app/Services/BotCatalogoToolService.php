@@ -432,6 +432,25 @@ class BotCatalogoToolService
             $datos['hint_precios']      = "Para calcular total: cantidad × precio de su unidad. Ej: 3 libras × precio_libra. NUNCA multipliques cantidad-en-libras por precio_kg.";
         }
 
+        // ✂️ Cortes disponibles: si el producto tiene cortes asignados, exponerlos
+        // al LLM. Así puede preguntar al cliente "¿qué corte prefieres?" antes
+        // de agregar al carrito. Ej: pechuga → "entero, mariposa, medallones".
+        if ($p instanceof \App\Models\Producto && !empty($p->id)) {
+            try {
+                $cortes = $p->cortes()->where('activo', true)->orderBy('orden')->get(['nombre','descripcion','icono_emoji']);
+                if ($cortes->isNotEmpty()) {
+                    $datos['cortes_disponibles'] = $cortes->map(fn ($c) => [
+                        'nombre'      => (string) $c->nombre,
+                        'descripcion' => (string) ($c->descripcion ?? ''),
+                        'emoji'       => (string) ($c->icono_emoji ?? ''),
+                    ])->all();
+                    $datos['hint_cortes'] = "⚠️ Este producto se ofrece en varios CORTES. ANTES de agregarlo al carrito, PREGUNTA al cliente '¿en qué corte lo prefieres?' y lista las opciones de cortes_disponibles. Solo agrega al carrito DESPUÉS de saber el corte.";
+                }
+            } catch (\Throwable $e) {
+                // Si falla la relación, simplemente no incluir cortes
+            }
+        }
+
         return $datos;
     }
 

@@ -96,6 +96,22 @@ Schedule::command('bot:reintentar-mensajes-salida')
     ->withoutOverlapping(2)
     ->runInBackground();
 
+// 🔄 Reintentar pedidos al ERP/SGI que fallaron por errores transitorios.
+// (DBPROCESS is dead, connection timeout, deadlock). Cada 5 minutos.
+Schedule::command('integraciones:reintentar-export')
+    ->everyFiveMinutes()
+    ->timezone('America/Bogota')
+    ->withoutOverlapping(10)
+    ->runInBackground();
+
+// 🛵 Auto-asignar domiciliario a pedidos a domicilio huerfanos (sin asignar).
+// Red de seguridad si el hook 'created' de Pedido no disparó. Cada 2 minutos.
+Schedule::command('pedidos:asignar-huerfanos')
+    ->everyTwoMinutes()
+    ->timezone('America/Bogota')
+    ->withoutOverlapping(5)
+    ->runInBackground();
+
 Schedule::command('clientes:felicitar-cumpleanos')
     ->everyMinute()
     ->timezone('America/Bogota')
