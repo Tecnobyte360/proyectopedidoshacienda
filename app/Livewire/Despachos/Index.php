@@ -728,8 +728,12 @@ class Index extends Component
             $domiActual = $this->domiciliarioActual();
             if ($domiActual) {
                 $hoy = now()->toDateString();
+                // Pendientes = listos para despacho o ya en camino (excluye 'nuevo')
                 $statsDomi['pendientes'] = \App\Models\Pedido::where('domiciliario_id', $domiActual->id)
-                    ->whereNotIn('estado', [\App\Models\Pedido::ESTADO_ENTREGADO, \App\Models\Pedido::ESTADO_CANCELADO])
+                    ->whereIn('estado', [
+                        \App\Models\Pedido::ESTADO_EN_PREPARACION,
+                        \App\Models\Pedido::ESTADO_REPARTIDOR_EN_CAMINO,
+                    ])
                     ->count();
                 $statsDomi['entregados'] = \App\Models\Pedido::where('domiciliario_id', $domiActual->id)
                     ->whereDate('fecha_entregado', $hoy)
@@ -738,10 +742,14 @@ class Index extends Component
                     ->whereDate('fecha_asignacion_domiciliario', $hoy)
                     ->count();
 
-                // Ruta optimizada
+                // Ruta optimizada — solo pedidos LISTOS PARA DESPACHO (en preparación)
+                // o YA EN CAMINO. Excluye 'nuevo' (sin armar) y 'pendiente'.
                 try {
                     $pedidosActivos = \App\Models\Pedido::where('domiciliario_id', $domiActual->id)
-                        ->whereNotIn('estado', [\App\Models\Pedido::ESTADO_ENTREGADO, \App\Models\Pedido::ESTADO_CANCELADO])
+                        ->whereIn('estado', [
+                            \App\Models\Pedido::ESTADO_EN_PREPARACION,
+                            \App\Models\Pedido::ESTADO_REPARTIDOR_EN_CAMINO,
+                        ])
                         ->with('sede:id,nombre')
                         ->get();
 
