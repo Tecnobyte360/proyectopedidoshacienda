@@ -272,21 +272,10 @@ class EstadoPedidoService
             if (!preg_match('/[a-záéíóúñ]/iu', $candidato) || mb_strlen($candidato) < 2 || mb_strlen($candidato) > 80) {
                 $esNombreValido = false;
             }
-            // 🛡️ Rechazar nombres que parecen productos alimenticios
-            $palabrasProducto = [
-                'carne', 'pollo', 'res', 'cerdo', 'pescado', 'pechuga', 'chuleta',
-                'costilla', 'lomo', 'chorizo', 'salchicha', 'huevo', 'leche',
-                'queso', 'jamón', 'jamon', 'tocineta', 'tocino', 'molida', 'molido',
-                'filete', 'milanesa', 'hamburguesa', 'morcilla', 'chicharrón',
-                'chicharron', 'pernil', 'muslo', 'ala ', 'alas', 'kg', 'libra',
-                'bandeja', 'paquete', 'combo', 'promo',
-            ];
-            $candidatoLower = mb_strtolower($candidato);
-            foreach ($palabrasProducto as $palabra) {
-                if (str_contains($candidatoLower, $palabra)) {
-                    $esNombreValido = false;
-                    break;
-                }
+            // 🛡️ Rechazar nombres que parecen productos o términos logísticos.
+            // Delega a Cliente::nombreNoEsProducto para mantener una sola fuente de verdad.
+            if (!\App\Models\Cliente::nombreNoEsProducto($candidato)) {
+                $esNombreValido = false;
             }
 
             if ($esNombreValido) {
@@ -1012,14 +1001,20 @@ class EstadoPedidoService
 
         if ($limpio === '') return null;
 
-        // Frases funcionales + nombres de productos comunes a descartar
+        // Frases funcionales + nombres de productos + logística comunes a descartar
         // 🛡️ Las palabras de producto (pollo, res, carne, etc) son CRÍTICAS:
         // sin ellas, "Quiero pollo deshuesada kilo" se capturaría como
         // nombre "Pollo Deshuesada Kilo" y contamina cliente_nombre en BD.
-        $stopwords = '/^(hola|buenas|buenos\s+dias|tardes|noches|gracias|si|no|listo|dale|quiero|necesito|tienes|tienen|tienes\s+un|para|de|del|los|las|el|la|por\s+favor|domicilio|despacho|recoger|aqui|alla|que|qué|cómo|como|cuanto|cuánto|cual|cuál'
+        // 🛡️ Las palabras de logística (sede, principal, recoger, etc) también:
+        // sin ellas, "Para recoger en sede principal" → "En Sede Principal".
+        $stopwords = '/^(hola|buenas|buenos\s+dias|tardes|noches|gracias|si|no|listo|dale|quiero|necesito|tienes|tienen|tienes\s+un|para|de|del|los|las|el|la|por\s+favor|domicilio|despacho|recoger|aqui|alla|que|qué|cómo|como|cuanto|cuánto|cual|cuál|en|con|sin|mi|tu|su|este|esta'
             . '|carne|pollo|res|cerdo|pescado|pechuga|chuleta|costilla|lomo|chorizo|salchicha|huevo|leche|queso|jam[oó]n|tocineta|tocino|molida|molido'
             . '|filete|milanesa|hamburguesa|morcilla|chicharr[oó]n|pernil|muslo|alas|kg|kilo|kilos|libra|libras|bandeja|paquete|combo|promo|deshuesada|deshuesado|ahumada|ahumado'
-            . '|solomito|sobrebarriga|barriguero|tilapia|trucha|pavo|cordero|bistek|bistec)$/iu';
+            . '|solomito|sobrebarriga|barriguero|tilapia|trucha|pavo|cordero|bistek|bistec'
+            . '|sede|principal|sucursal|punto|bodega|tienda|local|sucursales|sedes|recogida|recoge|recojo|recogo|recojo|pickup'
+            . '|direccion|direcci[oó]n|calle|carrera|cra|cl|avenida|av|barrio|ciudad|departamento|via|num|numero|n[oó]mero|casa|apto|apartamento|piso|edificio'
+            . '|telefono|tel[eé]fono|celular|movil|m[oó]vil|whatsapp|email|correo|cedula|c[eé]dula|cc|nit|documento|identificacion'
+            . '|pago|pagar|nequi|daviplata|efectivo|transferencia|contraentrega|wompi|bancolombia)$/iu';
 
         $palabras = explode(' ', $limpio);
         $palabras = array_filter($palabras, fn ($p) => mb_strlen($p) >= 2);
@@ -1071,28 +1066,17 @@ class EstadoPedidoService
 
     /**
      * 🛡️ Verifica si un string parece un nombre de persona válido.
-     * Rechaza strings que contienen nombres de productos (estática + catálogo).
+     * Rechaza strings que contienen nombres de productos (estática + catálogo)
+     * o palabras de logística (sede, dirección, sucursal, etc).
      */
     private function pareceNombrePersona(string $candidato): bool
     {
         $candidatoLower = mb_strtolower(trim($candidato));
         if ($candidatoLower === '') return false;
 
-        // Blacklist estática (mismo criterio que captarDeOrderData)
-        $palabrasProducto = [
-            'carne', 'pollo', 'res', 'cerdo', 'pescado', 'pechuga', 'chuleta',
-            'costilla', 'lomo', 'chorizo', 'salchicha', 'huevo', 'leche',
-            'queso', 'jamón', 'jamon', 'tocineta', 'tocino', 'molida', 'molido',
-            'filete', 'milanesa', 'hamburguesa', 'morcilla', 'chicharrón',
-            'chicharron', 'pernil', 'muslo', 'alas', 'kg', 'kilo', 'libra',
-            'bandeja', 'paquete', 'combo', 'promo', 'deshuesada', 'deshuesado',
-            'ahumada', 'ahumado', 'solomito', 'sobrebarriga', 'barriguero',
-            'tilapia', 'trucha', 'pavo', 'cordero', 'bistek', 'bistec',
-        ];
-        foreach ($palabrasProducto as $palabra) {
-            if (str_contains($candidatoLower, $palabra)) {
-                return false;
-            }
+        // Delegar a la blacklist centralizada (productos + logística + pagos)
+        if (!\App\Models\Cliente::nombreNoEsProducto($candidato)) {
+            return false;
         }
 
         // Blacklist dinámica desde catálogo de productos (cache 1h)

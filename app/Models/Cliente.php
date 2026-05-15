@@ -169,6 +169,7 @@ class Cliente extends Model
         if ($cand === '') return false;
 
         $palabrasProducto = [
+            // Productos
             'carne', 'pollo', 'res', 'cerdo', 'pescado', 'pechuga', 'chuleta',
             'costilla', 'lomo', 'chorizo', 'salchicha', 'huevo', 'leche',
             'queso', 'jamón', 'jamon', 'tocineta', 'tocino', 'molida', 'molido',
@@ -177,6 +178,17 @@ class Cliente extends Model
             'bandeja', 'paquete', 'combo', 'promo', 'deshuesada', 'deshuesado',
             'ahumada', 'ahumado', 'solomito', 'sobrebarriga', 'barriguero',
             'tilapia', 'trucha', 'pavo', 'cordero', 'bistek', 'bistec',
+            // Logística
+            'sede', 'principal', 'sucursal', 'punto', 'bodega', 'tienda',
+            'local', 'sucursales', 'sedes', 'recogida', 'pickup',
+            // Direcciones
+            'direccion', 'dirección', 'calle', 'carrera', 'avenida', 'barrio',
+            'ciudad', 'departamento', 'apto', 'apartamento', 'casa', 'edificio',
+            // Datos personales (no son nombres)
+            'telefono', 'teléfono', 'celular', 'whatsapp', 'email', 'correo',
+            'cedula', 'cédula', 'documento', 'identificacion',
+            // Métodos de pago
+            'nequi', 'daviplata', 'efectivo', 'transferencia', 'contraentrega',
         ];
         foreach ($palabrasProducto as $palabra) {
             if (str_contains($cand, $palabra)) {
