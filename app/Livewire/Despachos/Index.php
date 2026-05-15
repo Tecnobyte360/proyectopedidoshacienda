@@ -554,22 +554,73 @@ class Index extends Component
         }
     }
 
-    public function mount()
+    /**
+     * ¿El usuario actual es SOLO domiciliario (sin permisos de gestión)?
+     * Si sí, /despachos muestra UI simplificada con sus pedidos + ruta.
+     */
+    public function esDomiciliarioPuro(): bool
     {
-        // 🛵 Si el usuario es SOLO domiciliario (no admin/gerente/operador),
-        //    redirigirlo a su portal personal donde ve ruta optimizada y
-        //    botones Ir/Entregado. Mejor UX y reusa el flujo existente.
         $user = auth()->user();
-        if ($user && $user->hasRole('domiciliario')
+        return $user
+            && $user->hasRole('domiciliario')
             && !$user->hasRole('admin')
             && !$user->hasRole('gerente')
             && !$user->hasRole('operador')
-            && !$user->hasRole('super-admin')) {
-            $dom = \App\Models\Domiciliario::where('user_id', $user->id)->first();
-            if ($dom && !empty($dom->token_acceso)) {
-                return redirect()->away($dom->urlPortal());
-            }
+            && !$user->hasRole('super-admin');
+    }
+
+    public function domiciliarioActual(): ?\App\Models\Domiciliario
+    {
+        $user = auth()->user();
+        if (!$user) return null;
+        return \App\Models\Domiciliario::where('user_id', $user->id)->first();
+    }
+
+    /**
+     * 🛵 Marcar pedido como entregado (solo el domiciliario asignado).
+     */
+    public function marcarEntregado(int $pedidoId): void
+    {
+        $dom = $this->domiciliarioActual();
+        if (!$dom) return;
+
+        $pedido = \App\Models\Pedido::where('id', $pedidoId)
+            ->where('domiciliario_id', $dom->id)
+            ->first();
+        if (!$pedido) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Pedido no asignado a ti.']);
+            return;
         }
+        if ($pedido->estado === \App\Models\Pedido::ESTADO_ENTREGADO) return;
+
+        $pedido->cambiarEstado(
+            \App\Models\Pedido::ESTADO_ENTREGADO,
+            "Entregado por {$dom->nombre}",
+            'Entregado'
+        );
+        $this->dispatch('notify', ['type' => 'success', 'message' => '✅ Pedido entregado']);
+    }
+
+    /**
+     * 🛵 Marcar pedido como en camino (solo el domiciliario asignado).
+     */
+    public function marcarEnCamino(int $pedidoId): void
+    {
+        $dom = $this->domiciliarioActual();
+        if (!$dom) return;
+
+        $pedido = \App\Models\Pedido::where('id', $pedidoId)
+            ->where('domiciliario_id', $dom->id)
+            ->first();
+        if (!$pedido) return;
+        if ($pedido->estado === \App\Models\Pedido::ESTADO_REPARTIDOR_EN_CAMINO) return;
+
+        $pedido->cambiarEstado(
+            \App\Models\Pedido::ESTADO_REPARTIDOR_EN_CAMINO,
+            "Marcado en camino por {$dom->nombre}",
+            'En camino'
+        );
+        $this->dispatch('notify', ['type' => 'success', 'message' => '🛵 Pedido en camino']);
     }
 
     public function render()
@@ -666,6 +717,60 @@ class Index extends Component
             ? $tenant->google_maps_api_key
             : null;
 
+        // 🛵 Si es domiciliario puro, calcular ruta óptima + URL Google Maps
+        $esDomiciliarioPuro = $this->esDomiciliarioPuro();
+        $domiActual = null;
+        $statsDomi = ['pendientes' => 0, 'entregados' => 0, 'total_hoy' => 0];
+        $rutaOptimaUrl = null;
+        $pedidosOrdenados = collect();
+
+        if ($esDomiciliarioPuro) {
+            $domiActual = $this->domiciliarioActual();
+            if ($domiActual) {
+                $hoy = now()->toDateString();
+                $statsDomi['pendientes'] = \App\Models\Pedido::where('domiciliario_id', $domiActual->id)
+                    ->whereNotIn('estado', [\App\Models\Pedido::ESTADO_ENTREGADO, \App\Models\Pedido::ESTADO_CANCELADO])
+                    ->count();
+                $statsDomi['entregados'] = \App\Models\Pedido::where('domiciliario_id', $domiActual->id)
+                    ->whereDate('fecha_entregado', $hoy)
+                    ->count();
+                $statsDomi['total_hoy'] = \App\Models\Pedido::where('domiciliario_id', $domiActual->id)
+                    ->whereDate('fecha_asignacion_domiciliario', $hoy)
+                    ->count();
+
+                // Ruta optimizada
+                try {
+                    $pedidosActivos = \App\Models\Pedido::where('domiciliario_id', $domiActual->id)
+                        ->whereNotIn('estado', [\App\Models\Pedido::ESTADO_ENTREGADO, \App\Models\Pedido::ESTADO_CANCELADO])
+                        ->with('sede:id,nombre')
+                        ->get();
+
+                    $origLat = $domiActual->lat_actual;
+                    $origLng = $domiActual->lng_actual;
+                    if (!$origLat || !$origLng) {
+                        $sede = \App\Models\Sede::whereNotNull('latitud')->whereNotNull('longitud')->first();
+                        if ($sede) {
+                            $origLat = (float) $sede->latitud;
+                            $origLng = (float) $sede->longitud;
+                        }
+                    }
+
+                    $rutaSrv = app(\App\Services\RutaOptimizadaService::class);
+                    $pedidosOrdenados = $rutaSrv->optimizar($pedidosActivos, $origLat, $origLng);
+                    $rutaOptimaUrl = $rutaSrv->urlGoogleMaps($pedidosOrdenados, $origLat, $origLng);
+                } catch (\Throwable $e) {
+                    \Log::warning('No se pudo calcular ruta domiciliario: ' . $e->getMessage());
+                }
+            }
+        }
+
+        // Si es solo domiciliario → vista simplificada con ruta óptima
+        if ($esDomiciliarioPuro && $domiActual) {
+            return view('livewire.despachos.index-domiciliario', compact(
+                'domiActual', 'statsDomi', 'rutaOptimaUrl', 'pedidosOrdenados'
+            ))->layout('layouts.app');
+        }
+
         return view('livewire.despachos.index', compact(
             'agrupados',
             'sedes',
@@ -675,7 +780,12 @@ class Index extends Component
             'totalSelMonto',
             'porDomiciliario',
             'domiciliariosPag',
-            'googleMapsApiKey'
+            'googleMapsApiKey',
+            'esDomiciliarioPuro',
+            'domiActual',
+            'statsDomi',
+            'rutaOptimaUrl',
+            'pedidosOrdenados',
         ))->layout('layouts.app');
     }
 }
