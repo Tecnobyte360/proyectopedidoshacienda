@@ -8481,9 +8481,13 @@ PROMPT;
             'type'     => 'function',
             'function' => [
                 'name'        => 'agregar_producto_al_pedido',
-                'description' => '🛒 Persiste/modifica un producto en el carrito del cliente. '
+                'description' => '🛒 Persiste/modifica UN producto en el carrito del cliente. '
+                    . '⚠️ CRÍTICO: si el cliente menciona N productos en un mismo mensaje '
+                    . '(ej: "4 libras de tocino Y 2 libras de costilla"), DEBES llamar esta tool '
+                    . 'N VECES en paralelo (una por cada producto). NUNCA agrupes varios productos '
+                    . 'en una sola llamada — un producto = una llamada. '
                     . 'LLAMA SIEMPRE que el cliente confirme un producto O pida QUITARLO/MODIFICAR la cantidad. '
-                    . 'NUNCA respondas "listo, quitado/agregado" sin invocar esta tool primero — el sistema valida el resultado real. '
+                    . 'NUNCA respondas "listo, agregado/quitado" sin invocar esta tool primero — el sistema valida el resultado real. '
                     . 'Acciones soportadas: '
                     . '`add` = agregar producto al carrito (default), '
                     . '`update` = actualizar la cantidad de un producto ya agregado, '
