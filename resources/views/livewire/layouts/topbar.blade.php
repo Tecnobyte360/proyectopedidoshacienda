@@ -34,6 +34,16 @@
 
     [$titulo, $subtitulo, $icono] = $titulos[$current] ?? ['Panel', 'Bienvenido', 'fa-house'];
 
+    // 🛵 Si es domiciliario puro, ajustar el subtítulo de la página de despachos
+    if ($current === 'despachos.index' && auth()->check()) {
+        $u = auth()->user();
+        if ($u->hasRole('domiciliario') && !$u->hasAnyRole(['superadmin','admin','tenant_admin','despachador'])) {
+            $titulo    = 'Mis entregas';
+            $subtitulo = 'Tus pedidos asignados de hoy';
+            $icono     = 'fa-motorcycle';
+        }
+    }
+
     // 🎭 Detectar modo impersonación
     $tenantImitadoId = session('tenant_imitado_id');
     $tenantImitado = $tenantImitadoId
