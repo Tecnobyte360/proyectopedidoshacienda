@@ -81,11 +81,22 @@ class WhatsappStatusService
                 }
             }
 
+            $errorBody = $resp->json('error', '') ?: $resp->body();
             Log::error('WhatsappStatusService: error al crear estado', [
                 'status' => $resp->status(),
                 'body'   => mb_substr($resp->body(), 0, 500),
             ]);
-            return null;
+
+            // Devolver array con clave 'error' para que Livewire muestre mensaje específico
+            $mensajeError = match (true) {
+                str_contains($errorBody, 'ERR_VALIDATION_ERROR') => 'La fecha programada debe ser futura. Déjala vacía para publicar ahora.',
+                str_contains($errorBody, 'ERR_MISSING_REQUIRED_FIELDS') => 'Falta el texto o archivo del estado.',
+                str_contains($errorBody, 'ERR_WAPP_NOT_CONNECTED') => 'La conexión WhatsApp no está activa.',
+                str_contains($errorBody, 'ERR_SENDING_WAPP_MSG') => 'Error al enviar el estado a WhatsApp. Intenta de nuevo.',
+                default => 'Error del servidor: ' . mb_substr($errorBody, 0, 100),
+            };
+
+            return ['error' => $mensajeError];
 
         } catch (\Throwable $e) {
             Log::error('WhatsappStatusService: excepcion: ' . $e->getMessage());

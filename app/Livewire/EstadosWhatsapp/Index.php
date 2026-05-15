@@ -108,14 +108,16 @@ class Index extends Component
                 scheduledFor: $scheduled
             );
 
-            if ($result) {
+            if ($result && !isset($result['error'])) {
                 $this->dispatch('notify', type: 'success', message: $scheduled
                     ? 'Estado programado correctamente'
                     : 'Estado publicado correctamente');
                 $this->cerrarModal();
                 $this->cargarDatos();
+            } elseif (isset($result['error'])) {
+                $this->dispatch('notify', type: 'error', message: $result['error']);
             } else {
-                $this->dispatch('notify', type: 'error', message: 'Error al crear el estado. Revisa la conexión.');
+                $this->dispatch('notify', type: 'error', message: 'No se pudo conectar con la API. Revisa la conexión.');
             }
         } catch (\Throwable $e) {
             Log::error('EstadosWhatsapp crear: ' . $e->getMessage());
