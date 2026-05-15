@@ -113,17 +113,11 @@
                                     <span class="font-bold text-slate-800">${{ number_format((float) $p->total, 0, ',', '.') }}</span>
                                 </div>
 
-                                {{-- 🔑 CÓDIGO DE ENTREGA (solo si está en camino) --}}
+                                {{-- 🔑 INDICADOR (no mostramos el código — se valida en modal) --}}
                                 @if($p->token_entrega && $p->estado === 'repartidor_en_camino')
-                                    <div class="rounded-xl bg-amber-50 border border-amber-200 p-3 mb-3 flex items-center gap-3">
-                                        <i class="fa-solid fa-key text-amber-600 text-lg"></i>
-                                        <div class="flex-1">
-                                            <div class="text-xs font-bold text-amber-800">Código del cliente:</div>
-                                            <div class="text-[11px] text-amber-700">
-                                                Pídele al cliente este número:
-                                                <strong class="text-base font-mono text-amber-900">{{ $p->token_entrega }}</strong>
-                                            </div>
-                                        </div>
+                                    <div class="rounded-xl bg-slate-50 border border-slate-200 p-2 mb-3 flex items-center gap-2 text-xs">
+                                        <i class="fa-solid fa-key text-slate-500"></i>
+                                        <span class="text-slate-600">El cliente recibió un <strong>código de 4 dígitos</strong>. Te lo pedirá al entregar.</span>
                                     </div>
                                 @endif
 
@@ -170,16 +164,14 @@
 
                                     @if($p->estado === 'repartidor_en_camino')
                                         @if($p->estado_pago !== 'aprobado')
-                                            {{-- Pendiente de pago → botón pagar --}}
-                                            <button type="button" wire:click="marcarPagado({{ $p->id }})"
-                                                    wire:confirm="¿Confirmas que el cliente PAGÓ {{ '$' . number_format((float)$p->total,0,',','.') }} en efectivo?"
+                                            {{-- Pendiente de pago → abrir modal pagar --}}
+                                            <button type="button" wire:click="abrirModalPago({{ $p->id }})"
                                                     class="inline-flex items-center justify-center gap-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white py-2.5 text-sm font-bold">
                                                 <i class="fa-solid fa-money-bill-wave"></i> Marcar pagado
                                             </button>
                                         @else
-                                            {{-- Pagado → puede entregar --}}
-                                            <button type="button" wire:click="marcarEntregado({{ $p->id }})"
-                                                    wire:confirm="¿Marcar pedido #{{ $p->id }} como ENTREGADO? El cliente debe darte el código {{ $p->token_entrega }}."
+                                            {{-- Pagado → abrir modal entrega --}}
+                                            <button type="button" wire:click="abrirModalEntrega({{ $p->id }})"
                                                     class="inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 text-sm font-bold">
                                                 <i class="fa-solid fa-circle-check"></i> Entregado
                                             </button>
@@ -958,5 +950,144 @@
                 @endif
             </div>
         </div>
+    @endif
+
+    {{-- ════════════════════════════════════════════════════════════════
+         💰 MODAL: MARCAR PAGO RECIBIDO
+         ════════════════════════════════════════════════════════════════ --}}
+    @if($modalPagoPedidoId)
+        @php
+            $pPago = \App\Models\Pedido::find($modalPagoPedidoId);
+        @endphp
+        @if($pPago)
+            <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
+                 wire:click.self="cerrarModalPago">
+                <div class="w-full max-w-md rounded-3xl bg-white shadow-2xl overflow-hidden"
+                     wire:click.stop>
+                    <div class="bg-gradient-to-br from-amber-500 to-amber-600 text-white p-6">
+                        <div class="flex items-center gap-3">
+                            <div class="h-12 w-12 rounded-2xl bg-white/20 flex items-center justify-center">
+                                <i class="fa-solid fa-money-bill-wave text-2xl"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-xl font-extrabold">Registrar pago</h3>
+                                <p class="text-white/80 text-sm">Pedido #{{ $pPago->id }} · {{ $pPago->cliente_nombre }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-6">
+                        <div class="rounded-2xl bg-amber-50 border border-amber-200 p-4 mb-4">
+                            <div class="text-xs uppercase text-amber-700 font-bold">Total a cobrar</div>
+                            <div class="text-3xl font-black text-amber-900 mt-1">
+                                ${{ number_format((float) $pPago->total, 0, ',', '.') }}
+                            </div>
+                        </div>
+
+                        <label class="block text-xs font-bold uppercase text-slate-600 mb-2">
+                            ¿Cómo te pagó el cliente?
+                        </label>
+                        <div class="grid grid-cols-3 gap-2 mb-5">
+                            @foreach([
+                                'efectivo' => ['💵', 'Efectivo'],
+                                'transferencia' => ['🏦', 'Transferencia'],
+                                'tarjeta' => ['💳', 'Tarjeta'],
+                            ] as $val => [$emoji, $label])
+                                <button type="button" wire:click="$set('modalPagoMetodo', '{{ $val }}')"
+                                        class="rounded-xl border-2 p-3 text-center transition
+                                            {{ $modalPagoMetodo === $val ? 'border-amber-500 bg-amber-50 text-amber-900' : 'border-slate-200 hover:border-slate-300 text-slate-700' }}">
+                                    <div class="text-2xl mb-1">{{ $emoji }}</div>
+                                    <div class="text-xs font-bold">{{ $label }}</div>
+                                </button>
+                            @endforeach
+                        </div>
+
+                        <div class="flex gap-2">
+                            <button type="button" wire:click="cerrarModalPago"
+                                    class="flex-1 rounded-xl border-2 border-slate-200 hover:bg-slate-50 py-3 text-sm font-bold text-slate-700">
+                                Cancelar
+                            </button>
+                            <button type="button" wire:click="confirmarPago"
+                                    class="flex-1 rounded-xl bg-amber-500 hover:bg-amber-600 text-white py-3 text-sm font-bold">
+                                <i class="fa-solid fa-check"></i> Confirmar pago
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @endif
+    @endif
+
+    {{-- ════════════════════════════════════════════════════════════════
+         ✅ MODAL: ENTREGAR PEDIDO (con código de verificación)
+         ════════════════════════════════════════════════════════════════ --}}
+    @if($modalEntregaPedidoId)
+        @php
+            $pEnt = \App\Models\Pedido::find($modalEntregaPedidoId);
+        @endphp
+        @if($pEnt)
+            <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
+                 wire:click.self="cerrarModalEntrega">
+                <div class="w-full max-w-md rounded-3xl bg-white shadow-2xl overflow-hidden"
+                     wire:click.stop>
+                    <div class="bg-gradient-to-br from-emerald-500 to-emerald-700 text-white p-6">
+                        <div class="flex items-center gap-3">
+                            <div class="h-12 w-12 rounded-2xl bg-white/20 flex items-center justify-center">
+                                <i class="fa-solid fa-circle-check text-2xl"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-xl font-extrabold">Confirmar entrega</h3>
+                                <p class="text-white/80 text-sm">Pedido #{{ $pEnt->id }} · {{ $pEnt->cliente_nombre }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-6">
+                        <div class="rounded-2xl bg-emerald-50 border border-emerald-200 p-4 mb-4 text-center">
+                            <i class="fa-solid fa-key text-emerald-600 text-xl mb-2"></i>
+                            <p class="text-sm text-emerald-900 font-bold mb-1">Pídele al cliente que te dicte su código</p>
+                            <p class="text-[11px] text-emerald-700">El cliente lo recibió en su WhatsApp cuando saliste a entregar.</p>
+                        </div>
+
+                        <label class="block text-xs font-bold uppercase text-slate-600 mb-2 text-center">
+                            Código del cliente (4 dígitos)
+                        </label>
+                        <input type="text" wire:model.live="modalEntregaCodigo"
+                               inputmode="numeric" maxlength="4" autofocus
+                               placeholder="• • • •"
+                               class="w-full rounded-2xl border-2 border-slate-200 px-3 py-4 text-center text-3xl font-mono font-black tracking-[0.5em] focus:border-emerald-500 focus:outline-none mb-3">
+
+                        @if($modalEntregaError)
+                            <div class="rounded-xl bg-rose-50 border border-rose-200 p-3 mb-3 text-sm text-rose-700 text-center">
+                                {{ $modalEntregaError }}
+                            </div>
+                        @endif
+
+                        <div class="rounded-xl bg-slate-50 p-3 mb-4 text-xs text-slate-600">
+                            <div class="flex items-center justify-between">
+                                <span>Total cobrado:</span>
+                                <strong class="text-emerald-700">${{ number_format((float) $pEnt->total, 0, ',', '.') }}</strong>
+                            </div>
+                            <div class="flex items-center justify-between mt-1">
+                                <span>Método de pago:</span>
+                                <strong>{{ ucfirst($pEnt->metodo_pago ?: 'efectivo') }} ✓</strong>
+                            </div>
+                        </div>
+
+                        <div class="flex gap-2">
+                            <button type="button" wire:click="cerrarModalEntrega"
+                                    class="flex-1 rounded-xl border-2 border-slate-200 hover:bg-slate-50 py-3 text-sm font-bold text-slate-700">
+                                Cancelar
+                            </button>
+                            <button type="button" wire:click="confirmarEntrega"
+                                    class="flex-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white py-3 text-sm font-bold disabled:opacity-50"
+                                    @if(strlen(trim($modalEntregaCodigo)) < 4) disabled @endif>
+                                <i class="fa-solid fa-check"></i> Entregar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @endif
     @endif
 </div>

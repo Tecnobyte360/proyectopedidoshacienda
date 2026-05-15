@@ -554,6 +554,103 @@ class Index extends Component
         }
     }
 
+    // 🛵 MODALES del flujo del domiciliario
+    public ?int   $modalPagoPedidoId    = null;
+    public string $modalPagoMetodo      = 'efectivo';
+    public ?int   $modalEntregaPedidoId = null;
+    public string $modalEntregaCodigo   = '';
+    public string $modalEntregaError    = '';
+
+    public function abrirModalPago(int $pedidoId): void
+    {
+        $this->modalPagoPedidoId = $pedidoId;
+        $this->modalPagoMetodo = 'efectivo';
+    }
+
+    public function cerrarModalPago(): void
+    {
+        $this->modalPagoPedidoId = null;
+    }
+
+    public function confirmarPago(): void
+    {
+        if (!$this->modalPagoPedidoId) return;
+        $dom = $this->domiciliarioActual();
+        if (!$dom) return;
+
+        $pedido = \App\Models\Pedido::where('id', $this->modalPagoPedidoId)
+            ->where('domiciliario_id', $dom->id)
+            ->first();
+        if (!$pedido) {
+            $this->modalPagoPedidoId = null;
+            return;
+        }
+
+        $pedido->update([
+            'estado_pago'  => 'aprobado',
+            'metodo_pago'  => $this->modalPagoMetodo ?: 'efectivo',
+            'pagado_at'    => now(),
+        ]);
+
+        $this->modalPagoPedidoId = null;
+        $this->dispatch('notify', ['type' => 'success', 'message' => '💰 Pago registrado correctamente']);
+    }
+
+    public function abrirModalEntrega(int $pedidoId): void
+    {
+        $this->modalEntregaPedidoId = $pedidoId;
+        $this->modalEntregaCodigo = '';
+        $this->modalEntregaError = '';
+    }
+
+    public function cerrarModalEntrega(): void
+    {
+        $this->modalEntregaPedidoId = null;
+        $this->modalEntregaCodigo = '';
+        $this->modalEntregaError = '';
+    }
+
+    public function confirmarEntrega(): void
+    {
+        if (!$this->modalEntregaPedidoId) return;
+        $dom = $this->domiciliarioActual();
+        if (!$dom) return;
+
+        $pedido = \App\Models\Pedido::where('id', $this->modalEntregaPedidoId)
+            ->where('domiciliario_id', $dom->id)
+            ->first();
+        if (!$pedido) {
+            $this->modalEntregaPedidoId = null;
+            return;
+        }
+
+        // Validar pago
+        if ($pedido->estado_pago !== 'aprobado') {
+            $this->modalEntregaError = '⚠️ Este pedido NO está pagado. Cierra este modal, marca el pago primero y luego entrega.';
+            return;
+        }
+
+        // Validar código
+        $codigoIngresado = trim($this->modalEntregaCodigo);
+        $codigoReal      = trim((string) $pedido->token_entrega);
+        if ($codigoReal !== '' && $codigoIngresado !== $codigoReal) {
+            $this->modalEntregaError = '❌ Código incorrecto. Pídele al cliente que te lo dicte de nuevo.';
+            return;
+        }
+
+        // Cerrar entrega
+        $pedido->cambiarEstado(
+            \App\Models\Pedido::ESTADO_ENTREGADO,
+            "Entregado por {$dom->nombre} (código verificado)",
+            'Entregado'
+        );
+
+        $this->modalEntregaPedidoId = null;
+        $this->modalEntregaCodigo = '';
+        $this->modalEntregaError = '';
+        $this->dispatch('notify', ['type' => 'success', 'message' => '✅ Pedido entregado correctamente']);
+    }
+
     /**
      * ¿El usuario actual es SOLO domiciliario (sin permisos de gestión)?
      * Si sí, /despachos muestra UI simplificada con sus pedidos + ruta.
