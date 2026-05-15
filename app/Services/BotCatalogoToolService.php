@@ -85,11 +85,101 @@ class BotCatalogoToolService
         return $resultado;
     }
 
+    /**
+     * 🇨🇴 SINÓNIMOS COLOMBIANOS — el cliente puede usar el nombre coloquial
+     * y el sistema lo traduce al nombre oficial del producto en SGI.
+     *
+     * Cuando el cliente busca "chicharrón" debería encontrar "TOCINO".
+     * Cuando busca "rellena" → "MORCILLA". Etc.
+     *
+     * Estos sinónimos se EXPANDEN al hacer query: si la query coincide con
+     * un sinónimo, agregamos el término oficial al "bag" del producto para
+     * matching, sin requerir que el operador agregue palabras_clave manualmente.
+     */
+    private const SINONIMOS_COL = [
+        // Cerdo
+        'chicharron'   => ['tocino', 'panceta', 'barriguero'],
+        'chicharrón'   => ['tocino', 'panceta', 'barriguero'],
+        'panceta'      => ['tocino', 'barriguero'],
+        'cuero'        => ['piel', 'chicharron', 'tocino'],
+        'pellejo'      => ['piel', 'tocino'],
+        'tocineta'     => ['tocino'],
+        'lomo fino'    => ['solomito', 'lomo'],
+        'solomillo'    => ['solomito'],
+        'cañon'        => ['solomito cerdo', 'lomo'],
+        'pernil'       => ['pierna', 'pierna cerdo'],
+        // Res
+        'falda'        => ['posta', 'sobrebarriga'],
+        'punta gorda'  => ['punta de anca', 'punta'],
+        'pulpa negra'  => ['muchacho', 'cadera'],
+        'lomo viudo'   => ['lomo', 'solomito'],
+        'tenderloin'   => ['lomo fino', 'solomito'],
+        'bistec'       => ['milanesa', 'lomo'],
+        'escalope'     => ['milanesa'],
+        'ribs'         => ['costilla'],
+        'costillas'    => ['costilla'],
+        // Pollo
+        'pecho'        => ['pechuga'],
+        'blanco'       => ['pechuga blanca', 'pechuga'],
+        'piernapernil' => ['muslo'],
+        'cadera pollo' => ['muslo'],
+        'contramuslo'  => ['muslo'],
+        // Vísceras
+        'menudencia'   => ['menudos', 'asadura'],
+        'menudencias'  => ['menudos', 'asadura'],
+        'rellena'      => ['morcilla'],
+        'tripa'        => ['tripaje', 'menudos'],
+        'pajarilla'    => ['bazo', 'pajarilla res'],
+        'redaño'       => ['empella', 'redaño'],
+        'gordo'        => ['empella', 'tocino'],
+        'patica'       => ['pezuña', 'pata'],
+        'patica de cerdo' => ['pezuña cerdo', 'pata'],
+        'pata'         => ['pezuña', 'patas'],
+        'cara'         => ['careta'],
+        'cabeza'       => ['cabeza de cerdo'],
+        'lengua'       => ['lengua res'],
+        'orejón'       => ['oreja'],
+        'mondongo'     => ['callo', 'tripaje'],
+        'corazon'      => ['corazones'],
+        // Pescado
+        'tilapia roja' => ['mojarra'],
+        'mojarra'      => ['tilapia'],
+        // Generales
+        'pollito'      => ['pollo'],
+        'porcion'      => ['unidad', 'und'],
+        'pedacito'     => ['unidad', 'porcion'],
+    ];
+
+    /**
+     * Expande la query agregando sinónimos colombianos si los hay.
+     * Ej: "chicharron" → "chicharron tocino panceta barriguero"
+     */
+    private function expandirConSinonimos(string $q): string
+    {
+        $qNorm = $this->normalizar($q);
+        $tokens = explode(' ', $qNorm);
+        $expandidos = [$qNorm]; // siempre incluir la query original normalizada
+
+        // Buscar coincidencias en la query (puede tener varios sinónimos)
+        foreach (self::SINONIMOS_COL as $alias => $oficiales) {
+            $aliasNorm = $this->normalizar($alias);
+            if (str_contains($qNorm, $aliasNorm)) {
+                foreach ($oficiales as $oficial) {
+                    $expandidos[] = $this->normalizar($oficial);
+                }
+            }
+        }
+
+        return implode(' ', array_unique($expandidos));
+    }
+
     private function buscarInternoConSede(string $query, ?string $categoria, int $limite, ?int $sedeId): array
     {
         $productos = $this->catalogo->productosActivos($sedeId);
-        $q  = $this->normalizar($query);
-        $qF = $this->normalizarFuzzy($query); // tolera typos (dobles letras, etc)
+        // 🇨🇴 Expandir con sinónimos colombianos antes de normalizar
+        $queryExpandida = $this->expandirConSinonimos($query);
+        $q  = $queryExpandida; // ya está normalizado
+        $qF = $this->normalizarFuzzy($queryExpandida);
         $cat = $categoria ? $this->normalizar($categoria) : null;
 
         $candidatos = $productos->filter(function ($p) use ($cat) {

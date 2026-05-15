@@ -629,6 +629,12 @@ class Index extends Component
             ];
         });
 
+        // 🗺️ Google Maps config para el mapa de ruta
+        $tenant = app(\App\Services\TenantManager::class)->current();
+        $googleMapsApiKey = $tenant && $tenant->google_maps_activo && !empty($tenant->google_maps_api_key)
+            ? $tenant->google_maps_api_key
+            : null;
+
         return view('livewire.despachos.index', compact(
             'agrupados',
             'sedes',
@@ -637,7 +643,8 @@ class Index extends Component
             'totalSelected',
             'totalSelMonto',
             'porDomiciliario',
-            'domiciliariosPag'
+            'domiciliariosPag',
+            'googleMapsApiKey'
         ))->layout('layouts.app');
     }
 }

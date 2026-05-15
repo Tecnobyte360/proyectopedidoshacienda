@@ -1,3 +1,19 @@
+@if(!empty($googleMapsApiKey))
+    @once
+    @push('scripts')
+    <script>
+        if (!window._gmapsLoading && !window.google?.maps) {
+            window._gmapsLoading = true;
+            var s = document.createElement('script');
+            s.src = 'https://maps.googleapis.com/maps/api/js?key={{ $googleMapsApiKey }}&libraries=geometry&language=es&region=CO';
+            s.async = true; s.defer = true;
+            document.head.appendChild(s);
+        }
+    </script>
+    @endpush
+    @endonce
+@endif
+
 <div class="px-6 lg:px-10 py-8" wire:poll.30s="refrescar">
 
     {{-- HEADER --}}
@@ -220,97 +236,130 @@
                     var tienePuntos = data.origen || (data.paradas && data.paradas.length > 0);
                     if (!tienePuntos) return true;
 
-                    if (el._leafletMap) {
-                        try { el._leafletMap.remove(); } catch(e) {}
-                        el._leafletMap = null;
+                    if (!window.google || !window.google.maps) {
+                        return false; // esperar a que Google Maps cargue
+                    }
+
+                    // Limpiar mapa anterior si existe
+                    if (el._gmap) {
+                        el._gmap = null;
+                        if (el._gmapMarkers) el._gmapMarkers.forEach(function(m){ m.setMap(null); });
+                        if (el._gmapPath) el._gmapPath.setMap(null);
                     }
                     el.innerHTML = '';
+                    el._gmapMarkers = [];
 
                     var puntos = [];
-                    if (data.origen) puntos.push([data.origen.lat, data.origen.lng]);
-                    (data.paradas || []).forEach(function (p) { puntos.push([p.lat, p.lng]); });
+                    if (data.origen) puntos.push({lat: parseFloat(data.origen.lat), lng: parseFloat(data.origen.lng)});
+                    (data.paradas || []).forEach(function (p) { puntos.push({lat: parseFloat(p.lat), lng: parseFloat(p.lng)}); });
 
-                    var map = L.map('mapa-despacho');
-                    el._leafletMap = map;
+                    // Inicializar Google Map
+                    var map = new google.maps.Map(el, {
+                        zoom: 13,
+                        center: puntos[0] || {lat: 6.34, lng: -75.56},
+                        mapTypeControl: true,
+                        streetViewControl: true,
+                        fullscreenControl: true,
+                        styles: [
+                            { featureType: 'poi.business', elementType: 'labels', stylers: [{ visibility: 'off' }] }
+                        ]
+                    });
+                    el._gmap = map;
 
-                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                        maxZoom: 19,
-                        attribution: '© OpenStreetMap'
-                    }).addTo(map);
-
+                    // Marker de sede (origen)
                     if (data.origen) {
-                        var sedeIcon = L.divIcon({
-                            className: 'sede-marker',
-                            html: '<div style="background:#10b981;color:#fff;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-weight:bold;box-shadow:0 2px 8px rgba(0,0,0,0.3);border:3px solid #fff">🏪</div>',
-                            iconSize: [36, 36], iconAnchor: [18, 18],
+                        var sedeMarker = new google.maps.Marker({
+                            position: {lat: parseFloat(data.origen.lat), lng: parseFloat(data.origen.lng)},
+                            map: map,
+                            label: { text: '🏪', fontSize: '20px' },
+                            icon: {
+                                path: google.maps.SymbolPath.CIRCLE,
+                                scale: 18, fillColor: '#10b981', fillOpacity: 1,
+                                strokeColor: '#fff', strokeWeight: 3
+                            },
+                            title: (data.origen.nombre || 'Sede')
                         });
-                        L.marker([data.origen.lat, data.origen.lng], { icon: sedeIcon })
-                            .addTo(map)
-                            .bindPopup('<b>' + (data.origen.nombre || 'Sede') + '</b><br>' + (data.origen.detalle || ''));
+                        var sedeInfo = new google.maps.InfoWindow({
+                            content: '<b>' + (data.origen.nombre || 'Sede') + '</b><br>' + (data.origen.detalle || '')
+                        });
+                        sedeMarker.addListener('click', function(){ sedeInfo.open(map, sedeMarker); });
+                        el._gmapMarkers.push(sedeMarker);
                     }
 
+                    // Markers de pedidos (paradas)
                     (data.paradas || []).forEach(function (p, i) {
                         var num = i + 1;
-                        var pinIcon = L.divIcon({
-                            className: 'pedido-marker',
-                            html: '<div style="background:#d68643;color:#fff;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-weight:bold;box-shadow:0 2px 8px rgba(0,0,0,0.3);border:3px solid #fff">' + num + '</div>',
-                            iconSize: [32, 32], iconAnchor: [16, 16],
+                        var marker = new google.maps.Marker({
+                            position: {lat: parseFloat(p.lat), lng: parseFloat(p.lng)},
+                            map: map,
+                            label: { text: String(num), color: '#fff', fontWeight: 'bold', fontSize: '14px' },
+                            icon: {
+                                path: google.maps.SymbolPath.CIRCLE,
+                                scale: 16, fillColor: '#d68643', fillOpacity: 1,
+                                strokeColor: '#fff', strokeWeight: 3
+                            },
+                            title: 'Pedido ' + num
                         });
-                        L.marker([p.lat, p.lng], { icon: pinIcon })
-                            .addTo(map)
-                            .bindPopup(buildPopupPedido(p, num));
+                        var info = new google.maps.InfoWindow({ content: buildPopupPedido(p, num) });
+                        marker.addListener('click', function(){ info.open(map, marker); });
+                        el._gmapMarkers.push(marker);
                     });
 
-                    // Línea recta provisional (mientras llega OSRM)
-                    var lineaProvisional = null;
-                    if (puntos.length > 1) {
-                        lineaProvisional = L.polyline(puntos, {
-                            color: '#d68643', weight: 3, opacity: 0.4, dashArray: '8, 8'
-                        }).addTo(map);
-                    }
-
-                    // Zoom inicial
+                    // Ajustar viewport a todos los puntos
                     if (puntos.length === 1) {
-                        map.setView(puntos[0], 15);
+                        map.setCenter(puntos[0]);
+                        map.setZoom(15);
                     } else if (puntos.length > 1) {
-                        map.fitBounds(puntos, { padding: [40, 40] });
+                        var bounds = new google.maps.LatLngBounds();
+                        puntos.forEach(function(p){ bounds.extend(p); });
+                        map.fitBounds(bounds, { top: 50, right: 50, bottom: 50, left: 50 });
                     }
 
-                    // Traer ruta real por calles (OSRM) y dibujar encima
+                    // Ruta entre puntos usando DirectionsService (calles reales)
                     if (puntos.length > 1) {
-                        fetchRutaOSRM(puntos).then(function (osrm) {
-                            if (!osrm || !osrm.routes || !osrm.routes[0]) return;
+                        var directionsService = new google.maps.DirectionsService();
+                        var directionsRenderer = new google.maps.DirectionsRenderer({
+                            map: map,
+                            suppressMarkers: true, // dejar nuestros markers personalizados
+                            polylineOptions: { strokeColor: '#d68643', strokeWeight: 5, strokeOpacity: 0.85 }
+                        });
+                        el._gmapPath = directionsRenderer;
 
-                            var geometry = osrm.routes[0].geometry;
-                            if (lineaProvisional) map.removeLayer(lineaProvisional);
-
-                            L.geoJSON(geometry, {
-                                style: { color: '#d68643', weight: 5, opacity: 0.85 }
-                            }).addTo(map);
-
-                            var dur = osrm.routes[0].duration; // segundos
-                            var dist = osrm.routes[0].distance; // metros
-                            if (dur && dist) {
-                                var min = Math.round(dur / 60);
-                                var km = (dist / 1000).toFixed(1);
+                        var waypoints = puntos.slice(1, -1).map(function(p){ return {location: p, stopover: true}; });
+                        directionsService.route({
+                            origin: puntos[0],
+                            destination: puntos[puntos.length - 1],
+                            waypoints: waypoints,
+                            travelMode: google.maps.TravelMode.DRIVING
+                        }, function(result, status) {
+                            if (status === 'OK' && result) {
+                                directionsRenderer.setDirections(result);
+                                // Sumar duración + distancia de todos los legs
+                                var totalDur = 0, totalDist = 0;
+                                result.routes[0].legs.forEach(function(leg){
+                                    totalDur += leg.duration.value;
+                                    totalDist += leg.distance.value;
+                                });
+                                var min = Math.round(totalDur / 60);
+                                var km = (totalDist / 1000).toFixed(1);
                                 var info = document.getElementById('ruta-info-osrm');
                                 if (info) info.textContent = ' · ' + km + ' km real · ~' + min + ' min conduciendo';
+                            } else {
+                                console.warn('Google Maps Directions falló:', status);
                             }
                         });
                     }
 
-                    setTimeout(function () { try { map.invalidateSize(); } catch (e) {} }, 250);
-
                     return true;
                 }
 
-                // Polling con reintentos (Leaflet tiene defer, puede tardar en cargar)
+                // Polling con reintentos (Google Maps se carga async)
                 var intentos = 0;
                 var intervalo = setInterval(function () {
                     intentos++;
                     var ok = iniciarMapaDespacho();
-                    if (ok || intentos > 40) clearInterval(intervalo);
-                }, 200);
+                    if (ok || intentos > 60) clearInterval(intervalo);
+                }, 250);
             })();
         </script>
         @endscript
