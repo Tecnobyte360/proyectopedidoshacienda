@@ -57,45 +57,7 @@ class WhatsappStatusService
         $endpoint = rtrim($cred['api_base_url'], '/') . '/status';
 
         try {
-            $request = Http::withoutVerifying()
-                ->withToken($token)
-                ->timeout(30);
-
-            // Construir multipart
-            $multipart = [];
-
-            $multipart[] = [
-                'name'     => 'whatsappId',
-                'contents' => (string) $whatsappId,
-            ];
-
-            if ($body) {
-                $multipart[] = [
-                    'name'     => 'body',
-                    'contents' => $body,
-                ];
-            }
-
-            if ($scheduledFor) {
-                $multipart[] = [
-                    'name'     => 'scheduledFor',
-                    'contents' => $scheduledFor,
-                ];
-            }
-
-            if ($mediaPath && file_exists($mediaPath)) {
-                $multipart[] = [
-                    'name'     => 'medias',
-                    'contents' => fopen($mediaPath, 'r'),
-                    'filename' => basename($mediaPath),
-                ];
-            }
-
-            $resp = Http::withoutVerifying()
-                ->withToken($token)
-                ->timeout(30)
-                ->asMultipart()
-                ->post($endpoint, $multipart);
+            $resp = $this->enviarStatus($token, $endpoint, $whatsappId, $body, $mediaPath, $scheduledFor);
 
             if ($resp->successful()) {
                 Log::info('WhatsApp Status creado', [
@@ -112,11 +74,7 @@ class WhatsappStatusService
                 Cache::forget($cacheKey);
                 $nuevoToken = $this->obtenerToken($cred, $cacheKey);
                 if ($nuevoToken) {
-                    $retry = Http::withoutVerifying()
-                        ->withToken($nuevoToken)
-                        ->timeout(30)
-                        ->asMultipart()
-                        ->post($endpoint, $multipart);
+                    $retry = $this->enviarStatus($nuevoToken, $endpoint, $whatsappId, $body, $mediaPath, $scheduledFor);
                     if ($retry->successful()) {
                         return $retry->json();
                     }
@@ -130,7 +88,7 @@ class WhatsappStatusService
             return null;
 
         } catch (\Throwable $e) {
-            Log::error('WhatsappStatusService: excepcin: ' . $e->getMessage());
+            Log::error('WhatsappStatusService: excepcion: ' . $e->getMessage());
             return null;
         }
     }
@@ -218,6 +176,44 @@ class WhatsappStatusService
             Log::warning('WhatsappStatusService: error listando conexiones: ' . $e->getMessage());
             return [];
         }
+    }
+
+    /**
+     * Construye y envía la petición multipart correctamente usando attach().
+     */
+    private function enviarStatus(
+        string $token,
+        string $endpoint,
+        int $whatsappId,
+        ?string $body,
+        ?string $mediaPath,
+        ?string $scheduledFor
+    ): \Illuminate\Http\Client\Response {
+        $request = Http::withoutVerifying()
+            ->withToken($token)
+            ->timeout(30);
+
+        // Si hay archivo, usar attach() + campos como multipart
+        if ($mediaPath && file_exists($mediaPath)) {
+            $request = $request->attach(
+                'medias',
+                file_get_contents($mediaPath),
+                basename($mediaPath)
+            );
+        }
+
+        // Campos de formulario
+        $fields = [
+            'whatsappId' => (string) $whatsappId,
+        ];
+        if ($body !== null && $body !== '') {
+            $fields['body'] = $body;
+        }
+        if ($scheduledFor) {
+            $fields['scheduledFor'] = $scheduledFor;
+        }
+
+        return $request->post($endpoint, $fields);
     }
 
     // ────────────────────── helpers de token ──────────────────────
