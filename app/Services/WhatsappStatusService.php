@@ -189,31 +189,45 @@ class WhatsappStatusService
         ?string $mediaPath,
         ?string $scheduledFor
     ): \Illuminate\Http\Client\Response {
-        $request = Http::withoutVerifying()
-            ->withToken($token)
-            ->timeout(30);
-
-        // Si hay archivo, usar attach() + campos como multipart
-        if ($mediaPath && file_exists($mediaPath)) {
-            $request = $request->attach(
-                'medias',
-                file_get_contents($mediaPath),
-                basename($mediaPath)
-            );
-        }
-
-        // Campos de formulario
-        $fields = [
-            'whatsappId' => (string) $whatsappId,
+        // La API usa multer (multipart/form-data parser) — SIEMPRE debemos
+        // enviar como multipart, incluso cuando no hay archivo.
+        $multipart = [
+            ['name' => 'whatsappId', 'contents' => (string) $whatsappId],
         ];
+
         if ($body !== null && $body !== '') {
-            $fields['body'] = $body;
-        }
-        if ($scheduledFor) {
-            $fields['scheduledFor'] = $scheduledFor;
+            $multipart[] = ['name' => 'body', 'contents' => $body];
         }
 
-        return $request->post($endpoint, $fields);
+        if ($scheduledFor) {
+            $multipart[] = ['name' => 'scheduledFor', 'contents' => $scheduledFor];
+        }
+
+        if ($mediaPath && file_exists($mediaPath)) {
+            $mimeType = mime_content_type($mediaPath) ?: 'application/octet-stream';
+            $multipart[] = [
+                'name'     => 'medias',
+                'contents' => fopen($mediaPath, 'r'),
+                'filename' => basename($mediaPath),
+                'headers'  => ['Content-Type' => $mimeType],
+            ];
+        }
+
+        Log::info('WhatsappStatusService: enviando estado', [
+            'endpoint'    => $endpoint,
+            'whatsappId'  => $whatsappId,
+            'tieneBody'   => !empty($body),
+            'tieneMedia'  => $mediaPath && file_exists($mediaPath),
+            'scheduledFor'=> $scheduledFor,
+            'campos'      => count($multipart),
+        ]);
+
+        // Usar Guzzle directamente para garantizar multipart/form-data
+        return Http::withoutVerifying()
+            ->withToken($token)
+            ->timeout(30)
+            ->asMultipart()
+            ->post($endpoint, $multipart);
     }
 
     // ────────────────────── helpers de token ──────────────────────
