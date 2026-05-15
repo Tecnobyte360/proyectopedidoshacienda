@@ -2514,9 +2514,15 @@ TXT;
                     'mensaje'=> mb_substr($message, 0, 100),
                 ]);
 
-                // Reemplazar respuesta: el bot debe decir honestamente si lo hacen o no.
-                // No hacemos derivación, no marcamos atendida_por_humano, no asignamos departamento.
-                $reply = "Solo te entregamos el producto como está en el catálogo 😊 No hacemos preparaciones especiales (picar, aliñar, marinar, deshuesar). ¿Te lo agrego así como viene o prefieres mirar otra opción?";
+                // 🎯 ESTRATEGIA INTELIGENTE: buscar corte que mapee con la pregunta del cliente.
+                // Si el cliente dice "guiso" y existe corte "Goulash" (descripción: "cubos para guiso"),
+                // ofrecérselo. Convierte una pregunta que iba a derivar a humano en una venta.
+                $reply = $this->buscarCorteRelacionado($msgLower);
+                if (!$reply) {
+                    // No hay corte que aplique → respuesta honesta + listar cortes generales
+                    $reply = $this->respuestaCortesGenericos();
+                }
+
                 $conversationHistory[] = ['role' => 'assistant', 'content' => $reply];
                 Cache::put($cacheKey, $conversationHistory, now()->addMinutes(45));
                 $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_ASSISTANT, $reply, [
@@ -4175,6 +4181,115 @@ TXT;
         }
 
         return false;
+    }
+
+    /**
+     * 🎯 Cuando el cliente pregunta por una preparación específica (ej: "al estilo guiso",
+     * "molerlo", "para chicharrón"), busca si existe un CORTE en el catálogo que
+     * mapee con esa solicitud, y devuelve una respuesta que se la ofrezca.
+     *
+     * Retorna null si no encuentra match — el caller debe usar respuesta genérica.
+     */
+    private function buscarCorteRelacionado(string $msgLower): ?string
+    {
+        try {
+            $cortes = \App\Models\Corte::where('tenant_id', app(\App\Services\TenantManager::class)->id())
+                ->where('activo', true)
+                ->orderBy('orden')
+                ->get(['nombre', 'descripcion', 'icono_emoji']);
+
+            if ($cortes->isEmpty()) return null;
+
+            // Mapeo: palabra del cliente → palabras clave de cortes que matchean
+            $mapeo = [
+                'guiso'      => ['guiso', 'cubos', 'goulash', 'cuadros'],
+                'sancocho'   => ['guiso', 'cubos', 'goulash', 'porcionado a hueso', 'hueso'],
+                'asado'      => ['argentino', 'churrasco', 'troncos', 'parrilla'],
+                'parrilla'   => ['argentino', 'churrasco', 'troncos'],
+                'moler'      => ['molida'],
+                'molido'     => ['molida'],
+                'molida'     => ['molida'],
+                'chicharron' => ['barril'],
+                'chicharrón' => ['barril'],
+                'milanesa'   => ['churrasco', 'mariposa', 'tajadas'],
+                'churrasco'  => ['churrasco'],
+                'chuleta'    => ['tajadas'],
+                'tajada'     => ['tajadas'],
+                'medallon'   => ['medallones'],
+                'medallón'   => ['medallones'],
+                'tiras'      => ['tiras'],
+                'cuadros'    => ['cuadros'],
+                'cubos'      => ['cuadros', 'goulash'],
+                'picar'      => ['cuadros', 'goulash', 'molida'],
+                'sin grasa'  => ['sin cordón', 'sin cordon'],
+                'desgrasado' => ['sin cordón', 'sin cordon'],
+                'mariposa'   => ['mariposa'],
+            ];
+
+            $cortesEncontrados = collect();
+            foreach ($mapeo as $palabraCliente => $keywordsCorte) {
+                if (!str_contains($msgLower, \Illuminate\Support\Str::ascii($palabraCliente))) continue;
+                foreach ($cortes as $c) {
+                    $nombreLower = mb_strtolower(\Illuminate\Support\Str::ascii($c->nombre));
+                    $descLower   = mb_strtolower(\Illuminate\Support\Str::ascii($c->descripcion ?? ''));
+                    foreach ($keywordsCorte as $kw) {
+                        $kw = \Illuminate\Support\Str::ascii($kw);
+                        if (str_contains($nombreLower, $kw) || str_contains($descLower, $kw)) {
+                            $cortesEncontrados->push($c);
+                            break;
+                        }
+                    }
+                }
+            }
+            $cortesEncontrados = $cortesEncontrados->unique('nombre')->values();
+
+            if ($cortesEncontrados->isEmpty()) return null;
+
+            if ($cortesEncontrados->count() === 1) {
+                $c = $cortesEncontrados->first();
+                $emoji = $c->icono_emoji ?: '✂️';
+                $desc  = $c->descripcion ? " ({$c->descripcion})" : '';
+                return "¡Sí podemos! 🙌 Te lo dejo en corte *{$c->nombre}* {$emoji}{$desc}. ¿Cuántas libras o kilos te llevas?";
+            }
+
+            $lista = $cortesEncontrados->take(4)->map(function ($c) {
+                $emoji = $c->icono_emoji ?: '✂️';
+                $desc  = $c->descripcion ? " — {$c->descripcion}" : '';
+                return "• *{$c->nombre}* {$emoji}{$desc}";
+            })->implode("\n");
+
+            return "Sí podemos! 🙌 Para eso te recomiendo alguno de estos cortes:\n\n{$lista}\n\n¿Cuál te tinca y cuántas libras o kilos te llevas?";
+        } catch (\Throwable $e) {
+            \Log::warning('buscarCorteRelacionado falló: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Respuesta cuando el cliente pregunta por una preparación que NO mapea con
+     * ningún corte del catálogo. Lista los cortes disponibles para que elija.
+     */
+    private function respuestaCortesGenericos(): string
+    {
+        try {
+            $cortes = \App\Models\Corte::where('tenant_id', app(\App\Services\TenantManager::class)->id())
+                ->where('activo', true)
+                ->orderBy('orden')
+                ->limit(8)
+                ->get(['nombre', 'descripcion']);
+
+            if ($cortes->isEmpty()) {
+                return "Solo te entregamos el producto como está en el catálogo 😊 ¿Te lo agrego así o miramos otra opción?";
+            }
+
+            $lista = $cortes->map(fn ($c) =>
+                '• *' . $c->nombre . '*' . ($c->descripcion ? ' — ' . $c->descripcion : '')
+            )->implode("\n");
+
+            return "Esa preparación específica no la manejamos, pero te puedo ofrecer estos cortes 🙌:\n\n{$lista}\n\n¿Cuál te queda mejor?";
+        } catch (\Throwable $e) {
+            return "Solo te entregamos el producto como está en el catálogo 😊 ¿Te lo agrego o miramos otra opción?";
+        }
     }
 
     /**
@@ -8378,6 +8493,37 @@ TXT;
                      . "# 🔧 REGLAS ADICIONALES DE ESTE NEGOCIO\n\n"
                      . $extraRendered . "\n";
         }
+
+        // 🛡️ REGLAS DURAS DE ENFORCEMENT (siempre activas, NO configurables).
+        // El cliente DEBE seguir el flujo del bot — no al revés. El bot guía con asertividad.
+        $prompt .= "\n\n═══════════════════════════════════════════════════════════════════════════════\n"
+                 . "# 🛡️ REGLAS DURAS DE FLUJO (EL CLIENTE SE ADAPTA AL BOT)\n\n"
+                 . "Tú GUÍAS la conversación, NO al revés. El cliente debe cumplir el flujo que tú diriges.\n\n"
+                 . "1. **VARIANTES OBLIGATORIAS**: si llamas `buscar_productos` y el resultado tiene 2+\n"
+                 . "   variantes, el cliente DEBE elegir una específica antes de seguir. Si el cliente\n"
+                 . "   cambia de tema sin elegir, RECUÉRDALE: 'Antes de seguir, ¿cuál variante de [X] te\n"
+                 . "   llevas? Te mostré: [opciones]. Necesito que me digas cuál para agregarlo.'\n\n"
+                 . "2. **CORTES OBLIGATORIOS**: si el producto tiene `cortes_disponibles`, el cliente\n"
+                 . "   DEBE especificar el corte. Si pregunta por una preparación (guiso, asado, molida,\n"
+                 . "   chicharrón, milanesa), MAPÉALA con el corte que mejor encaje:\n"
+                 . "   - 'guiso/sancocho' → Goulash (cubos para guiso)\n"
+                 . "   - 'asado/parrilla' → Corte argentino o Churrasco\n"
+                 . "   - 'molerlo/molida' → Molida\n"
+                 . "   - 'chicharrón' → Para barril\n"
+                 . "   - 'milanesa/filete' → Churrasco o Mariposa\n"
+                 . "   - 'chuletas/tajadas' → En tajadas\n"
+                 . "   Ofrécelo directo: 'Sí, te lo dejo en corte Goulash que es cubos para guiso 🙌'\n\n"
+                 . "3. **CANTIDAD OBLIGATORIA**: si el cliente dice 'quiero pollo' sin cantidad, pídela\n"
+                 . "   junto con la variante en el MISMO mensaje. NO esperes 2 turnos.\n\n"
+                 . "4. **DATOS OBLIGATORIOS**: cédula, dirección (si domicilio), método de pago.\n"
+                 . "   Si el cliente da una dirección ambigua tipo 'por la 50 cerca al parque',\n"
+                 . "   PIDE EXACTITUD: 'Necesito la dirección exacta: calle, número y barrio.'\n\n"
+                 . "5. **NO DERIVES POR PREGUNTAS DE PREPARACIÓN/CORTE**: aunque parezca complejo,\n"
+                 . "   mapéalo con un corte del catálogo o di honestamente que no se hace.\n\n"
+                 . "6. **NO ACEPTES INFO VAGA**: 'me das 1 kilo de carne' es vago. Pide:\n"
+                 . "   ¿qué tipo? (res, cerdo, pollo) → ¿qué corte específico? → ¿con qué preparación?\n\n"
+                 . "REGLA DE ORO: cada turno tuyo debe MOVER al cliente hacia el cierre del pedido.\n"
+                 . "Si el cliente divaga, retómalo: 'Volviendo a tu pedido, me faltaba saber [X]'.\n";
 
         // 🎯 REGLA: ORDEN DEL FLUJO DEL PEDIDO (configurable desde panel)
         try {
