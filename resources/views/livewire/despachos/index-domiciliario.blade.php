@@ -112,6 +112,25 @@
                             <span class="font-bold text-slate-800">${{ number_format((float) $p->total, 0, ',', '.') }}</span>
                         </div>
 
+                        {{-- 🔑 Código de entrega visible para el domiciliario --}}
+                        @if($p->token_entrega && $p->estado === \App\Models\Pedido::ESTADO_REPARTIDOR_EN_CAMINO)
+                            <div x-data="{ ver: false }" class="rounded-xl border-2 border-dashed border-amber-300 bg-amber-50 p-2.5 mb-3">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-[11px] font-bold text-amber-900">
+                                        <i class="fa-solid fa-key"></i> Código del cliente:
+                                    </span>
+                                    <button type="button" @click="ver = !ver"
+                                            class="text-[11px] font-bold text-amber-700 underline">
+                                        <span x-show="!ver">👁️ Ver</span>
+                                        <span x-show="ver" x-cloak>🙈 Ocultar</span>
+                                    </button>
+                                </div>
+                                <div x-show="ver" x-cloak class="text-center mt-1">
+                                    <span class="font-mono text-2xl font-black tracking-[0.4em] text-amber-900">{{ $p->token_entrega }}</span>
+                                </div>
+                            </div>
+                        @endif
+
                         <div class="grid grid-cols-2 gap-2">
                             @if($p->lat && $p->lng)
                                 <a href="https://www.google.com/maps/dir/?api=1&destination={{ $p->lat }},{{ $p->lng }}&travelmode=driving"

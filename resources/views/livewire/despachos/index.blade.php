@@ -1049,6 +1049,29 @@
                             <p class="text-[11px] text-emerald-700">El cliente lo recibió en su WhatsApp cuando saliste a entregar.</p>
                         </div>
 
+                        {{-- 👁️ Código esperado (visible para el domiciliario) --}}
+                        @if($pEnt->token_entrega)
+                            <div x-data="{ ver: false }" class="rounded-2xl border-2 border-dashed border-amber-300 bg-amber-50 p-3 mb-4">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-2">
+                                        <i class="fa-solid fa-eye text-amber-600"></i>
+                                        <span class="text-xs font-bold text-amber-900">Código esperado:</span>
+                                    </div>
+                                    <button type="button" @click="ver = !ver"
+                                            class="text-[11px] font-bold text-amber-700 hover:text-amber-900 underline">
+                                        <span x-show="!ver">👁️ Mostrar</span>
+                                        <span x-show="ver" x-cloak>🙈 Ocultar</span>
+                                    </button>
+                                </div>
+                                <div x-show="ver" x-cloak class="mt-2 text-center">
+                                    <div class="font-mono text-3xl font-black tracking-[0.5em] text-amber-900">
+                                        {{ $pEnt->token_entrega }}
+                                    </div>
+                                    <p class="text-[10px] text-amber-700 mt-1 italic">⚠️ Úsalo solo como referencia, el cliente debe dictarlo</p>
+                                </div>
+                            </div>
+                        @endif
+
                         <label class="block text-xs font-bold uppercase text-slate-600 mb-2 text-center">
                             Código del cliente (4 dígitos)
                         </label>
