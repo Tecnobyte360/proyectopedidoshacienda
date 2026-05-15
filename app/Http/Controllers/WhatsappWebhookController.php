@@ -1335,22 +1335,27 @@ TXT;
         // producto, aunque "basa" parezca sustantivo propio).
         $preguntaProducto = !$forzarConfirmar && $this->clientePreguntaProducto($message);
 
+        // Obtener estado actual del pedido ANTES de decisiones de orquestación
+        $estadoActualBd     = app(\App\Services\EstadoPedidoService::class)->obtener($conversacion);
+
         // 🗺️ Detección dinámica de cobertura — SOLO si NO es pregunta de
         // producto. Si el mensaje menciona un LUGAR y el contexto sugiere
         // consulta de cobertura, FORZAR validar_cobertura.
+        // 🛡️ SKIP si la cobertura YA fue validada exitosamente — evita re-forzar
+        // cuando el cliente repite la ciudad en sus datos de envío.
+        $coberturaYaOk = $estadoActualBd?->cobertura_validada ?? false;
         $lugarEnMsg = $preguntaProducto ? null : $this->extraerLugarDelMensaje($message);
-        $contextoEsCobertura = !$preguntaProducto && $lugarEnMsg && $this->contextoSugiereCobertura($conversacion, $message);
+        $contextoEsCobertura = !$preguntaProducto && !$coberturaYaOk && $lugarEnMsg && $this->contextoSugiereCobertura($conversacion, $message);
 
         // 🛡️ Caso especial: el bot acaba de pedir clarificación de ciudad
         // y el cliente está respondiendo. Si el cliente dice un lugar
         // CUALQUIERA (incluso sin frases típicas), DEBE disparar validación
         // — sino el LLM puede alucinar.
-        $respondiendoAClarificacionCiudad = !$preguntaProducto && $lugarEnMsg && $this->botPidioClarificacionCiudad($conversacion);
+        // Pero SOLO si la cobertura no está ya validada.
+        $respondiendoAClarificacionCiudad = !$preguntaProducto && !$coberturaYaOk && $lugarEnMsg && $this->botPidioClarificacionCiudad($conversacion);
         if ($respondiendoAClarificacionCiudad) {
             $contextoEsCobertura = true;
         }
-
-        $estadoActualBd     = app(\App\Services\EstadoPedidoService::class)->obtener($conversacion);
         $estadoYaCompleto   = $estadoActualBd && $estadoActualBd->estaCompleto() && !$estadoActualBd->confirmado_at;
         $datosFinalesEnTexto= !$forzarConfirmar && !$contextoEsCobertura && !$preguntaProducto && $this->clienteDaDatosFinales($message);
 
