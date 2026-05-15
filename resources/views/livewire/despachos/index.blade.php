@@ -71,6 +71,157 @@
                 </a>
             @endif
 
+            {{-- 🗺️ MAPA con la ruta del domiciliario --}}
+            @if(!empty($rutaDomi['paradas']))
+                <div class="mt-4 rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                    <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                        <div class="flex items-center gap-2">
+                            <i class="fa-solid fa-map-location-dot text-brand"></i>
+                            <h3 class="text-sm font-bold text-slate-700">Mapa de tu ruta</h3>
+                        </div>
+                        <span class="text-xs text-slate-500" id="ruta-info-domi-osrm">
+                            {{ count($rutaDomi['paradas']) }} parada(s)
+                        </span>
+                    </div>
+                    <div wire:ignore
+                         id="mapa-domiciliario"
+                         data-ruta="{{ json_encode($rutaDomi) }}"
+                         style="height: 380px; background:#e5e7eb;"></div>
+                </div>
+
+                @script
+                <script>
+                    (function () {
+                        window.navegarHasta = window.navegarHasta || function (lat, lng) {
+                            window.open('https://www.google.com/maps/dir/?api=1&destination=' + lat + ',' + lng + '&travelmode=driving', '_blank');
+                        };
+                        window.navegarWaze = window.navegarWaze || function (lat, lng) {
+                            window.open('https://www.waze.com/ul?ll=' + lat + ',' + lng + '&navigate=yes', '_blank');
+                        };
+
+                        function buildPopupDomi(p, num) {
+                            var html = '<div style="min-width:200px;font-family:sans-serif">';
+                            html += '<b>#' + num + ' ' + (p.nombre || 'Cliente') + '</b><br>';
+                            if (p.direccion) html += '📍 ' + p.direccion + '<br>';
+                            if (p.barrio) html += '🏘️ ' + p.barrio + '<br>';
+                            if (p.telefono) html += '📞 ' + p.telefono + '<br>';
+                            html += '💵 $' + Number(p.total || 0).toLocaleString('es-CO');
+                            html += '<div style="margin-top:10px;display:flex;gap:4px;flex-wrap:wrap">';
+                            html += '<button onclick="navegarHasta(' + p.lat + ',' + p.lng + ')" '
+                                 + 'style="background:#4285f4;color:#fff;border:none;border-radius:6px;padding:6px 10px;font-size:11px;font-weight:600;cursor:pointer">'
+                                 + '🧭 Google Maps</button>';
+                            html += '<button onclick="navegarWaze(' + p.lat + ',' + p.lng + ')" '
+                                 + 'style="background:#33ccff;color:#fff;border:none;border-radius:6px;padding:6px 10px;font-size:11px;font-weight:600;cursor:pointer">'
+                                 + '🚗 Waze</button>';
+                            if (p.telefono) {
+                                html += '<a href="https://wa.me/' + String(p.telefono).replace(/\D/g,'') + '" target="_blank" '
+                                     + 'style="background:#25d366;color:#fff;border-radius:6px;padding:6px 10px;font-size:11px;font-weight:600;text-decoration:none">'
+                                     + '💬 WA</a>';
+                            }
+                            html += '</div></div>';
+                            return html;
+                        }
+
+                        function iniciarMapaDomi() {
+                            var el = document.getElementById('mapa-domiciliario');
+                            if (!el) return true;
+                            if (!window.google || !window.google.maps) return false;
+
+                            var data;
+                            try { data = JSON.parse(el.dataset.ruta || '{}'); }
+                            catch (e) { return true; }
+
+                            if (!data.paradas || data.paradas.length === 0) return true;
+
+                            if (el._gmap) {
+                                if (el._gmapMarkers) el._gmapMarkers.forEach(function(m){ m.setMap(null); });
+                                if (el._gmapPath) el._gmapPath.setMap(null);
+                            }
+                            el.innerHTML = '';
+                            el._gmapMarkers = [];
+
+                            var puntos = [];
+                            if (data.origen) puntos.push({lat: parseFloat(data.origen.lat), lng: parseFloat(data.origen.lng)});
+                            data.paradas.forEach(function(p){ puntos.push({lat: parseFloat(p.lat), lng: parseFloat(p.lng)}); });
+
+                            var map = new google.maps.Map(el, {
+                                zoom: 13,
+                                center: puntos[0] || {lat: 6.34, lng: -75.56},
+                                mapTypeControl: true,
+                                streetViewControl: true,
+                                fullscreenControl: true,
+                            });
+                            el._gmap = map;
+
+                            if (data.origen) {
+                                var sedeMarker = new google.maps.Marker({
+                                    position: {lat: parseFloat(data.origen.lat), lng: parseFloat(data.origen.lng)},
+                                    map: map,
+                                    label: { text: '🏪', fontSize: '20px' },
+                                    icon: { path: google.maps.SymbolPath.CIRCLE, scale: 18, fillColor: '#10b981', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 3 },
+                                    title: data.origen.nombre || 'Origen'
+                                });
+                                el._gmapMarkers.push(sedeMarker);
+                            }
+
+                            data.paradas.forEach(function(p, i) {
+                                var num = i + 1;
+                                var marker = new google.maps.Marker({
+                                    position: {lat: parseFloat(p.lat), lng: parseFloat(p.lng)},
+                                    map: map,
+                                    label: { text: String(num), color: '#fff', fontWeight: 'bold', fontSize: '14px' },
+                                    icon: { path: google.maps.SymbolPath.CIRCLE, scale: 16, fillColor: '#d68643', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 3 },
+                                    title: 'Pedido ' + num + ' · ' + (p.nombre || '')
+                                });
+                                var info = new google.maps.InfoWindow({ content: buildPopupDomi(p, num) });
+                                marker.addListener('click', function(){ info.open(map, marker); });
+                                el._gmapMarkers.push(marker);
+                            });
+
+                            if (puntos.length === 1) {
+                                map.setCenter(puntos[0]); map.setZoom(15);
+                            } else {
+                                var bounds = new google.maps.LatLngBounds();
+                                puntos.forEach(function(p){ bounds.extend(p); });
+                                map.fitBounds(bounds, { top: 50, right: 50, bottom: 50, left: 50 });
+                            }
+
+                            if (puntos.length > 1) {
+                                var ds = new google.maps.DirectionsService();
+                                var dr = new google.maps.DirectionsRenderer({
+                                    map: map, suppressMarkers: true,
+                                    polylineOptions: { strokeColor: '#d68643', strokeWeight: 5, strokeOpacity: 0.85 }
+                                });
+                                el._gmapPath = dr;
+                                var waypoints = puntos.slice(1, -1).map(function(p){ return {location: p, stopover: true}; });
+                                ds.route({
+                                    origin: puntos[0],
+                                    destination: puntos[puntos.length - 1],
+                                    waypoints: waypoints,
+                                    travelMode: google.maps.TravelMode.DRIVING
+                                }, function(result, status) {
+                                    if (status === 'OK' && result) {
+                                        dr.setDirections(result);
+                                        var totalDur = 0, totalDist = 0;
+                                        result.routes[0].legs.forEach(function(l){ totalDur += l.duration.value; totalDist += l.distance.value; });
+                                        var info = document.getElementById('ruta-info-domi-osrm');
+                                        if (info) info.textContent = (totalDist/1000).toFixed(1) + ' km · ~' + Math.round(totalDur/60) + ' min';
+                                    }
+                                });
+                            }
+                            return true;
+                        }
+
+                        var intentos = 0;
+                        var intv = setInterval(function () {
+                            intentos++;
+                            if (iniciarMapaDomi() || intentos > 60) clearInterval(intv);
+                        }, 250);
+                    })();
+                </script>
+                @endscript
+            @endif
+
             {{-- Lista de pedidos del domiciliario con código y botones --}}
             @if($pedidosOrdenados->count() > 0)
                 <div class="mt-4">

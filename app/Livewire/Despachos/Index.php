@@ -859,6 +859,7 @@ class Index extends Component
         $statsDomi = ['pendientes' => 0, 'entregados' => 0, 'total_hoy' => 0];
         $rutaOptimaUrl = null;
         $pedidosOrdenados = collect();
+        $rutaDomi = ['origen' => null, 'paradas' => []];
 
         if ($esDomiciliarioPuro) {
             $domiActual = $this->domiciliarioActual();
@@ -902,6 +903,30 @@ class Index extends Component
                     $rutaSrv = app(\App\Services\RutaOptimizadaService::class);
                     $pedidosOrdenados = $rutaSrv->optimizar($pedidosActivos, $origLat, $origLng);
                     $rutaOptimaUrl = $rutaSrv->urlGoogleMaps($pedidosOrdenados, $origLat, $origLng);
+
+                    // 🗺️ Datos para el mapa Google del domiciliario
+                    if ($origLat && $origLng) {
+                        $rutaDomi['origen'] = [
+                            'lat'     => (float) $origLat,
+                            'lng'     => (float) $origLng,
+                            'nombre'  => $domiActual->lat_actual ? 'Tu ubicación' : 'Sede',
+                            'detalle' => '',
+                        ];
+                    }
+                    $rutaDomi['paradas'] = $pedidosOrdenados
+                        ->filter(fn($p) => $p->lat && $p->lng)
+                        ->values()
+                        ->map(fn($p) => [
+                            'id'        => $p->id,
+                            'lat'       => (float) $p->lat,
+                            'lng'       => (float) $p->lng,
+                            'nombre'    => $p->cliente_nombre ?: 'Cliente',
+                            'direccion' => $p->direccion ?: '',
+                            'barrio'    => $p->barrio ?: '',
+                            'telefono'  => $p->telefono_contacto ?: $p->telefono_whatsapp ?: '',
+                            'total'     => (float) $p->total,
+                        ])
+                        ->all();
                 } catch (\Throwable $e) {
                     \Log::warning('No se pudo calcular ruta domiciliario: ' . $e->getMessage());
                 }
@@ -923,6 +948,7 @@ class Index extends Component
             'statsDomi',
             'rutaOptimaUrl',
             'pedidosOrdenados',
+            'rutaDomi',
         ))->layout('layouts.app');
     }
 }
