@@ -1007,7 +1007,7 @@ class EstadoPedidoService
         // nombre "Pollo Deshuesada Kilo" y contamina cliente_nombre en BD.
         // 🛡️ Las palabras de logística (sede, principal, recoger, etc) también:
         // sin ellas, "Para recoger en sede principal" → "En Sede Principal".
-        $stopwords = '/^(hola|buenas|buenos\s+dias|tardes|noches|gracias|si|no|listo|dale|quiero|necesito|tienes|tienen|tienes\s+un|para|de|del|los|las|el|la|por\s+favor|domicilio|despacho|recoger|aqui|alla|que|qué|cómo|como|cuanto|cuánto|cual|cuál|en|con|sin|mi|tu|su|este|esta|nombre|llamo|llamó|llaman|soy|llamado|llamada|apellido|apellidos'
+        $stopwords = '/^(hola|buenas|buenos\s+dias|tardes|noches|gracias|si|no|listo|dale|quiero|necesito|tienes|tienen|tienes\s+un|para|de|del|los|las|el|la|por\s+favor|domicilio|despacho|recoger|aqui|alla|que|qué|cómo|como|cuanto|cuánto|cual|cuál|en|con|sin|mi|tu|su|este|esta|nombre|llamo|llamó|llaman|soy|llamado|llamada|apellido|apellidos|es|son|fue|era|son|favor|atte'
             . '|carne|pollo|res|cerdo|pescado|pechuga|chuleta|costilla|lomo|chorizo|salchicha|huevo|leche|queso|jam[oó]n|tocineta|tocino|molida|molido'
             . '|filete|milanesa|hamburguesa|morcilla|chicharr[oó]n|pernil|muslo|alas|kg|kilo|kilos|libra|libras|bandeja|paquete|combo|promo|deshuesada|deshuesado|ahumada|ahumado'
             . '|solomito|sobrebarriga|barriguero|tilapia|trucha|pavo|cordero|bistek|bistec'
