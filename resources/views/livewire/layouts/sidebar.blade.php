@@ -75,7 +75,7 @@
                     ['name' => 'Reportes',          'icon' => 'fa-chart-line',         'route' => 'reportes.index',         'badge' => null, 'permission' => 'reportes.ver'],
                     ['name' => 'Rutas',             'icon' => 'fa-route',              'route' => 'rutas.index',            'badge' => null, 'permission' => 'despachos.gestionar'],
                     ['name' => 'Encuestas',         'icon' => 'fa-star-half-stroke',   'route' => 'encuestas.index',        'badge' => null, 'permission' => 'reportes.ver'],
-                    ['name' => 'Pagos',             'icon' => 'fa-credit-card',        'route' => 'pagos.index',            'badge' => null, 'permission' => 'reportes.ver'],
+                    ['name' => 'Pagos',             'icon' => 'fa-credit-card',        'route' => 'pagos.index',            'badge' => null, 'permission' => 'pagos_clientes.ver'],
                     ['name' => 'ANS Tiempos',       'icon' => 'fa-stopwatch',          'route' => 'ans.index',              'badge' => null, 'permission' => 'ans.gestionar'],
                     ['name' => 'Bot WhatsApp',      'icon' => 'fa-robot',              'route' => 'configuracion.bot',      'badge' => null, 'permission' => 'bot.configurar'],
                     ['name' => 'Meta WhatsApp',     'icon' => 'fa-brands fa-whatsapp', 'route' => 'meta-whatsapp.index',    'badge' => 'NUEVO', 'permission' => 'bot.configurar'],

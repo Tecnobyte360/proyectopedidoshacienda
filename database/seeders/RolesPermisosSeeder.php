@@ -53,6 +53,10 @@ class RolesPermisosSeeder extends Seeder
         'departamentos' => [
             'departamentos.gestionar',
         ],
+        'pagos_clientes' => [
+            'pagos_clientes.ver',        // ver transacciones Wompi del tenant
+            'pagos_clientes.gestionar',  // reembolsos / reintentos / cambiar estado
+        ],
         'chat' => [
             'chat.usar',
         ],
@@ -150,6 +154,7 @@ class RolesPermisosSeeder extends Seeder
             'campanas.ver', 'campanas.gestionar',
             'usuarios_internos.ver', 'usuarios_internos.gestionar',
             'departamentos.gestionar',
+            'pagos_clientes.ver', 'pagos_clientes.gestionar',
         ]);
 
         $operador = Role::firstOrCreate(['name' => 'operador', 'guard_name' => 'web']);

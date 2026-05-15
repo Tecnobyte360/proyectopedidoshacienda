@@ -146,7 +146,7 @@ Route::middleware(['no_super_sin_imp'])->group(function () {
         ->middleware('permission:despachos.gestionar')
         ->name('rutas.index');
     Route::get('/pagos', \App\Livewire\Pagos\Index::class)
-        ->middleware('permission:reportes.ver')
+        ->middleware('permission:pagos_clientes.ver|pagos_clientes.gestionar')
         ->name('pagos.index');
     Route::get('/clientes',          ClientesIndex::class)->middleware('permission:clientes.ver')->name('clientes.index');
     Route::get('/conversaciones',    ConversacionesIndex::class)->middleware('permission:conversaciones.ver')->name('conversaciones.index');
