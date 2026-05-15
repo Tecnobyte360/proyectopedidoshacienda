@@ -1,3 +1,19 @@
+@if(!$domiActual)
+<div class="px-4 lg:px-10 py-12 max-w-2xl mx-auto text-center">
+    <div class="rounded-2xl border-2 border-amber-200 bg-amber-50 p-8">
+        <i class="fa-solid fa-triangle-exclamation text-5xl text-amber-500 mb-4"></i>
+        <h2 class="text-xl font-bold text-slate-800 mb-2">Tu cuenta no está vinculada</h2>
+        <p class="text-sm text-slate-600 mb-4">
+            Tu usuario tiene rol <strong>domiciliario</strong> pero todavía NO está vinculado a un
+            perfil en el sistema. Pide a un administrador que te vincule en
+            <code class="bg-white px-1 rounded">/domiciliarios</code>.
+        </p>
+        <p class="text-xs text-slate-500">
+            Mientras tanto, contacta a tu encargado para que reciba los pedidos manualmente.
+        </p>
+    </div>
+</div>
+@else
 <div class="px-4 lg:px-10 py-6 max-w-3xl mx-auto" wire:poll.30s>
 
     {{-- Card de bienvenida con stats --}}
@@ -138,3 +154,4 @@
         <i class="fa-solid fa-arrows-rotate"></i> Se actualiza cada 30 segundos
     </p>
 </div>
+@endif

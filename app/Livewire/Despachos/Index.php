@@ -765,7 +765,8 @@ class Index extends Component
         }
 
         // Si es solo domiciliario → vista simplificada con ruta óptima
-        if ($esDomiciliarioPuro && $domiActual) {
+        // (siempre, incluso si domiActual es null — la vista muestra mensaje)
+        if ($esDomiciliarioPuro) {
             return view('livewire.despachos.index-domiciliario', compact(
                 'domiActual', 'statsDomi', 'rutaOptimaUrl', 'pedidosOrdenados'
             ))->layout('layouts.app');

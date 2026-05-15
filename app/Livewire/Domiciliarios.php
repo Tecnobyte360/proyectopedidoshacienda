@@ -23,6 +23,8 @@ class Domiciliarios extends Component
     public string $usuario_email    = '';
     public string $usuario_password = '';
     public ?int   $usuario_id_actual = null;
+    // Selector de usuario existente (para vincular sin crear nuevo)
+    public ?int   $usuario_id_seleccionar = null;
 
     public string $buscar = '';
 
@@ -76,10 +78,14 @@ class Domiciliarios extends Component
                 ->orderBy('nombre')
                 ->get();
 
+            // Usuarios disponibles con rol 'domiciliario' (para selector)
+            $usuariosDom = \App\Models\User::role('domiciliario')->orderBy('email')->get();
+
             return view('livewire.domiciliarios', [
                 'domiciliarios' => $domiciliarios,
                 'zonasDisponibles' => ZonaCobertura::activas()->orderBy('nombre')->get(),
                 'paises'           => Domiciliario::PAISES,
+                'usuariosDom'      => $usuariosDom,
             ])->layout('layouts.app');
 
         } catch (\Throwable $e) {
@@ -185,8 +191,22 @@ class Domiciliarios extends Component
 
             $domiciliario->zonas()->sync($this->zonasIds);
 
-            // 🔐 Crear/vincular usuario para que pueda ingresar al sistema
-            if (!empty(trim($this->usuario_email))) {
+            // 🔐 Opción A: vincular un usuario existente seleccionado
+            if (!empty($this->usuario_id_seleccionar)) {
+                $userExist = \App\Models\User::find($this->usuario_id_seleccionar);
+                if ($userExist) {
+                    if (!$userExist->hasRole('domiciliario')) {
+                        $userExist->assignRole('domiciliario');
+                    }
+                    $domiciliario->update(['user_id' => $userExist->id]);
+                    $this->dispatch('notify', [
+                        'type' => 'success',
+                        'message' => "Usuario {$userExist->email} vinculado ✓",
+                    ]);
+                }
+            }
+            // 🔐 Opción B: Crear nuevo usuario con email/password
+            elseif (!empty(trim($this->usuario_email))) {
                 $email = mb_strtolower(trim($this->usuario_email));
                 $user = \App\Models\User::where('email', $email)->first();
 
@@ -310,5 +330,6 @@ class Domiciliarios extends Component
         $this->usuario_email     = '';
         $this->usuario_password  = '';
         $this->usuario_id_actual = null;
+        $this->usuario_id_seleccionar = null;
     }
 }

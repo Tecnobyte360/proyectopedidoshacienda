@@ -313,13 +313,29 @@
                     <div class="rounded-xl border-2 border-indigo-200 bg-indigo-50/30 p-4">
                         <label class="block text-sm font-bold text-indigo-700 mb-2">
                             <i class="fa-solid fa-key mr-1"></i>
-                            Credenciales del sistema (para que ingrese y vea SUS pedidos)
+                            Acceso al sistema (para que entre y vea SUS pedidos)
                         </label>
-                        <p class="text-[11px] text-slate-600 mb-3">
-                            Si llenas estos campos, el domiciliario podrá entrar al sistema desde
-                            <code>/login</code> y ver solo sus pedidos asignados en <code>/despachos</code>.
-                            Se le asignará el rol <strong>domiciliario</strong> automáticamente.
-                        </p>
+
+                        @if(($usuariosDom ?? collect())->count() > 0)
+                            <div class="mb-3 rounded-lg bg-white border border-slate-200 p-3">
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">
+                                    Opción A · Vincular un usuario existente:
+                                </label>
+                                <select wire:model="usuario_id_seleccionar"
+                                        class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none">
+                                    <option value="">— Elegir usuario con rol 'domiciliario' —</option>
+                                    @foreach($usuariosDom as $u)
+                                        <option value="{{ $u->id }}">{{ $u->email }} ({{ $u->name }})</option>
+                                    @endforeach
+                                </select>
+                                <p class="text-[10px] text-slate-500 mt-1">
+                                    Solo aparecen usuarios que YA tienen rol 'domiciliario'. Crea uno desde /usuarios primero.
+                                </p>
+                            </div>
+                            <p class="text-center text-[10px] text-slate-400 my-2">— O —</p>
+                        @endif
+
+                        <p class="text-[11px] text-slate-600 mb-2"><strong>Opción B</strong> · Crear un usuario nuevo desde aquí:</p>
 
                         @if($modoEdicion && $usuario_id_actual)
                             <div class="mb-3 rounded-lg bg-emerald-100 border border-emerald-200 p-2 text-xs text-emerald-800">
