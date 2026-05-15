@@ -393,6 +393,43 @@ class Index extends Component
 
     public function seleccionar(int $id): void
     {
+        // 🛡️ Validar que el usuario PUEDE ver esta conversación (filtro por departamento).
+        // Previene acceso directo por URL a conversaciones de otros departamentos.
+        $user = auth()->user();
+        if ($user && !$user->puedeVerTodasLasConversaciones()) {
+            $deptoIds = $user->departamentos()->pluck('departamentos.id')->all();
+            $conv = ConversacionWhatsapp::select('id', 'departamento_id')->find($id);
+
+            if (!$conv) {
+                $this->dispatch('notify', ['type' => 'error', 'message' => 'Conversación no encontrada.']);
+                return;
+            }
+
+            // Si la conversación está derivada a un depto que NO es del agente → bloquear
+            if ($conv->departamento_id && !in_array($conv->departamento_id, $deptoIds, true)) {
+                Log::warning('🛡️ Intento de acceso cross-depto bloqueado', [
+                    'user_id'         => $user->id,
+                    'conv_id'         => $id,
+                    'depto_conv'      => $conv->departamento_id,
+                    'deptos_usuario'  => $deptoIds,
+                ]);
+                $this->dispatch('notify', [
+                    'type'    => 'error',
+                    'message' => '⛔ Esta conversación pertenece a otro departamento.',
+                ]);
+                return;
+            }
+
+            // Si la conversación no está derivada y el agente tiene depto(s) asignado(s) → bloquear
+            if (is_null($conv->departamento_id) && !empty($deptoIds)) {
+                $this->dispatch('notify', [
+                    'type'    => 'warning',
+                    'message' => 'Esta conversación aún no ha sido derivada a tu departamento.',
+                ]);
+                return;
+            }
+        }
+
         $this->conversacionActivaId = $id;
         $this->nuevoMensaje = '';
 
@@ -1239,8 +1276,8 @@ class Index extends Component
     {
         // 🛡️ Filtro por departamento del usuario actual.
         // - Si el usuario puede ver todas (super-admin / chat.ver-todos / sin dept) → no filtra.
-        // - Si tiene departamentos asignados → ve SOLO conversaciones derivadas a esos departamentos
-        //   más las NO derivadas (departamento_id NULL → conversaciones del bot sin derivar).
+        // - Si tiene departamentos asignados → ve SOLO conversaciones derivadas a SUS departamentos.
+        //   (Las conversaciones sin derivar las atiende el bot; los admins/supervisores las ven todas).
         $user = auth()->user();
         $deptoIds = $user?->departamentos()->pluck('departamentos.id')->all() ?? [];
         $verTodas = $user?->puedeVerTodasLasConversaciones() ?? true;
@@ -1249,12 +1286,8 @@ class Index extends Component
             ->with(['cliente', 'departamento'])
             ->where('estado', '!=', 'archivada')
             ->when(!$verTodas && !empty($deptoIds), function ($q) use ($deptoIds) {
-                // Mostrar: conversaciones del depto del usuario + conversaciones sin derivar (NULL).
-                // De esta forma agentes pueden tomar conversaciones nuevas Y atender las suyas.
-                $q->where(function ($qq) use ($deptoIds) {
-                    $qq->whereIn('departamento_id', $deptoIds)
-                       ->orWhereNull('departamento_id');
-                });
+                // Estricto: solo conversaciones derivadas a algún departamento del agente.
+                $q->whereIn('departamento_id', $deptoIds);
             })
             ->when($this->busqueda, function ($q) {
                 $q->where(function ($qq) {
