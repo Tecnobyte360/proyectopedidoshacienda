@@ -554,6 +554,24 @@ class Index extends Component
         }
     }
 
+    public function mount()
+    {
+        // 🛵 Si el usuario es SOLO domiciliario (no admin/gerente/operador),
+        //    redirigirlo a su portal personal donde ve ruta optimizada y
+        //    botones Ir/Entregado. Mejor UX y reusa el flujo existente.
+        $user = auth()->user();
+        if ($user && $user->hasRole('domiciliario')
+            && !$user->hasRole('admin')
+            && !$user->hasRole('gerente')
+            && !$user->hasRole('operador')
+            && !$user->hasRole('super-admin')) {
+            $dom = \App\Models\Domiciliario::where('user_id', $user->id)->first();
+            if ($dom && !empty($dom->token_acceso)) {
+                return redirect()->away($dom->urlPortal());
+            }
+        }
+    }
+
     public function render()
     {
         $pedidos = $this->pedidosEnPreparacion()->get();

@@ -45,7 +45,7 @@ class AuthController extends Controller
             $roles = $user->getRoleNames();
             if ($roles->count() === 1) {
                 $unicoRol = $roles->first();
-                if ($unicoRol === 'domiciliario') return '/rutas';
+                if ($unicoRol === 'domiciliario') return '/despachos'; // /despachos redirige al portal personal
                 if ($unicoRol === 'chat-only')   return '/chat';
             }
         } catch (\Throwable $e) {}
