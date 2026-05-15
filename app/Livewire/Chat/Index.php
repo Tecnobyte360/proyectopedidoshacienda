@@ -428,12 +428,34 @@ class Index extends Component
     {
         if (!$this->conversacionActivaId) return;
 
-        ConversacionWhatsapp::find($this->conversacionActivaId)
-            ?->update(['atendida_por_humano' => false]);
+        $conv = ConversacionWhatsapp::find($this->conversacionActivaId);
+        if (!$conv) return;
+
+        // 🏢 Al devolver al bot, también limpiamos la derivación al departamento
+        // para que la conversación vuelva al pool general (visible para todos
+        // los agentes de nuevo, hasta que el bot la derive otra vez si aplica).
+        $deptoAnterior = $conv->departamento_id;
+        $conv->update([
+            'atendida_por_humano' => false,
+            'departamento_id'     => null,
+            'derivada_at'         => null,
+        ]);
+
+        // Registrar en mensajes del sistema para auditoria
+        try {
+            \App\Models\MensajeWhatsapp::create([
+                'conversacion_id'  => $conv->id,
+                'rol'              => 'system',
+                'tipo'             => 'system_note',
+                'contenido'        => $deptoAnterior
+                    ? '🔄 Conversación devuelta al bot (departamento anterior liberado).'
+                    : '🔄 Conversación devuelta al bot.',
+            ]);
+        } catch (\Throwable $e) { /* ignore */ }
 
         $this->dispatch('notify', [
             'type'    => 'info',
-            'message' => '🤖 El bot retoma la conversación.',
+            'message' => '🤖 El bot retoma la conversación. Volvió al área general.',
         ]);
     }
 

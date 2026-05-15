@@ -208,7 +208,15 @@
                         </div>
                     @endif
                     <div class="min-w-0">
-                        <div class="font-semibold text-slate-800 truncate">{{ $conversacionActiva->cliente?->nombre ?? 'Cliente' }}</div>
+                        <div class="font-semibold text-slate-800 truncate flex items-center gap-2">
+                            <span>{{ $conversacionActiva->cliente?->nombre ?? 'Cliente' }}</span>
+                            @if($conversacionActiva->departamento)
+                                <span class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 border border-violet-200"
+                                      title="Derivada al departamento {{ $conversacionActiva->departamento->nombre }}">
+                                    {!! $conversacionActiva->departamento->icono_emoji ?: '🏢' !!} {{ $conversacionActiva->departamento->nombre }}
+                                </span>
+                            @endif
+                        </div>
                         <div class="text-xs text-slate-500 font-mono">
                             {{ $conversacionActiva->telefono_normalizado }}
                             @if($conversacionActiva->atendida_por_humano)
@@ -244,9 +252,13 @@
 
                     @if($conversacionActiva->atendida_por_humano)
                         <button wire:click="devolverAlBot"
-                                title="El bot retomará automáticamente la conversación"
+                                wire:confirm="¿Devolver al bot? La conversación volverá al área general y otros agentes podrán verla."
+                                title="El bot retomará automáticamente la conversación. Si estaba derivada a un departamento, también se libera."
                                 class="rounded-xl bg-emerald-500 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-600 transition">
                             <i class="fa-solid fa-robot mr-1"></i> Devolver al bot
+                            @if($conversacionActiva->departamento_id)
+                                <span class="ml-1 text-[10px] opacity-90">(libera depto)</span>
+                            @endif
                         </button>
                     @else
                         <button wire:click="tomarControl"

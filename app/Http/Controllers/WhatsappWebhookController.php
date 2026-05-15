@@ -9026,13 +9026,23 @@ PROMPT;
 
     /**
      * Devuelve el control al bot.
+     * 🏢 También libera la derivación a departamento para que la conversación
+     * vuelva al pool general (todos los agentes pueden tomarla de nuevo).
      */
     public function devolverAlBot(Request $request)
     {
         $data = $request->validate(['conversacion_id' => 'required|integer|exists:conversaciones_whatsapp,id']);
         $conv = \App\Models\ConversacionWhatsapp::findOrFail($data['conversacion_id']);
-        $conv->update(['atendida_por_humano' => false]);
-        return response()->json(['status' => 'ok', 'atendida_por_humano' => false]);
+        $conv->update([
+            'atendida_por_humano' => false,
+            'departamento_id'     => null,
+            'derivada_at'         => null,
+        ]);
+        return response()->json([
+            'status'              => 'ok',
+            'atendida_por_humano' => false,
+            'departamento_id'     => null,
+        ]);
     }
 
     /*
