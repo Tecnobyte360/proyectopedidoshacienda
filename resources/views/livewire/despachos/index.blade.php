@@ -205,6 +205,8 @@
         </div>
     @endif
 
+    {{-- 🔒 PANEL ADMIN: Solo visible para administradores (no domiciliarios puros) --}}
+    @if(!$esDomiciliarioPuro)
     {{-- HEADER --}}
     <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
@@ -951,6 +953,7 @@
             </div>
         </div>
     @endif
+    @endif {{-- /!$esDomiciliarioPuro --}}
 
     {{-- ════════════════════════════════════════════════════════════════
          💰 MODAL: MARCAR PAGO RECIBIDO
