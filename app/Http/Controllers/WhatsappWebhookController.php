@@ -7373,7 +7373,7 @@ TXT;
                 : 'Pedido creado automáticamente desde WhatsApp',
             'total'                 => $totalCalculado,
             'notas'                 => $notas,
-            'cliente_nombre'        => $orderData['customer_name'] ?? $name,
+            'cliente_nombre'        => $nombreSeguro,
             'direccion'             => $direccionGuardar,
             'barrio'                => $barrioGuardar,
             'lat'                   => $esPickup ? null : $pedidoLat,

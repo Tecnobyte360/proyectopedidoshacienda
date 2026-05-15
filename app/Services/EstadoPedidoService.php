@@ -186,20 +186,86 @@ class EstadoPedidoService
     {
         $estado = $this->obtener($conv);
 
-        // Productos: solo actualiza si vienen con datos válidos
+        // Productos: merge inteligente — NUNCA reemplazar ciegamente el carrito.
+        // El LLM puede enviar un confirmar_pedido con menos productos de los que
+        // el cliente ya agregó vía agregar_producto_al_pedido. Si el carrito de BD
+        // tiene más items que lo que envía el LLM, conservamos el de BD.
         if (!empty($orderData['products'])) {
             $productosLimpios = array_values(array_filter(
                 $orderData['products'],
                 fn ($p) => !empty($p['name'])
             ));
             if (!empty($productosLimpios)) {
-                $estado->productos = $productosLimpios;
+                $carritoActual = is_array($estado->productos) ? $estado->productos : [];
+
+                if (empty($carritoActual)) {
+                    // No había carrito — usar lo que manda el LLM
+                    $estado->productos = $productosLimpios;
+                } elseif (count($productosLimpios) >= count($carritoActual)) {
+                    // El LLM mandó igual o más items — confiar en su versión
+                    $estado->productos = $productosLimpios;
+                } else {
+                    // 🛡️ El LLM mandó MENOS productos que el carrito actual.
+                    // Conservar el carrito de BD (fuente de verdad) y solo
+                    // actualizar cantidades si coinciden por nombre/código.
+                    Log::warning('🛡️ confirmar_pedido trajo menos productos que el carrito — conservando BD', [
+                        'conv_id'        => $conv->id,
+                        'carrito_bd'     => count($carritoActual),
+                        'llm_products'   => count($productosLimpios),
+                    ]);
+                    // No reemplazar: $estado->productos se mantiene intacto
+                }
             }
         }
 
-        // Identificación
+        // Identificación — 🛡️ Validar que customer_name parezca un nombre real,
+        // no un producto ("Pechuga de pollo"), ni email, ni teléfono, ni cédula.
         if (!empty($orderData['customer_name'])) {
-            $estado->nombre_cliente = trim($orderData['customer_name']);
+            $candidato = trim($orderData['customer_name']);
+            $esNombreValido = true;
+
+            // Rechazar emails
+            if (filter_var($candidato, FILTER_VALIDATE_EMAIL) !== false || str_contains($candidato, '@')) {
+                $esNombreValido = false;
+            }
+            // Rechazar teléfonos
+            if (preg_match('/^\+?\d[\d\s\-]{6,}$/', $candidato) === 1) {
+                $esNombreValido = false;
+            }
+            // Rechazar cédulas
+            if (preg_match('/^\d{6,12}$/', $candidato) === 1) {
+                $esNombreValido = false;
+            }
+            // Debe tener letras y largo razonable
+            if (!preg_match('/[a-záéíóúñ]/iu', $candidato) || mb_strlen($candidato) < 2 || mb_strlen($candidato) > 80) {
+                $esNombreValido = false;
+            }
+            // 🛡️ Rechazar nombres que parecen productos alimenticios
+            $palabrasProducto = [
+                'carne', 'pollo', 'res', 'cerdo', 'pescado', 'pechuga', 'chuleta',
+                'costilla', 'lomo', 'chorizo', 'salchicha', 'huevo', 'leche',
+                'queso', 'jamón', 'jamon', 'tocineta', 'tocino', 'molida', 'molido',
+                'filete', 'milanesa', 'hamburguesa', 'morcilla', 'chicharrón',
+                'chicharron', 'pernil', 'muslo', 'ala ', 'alas', 'kg', 'libra',
+                'bandeja', 'paquete', 'combo', 'promo',
+            ];
+            $candidatoLower = mb_strtolower($candidato);
+            foreach ($palabrasProducto as $palabra) {
+                if (str_contains($candidatoLower, $palabra)) {
+                    $esNombreValido = false;
+                    break;
+                }
+            }
+
+            if ($esNombreValido) {
+                $estado->nombre_cliente = $candidato;
+            } else {
+                Log::warning('🛡️ customer_name rechazado en captarDeOrderData (no parece nombre real)', [
+                    'conv_id'        => $conv->id,
+                    'customer_name'  => $candidato,
+                    'nombre_actual'  => $estado->nombre_cliente,
+                ]);
+            }
         }
         if (!empty($orderData['cedula'])) {
             $cedulaCandidata = trim((string) $orderData['cedula']);
@@ -1578,8 +1644,14 @@ class EstadoPedidoService
         if (!empty($estado->productos)) {
             $prods = collect($estado->productos)->map(fn ($p) =>
                 ($p['quantity'] ?? 1) . ' ' . ($p['unit'] ?? '') . ' ' . ($p['name'] ?? '')
-            )->implode(', ');
-            $partes[] = "  • Productos: {$prods}";
+                . ' — $' . number_format((float) ($p['subtotal'] ?? ((float)($p['quantity'] ?? 0) * (float)($p['precio_unitario'] ?? 0))), 0, ',', '.')
+            )->implode("\n    ");
+            $subtotalCarrito = collect($estado->productos)->sum(fn ($p) =>
+                (float) ($p['subtotal'] ?? ((float)($p['quantity'] ?? 0) * (float)($p['precio_unitario'] ?? 0)))
+            );
+            $partes[] = "  • Productos (" . count($estado->productos) . " items):\n    {$prods}";
+            $partes[] = "  • Subtotal carrito: $" . number_format($subtotalCarrito, 0, ',', '.');
+            $partes[] = "  ⚠️ IMPORTANTE: estos son los productos REALES del carrito. NO omitas ni cambies ninguno al confirmar.";
         }
 
         if ($estado->metodo_entrega) {
