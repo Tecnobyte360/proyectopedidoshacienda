@@ -359,12 +359,25 @@ class Index extends Component
 
     private function pedidosEnPreparacion()
     {
-        return Pedido::query()
+        $query = Pedido::query()
             ->with(['detalles', 'zonaCobertura', 'sede', 'domiciliario'])
             ->where('estado', Pedido::ESTADO_EN_PREPARACION)
-            ->when($this->sedeId, fn ($q) => $q->where('sede_id', $this->sedeId))
-            ->orderBy('zona_cobertura_id')
-            ->orderBy('fecha_pedido');
+            ->when($this->sedeId, fn ($q) => $q->where('sede_id', $this->sedeId));
+
+        // 🛵 Si el usuario es DOMICILIARIO, solo ve SUS pedidos asignados.
+        // Buscamos el Domiciliario vinculado al user_id del usuario logueado.
+        $user = auth()->user();
+        if ($user && $user->hasRole('domiciliario') && !$user->hasRole('admin') && !$user->hasRole('gerente')) {
+            $dom = \App\Models\Domiciliario::where('user_id', $user->id)->first();
+            if ($dom) {
+                $query->where('domiciliario_id', $dom->id);
+            } else {
+                // Sin domiciliario vinculado → no ve nada
+                $query->whereRaw('1=0');
+            }
+        }
+
+        return $query->orderBy('zona_cobertura_id')->orderBy('fecha_pedido');
     }
 
     /**

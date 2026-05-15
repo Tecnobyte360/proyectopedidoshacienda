@@ -15,6 +15,7 @@ class Domiciliario extends Model
 
     protected $fillable = [
         'tenant_id',
+        'user_id',
         'nombre',
         'pais_codigo',
         'telefono',
@@ -87,6 +88,14 @@ class Domiciliario extends Model
         ['codigo' => '+56',  'nombre' => 'Chile',          'flag' => '🇨🇱'],
         ['codigo' => '+55',  'nombre' => 'Brasil',         'flag' => '🇧🇷'],
     ];
+
+    /**
+     * Usuario del sistema asociado (para login con rol 'domiciliario').
+     */
+    public function user(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(\App\Models\User::class);
+    }
 
     public function pedidos(): HasMany
     {

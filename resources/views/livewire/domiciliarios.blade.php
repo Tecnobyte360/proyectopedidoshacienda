@@ -309,6 +309,42 @@
                         </div>
                     </div>
 
+                    {{-- 🔐 Credenciales de acceso al sistema (rol domiciliario) --}}
+                    <div class="rounded-xl border-2 border-indigo-200 bg-indigo-50/30 p-4">
+                        <label class="block text-sm font-bold text-indigo-700 mb-2">
+                            <i class="fa-solid fa-key mr-1"></i>
+                            Credenciales del sistema (para que ingrese y vea SUS pedidos)
+                        </label>
+                        <p class="text-[11px] text-slate-600 mb-3">
+                            Si llenas estos campos, el domiciliario podrá entrar al sistema desde
+                            <code>/login</code> y ver solo sus pedidos asignados en <code>/despachos</code>.
+                            Se le asignará el rol <strong>domiciliario</strong> automáticamente.
+                        </p>
+
+                        @if($modoEdicion && $usuario_id_actual)
+                            <div class="mb-3 rounded-lg bg-emerald-100 border border-emerald-200 p-2 text-xs text-emerald-800">
+                                <i class="fa-solid fa-circle-check mr-1"></i>
+                                Ya tiene usuario asociado: <strong>{{ $usuario_email }}</strong>
+                                · Puedes actualizar email/password si quieres.
+                            </div>
+                        @endif
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">Email</label>
+                                <input type="email" wire:model="usuario_email" placeholder="domiciliario@empresa.com"
+                                       class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">
+                                    Contraseña {{ $modoEdicion && $usuario_id_actual ? '(opcional · solo si cambia)' : '' }}
+                                </label>
+                                <input type="text" wire:model="usuario_password" placeholder="mínimo 6 caracteres"
+                                       class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-mono focus:border-indigo-500 focus:outline-none">
+                            </div>
+                        </div>
+                    </div>
+
                     {{-- Zonas de cobertura asignadas --}}
                     <div class="rounded-xl border border-slate-200 p-4">
                         <div class="flex items-center justify-between mb-2">

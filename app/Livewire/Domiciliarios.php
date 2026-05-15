@@ -19,6 +19,11 @@ class Domiciliarios extends Component
     public bool   $activo       = true;
     public array  $zonasIds     = [];
 
+    // 🔐 Credenciales para que el domiciliario ingrese al sistema
+    public string $usuario_email    = '';
+    public string $usuario_password = '';
+    public ?int   $usuario_id_actual = null;
+
     public string $buscar = '';
 
     public bool $modalAbierto = false;
@@ -40,6 +45,8 @@ class Domiciliarios extends Component
             'activo'      => ['boolean'],
             'zonasIds'    => ['array'],
             'zonasIds.*'  => ['integer', 'exists:zonas_cobertura,id'],
+            'usuario_email'    => ['nullable', 'email', 'max:255'],
+            'usuario_password' => ['nullable', 'string', 'min:6', 'max:60'],
         ];
     }
 
@@ -116,6 +123,9 @@ class Domiciliarios extends Component
             $this->estado         = $domiciliario->estado ?? 'disponible';
             $this->activo         = (bool) $domiciliario->activo;
             $this->zonasIds       = $domiciliario->zonas->pluck('id')->toArray();
+            $this->usuario_id_actual = $domiciliario->user_id;
+            $this->usuario_email     = $domiciliario->user?->email ?? '';
+            $this->usuario_password  = ''; // nunca prellenar password
 
             $this->modoEdicion = true;
             $this->modalAbierto = true;
@@ -174,6 +184,45 @@ class Domiciliarios extends Component
             }
 
             $domiciliario->zonas()->sync($this->zonasIds);
+
+            // 🔐 Crear/vincular usuario para que pueda ingresar al sistema
+            if (!empty(trim($this->usuario_email))) {
+                $email = mb_strtolower(trim($this->usuario_email));
+                $user = \App\Models\User::where('email', $email)->first();
+
+                if (!$user) {
+                    if (empty($this->usuario_password)) {
+                        $this->dispatch('notify', [
+                            'type' => 'error',
+                            'message' => 'Para crear el usuario debes definir una contraseña.',
+                        ]);
+                        return;
+                    }
+                    $user = \App\Models\User::create([
+                        'name'      => $this->nombre,
+                        'email'     => $email,
+                        'password'  => \Illuminate\Support\Facades\Hash::make($this->usuario_password),
+                        'activo'    => true,
+                        'tenant_id' => $domiciliario->tenant_id,
+                    ]);
+                } elseif (!empty($this->usuario_password)) {
+                    // Si dio password en update, actualizar
+                    $user->update(['password' => \Illuminate\Support\Facades\Hash::make($this->usuario_password)]);
+                }
+
+                // Asegurar rol 'domiciliario'
+                if (!$user->hasRole('domiciliario')) {
+                    $user->assignRole('domiciliario');
+                }
+
+                // Vincular al domiciliario
+                $domiciliario->update(['user_id' => $user->id]);
+
+                $this->dispatch('notify', [
+                    'type' => 'success',
+                    'message' => "Usuario {$email} vinculado al domiciliario ✓",
+                ]);
+            }
 
             $this->cerrarModal();
 
@@ -258,5 +307,8 @@ class Domiciliarios extends Component
         $this->estado         = 'disponible';
         $this->activo         = true;
         $this->zonasIds       = [];
+        $this->usuario_email     = '';
+        $this->usuario_password  = '';
+        $this->usuario_id_actual = null;
     }
 }

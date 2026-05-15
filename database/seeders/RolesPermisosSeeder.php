@@ -52,7 +52,8 @@ class RolesPermisosSeeder extends Seeder
             'zonas.gestionar',
         ],
         'despachos' => [
-            'despachos.gestionar',
+            'despachos.gestionar',     // gestor: ve y asigna todos
+            'despachos.ver_propios',   // domiciliario: solo SUS pedidos asignados
         ],
         'reportes' => [
             'reportes.ver',
@@ -149,6 +150,16 @@ class RolesPermisosSeeder extends Seeder
         $cajero->syncPermissions([
             'pedidos.ver', 'pedidos.editar',
             'clientes.ver',
+        ]);
+
+        // 🛵 Rol del sistema: DOMICILIARIO.
+        // Solo ve sus pedidos asignados en /despachos y puede actualizar
+        // estados (en camino → entregado). NO ve pedidos de otros, NO ve
+        // configuración, productos, reportes, etc.
+        $domiciliario = Role::firstOrCreate(['name' => 'domiciliario', 'guard_name' => 'web']);
+        $domiciliario->syncPermissions([
+            'despachos.ver_propios',
+            'pedidos.ver', // solo los suyos por el filtro de Despachos\Index
         ]);
 
         // 💬 Rol del sistema: SOLO acceso al chat en vivo.
