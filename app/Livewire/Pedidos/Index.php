@@ -700,6 +700,43 @@ class Index extends Component
 
             $usuario = Auth::user();
 
+            // ─── 1. INVALIDAR ENLACE DE PAGO WOMPI ────────────────────────
+            // Mover la referencia actual al historial para que el link viejo
+            // apunte a una referencia huérfana. Si llega un pago posterior,
+            // el webhook lo rechazará por estado_pago = 'anulado'.
+            $teniaLinkPago = false;
+            if (!empty($pedido->wompi_reference)) {
+                $teniaLinkPago = true;
+                $historial = $pedido->wompi_referencias_historial ?? [];
+                if (!in_array($pedido->wompi_reference, $historial, true)) {
+                    $historial[] = $pedido->wompi_reference;
+                }
+                $pedido->wompi_referencias_historial = $historial;
+                $pedido->wompi_reference = null;
+
+                \Log::info('🚫 Link de pago Wompi invalidado por cancelación', [
+                    'pedido_id'          => $pedido->id,
+                    'ref_invalidada'     => end($historial),
+                ]);
+            }
+
+            // ─── 2. MARCAR PAGO COMO ANULADO ──────────────────────────────
+            // El guard del WompiWebhookController bloquea pagos en pedidos
+            // con estado_pago = 'anulado', incluso si la referencia aún
+            // existiese en el historial.
+            if ($pedido->estado_pago !== 'aprobado') {
+                $pedido->estado_pago = 'anulado';
+            }
+
+            $pedido->observacion_estado = trim(
+                (string) $pedido->observacion_estado
+                . ' | Cancelado por ' . ($usuario?->name ?? 'Sistema')
+                . ' el ' . now()->format('Y-m-d H:i')
+                . ($teniaLinkPago ? ' — Link de pago Wompi invalidado.' : '')
+            );
+            $pedido->saveQuietly(); // guardar antes de cambiarEstado para que los campos estén listos
+
+            // ─── 3. CAMBIAR ESTADO + NOTIFICAR WHATSAPP ───────────────────
             $pedido->cambiarEstado(
                 Pedido::ESTADO_CANCELADO,
                 'Tu pedido fue cancelado.',
@@ -708,6 +745,7 @@ class Index extends Component
                 $usuario?->id
             );
 
+            // Liberar domiciliario
             if ($pedido->domiciliario) {
                 $pedido->domiciliario->estado = 'disponible';
                 $pedido->domiciliario->save();
@@ -717,7 +755,8 @@ class Index extends Component
 
             $this->dispatch('notify', [
                 'type' => 'success',
-                'message' => "Pedido #{$pedido->id} cancelado.",
+                'message' => "Pedido #{$pedido->id} cancelado."
+                    . ($teniaLinkPago ? ' Link de pago Wompi invalidado.' : ''),
             ]);
         } catch (\Throwable $e) {
             report($e);

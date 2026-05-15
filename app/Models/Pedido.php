@@ -519,7 +519,10 @@ MSG;
                 . "En un momento te paso una encuesta cortica para saber cómo estuvo todo.",
 
             self::ESTADO_CANCELADO =>
-            "Hola {$primerNombre}, tu pedido fue cancelado.\n"
+            "Hola {$primerNombre}, tu pedido *#{$this->id}* fue cancelado.\n\n"
+                . ($this->estado_pago === 'anulado'
+                    ? "⚠️ Si recibiste un link de pago, *ya no es válido*. Por favor no lo uses.\n\n"
+                    : '')
                 . "Si necesitas ayuda o quieres pedir otra cosa, aquí estoy 🙏",
 
             default => null,
