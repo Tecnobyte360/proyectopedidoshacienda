@@ -3942,6 +3942,15 @@ TXT;
             'cambia', 'cambialo', 'cambiame',
             'mejor no', 'no asi', 'no asesor', 'no humano',
             'sigamos', 'continua', 'seguimos',
+            // 🔄 Cliente quiere seguir con SU pedido
+            'deseo seguir', 'quiero seguir', 'sigo con', 'continuemos',
+            'mi pedido', 'con mi pedido', 'el pedido',
+            'agrega', 'agregame', 'agrega tambien', 'agregame tambien',
+            'pidir mas', 'pedir mas', 'quiero mas', 'agrega tambien',
+            'y tambien', 'tambien quiero', 'tambien pidame', 'tambien pideme',
+            'sumale', 'añade', 'anade', 'anademe',
+            // Cliente sigue pidiendo productos = quiere seguir con bot
+            'quero pedir', 'quiero pedir', 'pideme', 'me das', 'regalame',
         ];
         foreach ($patrones as $p) {
             if (str_contains($msg, $p)) return true;
