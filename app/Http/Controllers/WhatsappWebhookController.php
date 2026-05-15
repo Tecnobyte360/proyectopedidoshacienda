@@ -2199,11 +2199,26 @@ TXT;
             $rawArgs = $toolCalls[0]['function']['arguments'] ?? '{}';
             $args    = json_decode($rawArgs, true) ?: [];
 
-            $direccion = trim((string) ($args['direccion'] ?? ''));
-            $barrio    = trim((string) ($args['barrio'] ?? ''));
-            $ciudad    = trim((string) ($args['ciudad'] ?? 'Bello'));
+            $direccion = $this->sanitizarPlaceholderLLM((string) ($args['direccion'] ?? ''));
+            $barrio    = $this->sanitizarPlaceholderLLM((string) ($args['barrio'] ?? ''));
+            $ciudad    = $this->sanitizarPlaceholderLLM((string) ($args['ciudad'] ?? 'Bello'));
+            if ($ciudad === '') $ciudad = 'Bello';
 
             Log::info('🗺️ Tool call validar_cobertura', compact('from', 'direccion', 'barrio', 'ciudad'));
+
+            // 🛡️ Si después de sanitizar la dirección queda vacía, NO ejecutar
+            // la validación — el LLM mandó <UNKNOWN> o similar. Pedir clarificación.
+            if ($direccion === '') {
+                Log::warning('🛡️ validar_cobertura recibió direccion vacía/placeholder — pidiendo al cliente', [
+                    'from' => $from,
+                    'args_originales' => $args,
+                ]);
+                $reply = "Necesito que me digas tu dirección exacta (calle, número y barrio) para validar si te llega el domicilio 🏠";
+                $conversationHistory[] = ['role' => 'assistant', 'content' => $reply];
+                Cache::put($cacheKey, $conversationHistory, now()->addMinutes(45));
+                $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_ASSISTANT, $reply);
+                return $reply;
+            }
 
             $sedeId    = $this->obtenerSedeIdDesdeConexion($connectionId);
             $resultado = $this->validarCoberturaDireccion($direccion, $barrio, $ciudad, $sedeId, $from);
@@ -4116,6 +4131,36 @@ TXT;
         }
 
         return false;
+    }
+
+    /**
+     * 🛡️ Sanitiza placeholders que el LLM (Claude/GPT) mete por error en strings.
+     * Casos típicos:
+     *   - "<UNKNOWN>" / "<unknown>" / "<DESCONOCIDO>"
+     *   - "<placeholder>", "<TBD>", "<XXX>"
+     *   - "null" / "N/A" como string literal
+     *   - "" (string vacío después de trim)
+     *
+     * Si detecta uno, devuelve string vacío. Si no, devuelve el valor trimeado.
+     */
+    private function sanitizarPlaceholderLLM(?string $valor): string
+    {
+        $v = trim((string) ($valor ?? ''));
+        if ($v === '') return '';
+
+        // Patrones de placeholder: <ALGO> con letras/símbolos dentro
+        if (preg_match('/^\s*<[A-Z_\-\s]+>\s*$/i', $v)) return '';
+
+        // Strings literales que indican "no sé"
+        $placeholdersLiterales = [
+            'null', 'undefined', 'n/a', 'na', '?', '??', '???',
+            'desconocido', 'desconocida', 'unknown', 'tbd',
+            'sin dato', 'sin datos', 'sin info', 'sin información',
+            'no se', 'no sé', 'no aplica', 'placeholder', 'no especificado',
+        ];
+        if (in_array(mb_strtolower($v), $placeholdersLiterales, true)) return '';
+
+        return $v;
     }
 
     private function detectarFalsaConfirmacion(string $reply): ?string
@@ -6993,16 +7038,22 @@ TXT;
             Log::info('🛡️ pickup_time ignorado (formato no válido)', ['raw' => $rawPickup]);
         }
         $telefonoWhatsapp = $this->normalizarTelefono($from);
-        // 🛡️ orderData['phone'] puede ser "" string vacío — usar coalesce real
-        $telContactoRaw = trim((string) ($orderData['phone'] ?? ''));
+        // 🛡️ orderData['phone'] puede ser "" string vacío o "<UNKNOWN>" — sanitizar
+        $telContactoRaw = $this->sanitizarPlaceholderLLM((string) ($orderData['phone'] ?? ''));
         if ($telContactoRaw === '') $telContactoRaw = $from;
         $telefonoContacto = $this->normalizarTelefono($telContactoRaw);
+
+        // 🛡️ Sanitizar customer_name de placeholders ANTES de cualquier otra cosa
+        if (isset($orderData['customer_name'])) {
+            $orderData['customer_name'] = $this->sanitizarPlaceholderLLM((string) $orderData['customer_name']);
+        }
         // Última red de seguridad: si quedó vacío, usar el WhatsApp
         if (empty($telefonoContacto)) $telefonoContacto = $telefonoWhatsapp;
 
-        // Resolver dirección y barrio desde la respuesta del bot
-        $direccion = trim((string) ($orderData['address'] ?? ''));
-        $barrio    = trim((string) ($orderData['neighborhood'] ?? ''));
+        // Resolver dirección y barrio desde la respuesta del bot.
+        // 🛡️ Sanitizar placeholders del LLM (<UNKNOWN>, null, N/A, etc.)
+        $direccion = $this->sanitizarPlaceholderLLM((string) ($orderData['address'] ?? ''));
+        $barrio    = $this->sanitizarPlaceholderLLM((string) ($orderData['neighborhood'] ?? ''));
 
         // 🧠 Detectar ciudad: priorizar campos explícitos del bot.
         // El bot LLM puede mandar la ciudad en cualquiera de estos campos:
@@ -7010,7 +7061,7 @@ TXT;
         //   - 'location'  (lo que está mandando OpenAI con el schema actual)
         //   - 'ciudad'    (por si en español)
         // Si nada viene, la INFIERE desde el texto de la dirección.
-        $ciudadOrden = trim((string) (
+        $ciudadOrden = $this->sanitizarPlaceholderLLM((string) (
             $orderData['city']
             ?? $orderData['location']
             ?? $orderData['ciudad']

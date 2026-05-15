@@ -353,13 +353,19 @@ class EstadoPedidoService
                 }
             }
         } elseif (!empty($orderData['address'])) {
-            $estado->metodo_entrega = ConversacionPedidoEstado::METODO_DOMICILIO;
-            $estado->direccion = trim($orderData['address']);
-            if (!empty($orderData['neighborhood'])) {
-                $estado->barrio = trim($orderData['neighborhood']);
-            }
-            if (!empty($orderData['location'])) {
-                $estado->ciudad = trim($orderData['location']);
+            // 🛡️ Filtrar placeholders del LLM (<UNKNOWN>, null, etc.)
+            $direccionLimpia = $this->limpiarPlaceholderLLM((string) $orderData['address']);
+            if ($direccionLimpia !== '') {
+                $estado->metodo_entrega = ConversacionPedidoEstado::METODO_DOMICILIO;
+                $estado->direccion = $direccionLimpia;
+                if (!empty($orderData['neighborhood'])) {
+                    $barrioLimpio = $this->limpiarPlaceholderLLM((string) $orderData['neighborhood']);
+                    if ($barrioLimpio !== '') $estado->barrio = $barrioLimpio;
+                }
+                if (!empty($orderData['location'])) {
+                    $ciudadLimpia = $this->limpiarPlaceholderLLM((string) $orderData['location']);
+                    if ($ciudadLimpia !== '') $estado->ciudad = $ciudadLimpia;
+                }
             }
         }
 
@@ -1069,6 +1075,20 @@ class EstadoPedidoService
      * Rechaza strings que contienen nombres de productos (estática + catálogo)
      * o palabras de logística (sede, dirección, sucursal, etc).
      */
+    /**
+     * 🛡️ Sanitiza placeholders del LLM. Si el valor es <UNKNOWN>, null, N/A, etc.
+     * devuelve string vacío. Si es válido, devuelve trimeado.
+     */
+    private function limpiarPlaceholderLLM(?string $valor): string
+    {
+        $v = trim((string) ($valor ?? ''));
+        if ($v === '') return '';
+        if (preg_match('/^\s*<[A-Z_\-\s]+>\s*$/i', $v)) return '';
+        $literales = ['null','undefined','n/a','na','?','??','???','desconocido','desconocida','unknown','tbd','sin dato','sin datos','sin info','sin información','no se','no sé','no aplica','placeholder','no especificado'];
+        if (in_array(mb_strtolower($v), $literales, true)) return '';
+        return $v;
+    }
+
     private function pareceNombrePersona(string $candidato): bool
     {
         $candidatoLower = mb_strtolower(trim($candidato));
