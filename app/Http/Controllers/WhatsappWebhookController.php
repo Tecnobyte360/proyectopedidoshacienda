@@ -6403,6 +6403,45 @@ TXT;
 
             if ($integLookupActivo) {
                 $cedulaOrder = trim((string) ($orderData['cedula'] ?? ''));
+
+                // 🔄 Fallback 1: buscar en estado del pedido (ConversacionPedidoEstado)
+                if (($cedulaOrder === '' || !preg_match('/^\d{6,12}$/', $cedulaOrder)) && $conversacion) {
+                    $estadoFb = app(\App\Services\EstadoPedidoService::class)->obtener($conversacion);
+                    if ($estadoFb && !empty($estadoFb->cedula) && preg_match('/^\d{6,12}$/', $estadoFb->cedula)) {
+                        $cedulaOrder = $estadoFb->cedula;
+                        $orderData['cedula'] = $cedulaOrder;
+                        Log::info('🔄 Cédula recuperada del estado del pedido', ['cedula' => $cedulaOrder, 'from' => $from]);
+                    }
+                }
+
+                // 🔄 Fallback 2: buscar en el cliente existente por teléfono
+                if (($cedulaOrder === '' || !preg_match('/^\d{6,12}$/', $cedulaOrder)) && $from) {
+                    $telNorm = preg_replace('/\D+/', '', $from);
+                    $clienteFb = \App\Models\Cliente::where('telefono_normalizado', $telNorm)->first();
+                    if ($clienteFb && !empty($clienteFb->cedula) && preg_match('/^\d{6,12}$/', $clienteFb->cedula)) {
+                        $cedulaOrder = $clienteFb->cedula;
+                        $orderData['cedula'] = $cedulaOrder;
+                        Log::info('🔄 Cédula recuperada del cliente existente', ['cedula' => $cedulaOrder, 'from' => $from]);
+                    }
+                }
+
+                // 🔄 Fallback 3: buscar en el historial de mensajes del cliente (regex)
+                if (($cedulaOrder === '' || !preg_match('/^\d{6,12}$/', $cedulaOrder)) && $conversacion) {
+                    $mensajesCliente = $conversacion->mensajes()
+                        ->where('rol', 'user')
+                        ->latest()
+                        ->limit(10)
+                        ->pluck('contenido');
+                    foreach ($mensajesCliente as $msg) {
+                        if (preg_match('/c[eé]dula\s*(?:es\s*)?(\d{6,12})/iu', $msg, $m)) {
+                            $cedulaOrder = $m[1];
+                            $orderData['cedula'] = $cedulaOrder;
+                            Log::info('🔄 Cédula extraída del historial de mensajes', ['cedula' => $cedulaOrder, 'from' => $from, 'msg' => $msg]);
+                            break;
+                        }
+                    }
+                }
+
                 if ($cedulaOrder === '' || !preg_match('/^\d{6,12}$/', $cedulaOrder)) {
                     Log::warning('🚨 GUARD: pedido bloqueado — cédula NO presente o inválida', [
                         'from'   => $from,
