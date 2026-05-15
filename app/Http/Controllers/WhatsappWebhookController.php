@@ -2482,6 +2482,50 @@ TXT;
 
             Log::info('🎯 Tool call derivar_a_departamento', compact('from', 'nombreDpto', 'razon', 'urgencia'));
 
+            // 🛡️ GUARD DETERMINISTA: rechazar derivaciones por preguntas de preparación/variante.
+            // El LLM tiende a derivar cuando el cliente pregunta cosas como "me lo pueden picar?",
+            // "me lo aliñan?", "al estilo guiso?", "deshuesarlo?". Esas son consultas SIMPLES
+            // que el bot debe responder con honestidad — NO son casos para humano.
+            $razonLower = mb_strtolower(\Illuminate\Support\Str::ascii($razon));
+            $msgLower   = mb_strtolower(\Illuminate\Support\Str::ascii($message));
+            $patronesPreparacion = [
+                'preparacion', 'preparar especial', 'preparacion especial',
+                'picar', 'pican', 'pique', 'molerlo', 'molerla', 'moler ', 'mole ',
+                'alinarlo', 'alinarla', 'alinear', 'sazon',
+                'deshuesarlo', 'deshuesarla', 'deshuesar',
+                'porcionar', 'fileterar', 'cortar especial',
+                'al estilo', 'estilo guiso', 'estilo sancocho', 'estilo asado',
+                'apanarlo', 'apanarla', 'apanar',
+                'marinarlo', 'marinarla', 'marinar',
+                // Casos genéricos: cliente pregunta si pueden hacer algo extra al producto
+                'variante', 'preparacion del', 'preparacion de la',
+            ];
+            $esConsultaPreparacion = false;
+            foreach ($patronesPreparacion as $p) {
+                if (str_contains($razonLower, $p) || str_contains($msgLower, $p)) {
+                    $esConsultaPreparacion = true; break;
+                }
+            }
+
+            if ($esConsultaPreparacion) {
+                Log::warning('🛡️ DERIVACIÓN BLOQUEADA — es consulta de preparación, NO caso para humano', [
+                    'from'   => $from,
+                    'razon'  => $razon,
+                    'mensaje'=> mb_substr($message, 0, 100),
+                ]);
+
+                // Reemplazar respuesta: el bot debe decir honestamente si lo hacen o no.
+                // No hacemos derivación, no marcamos atendida_por_humano, no asignamos departamento.
+                $reply = "Solo te entregamos el producto como está en el catálogo 😊 No hacemos preparaciones especiales (picar, aliñar, marinar, deshuesar). ¿Te lo agrego así como viene o prefieres mirar otra opción?";
+                $conversationHistory[] = ['role' => 'assistant', 'content' => $reply];
+                Cache::put($cacheKey, $conversationHistory, now()->addMinutes(45));
+                $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_ASSISTANT, $reply, [
+                    'tipo' => 'guard_derivacion_bloqueada',
+                    'meta' => ['razon_llm' => $razon, 'patron_detectado' => true],
+                ]);
+                return $reply;
+            }
+
             $depto = \App\Models\Departamento::where('activo', true)
                 ->where('nombre', $nombreDpto)
                 ->first();
