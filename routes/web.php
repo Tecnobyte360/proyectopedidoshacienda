@@ -28,6 +28,7 @@ use App\Livewire\Chat\Index as ChatIndex;
 use App\Livewire\Alertas\Index as AlertasIndex;
 use App\Livewire\Felicitaciones\Index as FelicitacionesIndex;
 use App\Livewire\Encuestas\Index as EncuestasIndex;
+use App\Livewire\EstadosWhatsapp\Index as EstadosWhatsappIndex;
 use App\Livewire\Sedes\Index as SedesIndex;
 use App\Livewire\Usuarios\Index as UsuariosIndex;
 use App\Livewire\Roles\Index as RolesIndex;
@@ -79,7 +80,8 @@ Route::middleware(['no_super_sin_imp'])->group(function () {
     Route::get('/productos',     ProductosIndex::class)->middleware('permission:productos.ver')->name('productos.index');
     Route::get('/categorias',    CategoriasIndex::class)->middleware('permission:categorias.gestionar')->name('categorias.index');
     Route::get('/cortes',        CortesIndex::class)->middleware('permission:productos.ver')->name('cortes.index');
-    Route::get('/campanas',      CampanasIndex::class)->middleware('permission:campanas.ver|campanas.gestionar')->name('campanas.index');
+    Route::get('/campanas',           CampanasIndex::class)->middleware('permission:campanas.ver|campanas.gestionar')->name('campanas.index');
+    Route::get('/estados-whatsapp',  EstadosWhatsappIndex::class)->middleware('permission:campanas.ver|campanas.gestionar')->name('estados-whatsapp.index');
     Route::get('/importaciones', ImportacionesIndex::class)->middleware('permission:productos.ver')->name('importaciones.index');
     Route::get('/integraciones', IntegracionesIndex::class)->middleware(['permission:productos.ver', 'role:super-admin'])->name('integraciones.index');
     Route::get('/integraciones/{integracion}/consultas', \App\Livewire\Integraciones\Consultas::class)
