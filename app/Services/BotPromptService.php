@@ -1278,6 +1278,46 @@ PROMPT;
                 $partes[] = "  • Cliente desde: {$cliente->created_at->locale('es')->isoFormat('D MMM YYYY')} ({$dias} días)";
             }
 
+            // 🎁 BENEFICIOS VIGENTES (envío gratis por cumpleaños, descuentos, etc.)
+            try {
+                $beneficios = \App\Models\BeneficioCliente::where('cliente_id', $cliente->id)
+                    ->vigentes() // scope: usado_at NULL Y vigente_hasta >= hoy
+                    ->orderBy('vigente_hasta')
+                    ->get();
+
+                if ($beneficios->isNotEmpty()) {
+                    $partes[] = "";
+                    $partes[] = "🎁 BENEFICIOS VIGENTES (APROVECHA EN ESTA CONVERSACIÓN):";
+                    foreach ($beneficios as $b) {
+                        $tipo = match ($b->tipo) {
+                            \App\Models\BeneficioCliente::TIPO_ENVIO_GRATIS    => '🚚 ENVÍO GRATIS',
+                            \App\Models\BeneficioCliente::TIPO_DESCUENTO_PCT   => '% Descuento ' . ($b->valor ?? 0) . '%',
+                            \App\Models\BeneficioCliente::TIPO_DESCUENTO_MONTO => '💰 Descuento $' . number_format($b->valor ?? 0, 0, ',', '.'),
+                            default => '🎁 ' . ucfirst(str_replace('_', ' ', $b->tipo)),
+                        };
+                        $origenTxt = match ($b->origen) {
+                            \App\Models\BeneficioCliente::ORIGEN_CUMPLEANOS => ' por su cumpleaños 🎂',
+                            \App\Models\BeneficioCliente::ORIGEN_PROMO      => ' por promoción',
+                            \App\Models\BeneficioCliente::ORIGEN_MANUAL     => ' otorgado por la empresa',
+                            default => '',
+                        };
+                        $venceTxt = $b->vigente_hasta
+                            ? ' (vence: ' . $b->vigente_hasta->locale('es')->isoFormat('D MMM') . ')'
+                            : '';
+                        $partes[] = "  • {$tipo}{$origenTxt}{$venceTxt}";
+                    }
+                    $partes[] = "";
+                    $partes[] = "  ⚠️ IMPORTANTE: si el cliente pide DOMICILIO y tiene ENVÍO GRATIS vigente, "
+                              . "menciónalo con cariño cuando muestres el resumen final: ";
+                    $partes[] = "    Ej: '🎁 Como es tu cumpleaños, *el domicilio te sale gratis*. ¡Disfruta!'";
+                    $partes[] = "  El sistema aplica el descuento AUTOMÁTICAMENTE al guardar el pedido — "
+                              . "tú solo lo cuentas al cliente para que se sienta querido.";
+                    $partes[] = "  Si es PICKUP (recoger en sede), NO menciones el envío gratis (no aplica).";
+                }
+            } catch (\Throwable $e) {
+                // Si falla, simplemente no incluir beneficios
+            }
+
             // Pedidos previos
             $pedidos = \App\Models\Pedido::where('telefono_whatsapp', $telNorm)
                 ->where('estado', '!=', 'cancelado')

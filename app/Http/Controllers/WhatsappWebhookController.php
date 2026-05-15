@@ -7539,16 +7539,21 @@ TXT;
         );
 
         // 🎁 ¿Tiene beneficio de envío gratis vigente? (ej. por cumpleaños)
+        // Aplica si es DOMICILIO (sin importar si la zona se resolvió o no — usamos
+        // el costo de envío calculado arriba, que ya incluye el fallback de la sede).
         $beneficioAplicado = null;
-        if ($zonaCobertura && (float) $costoEnvio > 0) {
+        $ahorroEnvio = 0;
+        if (!$esPickup && (float) $costoEnvio > 0) {
             $beneficioAplicado = $cliente->beneficioVigente(
                 \App\Models\BeneficioCliente::TIPO_ENVIO_GRATIS
             );
             if ($beneficioAplicado) {
+                $ahorroEnvio = (float) $costoEnvio;
                 Log::info('🎁 Beneficio envío gratis aplicado', [
                     'cliente_id'   => $cliente->id,
                     'beneficio_id' => $beneficioAplicado->id,
-                    'ahorro'       => $costoEnvio,
+                    'ahorro'       => $ahorroEnvio,
+                    'origen'       => $beneficioAplicado->origen,
                 ]);
                 $costoEnvio = 0;
             }
@@ -7726,12 +7731,47 @@ TXT;
             'no_encontrados'  => $productosNoEncontrados,
         ]);
 
-        // Marcar beneficio como usado si fue aplicado
+        // Marcar beneficio como usado si fue aplicado + trazabilidad en el pedido
         if ($beneficioAplicado) {
             $beneficioAplicado->update([
                 'usado_at'  => now(),
                 'pedido_id' => $pedido->id,
             ]);
+
+            // 🎁 Trazabilidad explícita: nota descriptiva + observación + relación
+            $origenTxt = match ($beneficioAplicado->origen) {
+                \App\Models\BeneficioCliente::ORIGEN_CUMPLEANOS => 'cumpleaños',
+                \App\Models\BeneficioCliente::ORIGEN_PROMO      => 'promoción',
+                \App\Models\BeneficioCliente::ORIGEN_MANUAL     => 'beneficio manual',
+                default => 'beneficio',
+            };
+            $ahorroStr = '$' . number_format($ahorroEnvio, 0, ',', '.');
+            $notaTraza = "🎁 ENVÍO GRATIS aplicado por {$origenTxt}. "
+                       . "Ahorro: {$ahorroStr}. "
+                       . "Beneficio ID: #{$beneficioAplicado->id}";
+
+            // Agregar a notas del pedido (concatenar si ya existe)
+            $notasActuales = trim((string) $pedido->notas);
+            $pedido->update([
+                'notas'                => $notasActuales !== ''
+                    ? $notasActuales . "\n\n" . $notaTraza
+                    : $notaTraza,
+                'beneficio_cliente_id' => $beneficioAplicado->id,
+                'observacion_estado'   => ($pedido->observacion_estado ? $pedido->observacion_estado . ' | ' : '')
+                    . "🎁 Envío gratis ({$origenTxt})",
+            ]);
+
+            // Registrar en historial de estados para auditoría completa
+            try {
+                $pedido->registrarHistorial(
+                    estadoNuevo: $pedido->estado,
+                    estadoAnterior: $pedido->estado,
+                    titulo: '🎁 Envío gratis aplicado',
+                    descripcion: "Beneficio de {$origenTxt} aplicado al pedido. Ahorro: {$ahorroStr}.",
+                );
+            } catch (\Throwable $e) {
+                Log::warning('No se pudo registrar historial de beneficio: ' . $e->getMessage());
+            }
         }
 
         DB::commit();
@@ -7908,10 +7948,38 @@ TXT;
         }
         $productosStr = implode("\n", $productosTxt);
 
-        // Beneficio aplicado (línea opcional)
+        // 🎁 Beneficio aplicado (línea opcional con mensaje cálido según origen)
         $beneficioTxt = '';
         if ($beneficioAplicado) {
-            $beneficioTxt = "🎁 *Envío GRATIS aplicado* (beneficio por {$beneficioAplicado->origen}) — no pagaste costo de envío.\n";
+            $ahorroBeneficio = 0;
+            // Calcular el ahorro: si el pedido tiene costo_envio en BD, ese es el ahorro original
+            // (porque se restauró a 0 con el beneficio). Si no, leemos del modelo.
+            try {
+                // El pedido ya fue guardado con costo_envio=0 por el beneficio.
+                // Para mostrar el ahorro, leemos del beneficio o del cliente.
+                $sede = $pedido->sede;
+                $costoOriginal = (float) ($sede?->cobertura_costo_envio ?? 0);
+                if ($costoOriginal === 0.0 && $pedido->zona_cobertura_id) {
+                    $zona = \App\Models\ZonaCobertura::find($pedido->zona_cobertura_id);
+                    $costoOriginal = (float) ($zona?->costo_envio ?? 0);
+                }
+                $ahorroBeneficio = $costoOriginal;
+            } catch (\Throwable $e) { /* ignore */ }
+
+            $ahorroStr = $ahorroBeneficio > 0
+                ? ' (ahorraste $' . number_format($ahorroBeneficio, 0, ',', '.') . ')'
+                : '';
+
+            $beneficioTxt = match ($beneficioAplicado->origen) {
+                \App\Models\BeneficioCliente::ORIGEN_CUMPLEANOS =>
+                    "🎂 *¡FELIZ CUMPLEAÑOS!* Tu *envío va GRATIS*{$ahorroStr} — disfruta de tu día con La Hacienda. 🎉\n",
+                \App\Models\BeneficioCliente::ORIGEN_PROMO =>
+                    "🎁 *Envío GRATIS aplicado* por promoción{$ahorroStr}.\n",
+                \App\Models\BeneficioCliente::ORIGEN_MANUAL =>
+                    "🎁 *Envío GRATIS aplicado* como regalo de la empresa{$ahorroStr}.\n",
+                default =>
+                    "🎁 *Envío GRATIS aplicado*{$ahorroStr}.\n",
+            };
         }
 
         // Bloque de pago (opcional, solo si Wompi está activo)
