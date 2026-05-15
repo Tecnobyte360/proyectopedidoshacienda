@@ -2114,55 +2114,76 @@ TXT;
         // ── 🛒 Tool call: agregar_producto_al_pedido ───────────────────────────
         // Persiste un producto en estado.productos con validación de catálogo
         // y conversión de unidades (libra → kg). Devuelve carrito actualizado.
-        if ($toolCalls && ($toolCalls[0]['function']['name'] ?? '') === 'agregar_producto_al_pedido') {
-            $rawArgs = $toolCalls[0]['function']['arguments'] ?? '{}';
-            $args    = json_decode($rawArgs, true) ?: [];
+        // 🛡️ BUG-PARALLEL: procesar TODOS los tool_calls de agregar_producto_al_pedido,
+        // no solo el primero. El cliente puede pedir "X y Y" y el LLM emite 2 calls.
+        $callsAgregar = $toolCalls
+            ? array_filter($toolCalls, fn ($tc) => ($tc['function']['name'] ?? '') === 'agregar_producto_al_pedido')
+            : [];
+        if (!empty($callsAgregar)) {
+            $resultados = [];
+            $toolResultBlocks = [];
+            $ultimoResultado = null;
 
-            $action   = strtolower(trim((string) ($args['action'] ?? 'add')));
-            $name     = trim((string) ($args['name'] ?? ''));
-            $code     = trim((string) ($args['code'] ?? ''));
-            $quantity = (float) ($args['quantity'] ?? 0);
-            $unitRaw  = strtolower(trim((string) ($args['unit'] ?? '')));
+            foreach ($callsAgregar as $tc) {
+                $rawArgs = $tc['function']['arguments'] ?? '{}';
+                $args    = json_decode($rawArgs, true) ?: [];
 
-            Log::info('🛒 Tool call agregar_producto_al_pedido', compact('from', 'action', 'name', 'quantity', 'unitRaw', 'code'));
+                $action   = strtolower(trim((string) ($args['action'] ?? 'add')));
+                $name     = trim((string) ($args['name'] ?? ''));
+                $code     = trim((string) ($args['code'] ?? ''));
+                $quantity = (float) ($args['quantity'] ?? 0);
+                $unitRaw  = strtolower(trim((string) ($args['unit'] ?? '')));
 
-            $resultado = $this->procesarAgregarProductoAlPedido(
-                $conversacion,
-                $action,
-                $name,
-                $code,
-                $quantity,
-                $unitRaw,
-                $connectionId
-            );
+                Log::info('🛒 Tool call agregar_producto_al_pedido', compact('from', 'action', 'name', 'quantity', 'unitRaw', 'code'));
 
-            // Respuesta de la tool para que el LLM la incorpore en su siguiente turn
+                $resultado = $this->procesarAgregarProductoAlPedido(
+                    $conversacion,
+                    $action,
+                    $name,
+                    $code,
+                    $quantity,
+                    $unitRaw,
+                    $connectionId
+                );
+                $resultados[] = $resultado;
+                $ultimoResultado = $resultado;
+
+                $toolResultBlocks[] = [
+                    'role'         => 'tool',
+                    'tool_call_id' => $tc['id'] ?? ('call_' . count($toolResultBlocks)),
+                    'name'         => 'agregar_producto_al_pedido',
+                    'content'      => json_encode($resultado, JSON_UNESCAPED_UNICODE),
+                ];
+            }
+
+            // El assistant_turn debe incluir SOLO los tool_calls que respondimos
+            // (para evitar tool_use huérfanos si hubieran otros tipos mezclados,
+            // los demás branches no llegarían aquí porque chequean toolCalls[0]).
             $toolResponseMessages = array_merge(
                 [['role' => 'system', 'content' => $systemPrompt]],
                 $conversationHistory,
                 [[
                     'role'       => 'assistant',
                     'content'    => null,
-                    'tool_calls' => $toolCalls,
+                    'tool_calls' => array_values($callsAgregar),
                 ]],
-                [[
-                    'role'         => 'tool',
-                    'tool_call_id' => $toolCalls[0]['id'] ?? 'call_1',
-                    'name'         => 'agregar_producto_al_pedido',
-                    'content'      => json_encode($resultado, JSON_UNESCAPED_UNICODE),
-                ]]
+                $toolResultBlocks
             );
 
             $followUp = $this->llamarOpenAI($toolResponseMessages);
             $reply    = $followUp['choices'][0]['message']['content']
-                ?? ($resultado['mensaje_sugerido'] ?? 'Listo, agregado a tu pedido ✅');
+                ?? ($ultimoResultado['mensaje_sugerido'] ?? 'Listo, agregado a tu pedido ✅');
 
             $conversationHistory[] = ['role' => 'assistant', 'content' => $reply];
             Cache::put($cacheKey, $conversationHistory, now()->addMinutes(45));
 
             $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_ASSISTANT, $reply, [
                 'tipo' => 'tool_call',
-                'meta' => ['tool' => 'agregar_producto_al_pedido', 'resultado' => $resultado],
+                'meta' => [
+                    'tool'        => 'agregar_producto_al_pedido',
+                    'count_calls' => count($callsAgregar),
+                    'resultados'  => $resultados,
+                ],
             ]);
 
             return $reply;
