@@ -93,7 +93,11 @@ class Index extends Component
         try {
             $mediaPath = null;
             if ($this->media) {
-                $mediaPath = $this->media->getRealPath();
+                // Guardar temporalmente para que la ruta sea accesible
+                $tmpName = 'status_' . time() . '.' . $this->media->getClientOriginalExtension();
+                $mediaPath = $this->media->storeAs('temp-status', $tmpName, 'local');
+                $mediaPath = storage_path('app/' . $mediaPath);
+                Log::info('EstadosWhatsapp: media guardado', ['path' => $mediaPath, 'exists' => file_exists($mediaPath)]);
             }
 
             $scheduled = null;
@@ -122,6 +126,11 @@ class Index extends Component
         } catch (\Throwable $e) {
             Log::error('EstadosWhatsapp crear: ' . $e->getMessage());
             $this->dispatch('notify', type: 'error', message: 'Error: ' . $e->getMessage());
+        } finally {
+            // Limpiar archivo temporal
+            if ($mediaPath && file_exists($mediaPath)) {
+                @unlink($mediaPath);
+            }
         }
 
         $this->cargandoAccion = false;
