@@ -809,64 +809,115 @@
                                 </td>
 
                                 {{-- 🛒 Productos del pedido (visible desde xl, antes era 2xl) --}}
-                                <td class="px-3 py-3.5 align-middle hidden xl:table-cell">
+                                <td class="px-3 py-3.5 align-middle hidden xl:table-cell relative">
                                     @php
                                         $detalles    = $pedido->detalles ?? collect();
                                         $totalLineas = $detalles->count();
-                                        // Tooltip texto plano completo (para hover)
-                                        $tooltipDetalle = $detalles->map(function ($d) {
-                                            $cant = (float) ($d->cantidad ?? 1);
-                                            $cantFmt = fmod($cant, 1) == 0 ? (int) $cant : rtrim(rtrim(number_format($cant, 3, '.', ''), '0'), '.');
-                                            $unit = $d->unidad ?? '';
-                                            $sub  = number_format((float) $d->subtotal, 0, ',', '.');
-                                            return "• {$cantFmt} {$unit} {$d->producto} — \${$sub}";
-                                        })->implode("\n");
+                                        $totalPedido = $detalles->sum('subtotal');
                                     @endphp
 
                                     @if($totalLineas > 0)
-                                        <div class="min-w-0 max-w-[280px]"
-                                             x-data="{ open: false }"
-                                             title="{{ $tooltipDetalle }}">
+                                        {{-- 🎯 Trigger: chip compacto que muestra resumen.
+                                              Al hover → muestra tooltip rico con tabla completa de productos. --}}
+                                        <div class="min-w-0 max-w-[260px] relative group"
+                                             x-data="{ hover: false }"
+                                             @mouseenter="hover = true"
+                                             @mouseleave="hover = false">
 
-                                            {{-- Lista compacta de TODOS los productos (siempre visible, sin truncar) --}}
-                                            <div class="space-y-0.5">
-                                                @foreach($detalles as $i => $d)
-                                                    @php
-                                                        $cant = (float) ($d->cantidad ?? 1);
-                                                        $cantFmt = fmod($cant, 1) == 0 ? (int) $cant : rtrim(rtrim(number_format($cant, 2, '.', ''), '0'), '.');
-                                                        $unit = $d->unidad ?? '';
-                                                        $sub  = number_format((float) $d->subtotal, 0, ',', '.');
-                                                    @endphp
-                                                    {{-- Mostrar siempre los primeros 3, el resto al expandir --}}
-                                                    <div class="flex items-start gap-1 text-[11px] leading-tight {{ $i >= 3 ? 'hidden' : '' }}"
-                                                         x-show="{{ $i >= 3 ? 'open' : 'true' }}"
-                                                         @if($i >= 3) x-cloak @endif>
-                                                        <span class="inline-flex items-center justify-center min-w-[24px] h-[16px] rounded bg-slate-900 text-white text-[9px] font-bold shrink-0 mt-0.5">
-                                                            {{ $cantFmt }}{{ in_array(strtolower($unit), ['kg','kl']) ? 'kg' : (in_array(strtolower($unit), ['lb','libra','libras']) ? 'lb' : '') }}
-                                                        </span>
-                                                        <span class="font-medium text-slate-800 leading-tight">
-                                                            {{ \Illuminate\Support\Str::limit($d->producto ?? 'item', 26) }}
-                                                        </span>
-                                                        <span class="ml-auto font-mono text-[10px] text-slate-500 whitespace-nowrap shrink-0">
-                                                            ${{ $sub }}
-                                                        </span>
-                                                    </div>
-                                                @endforeach
-
-                                                @if($totalLineas > 3)
-                                                    <button type="button" @click="open = !open"
-                                                            class="text-[10px] font-semibold text-brand hover:text-brand-dark mt-0.5 flex items-center gap-1"
-                                                            x-text="open ? '▴ Mostrar menos' : '▾ Ver {{ $totalLineas - 3 }} más'">
-                                                        ▾ Ver {{ $totalLineas - 3 }} más
-                                                    </button>
-                                                @endif
+                                            {{-- Chip resumen visible siempre --}}
+                                            <div class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/50 px-2.5 py-1.5 cursor-help hover:bg-brand-soft hover:border-brand/30 transition">
+                                                <span class="inline-flex items-center justify-center min-w-[22px] h-[22px] rounded-lg bg-brand text-white text-[10px] font-bold">
+                                                    {{ $totalLineas }}
+                                                </span>
+                                                <div class="flex flex-col">
+                                                    <span class="text-[11px] font-semibold text-slate-700 leading-tight">
+                                                        {{ $totalLineas === 1 ? 'producto' : 'productos' }}
+                                                    </span>
+                                                    <span class="text-[10px] text-slate-500 leading-tight">
+                                                        Pasa el cursor 👆
+                                                    </span>
+                                                </div>
+                                                <i class="fa-solid fa-eye text-[10px] text-slate-400 ml-1"></i>
                                             </div>
 
-                                            <div class="mt-1 pt-1 border-t border-slate-100 text-[10px] text-slate-400 flex items-center justify-between">
-                                                <span>
-                                                    <i class="fa-solid fa-cart-shopping text-[9px]"></i>
-                                                    {{ $totalLineas }} {{ $totalLineas === 1 ? 'producto' : 'productos' }}
-                                                </span>
+                                            {{-- 📋 Tooltip rico con tabla — aparece al hover --}}
+                                            <div x-show="hover"
+                                                 x-cloak
+                                                 x-transition:enter="transition ease-out duration-150"
+                                                 x-transition:enter-start="opacity-0 translate-y-1"
+                                                 x-transition:enter-end="opacity-100 translate-y-0"
+                                                 x-transition:leave="transition ease-in duration-100"
+                                                 x-transition:leave-start="opacity-100"
+                                                 x-transition:leave-end="opacity-0"
+                                                 class="absolute z-50 left-0 top-full mt-2 w-[380px] max-w-[90vw] rounded-xl border border-slate-200 bg-white shadow-2xl pointer-events-none">
+
+                                                {{-- Header del tooltip --}}
+                                                <div class="px-3 py-2 border-b border-slate-100 bg-gradient-to-r from-brand/5 to-brand-secondary/5 rounded-t-xl">
+                                                    <div class="flex items-center justify-between">
+                                                        <span class="text-xs font-bold text-slate-700">
+                                                            <i class="fa-solid fa-cart-shopping text-brand mr-1"></i>
+                                                            Detalle del pedido #{{ $pedido->id }}
+                                                        </span>
+                                                        <span class="text-[10px] text-slate-500">
+                                                            {{ $totalLineas }} {{ $totalLineas === 1 ? 'ítem' : 'ítems' }}
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                {{-- Tabla de productos --}}
+                                                <div class="max-h-[280px] overflow-y-auto">
+                                                    <table class="w-full text-xs">
+                                                        <thead class="bg-slate-50 sticky top-0">
+                                                            <tr class="text-left">
+                                                                <th class="px-3 py-1.5 text-[10px] font-bold uppercase text-slate-500 tracking-wider">Cant.</th>
+                                                                <th class="px-2 py-1.5 text-[10px] font-bold uppercase text-slate-500 tracking-wider">Producto</th>
+                                                                <th class="px-3 py-1.5 text-[10px] font-bold uppercase text-slate-500 tracking-wider text-right">Subtotal</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody class="divide-y divide-slate-100">
+                                                            @foreach($detalles as $d)
+                                                                @php
+                                                                    $cant = (float) ($d->cantidad ?? 1);
+                                                                    $cantFmt = fmod($cant, 1) == 0 ? (int) $cant : rtrim(rtrim(number_format($cant, 3, '.', ''), '0'), '.');
+                                                                    $unit = $d->unidad ?? '';
+                                                                    $unitDisplay = in_array(strtolower($unit), ['kg','kl']) ? 'kg' : (in_array(strtolower($unit), ['lb','libra','libras']) ? 'lb' : $unit);
+                                                                    $sub  = number_format((float) $d->subtotal, 0, ',', '.');
+                                                                    $precioUnit = number_format((float) ($d->precio_unitario ?? 0), 0, ',', '.');
+                                                                @endphp
+                                                                <tr class="hover:bg-slate-50/50">
+                                                                    <td class="px-3 py-2 whitespace-nowrap">
+                                                                        <span class="inline-flex items-center justify-center min-w-[34px] h-6 rounded-md bg-slate-900 text-white text-[10px] font-bold">
+                                                                            {{ $cantFmt }}{{ $unitDisplay ? ' '.$unitDisplay : '' }}
+                                                                        </span>
+                                                                    </td>
+                                                                    <td class="px-2 py-2">
+                                                                        <div class="font-medium text-slate-800 leading-tight">
+                                                                            {{ $d->producto ?? 'Producto' }}
+                                                                        </div>
+                                                                        @if($d->precio_unitario && $cant > 1)
+                                                                            <div class="text-[9px] text-slate-400 mt-0.5">
+                                                                                ${{ $precioUnit }} c/u
+                                                                            </div>
+                                                                        @endif
+                                                                    </td>
+                                                                    <td class="px-3 py-2 text-right whitespace-nowrap font-mono text-[11px] font-semibold text-slate-700">
+                                                                        ${{ $sub }}
+                                                                    </td>
+                                                                </tr>
+                                                            @endforeach
+                                                        </tbody>
+                                                        <tfoot class="bg-slate-50 border-t border-slate-200">
+                                                            <tr>
+                                                                <td colspan="2" class="px-3 py-2 text-right text-[10px] font-bold uppercase text-slate-600 tracking-wider">
+                                                                    Total productos
+                                                                </td>
+                                                                <td class="px-3 py-2 text-right whitespace-nowrap font-mono text-xs font-bold text-emerald-700">
+                                                                    ${{ number_format((float) $totalPedido, 0, ',', '.') }}
+                                                                </td>
+                                                            </tr>
+                                                        </tfoot>
+                                                    </table>
+                                                </div>
                                             </div>
                                         </div>
                                     @else
