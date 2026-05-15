@@ -67,6 +67,9 @@ class Pedido extends Model
         'pago_metodo',
         'pagado_at',
         'programado_para',
+        'subtotal',
+        'costo_envio',
+        'beneficio_cliente_id',
     ];
 
     protected $casts = [
@@ -78,6 +81,8 @@ class Pedido extends Model
         'programado_para' => 'datetime',
         'wompi_referencias_historial' => 'array',
         'total'           => 'decimal:2',
+        'subtotal'        => 'decimal:2',
+        'costo_envio'     => 'decimal:2',
         'empresa_id'      => 'integer',
         'connection_id'   => 'integer',
         'whatsapp_id'     => 'integer',

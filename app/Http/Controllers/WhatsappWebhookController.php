@@ -7445,8 +7445,31 @@ TXT;
             return $mensaje;
         }
 
-        // Costo de envío de la zona (0 si no se resolvió)
-        $costoEnvio = $zonaCobertura?->costo_envio ?? 0;
+        // 🚚 Costo de envío:
+        //   - Si hay zona resuelta → usar costo de la zona
+        //   - Si NO hay zona y es DOMICILIO → fallback al costo default de la sede
+        //   - Si es pickup → siempre $0
+        $costoEnvio = 0;
+        if ($esPickup) {
+            $costoEnvio = 0;
+        } elseif ($zonaCobertura) {
+            $costoEnvio = (float) ($zonaCobertura->costo_envio ?? 0);
+        } elseif ($sede && (float) ($sede->cobertura_costo_envio ?? 0) > 0) {
+            // Fallback: domicilio sin zona resuelta → cobrar costo default de la sede
+            $costoEnvio = (float) $sede->cobertura_costo_envio;
+            Log::warning('🚚 Domicilio sin zona resuelta — usando costo default de sede', [
+                'from'              => $from,
+                'sede'              => $sede->nombre,
+                'costo_default'     => $costoEnvio,
+                'direccion'         => $direccion,
+            ]);
+        } else {
+            Log::error('🚨 Domicilio sin zona y sede sin costo default — pedido tendrá envío $0', [
+                'from'      => $from,
+                'sede'      => $sede?->nombre,
+                'direccion' => $direccion,
+            ]);
+        }
 
         // ── CLIENTE: lo resolvemos acá arriba para poder consultar beneficios ──
         // (antes se hacía más abajo, pero necesitamos el $cliente antes)
@@ -7609,6 +7632,9 @@ TXT;
                 ? "Pedido programado para preparación: " . $programadoPara->format('d/m/Y H:i')
                 : 'Pedido creado automáticamente desde WhatsApp',
             'total'                 => $totalCalculado,
+            'subtotal'              => $subtotalProductos,
+            'costo_envio'           => $esPickup ? 0 : $costoEnvio,
+            'beneficio_cliente_id'  => $beneficioAplicado?->id,
             'notas'                 => $notas,
             'cliente_nombre'        => $nombreSeguro,
             'direccion'             => $direccionGuardar,
