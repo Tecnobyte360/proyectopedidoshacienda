@@ -118,7 +118,7 @@ Route::middleware(['no_super_sin_imp'])->group(function () {
     Route::get('/zonas/{zona}/editor-mapa', \App\Livewire\Zonas\EditorMapa::class)
         ->middleware('permission:zonas.gestionar')
         ->name('zonas.editor-mapa');
-    Route::get('/despachos',     DespachosIndex::class)->middleware('permission:despachos.gestionar')->name('despachos.index');
+    Route::get('/despachos',     DespachosIndex::class)->middleware('permission:despachos.gestionar|despachos.ver_propios')->name('despachos.index');
     Route::get('/reportes',      ReportesIndex::class)->middleware('permission:reportes.ver')->name('reportes.index');
     Route::get('/ans-tiempos',   AnsIndex::class)->middleware('permission:ans.gestionar')->name('ans.index');
     Route::get('/meta-whatsapp', \App\Livewire\MetaWhatsapp\Index::class)
