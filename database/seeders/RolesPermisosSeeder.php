@@ -42,6 +42,17 @@ class RolesPermisosSeeder extends Seeder
         'conversaciones' => [
             'conversaciones.ver',
         ],
+        'campanas' => [
+            'campanas.ver',
+            'campanas.gestionar',  // crear/editar/enviar campañas WhatsApp
+        ],
+        'usuarios_internos' => [
+            'usuarios_internos.ver',
+            'usuarios_internos.gestionar',
+        ],
+        'departamentos' => [
+            'departamentos.gestionar',
+        ],
         'chat' => [
             'chat.usar',
         ],
@@ -136,6 +147,9 @@ class RolesPermisosSeeder extends Seeder
             'domiciliarios.gestionar', 'zonas.gestionar', 'despachos.gestionar',
             'reportes.ver', 'ans.gestionar',
             'felicitaciones.ver', 'alertas.ver',
+            'campanas.ver', 'campanas.gestionar',
+            'usuarios_internos.ver', 'usuarios_internos.gestionar',
+            'departamentos.gestionar',
         ]);
 
         $operador = Role::firstOrCreate(['name' => 'operador', 'guard_name' => 'web']);

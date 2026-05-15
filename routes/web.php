@@ -79,7 +79,7 @@ Route::middleware(['no_super_sin_imp'])->group(function () {
     Route::get('/productos',     ProductosIndex::class)->middleware('permission:productos.ver')->name('productos.index');
     Route::get('/categorias',    CategoriasIndex::class)->middleware('permission:categorias.gestionar')->name('categorias.index');
     Route::get('/cortes',        CortesIndex::class)->middleware('permission:productos.ver')->name('cortes.index');
-    Route::get('/campanas',      CampanasIndex::class)->middleware('permission:conversaciones.ver')->name('campanas.index');
+    Route::get('/campanas',      CampanasIndex::class)->middleware('permission:campanas.ver|campanas.gestionar')->name('campanas.index');
     Route::get('/importaciones', ImportacionesIndex::class)->middleware('permission:productos.ver')->name('importaciones.index');
     Route::get('/integraciones', IntegracionesIndex::class)->middleware(['permission:productos.ver', 'role:super-admin'])->name('integraciones.index');
     Route::get('/integraciones/{integracion}/consultas', \App\Livewire\Integraciones\Consultas::class)
@@ -91,8 +91,8 @@ Route::middleware(['no_super_sin_imp'])->group(function () {
     Route::get('/integraciones/clientes-erp', \App\Livewire\Integraciones\ClientesErp::class)
         ->middleware(['permission:productos.ver', 'role:super-admin'])
         ->name('integraciones.clientes-erp');
-    Route::get('/usuarios-internos', UsuariosInternosIndex::class)->middleware('permission:conversaciones.ver')->name('usuarios-internos.index');
-    Route::get('/departamentos',     DepartamentosIndex::class)->middleware('permission:conversaciones.ver')->name('departamentos.index');
+    Route::get('/usuarios-internos', UsuariosInternosIndex::class)->middleware('permission:usuarios_internos.ver|usuarios_internos.gestionar')->name('usuarios-internos.index');
+    Route::get('/departamentos',     DepartamentosIndex::class)->middleware('permission:departamentos.gestionar')->name('departamentos.index');
     Route::get('/chat-widgets',      ChatWidgetsIndex::class)->middleware(['permission:conversaciones.ver', 'role:super-admin'])->name('chat-widgets.index');
     Route::get('/importaciones/plantilla/{tipo}', function (string $tipo) {
         $tipo = in_array($tipo, ['productos', 'categorias'], true) ? $tipo : 'productos';
