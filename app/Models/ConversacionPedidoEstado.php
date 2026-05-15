@@ -96,6 +96,15 @@ class ConversacionPedidoEstado extends Model
         if (empty($this->productos)) return false;
         if (empty($this->metodo_entrega)) return false;
 
+        // 🛡️ BUG-16: validar que cada producto tenga campos mínimos
+        foreach ($this->productos as $p) {
+            $nombre = is_array($p) ? trim((string) ($p['name'] ?? $p['producto'] ?? '')) : '';
+            $cantidad = is_array($p) ? (float) ($p['quantity'] ?? $p['cantidad'] ?? 0) : 0;
+            if ($nombre === '' || $cantidad <= 0) {
+                return false;
+            }
+        }
+
         if ($this->metodo_entrega === self::METODO_DOMICILIO) {
             if (empty($this->direccion)) return false;
             if (!$this->cobertura_validada) return false;
@@ -103,8 +112,10 @@ class ConversacionPedidoEstado extends Model
             if (empty($this->sede_id)) return false;
         }
 
-        // Identificación: al menos cédula O nombre
-        if (empty($this->cedula) && empty($this->nombre_cliente)) return false;
+        // 🛡️ BUG-04: Identificación — CÉDULA es OBLIGATORIA (no OR).
+        // El nombre solo no basta para facturar en el ERP.
+        if (empty($this->cedula)) return false;
+        if (empty($this->nombre_cliente)) return false;
 
         return true;
     }

@@ -205,15 +205,47 @@ class EstadoPedidoService
                     // El LLM mandó igual o más items — confiar en su versión
                     $estado->productos = $productosLimpios;
                 } else {
-                    // 🛡️ El LLM mandó MENOS productos que el carrito actual.
-                    // Conservar el carrito de BD (fuente de verdad) y solo
-                    // actualizar cantidades si coinciden por nombre/código.
-                    Log::warning('🛡️ confirmar_pedido trajo menos productos que el carrito — conservando BD', [
-                        'conv_id'        => $conv->id,
-                        'carrito_bd'     => count($carritoActual),
-                        'llm_products'   => count($productosLimpios),
-                    ]);
-                    // No reemplazar: $estado->productos se mantiene intacto
+                    // 🛡️ BUG-01: El LLM mandó MENOS productos que el carrito actual.
+                    // Esto puede ser legítimo (el cliente pidió quitar algo) o un
+                    // descuido del LLM (olvidó listar productos del carrito).
+                    //
+                    // Estrategia: comprobar si los productos que envió el LLM son
+                    // un SUBCONJUNTO de los productos del carrito (mismos nombres/códigos).
+                    // Si sí → es una eliminación legítima, aplicar.
+                    // Si no → es un descuido, conservar el carrito de BD.
+                    $nombresLlm = array_map(
+                        fn ($p) => mb_strtolower(trim((string) ($p['name'] ?? $p['producto'] ?? ''))),
+                        $productosLimpios
+                    );
+                    $nombresBd = array_map(
+                        fn ($p) => mb_strtolower(trim((string) ($p['name'] ?? $p['producto'] ?? ''))),
+                        $carritoActual
+                    );
+
+                    // Subconjunto si TODOS los nombres del LLM están en BD
+                    $esSubconjunto = !empty($nombresLlm)
+                        && empty(array_diff($nombresLlm, $nombresBd));
+
+                    if ($esSubconjunto) {
+                        // Es una eliminación legítima — confiar en la versión del LLM
+                        Log::info('🛒 confirmar_pedido: detectada eliminación legítima de productos', [
+                            'conv_id'      => $conv->id,
+                            'carrito_bd'   => count($carritoActual),
+                            'llm_products' => count($productosLimpios),
+                            'eliminados'   => array_diff($nombresBd, $nombresLlm),
+                        ]);
+                        $estado->productos = $productosLimpios;
+                    } else {
+                        // No es subconjunto: el LLM olvidó productos. Conservar BD.
+                        Log::warning('🛡️ confirmar_pedido trajo menos productos que el carrito (no subconjunto) — conservando BD', [
+                            'conv_id'      => $conv->id,
+                            'carrito_bd'   => count($carritoActual),
+                            'llm_products' => count($productosLimpios),
+                            'llm_nombres'  => $nombresLlm,
+                            'bd_nombres'   => $nombresBd,
+                        ]);
+                        // No reemplazar: $estado->productos se mantiene intacto
+                    }
                 }
             }
         }
@@ -311,11 +343,15 @@ class EstadoPedidoService
                 $estado->sede_id = (int) $orderData['sede_id'];
             } elseif (!empty($orderData['location'])) {
                 $sedeBuscada = trim($orderData['location']);
+                // 🛡️ BUG-LIKE: escapar wildcards (% _) que pueden venir del LLM/cliente
+                // y forzarían un match no deseado en la búsqueda LIKE.
+                $sedeBuscadaLower = mb_strtolower($sedeBuscada);
+                $sedeBuscadaEscapada = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $sedeBuscadaLower);
                 $sedeMatch = \App\Models\Sede::query()
                     ->where('activa', true)
-                    ->where(function ($q) use ($sedeBuscada) {
-                        $q->whereRaw('LOWER(nombre) = ?', [mb_strtolower($sedeBuscada)])
-                          ->orWhereRaw('LOWER(nombre) LIKE ?', ['%' . mb_strtolower($sedeBuscada) . '%']);
+                    ->where(function ($q) use ($sedeBuscadaLower, $sedeBuscadaEscapada) {
+                        $q->whereRaw('LOWER(nombre) = ?', [$sedeBuscadaLower])
+                          ->orWhereRaw("LOWER(nombre) LIKE ? ESCAPE '\\\\'", ['%' . $sedeBuscadaEscapada . '%']);
                     })
                     ->first();
                 if ($sedeMatch) {
@@ -976,8 +1012,14 @@ class EstadoPedidoService
 
         if ($limpio === '') return null;
 
-        // Frases funcionales a descartar
-        $stopwords = '/^(hola|buenas|buenos\s+dias|tardes|noches|gracias|si|no|listo|dale|quiero|necesito|tienes|tienen|para|de|del|los|las|el|la|por\s+favor|domicilio|despacho|recoger|aqui|alla|que|qué|cómo|como|cuanto|cuánto|cual|cuál)$/iu';
+        // Frases funcionales + nombres de productos comunes a descartar
+        // 🛡️ Las palabras de producto (pollo, res, carne, etc) son CRÍTICAS:
+        // sin ellas, "Quiero pollo deshuesada kilo" se capturaría como
+        // nombre "Pollo Deshuesada Kilo" y contamina cliente_nombre en BD.
+        $stopwords = '/^(hola|buenas|buenos\s+dias|tardes|noches|gracias|si|no|listo|dale|quiero|necesito|tienes|tienen|tienes\s+un|para|de|del|los|las|el|la|por\s+favor|domicilio|despacho|recoger|aqui|alla|que|qué|cómo|como|cuanto|cuánto|cual|cuál'
+            . '|carne|pollo|res|cerdo|pescado|pechuga|chuleta|costilla|lomo|chorizo|salchicha|huevo|leche|queso|jam[oó]n|tocineta|tocino|molida|molido'
+            . '|filete|milanesa|hamburguesa|morcilla|chicharr[oó]n|pernil|muslo|alas|kg|kilo|kilos|libra|libras|bandeja|paquete|combo|promo|deshuesada|deshuesado|ahumada|ahumado'
+            . '|solomito|sobrebarriga|barriguero|tilapia|trucha|pavo|cordero|bistek|bistec)$/iu';
 
         $palabras = explode(' ', $limpio);
         $palabras = array_filter($palabras, fn ($p) => mb_strlen($p) >= 2);
@@ -1013,8 +1055,69 @@ class EstadoPedidoService
 
         if (!$mejorNombre) return null;
 
+        // 🛡️ Validación final contra blacklist de productos (defensa en profundidad):
+        // si pasó por algún motivo una palabra de producto, rechazar.
+        if (!$this->pareceNombrePersona($mejorNombre)) {
+            Log::warning('🛡️ extraerNombreDeMensaje: candidato rechazado por blacklist producto', [
+                'candidato' => $mejorNombre,
+                'mensaje'   => mb_substr($msg, 0, 100),
+            ]);
+            return null;
+        }
+
         // Capitalizar correctamente
         return mb_convert_case(trim($mejorNombre), MB_CASE_TITLE, 'UTF-8');
+    }
+
+    /**
+     * 🛡️ Verifica si un string parece un nombre de persona válido.
+     * Rechaza strings que contienen nombres de productos (estática + catálogo).
+     */
+    private function pareceNombrePersona(string $candidato): bool
+    {
+        $candidatoLower = mb_strtolower(trim($candidato));
+        if ($candidatoLower === '') return false;
+
+        // Blacklist estática (mismo criterio que captarDeOrderData)
+        $palabrasProducto = [
+            'carne', 'pollo', 'res', 'cerdo', 'pescado', 'pechuga', 'chuleta',
+            'costilla', 'lomo', 'chorizo', 'salchicha', 'huevo', 'leche',
+            'queso', 'jamón', 'jamon', 'tocineta', 'tocino', 'molida', 'molido',
+            'filete', 'milanesa', 'hamburguesa', 'morcilla', 'chicharrón',
+            'chicharron', 'pernil', 'muslo', 'alas', 'kg', 'kilo', 'libra',
+            'bandeja', 'paquete', 'combo', 'promo', 'deshuesada', 'deshuesado',
+            'ahumada', 'ahumado', 'solomito', 'sobrebarriga', 'barriguero',
+            'tilapia', 'trucha', 'pavo', 'cordero', 'bistek', 'bistec',
+        ];
+        foreach ($palabrasProducto as $palabra) {
+            if (str_contains($candidatoLower, $palabra)) {
+                return false;
+            }
+        }
+
+        // Blacklist dinámica desde catálogo de productos (cache 1h)
+        try {
+            $nombresProductos = Cache::remember('blacklist_productos_nombres', 3600, function () {
+                return \App\Models\Producto::where('activo', true)
+                    ->pluck('nombre')
+                    ->flatMap(function ($n) {
+                        $palabras = preg_split('/\s+/u', mb_strtolower((string) $n));
+                        return array_filter($palabras, fn ($p) => mb_strlen($p) >= 3);
+                    })
+                    ->unique()
+                    ->values()
+                    ->all();
+            });
+            foreach ($nombresProductos as $palabra) {
+                if (str_contains($candidatoLower, $palabra)) {
+                    return false;
+                }
+            }
+        } catch (\Throwable $e) {
+            // Si el cache/DB falla, continuamos con la blacklist estática
+        }
+
+        return true;
     }
 
     /**

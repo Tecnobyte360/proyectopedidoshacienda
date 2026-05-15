@@ -118,15 +118,16 @@ class Cliente extends Model
     {
         $cliente = self::where('telefono_normalizado', $telefonoNormalizado)->first();
 
-        if ($cliente) {
-            // 🛡️ Validar que $nombre parezca un nombre real (no email, no tel, no cédula)
-            $nombreLimpio = trim((string) $nombre);
-            $pareceNombre = $nombreLimpio !== ''
-                && !str_contains($nombreLimpio, '@')
-                && !preg_match('/^\+?\d[\d\s\-]{6,}$/', $nombreLimpio)
-                && !preg_match('/^\d{6,12}$/', $nombreLimpio)
-                && preg_match('/[a-záéíóúñ]/iu', $nombreLimpio);
+        // 🛡️ Validar que $nombre parezca un nombre real (no email, no tel, no cédula, no producto)
+        $nombreLimpio = trim((string) $nombre);
+        $pareceNombre = $nombreLimpio !== ''
+            && !str_contains($nombreLimpio, '@')
+            && !preg_match('/^\+?\d[\d\s\-]{6,}$/', $nombreLimpio)
+            && !preg_match('/^\d{6,12}$/', $nombreLimpio)
+            && preg_match('/[a-záéíóúñ]/iu', $nombreLimpio)
+            && self::nombreNoEsProducto($nombreLimpio);
 
+        if ($cliente) {
             if (
                 $pareceNombre
                 && in_array(strtolower(trim($cliente->nombre)), ['cliente', 'usuario', ''], true)
@@ -145,14 +146,44 @@ class Cliente extends Model
             $telefonoCorto = $solo;
         }
 
+        // Si el nombre no parece persona, usar fallback genérico (no contaminar el ERP)
+        $nombreInicial = $pareceNombre ? $nombreLimpio : 'Cliente';
+
         return self::create([
-            'nombre'               => $nombre ?: 'Cliente',
+            'nombre'               => $nombreInicial,
             'pais_codigo'          => $paisCodigo,
             'telefono'             => $telefonoCorto,
             'telefono_normalizado' => $telefonoNormalizado,
             'canal_origen'         => $canalOrigen,
             'activo'               => true,
         ]);
+    }
+
+    /**
+     * 🛡️ Verifica que el nombre NO contenga palabras de producto.
+     * Centraliza la blacklist para evitar duplicar lógica en varios servicios.
+     */
+    public static function nombreNoEsProducto(string $candidato): bool
+    {
+        $cand = mb_strtolower(trim($candidato));
+        if ($cand === '') return false;
+
+        $palabrasProducto = [
+            'carne', 'pollo', 'res', 'cerdo', 'pescado', 'pechuga', 'chuleta',
+            'costilla', 'lomo', 'chorizo', 'salchicha', 'huevo', 'leche',
+            'queso', 'jamón', 'jamon', 'tocineta', 'tocino', 'molida', 'molido',
+            'filete', 'milanesa', 'hamburguesa', 'morcilla', 'chicharrón',
+            'chicharron', 'pernil', 'muslo', 'alas', 'kg', 'kilo', 'libra',
+            'bandeja', 'paquete', 'combo', 'promo', 'deshuesada', 'deshuesado',
+            'ahumada', 'ahumado', 'solomito', 'sobrebarriga', 'barriguero',
+            'tilapia', 'trucha', 'pavo', 'cordero', 'bistek', 'bistec',
+        ];
+        foreach ($palabrasProducto as $palabra) {
+            if (str_contains($cand, $palabra)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**

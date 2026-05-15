@@ -50,4 +50,18 @@ return [
         'email' => env('CERTBOT_EMAIL', 'admin@tecnobyte360.com'),
     ],
 
+    // 🛡️ BUG-C4: Configuración del webhook de WhatsApp.
+    // Token compartido: si está definido, se exige en cada POST al webhook.
+    // IP whitelist: si está definida (CSV), solo IPs en la lista pueden entrar.
+    // Rate limit: requests por minuto por IP (siempre activo).
+    'whatsapp' => [
+        'webhook_token' => env('WHATSAPP_WEBHOOK_TOKEN'), // ej: token compartido con EstradaHub
+        'allowed_ips'   => array_filter(array_map('trim', explode(',', env('WHATSAPP_WEBHOOK_ALLOWED_IPS', '')))),
+        'rate_limit'    => (int) env('WHATSAPP_WEBHOOK_RATE_LIMIT', 120),
+        // 🛡️ BUG-08: límites de cantidad por producto. Si se excede,
+        // el pedido se deriva a humano (canal comercial).
+        'max_kg_por_producto'       => (float) env('WHATSAPP_MAX_KG_PRODUCTO', 200.0),
+        'max_unidades_por_producto' => (int) env('WHATSAPP_MAX_UNIDADES_PRODUCTO', 500),
+    ],
+
 ];

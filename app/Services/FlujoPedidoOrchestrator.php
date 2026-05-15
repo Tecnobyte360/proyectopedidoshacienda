@@ -54,17 +54,15 @@ class FlujoPedidoOrchestrator
         // Cliente puede adicionar productos a un pedido existente (dentro del
         // ANS configurado). La tool valida tiempo + crea pedido ligado + SGI.
         'crear_adicion_pedido',
-        // 🆕 confirmar_pedido SIEMPRE disponible: el LLM decide cuándo llamarla.
-        // El GUARD validarDatosObligatoriosPedido() rechaza si faltan campos.
-        // Sin esto, el LLM queda atascado cuando el captador determinista no
-        // captura productos (que ahora está desactivado para evitar falsos
-        // positivos del fuzzy match).
-        'confirmar_pedido',
         'registrar_datos_cliente',
         // 🛒 Carrito: el LLM debe poder agregar/quitar/actualizar productos
         // del pedido en cualquier momento del flujo (incluso en confirmación
         // si el cliente cambia de opinión).
         'agregar_producto_al_pedido',
+        // 🛡️ BUG-02: `confirmar_pedido` REMOVIDO de TOOLS_GLOBALES.
+        // Ahora solo se habilita explícitamente cuando estaCompleto() es true,
+        // vía filtrarTools(). Esto previene que el LLM cierre pedidos saltando
+        // pasos de validación (cobertura, ERP, datos del cliente).
     ];
 
     /**

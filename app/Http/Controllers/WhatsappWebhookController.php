@@ -2786,6 +2786,50 @@ TXT;
             Log::warning('Guard capturar agregados implícitos falló: ' . $e->getMessage());
         }
 
+        // 🛡️ BUG-C2: Guard contra alucinación de carrito.
+        // Detecta cuando el bot dice "quitado/agregado" pero el carrito real NO refleja.
+        // Reemplaza la respuesta por una clarificación honesta.
+        try {
+            $estadoCarrito = app(\App\Services\EstadoPedidoService::class)->obtener($conversacion);
+            $alucinacion = $this->detectarAlucinacionCarrito($reply, $estadoCarrito);
+
+            if ($alucinacion === 'QUITAR_FALSO_VACIO') {
+                Log::warning('🛡️ BUG-C2: bot afirmó quitar del carrito pero carrito está vacío', [
+                    'from'  => $from,
+                    'reply' => mb_substr($reply, 0, 200),
+                ]);
+                $replyHonesto = "Disculpa, en realidad no tienes productos en tu carrito todavía. ¿Qué te gustaría pedir? 😊";
+
+                // Reemplazar la respuesta alucinada
+                array_pop($conversationHistory); // quitar respuesta alucinada
+                $conversationHistory[] = ['role' => 'assistant', 'content' => $replyHonesto];
+                Cache::put($cacheKey, $conversationHistory, now()->addMinutes(45));
+
+                return $replyHonesto;
+            }
+
+            if ($alucinacion === 'AGREGAR_FALSO') {
+                // capturarAgregadosImplicitos ya intentó. Si después de eso el carrito sigue vacío,
+                // refrescamos el estado y verificamos.
+                $estadoPost = app(\App\Services\EstadoPedidoService::class)->obtener($conversacion->fresh());
+                if (empty($estadoPost->productos)) {
+                    Log::warning('🛡️ BUG-C2: bot afirmó agregar al carrito pero no se capturó', [
+                        'from'  => $from,
+                        'reply' => mb_substr($reply, 0, 200),
+                    ]);
+                    $replyHonesto = "Disculpa, ¿podrías confirmarme qué producto y qué cantidad quieres? Necesito el detalle exacto para agregarlo correctamente al pedido. 🙏";
+
+                    array_pop($conversationHistory);
+                    $conversationHistory[] = ['role' => 'assistant', 'content' => $replyHonesto];
+                    Cache::put($cacheKey, $conversationHistory, now()->addMinutes(45));
+
+                    return $replyHonesto;
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Guard alucinación carrito falló: ' . $e->getMessage());
+        }
+
         // Persistir respuesta del bot en BD
         $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_ASSISTANT, $reply);
 
@@ -4031,6 +4075,66 @@ TXT;
         }
         return null;
     }
+
+    /**
+     * 🛡️ BUG-C2: Detecta cuando el bot dice "listo, agregué/quité X al carrito"
+     * pero el carrito en BD NO refleja esa operación. El bot alucinaría que
+     * realizó cambios sin haber llamado las tools correspondientes.
+     *
+     * Retorna la frase detectada, o null si no hay alucinación.
+     */
+    private function detectarAlucinacionCarrito(string $reply, ?\App\Models\ConversacionPedidoEstado $estado): ?string
+    {
+        $lower = mb_strtolower($reply);
+
+        // Regexes que detectan afirmaciones de operación sobre el carrito
+        $regexesAgregar = [
+            '/\b(?:listo|perfecto|hecho|ya|ok)[\s,]+(?:te\s+)?(?:lo|la|los|las)\s+agregu[eé](?:mos)?\b/u',
+            '/\b(?:agregad[oa]|añadid[oa])\s+(?:al\s+)?(?:carrito|pedido)\b/u',
+            '/\b(?:te\s+)?(?:lo|la|los|las)\s+(?:añad[íi]|agregu[eé])\s+(?:al\s+)?(?:carrito|pedido)\b/u',
+            '/\b(?:queda\s+)?(?:agregad[oa]|añadid[oa])\s+en\s+(?:tu\s+)?(?:carrito|pedido)\b/u',
+            '/\bya\s+est[aá]\s+en\s+(?:tu\s+)?(?:carrito|pedido)\b/u',
+        ];
+
+        $regexesQuitar = [
+            '/\b(?:listo|perfecto|hecho|ya|ok)[\s,]+(?:te\s+)?(?:lo|la|los|las)\s+(?:quit[eé]|elimin[eé]|borr[eé]|remov[íi])(?:mos)?\b/u',
+            '/\b(?:quitad[oa]|eliminad[oa]|borrad[oa]|removid[oa])\s+(?:del?\s+)?(?:carrito|pedido)\b/u',
+            '/\b(?:te\s+)?(?:lo|la|los|las)\s+(?:quit[eé]|elimin[eé]|borr[eé])\s+(?:del?\s+)?(?:carrito|pedido)\b/u',
+            '/\bya\s+(?:no\s+est[aá]|sali[oó])\s+(?:del\s+)?(?:carrito|pedido)\b/u',
+        ];
+
+        $afirmaAgregar = false;
+        foreach ($regexesAgregar as $r) {
+            if (preg_match($r, $lower)) { $afirmaAgregar = true; break; }
+        }
+        $afirmaQuitar = false;
+        foreach ($regexesQuitar as $r) {
+            if (preg_match($r, $lower)) { $afirmaQuitar = true; break; }
+        }
+
+        if (!$afirmaAgregar && !$afirmaQuitar) {
+            return null;
+        }
+
+        $productosCarrito = $estado?->productos ?: [];
+        $hayProductos = !empty($productosCarrito);
+
+        // Caso 1: dice que AGREGÓ pero carrito vacío → alucinación
+        if ($afirmaAgregar && !$hayProductos) {
+            return 'AGREGAR_FALSO';
+        }
+
+        // Caso 2: dice que QUITÓ pero carrito vacío (nada que quitar) → alucinación
+        if ($afirmaQuitar && !$hayProductos) {
+            return 'QUITAR_FALSO_VACIO';
+        }
+
+        // Caso 3: dice que QUITÓ X pero X sigue en el carrito → no se puede
+        // determinar sin info adicional. Por ahora, dejamos pasar.
+
+        return null;
+    }
+
     /**
      * Obtiene el ID de la sede asociada a la conexión.
      * Estrategia:
@@ -5866,6 +5970,12 @@ TXT;
           ];
       }
 
+      // 🛡️ BUG-08: Validación de cantidad máxima por producto.
+      // Defensa contra cantidades absurdas (999999 kg, etc) que pasarían
+      // por el guard del LLM. Configurable via ConfiguracionBot.
+      $maxKgPorProducto = (float) (config('services.whatsapp.max_kg_por_producto', 200.0));
+      $maxUnidades = (int) (config('services.whatsapp.max_unidades_por_producto', 500));
+
       // ── Conversión de unidades (igual lógica que confirmar_pedido) ─────
       $unitNorm = $unitRaw;
       $cantidadFinal = $quantity;
@@ -5878,6 +5988,32 @@ TXT;
           $unitNorm      = 'kg';
       } elseif (in_array($unitRaw, ['kg', 'k', 'kl', 'kilo', 'kilos', 'kilogramo'], true)) {
           $unitNorm = 'kg';
+      }
+
+      // 🛡️ BUG-08: Rechazar cantidades absurdas.
+      $limiteUsado = ($unitNorm === 'kg') ? $maxKgPorProducto : $maxUnidades;
+      if ($cantidadFinal > $limiteUsado) {
+          Log::warning('🛡️ BUG-08: cantidad absurda rechazada en agregar_producto_al_pedido', [
+              'producto'   => $producto->nombre ?? $name,
+              'cantidad'   => $cantidadFinal,
+              'unidad'     => $unitNorm,
+              'limite'     => $limiteUsado,
+          ]);
+          return [
+              'ok'               => false,
+              'action'           => $action,
+              'error'            => "Cantidad {$cantidadFinal} {$unitNorm} excede el límite ({$limiteUsado}). Pedidos grandes deben ir por canal comercial.",
+              'mensaje_sugerido' => "Esa cantidad ({$cantidadFinal} {$unitNorm}) es demasiado grande para pedido normal 😅. Voy a conectarte con nuestro equipo comercial para que te atiendan ese volumen.",
+              'derivar_a_humano' => true,
+          ];
+      }
+      if ($cantidadFinal <= 0) {
+          return [
+              'ok'               => false,
+              'action'           => $action,
+              'error'            => "La cantidad debe ser mayor a 0.",
+              'mensaje_sugerido' => "¿Qué cantidad necesitas? Dime un número mayor a 0.",
+          ];
       }
 
       $precioKg = method_exists($producto, 'precioParaSede')
@@ -7135,10 +7271,22 @@ TXT;
                 $sub = $precio * $cantidad;
                 $subtotalProductos += $sub;
 
+                // 🛡️ BUG-C3: garantizar que SIEMPRE haya nombre de producto en el detalle.
+                // Fallback: nombre del catálogo → nombre solicitado por el cliente → código.
+                $nombreProducto = trim((string) ($producto->nombre ?? ''));
+                if ($nombreProducto === '') {
+                    $nombreProducto = trim((string) $nameRaw) ?: ('Producto ' . ($producto->codigo ?? 'SIN_CODIGO'));
+                    Log::warning('🛡️ DetallePedido: producto sin nombre en catálogo, usando fallback', [
+                        'producto_id' => $producto->id ?? null,
+                        'codigo'      => $producto->codigo ?? null,
+                        'fallback'    => $nombreProducto,
+                    ]);
+                }
+
                 $productosValidados[] = [
                     'producto_id'     => $producto->id ?? null,
                     'codigo_producto' => $producto->codigo ?? null,
-                    'producto'        => $producto->nombre ?? '',
+                    'producto'        => $nombreProducto,
                     'cantidad'        => $cantidad,
                     'unidad'          => $unidadGuardar,
                     'precio_unitario' => $precio,
@@ -7291,25 +7439,51 @@ TXT;
         }
 
         // ── CLIENTE: actualizar datos (ya lo resolvimos arriba) ────────────
-        // 🛡️ Sanitizar customer_name: el LLM a veces mete emails, teléfonos o
-        // strings raros como customer_name. Solo aceptamos si parece un nombre.
+        // 🛡️ Sanitizar customer_name: el LLM a veces mete emails, teléfonos,
+        // nombres de producto o strings raros como customer_name. Solo aceptamos
+        // si parece un nombre persona REAL.
         $customerNameRaw = trim((string) ($orderData['customer_name'] ?? ''));
         $nombreSeguro = $cliente->nombre; // default: mantener el actual
+
+        // 🛡️ Si el nombre actual del cliente ESTÁ contaminado (parece producto),
+        // lo descartamos y usamos un fallback genérico.
+        if (!\App\Models\Cliente::nombreNoEsProducto($nombreSeguro)) {
+            Log::warning('🛡️ cliente->nombre actual contaminado (parece producto), descartando', [
+                'cliente_id'      => $cliente->id,
+                'nombre_actual'   => $nombreSeguro,
+            ]);
+            $nombreSeguro = 'Cliente';
+        }
+
         if ($customerNameRaw !== '') {
             $esEmail   = filter_var($customerNameRaw, FILTER_VALIDATE_EMAIL) !== false || str_contains($customerNameRaw, '@');
             $esTel     = preg_match('/^\+?\d[\d\s\-]{6,}$/', $customerNameRaw) === 1;
             $esCedula  = preg_match('/^\d{6,12}$/', $customerNameRaw) === 1;
             $tieneLetras = preg_match('/[a-záéíóúñ]/iu', $customerNameRaw) === 1;
             $largoOk = mb_strlen($customerNameRaw) >= 2 && mb_strlen($customerNameRaw) <= 80;
+            $noEsProducto = \App\Models\Cliente::nombreNoEsProducto($customerNameRaw);
 
-            if (!$esEmail && !$esTel && !$esCedula && $tieneLetras && $largoOk) {
+            if (!$esEmail && !$esTel && !$esCedula && $tieneLetras && $largoOk && $noEsProducto) {
                 $nombreSeguro = $customerNameRaw;
             } else {
                 Log::warning('🛡️ customer_name del orderData rechazado (no parece un nombre)', [
                     'customer_name' => $customerNameRaw,
                     'cliente_id'    => $cliente->id,
+                    'es_producto'   => !$noEsProducto,
                 ]);
             }
+        }
+
+        // 🛡️ Si el estado persistente tiene un nombre validado, preferirlo
+        // (es la fuente más confiable, ya pasó por captarDeOrderData con guards).
+        try {
+            $estadoActual = \App\Models\ConversacionPedidoEstado::where('conversacion_id', $conversacion->id)->first();
+            if ($estadoActual && !empty($estadoActual->nombre_cliente)
+                && \App\Models\Cliente::nombreNoEsProducto($estadoActual->nombre_cliente)) {
+                $nombreSeguro = $estadoActual->nombre_cliente;
+            }
+        } catch (\Throwable $e) {
+            // Ignorar — usar el nombre que tenemos
         }
 
         $datosClienteActualizar = [
@@ -8307,16 +8481,17 @@ PROMPT;
             'type'     => 'function',
             'function' => [
                 'name'        => 'agregar_producto_al_pedido',
-                'description' => '🛒 Persiste un producto en el carrito del cliente DESPUÉS de confirmar nombre+cantidad+unidad. '
-                    . 'LLAMA SIEMPRE cuando el cliente confirme un producto. Sin esto el pedido queda vacío. '
+                'description' => '🛒 Persiste/modifica un producto en el carrito del cliente. '
+                    . 'LLAMA SIEMPRE que el cliente confirme un producto O pida QUITARLO/MODIFICAR la cantidad. '
+                    . 'NUNCA respondas "listo, quitado/agregado" sin invocar esta tool primero — el sistema valida el resultado real. '
                     . 'Acciones soportadas: '
                     . '`add` = agregar producto al carrito (default), '
                     . '`update` = actualizar la cantidad de un producto ya agregado, '
-                    . '`remove` = quitar un producto del carrito, '
-                    . '`clear` = vaciar el carrito completo. '
+                    . '`remove` = QUITAR un producto del carrito (llamar SIEMPRE cuando el cliente diga "quita X", "ya no quiero X", "elimina X"), '
+                    . '`clear` = vaciar el carrito completo (cuando el cliente diga "cancela todo", "empezar de nuevo"). '
                     . 'El sistema valida que el producto exista en el catálogo, convierte libras→kg si aplica '
                     . 'y devuelve el resumen del carrito actual con total. NO debes decirle al cliente '
-                    . '"agregado" antes de invocar la tool; el sistema te devuelve el subtotal real.',
+                    . '"agregado/quitado" antes de invocar la tool; el sistema te devuelve el subtotal real.',
                 'parameters'  => [
                     'type'       => 'object',
                     'properties' => [

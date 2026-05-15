@@ -22,7 +22,12 @@ Route::get('/whatsapp-webhook', function () {
     ]);
 });
 
-Route::post('/whatsapp-webhook', [WhatsappWebhookController::class, 'receive']);
+// 🛡️ BUG-C4: Middleware whatsapp.webhook protege contra:
+// - Rate limit (siempre activo, 120 req/min por IP)
+// - IP whitelist (opcional, via config services.whatsapp.allowed_ips)
+// - Token compartido (opcional, via WHATSAPP_WEBHOOK_TOKEN en .env)
+Route::post('/whatsapp-webhook', [WhatsappWebhookController::class, 'receive'])
+    ->middleware('whatsapp.webhook');
 
 // 📱 Meta WhatsApp Cloud API — webhook único multi-tenant.
 // Identifica el tenant por phone_number_id del payload.
@@ -32,7 +37,8 @@ Route::post('/meta/whatsapp/webhook', [MetaWhatsappWebhookController::class, 're
 // Webhook ESPECÍFICO POR TENANT — identifica al tenant por slug en la URL.
 // Recomendado en producción: cada tenant tiene su URL única que copia y
 // pega en TecnoByteApp para SU conexión de WhatsApp.
-Route::post('/whatsapp-webhook/tenant/{slug}', [WhatsappWebhookController::class, 'receivePorTenant']);
+Route::post('/whatsapp-webhook/tenant/{slug}', [WhatsappWebhookController::class, 'receivePorTenant'])
+    ->middleware('whatsapp.webhook');
 Route::get('/whatsapp-webhook/tenant/{slug}', function (string $slug) {
     return response()->json([
         'ok'          => true,
