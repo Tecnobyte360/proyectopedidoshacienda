@@ -1029,7 +1029,7 @@ class WhatsappWebhookController extends Controller
             Log::warning('⚠️ Router determinista falló (siguiendo a LLM): ' . $e->getMessage());
         }
 
-        $systemPrompt = $this->getSystemPrompt($pedidosInfo, $this->infoEmpresa(), $nombreParaPrompt, $ansInfo, $sedeId);
+        $systemPrompt = $this->getSystemPrompt($pedidosInfo, $this->infoEmpresa(), $nombreParaPrompt, $ansInfo, $sedeId, $from);
 
         // ── NOTA DE RECHAZO RECIENTE DE COBERTURA ────────────────────────
         // Si en los últimos 15 min rechazamos una dirección por cobertura,
@@ -7810,7 +7810,8 @@ TXT;
         string $infoEmpresa = '',
         string $name = 'Cliente',
         string $ansInfo = '',
-        ?int $sedeId = null
+        ?int $sedeId = null,
+        ?string $from = null
     ): string {
         /** @var BotPromptService $promptService */
         $promptService = app(BotPromptService::class);
