@@ -22,54 +22,140 @@
          automáticamente a sus pedidos.
          ════════════════════════════════════════════════════════════════ --}}
     @if($esDomiciliarioPuro && $domiActual)
-        <div class="mb-6 max-w-5xl">
-            {{-- Welcome card con stats --}}
-            <div class="rounded-3xl bg-gradient-to-br from-brand to-brand-dark text-white p-6 shadow-xl">
-                <div class="flex items-center gap-4 mb-5">
-                    <div class="h-14 w-14 rounded-full bg-white/20 flex items-center justify-center text-2xl font-extrabold">
-                        {{ mb_substr($domiActual->nombre, 0, 1) }}
-                    </div>
-                    <div>
-                        <h2 class="text-2xl font-extrabold">¡Hola {{ explode(' ', $domiActual->nombre)[0] }}!</h2>
-                        <p class="text-white/80 text-sm">
-                            <i class="fa-solid fa-motorcycle"></i>
-                            {{ $domiActual->vehiculo ?: 'Vehículo' }} · {{ $domiActual->placa ?: '—' }}
-                        </p>
-                    </div>
-                </div>
+        @php
+            // Calcular stats extras para los KPIs estilo /pedidos
+            $totalEnCaminoHoy = collect($pedidosOrdenados)->where('estado', 'repartidor_en_camino')->count();
+            $totalEnPrepHoy   = collect($pedidosOrdenados)->where('estado', 'en_preparacion')->count();
+            $totalMontoHoy    = collect($pedidosOrdenados)->sum(fn ($p) => (float) $p->total);
+        @endphp
 
-                <div class="grid grid-cols-3 gap-3">
-                    <div class="rounded-2xl bg-white/15 backdrop-blur-sm p-3 text-center">
-                        <div class="text-2xl font-black">{{ $statsDomi['pendientes'] }}</div>
-                        <div class="text-[10px] uppercase tracking-wider text-white/80">Pendientes</div>
+        {{-- ╔══════════════ HEADER: avatar + saludo + estado en vivo ══════════════╗ --}}
+        <div class="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-brand to-brand-dark text-white text-xl font-extrabold shadow-sm">
+                    {{ mb_substr($domiActual->nombre, 0, 1) }}
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full bg-emerald-100 text-emerald-700">
+                            <span class="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                            En tiempo real
+                        </span>
                     </div>
-                    <div class="rounded-2xl bg-white/15 backdrop-blur-sm p-3 text-center">
-                        <div class="text-2xl font-black">{{ $statsDomi['entregados'] }}</div>
-                        <div class="text-[10px] uppercase tracking-wider text-white/80">Entregados</div>
-                    </div>
-                    <div class="rounded-2xl bg-white/15 backdrop-blur-sm p-3 text-center">
-                        <div class="text-2xl font-black">{{ $statsDomi['total_hoy'] }}</div>
-                        <div class="text-[10px] uppercase tracking-wider text-white/80">Total hoy</div>
-                    </div>
+                    <h2 class="text-xl sm:text-2xl font-extrabold text-slate-800">Mis despachos · {{ explode(' ', $domiActual->nombre)[0] }}</h2>
+                    <p class="text-xs text-slate-500">
+                        <i class="fa-solid fa-motorcycle"></i> {{ $domiActual->vehiculo ?: 'Vehículo' }}
+                        <span class="text-slate-300 mx-1">·</span>
+                        {{ $domiActual->placa ?: '—' }}
+                    </p>
                 </div>
             </div>
 
-            {{-- Botón ruta óptima --}}
-            @if($rutaOptimaUrl && $pedidosOrdenados->count() > 0)
-                <a href="{{ $rutaOptimaUrl }}" target="_blank" rel="noopener"
-                   class="mt-3 flex items-center justify-between rounded-2xl border-2 border-emerald-300 bg-emerald-50 p-4 hover:bg-emerald-100 transition group">
-                    <div class="flex items-center gap-3">
-                        <div class="h-10 w-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center">
-                            <i class="fa-solid fa-route"></i>
-                        </div>
-                        <div>
-                            <div class="font-bold text-emerald-900">Ver ruta óptima en Google Maps</div>
-                            <div class="text-[11px] text-emerald-700">{{ $pedidosOrdenados->count() }} parada(s) · Optimizado por cercanía</div>
-                        </div>
-                    </div>
-                    <i class="fa-brands fa-google text-xl text-emerald-600 group-hover:scale-110 transition"></i>
-                </a>
-            @endif
+            <div class="flex items-center gap-2">
+                @if($rutaOptimaUrl && $pedidosOrdenados->count() > 0)
+                    <a href="{{ $rutaOptimaUrl }}" target="_blank" rel="noopener"
+                       class="inline-flex items-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2.5 text-sm font-bold shadow-sm transition">
+                        <i class="fa-solid fa-route"></i>
+                        <span class="hidden sm:inline">Ruta óptima</span>
+                        <span class="sm:hidden">Ruta</span>
+                        <span class="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-white/25 text-[10px] font-extrabold">
+                            {{ $pedidosOrdenados->count() }}
+                        </span>
+                    </a>
+                @endif
+                <button wire:click="refrescar" wire:loading.attr="disabled"
+                        title="Refrescar"
+                        class="inline-flex items-center justify-center h-10 w-10 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 transition">
+                    <i class="fa-solid fa-arrows-rotate" wire:loading.class="fa-spin"></i>
+                </button>
+            </div>
+        </div>
+
+        {{-- ╔══════════════ KPI BAR estilo /pedidos ══════════════╗ --}}
+        <div class="mb-5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            {{-- KPI 1: En preparación --}}
+            <div class="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
+                <div class="flex items-center justify-between mb-2">
+                    <div class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Por recoger</div>
+                    <i class="fa-solid fa-utensils text-amber-500"></i>
+                </div>
+                <div class="text-2xl font-black text-slate-800">{{ $totalEnPrepHoy }}</div>
+                <div class="mt-1.5 h-1 rounded-full bg-amber-100"><div class="h-1 rounded-full bg-amber-400" style="width: {{ $statsDomi['pendientes'] > 0 ? ($totalEnPrepHoy / $statsDomi['pendientes']) * 100 : 0 }}%"></div></div>
+            </div>
+
+            {{-- KPI 2: En camino --}}
+            <div class="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
+                <div class="flex items-center justify-between mb-2">
+                    <div class="text-[10px] font-bold uppercase tracking-wider text-slate-500">En camino</div>
+                    <i class="fa-solid fa-motorcycle text-violet-500"></i>
+                </div>
+                <div class="text-2xl font-black text-slate-800">{{ $totalEnCaminoHoy }}</div>
+                <div class="mt-1.5 h-1 rounded-full bg-violet-100"><div class="h-1 rounded-full bg-violet-500" style="width: {{ $statsDomi['pendientes'] > 0 ? ($totalEnCaminoHoy / $statsDomi['pendientes']) * 100 : 0 }}%"></div></div>
+            </div>
+
+            {{-- KPI 3: Entregados hoy --}}
+            <div class="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
+                <div class="flex items-center justify-between mb-2">
+                    <div class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Entregados</div>
+                    <i class="fa-solid fa-circle-check text-emerald-500"></i>
+                </div>
+                <div class="text-2xl font-black text-emerald-700">{{ $statsDomi['entregados'] }}</div>
+                <div class="text-[10px] text-slate-400 mt-1">Hoy</div>
+            </div>
+
+            {{-- KPI 4: Total hoy --}}
+            <div class="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
+                <div class="flex items-center justify-between mb-2">
+                    <div class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total hoy</div>
+                    <i class="fa-solid fa-list text-blue-500"></i>
+                </div>
+                <div class="text-2xl font-black text-slate-800">{{ $statsDomi['total_hoy'] }}</div>
+                <div class="text-[10px] text-slate-400 mt-1">Asignados</div>
+            </div>
+
+            {{-- KPI 5: Monto en ruta --}}
+            <div class="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm col-span-2 sm:col-span-1">
+                <div class="flex items-center justify-between mb-2">
+                    <div class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total $</div>
+                    <i class="fa-solid fa-coins text-yellow-500"></i>
+                </div>
+                <div class="text-2xl font-black text-slate-800">${{ number_format($totalMontoHoy, 0, ',', '.') }}</div>
+                <div class="text-[10px] text-slate-400 mt-1">En ruta</div>
+            </div>
+        </div>
+
+        {{-- ╔══════════════ TABS de filtro estilo /pedidos ══════════════╗ --}}
+        @php
+            $filtroDomi = $filtroEstadoDomi ?? 'todos';
+        @endphp
+        <div class="mb-5 flex flex-wrap gap-2" x-data="{ tab: '{{ $filtroDomi }}' }">
+            <button @click="tab = 'todos'" wire:click="$set('filtroEstadoDomi', 'todos')"
+                    :class="tab === 'todos' ? 'bg-slate-900 text-white' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'"
+                    class="inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-sm font-bold transition">
+                <i class="fa-solid fa-list"></i> Todos
+                <span :class="tab === 'todos' ? 'bg-white/20' : 'bg-slate-100'" class="ml-1 px-1.5 rounded-full text-[10px]">{{ $pedidosOrdenados->count() }}</span>
+            </button>
+            <button @click="tab = 'por_recoger'" wire:click="$set('filtroEstadoDomi', 'por_recoger')"
+                    :class="tab === 'por_recoger' ? 'bg-amber-500 text-white' : 'bg-white text-slate-700 border border-slate-200 hover:bg-amber-50'"
+                    class="inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-sm font-bold transition">
+                <i class="fa-solid fa-utensils"></i> Por recoger
+                <span :class="tab === 'por_recoger' ? 'bg-white/20' : 'bg-amber-100 text-amber-700'" class="ml-1 px-1.5 rounded-full text-[10px]">{{ $totalEnPrepHoy }}</span>
+            </button>
+            <button @click="tab = 'en_camino'" wire:click="$set('filtroEstadoDomi', 'en_camino')"
+                    :class="tab === 'en_camino' ? 'bg-violet-600 text-white' : 'bg-white text-slate-700 border border-slate-200 hover:bg-violet-50'"
+                    class="inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-sm font-bold transition">
+                <i class="fa-solid fa-motorcycle"></i> En camino
+                <span :class="tab === 'en_camino' ? 'bg-white/20' : 'bg-violet-100 text-violet-700'" class="ml-1 px-1.5 rounded-full text-[10px]">{{ $totalEnCaminoHoy }}</span>
+            </button>
+            <button @click="tab = 'entregados'" wire:click="$set('filtroEstadoDomi', 'entregados')"
+                    :class="tab === 'entregados' ? 'bg-emerald-600 text-white' : 'bg-white text-slate-700 border border-slate-200 hover:bg-emerald-50'"
+                    class="inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-sm font-bold transition">
+                <i class="fa-solid fa-circle-check"></i> Entregados
+                <span :class="tab === 'entregados' ? 'bg-white/20' : 'bg-emerald-100 text-emerald-700'" class="ml-1 px-1.5 rounded-full text-[10px]">{{ $statsDomi['entregados'] }}</span>
+            </button>
+        </div>
+
+        <div class="mb-6">
 
             {{-- 🗺️ MAPA con la ruta del domiciliario --}}
             @if(!empty($rutaDomi['paradas']))
@@ -223,46 +309,114 @@
             @endif
 
             {{-- Lista de pedidos del domiciliario con código y botones --}}
-            @if($pedidosOrdenados->count() > 0)
+            @php
+                // Aplicar filtro por tab
+                $pedidosFiltrados = match ($filtroEstadoDomi ?? 'todos') {
+                    'por_recoger' => $pedidosOrdenados->where('estado', 'en_preparacion'),
+                    'en_camino'   => $pedidosOrdenados->where('estado', 'repartidor_en_camino'),
+                    'entregados'  => \App\Models\Pedido::where('domiciliario_id', $domiActual->id)
+                                        ->whereDate('fecha_entregado', now()->toDateString())
+                                        ->with(['sede:id,nombre', 'detalles'])
+                                        ->orderByDesc('fecha_entregado')
+                                        ->get(),
+                    default       => $pedidosOrdenados,
+                };
+            @endphp
+
+            @if($pedidosFiltrados->count() > 0)
                 <div class="mt-4">
-                    <h3 class="text-xs uppercase tracking-wider text-slate-500 font-bold mb-3">
-                        <i class="fa-solid fa-list-ol"></i> Mis pedidos en orden
+                    <h3 class="text-xs uppercase tracking-wider text-slate-500 font-bold mb-3 flex items-center gap-2">
+                        <i class="fa-solid fa-list-ol"></i>
+                        @if(($filtroEstadoDomi ?? 'todos') === 'entregados')
+                            Entregados hoy ({{ $pedidosFiltrados->count() }})
+                        @elseif(($filtroEstadoDomi ?? 'todos') === 'por_recoger')
+                            Por recoger en sede ({{ $pedidosFiltrados->count() }})
+                        @elseif(($filtroEstadoDomi ?? 'todos') === 'en_camino')
+                            En camino al cliente ({{ $pedidosFiltrados->count() }})
+                        @else
+                            Mis pedidos en orden ({{ $pedidosFiltrados->count() }})
+                        @endif
                     </h3>
-                    <div class="space-y-3">
-                        @foreach($pedidosOrdenados as $i => $p)
-                            <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                                <div class="flex items-start justify-between gap-3 mb-3">
-                                    <div class="flex items-center gap-3">
-                                        <div class="h-10 w-10 rounded-full bg-brand text-white flex items-center justify-center font-bold">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                        @foreach($pedidosFiltrados as $i => $p)
+                            @php
+                                $estadoLabel = match($p->estado) {
+                                    'repartidor_en_camino' => ['🛵', 'En camino', 'violet'],
+                                    'entregado'            => ['✅', 'Entregado', 'emerald'],
+                                    'en_preparacion'       => ['👨‍🍳', 'Por recoger', 'amber'],
+                                    default                => ['📦', ucfirst($p->estado), 'slate'],
+                                };
+                                $detalles = $p->detalles ?? collect();
+                            @endphp
+                            <div class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden flex flex-col">
+                                {{-- Header card --}}
+                                <div class="flex items-start justify-between gap-3 p-4 border-b border-slate-100 bg-slate-50/50">
+                                    <div class="flex items-center gap-3 min-w-0">
+                                        <div class="flex-shrink-0 h-11 w-11 rounded-2xl bg-gradient-to-br from-brand to-brand-dark text-white flex items-center justify-center font-extrabold shadow-sm">
                                             {{ $i + 1 }}
                                         </div>
-                                        <div>
-                                            <div class="font-bold text-slate-800">Pedido #{{ $p->id }}</div>
-                                            <div class="text-xs text-slate-500">{{ $p->cliente_nombre ?: 'Cliente' }}</div>
+                                        <div class="min-w-0">
+                                            <div class="flex items-center gap-2 flex-wrap">
+                                                <span class="font-extrabold text-slate-800">#{{ $p->id }}</span>
+                                                <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold bg-{{ $estadoLabel[2] }}-100 text-{{ $estadoLabel[2] }}-800">
+                                                    {{ $estadoLabel[0] }} {{ $estadoLabel[1] }}
+                                                </span>
+                                            </div>
+                                            <div class="text-xs text-slate-500 truncate">{{ $p->cliente_nombre ?: 'Cliente' }}</div>
                                         </div>
                                     </div>
-                                    <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold
-                                        @if($p->estado === 'repartidor_en_camino') bg-violet-100 text-violet-800
-                                        @else bg-amber-100 text-amber-800 @endif">
-                                        @if($p->estado === 'repartidor_en_camino') 🛵 En camino
-                                        @else 👨‍🍳 En preparación @endif
-                                    </span>
+                                    <div class="text-right flex-shrink-0">
+                                        <div class="font-extrabold text-slate-800">${{ number_format((float) $p->total, 0, ',', '.') }}</div>
+                                        @if($detalles->count() > 0)
+                                            <div class="text-[10px] text-slate-400 mt-0.5">
+                                                <i class="fa-solid fa-cart-shopping"></i> {{ $detalles->count() }} {{ $detalles->count() === 1 ? 'item' : 'items' }}
+                                            </div>
+                                        @endif
+                                    </div>
                                 </div>
 
-                                <div class="text-sm text-slate-700 mb-1">
-                                    <i class="fa-solid fa-location-dot text-rose-500"></i>
-                                    {{ $p->direccion ?: 'Sin dirección' }}{{ $p->barrio ? ', ' . $p->barrio : '' }}
-                                </div>
-                                <div class="flex items-center justify-between mb-3">
-                                    @if($p->telefono_contacto ?: $p->telefono_whatsapp)
-                                        <a href="tel:{{ $p->telefono_contacto ?: $p->telefono_whatsapp }}" class="text-xs text-emerald-700 hover:underline">
-                                            <i class="fa-solid fa-phone"></i> {{ $p->telefono_contacto ?: $p->telefono_whatsapp }}
-                                        </a>
-                                    @else
-                                        <span class="text-xs text-slate-400">Sin teléfono</span>
+                                <div class="p-4 flex-1 flex flex-col gap-3">
+                                    {{-- Dirección + teléfono --}}
+                                    <div class="space-y-1">
+                                        <div class="text-sm text-slate-700 flex items-start gap-2">
+                                            <i class="fa-solid fa-location-dot text-rose-500 mt-0.5 flex-shrink-0"></i>
+                                            <span class="leading-tight">{{ $p->direccion ?: 'Sin dirección' }}@if($p->barrio), {{ $p->barrio }}@endif</span>
+                                        </div>
+                                        @if($p->telefono_contacto ?: $p->telefono_whatsapp)
+                                            <a href="tel:{{ $p->telefono_contacto ?: $p->telefono_whatsapp }}" class="text-xs text-emerald-700 hover:underline inline-flex items-center gap-1.5">
+                                                <i class="fa-solid fa-phone"></i> {{ $p->telefono_contacto ?: $p->telefono_whatsapp }}
+                                            </a>
+                                        @endif
+                                    </div>
+
+                                    {{-- 🛒 Productos --}}
+                                    @if($detalles->count() > 0)
+                                        <div class="rounded-xl bg-slate-50 border border-slate-100 p-2.5">
+                                            <div class="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                                                <i class="fa-solid fa-cart-shopping text-[9px]"></i> Productos
+                                            </div>
+                                            <ul class="space-y-1">
+                                                @foreach($detalles as $d)
+                                                    @php
+                                                        $cant = (float) ($d->cantidad ?? 1);
+                                                        $cantFmt = fmod($cant, 1) == 0 ? (int) $cant : rtrim(rtrim(number_format($cant, 2, '.', ''), '0'), '.');
+                                                        $unit = $d->unidad ?: '';
+                                                    @endphp
+                                                    <li class="flex items-start gap-2 text-[11px] leading-tight">
+                                                        <span class="inline-flex items-center justify-center min-w-[28px] h-[18px] rounded bg-slate-900 text-white text-[10px] font-bold shrink-0">
+                                                            {{ $cantFmt }}{{ $unit ? ' ' . (in_array(strtolower($unit), ['kg','kl']) ? 'kg' : (in_array(strtolower($unit), ['lb','libra','libras']) ? 'lb' : '')) : '' }}
+                                                        </span>
+                                                        <span class="font-medium text-slate-700 leading-tight">
+                                                            {{ \Illuminate\Support\Str::limit($d->producto ?? 'Item', 30) }}
+                                                            @if(!empty($d->corte_nombre))
+                                                                <span class="text-[9px] text-violet-600">· {{ $d->corte_nombre }}</span>
+                                                            @endif
+                                                        </span>
+                                                    </li>
+                                                @endforeach
+                                            </ul>
+                                        </div>
                                     @endif
-                                    <span class="font-bold text-slate-800">${{ number_format((float) $p->total, 0, ',', '.') }}</span>
-                                </div>
 
                                 {{-- 🔑 INDICADOR (no mostramos el código — se valida en modal) --}}
                                 @if($p->token_entrega && $p->estado === 'repartidor_en_camino')
@@ -338,6 +492,22 @@
                             </div>
                         @endforeach
                     </div>
+                </div>
+            @else
+                {{-- Estado vacío estilizado --}}
+                <div class="mt-4 rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
+                    @php
+                        $msgsEmpty = [
+                            'por_recoger' => ['📦', 'No tienes pedidos por recoger', 'Cuando un pedido esté listo en la sede, te aparecerá aquí.'],
+                            'en_camino'   => ['🛵', 'No tienes pedidos en camino', 'Cuando salgas con un pedido, te aparecerá aquí hasta que lo entregues.'],
+                            'entregados'  => ['🎉', 'Aún no has entregado pedidos hoy', '¡Vamos por el primero! Tus entregas aparecerán aquí.'],
+                            'todos'       => ['💤', 'No tienes pedidos asignados', 'Espera a que el sistema te asigne pedidos o pasa más tarde.'],
+                        ];
+                        $emp = $msgsEmpty[$filtroEstadoDomi ?? 'todos'] ?? $msgsEmpty['todos'];
+                    @endphp
+                    <div class="text-5xl mb-3">{{ $emp[0] }}</div>
+                    <h3 class="text-base font-bold text-slate-700">{{ $emp[1] }}</h3>
+                    <p class="text-sm text-slate-500 mt-1">{{ $emp[2] }}</p>
                 </div>
             @endif
         </div>

@@ -20,6 +20,9 @@ class Index extends Component
     public ?int $sedeId = null;
     public ?int $zonaSeleccionada = null;
 
+    /** Filtro de estado para la vista del domiciliario (todos|por_recoger|en_camino|entregados) */
+    public string $filtroEstadoDomi = 'todos';
+
     /** Pedidos seleccionados para despachar (id => true) */
     public array $seleccionados = [];
 
@@ -887,7 +890,7 @@ class Index extends Component
                             \App\Models\Pedido::ESTADO_EN_PREPARACION,
                             \App\Models\Pedido::ESTADO_REPARTIDOR_EN_CAMINO,
                         ])
-                        ->with('sede:id,nombre')
+                        ->with(['sede:id,nombre', 'detalles'])
                         ->get();
 
                     $origLat = $domiActual->lat_actual;
