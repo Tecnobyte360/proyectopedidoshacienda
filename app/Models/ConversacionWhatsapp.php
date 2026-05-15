@@ -137,12 +137,14 @@ class ConversacionWhatsapp extends Model
             ->where('conversacion_id', $this->id)
             ->whereIn('rol', ['user', 'assistant']);
 
-        // 🛡️ Si está activo el aislamiento por día, filtrar a HOY (Bogotá)
+        // 🛡️ Si está activo el aislamiento por día, filtrar a HOY (Bogotá).
+        // 🐛 FIX: MySQL almacena timestamps en hora local (Bogotá según config Laravel).
+        // No convertir a UTC, comparar en la misma TZ del storage.
         try {
             $cfg = ConfiguracionBot::actual();
             if ($cfg && (bool) ($cfg->aislar_contexto_por_dia ?? true)) {
-                $inicioHoyUtc = \Carbon\Carbon::now('America/Bogota')->startOfDay()->utc();
-                $query->where('created_at', '>=', $inicioHoyUtc);
+                $inicioHoyBogota = \Carbon\Carbon::now('America/Bogota')->startOfDay();
+                $query->where('created_at', '>=', $inicioHoyBogota);
             }
         } catch (\Throwable $e) {
             // En caso de error de config, fallback a comportamiento clásico
