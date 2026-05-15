@@ -70,6 +70,133 @@
                     <i class="fa-brands fa-google text-xl text-emerald-600 group-hover:scale-110 transition"></i>
                 </a>
             @endif
+
+            {{-- Lista de pedidos del domiciliario con código y botones --}}
+            @if($pedidosOrdenados->count() > 0)
+                <div class="mt-4">
+                    <h3 class="text-xs uppercase tracking-wider text-slate-500 font-bold mb-3">
+                        <i class="fa-solid fa-list-ol"></i> Mis pedidos en orden
+                    </h3>
+                    <div class="space-y-3">
+                        @foreach($pedidosOrdenados as $i => $p)
+                            <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                                <div class="flex items-start justify-between gap-3 mb-3">
+                                    <div class="flex items-center gap-3">
+                                        <div class="h-10 w-10 rounded-full bg-brand text-white flex items-center justify-center font-bold">
+                                            {{ $i + 1 }}
+                                        </div>
+                                        <div>
+                                            <div class="font-bold text-slate-800">Pedido #{{ $p->id }}</div>
+                                            <div class="text-xs text-slate-500">{{ $p->cliente_nombre ?: 'Cliente' }}</div>
+                                        </div>
+                                    </div>
+                                    <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold
+                                        @if($p->estado === 'repartidor_en_camino') bg-violet-100 text-violet-800
+                                        @else bg-amber-100 text-amber-800 @endif">
+                                        @if($p->estado === 'repartidor_en_camino') 🛵 En camino
+                                        @else 👨‍🍳 En preparación @endif
+                                    </span>
+                                </div>
+
+                                <div class="text-sm text-slate-700 mb-1">
+                                    <i class="fa-solid fa-location-dot text-rose-500"></i>
+                                    {{ $p->direccion ?: 'Sin dirección' }}{{ $p->barrio ? ', ' . $p->barrio : '' }}
+                                </div>
+                                <div class="flex items-center justify-between mb-3">
+                                    @if($p->telefono_contacto ?: $p->telefono_whatsapp)
+                                        <a href="tel:{{ $p->telefono_contacto ?: $p->telefono_whatsapp }}" class="text-xs text-emerald-700 hover:underline">
+                                            <i class="fa-solid fa-phone"></i> {{ $p->telefono_contacto ?: $p->telefono_whatsapp }}
+                                        </a>
+                                    @else
+                                        <span class="text-xs text-slate-400">Sin teléfono</span>
+                                    @endif
+                                    <span class="font-bold text-slate-800">${{ number_format((float) $p->total, 0, ',', '.') }}</span>
+                                </div>
+
+                                {{-- 🔑 CÓDIGO DE ENTREGA (solo si está en camino) --}}
+                                @if($p->token_entrega && $p->estado === 'repartidor_en_camino')
+                                    <div class="rounded-xl bg-amber-50 border border-amber-200 p-3 mb-3 flex items-center gap-3">
+                                        <i class="fa-solid fa-key text-amber-600 text-lg"></i>
+                                        <div class="flex-1">
+                                            <div class="text-xs font-bold text-amber-800">Código del cliente:</div>
+                                            <div class="text-[11px] text-amber-700">
+                                                Pídele al cliente este número:
+                                                <strong class="text-base font-mono text-amber-900">{{ $p->token_entrega }}</strong>
+                                            </div>
+                                        </div>
+                                    </div>
+                                @endif
+
+                                {{-- 💰 ESTADO DE PAGO --}}
+                                @if($p->estado_pago !== 'aprobado')
+                                    <div class="rounded-xl bg-rose-50 border border-rose-200 p-3 mb-3 flex items-center gap-3">
+                                        <i class="fa-solid fa-circle-exclamation text-rose-600 text-lg"></i>
+                                        <div class="flex-1 text-xs">
+                                            <div class="font-bold text-rose-800">⚠️ Pedido SIN pagar</div>
+                                            <div class="text-rose-700">
+                                                Antes de entregar, marca el pago (efectivo). Sin pago no podrás cerrar el pedido.
+                                            </div>
+                                        </div>
+                                    </div>
+                                @else
+                                    <div class="rounded-xl bg-emerald-50 border border-emerald-200 p-2 mb-3 flex items-center gap-2 text-xs">
+                                        <i class="fa-solid fa-circle-check text-emerald-600"></i>
+                                        <span class="font-bold text-emerald-800">Pago confirmado</span>
+                                        @if($p->metodo_pago)
+                                            <span class="text-emerald-700">({{ $p->metodo_pago }})</span>
+                                        @endif
+                                    </div>
+                                @endif
+
+                                {{-- BOTONES DE ACCIÓN --}}
+                                <div class="grid grid-cols-2 gap-2">
+                                    @if($p->lat && $p->lng)
+                                        <a href="https://www.google.com/maps/dir/?api=1&destination={{ $p->lat }},{{ $p->lng }}&travelmode=driving"
+                                           target="_blank" rel="noopener"
+                                           class="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 py-2.5 text-sm font-bold text-slate-700">
+                                            <i class="fa-brands fa-google"></i> Ir
+                                        </a>
+                                    @elseif($p->direccion)
+                                        <a href="https://www.google.com/maps/search/?api=1&query={{ urlencode(($p->direccion ?? '') . ' ' . ($p->barrio ?? '')) }}"
+                                           target="_blank" rel="noopener"
+                                           class="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 py-2.5 text-sm font-bold text-slate-700">
+                                            <i class="fa-brands fa-google"></i> Ir
+                                        </a>
+                                    @else
+                                        <span class="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-slate-100 py-2.5 text-sm font-bold text-slate-400 cursor-not-allowed">
+                                            <i class="fa-solid fa-location-crosshairs"></i> Sin GPS
+                                        </span>
+                                    @endif
+
+                                    @if($p->estado === 'repartidor_en_camino')
+                                        @if($p->estado_pago !== 'aprobado')
+                                            {{-- Pendiente de pago → botón pagar --}}
+                                            <button type="button" wire:click="marcarPagado({{ $p->id }})"
+                                                    wire:confirm="¿Confirmas que el cliente PAGÓ {{ '$' . number_format((float)$p->total,0,',','.') }} en efectivo?"
+                                                    class="inline-flex items-center justify-center gap-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white py-2.5 text-sm font-bold">
+                                                <i class="fa-solid fa-money-bill-wave"></i> Marcar pagado
+                                            </button>
+                                        @else
+                                            {{-- Pagado → puede entregar --}}
+                                            <button type="button" wire:click="marcarEntregado({{ $p->id }})"
+                                                    wire:confirm="¿Marcar pedido #{{ $p->id }} como ENTREGADO? El cliente debe darte el código {{ $p->token_entrega }}."
+                                                    class="inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 text-sm font-bold">
+                                                <i class="fa-solid fa-circle-check"></i> Entregado
+                                            </button>
+                                        @endif
+                                    @else
+                                        {{-- En preparación → botón salir --}}
+                                        <button type="button" wire:click="marcarEnCamino({{ $p->id }})"
+                                                class="inline-flex items-center justify-center gap-1.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white py-2.5 text-sm font-bold">
+                                            <i class="fa-solid fa-motorcycle"></i> Salir
+                                        </button>
+                                    @endif
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
         </div>
     @elseif($esDomiciliarioPuro)
         <div class="mb-6 rounded-2xl border-2 border-amber-200 bg-amber-50 p-5 max-w-2xl">

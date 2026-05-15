@@ -593,12 +593,51 @@ class Index extends Component
         }
         if ($pedido->estado === \App\Models\Pedido::ESTADO_ENTREGADO) return;
 
+        // 🛡️ GUARD DE PAGO: no permitir entregar si el pedido NO está pagado.
+        // El domiciliario debe marcar el pago primero (efectivo) o el cliente
+        // debe haber pagado antes online.
+        if ($pedido->estado_pago !== 'aprobado') {
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => '⚠️ Este pedido NO está pagado. Marca el pago primero (efectivo) y luego entrega.',
+            ]);
+            return;
+        }
+
         $pedido->cambiarEstado(
             \App\Models\Pedido::ESTADO_ENTREGADO,
             "Entregado por {$dom->nombre}",
             'Entregado'
         );
         $this->dispatch('notify', ['type' => 'success', 'message' => '✅ Pedido entregado']);
+    }
+
+    /**
+     * 💰 Marcar pago como aprobado en efectivo (solo el domiciliario asignado).
+     * Útil para cuando el cliente paga al recibir y el domiciliario confirma.
+     */
+    public function marcarPagado(int $pedidoId): void
+    {
+        $dom = $this->domiciliarioActual();
+        if (!$dom) return;
+
+        $pedido = \App\Models\Pedido::where('id', $pedidoId)
+            ->where('domiciliario_id', $dom->id)
+            ->first();
+        if (!$pedido) return;
+
+        if ($pedido->estado_pago === 'aprobado') {
+            $this->dispatch('notify', ['type' => 'info', 'message' => 'Este pedido ya está pagado.']);
+            return;
+        }
+
+        $pedido->update([
+            'estado_pago'  => 'aprobado',
+            'metodo_pago'  => $pedido->metodo_pago ?: 'efectivo',
+            'pagado_at'    => now(),
+        ]);
+
+        $this->dispatch('notify', ['type' => 'success', 'message' => '💰 Pago marcado como recibido en efectivo']);
     }
 
     /**
