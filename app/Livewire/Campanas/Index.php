@@ -6,6 +6,8 @@ use App\Models\CampanaWhatsapp;
 use App\Models\Sede;
 use App\Models\ZonaCobertura;
 use App\Services\CampanaSenderService;
+use App\Services\WhatsappResolverService;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -17,6 +19,13 @@ class Index extends Component
     use WithPagination, WithFileUploads;
 
     protected $paginationTheme = 'tailwind';
+
+    // ─── Estado WhatsApp ────────────────────────────────────────────────
+    public bool   $waConectado    = false;
+    public string $waStatus       = 'UNKNOWN';
+    public string $waPhone        = '';
+    public string $waNombre       = '';
+    public ?int   $waConnectionId = null;
 
     public bool $modal = false;
     public ?int $editandoId = null;
@@ -128,6 +137,47 @@ class Index extends Component
                 'type'    => 'error',
                 'message' => 'No pude leer el archivo: ' . $e->getMessage(),
             ]);
+        }
+    }
+
+    public function mount(): void
+    {
+        $this->refreshEstadoWa();
+    }
+
+    /** Consulta el estado de la sesión WA del tenant. Llamado en mount + wire:poll.30s */
+    public function refreshEstadoWa(): void
+    {
+        try {
+            $resolver = app(WhatsappResolverService::class);
+            $cred     = $resolver->credenciales();
+            $base     = rtrim($cred['api_base_url'] ?? '', '/');
+            if (!$base) return;
+
+            $token = $resolver->token();
+            if (!$token) return;
+
+            $resp = Http::withoutVerifying()->withToken($token)->timeout(8)->get("{$base}/whatsapp/");
+            if (!$resp->successful()) return;
+
+            $whatsapps = collect($resp->json('whatsapps', []));
+            if ($whatsapps->isEmpty()) return;
+
+            // Priorizar el connection_id del tenant
+            $ids  = $resolver->connectionIdsDelTenant();
+            $conn = !empty($ids) ? $whatsapps->firstWhere('id', $ids[0]) : null;
+            $conn = $conn ?? $whatsapps->first(fn ($w) => strtoupper($w['status'] ?? '') === 'CONNECTED')
+                         ?? $whatsapps->first();
+
+            if (!$conn) return;
+
+            $this->waStatus       = strtoupper($conn['status'] ?? 'UNKNOWN');
+            $this->waConectado    = $this->waStatus === 'CONNECTED';
+            $this->waPhone        = $conn['phoneNumber'] ?? $conn['profileName'] ?? $conn['name'] ?? '';
+            $this->waNombre       = $conn['profileName'] ?? $conn['name'] ?? '';
+            $this->waConnectionId = isset($conn['id']) ? (int) $conn['id'] : null;
+        } catch (\Throwable) {
+            // Falla silenciosamente — mantiene el estado anterior
         }
     }
 

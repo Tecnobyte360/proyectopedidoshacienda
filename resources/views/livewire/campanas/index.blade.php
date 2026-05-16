@@ -20,7 +20,40 @@
         </div>
 
         {{-- 📱 Sesión WhatsApp activa --}}
-        @livewire('whatsapp-status-monitor')
+        <div wire:poll.30000ms="refreshEstadoWa"
+             class="rounded-xl border p-3 flex items-center gap-3 {{ $waConectado ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200' }}">
+            <div class="flex h-9 w-9 items-center justify-center rounded-xl {{ $waConectado ? 'bg-emerald-100' : 'bg-rose-100' }} shrink-0">
+                <i class="fa-brands fa-whatsapp text-base {{ $waConectado ? 'text-emerald-600' : 'text-rose-500' }}"></i>
+            </div>
+            <div class="flex-1 min-w-0">
+                <p class="text-xs font-bold flex items-center gap-1.5 {{ $waConectado ? 'text-emerald-800' : 'text-rose-800' }}">
+                    <span class="relative flex h-2 w-2 shrink-0">
+                        @if($waConectado)
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        @endif
+                        <span class="relative inline-flex rounded-full h-2 w-2 {{ $waConectado ? 'bg-emerald-500' : ($waStatus === 'UNKNOWN' ? 'bg-slate-400' : 'bg-amber-500') }}"></span>
+                    </span>
+                    WhatsApp ·
+                    @if($waConectado) Conectado
+                    @elseif($waStatus === 'PAIRING') Esperando QR
+                    @elseif($waStatus === 'DISCONNECTED') Desconectado
+                    @elseif($waStatus === 'UNKNOWN') Verificando…
+                    @else {{ $waStatus }}
+                    @endif
+                </p>
+                @if($waPhone)
+                    <p class="text-[11px] font-mono {{ $waConectado ? 'text-emerald-700' : 'text-rose-700' }} truncate">
+                        📞 {{ $waPhone }}
+                        @if($waNombre && $waNombre !== $waPhone) · {{ $waNombre }}@endif
+                    </p>
+                @elseif(!$waConectado)
+                    <p class="text-[11px] text-rose-600">Los mensajes no se enviarán hasta reconectar.</p>
+                @endif
+            </div>
+            @if($waConnectionId)
+                <span class="text-[10px] font-mono text-slate-400 shrink-0">ID: {{ $waConnectionId }}</span>
+            @endif
+        </div>
 
         <div class="rounded-xl bg-amber-50 border border-amber-200 p-4 text-xs text-amber-800">
             <p class="font-bold mb-1"><i class="fa-solid fa-shield-halved"></i> Anti-baneo activado</p>
