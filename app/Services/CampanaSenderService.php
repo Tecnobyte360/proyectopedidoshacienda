@@ -160,6 +160,19 @@ class CampanaSenderService
         }
         $this->tenantManager->set($tenant);
 
+        // 🔌 Resolver connection_id correcto del tenant si la campaña no tiene uno asignado.
+        // Si connection_id es null, TecnoByteApp elige su sesión default que puede ser
+        // de OTRO tenant → siempre forzamos el primer connection_id del tenant.
+        $connectionId = $c->connection_id;
+        if (!$connectionId) {
+            $resolver = app(\App\Services\WhatsappResolverService::class);
+            $ids = $resolver->connectionIdsDelTenant($tenant);
+            $connectionId = $ids[0] ?? null;
+            if ($connectionId) {
+                Log::info("📱 Campaña #{$c->id}: connection_id no definido, usando default del tenant: {$connectionId}");
+            }
+        }
+
         $pendientes = CampanaDestinatario::where('campana_id', $c->id)
             ->where('estado', CampanaDestinatario::ESTADO_PENDIENTE)
             ->limit($c->lote_tamano)
@@ -191,10 +204,10 @@ class CampanaSenderService
                         $d->telefono,
                         $c->media_url,
                         $mensaje,
-                        $c->connection_id
+                        $connectionId
                     );
                 } else {
-                    $ok = $this->sender->enviarTexto($d->telefono, $mensaje, $c->connection_id);
+                    $ok = $this->sender->enviarTexto($d->telefono, $mensaje, $connectionId);
                 }
                 if ($ok) {
                     $d->update([
