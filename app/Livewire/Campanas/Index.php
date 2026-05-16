@@ -6,9 +6,6 @@ use App\Models\CampanaWhatsapp;
 use App\Models\Sede;
 use App\Models\ZonaCobertura;
 use App\Services\CampanaSenderService;
-use App\Services\WhatsappResolverService;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -136,65 +133,12 @@ class Index extends Component
 
     public function render()
     {
-        $campanas  = CampanaWhatsapp::orderByDesc('id')->paginate(15);
-        $zonas     = ZonaCobertura::where('activa', true)->orderBy('nombre')->get();
-        $sedes     = Sede::orderBy('nombre')->get();
-        $sesionWa  = $this->resolverSesionWhatsapp();
+        $campanas = CampanaWhatsapp::orderByDesc('id')->paginate(15);
+        $zonas    = ZonaCobertura::where('activa', true)->orderBy('nombre')->get();
+        $sedes    = Sede::orderBy('nombre')->get();
 
-        return view('livewire.campanas.index', compact('campanas', 'zonas', 'sedes', 'sesionWa'))
+        return view('livewire.campanas.index', compact('campanas', 'zonas', 'sedes'))
             ->layout('layouts.app');
-    }
-
-    /**
-     * Obtiene la sesión WhatsApp activa del tenant (cacheada 30 s).
-     * Devuelve array con: id, status, phoneNumber, nombre, conectado (bool)
-     */
-    private function resolverSesionWhatsapp(): array
-    {
-        $tenantId = auth()->user()?->tenant_id;
-        $cacheKey = "campanas_sesion_wa_t{$tenantId}";
-
-        return Cache::remember($cacheKey, 30, function () {
-            $default = ['id' => null, 'status' => 'UNKNOWN', 'phoneNumber' => '', 'nombre' => '', 'conectado' => false];
-
-            try {
-                $resolver = app(WhatsappResolverService::class);
-                $cred = $resolver->credenciales();
-                if (empty($cred['api_base_url'])) return $default;
-
-                $token = $resolver->token();
-                if (!$token) return $default;
-
-                $base = rtrim($cred['api_base_url'], '/');
-                $resp = Http::withoutVerifying()->withToken($token)->timeout(8)->get("{$base}/whatsapp/");
-                if (!$resp->successful()) return $default;
-
-                $whatsapps = collect($resp->json('whatsapps', []));
-                if ($whatsapps->isEmpty()) return $default;
-
-                // Filtrar a los connection_ids del tenant
-                $ids = $resolver->connectionIdsDelTenant();
-                if (!empty($ids)) {
-                    $conn = $whatsapps->firstWhere('id', $ids[0]);
-                } else {
-                    $conn = $whatsapps->first(fn ($w) => strtoupper($w['status'] ?? '') === 'CONNECTED')
-                         ?? $whatsapps->first();
-                }
-
-                if (!$conn) return $default;
-
-                $status = strtoupper($conn['status'] ?? 'UNKNOWN');
-                return [
-                    'id'          => $conn['id'] ?? null,
-                    'status'      => $status,
-                    'phoneNumber' => $conn['phoneNumber'] ?? $conn['profileName'] ?? $conn['name'] ?? '',
-                    'nombre'      => $conn['profileName'] ?? $conn['name'] ?? '',
-                    'conectado'   => $status === 'CONNECTED',
-                ];
-            } catch (\Throwable) {
-                return ['id' => null, 'status' => 'ERROR', 'phoneNumber' => '', 'nombre' => '', 'conectado' => false];
-            }
-        });
     }
 
     public function abrirCrear(): void
