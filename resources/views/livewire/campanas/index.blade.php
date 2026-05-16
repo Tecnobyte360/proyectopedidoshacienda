@@ -1,8 +1,10 @@
 <div class="min-h-screen bg-slate-50">
     <div class="w-full px-4 py-6 sm:px-6 sm:py-8 lg:px-8 space-y-6">
 
-        <div class="rounded-2xl border border-[#fbe9d7] bg-gradient-to-r from-brand-soft/40 via-white to-white p-5 shadow-sm">
-            <div class="flex items-center justify-between gap-4">
+        <div wire:poll.30000ms="refreshEstadoWa"
+             class="rounded-2xl border border-[#fbe9d7] bg-gradient-to-r from-brand-soft/40 via-white to-white p-5 shadow-sm">
+            <div class="flex items-center justify-between gap-4 flex-wrap">
+                {{-- Título --}}
                 <div class="flex items-center gap-4">
                     <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-brand to-brand-secondary text-white shadow-lg">
                         <i class="fa-solid fa-bullhorn text-xl"></i>
@@ -12,47 +14,36 @@
                         <p class="text-sm text-slate-500">Envío masivo pausado para evitar baneos. Configura intervalos, lotes y ventana horaria.</p>
                     </div>
                 </div>
+
+                {{-- Centro: badge sesión WA --}}
+                <div class="flex items-center gap-2 px-3 py-2 rounded-xl border {{ $waConectado ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-100 border-slate-200' }}">
+                    <i class="fa-brands fa-whatsapp text-base {{ $waConectado ? 'text-emerald-600' : 'text-slate-400' }}"></i>
+                    <div>
+                        <p class="text-[11px] font-bold flex items-center gap-1 {{ $waConectado ? 'text-emerald-700' : 'text-slate-500' }}">
+                            <span class="relative flex h-2 w-2">
+                                @if($waConectado)
+                                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                @endif
+                                <span class="relative inline-flex rounded-full h-2 w-2 {{ $waConectado ? 'bg-emerald-500' : 'bg-slate-400' }}"></span>
+                            </span>
+                            {{ $waConectado ? 'Conectado' : ($waStatus === 'PAIRING' ? 'Esperando QR' : ($waStatus === 'DISCONNECTED' ? 'Desconectado' : 'Verificando…')) }}
+                        </p>
+                        @if($waPhone)
+                            <p class="text-[11px] font-mono font-semibold text-slate-700 leading-tight">{{ $waPhone }}</p>
+                        @elseif($waConnectionId)
+                            <p class="text-[10px] font-mono text-slate-400 leading-tight">ID: {{ $waConnectionId }}</p>
+                        @else
+                            <p class="text-[10px] text-slate-400 leading-tight">Sin número detectado</p>
+                        @endif
+                    </div>
+                </div>
+
+                {{-- Botón nueva campaña --}}
                 <button wire:click="abrirCrear"
                         class="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-brand to-brand-secondary hover:from-brand-dark hover:to-brand-dark text-white font-bold px-5 py-3 transition shadow-lg">
                     <i class="fa-solid fa-plus"></i> Nueva campaña
                 </button>
             </div>
-        </div>
-
-        {{-- 📱 Sesión WhatsApp activa --}}
-        <div wire:poll.30000ms="refreshEstadoWa"
-             class="rounded-xl border p-3 flex items-center gap-3 {{ $waConectado ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200' }}">
-            <div class="flex h-9 w-9 items-center justify-center rounded-xl {{ $waConectado ? 'bg-emerald-100' : 'bg-rose-100' }} shrink-0">
-                <i class="fa-brands fa-whatsapp text-base {{ $waConectado ? 'text-emerald-600' : 'text-rose-500' }}"></i>
-            </div>
-            <div class="flex-1 min-w-0">
-                <p class="text-xs font-bold flex items-center gap-1.5 {{ $waConectado ? 'text-emerald-800' : 'text-rose-800' }}">
-                    <span class="relative flex h-2 w-2 shrink-0">
-                        @if($waConectado)
-                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                        @endif
-                        <span class="relative inline-flex rounded-full h-2 w-2 {{ $waConectado ? 'bg-emerald-500' : ($waStatus === 'UNKNOWN' ? 'bg-slate-400' : 'bg-amber-500') }}"></span>
-                    </span>
-                    WhatsApp ·
-                    @if($waConectado) Conectado
-                    @elseif($waStatus === 'PAIRING') Esperando QR
-                    @elseif($waStatus === 'DISCONNECTED') Desconectado
-                    @elseif($waStatus === 'UNKNOWN') Verificando…
-                    @else {{ $waStatus }}
-                    @endif
-                </p>
-                @if($waPhone)
-                    <p class="text-[11px] font-mono {{ $waConectado ? 'text-emerald-700' : 'text-rose-700' }} truncate">
-                        📞 {{ $waPhone }}
-                        @if($waNombre && $waNombre !== $waPhone) · {{ $waNombre }}@endif
-                    </p>
-                @elseif(!$waConectado)
-                    <p class="text-[11px] text-rose-600">Los mensajes no se enviarán hasta reconectar.</p>
-                @endif
-            </div>
-            @if($waConnectionId)
-                <span class="text-[10px] font-mono text-slate-400 shrink-0">ID: {{ $waConnectionId }}</span>
-            @endif
         </div>
 
         <div class="rounded-xl bg-amber-50 border border-amber-200 p-4 text-xs text-amber-800">
