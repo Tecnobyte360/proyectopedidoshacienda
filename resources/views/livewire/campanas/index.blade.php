@@ -19,6 +19,63 @@
             </div>
         </div>
 
+        {{-- 📱 Sesión WhatsApp activa --}}
+        @php
+            $waColor = $sesionWa['conectado']
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                : 'bg-rose-50 border-rose-200 text-rose-800';
+            $waDot = $sesionWa['conectado']
+                ? 'bg-emerald-500'
+                : ($sesionWa['status'] === 'UNKNOWN' || $sesionWa['status'] === 'ERROR' ? 'bg-slate-400' : 'bg-amber-500');
+            $waIcon = $sesionWa['conectado'] ? 'fa-check-circle text-emerald-600' : 'fa-circle-exclamation text-rose-500';
+            $waLabel = match($sesionWa['status']) {
+                'CONNECTED'     => 'Conectado',
+                'DISCONNECTED'  => 'Desconectado',
+                'PAIRING'       => 'Esperando QR',
+                'TIMEOUT'       => 'Timeout',
+                'NOT_CONNECTED' => 'Sin conectar',
+                'ERROR'         => 'Error de conexión',
+                default         => 'Verificando…',
+            };
+        @endphp
+        <div class="rounded-xl border {{ $waColor }} p-4">
+            <div class="flex items-center justify-between gap-4 flex-wrap">
+                <div class="flex items-center gap-3">
+                    {{-- Icono WhatsApp --}}
+                    <div class="flex h-10 w-10 items-center justify-center rounded-xl {{ $sesionWa['conectado'] ? 'bg-emerald-100' : 'bg-rose-100' }} shrink-0">
+                        <i class="fa-brands fa-whatsapp text-lg {{ $sesionWa['conectado'] ? 'text-emerald-600' : 'text-rose-500' }}"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs font-bold flex items-center gap-1.5">
+                            {{-- Dot animado --}}
+                            <span class="relative flex h-2 w-2">
+                                @if($sesionWa['conectado'])
+                                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                @endif
+                                <span class="relative inline-flex rounded-full h-2 w-2 {{ $waDot }}"></span>
+                            </span>
+                            WhatsApp · {{ $waLabel }}
+                        </p>
+                        @if($sesionWa['phoneNumber'])
+                            <p class="text-[11px] font-mono font-semibold mt-0.5">
+                                📞 {{ $sesionWa['phoneNumber'] }}
+                                @if($sesionWa['nombre'] && $sesionWa['nombre'] !== $sesionWa['phoneNumber'])
+                                    <span class="font-normal opacity-70">· {{ $sesionWa['nombre'] }}</span>
+                                @endif
+                            </p>
+                        @else
+                            <p class="text-[11px] opacity-70 mt-0.5">
+                                {{ $sesionWa['conectado'] ? 'Sesión activa' : 'Los mensajes no se enviarán hasta reconectar.' }}
+                            </p>
+                        @endif
+                    </div>
+                </div>
+                @if($sesionWa['id'])
+                    <span class="text-[10px] font-mono opacity-60">ID: {{ $sesionWa['id'] }}</span>
+                @endif
+            </div>
+        </div>
+
         <div class="rounded-xl bg-amber-50 border border-amber-200 p-4 text-xs text-amber-800">
             <p class="font-bold mb-1"><i class="fa-solid fa-shield-halved"></i> Anti-baneo activado</p>
             <p>El envío usa intervalos aleatorios entre cada mensaje y descansos por lote para evitar que WhatsApp banee tu número (ya que estamos usando whatsapp-web.js, no la API oficial de Meta). Asegúrate que el cron <code class="bg-white px-1 rounded">campanas:procesar</code> corra cada minuto.</p>
