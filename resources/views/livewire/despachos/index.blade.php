@@ -920,12 +920,12 @@
                 @foreach($grupo['pedidos'] as $p)
                     @php $isSelected = !empty($seleccionados[$p->id]); @endphp
 
-                    <label class="flex items-start gap-4 px-5 py-4 hover:bg-slate-50 cursor-pointer transition
+                    <div class="flex items-start gap-4 px-5 py-4 hover:bg-slate-50 transition
                                   {{ $isSelected ? 'bg-amber-50/50' : '' }}">
 
                         <input type="checkbox"
                                wire:model.live="seleccionados.{{ $p->id }}"
-                               class="mt-1 h-5 w-5 rounded border-slate-300 text-brand focus:ring-brand">
+                               class="mt-1 h-5 w-5 rounded border-slate-300 text-brand focus:ring-brand cursor-pointer">
 
                         <div class="flex-1 min-w-0">
                             <div class="flex items-start justify-between gap-3">
@@ -1004,7 +1004,7 @@
                                 </div>
                             </div>
                         </div>
-                    </label>
+                    </div>
                 @endforeach
             </div>
         </div>
