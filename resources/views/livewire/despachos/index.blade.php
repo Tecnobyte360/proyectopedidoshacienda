@@ -815,8 +815,8 @@
                     el._mapaInit = true;
 
                     const cfg = window._despachosMapCfg;
-                    // Tipo de mapa guardado en localStorage (default: hybrid = satélite + calles)
-                    const tipoGuardado = localStorage.getItem('despachos_mapa_tipo') || 'hybrid';
+                    // Tipo de mapa guardado en localStorage (default: roadmap = estilo verde de marca)
+                    const tipoGuardado = localStorage.getItem('despachos_mapa_tipo') || 'roadmap';
                     const map = new google.maps.Map(el, {
                         center: { lat: cfg.centerLat, lng: cfg.centerLng },
                         zoom: cfg.zoom,
@@ -832,24 +832,46 @@
                         zoomControl: true,
                         gestureHandling: 'greedy',
                         styles: [
-                            { elementType: 'geometry', stylers: [{ color: '#f8fafc' }] },
+                            // Base limpia con tono pastel
+                            { elementType: 'geometry', stylers: [{ color: '#f1f5f9' }] },
                             { elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
-                            { elementType: 'labels.text.fill', stylers: [{ color: '#64748b' }] },
-                            { elementType: 'labels.text.stroke', stylers: [{ color: '#ffffff' }] },
-                            { featureType: 'administrative.land_parcel', elementType: 'labels.text.fill', stylers: [{ color: '#bdbdbd' }] },
+                            { elementType: 'labels.text.fill', stylers: [{ color: '#475569' }] },
+                            { elementType: 'labels.text.stroke', stylers: [{ color: '#ffffff' }, { weight: 3 }] },
+
+                            // Áreas administrativas
+                            { featureType: 'administrative.land_parcel', stylers: [{ visibility: 'off' }] },
+                            { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#1e293b' }, { weight: 'bold' }] },
+                            { featureType: 'administrative.neighborhood', elementType: 'labels.text.fill', stylers: [{ color: '#64748b' }] },
+
+                            // POIs ocultos para limpiar
+                            { featureType: 'poi', stylers: [{ visibility: 'off' }] },
                             { featureType: 'poi.business', stylers: [{ visibility: 'off' }] },
-                            { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#dcfce7' }] },
-                            { featureType: 'poi.park', elementType: 'labels.text.fill', stylers: [{ color: '#16a34a' }] },
+
+                            // 🌳 Parques en verde marca
+                            { featureType: 'poi.park', stylers: [{ visibility: 'on' }] },
+                            { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#bbf7d0' }] },
+                            { featureType: 'poi.park', elementType: 'labels.text.fill', stylers: [{ color: '#15803d' }] },
+
+                            // 🏞️ Áreas naturales verde claro
+                            { featureType: 'landscape.natural', elementType: 'geometry', stylers: [{ color: '#d1fae5' }] },
+                            { featureType: 'landscape.natural.terrain', elementType: 'geometry', stylers: [{ color: '#a7f3d0' }] },
+                            { featureType: 'landscape.man_made', elementType: 'geometry', stylers: [{ color: '#e2e8f0' }] },
+
+                            // 🛣️ Carreteras blancas con jerarquía
                             { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#ffffff' }] },
-                            { featureType: 'road.arterial', elementType: 'geometry', stylers: [{ color: '#cbd5e1' }] },
-                            { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#94a3b8' }] },
-                            { featureType: 'road.highway', elementType: 'geometry.stroke', stylers: [{ color: '#64748b' }] },
+                            { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#64748b' }] },
+                            { featureType: 'road.arterial', elementType: 'geometry', stylers: [{ color: '#ffffff' }] },
+                            { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#a3e635' }] },
+                            { featureType: 'road.highway', elementType: 'geometry.stroke', stylers: [{ color: '#65a30d' }] },
+                            { featureType: 'road.highway.controlled_access', elementType: 'geometry', stylers: [{ color: '#84cc16' }] },
                             { featureType: 'road.local', elementType: 'labels.text.fill', stylers: [{ color: '#94a3b8' }] },
+
+                            // Transporte oculto
                             { featureType: 'transit', stylers: [{ visibility: 'off' }] },
-                            { featureType: 'transit.line', elementType: 'geometry', stylers: [{ color: '#e2e8f0' }] },
-                            { featureType: 'transit.station', elementType: 'labels.text.fill', stylers: [{ color: '#94a3b8' }] },
-                            { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#bae6fd' }] },
-                            { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#0284c7' }] }
+
+                            // 💧 Agua celeste suave
+                            { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#7dd3fc' }] },
+                            { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#0369a1' }] }
                         ],
                     });
 
