@@ -26,7 +26,11 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         // Si no está autenticado y golpea una ruta protegida, redirigir al login
-        $middleware->redirectGuestsTo(fn () => route('login'));
+        // ⚠️ Importante: usar '/login' (path relativo) en vez de route('login') porque
+        // route() genera URLs absolutas con APP_URL — eso enviaría al usuario a
+        // admin.kivox.co/login aunque esté en la-hacienda.kivox.co. El path relativo
+        // mantiene el host actual y respeta el subdominio del tenant.
+        $middleware->redirectGuestsTo('/login');
 
         // Multi-tenant: setea tenant actual en cada request web
         $middleware->web(append: [
