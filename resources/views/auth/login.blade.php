@@ -42,24 +42,23 @@
         body { font-family: 'Plus Jakarta Sans', sans-serif; }
     </style>
 </head>
-<body class="min-h-screen flex items-center justify-center p-4"
-      style="background: linear-gradient(135deg, {{ $bgLight }}, #ffffff, {{ $bgLight }});">
+<body class="min-h-screen flex items-center justify-center p-4 bg-white">
 
     <div class="w-full max-w-md">
         {{-- Brand dinámico por tenant --}}
-        <div class="text-center mb-8">
+        <div class="text-center mb-6">
             @if($brandLogo)
-                <div class="inline-flex h-20 w-20 items-center justify-center rounded-2xl bg-white shadow-xl mb-4 overflow-hidden border-2 border-slate-100">
+                <div class="inline-flex h-14 w-14 items-center justify-center rounded-xl bg-white shadow-md mb-3 overflow-hidden border border-slate-100">
                     <img src="{{ $brandLogo }}" alt="{{ $brandName }}" class="h-full w-full object-contain">
                 </div>
             @else
-                <div class="inline-flex h-16 w-16 items-center justify-center rounded-2xl text-white shadow-xl mb-4"
+                <div class="inline-flex h-12 w-12 items-center justify-center rounded-xl text-white shadow-md mb-3"
                      style="background: linear-gradient(135deg, {{ $colorPrim }}, {{ $colorSec }});">
-                    <i class="fa-solid fa-utensils text-2xl"></i>
+                    <i class="fa-solid fa-utensils text-lg"></i>
                 </div>
             @endif
-            <h1 class="text-2xl font-extrabold text-slate-800">{{ $brandName }}</h1>
-            <p class="text-sm text-slate-500 mt-1">Plataforma de gestión de pedidos</p>
+            <h1 class="text-xl font-extrabold text-slate-800">{{ $brandName }}</h1>
+            <p class="text-xs text-slate-500 mt-0.5">Plataforma de gestión de pedidos</p>
         </div>
 
         {{-- Card --}}
