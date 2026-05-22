@@ -48,97 +48,41 @@
 
     <div class="min-h-screen grid lg:grid-cols-2">
 
-        {{-- ═══════════════ MITAD IZQUIERDA: BRAND ═══════════════ --}}
-        <div class="relative hidden lg:flex flex-col items-center justify-center px-12 py-16 overflow-hidden"
+        {{-- ═══════════════ MITAD IZQUIERDA: SOLO LOGO ═══════════════ --}}
+        <div class="relative hidden lg:flex flex-col items-center justify-center overflow-hidden"
              style="background: linear-gradient(135deg, {{ $colorPrim }} 0%, {{ $colorSec }} 100%);">
 
-            {{-- Patrón decorativo --}}
-            <div class="absolute inset-0 opacity-[0.07]">
-                <svg class="w-full h-full" xmlns="http://www.w3.org/2000/svg">
-                    <defs>
-                        <pattern id="dots" width="32" height="32" patternUnits="userSpaceOnUse">
-                            <circle cx="16" cy="16" r="1.5" fill="white"/>
-                        </pattern>
-                    </defs>
-                    <rect width="100%" height="100%" fill="url(#dots)"/>
-                </svg>
-            </div>
+            {{-- Orbes decorativos suaves (sin patrón de puntos) --}}
+            <div class="absolute -top-40 -left-40 w-[36rem] h-[36rem] bg-white/15 rounded-full blur-3xl"></div>
+            <div class="absolute -bottom-40 -right-40 w-[40rem] h-[40rem] bg-white/10 rounded-full blur-3xl"></div>
+            <div class="absolute top-1/4 right-1/4 w-72 h-72 bg-white/8 rounded-full blur-2xl"></div>
 
-            {{-- Círculos decorativos blur --}}
-            <div class="absolute -top-32 -left-32 w-96 h-96 bg-white/15 rounded-full blur-3xl"></div>
-            <div class="absolute -bottom-32 -right-32 w-[28rem] h-[28rem] bg-white/10 rounded-full blur-3xl"></div>
-            <div class="absolute top-1/3 left-1/4 w-64 h-64 bg-white/5 rounded-full blur-2xl"></div>
-
-            {{-- Contenido principal --}}
-            <div class="relative z-10 text-center max-w-md flex flex-col items-center">
-
-                {{-- Logo card (compacto — logo ya contiene texto del brand) --}}
+            {{-- Logo grande centrado --}}
+            <div class="relative z-10 flex items-center justify-center">
                 @if($brandLogo)
-                    <div class="relative mb-6">
+                    <div class="relative">
                         {{-- Glow detrás del logo --}}
-                        <div class="absolute inset-0 bg-white/40 rounded-2xl blur-2xl scale-110"></div>
+                        <div class="absolute inset-0 bg-white/50 rounded-[2.5rem] blur-3xl scale-125"></div>
                         {{-- Card del logo --}}
-                        <div class="relative h-28 w-28 flex items-center justify-center rounded-2xl bg-white shadow-2xl border border-white/40 overflow-hidden">
+                        <div class="relative h-72 w-72 flex items-center justify-center rounded-[2.5rem] bg-white shadow-2xl border border-white/30 overflow-hidden">
                             <img src="{{ $brandLogo }}" alt="{{ $brandName }}"
-                                 class="h-full w-full object-contain p-3">
+                                 class="h-full w-full object-contain p-6">
                         </div>
                     </div>
-                    {{-- Subtítulo (sin h1 — el logo ya tiene el nombre) --}}
-                    <p class="text-base text-white/95 font-medium">{{ $subtitulo }}</p>
                 @else
-                    <div class="relative mb-6">
-                        <div class="absolute inset-0 bg-white/40 rounded-2xl blur-2xl scale-110"></div>
-                        <div class="relative h-24 w-24 flex items-center justify-center rounded-2xl bg-white shadow-2xl">
-                            <i class="fa-solid fa-utensils text-4xl" style="color: {{ $colorPrim }};"></i>
+                    <div class="relative">
+                        <div class="absolute inset-0 bg-white/50 rounded-[2.5rem] blur-3xl scale-125"></div>
+                        <div class="relative h-72 w-72 flex flex-col items-center justify-center rounded-[2.5rem] bg-white shadow-2xl">
+                            <i class="fa-solid fa-utensils text-7xl mb-4" style="color: {{ $colorPrim }};"></i>
+                            <h1 class="text-3xl font-extrabold" style="color: {{ $colorPrim }};">{{ $brandName }}</h1>
                         </div>
                     </div>
-                    <h1 class="text-4xl font-extrabold text-white drop-shadow-lg tracking-tight">{{ $brandName }}</h1>
-                    <p class="text-base text-white/95 mt-2 font-medium">{{ $subtitulo }}</p>
                 @endif
-
-                {{-- Separador decorativo --}}
-                <div class="mt-8 mb-6 flex items-center gap-3 w-full max-w-xs">
-                    <span class="h-px flex-1 bg-white/30"></span>
-                    <span class="text-[10px] uppercase tracking-[0.3em] text-white/70 font-bold">
-                        Plataforma omnicanal
-                    </span>
-                    <span class="h-px flex-1 bg-white/30"></span>
-                </div>
-
-                {{-- Lista de beneficios --}}
-                <div class="space-y-3 w-full max-w-sm">
-                    <div class="flex items-center gap-4 text-white bg-white/10 backdrop-blur-sm rounded-2xl px-4 py-3 border border-white/20 hover:bg-white/15 transition">
-                        <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-white/25 shrink-0">
-                            <i class="fa-solid fa-bolt text-white text-lg"></i>
-                        </span>
-                        <div class="text-left">
-                            <p class="text-sm font-bold leading-tight">Pedidos automáticos</p>
-                            <p class="text-[11px] text-white/75">Vía WhatsApp 24/7</p>
-                        </div>
-                    </div>
-                    <div class="flex items-center gap-4 text-white bg-white/10 backdrop-blur-sm rounded-2xl px-4 py-3 border border-white/20 hover:bg-white/15 transition">
-                        <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-white/25 shrink-0">
-                            <i class="fa-solid fa-route text-white text-lg"></i>
-                        </span>
-                        <div class="text-left">
-                            <p class="text-sm font-bold leading-tight">Domiciliarios en vivo</p>
-                            <p class="text-[11px] text-white/75">Tracking GPS en tiempo real</p>
-                        </div>
-                    </div>
-                    <div class="flex items-center gap-4 text-white bg-white/10 backdrop-blur-sm rounded-2xl px-4 py-3 border border-white/20 hover:bg-white/15 transition">
-                        <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-white/25 shrink-0">
-                            <i class="fa-solid fa-chart-line text-white text-lg"></i>
-                        </span>
-                        <div class="text-left">
-                            <p class="text-sm font-bold leading-tight">Reportes y métricas</p>
-                            <p class="text-[11px] text-white/75">Análisis profundo del negocio</p>
-                        </div>
-                    </div>
-                </div>
             </div>
 
-            <p class="absolute bottom-6 text-xs text-white/60 font-medium">
-                © {{ date('Y') }} {{ $brandName }} · Todos los derechos reservados
+            {{-- Footer mínimo --}}
+            <p class="absolute bottom-8 text-xs text-white/70 font-medium tracking-wide">
+                © {{ date('Y') }} {{ $brandName }}
             </p>
         </div>
 
