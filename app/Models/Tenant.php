@@ -170,6 +170,14 @@ class Tenant extends Model
                 $disk->makeDirectory($ruta);
                 // .gitkeep para que sobreviva a operaciones de git si se versionan
                 $disk->put("{$ruta}/.gitkeep", '');
+
+                // 🔐 Asegurar que www-data pueda escribir (Laravel ejecuta como
+                // www-data via PHP-FPM, pero el comando CLI puede correr como root).
+                // Sin esto, los uploads desde la app fallan silenciosamente.
+                $rutaAbs = $disk->path($ruta);
+                @chown($rutaAbs, 'www-data');
+                @chgrp($rutaAbs, 'www-data');
+                @chmod($rutaAbs, 0775);
             }
         }
     }
