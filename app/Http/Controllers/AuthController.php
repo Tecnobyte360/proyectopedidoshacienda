@@ -123,10 +123,21 @@ class AuthController extends Controller
         $user = Auth::user();
         $user->update(['ultimo_login_at' => now()]);
 
-        // Limpiar la URL "intended" — el usuario podría haber intentado entrar
-        // a una ruta que no le corresponde según su rol. Lo enviamos a SU ruta
-        // inicial calculada por permisos.
+        // Limpiar la URL "intended"
         $request->session()->forget('url.intended');
+
+        // 🎭 Super-admin logueado desde subdominio de tenant → impersonar
+        // automáticamente ese tenant. Sin esto el super-admin sería enviado a
+        // /admin/tenants → middleware lo redirige a admin.kivox.co → mala UX.
+        try {
+            if ($user->hasRole('super-admin')) {
+                $tenantSub = $this->resolverTenantLogin();
+                if ($tenantSub) {
+                    session(['tenant_imitado_id' => $tenantSub->id]);
+                    return redirect('/pedidos'); // dashboard del tenant
+                }
+            }
+        } catch (\Throwable $e) { /* ignorar */ }
 
         return redirect($this->rutaInicialPara($user));
     }
