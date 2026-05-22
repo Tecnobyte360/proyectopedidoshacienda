@@ -50,38 +50,37 @@
 
         {{-- ═══════════════ MITAD IZQUIERDA: LOGO HERO ═══════════════ --}}
         <div class="relative hidden lg:flex flex-col items-center justify-center overflow-hidden"
-             style="background: linear-gradient(135deg, {{ $colorPrim }} 0%, {{ $colorSec }} 60%, #064e3b 100%);">
+             style="background: linear-gradient(135deg, {{ $colorPrim }} 0%, {{ $colorSec }} 55%, #047857 100%);">
 
-            {{-- Orbes 3D decorativos --}}
-            <div class="absolute top-16 right-24 w-32 h-32 rounded-full shadow-2xl"
-                 style="background: radial-gradient(circle at 30% 30%, #6ee7b7 0%, #10b981 40%, #064e3b 100%);"></div>
-            <div class="absolute bottom-12 left-16 w-20 h-20 rounded-full shadow-xl"
-                 style="background: radial-gradient(circle at 30% 30%, #86efac 0%, #22c55e 40%, #14532d 100%);"></div>
-            <div class="absolute top-1/2 -left-8 w-24 h-24 rounded-full shadow-xl opacity-80"
-                 style="background: radial-gradient(circle at 30% 30%, #a7f3d0 0%, #34d399 40%, #065f46 100%);"></div>
+            {{-- Anillo circular brillante alrededor del logo (efecto spotlight) --}}
+            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[44rem] h-[44rem] rounded-full"
+                 style="background: radial-gradient(circle, transparent 35%, rgba(255,255,255,0.18) 45%, transparent 60%);"></div>
+            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[36rem] h-[36rem] rounded-full"
+                 style="background: radial-gradient(circle, rgba(255,255,255,0.12) 0%, transparent 70%);"></div>
 
-            {{-- Halo radial blanco gigante detrás del logo --}}
-            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[40rem] h-[40rem] rounded-full blur-3xl"
-                 style="background: radial-gradient(circle, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0.08) 40%, transparent 70%);"></div>
-            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[28rem] h-[28rem] rounded-full bg-white/10 blur-2xl"></div>
+            {{-- Brillos sutiles en bordes --}}
+            <div class="absolute -bottom-32 -left-32 w-[28rem] h-[28rem] rounded-full"
+                 style="background: radial-gradient(circle, rgba(187,247,208,0.25) 0%, transparent 70%);"></div>
+            <div class="absolute -top-32 -right-32 w-[28rem] h-[28rem] rounded-full"
+                 style="background: radial-gradient(circle, rgba(167,243,208,0.2) 0%, transparent 70%);"></div>
 
             {{-- Puntos decorativos esquina superior izquierda --}}
-            <div class="absolute top-12 left-12 opacity-40">
-                <svg width="100" height="100" xmlns="http://www.w3.org/2000/svg">
-                    @for($i = 0; $i < 5; $i++)
-                        @for($j = 0; $j < 5; $j++)
-                            <circle cx="{{ 10 + $i * 18 }}" cy="{{ 10 + $j * 18 }}" r="1.5" fill="white"/>
+            <div class="absolute top-10 left-10 opacity-60">
+                <svg width="120" height="120" xmlns="http://www.w3.org/2000/svg">
+                    @for($i = 0; $i < 6; $i++)
+                        @for($j = 0; $j < 6; $j++)
+                            <circle cx="{{ 8 + $i * 18 }}" cy="{{ 8 + $j * 18 }}" r="1.8" fill="white" opacity="{{ 0.3 + ($i + $j) * 0.05 }}"/>
                         @endfor
                     @endfor
                 </svg>
             </div>
 
             {{-- Puntos decorativos esquina inferior derecha --}}
-            <div class="absolute bottom-12 right-12 opacity-40">
-                <svg width="100" height="100" xmlns="http://www.w3.org/2000/svg">
-                    @for($i = 0; $i < 5; $i++)
-                        @for($j = 0; $j < 5; $j++)
-                            <circle cx="{{ 10 + $i * 18 }}" cy="{{ 10 + $j * 18 }}" r="1.5" fill="white"/>
+            <div class="absolute bottom-10 right-10 opacity-60">
+                <svg width="120" height="120" xmlns="http://www.w3.org/2000/svg">
+                    @for($i = 0; $i < 6; $i++)
+                        @for($j = 0; $j < 6; $j++)
+                            <circle cx="{{ 8 + $i * 18 }}" cy="{{ 8 + $j * 18 }}" r="1.8" fill="white" opacity="{{ 0.3 + (5 - $i + 5 - $j) * 0.05 }}"/>
                         @endfor
                     @endfor
                 </svg>
@@ -100,7 +99,7 @@
                     </div>
                 @endif
 
-                {{-- Tagline debajo del KIVOX (margen negativo para acercarlo al texto del logo) --}}
+                {{-- Tagline debajo del KIVOX --}}
                 <p class="-mt-4 text-sm lg:text-base text-white font-bold tracking-[0.4em] uppercase drop-shadow-md">
                     Conecta · Comunica · Transforma
                 </p>
@@ -186,6 +185,22 @@
                         Iniciar sesión
                     </button>
                 </form>
+
+                {{-- Divisor + link de recuperar contraseña --}}
+                <div class="mt-6 flex items-center gap-3">
+                    <span class="h-px flex-1 bg-slate-200"></span>
+                    <i class="fa-regular fa-circle text-[10px] text-slate-300"></i>
+                    <span class="h-px flex-1 bg-slate-200"></span>
+                </div>
+
+                <div class="mt-4 text-center">
+                    <a href="#" onclick="alert('Contacta al administrador para restablecer tu contraseña.'); return false;"
+                       class="inline-flex items-center gap-2 text-sm font-semibold transition hover:underline"
+                       style="color: {{ $colorPrim }};">
+                        <i class="fa-solid fa-shield-halved text-xs"></i>
+                        ¿Olvidaste tu contraseña?
+                    </a>
+                </div>
 
                 <p class="text-center text-xs text-slate-400 mt-8 lg:hidden">
                     © {{ date('Y') }} {{ $brandName }} · Todos los derechos reservados
