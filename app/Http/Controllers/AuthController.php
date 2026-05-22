@@ -13,14 +13,17 @@ class AuthController extends Controller
         // Usado cuando entras a un subdominio de tenant desde admin/tenants
         // y queremos que el usuario inicie sesión limpia (no auto-redirect
         // al dashboard usando una sesión cross-subdomain previa).
-        if ($request->query('logout') === '1' && Auth::check()) {
+        $forzarLogout = $request->query('logout') === '1';
+        if ($forzarLogout && Auth::check()) {
             Auth::logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();
-            return redirect()->route('login');
+            // No usamos redirect()->route('login') porque genera URL con APP_URL
+            // (admin.kivox.co) en vez del host actual. Renderizamos directo.
         }
 
-        if (Auth::check()) {
+        // Si ya está logueado (y NO pidió logout), redirigir a su ruta inicial
+        if (!$forzarLogout && Auth::check()) {
             return redirect($this->rutaInicialPara(Auth::user()));
         }
 
