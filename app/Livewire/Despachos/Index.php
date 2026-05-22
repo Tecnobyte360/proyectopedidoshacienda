@@ -280,6 +280,109 @@ class Index extends Component
         }
     }
 
+    /**
+     * 🔄 Reasigna UN pedido a otro domiciliario directamente desde el listado.
+     * Libera al domiciliario anterior si quedaba sin pedidos, ocupa al nuevo
+     * y notifica con WhatsApp (token de entrega).
+     */
+    public function reasignarPedido(int $pedidoId, int $nuevoDomiciliarioId): void
+    {
+        try {
+            $pedido = Pedido::findOrFail($pedidoId);
+            $nuevo  = Domiciliario::findOrFail($nuevoDomiciliarioId);
+
+            if ($pedido->domiciliario_id === $nuevo->id) {
+                $this->dispatch('notify', [
+                    'type'    => 'info',
+                    'message' => "El pedido #{$pedido->id} ya está asignado a {$nuevo->nombre}.",
+                ]);
+                return;
+            }
+
+            $usuario = Auth::user();
+            $anteriorNombre = null;
+
+            DB::transaction(function () use ($pedido, $nuevo, $usuario, &$anteriorNombre) {
+                // Liberar al anterior si quedaba sin más pedidos activos
+                if ($pedido->domiciliario_id) {
+                    $anterior = Domiciliario::find($pedido->domiciliario_id);
+                    if ($anterior) {
+                        $anteriorNombre = $anterior->nombre;
+                        $otrosActivos = Pedido::where('domiciliario_id', $anterior->id)
+                            ->where('id', '!=', $pedido->id)
+                            ->whereNotIn('estado', [Pedido::ESTADO_ENTREGADO, Pedido::ESTADO_CANCELADO])
+                            ->count();
+                        if ($otrosActivos === 0 && $anterior->estado === 'ocupado') {
+                            $anterior->estado = 'disponible';
+                            $anterior->save();
+                        }
+                    }
+                }
+
+                $pedido->domiciliario_id = $nuevo->id;
+                $pedido->fecha_asignacion_domiciliario = now();
+                if (!$pedido->fecha_salida_domiciliario) {
+                    $pedido->fecha_salida_domiciliario = now();
+                }
+                $pedido->save();
+
+                $pedido->registrarHistorial(
+                    estadoNuevo: $pedido->estado,
+                    estadoAnterior: $pedido->estado,
+                    titulo: 'Pedido reasignado',
+                    descripcion: $anteriorNombre
+                        ? "Reasignado de {$anteriorNombre} a {$nuevo->nombre}"
+                        : "Asignado a {$nuevo->nombre}",
+                    usuario: $usuario?->name,
+                    usuarioId: $usuario?->id
+                );
+
+                // Si aún no estaba en camino, marcar el cambio de estado
+                if ($pedido->estado === Pedido::ESTADO_EN_PREPARACION) {
+                    $token = $pedido->generarTokenEntrega();
+                    $pedido->cambiarEstado(
+                        Pedido::ESTADO_REPARTIDOR_EN_CAMINO,
+                        "Tu pedido va en camino con {$nuevo->nombre}.",
+                        'Pedido en camino',
+                        $usuario?->name,
+                        $usuario?->id
+                    );
+                    $pedido->notificarTokenEntrega($token);
+                }
+
+                if ($nuevo->estado !== 'ocupado') {
+                    $nuevo->estado = 'ocupado';
+                    $nuevo->save();
+                }
+            });
+
+            // Enviar la nueva asignación por WhatsApp al domiciliario
+            try {
+                $zonaNombre = $pedido->zonaCobertura?->nombre ?? 'Sin zona';
+                $this->enviarRutaADomiciliario($nuevo, [$pedido->id], $zonaNombre);
+            } catch (\Throwable $e) {
+                \Log::warning('No se pudo notificar reasignación: ' . $e->getMessage());
+            }
+
+            $this->dispatch('notify', [
+                'type'    => 'success',
+                'message' => $anteriorNombre
+                    ? "🔄 Pedido #{$pedido->id} reasignado de {$anteriorNombre} a {$nuevo->nombre}."
+                    : "✅ Pedido #{$pedido->id} asignado a {$nuevo->nombre}.",
+            ]);
+        } catch (\Throwable $e) {
+            \Log::error('Error al reasignar pedido', [
+                'pedido_id' => $pedidoId,
+                'domi_id'   => $nuevoDomiciliarioId,
+                'message'   => $e->getMessage(),
+            ]);
+            $this->dispatch('notify', [
+                'type'    => 'error',
+                'message' => '❌ No se pudo reasignar: ' . mb_substr($e->getMessage(), 0, 180),
+            ]);
+        }
+    }
+
     public function confirmarDespacho(): void
     {
         $this->validate([

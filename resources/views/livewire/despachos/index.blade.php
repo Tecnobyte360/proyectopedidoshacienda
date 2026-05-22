@@ -969,9 +969,27 @@
                                     </div>
 
                                     @if($p->domiciliario_id)
-                                        <div class="mt-2 inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-0.5 text-[11px] font-medium text-blue-700">
-                                            <i class="fa-solid fa-motorcycle"></i>
-                                            Reasignar de: {{ $p->domiciliario?->nombre }}
+                                        <div class="mt-2 flex flex-wrap items-center gap-2"
+                                             onclick="event.stopPropagation();"
+                                             onmousedown="event.stopPropagation();">
+                                            <span class="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-0.5 text-[11px] font-medium text-blue-700">
+                                                <i class="fa-solid fa-motorcycle"></i>
+                                                Asignado a: {{ $p->domiciliario?->nombre }}
+                                            </span>
+                                            <div class="inline-flex items-center gap-1">
+                                                <i class="fa-solid fa-arrows-rotate text-[11px] text-amber-500"></i>
+                                                <select
+                                                    onchange="if(this.value){ if(confirm('¿Reasignar pedido #{{ $p->id }} a este domiciliario?')){ @this.call('reasignarPedido', {{ $p->id }}, this.value); } this.value=''; }"
+                                                    onclick="event.stopPropagation();"
+                                                    class="rounded-md border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800 focus:border-amber-500 focus:ring-amber-500">
+                                                    <option value="">Reasignar a…</option>
+                                                    @foreach($domiciliarios->where('id', '!=', $p->domiciliario_id) as $dRe)
+                                                        <option value="{{ $dRe->id }}">
+                                                            {{ $dRe->nombre }} ({{ ucfirst($dRe->estado) }}){{ $dRe->vehiculo ? ' · '.$dRe->vehiculo : '' }}
+                                                        </option>
+                                                    @endforeach
+                                                </select>
+                                            </div>
                                         </div>
                                     @endif
                                 </div>
@@ -1065,6 +1083,20 @@
                                            style="color: {{ $p->estado === 'despachado' ? '#3b82f6' : '#10b981' }}">
                                             {{ $p->estado }}
                                         </p>
+                                    </div>
+                                    {{-- 🔄 Reasignar a otro domiciliario --}}
+                                    <div class="flex-shrink-0">
+                                        <select
+                                            onchange="if(this.value){ if(confirm('¿Reasignar pedido #{{ $p->id }} a este domiciliario?')){ @this.call('reasignarPedido', {{ $p->id }}, this.value); } this.value=''; }"
+                                            class="rounded-lg border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-800 hover:bg-amber-100 focus:border-amber-500 focus:ring-amber-500"
+                                            title="Reasignar a otro domiciliario">
+                                            <option value=""><i class="fa-solid fa-arrows-rotate"></i> 🔄 Reasignar…</option>
+                                            @foreach($domiciliarios->where('id', '!=', $p->domiciliario_id) as $dRe)
+                                                <option value="{{ $dRe->id }}">
+                                                    {{ $dRe->nombre }} ({{ ucfirst($dRe->estado) }}){{ $dRe->vehiculo ? ' · '.$dRe->vehiculo : '' }}
+                                                </option>
+                                            @endforeach
+                                        </select>
                                     </div>
                                 </div>
                             @endforeach
