@@ -647,21 +647,25 @@
         $mapZoom      = (int) ($tenantActual?->google_maps_zoom ?: 12);
 
         // 🗺️ Zonas de cobertura (polígonos) para dibujar sobre el mapa
-        $zonasCobertura = \App\Models\ZonaCobertura::where('activa', true)
-            ->whereNotNull('coordenadas')
-            ->get(['id', 'nombre', 'color', 'coordenadas'])
-            ->map(function ($z) {
-                $coords = is_string($z->coordenadas) ? json_decode($z->coordenadas, true) : $z->coordenadas;
-                return [
-                    'id'     => $z->id,
-                    'nombre' => $z->nombre,
-                    'color'  => $z->color ?: '#f59e0b',
-                    'coords' => is_array($coords) ? $coords : [],
-                ];
-            })
-            ->filter(fn ($z) => count($z['coords']) > 2)
-            ->values()
-            ->toArray();
+        try {
+            $zonasCobertura = \App\Models\ZonaCobertura::where('activa', true)
+                ->whereNotNull('poligono')
+                ->get(['id', 'nombre', 'color', 'poligono'])
+                ->map(function ($z) {
+                    $coords = is_string($z->poligono) ? json_decode($z->poligono, true) : $z->poligono;
+                    return [
+                        'id'     => $z->id,
+                        'nombre' => $z->nombre,
+                        'color'  => $z->color ?: '#f59e0b',
+                        'coords' => is_array($coords) ? $coords : [],
+                    ];
+                })
+                ->filter(fn ($z) => count($z['coords']) > 2)
+                ->values()
+                ->toArray();
+        } catch (\Throwable $e) {
+            $zonasCobertura = [];
+        }
     @endphp
 
     <div x-data="{ abierto: (localStorage.getItem('despachos_mapa_abierto') ?? '1') === '1' }"
