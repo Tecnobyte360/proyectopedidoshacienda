@@ -628,6 +628,42 @@
         </div>
     </div>
 
+    {{-- 🗺️ MAPA EN VIVO DE DOMICILIARIOS (integrado de /domiciliarios/mapa) --}}
+    <div x-data="{ abierto: localStorage.getItem('despachos_mapa_abierto') === '1' }"
+         x-init="$watch('abierto', v => localStorage.setItem('despachos_mapa_abierto', v ? '1' : '0'))"
+         class="mb-6 rounded-2xl bg-white border border-slate-200 shadow-sm overflow-hidden">
+        <button type="button" @click="abierto = !abierto"
+                class="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-50 transition">
+            <div class="flex items-center gap-3">
+                <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand/10 text-brand">
+                    <i class="fa-solid fa-map-location-dot"></i>
+                </div>
+                <div class="text-left">
+                    <h3 class="font-extrabold text-slate-800 flex items-center gap-2">
+                        Mapa en vivo de domiciliarios
+                        <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 text-emerald-700 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+                            <span class="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                            En vivo
+                        </span>
+                    </h3>
+                    <p class="text-xs text-slate-500">Ubicación actual de todos los repartidores · rutas hacia sus pedidos asignados</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="hidden sm:inline-flex items-center gap-1.5 rounded-full bg-brand/10 text-brand px-3 py-1 text-xs font-bold">
+                    <i class="fa-solid fa-motorcycle"></i>
+                    {{ $domiciliarios->where('estado','ocupado')->count() }} activos
+                </span>
+                <i class="fa-solid fa-chevron-down text-slate-400 transition-transform"
+                   :class="abierto ? 'rotate-180' : ''"></i>
+            </div>
+        </button>
+
+        <div x-show="abierto" x-cloak x-transition class="border-t border-slate-100">
+            <livewire:domiciliarios.mapa />
+        </div>
+    </div>
+
     {{-- 🗺️ MAPA DE RUTA (aparece cuando hay pedidos seleccionados) --}}
     @if($totalSelected > 0)
         @php
