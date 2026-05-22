@@ -5,7 +5,7 @@
         <div class="rounded-2xl border border-[#fbe9d7] bg-gradient-to-r from-brand-soft/40 via-white to-white p-5 shadow-sm">
             <div class="flex flex-wrap items-center justify-between gap-4">
                 <div class="flex items-center gap-4">
-                    <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-700 text-white shadow-lg">
+                    <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-brand to-brand-dark text-white shadow-lg">
                         <i class="fa-solid fa-money-bills text-xl"></i>
                     </div>
                     <div>
@@ -14,7 +14,7 @@
                     </div>
                 </div>
                 <button wire:click="abrirModalCrear"
-                        class="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-bold px-5 py-3 transition shadow-lg">
+                        class="inline-flex items-center gap-2 rounded-2xl bg-brand hover:bg-brand-dark text-white font-bold px-5 py-3 transition shadow-lg">
                     <i class="fa-solid fa-circle-dollar-to-slot"></i> Registrar pago
                 </button>
             </div>
@@ -234,7 +234,7 @@
 
                     <div class="flex justify-end gap-3 pt-4 border-t border-slate-100">
                         <button type="button" wire:click="cerrarModal" class="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancelar</button>
-                        <button type="submit" class="rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-6 py-2.5 text-sm font-bold text-white shadow-lg">
+                        <button type="submit" class="rounded-xl bg-brand hover:bg-brand-dark px-6 py-2.5 text-sm font-bold text-white shadow-lg transition">
                             <i class="fa-solid fa-floppy-disk mr-1"></i> {{ $editandoId ? 'Actualizar pago' : 'Registrar pago' }}
                         </button>
                     </div>

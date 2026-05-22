@@ -23,8 +23,7 @@
     {{-- KPIs --}}
     <div class="mb-6 grid grid-cols-2 lg:grid-cols-4 gap-4">
 
-        <div class="rounded-2xl p-5 text-white shadow-lg"
-             style="background: linear-gradient(135deg, var(--brand-primary, #7c3aed), var(--brand-secondary, #a855f7));">
+        <div class="rounded-2xl p-5 text-white shadow-lg bg-gradient-to-br from-brand to-brand-dark">
             <div class="flex items-center justify-between mb-3">
                 <span class="text-xs font-semibold uppercase tracking-wider opacity-80">Cobrado</span>
                 <i class="fa-solid fa-circle-check text-2xl opacity-60"></i>
@@ -197,14 +196,14 @@
 
                                 @if(in_array($p->estado_pago, ['pendiente', 'rechazado', 'fallido']))
                                     <a href="{{ $p->urlPagoWompi() }}" target="_blank"
-                                       class="inline-flex items-center justify-center h-8 px-3 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-[11px] font-bold ml-1"
+                                       class="inline-flex items-center justify-center h-8 px-3 rounded-lg bg-brand hover:bg-brand-dark text-white text-[11px] font-bold ml-1 transition shadow-sm"
                                        title="Abrir link de pago">
-                                        💳 Pagar
+                                        <i class="fa-solid fa-credit-card mr-1"></i> Pagar
                                     </a>
                                     <button type="button"
                                             wire:click="regenerarLink({{ $p->id }})"
                                             wire:confirm="Generar una nueva referencia de pago? Esto invalida el link anterior."
-                                            class="inline-flex items-center justify-center h-8 w-8 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-700 ml-1"
+                                            class="inline-flex items-center justify-center h-8 w-8 rounded-lg bg-brand/10 hover:bg-brand/20 text-brand-dark ml-1 transition"
                                             title="Generar nuevo link (rotar referencia)">
                                         <i class="fa-solid fa-rotate text-xs"></i>
                                     </button>
