@@ -100,8 +100,8 @@
                     </div>
                 @endif
 
-                {{-- Tagline grande estilo banner --}}
-                <p class="mt-6 text-sm lg:text-base text-white font-bold tracking-[0.4em] uppercase drop-shadow-md">
+                {{-- Tagline debajo del KIVOX (margen negativo para acercarlo al texto del logo) --}}
+                <p class="-mt-4 text-sm lg:text-base text-white font-bold tracking-[0.4em] uppercase drop-shadow-md">
                     Conecta · Comunica · Transforma
                 </p>
             </div>
