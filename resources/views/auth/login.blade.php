@@ -57,31 +57,38 @@
             <div class="absolute -bottom-40 -right-40 w-[40rem] h-[40rem] bg-white/10 rounded-full blur-3xl"></div>
             <div class="absolute top-1/4 right-1/4 w-72 h-72 bg-white/8 rounded-full blur-2xl"></div>
 
-            {{-- Logo grande centrado SIN fondo --}}
-            <div class="relative z-10 flex items-center justify-center">
+            {{-- Logo centrado con halo blanco para que destaque --}}
+            <div class="relative z-10 flex items-center justify-center px-12">
                 @if($brandLogo)
                     <div class="relative">
-                        {{-- Glow blanco difuso detrás del logo --}}
-                        <div class="absolute inset-0 bg-white/30 rounded-full blur-3xl scale-110"></div>
-                        {{-- Logo sin card --}}
+                        {{-- Halo circular brillante detrás del logo (para contrastar verde-sobre-verde) --}}
+                        <div class="absolute inset-0 -m-16 rounded-full blur-3xl"
+                             style="background: radial-gradient(circle, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0.15) 50%, transparent 75%);"></div>
+                        <div class="absolute inset-0 -m-8 rounded-full bg-white/10 blur-2xl"></div>
+                        {{-- Logo --}}
                         <img src="{{ $brandLogo }}" alt="{{ $brandName }}"
-                             class="relative h-80 w-auto max-w-[22rem] object-contain"
-                             style="filter: drop-shadow(0 18px 28px rgba(0,0,0,0.28));">
+                             class="relative h-64 w-auto max-w-[18rem] object-contain"
+                             style="filter: drop-shadow(0 16px 24px rgba(0,0,0,0.35)) drop-shadow(0 0 12px rgba(255,255,255,0.3));">
                     </div>
                 @else
                     <div class="relative text-center">
-                        <div class="absolute inset-0 bg-white/30 rounded-full blur-3xl scale-110"></div>
+                        <div class="absolute inset-0 -m-12 rounded-full bg-white/20 blur-3xl"></div>
                         <div class="relative">
-                            <i class="fa-solid fa-utensils text-white text-9xl mb-6 drop-shadow-2xl"></i>
+                            <i class="fa-solid fa-utensils text-white text-8xl mb-6 drop-shadow-2xl"></i>
                             <h1 class="text-5xl font-extrabold text-white drop-shadow-lg tracking-tight">{{ $brandName }}</h1>
                         </div>
                     </div>
                 @endif
             </div>
 
-            {{-- Footer mínimo --}}
-            <p class="absolute bottom-8 text-xs text-white/70 font-medium tracking-wide">
-                © {{ date('Y') }} {{ $brandName }}
+            {{-- Tagline opcional debajo del logo --}}
+            <p class="relative z-10 mt-8 text-sm text-white/85 font-medium tracking-wider uppercase">
+                {{ $subtitulo }}
+            </p>
+
+            {{-- Footer al pie --}}
+            <p class="absolute bottom-6 left-0 right-0 text-center text-xs text-white/60 font-medium tracking-wide">
+                © {{ date('Y') }} {{ $brandName }} · Todos los derechos reservados
             </p>
         </div>
 
