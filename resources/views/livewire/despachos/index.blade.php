@@ -918,88 +918,140 @@
             {{-- Pedidos de esta zona --}}
             <div class="divide-y divide-slate-100">
                 @foreach($grupo['pedidos'] as $p)
-                    @php $isSelected = !empty($seleccionados[$p->id]); @endphp
+                    @php
+                        $isSelected = !empty($seleccionados[$p->id]);
+                        $domiAsignado = $p->domiciliario;
+                        $iniDom = $domiAsignado
+                            ? collect(explode(' ', trim($domiAsignado->nombre)))->filter()->take(2)->map(fn($x)=>mb_substr($x,0,1))->implode('')
+                            : '';
+                    @endphp
 
-                    <div class="flex items-start gap-4 px-5 py-4 hover:bg-slate-50 transition
-                                  {{ $isSelected ? 'bg-amber-50/50' : '' }}">
+                    <div class="group px-5 py-4 transition border-l-4
+                                {{ $isSelected ? 'border-l-amber-400 bg-amber-50/40' : 'border-l-transparent hover:border-l-slate-200 hover:bg-slate-50/60' }}">
 
-                        <input type="checkbox"
-                               wire:model.live="seleccionados.{{ $p->id }}"
-                               class="mt-1 h-5 w-5 rounded border-slate-300 text-brand focus:ring-brand cursor-pointer">
+                        <div class="flex items-start gap-4">
+                            {{-- Checkbox --}}
+                            <input type="checkbox"
+                                   wire:model.live="seleccionados.{{ $p->id }}"
+                                   class="mt-1 h-5 w-5 rounded border-slate-300 text-brand focus:ring-brand cursor-pointer shrink-0">
 
-                        <div class="flex-1 min-w-0">
-                            <div class="flex items-start justify-between gap-3">
-                                <div class="min-w-0 flex-1">
-                                    <div class="flex items-center gap-2">
-                                        <span class="font-bold text-slate-800">#{{ $p->id }}</span>
-                                        <span class="text-sm font-semibold text-slate-700 truncate">
-                                            {{ $p->cliente_nombre }}
-                                        </span>
-                                        @if($p->canal === 'whatsapp')
-                                            <i class="fa-brands fa-whatsapp text-green-500 text-sm"></i>
-                                        @endif
+                            {{-- Contenido principal --}}
+                            <div class="flex-1 min-w-0">
+                                {{-- HEADER: ID + Cliente + Total --}}
+                                <div class="flex items-start justify-between gap-3">
+                                    <div class="min-w-0 flex-1">
+                                        <div class="flex items-center gap-2 flex-wrap">
+                                            <span class="inline-flex items-center justify-center rounded-md bg-slate-900 px-2 py-0.5 text-[11px] font-mono font-bold text-white">
+                                                #{{ $p->id }}
+                                            </span>
+                                            <span class="text-sm font-bold text-slate-800 truncate">
+                                                {{ $p->cliente_nombre }}
+                                            </span>
+                                            @if($p->canal === 'whatsapp')
+                                                <span class="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-[10px] font-semibold text-green-700">
+                                                    <i class="fa-brands fa-whatsapp"></i> WhatsApp
+                                                </span>
+                                            @endif
+                                        </div>
                                     </div>
 
-                                    <div class="flex flex-wrap items-center gap-3 text-xs text-slate-500 mt-1">
-                                        @if($p->direccion)
-                                            <span><i class="fa-solid fa-location-dot text-brand mr-1"></i>{{ $p->direccion }}</span>
-                                        @endif
-                                        @if($p->barrio)
-                                            <span><i class="fa-solid fa-map-pin mr-1"></i>{{ $p->barrio }}</span>
-                                        @endif
-                                        @if($p->telefono_whatsapp || $p->telefono)
-                                            <span><i class="fa-solid fa-phone mr-1"></i>{{ $p->telefono_whatsapp ?? $p->telefono }}</span>
-                                        @endif
+                                    <div class="text-right shrink-0">
+                                        <div class="text-xl font-extrabold text-brand leading-none">
+                                            ${{ number_format($p->total, 0, ',', '.') }}
+                                        </div>
+                                        <div class="text-[10px] text-slate-400 uppercase tracking-wide mt-1">
+                                            <i class="fa-regular fa-clock"></i>
+                                            {{ $p->fecha_pedido?->diffForHumans() }}
+                                        </div>
                                     </div>
+                                </div>
 
-                                    {{-- Productos --}}
-                                    <div class="mt-2 flex flex-wrap gap-1">
-                                        @foreach($p->detalles->take(3) as $d)
-                                            <span class="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-[11px] text-slate-700">
-                                                {{ rtrim(rtrim(number_format($d->cantidad, 2, ',', '.'), '0'), ',') }}
-                                                {{ $d->unidad }}
-                                                · {{ $d->producto }}
-                                            </span>
-                                        @endforeach
-                                        @if($p->detalles->count() > 3)
-                                            <span class="inline-flex items-center rounded-md bg-slate-200 px-2 py-0.5 text-[11px] text-slate-700">
-                                                +{{ $p->detalles->count() - 3 }} más
-                                            </span>
-                                        @endif
-                                    </div>
-
-                                    @if($p->domiciliario_id)
-                                        <div class="mt-2 flex flex-wrap items-center gap-2"
-                                             onclick="event.stopPropagation();"
-                                             onmousedown="event.stopPropagation();">
-                                            <span class="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-0.5 text-[11px] font-medium text-blue-700">
-                                                <i class="fa-solid fa-motorcycle"></i>
-                                                Asignado a: {{ $p->domiciliario?->nombre }}
-                                            </span>
-                                            <div class="inline-flex items-center gap-1">
-                                                <i class="fa-solid fa-arrows-rotate text-[11px] text-amber-500"></i>
-                                                <select
-                                                    onchange="if(this.value){ if(confirm('¿Reasignar pedido #{{ $p->id }} a este domiciliario?')){ @this.call('reasignarPedido', {{ $p->id }}, this.value); } this.value=''; }"
-                                                    onclick="event.stopPropagation();"
-                                                    class="rounded-md border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800 focus:border-amber-500 focus:ring-amber-500">
-                                                    <option value="">Reasignar a…</option>
-                                                    @foreach($domiciliarios->where('id', '!=', $p->domiciliario_id) as $dRe)
-                                                        <option value="{{ $dRe->id }}">
-                                                            {{ $dRe->nombre }} ({{ ucfirst($dRe->estado) }}){{ $dRe->vehiculo ? ' · '.$dRe->vehiculo : '' }}
-                                                        </option>
-                                                    @endforeach
-                                                </select>
-                                            </div>
+                                {{-- INFO: dirección · barrio · teléfono --}}
+                                <div class="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs text-slate-600">
+                                    @if($p->direccion)
+                                        <div class="flex items-start gap-1.5 min-w-0">
+                                            <i class="fa-solid fa-location-dot text-rose-500 mt-0.5 shrink-0"></i>
+                                            <span class="truncate">{{ $p->direccion }}</span>
+                                        </div>
+                                    @endif
+                                    @if($p->barrio)
+                                        <div class="flex items-start gap-1.5 min-w-0">
+                                            <i class="fa-solid fa-map-pin text-emerald-500 mt-0.5 shrink-0"></i>
+                                            <span class="truncate">{{ $p->barrio }}</span>
+                                        </div>
+                                    @endif
+                                    @if($p->telefono_whatsapp || $p->telefono)
+                                        <div class="flex items-start gap-1.5 min-w-0">
+                                            <i class="fa-solid fa-phone text-blue-500 mt-0.5 shrink-0"></i>
+                                            <span class="truncate">{{ $p->telefono_whatsapp ?? $p->telefono }}</span>
                                         </div>
                                     @endif
                                 </div>
 
-                                <div class="text-right shrink-0">
-                                    <div class="text-lg font-extrabold text-brand">
-                                        ${{ number_format($p->total, 0, ',', '.') }}
+                                {{-- Productos --}}
+                                @if($p->detalles->isNotEmpty())
+                                    <div class="mt-2.5 flex flex-wrap gap-1">
+                                        @foreach($p->detalles->take(3) as $d)
+                                            <span class="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[11px] text-slate-700 border border-slate-200">
+                                                <span class="font-semibold">{{ rtrim(rtrim(number_format($d->cantidad, 2, ',', '.'), '0'), ',') }} {{ $d->unidad }}</span>
+                                                <span class="text-slate-400">·</span>
+                                                <span>{{ $d->producto }}</span>
+                                            </span>
+                                        @endforeach
+                                        @if($p->detalles->count() > 3)
+                                            <span class="inline-flex items-center rounded-md bg-slate-200 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
+                                                +{{ $p->detalles->count() - 3 }} más
+                                            </span>
+                                        @endif
                                     </div>
-                                    <div class="text-[10px] text-slate-400 uppercase">
-                                        {{ $p->fecha_pedido?->diffForHumans() }}
+                                @endif
+
+                                {{-- BARRA DE ASIGNACIÓN --}}
+                                <div class="mt-3 rounded-xl border {{ $domiAsignado ? 'border-blue-100 bg-blue-50/40' : 'border-slate-200 bg-slate-50/60 border-dashed' }} px-3 py-2">
+                                    <div class="flex flex-wrap items-center justify-between gap-3">
+                                        {{-- Lado izquierdo: estado actual --}}
+                                        <div class="flex items-center gap-2.5 min-w-0">
+                                            @if($domiAsignado)
+                                                <div class="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-700 text-white text-[11px] font-extrabold shrink-0">
+                                                    {{ $iniDom ?: '?' }}
+                                                </div>
+                                                <div class="min-w-0">
+                                                    <div class="text-[10px] uppercase tracking-wider text-blue-600 font-semibold">Asignado a</div>
+                                                    <div class="text-sm font-bold text-slate-800 truncate">
+                                                        {{ $domiAsignado->nombre }}
+                                                        <span class="text-[10px] font-medium text-slate-500">
+                                                            · {{ ucfirst($domiAsignado->estado) }}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            @else
+                                                <div class="flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-slate-500 text-sm shrink-0">
+                                                    <i class="fa-solid fa-user-slash"></i>
+                                                </div>
+                                                <div>
+                                                    <div class="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Sin asignar</div>
+                                                    <div class="text-xs text-slate-600">Selecciona un domiciliario abajo</div>
+                                                </div>
+                                            @endif
+                                        </div>
+
+                                        {{-- Lado derecho: selector --}}
+                                        <div class="flex items-center gap-2"
+                                             onclick="event.stopPropagation();"
+                                             onmousedown="event.stopPropagation();">
+                                            <i class="fa-solid fa-arrows-rotate text-amber-500 text-xs"></i>
+                                            <select
+                                                onchange="if(this.value){ if(confirm('¿{{ $domiAsignado ? 'Reasignar' : 'Asignar' }} pedido #{{ $p->id }} a este domiciliario?')){ @this.call('reasignarPedido', {{ $p->id }}, this.value); } this.value=''; }"
+                                                onclick="event.stopPropagation();"
+                                                class="rounded-lg border-2 border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-800 hover:border-amber-400 hover:bg-amber-50 focus:border-amber-500 focus:ring-amber-500 transition cursor-pointer">
+                                                <option value="">{{ $domiAsignado ? '🔄 Reasignar a…' : '➕ Asignar a…' }}</option>
+                                                @foreach($domiciliarios->where('id', '!=', $p->domiciliario_id) as $dRe)
+                                                    <option value="{{ $dRe->id }}">
+                                                        {{ $dRe->nombre }} ({{ ucfirst($dRe->estado) }}){{ $dRe->vehiculo ? ' · '.$dRe->vehiculo : '' }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -1062,41 +1114,68 @@
                         {{-- Lista de pedidos --}}
                         <div class="divide-y divide-slate-100">
                             @foreach($info['pedidos'] as $p)
-                                <div class="px-5 py-3 flex items-center gap-4 hover:bg-slate-50 transition">
-                                    <div class="flex-shrink-0 px-3 py-1 rounded-lg bg-slate-100 text-xs font-mono font-bold">
-                                        #{{ $p->id }}
-                                    </div>
-                                    <div class="flex-1 min-w-0">
-                                        <p class="text-sm font-semibold text-slate-800 truncate">{{ $p->cliente_nombre }}</p>
-                                        <p class="text-xs text-slate-500 truncate">
-                                            <i class="fa-solid fa-location-dot"></i>
-                                            {{ $p->direccion ?: 'Sin dirección' }}
-                                            @if($p->zonaCobertura) · <span class="text-emerald-600">{{ $p->zonaCobertura->nombre }}</span> @endif
-                                        </p>
-                                    </div>
-                                    <div class="text-xs text-slate-500 flex-shrink-0">
-                                        <i class="fa-solid fa-phone"></i> {{ $p->telefono }}
-                                    </div>
-                                    <div class="text-right flex-shrink-0">
-                                        <p class="text-sm font-bold text-slate-800">${{ number_format($p->total, 0, ',', '.') }}</p>
-                                        <p class="text-[10px] uppercase font-bold tracking-wider"
-                                           style="color: {{ $p->estado === 'despachado' ? '#3b82f6' : '#10b981' }}">
-                                            {{ $p->estado }}
-                                        </p>
-                                    </div>
-                                    {{-- 🔄 Reasignar a otro domiciliario --}}
-                                    <div class="flex-shrink-0">
-                                        <select
-                                            onchange="if(this.value){ if(confirm('¿Reasignar pedido #{{ $p->id }} a este domiciliario?')){ @this.call('reasignarPedido', {{ $p->id }}, this.value); } this.value=''; }"
-                                            class="rounded-lg border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-800 hover:bg-amber-100 focus:border-amber-500 focus:ring-amber-500"
-                                            title="Reasignar a otro domiciliario">
-                                            <option value=""><i class="fa-solid fa-arrows-rotate"></i> 🔄 Reasignar…</option>
-                                            @foreach($domiciliarios->where('id', '!=', $p->domiciliario_id) as $dRe)
-                                                <option value="{{ $dRe->id }}">
-                                                    {{ $dRe->nombre }} ({{ ucfirst($dRe->estado) }}){{ $dRe->vehiculo ? ' · '.$dRe->vehiculo : '' }}
-                                                </option>
-                                            @endforeach
-                                        </select>
+                                @php
+                                    $estadoColor = match($p->estado) {
+                                        'repartidor_en_camino' => ['bg' => 'bg-blue-100', 'text' => 'text-blue-700', 'dot' => 'bg-blue-500'],
+                                        'entregado' => ['bg' => 'bg-emerald-100', 'text' => 'text-emerald-700', 'dot' => 'bg-emerald-500'],
+                                        'en_preparacion' => ['bg' => 'bg-amber-100', 'text' => 'text-amber-700', 'dot' => 'bg-amber-500'],
+                                        'nuevo' => ['bg' => 'bg-slate-100', 'text' => 'text-slate-700', 'dot' => 'bg-slate-400'],
+                                        default => ['bg' => 'bg-slate-100', 'text' => 'text-slate-700', 'dot' => 'bg-slate-400'],
+                                    };
+                                @endphp
+                                <div class="px-5 py-3.5 hover:bg-slate-50 transition">
+                                    <div class="grid grid-cols-12 gap-3 items-center">
+                                        {{-- ID + estado --}}
+                                        <div class="col-span-12 sm:col-span-2 flex items-center gap-2">
+                                            <span class="inline-flex items-center justify-center rounded-md bg-slate-900 px-2 py-1 text-[11px] font-mono font-bold text-white">
+                                                #{{ $p->id }}
+                                            </span>
+                                            <span class="inline-flex items-center gap-1.5 rounded-full {{ $estadoColor['bg'] }} px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider {{ $estadoColor['text'] }}">
+                                                <span class="h-1.5 w-1.5 rounded-full {{ $estadoColor['dot'] }}"></span>
+                                                {{ str_replace('_', ' ', $p->estado) }}
+                                            </span>
+                                        </div>
+
+                                        {{-- Cliente + dirección --}}
+                                        <div class="col-span-12 sm:col-span-5 min-w-0">
+                                            <p class="text-sm font-bold text-slate-800 truncate">{{ $p->cliente_nombre }}</p>
+                                            <p class="text-xs text-slate-500 truncate flex items-center gap-1">
+                                                <i class="fa-solid fa-location-dot text-rose-400"></i>
+                                                {{ $p->direccion ?: 'Sin dirección' }}
+                                                @if($p->zonaCobertura)
+                                                    <span class="text-slate-300">·</span>
+                                                    <span class="text-emerald-600 font-medium">{{ $p->zonaCobertura->nombre }}</span>
+                                                @endif
+                                            </p>
+                                        </div>
+
+                                        {{-- Teléfono --}}
+                                        <div class="col-span-6 sm:col-span-2 text-xs text-slate-600">
+                                            <div class="flex items-center gap-1">
+                                                <i class="fa-solid fa-phone text-blue-400"></i>
+                                                <span class="truncate">{{ $p->telefono ?: '—' }}</span>
+                                            </div>
+                                        </div>
+
+                                        {{-- Total --}}
+                                        <div class="col-span-6 sm:col-span-1 text-right">
+                                            <p class="text-sm font-extrabold text-slate-800">${{ number_format($p->total, 0, ',', '.') }}</p>
+                                        </div>
+
+                                        {{-- Reasignar --}}
+                                        <div class="col-span-12 sm:col-span-2 flex justify-end">
+                                            <select
+                                                onchange="if(this.value){ if(confirm('¿Reasignar pedido #{{ $p->id }} a este domiciliario?')){ @this.call('reasignarPedido', {{ $p->id }}, this.value); } this.value=''; }"
+                                                class="w-full rounded-lg border-2 border-amber-300 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-amber-800 hover:border-amber-400 hover:bg-amber-50 focus:border-amber-500 focus:ring-amber-500 transition cursor-pointer"
+                                                title="Reasignar a otro domiciliario">
+                                                <option value="">🔄 Reasignar…</option>
+                                                @foreach($domiciliarios->where('id', '!=', $p->domiciliario_id) as $dRe)
+                                                    <option value="{{ $dRe->id }}">
+                                                        {{ $dRe->nombre }} ({{ ucfirst($dRe->estado) }}){{ $dRe->vehiculo ? ' · '.$dRe->vehiculo : '' }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                        </div>
                                     </div>
                                 </div>
                             @endforeach
