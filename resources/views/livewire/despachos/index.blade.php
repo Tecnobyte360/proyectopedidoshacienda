@@ -877,196 +877,346 @@
         @endscript
     @endif
 
-    {{-- ZONAS --}}
-    @forelse($agrupados as $zonaId => $grupo)
-        @php
-            $zona = $grupo['zona'];
-            $color = $zona?->color ?? '#94a3b8';
-            $nombreZona = $zona?->nombre ?? 'Sin zona asignada';
-        @endphp
+    {{-- ═══════════════════════════════════════════════════════════════
+         TABLA UNIFICADA: SIN ASIGNAR + ASIGNADOS
+         Estilo /pedidos — colores de la marca
+         ═══════════════════════════════════════════════════════════════ --}}
+    @php
+        $todosPedidos = $agrupados->flatMap(fn($g) => $g['pedidos'])->values();
+        $sinAsignar   = $todosPedidos->filter(fn($p) => empty($p->domiciliario_id))->sortBy('zona_cobertura_id')->values();
+        $asignados    = $todosPedidos->filter(fn($p) => !empty($p->domiciliario_id))->sortBy('domiciliario_id')->values();
+        $totalSinAsig = $sinAsignar->sum('total');
+        $totalAsig    = $asignados->sum('total');
+    @endphp
 
-        <div class="mb-6 rounded-2xl bg-white shadow overflow-hidden">
+    @if($todosPedidos->isEmpty())
+        <div class="rounded-2xl bg-white p-16 text-center shadow-sm border border-slate-100">
+            <div class="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-brand/10 to-brand/5">
+                <i class="fa-solid fa-mug-hot text-3xl text-brand"></i>
+            </div>
+            <h3 class="font-extrabold text-slate-800 mb-1">Todo despachado</h3>
+            <p class="text-sm text-slate-500">No hay pedidos en preparación esperando.</p>
+        </div>
+    @else
+        <div class="rounded-2xl bg-white shadow-sm border border-slate-200 overflow-hidden">
 
-            {{-- Header de la zona --}}
-            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4"
-                 style="background: linear-gradient(135deg, {{ $color }}20, transparent);">
+            {{-- Header de la tabla --}}
+            <div class="flex flex-wrap items-center justify-between gap-3 px-5 py-4 bg-gradient-to-r from-slate-50 to-white border-b border-slate-100">
                 <div class="flex items-center gap-3">
-                    <div class="flex h-11 w-11 items-center justify-center rounded-xl text-white shadow"
-                         style="background-color: {{ $color }}">
-                        <i class="fa-solid fa-map-location-dot"></i>
+                    <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand/10 text-brand">
+                        <i class="fa-solid fa-list-check"></i>
                     </div>
                     <div>
-                        <h3 class="font-bold text-slate-800">{{ $nombreZona }}</h3>
-                        <div class="text-xs text-slate-500">
-                            {{ $grupo['pedidos']->count() }} pedido(s) ·
-                            <span class="font-semibold text-slate-700">${{ number_format($grupo['total'], 0, ',', '.') }}</span>
-                            @if($zona && $zona->tiempo_estimado_min)
-                                · <i class="fa-solid fa-clock"></i> ~{{ $zona->tiempo_estimado_min }} min
-                            @endif
-                        </div>
+                        <h3 class="font-extrabold text-slate-800">Pedidos por despachar</h3>
+                        <p class="text-xs text-slate-500">
+                            <span class="font-semibold text-amber-600">{{ $sinAsignar->count() }} sin asignar</span>
+                            ·
+                            <span class="font-semibold text-blue-600">{{ $asignados->count() }} asignados</span>
+                            · Total
+                            <span class="font-semibold text-slate-700">${{ number_format($todosPedidos->sum('total'), 0, ',', '.') }}</span>
+                        </p>
                     </div>
                 </div>
 
-                @if($zonaId)
-                    <button wire:click="seleccionarTodosDeZona({{ $zonaId }})"
-                            class="rounded-lg bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow hover:bg-slate-50 transition">
-                        <i class="fa-solid fa-check-double mr-1"></i> Seleccionar todos
-                    </button>
-                @endif
+                {{-- Resumen rápido --}}
+                <div class="flex items-center gap-2">
+                    @if($sinAsignar->isNotEmpty())
+                        <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-100 text-amber-700 px-3 py-1 text-xs font-bold">
+                            <i class="fa-solid fa-circle-exclamation"></i>
+                            {{ $sinAsignar->count() }} pendientes
+                        </span>
+                    @endif
+                    @if($asignados->isNotEmpty())
+                        <span class="inline-flex items-center gap-1.5 rounded-full bg-blue-100 text-blue-700 px-3 py-1 text-xs font-bold">
+                            <i class="fa-solid fa-motorcycle"></i>
+                            {{ $asignados->count() }} con repartidor
+                        </span>
+                    @endif
+                </div>
             </div>
 
-            {{-- Pedidos de esta zona --}}
-            <div class="divide-y divide-slate-100">
-                @foreach($grupo['pedidos'] as $p)
-                    @php
-                        $isSelected = !empty($seleccionados[$p->id]);
-                        $domiAsignado = $p->domiciliario;
-                        $iniDom = $domiAsignado
-                            ? collect(explode(' ', trim($domiAsignado->nombre)))->filter()->take(2)->map(fn($x)=>mb_substr($x,0,1))->implode('')
-                            : '';
-                    @endphp
+            {{-- TABLA --}}
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-slate-50 border-b border-slate-200">
+                        <tr class="text-[10px] uppercase tracking-wider text-slate-500 font-bold">
+                            <th class="px-4 py-3 text-left w-10">
+                                <i class="fa-solid fa-square-check text-slate-400"></i>
+                            </th>
+                            <th class="px-3 py-3 text-left">Pedido</th>
+                            <th class="px-3 py-3 text-left">Cliente</th>
+                            <th class="px-3 py-3 text-left">Dirección</th>
+                            <th class="px-3 py-3 text-left">Zona</th>
+                            <th class="px-3 py-3 text-left">Productos</th>
+                            <th class="px-3 py-3 text-right">Total</th>
+                            <th class="px-3 py-3 text-left">Asignación</th>
+                        </tr>
+                    </thead>
 
-                    <div class="group px-5 py-4 transition border-l-4
-                                {{ $isSelected ? 'border-l-amber-400 bg-amber-50/40' : 'border-l-transparent hover:border-l-slate-200 hover:bg-slate-50/60' }}">
+                    <tbody class="divide-y divide-slate-100">
 
-                        <div class="flex items-start gap-4">
-                            {{-- Checkbox --}}
-                            <input type="checkbox"
-                                   wire:model.live="seleccionados.{{ $p->id }}"
-                                   class="mt-1 h-5 w-5 rounded border-slate-300 text-brand focus:ring-brand cursor-pointer shrink-0">
-
-                            {{-- Contenido principal --}}
-                            <div class="flex-1 min-w-0">
-                                {{-- HEADER: ID + Cliente + Total --}}
-                                <div class="flex items-start justify-between gap-3">
-                                    <div class="min-w-0 flex-1">
-                                        <div class="flex items-center gap-2 flex-wrap">
-                                            <span class="inline-flex items-center justify-center rounded-md bg-slate-900 px-2 py-0.5 text-[11px] font-mono font-bold text-white">
-                                                #{{ $p->id }}
+                        {{-- ═══════════ SECCIÓN: SIN ASIGNAR ═══════════ --}}
+                        @if($sinAsignar->isNotEmpty())
+                            <tr class="bg-gradient-to-r from-amber-50 to-amber-50/30">
+                                <td colspan="8" class="px-4 py-2.5">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center gap-2">
+                                            <span class="flex h-6 w-6 items-center justify-center rounded-md bg-amber-500 text-white">
+                                                <i class="fa-solid fa-circle-exclamation text-[11px]"></i>
                                             </span>
-                                            <span class="text-sm font-bold text-slate-800 truncate">
-                                                {{ $p->cliente_nombre }}
+                                            <span class="text-xs font-extrabold uppercase tracking-wider text-amber-800">
+                                                Sin asignar
                                             </span>
-                                            @if($p->canal === 'whatsapp')
-                                                <span class="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-[10px] font-semibold text-green-700">
-                                                    <i class="fa-brands fa-whatsapp"></i> WhatsApp
-                                                </span>
-                                            @endif
+                                            <span class="rounded-full bg-amber-200 text-amber-800 px-2 py-0.5 text-[10px] font-bold">
+                                                {{ $sinAsignar->count() }}
+                                            </span>
+                                            <span class="text-xs text-amber-700 font-semibold">
+                                                ${{ number_format($totalSinAsig, 0, ',', '.') }}
+                                            </span>
                                         </div>
+                                        <span class="text-[10px] uppercase tracking-wider text-amber-600 font-bold">
+                                            Selecciona un domiciliario →
+                                        </span>
                                     </div>
+                                </td>
+                            </tr>
 
-                                    <div class="text-right shrink-0">
-                                        <div class="text-xl font-extrabold text-brand leading-none">
-                                            ${{ number_format($p->total, 0, ',', '.') }}
-                                        </div>
-                                        <div class="text-[10px] text-slate-400 uppercase tracking-wide mt-1">
-                                            <i class="fa-regular fa-clock"></i>
-                                            {{ $p->fecha_pedido?->diffForHumans() }}
-                                        </div>
-                                    </div>
-                                </div>
+                            @foreach($sinAsignar as $p)
+                                @php $isSelected = !empty($seleccionados[$p->id]); @endphp
+                                <tr class="hover:bg-amber-50/30 transition {{ $isSelected ? 'bg-amber-50' : '' }}">
+                                    {{-- Checkbox --}}
+                                    <td class="px-4 py-3">
+                                        <input type="checkbox"
+                                               wire:model.live="seleccionados.{{ $p->id }}"
+                                               class="h-4 w-4 rounded border-slate-300 text-brand focus:ring-brand cursor-pointer">
+                                    </td>
 
-                                {{-- INFO: dirección · barrio · teléfono --}}
-                                <div class="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs text-slate-600">
-                                    @if($p->direccion)
-                                        <div class="flex items-start gap-1.5 min-w-0">
-                                            <i class="fa-solid fa-location-dot text-rose-500 mt-0.5 shrink-0"></i>
-                                            <span class="truncate">{{ $p->direccion }}</span>
-                                        </div>
-                                    @endif
-                                    @if($p->barrio)
-                                        <div class="flex items-start gap-1.5 min-w-0">
-                                            <i class="fa-solid fa-map-pin text-emerald-500 mt-0.5 shrink-0"></i>
-                                            <span class="truncate">{{ $p->barrio }}</span>
-                                        </div>
-                                    @endif
-                                    @if($p->telefono_whatsapp || $p->telefono)
-                                        <div class="flex items-start gap-1.5 min-w-0">
-                                            <i class="fa-solid fa-phone text-blue-500 mt-0.5 shrink-0"></i>
-                                            <span class="truncate">{{ $p->telefono_whatsapp ?? $p->telefono }}</span>
-                                        </div>
-                                    @endif
-                                </div>
-
-                                {{-- Productos --}}
-                                @if($p->detalles->isNotEmpty())
-                                    <div class="mt-2.5 flex flex-wrap gap-1">
-                                        @foreach($p->detalles->take(3) as $d)
-                                            <span class="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[11px] text-slate-700 border border-slate-200">
-                                                <span class="font-semibold">{{ rtrim(rtrim(number_format($d->cantidad, 2, ',', '.'), '0'), ',') }} {{ $d->unidad }}</span>
-                                                <span class="text-slate-400">·</span>
-                                                <span>{{ $d->producto }}</span>
-                                            </span>
-                                        @endforeach
-                                        @if($p->detalles->count() > 3)
-                                            <span class="inline-flex items-center rounded-md bg-slate-200 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
-                                                +{{ $p->detalles->count() - 3 }} más
-                                            </span>
+                                    {{-- # ID --}}
+                                    <td class="px-3 py-3 whitespace-nowrap">
+                                        <span class="inline-flex items-center justify-center rounded-md bg-slate-900 px-2 py-1 text-[11px] font-mono font-bold text-white">
+                                            #{{ str_pad($p->id, 3, '0', STR_PAD_LEFT) }}
+                                        </span>
+                                        @if($p->canal === 'whatsapp')
+                                            <div class="mt-1"><i class="fa-brands fa-whatsapp text-green-500 text-sm" title="WhatsApp"></i></div>
                                         @endif
-                                    </div>
-                                @endif
+                                    </td>
 
-                                {{-- BARRA DE ASIGNACIÓN --}}
-                                <div class="mt-3 rounded-xl border {{ $domiAsignado ? 'border-blue-100 bg-blue-50/40' : 'border-slate-200 bg-slate-50/60 border-dashed' }} px-3 py-2">
-                                    <div class="flex flex-wrap items-center justify-between gap-3">
-                                        {{-- Lado izquierdo: estado actual --}}
-                                        <div class="flex items-center gap-2.5 min-w-0">
-                                            @if($domiAsignado)
-                                                <div class="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-700 text-white text-[11px] font-extrabold shrink-0">
-                                                    {{ $iniDom ?: '?' }}
-                                                </div>
-                                                <div class="min-w-0">
-                                                    <div class="text-[10px] uppercase tracking-wider text-blue-600 font-semibold">Asignado a</div>
-                                                    <div class="text-sm font-bold text-slate-800 truncate">
-                                                        {{ $domiAsignado->nombre }}
-                                                        <span class="text-[10px] font-medium text-slate-500">
-                                                            · {{ ucfirst($domiAsignado->estado) }}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            @else
-                                                <div class="flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-slate-500 text-sm shrink-0">
-                                                    <i class="fa-solid fa-user-slash"></i>
-                                                </div>
-                                                <div>
-                                                    <div class="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Sin asignar</div>
-                                                    <div class="text-xs text-slate-600">Selecciona un domiciliario abajo</div>
-                                                </div>
-                                            @endif
-                                        </div>
+                                    {{-- Cliente --}}
+                                    <td class="px-3 py-3">
+                                        <div class="font-bold text-slate-800 truncate max-w-[180px]">{{ $p->cliente_nombre }}</div>
+                                        @if($p->telefono_whatsapp || $p->telefono)
+                                            <div class="text-[11px] text-slate-500 flex items-center gap-1">
+                                                <i class="fa-solid fa-phone text-blue-400 text-[10px]"></i>
+                                                {{ $p->telefono_whatsapp ?? $p->telefono }}
+                                            </div>
+                                        @endif
+                                    </td>
 
-                                        {{-- Lado derecho: selector --}}
-                                        <div class="flex items-center gap-2"
-                                             onclick="event.stopPropagation();"
-                                             onmousedown="event.stopPropagation();">
-                                            <i class="fa-solid fa-arrows-rotate text-amber-500 text-xs"></i>
-                                            <select
-                                                onchange="if(this.value){ if(confirm('¿{{ $domiAsignado ? 'Reasignar' : 'Asignar' }} pedido #{{ $p->id }} a este domiciliario?')){ @this.call('reasignarPedido', {{ $p->id }}, this.value); } this.value=''; }"
-                                                onclick="event.stopPropagation();"
-                                                class="rounded-lg border-2 border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-800 hover:border-amber-400 hover:bg-amber-50 focus:border-amber-500 focus:ring-amber-500 transition cursor-pointer">
-                                                <option value="">{{ $domiAsignado ? '🔄 Reasignar a…' : '➕ Asignar a…' }}</option>
-                                                @foreach($domiciliarios->where('id', '!=', $p->domiciliario_id) as $dRe)
-                                                    <option value="{{ $dRe->id }}">
-                                                        {{ $dRe->nombre }} ({{ ucfirst($dRe->estado) }}){{ $dRe->vehiculo ? ' · '.$dRe->vehiculo : '' }}
-                                                    </option>
-                                                @endforeach
-                                            </select>
+                                    {{-- Dirección --}}
+                                    <td class="px-3 py-3 max-w-[200px]">
+                                        <div class="text-xs text-slate-700 truncate flex items-start gap-1">
+                                            <i class="fa-solid fa-location-dot text-rose-400 mt-0.5"></i>
+                                            <span class="truncate">{{ $p->direccion ?: '—' }}</span>
                                         </div>
+                                        @if($p->barrio)
+                                            <div class="text-[11px] text-slate-500 truncate flex items-center gap-1 mt-0.5">
+                                                <i class="fa-solid fa-map-pin text-emerald-400 text-[10px]"></i>
+                                                {{ $p->barrio }}
+                                            </div>
+                                        @endif
+                                    </td>
+
+                                    {{-- Zona --}}
+                                    <td class="px-3 py-3">
+                                        @if($p->zonaCobertura)
+                                            <span class="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                                                  style="background: {{ $p->zonaCobertura->color ?? '#94a3b8' }}20; color: {{ $p->zonaCobertura->color ?? '#475569' }}">
+                                                <span class="h-1.5 w-1.5 rounded-full" style="background: {{ $p->zonaCobertura->color ?? '#94a3b8' }}"></span>
+                                                {{ $p->zonaCobertura->nombre }}
+                                            </span>
+                                        @else
+                                            <span class="text-[11px] text-slate-400 italic">Sin zona</span>
+                                        @endif
+                                    </td>
+
+                                    {{-- Productos --}}
+                                    <td class="px-3 py-3 max-w-[200px]">
+                                        @if($p->detalles->isNotEmpty())
+                                            <div class="text-xs text-slate-700 truncate">
+                                                <span class="font-semibold">{{ $p->detalles->first()->producto }}</span>
+                                                @if($p->detalles->count() > 1)
+                                                    <span class="text-slate-400">+{{ $p->detalles->count() - 1 }} más</span>
+                                                @endif
+                                            </div>
+                                        @else
+                                            <span class="text-[11px] text-slate-400">—</span>
+                                        @endif
+                                    </td>
+
+                                    {{-- Total --}}
+                                    <td class="px-3 py-3 text-right whitespace-nowrap">
+                                        <div class="font-extrabold text-brand">${{ number_format($p->total, 0, ',', '.') }}</div>
+                                        <div class="text-[10px] text-slate-400">{{ $p->fecha_pedido?->diffForHumans() }}</div>
+                                    </td>
+
+                                    {{-- Acción: Asignar --}}
+                                    <td class="px-3 py-3">
+                                        <select
+                                            onchange="if(this.value){ if(confirm('¿Asignar pedido #{{ $p->id }} a este domiciliario?')){ @this.call('reasignarPedido', {{ $p->id }}, this.value); } this.value=''; }"
+                                            class="w-full min-w-[160px] rounded-lg border-2 border-amber-300 bg-white px-2.5 py-1.5 text-xs font-bold text-amber-800 hover:border-amber-400 hover:bg-amber-50 focus:border-amber-500 focus:ring-amber-500 transition cursor-pointer">
+                                            <option value="">➕ Asignar a…</option>
+                                            @foreach($domiciliarios as $dRe)
+                                                <option value="{{ $dRe->id }}">
+                                                    {{ $dRe->nombre }} · {{ ucfirst($dRe->estado) }}{{ $dRe->vehiculo ? ' · '.$dRe->vehiculo : '' }}
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        @endif
+
+                        {{-- ═══════════ SECCIÓN: YA ASIGNADOS ═══════════ --}}
+                        @if($asignados->isNotEmpty())
+                            <tr class="bg-gradient-to-r from-blue-50 to-blue-50/30">
+                                <td colspan="8" class="px-4 py-2.5">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center gap-2">
+                                            <span class="flex h-6 w-6 items-center justify-center rounded-md bg-blue-500 text-white">
+                                                <i class="fa-solid fa-motorcycle text-[11px]"></i>
+                                            </span>
+                                            <span class="text-xs font-extrabold uppercase tracking-wider text-blue-800">
+                                                Asignados (en preparación)
+                                            </span>
+                                            <span class="rounded-full bg-blue-200 text-blue-800 px-2 py-0.5 text-[10px] font-bold">
+                                                {{ $asignados->count() }}
+                                            </span>
+                                            <span class="text-xs text-blue-700 font-semibold">
+                                                ${{ number_format($totalAsig, 0, ',', '.') }}
+                                            </span>
+                                        </div>
+                                        <span class="text-[10px] uppercase tracking-wider text-blue-600 font-bold">
+                                            Puedes reasignar si es necesario →
+                                        </span>
                                     </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                @endforeach
+                                </td>
+                            </tr>
+
+                            @foreach($asignados as $p)
+                                @php
+                                    $isSelected = !empty($seleccionados[$p->id]);
+                                    $domiAsig = $p->domiciliario;
+                                    $iniDom = $domiAsig
+                                        ? collect(explode(' ', trim($domiAsig->nombre)))->filter()->take(2)->map(fn($x)=>mb_substr($x,0,1))->implode('')
+                                        : '';
+                                @endphp
+                                <tr class="hover:bg-blue-50/30 transition {{ $isSelected ? 'bg-blue-50' : '' }}">
+                                    {{-- Checkbox --}}
+                                    <td class="px-4 py-3">
+                                        <input type="checkbox"
+                                               wire:model.live="seleccionados.{{ $p->id }}"
+                                               class="h-4 w-4 rounded border-slate-300 text-brand focus:ring-brand cursor-pointer">
+                                    </td>
+
+                                    {{-- # ID --}}
+                                    <td class="px-3 py-3 whitespace-nowrap">
+                                        <span class="inline-flex items-center justify-center rounded-md bg-slate-900 px-2 py-1 text-[11px] font-mono font-bold text-white">
+                                            #{{ str_pad($p->id, 3, '0', STR_PAD_LEFT) }}
+                                        </span>
+                                        @if($p->canal === 'whatsapp')
+                                            <div class="mt-1"><i class="fa-brands fa-whatsapp text-green-500 text-sm" title="WhatsApp"></i></div>
+                                        @endif
+                                    </td>
+
+                                    {{-- Cliente --}}
+                                    <td class="px-3 py-3">
+                                        <div class="font-bold text-slate-800 truncate max-w-[180px]">{{ $p->cliente_nombre }}</div>
+                                        @if($p->telefono_whatsapp || $p->telefono)
+                                            <div class="text-[11px] text-slate-500 flex items-center gap-1">
+                                                <i class="fa-solid fa-phone text-blue-400 text-[10px]"></i>
+                                                {{ $p->telefono_whatsapp ?? $p->telefono }}
+                                            </div>
+                                        @endif
+                                    </td>
+
+                                    {{-- Dirección --}}
+                                    <td class="px-3 py-3 max-w-[200px]">
+                                        <div class="text-xs text-slate-700 truncate flex items-start gap-1">
+                                            <i class="fa-solid fa-location-dot text-rose-400 mt-0.5"></i>
+                                            <span class="truncate">{{ $p->direccion ?: '—' }}</span>
+                                        </div>
+                                        @if($p->barrio)
+                                            <div class="text-[11px] text-slate-500 truncate flex items-center gap-1 mt-0.5">
+                                                <i class="fa-solid fa-map-pin text-emerald-400 text-[10px]"></i>
+                                                {{ $p->barrio }}
+                                            </div>
+                                        @endif
+                                    </td>
+
+                                    {{-- Zona --}}
+                                    <td class="px-3 py-3">
+                                        @if($p->zonaCobertura)
+                                            <span class="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                                                  style="background: {{ $p->zonaCobertura->color ?? '#94a3b8' }}20; color: {{ $p->zonaCobertura->color ?? '#475569' }}">
+                                                <span class="h-1.5 w-1.5 rounded-full" style="background: {{ $p->zonaCobertura->color ?? '#94a3b8' }}"></span>
+                                                {{ $p->zonaCobertura->nombre }}
+                                            </span>
+                                        @else
+                                            <span class="text-[11px] text-slate-400 italic">Sin zona</span>
+                                        @endif
+                                    </td>
+
+                                    {{-- Productos --}}
+                                    <td class="px-3 py-3 max-w-[200px]">
+                                        @if($p->detalles->isNotEmpty())
+                                            <div class="text-xs text-slate-700 truncate">
+                                                <span class="font-semibold">{{ $p->detalles->first()->producto }}</span>
+                                                @if($p->detalles->count() > 1)
+                                                    <span class="text-slate-400">+{{ $p->detalles->count() - 1 }} más</span>
+                                                @endif
+                                            </div>
+                                        @else
+                                            <span class="text-[11px] text-slate-400">—</span>
+                                        @endif
+                                    </td>
+
+                                    {{-- Total --}}
+                                    <td class="px-3 py-3 text-right whitespace-nowrap">
+                                        <div class="font-extrabold text-brand">${{ number_format($p->total, 0, ',', '.') }}</div>
+                                        <div class="text-[10px] text-slate-400">{{ $p->fecha_pedido?->diffForHumans() }}</div>
+                                    </td>
+
+                                    {{-- Asignación + Reasignar --}}
+                                    <td class="px-3 py-3">
+                                        <div class="flex items-center gap-2">
+                                            {{-- Avatar del domi --}}
+                                            <div class="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-700 text-white text-[10px] font-extrabold shrink-0"
+                                                 title="{{ $domiAsig->nombre }}">
+                                                {{ $iniDom ?: '?' }}
+                                            </div>
+                                            <div class="min-w-0 flex-1">
+                                                <div class="text-xs font-bold text-slate-800 truncate">{{ $domiAsig->nombre }}</div>
+                                                <select
+                                                    onchange="if(this.value){ if(confirm('¿Reasignar pedido #{{ $p->id }} a este domiciliario?')){ @this.call('reasignarPedido', {{ $p->id }}, this.value); } this.value=''; }"
+                                                    class="mt-0.5 w-full min-w-[140px] rounded-md border border-blue-200 bg-blue-50/50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 hover:bg-blue-100 focus:border-blue-400 focus:ring-blue-400 cursor-pointer">
+                                                    <option value="">🔄 Reasignar…</option>
+                                                    @foreach($domiciliarios->where('id', '!=', $p->domiciliario_id) as $dRe)
+                                                        <option value="{{ $dRe->id }}">
+                                                            {{ $dRe->nombre }} · {{ ucfirst($dRe->estado) }}{{ $dRe->vehiculo ? ' · '.$dRe->vehiculo : '' }}
+                                                        </option>
+                                                    @endforeach
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        @endif
+                    </tbody>
+                </table>
             </div>
         </div>
-    @empty
-        <div class="rounded-2xl bg-white p-16 text-center shadow">
-            <i class="fa-solid fa-mug-hot text-5xl text-slate-300 mb-4 block"></i>
-            <h3 class="font-bold text-slate-700 mb-1">Todo despachado</h3>
-            <p class="text-sm text-slate-500">No hay pedidos en preparación esperando.</p>
-        </div>
-    @endforelse
+    @endif
 
     {{-- 🛵 PEDIDOS EN RUTA AGRUPADOS POR DOMICILIARIO --}}
     @if(isset($porDomiciliario) && $porDomiciliario->isNotEmpty())
