@@ -44,9 +44,9 @@
         body { font-family: 'Plus Jakarta Sans', sans-serif; }
     </style>
 </head>
-<body class="min-h-screen bg-white">
+<body class="h-screen bg-white overflow-hidden">
 
-    <div class="min-h-screen grid lg:grid-cols-2">
+    <div class="h-screen grid lg:grid-cols-2 overflow-hidden">
 
         {{-- ═══════════════ MITAD IZQUIERDA: LOGO HERO ═══════════════ --}}
         <div class="relative hidden lg:flex flex-col items-center justify-center overflow-hidden"
@@ -88,10 +88,10 @@
             </div>
 
             {{-- LOGO HERO + TAGLINE --}}
-            <div class="relative z-10 flex flex-col items-center justify-center px-12 text-center">
+            <div class="relative z-10 flex flex-col items-center justify-center px-8 text-center h-full">
                 @if($brandLogo)
                     <img src="{{ $brandLogo }}" alt="{{ $brandName }}"
-                         class="h-[28rem] w-auto max-w-[28rem] object-contain"
+                         class="max-h-[60vh] w-auto max-w-[24rem] object-contain"
                          style="filter: drop-shadow(0 20px 40px rgba(0,0,0,0.4)) drop-shadow(0 0 30px rgba(255,255,255,0.2));">
                 @else
                     <div class="relative">
@@ -101,14 +101,14 @@
                 @endif
 
                 {{-- Tagline grande estilo banner --}}
-                <p class="mt-6 text-base lg:text-lg text-white font-bold tracking-[0.4em] uppercase drop-shadow-md">
+                <p class="mt-6 text-sm lg:text-base text-white font-bold tracking-[0.4em] uppercase drop-shadow-md">
                     Conecta · Comunica · Transforma
                 </p>
             </div>
         </div>
 
         {{-- ═══════════════ MITAD DERECHA: LOGIN ═══════════════ --}}
-        <div class="flex items-center justify-center px-6 py-12 bg-white">
+        <div class="flex items-center justify-center px-6 py-8 bg-white overflow-y-auto">
             <div class="w-full max-w-md">
 
                 {{-- Logo (visible en todos los tamaños) --}}
