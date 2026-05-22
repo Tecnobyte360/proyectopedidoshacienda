@@ -324,9 +324,15 @@ class Index extends Component
         if ($this->audienciaTipo === 'manual')                        $filtros['telefonos'] = array_values(array_filter(array_map('trim', preg_split('/[\s,]+/', $this->telefonosManual))));
 
         // Subir imagen al disco público si vino una nueva
+        // ✅ Aislamiento por tenant: cada empresa tiene su propia carpeta
+        // tenants/{slug}/campanas/ para que las imágenes no se mezclen
+        // entre tenants y sean fáciles de auditar/limpiar por tenant.
         $mediaUrl = $this->mediaUrlExistente;
         if ($this->imagen) {
-            $path = $this->imagen->store('campanas', 'public');
+            $tenant = app(\App\Services\TenantManager::class)->current();
+            $slug = $tenant?->slug ?: 'sin-tenant';
+            $carpeta = "tenants/{$slug}/campanas";
+            $path = $this->imagen->store($carpeta, 'public');
             $mediaUrl = Storage::disk('public')->url($path);
         }
 

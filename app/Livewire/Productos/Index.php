@@ -142,8 +142,11 @@ class Index extends Component
                 Storage::disk('public')->delete($producto->imagen_path);
             }
 
+            // ✅ Aislamiento por tenant: carpeta tenants/{slug}/productos/
+            $tenant = app(\App\Services\TenantManager::class)->current();
+            $slug = $tenant?->slug ?: 'sin-tenant';
             $ext  = $this->imagenFile->getClientOriginalExtension() ?: 'jpg';
-            $name = "productos/{$producto->id}_" . time() . '.' . strtolower($ext);
+            $name = "tenants/{$slug}/productos/{$producto->id}_" . time() . '.' . strtolower($ext);
             $this->imagenFile->storePubliclyAs('', $name, 'public');
 
             $producto->update(['imagen_path' => $name]);
