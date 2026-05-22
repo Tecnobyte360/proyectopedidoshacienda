@@ -55,8 +55,12 @@ class SoloDominioPrincipal
                 return $next($request);
             }
 
-            // Subdominio de tenant → 404
-            abort(404);
+            // Subdominio de tenant → redirigir a admin.{base} preservando path
+            // (en vez de 404). Así el super-admin puede llegar a las rutas
+            // /admin/* aunque haya quedado pegado en un subdominio de tenant.
+            $adminHost = 'admin.' . $base;
+            $url = $request->getScheme() . '://' . $adminHost . $request->getRequestUri();
+            return redirect()->away($url, 302);
         }
 
         // Host no reconocido (IP local, dominio custom, etc) → permitir por default

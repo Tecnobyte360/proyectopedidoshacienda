@@ -44,83 +44,163 @@
         body { font-family: 'Plus Jakarta Sans', sans-serif; }
     </style>
 </head>
-<body class="min-h-screen flex items-center justify-center p-4 bg-white">
+<body class="min-h-screen bg-white">
 
-    <div class="w-full max-w-md">
-        {{-- Brand dinámico por tenant --}}
-        <div class="text-center mb-6">
-            @if($brandLogo)
-                <div class="inline-flex h-14 w-14 items-center justify-center rounded-xl bg-white shadow-md mb-3 overflow-hidden border border-slate-100">
-                    <img src="{{ $brandLogo }}" alt="{{ $brandName }}" class="h-full w-full object-contain">
+    <div class="min-h-screen grid lg:grid-cols-2">
+
+        {{-- ═══════════════ MITAD IZQUIERDA: BRAND ═══════════════ --}}
+        <div class="relative hidden lg:flex flex-col items-center justify-center px-12 py-16 overflow-hidden"
+             style="background: linear-gradient(135deg, {{ $colorPrim }} 0%, {{ $colorSec }} 100%);">
+
+            {{-- Patrón decorativo --}}
+            <div class="absolute inset-0 opacity-10">
+                <svg class="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <pattern id="dots" width="40" height="40" patternUnits="userSpaceOnUse">
+                            <circle cx="20" cy="20" r="2" fill="white"/>
+                        </pattern>
+                    </defs>
+                    <rect width="100%" height="100%" fill="url(#dots)"/>
+                </svg>
+            </div>
+
+            {{-- Círculos decorativos blur --}}
+            <div class="absolute top-0 -left-20 w-80 h-80 bg-white/10 rounded-full blur-3xl"></div>
+            <div class="absolute bottom-0 -right-20 w-96 h-96 bg-white/10 rounded-full blur-3xl"></div>
+
+            {{-- Logo + texto --}}
+            <div class="relative z-10 text-center max-w-sm">
+                @if($brandLogo)
+                    <div class="inline-flex h-28 w-28 items-center justify-center rounded-3xl bg-white shadow-2xl mb-6 overflow-hidden">
+                        <img src="{{ $brandLogo }}" alt="{{ $brandName }}" class="h-full w-full object-contain p-2">
+                    </div>
+                @else
+                    <div class="inline-flex h-24 w-24 items-center justify-center rounded-3xl bg-white/20 backdrop-blur shadow-2xl mb-6 border border-white/30">
+                        <i class="fa-solid fa-utensils text-4xl text-white"></i>
+                    </div>
+                @endif
+
+                <h1 class="text-4xl font-extrabold text-white drop-shadow-md">{{ $brandName }}</h1>
+                <p class="text-base text-white/85 mt-3">{{ $subtitulo }}</p>
+
+                {{-- Lista de beneficios --}}
+                <div class="mt-10 space-y-3 text-left">
+                    <div class="flex items-center gap-3 text-white/90">
+                        <span class="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 backdrop-blur">
+                            <i class="fa-solid fa-bolt text-white text-sm"></i>
+                        </span>
+                        <span class="text-sm font-medium">Pedidos automáticos vía WhatsApp</span>
+                    </div>
+                    <div class="flex items-center gap-3 text-white/90">
+                        <span class="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 backdrop-blur">
+                            <i class="fa-solid fa-route text-white text-sm"></i>
+                        </span>
+                        <span class="text-sm font-medium">Domiciliarios en tiempo real</span>
+                    </div>
+                    <div class="flex items-center gap-3 text-white/90">
+                        <span class="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 backdrop-blur">
+                            <i class="fa-solid fa-chart-line text-white text-sm"></i>
+                        </span>
+                        <span class="text-sm font-medium">Reportes y métricas en vivo</span>
+                    </div>
                 </div>
-            @else
-                <div class="inline-flex h-12 w-12 items-center justify-center rounded-xl text-white shadow-md mb-3"
-                     style="background: linear-gradient(135deg, {{ $colorPrim }}, {{ $colorSec }});">
-                    <i class="fa-solid fa-utensils text-lg"></i>
-                </div>
-            @endif
-            <h1 class="text-xl font-extrabold text-slate-800">{{ $brandName }}</h1>
-            <p class="text-xs text-slate-500 mt-0.5">{{ $subtitulo }}</p>
+            </div>
+
+            <p class="absolute bottom-6 text-xs text-white/70">
+                © {{ date('Y') }} {{ $brandName }}
+            </p>
         </div>
 
-        {{-- Card --}}
-        <div class="bg-white rounded-3xl shadow-2xl p-8 border border-slate-100">
-            <h2 class="text-xl font-bold text-slate-800 mb-1">Iniciar sesión</h2>
-            <p class="text-sm text-slate-500 mb-6">Ingresa con tus credenciales para continuar.</p>
+        {{-- ═══════════════ MITAD DERECHA: LOGIN ═══════════════ --}}
+        <div class="flex items-center justify-center px-6 py-12 bg-white">
+            <div class="w-full max-w-md">
 
-            @if($errors->any())
-                <div class="rounded-xl bg-rose-50 border border-rose-200 p-3 mb-4 text-sm text-rose-700">
-                    <i class="fa-solid fa-circle-exclamation mr-1"></i>
-                    {{ $errors->first() }}
-                </div>
-            @endif
-
-            <form method="POST" action="{{ route('login') }}" class="space-y-4">
-                @csrf
-
-                <div>
-                    <label class="block text-xs font-semibold text-slate-700 mb-1.5">
-                        <i class="fa-solid fa-envelope text-slate-400"></i> Correo electrónico
-                    </label>
-                    <input type="email" name="email" value="{{ old('email') }}" required autofocus
-                           style="--tw-ring-color: {{ $colorPrim }}33;"
-                           class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:ring-2 focus:outline-none"
-                           onfocus="this.style.borderColor='{{ $colorPrim }}';"
-                           onblur="this.style.borderColor='';"
-                           placeholder="{{ 'tucorreo@' . $emailDomain }}">
+                {{-- Logo móvil (solo cuando NO se ve la mitad izquierda) --}}
+                <div class="lg:hidden text-center mb-8">
+                    @if($brandLogo)
+                        <div class="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-md mb-3 overflow-hidden border border-slate-100">
+                            <img src="{{ $brandLogo }}" alt="{{ $brandName }}" class="h-full w-full object-contain">
+                        </div>
+                    @else
+                        <div class="inline-flex h-14 w-14 items-center justify-center rounded-2xl text-white shadow-md mb-3"
+                             style="background: linear-gradient(135deg, {{ $colorPrim }}, {{ $colorSec }});">
+                            <i class="fa-solid fa-utensils text-xl"></i>
+                        </div>
+                    @endif
+                    <h1 class="text-2xl font-extrabold text-slate-800">{{ $brandName }}</h1>
                 </div>
 
-                <div>
-                    <label class="block text-xs font-semibold text-slate-700 mb-1.5">
-                        <i class="fa-solid fa-lock text-slate-400"></i> Contraseña
-                    </label>
-                    <input type="password" name="password" required
-                           class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:ring-2 focus:outline-none"
-                           style="--tw-ring-color: {{ $colorPrim }}33;"
-                           onfocus="this.style.borderColor='{{ $colorPrim }}';"
-                           onblur="this.style.borderColor='';"
-                           placeholder="••••••••">
+                <div class="mb-8">
+                    <h2 class="text-3xl font-extrabold text-slate-800">Bienvenido de nuevo 👋</h2>
+                    <p class="text-sm text-slate-500 mt-2">Ingresa con tus credenciales para continuar.</p>
                 </div>
 
-                <label class="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" name="remember" {{ old('remember') ? 'checked' : '' }}
-                           class="rounded border-slate-300"
-                           style="color: {{ $colorPrim }};">
-                    <span class="text-sm text-slate-600">Recordarme en este equipo</span>
-                </label>
+                @if($errors->any())
+                    <div class="rounded-xl bg-rose-50 border border-rose-200 p-3 mb-5 text-sm text-rose-700">
+                        <i class="fa-solid fa-circle-exclamation mr-1"></i>
+                        {{ $errors->first() }}
+                    </div>
+                @endif
 
-                <button type="submit"
-                        class="w-full rounded-xl text-white font-bold py-3 transition shadow-lg hover:opacity-90"
-                        style="background: linear-gradient(135deg, {{ $colorPrim }}, {{ $colorSec }});">
-                    <i class="fa-solid fa-arrow-right-to-bracket mr-1"></i>
-                    Entrar
-                </button>
-            </form>
+                <form method="POST" action="{{ route('login') }}" class="space-y-5">
+                    @csrf
+
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
+                            Correo electrónico
+                        </label>
+                        <div class="relative">
+                            <i class="fa-solid fa-envelope absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                            <input type="email" name="email" value="{{ old('email') }}" required autofocus
+                                   style="--tw-ring-color: {{ $colorPrim }}33;"
+                                   class="w-full rounded-xl border border-slate-200 pl-11 pr-4 py-3 text-sm focus:ring-2 focus:outline-none transition"
+                                   onfocus="this.style.borderColor='{{ $colorPrim }}';"
+                                   onblur="this.style.borderColor='';"
+                                   placeholder="{{ 'tucorreo@' . $emailDomain }}">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
+                            Contraseña
+                        </label>
+                        <div class="relative">
+                            <i class="fa-solid fa-lock absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                            <input type="password" name="password" required id="pwdInput"
+                                   class="w-full rounded-xl border border-slate-200 pl-11 pr-12 py-3 text-sm focus:ring-2 focus:outline-none transition"
+                                   style="--tw-ring-color: {{ $colorPrim }}33;"
+                                   onfocus="this.style.borderColor='{{ $colorPrim }}';"
+                                   onblur="this.style.borderColor='';"
+                                   placeholder="••••••••">
+                            <button type="button" onclick="const i=document.getElementById('pwdInput');i.type=i.type==='password'?'text':'password';this.querySelector('i').className='fa-solid '+(i.type==='password'?'fa-eye':'fa-eye-slash')+' text-sm';"
+                                    class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-2 rounded-lg hover:bg-slate-50">
+                                <i class="fa-solid fa-eye text-sm"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" name="remember" {{ old('remember') ? 'checked' : '' }}
+                                   class="rounded border-slate-300"
+                                   style="color: {{ $colorPrim }};">
+                            <span class="text-sm text-slate-600">Recordarme</span>
+                        </label>
+                    </div>
+
+                    <button type="submit"
+                            class="w-full rounded-xl text-white font-bold py-3.5 transition shadow-lg hover:shadow-xl active:scale-[0.99]"
+                            style="background: linear-gradient(135deg, {{ $colorPrim }}, {{ $colorSec }});">
+                        <i class="fa-solid fa-arrow-right-to-bracket mr-2"></i>
+                        Iniciar sesión
+                    </button>
+                </form>
+
+                <p class="text-center text-xs text-slate-400 mt-8 lg:hidden">
+                    © {{ date('Y') }} {{ $brandName }} · Todos los derechos reservados
+                </p>
+            </div>
         </div>
-
-        <p class="text-center text-xs text-slate-400 mt-6">
-            © {{ date('Y') }} {{ $brandName }} · Todos los derechos reservados
-        </p>
     </div>
 
 </body>
