@@ -68,40 +68,42 @@
             <div class="absolute top-0 -left-20 w-80 h-80 bg-white/10 rounded-full blur-3xl"></div>
             <div class="absolute bottom-0 -right-20 w-96 h-96 bg-white/10 rounded-full blur-3xl"></div>
 
-            {{-- Logo + texto --}}
-            <div class="relative z-10 text-center max-w-sm">
+            {{-- Logo grande + texto --}}
+            <div class="relative z-10 text-center max-w-md">
                 @if($brandLogo)
-                    <div class="inline-flex h-28 w-28 items-center justify-center rounded-3xl bg-white shadow-2xl mb-6 overflow-hidden">
-                        <img src="{{ $brandLogo }}" alt="{{ $brandName }}" class="h-full w-full object-contain p-2">
+                    <div class="mb-6">
+                        <img src="{{ $brandLogo }}" alt="{{ $brandName }}"
+                             class="h-48 w-auto max-w-full mx-auto drop-shadow-2xl"
+                             style="filter: drop-shadow(0 20px 30px rgba(0,0,0,0.25));">
                     </div>
                 @else
-                    <div class="inline-flex h-24 w-24 items-center justify-center rounded-3xl bg-white/20 backdrop-blur shadow-2xl mb-6 border border-white/30">
-                        <i class="fa-solid fa-utensils text-4xl text-white"></i>
+                    <div class="inline-flex h-32 w-32 items-center justify-center rounded-3xl bg-white/20 backdrop-blur shadow-2xl mb-6 border border-white/30">
+                        <i class="fa-solid fa-utensils text-5xl text-white"></i>
                     </div>
                 @endif
 
-                <h1 class="text-4xl font-extrabold text-white drop-shadow-md">{{ $brandName }}</h1>
-                <p class="text-base text-white/85 mt-3">{{ $subtitulo }}</p>
+                <h1 class="text-5xl font-extrabold text-white drop-shadow-md tracking-tight">{{ $brandName }}</h1>
+                <p class="text-lg text-white/90 mt-4 font-medium">{{ $subtitulo }}</p>
 
                 {{-- Lista de beneficios --}}
-                <div class="mt-10 space-y-3 text-left">
-                    <div class="flex items-center gap-3 text-white/90">
-                        <span class="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 backdrop-blur">
-                            <i class="fa-solid fa-bolt text-white text-sm"></i>
+                <div class="mt-12 space-y-4 text-left max-w-sm mx-auto">
+                    <div class="flex items-center gap-3 text-white/95">
+                        <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 backdrop-blur shrink-0">
+                            <i class="fa-solid fa-bolt text-white"></i>
                         </span>
-                        <span class="text-sm font-medium">Pedidos automáticos vía WhatsApp</span>
+                        <span class="text-sm font-semibold">Pedidos automáticos vía WhatsApp</span>
                     </div>
-                    <div class="flex items-center gap-3 text-white/90">
-                        <span class="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 backdrop-blur">
-                            <i class="fa-solid fa-route text-white text-sm"></i>
+                    <div class="flex items-center gap-3 text-white/95">
+                        <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 backdrop-blur shrink-0">
+                            <i class="fa-solid fa-route text-white"></i>
                         </span>
-                        <span class="text-sm font-medium">Domiciliarios en tiempo real</span>
+                        <span class="text-sm font-semibold">Domiciliarios en tiempo real</span>
                     </div>
-                    <div class="flex items-center gap-3 text-white/90">
-                        <span class="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 backdrop-blur">
-                            <i class="fa-solid fa-chart-line text-white text-sm"></i>
+                    <div class="flex items-center gap-3 text-white/95">
+                        <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 backdrop-blur shrink-0">
+                            <i class="fa-solid fa-chart-line text-white"></i>
                         </span>
-                        <span class="text-sm font-medium">Reportes y métricas en vivo</span>
+                        <span class="text-sm font-semibold">Reportes y métricas en vivo</span>
                     </div>
                 </div>
             </div>
@@ -115,24 +117,19 @@
         <div class="flex items-center justify-center px-6 py-12 bg-white">
             <div class="w-full max-w-md">
 
-                {{-- Logo móvil (solo cuando NO se ve la mitad izquierda) --}}
-                <div class="lg:hidden text-center mb-8">
+                {{-- Logo (visible en todos los tamaños) --}}
+                <div class="text-center mb-8">
                     @if($brandLogo)
-                        <div class="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-md mb-3 overflow-hidden border border-slate-100">
-                            <img src="{{ $brandLogo }}" alt="{{ $brandName }}" class="h-full w-full object-contain">
-                        </div>
+                        <img src="{{ $brandLogo }}" alt="{{ $brandName }}"
+                             class="h-20 w-auto mx-auto mb-4">
                     @else
-                        <div class="inline-flex h-14 w-14 items-center justify-center rounded-2xl text-white shadow-md mb-3"
+                        <div class="inline-flex h-16 w-16 items-center justify-center rounded-2xl text-white shadow-md mb-4"
                              style="background: linear-gradient(135deg, {{ $colorPrim }}, {{ $colorSec }});">
-                            <i class="fa-solid fa-utensils text-xl"></i>
+                            <i class="fa-solid fa-utensils text-2xl"></i>
                         </div>
                     @endif
-                    <h1 class="text-2xl font-extrabold text-slate-800">{{ $brandName }}</h1>
-                </div>
-
-                <div class="mb-8">
-                    <h2 class="text-3xl font-extrabold text-slate-800">Bienvenido de nuevo 👋</h2>
-                    <p class="text-sm text-slate-500 mt-2">Ingresa con tus credenciales para continuar.</p>
+                    <h2 class="text-2xl font-extrabold text-slate-800">Iniciar sesión</h2>
+                    <p class="text-sm text-slate-500 mt-1">Ingresa con tus credenciales para continuar.</p>
                 </div>
 
                 @if($errors->any())
