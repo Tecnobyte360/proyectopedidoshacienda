@@ -1,15 +1,17 @@
 @php
-    $brandName = $tenantBranding?->nombre ?: 'TecnoByte360';
-    $brandLogo = $tenantBranding?->logo_url;
-    $colorPrim = $tenantBranding?->color_primario ?: '#d68643';
-    $colorSec  = $tenantBranding?->color_secundario ?: '#a85f24';
-    $bgLight   = $tenantBranding?->color_primario
-        ? $tenantBranding->color_primario . '22'
-        : '#fbe9d7';
-    $emailDomain = $tenantBranding?->slug ? $tenantBranding->slug . '.com' : 'empresa.com';
-
+    // Cargar config global de la plataforma (singleton — usado cuando NO hay tenant subdomain)
     $platformCfg = null;
     try { $platformCfg = \App\Models\ConfiguracionPlataforma::actual(); } catch (\Throwable $e) {}
+
+    // Si estamos en un subdominio de tenant → mostrar branding del tenant
+    // Si no → mostrar branding de la plataforma (Kivox)
+    $brandName  = $tenantBranding?->nombre ?: ($platformCfg->nombre ?: 'Kivox');
+    $brandLogo  = $tenantBranding?->logo_url ?: ($platformCfg->logo_url ?? null);
+    $colorPrim  = $tenantBranding?->color_primario ?: ($platformCfg->color_primario ?? '#10b981');
+    $colorSec   = $tenantBranding?->color_secundario ?: ($platformCfg->color_secundario ?? '#059669');
+    $subtitulo  = $tenantBranding ? 'Plataforma de gestión de pedidos' : ($platformCfg->subtitulo ?? 'Plataforma SaaS');
+    $emailDomain = $tenantBranding?->slug ? $tenantBranding->slug . '.com' : 'empresa.com';
+
     $faviconUrl = $tenantBranding?->favicon_url ?: ($platformCfg->favicon_url ?? null);
     if (!$faviconUrl) {
         $inicial = mb_strtoupper(mb_substr($brandName, 0, 1));
@@ -58,7 +60,7 @@
                 </div>
             @endif
             <h1 class="text-xl font-extrabold text-slate-800">{{ $brandName }}</h1>
-            <p class="text-xs text-slate-500 mt-0.5">Plataforma de gestión de pedidos</p>
+            <p class="text-xs text-slate-500 mt-0.5">{{ $subtitulo }}</p>
         </div>
 
         {{-- Card --}}
