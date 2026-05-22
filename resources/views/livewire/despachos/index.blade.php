@@ -16,6 +16,77 @@
 
 <div class="px-6 lg:px-10 py-8" wire:poll.30s="refrescar">
 
+    @once
+    @push('scripts')
+    <script>
+        // 🎨 Confirmación con SweetAlert2 para asignar/reasignar pedidos
+        window.confirmarReasignar = function(selectEl, pedidoId, modo) {
+            const domiId = selectEl.value;
+            if (!domiId) return;
+
+            // Texto del domiciliario seleccionado (incluye estado/vehículo)
+            const opcionTexto = selectEl.options[selectEl.selectedIndex].text;
+
+            // Resetear el select inmediatamente
+            selectEl.value = '';
+
+            const esReasignar = modo === 'reasignar';
+            const titulo = esReasignar ? '¿Reasignar este pedido?' : '¿Asignar este pedido?';
+            const colorPrimario = esReasignar ? '#10b981' : '#f43f5e'; // brand verde / rose
+            const icono = esReasignar ? 'question' : 'info';
+
+            if (typeof Swal === 'undefined') {
+                if (confirm(titulo + '\n\nPedido #' + pedidoId + ' → ' + opcionTexto)) {
+                    Livewire.find(document.querySelector('[wire\\:id]')?.getAttribute('wire:id'))
+                        ?.call('reasignarPedido', pedidoId, domiId);
+                }
+                return;
+            }
+
+            Swal.fire({
+                title: titulo,
+                html: `
+                    <div style="font-size:14px;color:#475569;text-align:left">
+                        <div style="background:#f1f5f9;padding:10px 12px;border-radius:8px;margin-bottom:10px">
+                            <div style="font-size:11px;text-transform:uppercase;color:#94a3b8;letter-spacing:0.05em;font-weight:700">Pedido</div>
+                            <div style="font-weight:800;color:#0f172a;font-size:16px">#${String(pedidoId).padStart(3,'0')}</div>
+                        </div>
+                        <div style="background:${colorPrimario}15;padding:10px 12px;border-radius:8px;border-left:4px solid ${colorPrimario}">
+                            <div style="font-size:11px;text-transform:uppercase;color:${colorPrimario};letter-spacing:0.05em;font-weight:700">${esReasignar ? 'Nuevo domiciliario' : 'Domiciliario'}</div>
+                            <div style="font-weight:700;color:#0f172a">${opcionTexto}</div>
+                        </div>
+                    </div>
+                `,
+                icon: icono,
+                showCancelButton: true,
+                confirmButtonColor: colorPrimario,
+                cancelButtonColor: '#94a3b8',
+                confirmButtonText: esReasignar ? '🔄 Sí, reasignar' : '✓ Sí, asignar',
+                cancelButtonText: 'Cancelar',
+                reverseButtons: true,
+                customClass: {
+                    popup: 'rounded-2xl',
+                    confirmButton: 'rounded-xl px-5 py-2.5 font-bold',
+                    cancelButton: 'rounded-xl px-5 py-2.5 font-bold',
+                },
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // Buscar el componente Livewire de Despachos
+                    const root = selectEl.closest('[wire\\:id]');
+                    if (root && window.Livewire) {
+                        const cmp = Livewire.find(root.getAttribute('wire:id'));
+                        if (cmp) cmp.call('reasignarPedido', pedidoId, domiId);
+                    } else {
+                        // Fallback
+                        Livewire.dispatch('reasignar-pedido', { pedidoId: pedidoId, domiId: domiId });
+                    }
+                }
+            });
+        };
+    </script>
+    @endpush
+    @endonce
+
     {{-- ════════════════════════════════════════════════════════════════
          🛵 PANEL PERSONAL DEL DOMICILIARIO (cuando es solo rol 'domiciliario')
          Se muestra ARRIBA del view admin estándar. El view admin se filtra
@@ -1451,7 +1522,7 @@
                                     {{-- Acción: Asignar --}}
                                     <td class="px-3 py-3">
                                         <select
-                                            onchange="if(this.value){ if(confirm('¿Asignar pedido #{{ $p->id }} a este domiciliario?')){ @this.call('reasignarPedido', {{ $p->id }}, this.value); } this.value=''; }"
+                                            onchange="window.confirmarReasignar(this, {{ $p->id }}, 'asignar')"
                                             class="w-full min-w-[160px] rounded-lg border-2 border-rose-300 bg-white px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:border-rose-400 hover:bg-rose-50 focus:border-rose-500 focus:ring-rose-500 transition cursor-pointer">
                                             <option value="">➕ Asignar a…</option>
                                             @foreach($domiciliarios as $dRe)
@@ -1599,7 +1670,7 @@
                                             <div class="min-w-0 flex-1">
                                                 <div class="text-xs font-bold text-slate-800 truncate">{{ $domiAsig?->nombre ?? '—' }}</div>
                                                 <select
-                                                    onchange="if(this.value){ if(confirm('¿Reasignar pedido #{{ $p->id }} a este domiciliario?')){ @this.call('reasignarPedido', {{ $p->id }}, this.value); } this.value=''; }"
+                                                    onchange="window.confirmarReasignar(this, {{ $p->id }}, 'reasignar')"
                                                     class="mt-0.5 w-full min-w-[140px] rounded-md border border-brand/30 bg-brand/5 px-1.5 py-0.5 text-[10px] font-semibold text-brand-dark hover:bg-brand/10 focus:border-brand focus:ring-brand cursor-pointer">
                                                     <option value="">🔄 Reasignar…</option>
                                                     @foreach($domiciliarios->where('id', '!=', $p->domiciliario_id) as $dRe)
@@ -1717,7 +1788,7 @@
                                         {{-- Reasignar --}}
                                         <div class="col-span-12 sm:col-span-2 flex justify-end">
                                             <select
-                                                onchange="if(this.value){ if(confirm('¿Reasignar pedido #{{ $p->id }} a este domiciliario?')){ @this.call('reasignarPedido', {{ $p->id }}, this.value); } this.value=''; }"
+                                                onchange="window.confirmarReasignar(this, {{ $p->id }}, 'reasignar')"
                                                 class="w-full rounded-lg border-2 border-amber-300 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-amber-800 hover:border-amber-400 hover:bg-amber-50 focus:border-amber-500 focus:ring-amber-500 transition cursor-pointer"
                                                 title="Reasignar a otro domiciliario">
                                                 <option value="">🔄 Reasignar…</option>
