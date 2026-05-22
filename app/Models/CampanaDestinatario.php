@@ -16,11 +16,14 @@ class CampanaDestinatario extends Model
         'campana_id', 'tenant_id', 'cliente_id',
         'nombre', 'telefono',
         'estado', 'mensaje_renderizado', 'enviado_at', 'error_detalle', 'intentos',
+        'respondio_at', 'respuestas_count',
     ];
 
     protected $casts = [
-        'enviado_at' => 'datetime',
-        'intentos'   => 'integer',
+        'enviado_at'       => 'datetime',
+        'respondio_at'     => 'datetime',
+        'intentos'         => 'integer',
+        'respuestas_count' => 'integer',
     ];
 
     public const ESTADO_PENDIENTE = 'pendiente';

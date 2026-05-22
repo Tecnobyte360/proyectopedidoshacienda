@@ -254,6 +254,16 @@ class WhatsappWebhookController extends Controller
             return response()->json(['status' => 'self_message_ignored']);
         }
 
+        // 📊 Tracking de campañas: marcar destinatarios que respondieron.
+        // Esto no bloquea ni afecta el flujo del bot — solo registra la métrica.
+        try {
+            $tenantActual = app(\App\Services\TenantManager::class)->current();
+            app(\App\Services\CampanaRespuestaTracker::class)
+                ->procesarMensajeEntrante($from, $tenantActual?->id);
+        } catch (\Throwable $e) {
+            Log::warning('No se pudo trackear respuesta de campaña: ' . $e->getMessage());
+        }
+
         // Deduplicación por messageId — debe ir ANTES de cualquier persist
         // (usuario interno, modo humano, etc.) para evitar duplicados por retries.
         if ($messageId) {

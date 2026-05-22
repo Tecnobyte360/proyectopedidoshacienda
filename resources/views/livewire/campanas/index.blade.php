@@ -212,7 +212,7 @@
                 <div class="p-6 space-y-5 max-h-[80vh] overflow-y-auto">
 
                     {{-- KPIs grandes --}}
-                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
                         <div class="rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 p-4 text-white shadow-sm">
                             <div class="flex items-center justify-between mb-2">
                                 <span class="text-[10px] font-bold uppercase tracking-wider opacity-80">Enviados</span>
@@ -220,6 +220,21 @@
                             </div>
                             <div class="text-3xl font-extrabold">{{ $monitorEstadisticas['enviado'] }}</div>
                         </div>
+
+                        {{-- ⭐ NUEVO: Respondieron --}}
+                        <div class="rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 p-4 text-white shadow-sm">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-[10px] font-bold uppercase tracking-wider opacity-90">Respondieron</span>
+                                <i class="fa-solid fa-reply"></i>
+                            </div>
+                            <div class="text-3xl font-extrabold">{{ $monitorEstadisticas['respondieron'] ?? 0 }}</div>
+                            <div class="text-[10px] opacity-80 mt-1">
+                                @if($monitorEstadisticas['enviado'] > 0)
+                                    {{ $monitorEstadisticas['tasa_respuesta'] ?? 0 }}% tasa respuesta
+                                @endif
+                            </div>
+                        </div>
+
                         <div class="rounded-2xl bg-gradient-to-br from-rose-500 to-rose-600 p-4 text-white shadow-sm">
                             <div class="flex items-center justify-between mb-2">
                                 <span class="text-[10px] font-bold uppercase tracking-wider opacity-80">Fallidos</span>
@@ -301,6 +316,7 @@
                                     <th class="px-3 py-2 text-left">Nombre</th>
                                     <th class="px-3 py-2 text-left">Teléfono</th>
                                     <th class="px-3 py-2 text-left">Enviado</th>
+                                    <th class="px-3 py-2 text-center">Respondió</th>
                                     <th class="px-3 py-2 text-left">Detalle</th>
                                 </tr>
                             </thead>
@@ -327,6 +343,21 @@
                                         <td class="px-3 py-2 text-xs text-slate-500">
                                             {{ $d->enviado_at?->diffForHumans() ?? '—' }}
                                         </td>
+                                        <td class="px-3 py-2 text-center">
+                                            @if($d->respondio_at)
+                                                <span class="inline-flex items-center gap-1 rounded-full bg-blue-100 text-blue-700 px-2 py-0.5 text-[10px] font-bold"
+                                                      title="Respondió {{ $d->respondio_at->diffForHumans() }} · {{ $d->respuestas_count }} mensaje(s)">
+                                                    <i class="fa-solid fa-reply"></i>
+                                                    @if($d->respuestas_count > 1)
+                                                        {{ $d->respuestas_count }}x
+                                                    @else
+                                                        Sí
+                                                    @endif
+                                                </span>
+                                            @else
+                                                <span class="text-slate-300 text-[10px]">—</span>
+                                            @endif
+                                        </td>
                                         <td class="px-3 py-2 text-xs text-slate-500 truncate max-w-[280px]">
                                             @if($d->error_detalle)
                                                 <span class="text-rose-600" title="{{ $d->error_detalle }}">
@@ -342,7 +373,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="5" class="px-4 py-8 text-center text-slate-400">
+                                        <td colspan="6" class="px-4 py-8 text-center text-slate-400">
                                             <i class="fa-solid fa-inbox text-2xl block mb-2"></i>
                                             No hay destinatarios con este estado.
                                         </td>

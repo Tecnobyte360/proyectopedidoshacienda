@@ -250,6 +250,14 @@ class Index extends Component
                     ? (int) round((($monitorEstadisticas['enviado'] + $monitorEstadisticas['fallido']) / $monitorEstadisticas['total']) * 100)
                     : 0;
 
+                // 📩 Métrica de respuestas: cuántos destinatarios respondieron tras la campaña
+                $monitorEstadisticas['respondieron'] = (int) \App\Models\CampanaDestinatario::where('campana_id', $monitorCampana->id)
+                    ->whereNotNull('respondio_at')
+                    ->count();
+                $monitorEstadisticas['tasa_respuesta'] = $monitorEstadisticas['enviado'] > 0
+                    ? round(($monitorEstadisticas['respondieron'] / $monitorEstadisticas['enviado']) * 100, 1)
+                    : 0;
+
                 // Lista filtrada (últimos 50 con orden por actividad)
                 if ($this->filtroMonitor !== 'todos') {
                     $destinatariosQuery->where('estado', $this->filtroMonitor);
