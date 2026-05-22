@@ -133,6 +133,45 @@ class Tenant extends Model
         // Limpiar caché del mapa connection_id → tenant cuando se edita
         static::saved(fn () => app(\App\Services\WhatsappResolverService::class)->limpiarCache());
         static::deleted(fn () => app(\App\Services\WhatsappResolverService::class)->limpiarCache());
+
+        // 📁 Crear carpetas de storage automáticamente al crear el tenant
+        static::created(function ($tenant) {
+            try {
+                $tenant->crearCarpetasStorage();
+            } catch (\Throwable $e) {
+                \Log::warning("No se pudieron crear carpetas storage para tenant {$tenant->slug}: " . $e->getMessage());
+            }
+        });
+    }
+
+    /**
+     * Crea la estructura de carpetas dedicada del tenant en storage/app/public.
+     * Idempotente: si ya existen, no las recrea.
+     *
+     *  tenants/{slug}/
+     *    ├── campanas/       (imágenes de campañas WhatsApp)
+     *    ├── productos/      (imágenes de productos)
+     *    ├── logos/          (logo + favicon del branding)
+     *    ├── pedidos/        (adjuntos/comprobantes de pedidos)
+     *    └── otros/          (catch-all para futuros módulos)
+     */
+    public function crearCarpetasStorage(): void
+    {
+        if (!$this->slug) return;
+
+        $disk = \Illuminate\Support\Facades\Storage::disk('public');
+        $base = "tenants/{$this->slug}";
+
+        $subcarpetas = ['campanas', 'productos', 'logos', 'pedidos', 'otros'];
+
+        foreach ($subcarpetas as $sub) {
+            $ruta = "{$base}/{$sub}";
+            if (!$disk->exists($ruta)) {
+                $disk->makeDirectory($ruta);
+                // .gitkeep para que sobreviva a operaciones de git si se versionan
+                $disk->put("{$ruta}/.gitkeep", '');
+            }
+        }
     }
 
     public function users(): HasMany
