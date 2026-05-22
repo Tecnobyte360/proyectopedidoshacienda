@@ -14,6 +14,18 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // 🔐 Trust the reverse proxy (nginx) so Laravel honors X-Forwarded-Proto
+        // y X-Forwarded-For. Sin esto, las signed URLs de Livewire fallan con
+        // 401 (porque la firma se genera con https:// pero el request se ve
+        // como http:// internamente).
+        $middleware->trustProxies(at: '*', headers:
+            \Illuminate\Http\Request::HEADER_X_FORWARDED_FOR |
+            \Illuminate\Http\Request::HEADER_X_FORWARDED_HOST |
+            \Illuminate\Http\Request::HEADER_X_FORWARDED_PORT |
+            \Illuminate\Http\Request::HEADER_X_FORWARDED_PROTO |
+            \Illuminate\Http\Request::HEADER_X_FORWARDED_AWS_ELB
+        );
+
         $middleware->alias([
             'api.key'    => \App\Http\Middleware\ApiKeyAuth::class,
             'role'       => \Spatie\Permission\Middleware\RoleMiddleware::class,
