@@ -882,7 +882,15 @@
          Estilo /pedidos — colores de la marca
          ═══════════════════════════════════════════════════════════════ --}}
     @php
-        $todosPedidos = $agrupados->flatMap(fn($g) => $g['pedidos'])->values();
+        // Pedidos en preparación (vienen de $agrupados)
+        $pedidosPrep = $agrupados->flatMap(fn($g) => $g['pedidos'])->values();
+        // Pedidos en ruta (ya asignados a un domiciliario, vienen de $porDomiciliario)
+        $pedidosRuta = isset($porDomiciliario)
+            ? collect($porDomiciliario)->flatMap(fn($info) => $info['pedidos'])->values()
+            : collect();
+
+        // Unificar y separar
+        $todosPedidos = $pedidosPrep->merge($pedidosRuta)->unique('id')->values();
         $sinAsignar   = $todosPedidos->filter(fn($p) => empty($p->domiciliario_id))->sortBy('zona_cobertura_id')->values();
         $asignados    = $todosPedidos->filter(fn($p) => !empty($p->domiciliario_id))->sortBy('domiciliario_id')->values();
         $totalSinAsig = $sinAsignar->sum('total');
@@ -947,7 +955,7 @@
                             <th class="px-3 py-3 text-left">Cliente</th>
                             <th class="px-3 py-3 text-left">Dirección</th>
                             <th class="px-3 py-3 text-left">Zona</th>
-                            <th class="px-3 py-3 text-left">Productos</th>
+                            <th class="px-3 py-3 text-left">Estado</th>
                             <th class="px-3 py-3 text-right">Total</th>
                             <th class="px-3 py-3 text-left">Asignación</th>
                         </tr>
@@ -1039,17 +1047,30 @@
                                         @endif
                                     </td>
 
-                                    {{-- Productos --}}
-                                    <td class="px-3 py-3 max-w-[200px]">
+                                    {{-- Estado --}}
+                                    <td class="px-3 py-3">
+                                        @php
+                                            $estadoColor = match($p->estado) {
+                                                'repartidor_en_camino' => ['bg' => 'bg-blue-100', 'text' => 'text-blue-700', 'dot' => 'bg-blue-500', 'label' => 'En camino'],
+                                                'entregado' => ['bg' => 'bg-emerald-100', 'text' => 'text-emerald-700', 'dot' => 'bg-emerald-500', 'label' => 'Entregado'],
+                                                'en_preparacion' => ['bg' => 'bg-amber-100', 'text' => 'text-amber-700', 'dot' => 'bg-amber-500', 'label' => 'En preparación'],
+                                                'nuevo' => ['bg' => 'bg-slate-100', 'text' => 'text-slate-700', 'dot' => 'bg-slate-400', 'label' => 'Nuevo'],
+                                                'cancelado' => ['bg' => 'bg-rose-100', 'text' => 'text-rose-700', 'dot' => 'bg-rose-500', 'label' => 'Cancelado'],
+                                                default => ['bg' => 'bg-slate-100', 'text' => 'text-slate-700', 'dot' => 'bg-slate-400', 'label' => str_replace('_', ' ', $p->estado)],
+                                            };
+                                        @endphp
+                                        <span class="inline-flex items-center gap-1.5 rounded-full {{ $estadoColor['bg'] }} px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider {{ $estadoColor['text'] }}">
+                                            <span class="h-1.5 w-1.5 rounded-full {{ $estadoColor['dot'] }}"></span>
+                                            {{ $estadoColor['label'] }}
+                                        </span>
                                         @if($p->detalles->isNotEmpty())
-                                            <div class="text-xs text-slate-700 truncate">
-                                                <span class="font-semibold">{{ $p->detalles->first()->producto }}</span>
+                                            <div class="text-[10px] text-slate-500 mt-1 truncate max-w-[120px]" title="{{ $p->detalles->pluck('producto')->implode(', ') }}">
+                                                <i class="fa-solid fa-box text-slate-400"></i>
+                                                {{ $p->detalles->first()->producto }}
                                                 @if($p->detalles->count() > 1)
-                                                    <span class="text-slate-400">+{{ $p->detalles->count() - 1 }} más</span>
+                                                    <span class="text-slate-400">+{{ $p->detalles->count() - 1 }}</span>
                                                 @endif
                                             </div>
-                                        @else
-                                            <span class="text-[11px] text-slate-400">—</span>
                                         @endif
                                     </td>
 
@@ -1166,17 +1187,30 @@
                                         @endif
                                     </td>
 
-                                    {{-- Productos --}}
-                                    <td class="px-3 py-3 max-w-[200px]">
+                                    {{-- Estado --}}
+                                    <td class="px-3 py-3">
+                                        @php
+                                            $estadoColor = match($p->estado) {
+                                                'repartidor_en_camino' => ['bg' => 'bg-blue-100', 'text' => 'text-blue-700', 'dot' => 'bg-blue-500', 'label' => 'En camino'],
+                                                'entregado' => ['bg' => 'bg-emerald-100', 'text' => 'text-emerald-700', 'dot' => 'bg-emerald-500', 'label' => 'Entregado'],
+                                                'en_preparacion' => ['bg' => 'bg-amber-100', 'text' => 'text-amber-700', 'dot' => 'bg-amber-500', 'label' => 'En preparación'],
+                                                'nuevo' => ['bg' => 'bg-slate-100', 'text' => 'text-slate-700', 'dot' => 'bg-slate-400', 'label' => 'Nuevo'],
+                                                'cancelado' => ['bg' => 'bg-rose-100', 'text' => 'text-rose-700', 'dot' => 'bg-rose-500', 'label' => 'Cancelado'],
+                                                default => ['bg' => 'bg-slate-100', 'text' => 'text-slate-700', 'dot' => 'bg-slate-400', 'label' => str_replace('_', ' ', $p->estado)],
+                                            };
+                                        @endphp
+                                        <span class="inline-flex items-center gap-1.5 rounded-full {{ $estadoColor['bg'] }} px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider {{ $estadoColor['text'] }}">
+                                            <span class="h-1.5 w-1.5 rounded-full {{ $estadoColor['dot'] }}"></span>
+                                            {{ $estadoColor['label'] }}
+                                        </span>
                                         @if($p->detalles->isNotEmpty())
-                                            <div class="text-xs text-slate-700 truncate">
-                                                <span class="font-semibold">{{ $p->detalles->first()->producto }}</span>
+                                            <div class="text-[10px] text-slate-500 mt-1 truncate max-w-[120px]" title="{{ $p->detalles->pluck('producto')->implode(', ') }}">
+                                                <i class="fa-solid fa-box text-slate-400"></i>
+                                                {{ $p->detalles->first()->producto }}
                                                 @if($p->detalles->count() > 1)
-                                                    <span class="text-slate-400">+{{ $p->detalles->count() - 1 }} más</span>
+                                                    <span class="text-slate-400">+{{ $p->detalles->count() - 1 }}</span>
                                                 @endif
                                             </div>
-                                        @else
-                                            <span class="text-[11px] text-slate-400">—</span>
                                         @endif
                                     </td>
 
@@ -1218,8 +1252,8 @@
         </div>
     @endif
 
-    {{-- 🛵 PEDIDOS EN RUTA AGRUPADOS POR DOMICILIARIO --}}
-    @if(isset($porDomiciliario) && $porDomiciliario->isNotEmpty())
+    {{-- 🛵 PEDIDOS EN RUTA AGRUPADOS POR DOMICILIARIO (unificado arriba en tabla principal) --}}
+    @if(false && isset($porDomiciliario) && $porDomiciliario->isNotEmpty())
         <div class="mt-8">
             <div class="flex items-center gap-3 mb-4">
                 <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 text-blue-600">
