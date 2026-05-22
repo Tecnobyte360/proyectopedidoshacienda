@@ -1,5 +1,72 @@
 <div class="px-6 lg:px-10 py-8">
 
+    @once
+    @push('scripts')
+    <script>
+        window.confirmarEliminarCategoria = function(catId, catNombre, productosCount) {
+            if (typeof Swal === 'undefined') {
+                if (confirm('¿Seguro que deseas eliminar la categoría "' + catNombre + '"?')) {
+                    const root = document.querySelector('[wire\\:id]');
+                    if (root) Livewire.find(root.getAttribute('wire:id'))?.call('eliminar', catId);
+                }
+                return;
+            }
+
+            const tieneProductos = productosCount > 0;
+
+            Swal.fire({
+                title: '¿Eliminar categoría?',
+                html: `
+                    <div style="text-align:left;font-size:14px;color:#475569">
+                        <div style="background:#fef2f2;padding:12px 14px;border-radius:10px;border-left:4px solid #ef4444;margin-bottom:10px">
+                            <div style="font-size:11px;text-transform:uppercase;color:#dc2626;letter-spacing:0.05em;font-weight:700">Categoría a eliminar</div>
+                            <div style="font-weight:800;color:#0f172a;font-size:16px;margin-top:2px">📂 ${catNombre}</div>
+                        </div>
+                        ${tieneProductos ? `
+                            <div style="background:#fef3c7;padding:12px 14px;border-radius:10px;border-left:4px solid #f59e0b">
+                                <div style="font-size:12px;color:#92400e;font-weight:700">
+                                    ⚠️ Esta categoría tiene <b>${productosCount} producto(s)</b> asignados.
+                                </div>
+                                <div style="font-size:11px;color:#a16207;margin-top:4px">
+                                    Los productos quedarán sin categoría tras eliminarla.
+                                </div>
+                            </div>
+                        ` : `
+                            <div style="background:#f0fdf4;padding:10px 14px;border-radius:10px;font-size:12px;color:#166534">
+                                ✓ Esta categoría no tiene productos asociados.
+                            </div>
+                        `}
+                        <div style="margin-top:10px;font-size:12px;color:#94a3b8;text-align:center">
+                            Esta acción no se puede deshacer
+                        </div>
+                    </div>
+                `,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#ef4444',
+                cancelButtonColor: '#94a3b8',
+                confirmButtonText: '🗑️ Sí, eliminar',
+                cancelButtonText: 'Cancelar',
+                reverseButtons: true,
+                focusCancel: true,
+                customClass: {
+                    popup: 'rounded-2xl',
+                    confirmButton: 'rounded-xl px-5 py-2.5 font-bold',
+                    cancelButton: 'rounded-xl px-5 py-2.5 font-bold',
+                },
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    const root = document.querySelector('[wire\\:id]');
+                    if (root && window.Livewire) {
+                        Livewire.find(root.getAttribute('wire:id'))?.call('eliminar', catId);
+                    }
+                }
+            });
+        };
+    </script>
+    @endpush
+    @endonce
+
     {{-- HEADER --}}
     <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
@@ -70,8 +137,8 @@
                                     class="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition">
                                 <i class="fa-solid fa-pen-to-square"></i>
                             </button>
-                            <button wire:click="eliminar({{ $cat->id }})"
-                                    wire:confirm="¿Seguro que deseas eliminar esta categoría?"
+                            <button type="button"
+                                    onclick="window.confirmarEliminarCategoria({{ $cat->id }}, @js($cat->nombre), {{ $cat->productos_count }})"
                                     class="rounded-lg p-2 text-red-500 hover:bg-red-50 transition">
                                 <i class="fa-solid fa-trash"></i>
                             </button>
