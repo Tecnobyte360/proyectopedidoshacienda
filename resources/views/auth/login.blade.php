@@ -48,63 +48,81 @@
 
     <div class="h-screen grid lg:grid-cols-2 overflow-hidden">
 
-        {{-- ═══════════════ MITAD IZQUIERDA: LOGO HERO ═══════════════ --}}
-        <div class="relative hidden lg:flex flex-col items-center justify-center overflow-hidden"
-             style="background: linear-gradient(135deg, {{ $colorPrim }} 0%, {{ $colorSec }} 55%, #047857 100%);">
+        {{-- ═══════════════ MITAD IZQUIERDA: HERO IMAGE ═══════════════ --}}
+        @php
+            // Imagen hero personalizada (composición completa con logo + tagline + efectos)
+            // Si existe, llena todo el panel sin overlays sintéticos.
+            $heroImage = $tenantBranding?->login_hero_url
+                ?? $platformCfg?->login_hero_url
+                ?? null;
+        @endphp
 
-            {{-- Anillo circular brillante alrededor del logo (efecto spotlight) --}}
-            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[44rem] h-[44rem] rounded-full"
-                 style="background: radial-gradient(circle, transparent 35%, rgba(255,255,255,0.18) 45%, transparent 60%);"></div>
-            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[36rem] h-[36rem] rounded-full"
-                 style="background: radial-gradient(circle, rgba(255,255,255,0.12) 0%, transparent 70%);"></div>
+        @if($heroImage)
+            {{-- ⭐ Modo HERO IMAGE: usa la imagen completa diseñada (logo + tagline + efectos) --}}
+            <div class="relative hidden lg:block overflow-hidden">
+                <img src="{{ $heroImage }}" alt="{{ $brandName }}"
+                     class="absolute inset-0 w-full h-full object-cover">
+            </div>
+        @else
+            {{-- Modo automático: gradient verde + logo + efectos generados --}}
+            <div class="relative hidden lg:flex flex-col items-center justify-center overflow-hidden"
+                 style="background: linear-gradient(135deg, {{ $colorPrim }} 0%, {{ $colorSec }} 55%, #047857 100%);">
 
-            {{-- Brillos sutiles en bordes --}}
-            <div class="absolute -bottom-32 -left-32 w-[28rem] h-[28rem] rounded-full"
-                 style="background: radial-gradient(circle, rgba(187,247,208,0.25) 0%, transparent 70%);"></div>
-            <div class="absolute -top-32 -right-32 w-[28rem] h-[28rem] rounded-full"
-                 style="background: radial-gradient(circle, rgba(167,243,208,0.2) 0%, transparent 70%);"></div>
+                {{-- Anillo circular brillante alrededor del logo --}}
+                <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[44rem] h-[44rem] rounded-full"
+                     style="background: radial-gradient(circle, transparent 35%, rgba(255,255,255,0.18) 45%, transparent 60%);"></div>
+                <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[36rem] h-[36rem] rounded-full"
+                     style="background: radial-gradient(circle, rgba(255,255,255,0.12) 0%, transparent 70%);"></div>
 
-            {{-- Puntos decorativos esquina superior izquierda --}}
-            <div class="absolute top-10 left-10 opacity-60">
-                <svg width="120" height="120" xmlns="http://www.w3.org/2000/svg">
-                    @for($i = 0; $i < 6; $i++)
-                        @for($j = 0; $j < 6; $j++)
-                            <circle cx="{{ 8 + $i * 18 }}" cy="{{ 8 + $j * 18 }}" r="1.8" fill="white" opacity="{{ 0.3 + ($i + $j) * 0.05 }}"/>
+                {{-- Arco de luz en la esquina inferior izquierda (estilo mockup) --}}
+                <div class="absolute -bottom-40 -left-40 w-[36rem] h-[36rem] rounded-full"
+                     style="background: radial-gradient(circle at 70% 30%, rgba(187,247,208,0.4) 0%, rgba(110,231,183,0.2) 30%, transparent 70%);"></div>
+
+                {{-- Brillo sutil esquina superior derecha --}}
+                <div class="absolute -top-32 -right-32 w-[28rem] h-[28rem] rounded-full"
+                     style="background: radial-gradient(circle, rgba(167,243,208,0.2) 0%, transparent 70%);"></div>
+
+                {{-- Dots decorativos esquina superior izquierda --}}
+                <div class="absolute top-10 left-10 opacity-60">
+                    <svg width="120" height="120" xmlns="http://www.w3.org/2000/svg">
+                        @for($i = 0; $i < 6; $i++)
+                            @for($j = 0; $j < 6; $j++)
+                                <circle cx="{{ 8 + $i * 18 }}" cy="{{ 8 + $j * 18 }}" r="1.8" fill="white" opacity="{{ 0.3 + ($i + $j) * 0.05 }}"/>
+                            @endfor
                         @endfor
-                    @endfor
-                </svg>
-            </div>
+                    </svg>
+                </div>
 
-            {{-- Puntos decorativos esquina inferior derecha --}}
-            <div class="absolute bottom-10 right-10 opacity-60">
-                <svg width="120" height="120" xmlns="http://www.w3.org/2000/svg">
-                    @for($i = 0; $i < 6; $i++)
-                        @for($j = 0; $j < 6; $j++)
-                            <circle cx="{{ 8 + $i * 18 }}" cy="{{ 8 + $j * 18 }}" r="1.8" fill="white" opacity="{{ 0.3 + (5 - $i + 5 - $j) * 0.05 }}"/>
+                {{-- Dots decorativos esquina inferior derecha --}}
+                <div class="absolute bottom-10 right-10 opacity-60">
+                    <svg width="120" height="120" xmlns="http://www.w3.org/2000/svg">
+                        @for($i = 0; $i < 6; $i++)
+                            @for($j = 0; $j < 6; $j++)
+                                <circle cx="{{ 8 + $i * 18 }}" cy="{{ 8 + $j * 18 }}" r="1.8" fill="white" opacity="{{ 0.3 + (5 - $i + 5 - $j) * 0.05 }}"/>
+                            @endfor
                         @endfor
-                    @endfor
-                </svg>
-            </div>
+                    </svg>
+                </div>
 
-            {{-- LOGO HERO + TAGLINE --}}
-            <div class="relative z-10 flex flex-col items-center justify-center px-8 text-center h-full">
-                @if($brandLogo)
-                    <img src="{{ $brandLogo }}" alt="{{ $brandName }}"
-                         class="max-h-[60vh] w-auto max-w-[24rem] object-contain"
-                         style="filter: drop-shadow(0 20px 40px rgba(0,0,0,0.4)) drop-shadow(0 0 30px rgba(255,255,255,0.2));">
-                @else
-                    <div class="relative">
-                        <i class="fa-solid fa-utensils text-white text-9xl mb-6 drop-shadow-2xl"></i>
-                        <h1 class="text-6xl font-extrabold text-white drop-shadow-lg tracking-tight">{{ $brandName }}</h1>
-                    </div>
-                @endif
+                {{-- LOGO + TAGLINE --}}
+                <div class="relative z-10 flex flex-col items-center justify-center px-8 text-center h-full">
+                    @if($brandLogo)
+                        <img src="{{ $brandLogo }}" alt="{{ $brandName }}"
+                             class="max-h-[60vh] w-auto max-w-[24rem] object-contain"
+                             style="filter: drop-shadow(0 20px 40px rgba(0,0,0,0.4)) drop-shadow(0 0 30px rgba(255,255,255,0.2));">
+                    @else
+                        <div class="relative">
+                            <i class="fa-solid fa-utensils text-white text-9xl mb-6 drop-shadow-2xl"></i>
+                            <h1 class="text-6xl font-extrabold text-white drop-shadow-lg tracking-tight">{{ $brandName }}</h1>
+                        </div>
+                    @endif
 
-                {{-- Tagline debajo del KIVOX --}}
-                <p class="-mt-4 text-sm lg:text-base text-white font-bold tracking-[0.4em] uppercase drop-shadow-md">
-                    Conecta · Comunica · Transforma
-                </p>
+                    <p class="-mt-4 text-sm lg:text-base text-white font-bold tracking-[0.4em] uppercase drop-shadow-md">
+                        Conecta · Comunica · Transforma
+                    </p>
+                </div>
             </div>
-        </div>
+        @endif
 
         {{-- ═══════════════ MITAD DERECHA: LOGIN ═══════════════ --}}
         <div class="flex items-center justify-center px-6 py-8 bg-white overflow-y-auto">
