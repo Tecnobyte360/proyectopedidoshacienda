@@ -7,8 +7,19 @@ use Illuminate\Support\Facades\Auth;
 
 class AuthController extends Controller
 {
-    public function showLogin()
+    public function showLogin(Request $request)
     {
+        // 🔓 ?logout=1 → forzar cierre de sesión antes de mostrar login.
+        // Usado cuando entras a un subdominio de tenant desde admin/tenants
+        // y queremos que el usuario inicie sesión limpia (no auto-redirect
+        // al dashboard usando una sesión cross-subdomain previa).
+        if ($request->query('logout') === '1' && Auth::check()) {
+            Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+            return redirect()->route('login');
+        }
+
         if (Auth::check()) {
             return redirect($this->rutaInicialPara(Auth::user()));
         }

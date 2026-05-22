@@ -186,8 +186,9 @@
 
                                 {{-- SUBDOMINIO --}}
                                 <td class="px-4 py-3">
-                                    <a href="https://{{ $dominio }}" target="_blank"
-                                       class="text-xs text-brand-secondary hover:underline font-medium inline-flex items-center gap-1">
+                                    <a href="https://{{ $dominio }}/login?logout=1" target="_blank"
+                                       class="text-xs text-brand-secondary hover:underline font-medium inline-flex items-center gap-1"
+                                       title="Abre el login del tenant en una pestaña nueva (forzando inicio de sesión limpio)">
                                         <i class="fa-solid fa-globe text-[10px]"></i>
                                         {{ $dominio }}
                                         <i class="fa-solid fa-arrow-up-right-from-square text-[9px] opacity-60"></i>
