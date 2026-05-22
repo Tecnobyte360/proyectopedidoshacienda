@@ -775,7 +775,9 @@
                     </div>
                 </div>
 
-                <div id="mapaDespachosLive" style="width: 100%; height: 520px; background: #f1f5f9;"></div>
+                <div wire:ignore>
+                    <div id="mapaDespachosLive" style="width: 100%; height: 520px; background: #f1f5f9;"></div>
+                </div>
 
                 @push('scripts')
                 <script>
@@ -972,6 +974,16 @@
                         setTimeout(poll, 300);
                     }
                 })();
+
+                // Re-inicializar si Livewire reemplazó el contenedor
+                document.addEventListener('livewire:initialized', () => {
+                    Livewire.hook('morph.updated', () => {
+                        const el = document.getElementById('mapaDespachosLive');
+                        if (el && !el._mapaInit && window.google && window.google.maps) {
+                            window.initDespachosMapa();
+                        }
+                    });
+                });
 
                 // Reverb: escuchar cambios de ubicación
                 @if($tenantId = app(\App\Services\TenantManager::class)->id())
