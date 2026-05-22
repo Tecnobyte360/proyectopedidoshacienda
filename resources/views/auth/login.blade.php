@@ -48,48 +48,63 @@
 
     <div class="min-h-screen grid lg:grid-cols-2">
 
-        {{-- ═══════════════ MITAD IZQUIERDA: SOLO LOGO ═══════════════ --}}
+        {{-- ═══════════════ MITAD IZQUIERDA: LOGO HERO ═══════════════ --}}
         <div class="relative hidden lg:flex flex-col items-center justify-center overflow-hidden"
-             style="background: linear-gradient(135deg, {{ $colorPrim }} 0%, {{ $colorSec }} 100%);">
+             style="background: linear-gradient(135deg, {{ $colorPrim }} 0%, {{ $colorSec }} 60%, #064e3b 100%);">
 
-            {{-- Orbes decorativos suaves (sin patrón de puntos) --}}
-            <div class="absolute -top-40 -left-40 w-[36rem] h-[36rem] bg-white/15 rounded-full blur-3xl"></div>
-            <div class="absolute -bottom-40 -right-40 w-[40rem] h-[40rem] bg-white/10 rounded-full blur-3xl"></div>
-            <div class="absolute top-1/4 right-1/4 w-72 h-72 bg-white/8 rounded-full blur-2xl"></div>
+            {{-- Orbes 3D decorativos --}}
+            <div class="absolute top-16 right-24 w-32 h-32 rounded-full shadow-2xl"
+                 style="background: radial-gradient(circle at 30% 30%, #6ee7b7 0%, #10b981 40%, #064e3b 100%);"></div>
+            <div class="absolute bottom-12 left-16 w-20 h-20 rounded-full shadow-xl"
+                 style="background: radial-gradient(circle at 30% 30%, #86efac 0%, #22c55e 40%, #14532d 100%);"></div>
+            <div class="absolute top-1/2 -left-8 w-24 h-24 rounded-full shadow-xl opacity-80"
+                 style="background: radial-gradient(circle at 30% 30%, #a7f3d0 0%, #34d399 40%, #065f46 100%);"></div>
 
-            {{-- Logo centrado con halo blanco para que destaque --}}
-            <div class="relative z-10 flex items-center justify-center px-12">
-                @if($brandLogo)
-                    <div class="relative">
-                        {{-- Halo circular brillante detrás del logo (para contrastar verde-sobre-verde) --}}
-                        <div class="absolute inset-0 -m-16 rounded-full blur-3xl"
-                             style="background: radial-gradient(circle, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0.15) 50%, transparent 75%);"></div>
-                        <div class="absolute inset-0 -m-8 rounded-full bg-white/10 blur-2xl"></div>
-                        {{-- Logo --}}
-                        <img src="{{ $brandLogo }}" alt="{{ $brandName }}"
-                             class="relative h-64 w-auto max-w-[18rem] object-contain"
-                             style="filter: drop-shadow(0 16px 24px rgba(0,0,0,0.35)) drop-shadow(0 0 12px rgba(255,255,255,0.3));">
-                    </div>
-                @else
-                    <div class="relative text-center">
-                        <div class="absolute inset-0 -m-12 rounded-full bg-white/20 blur-3xl"></div>
-                        <div class="relative">
-                            <i class="fa-solid fa-utensils text-white text-8xl mb-6 drop-shadow-2xl"></i>
-                            <h1 class="text-5xl font-extrabold text-white drop-shadow-lg tracking-tight">{{ $brandName }}</h1>
-                        </div>
-                    </div>
-                @endif
+            {{-- Halo radial blanco gigante detrás del logo --}}
+            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[40rem] h-[40rem] rounded-full blur-3xl"
+                 style="background: radial-gradient(circle, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0.08) 40%, transparent 70%);"></div>
+            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[28rem] h-[28rem] rounded-full bg-white/10 blur-2xl"></div>
+
+            {{-- Puntos decorativos esquina superior izquierda --}}
+            <div class="absolute top-12 left-12 opacity-40">
+                <svg width="100" height="100" xmlns="http://www.w3.org/2000/svg">
+                    @for($i = 0; $i < 5; $i++)
+                        @for($j = 0; $j < 5; $j++)
+                            <circle cx="{{ 10 + $i * 18 }}" cy="{{ 10 + $j * 18 }}" r="1.5" fill="white"/>
+                        @endfor
+                    @endfor
+                </svg>
             </div>
 
-            {{-- Tagline opcional debajo del logo --}}
-            <p class="relative z-10 mt-8 text-sm text-white/85 font-medium tracking-wider uppercase">
-                {{ $subtitulo }}
-            </p>
+            {{-- Puntos decorativos esquina inferior derecha --}}
+            <div class="absolute bottom-12 right-12 opacity-40">
+                <svg width="100" height="100" xmlns="http://www.w3.org/2000/svg">
+                    @for($i = 0; $i < 5; $i++)
+                        @for($j = 0; $j < 5; $j++)
+                            <circle cx="{{ 10 + $i * 18 }}" cy="{{ 10 + $j * 18 }}" r="1.5" fill="white"/>
+                        @endfor
+                    @endfor
+                </svg>
+            </div>
 
-            {{-- Footer al pie --}}
-            <p class="absolute bottom-6 left-0 right-0 text-center text-xs text-white/60 font-medium tracking-wide">
-                © {{ date('Y') }} {{ $brandName }} · Todos los derechos reservados
-            </p>
+            {{-- LOGO HERO + TAGLINE --}}
+            <div class="relative z-10 flex flex-col items-center justify-center px-12 text-center">
+                @if($brandLogo)
+                    <img src="{{ $brandLogo }}" alt="{{ $brandName }}"
+                         class="h-[28rem] w-auto max-w-[28rem] object-contain"
+                         style="filter: drop-shadow(0 20px 40px rgba(0,0,0,0.4)) drop-shadow(0 0 30px rgba(255,255,255,0.2));">
+                @else
+                    <div class="relative">
+                        <i class="fa-solid fa-utensils text-white text-9xl mb-6 drop-shadow-2xl"></i>
+                        <h1 class="text-6xl font-extrabold text-white drop-shadow-lg tracking-tight">{{ $brandName }}</h1>
+                    </div>
+                @endif
+
+                {{-- Tagline grande estilo banner --}}
+                <p class="mt-6 text-base lg:text-lg text-white font-bold tracking-[0.4em] uppercase drop-shadow-md">
+                    Conecta · Comunica · Transforma
+                </p>
+            </div>
         </div>
 
         {{-- ═══════════════ MITAD DERECHA: LOGIN ═══════════════ --}}
