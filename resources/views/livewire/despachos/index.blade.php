@@ -958,8 +958,8 @@
         </div>
     </div>
 
-    {{-- 🗺️ MAPA DE RUTA (aparece cuando hay pedidos seleccionados) --}}
-    @if($totalSelected > 0)
+    {{-- 🗺️ MAPA DE RUTA (oculto a petición del usuario) --}}
+    @if(false && $totalSelected > 0)
         @php
             $ruta = $this->rutaParaMapa;
             $urlGmaps = $this->rutaGoogleMapsUrl;
