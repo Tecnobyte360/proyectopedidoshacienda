@@ -710,12 +710,41 @@
                             <span class="text-slate-500">({{ $domiciliarios->where('estado','en_ruta')->count() }})</span>
                         </div>
                     </div>
-                    <div class="flex items-center gap-2">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        {{-- Selector de tipo de mapa --}}
+                        <div class="inline-flex rounded-lg border border-slate-200 bg-white p-0.5"
+                             x-data="{ tipo: localStorage.getItem('despachos_mapa_tipo') || 'hybrid' }">
+                            <button type="button"
+                                    @click="tipo='roadmap'; localStorage.setItem('despachos_mapa_tipo','roadmap'); document.getElementById('mapaDespachosLive')?._gmap?.setMapTypeId('roadmap')"
+                                    :class="tipo==='roadmap' ? 'bg-brand text-white shadow' : 'text-slate-600 hover:bg-slate-50'"
+                                    class="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-bold transition"
+                                    title="Mapa de calles">
+                                <i class="fa-solid fa-map"></i>
+                                Mapa
+                            </button>
+                            <button type="button"
+                                    @click="tipo='hybrid'; localStorage.setItem('despachos_mapa_tipo','hybrid'); document.getElementById('mapaDespachosLive')?._gmap?.setMapTypeId('hybrid')"
+                                    :class="tipo==='hybrid' ? 'bg-brand text-white shadow' : 'text-slate-600 hover:bg-slate-50'"
+                                    class="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-bold transition"
+                                    title="Satélite con calles">
+                                <i class="fa-solid fa-layer-group"></i>
+                                Híbrido
+                            </button>
+                            <button type="button"
+                                    @click="tipo='satellite'; localStorage.setItem('despachos_mapa_tipo','satellite'); document.getElementById('mapaDespachosLive')?._gmap?.setMapTypeId('satellite')"
+                                    :class="tipo==='satellite' ? 'bg-brand text-white shadow' : 'text-slate-600 hover:bg-slate-50'"
+                                    class="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-bold transition"
+                                    title="Solo satélite">
+                                <i class="fa-solid fa-satellite"></i>
+                                Satélite
+                            </button>
+                        </div>
+
                         <button type="button"
                                 onclick="if(document.getElementById('mapaDespachosLive')?._gmap){ const m=document.getElementById('mapaDespachosLive')._gmap; const b=new google.maps.LatLngBounds(); Object.values(document.getElementById('mapaDespachosLive')._markers).forEach(e=>b.extend(e.marker.getPosition())); m.fitBounds(b,{top:60,right:40,bottom:60,left:40}); }"
                                 class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition">
                             <i class="fa-solid fa-expand"></i>
-                            Centrar todos
+                            Centrar
                         </button>
                         <a href="/domiciliarios/mapa" target="_blank"
                            class="inline-flex items-center gap-1.5 rounded-lg bg-brand text-white px-3 py-1.5 text-xs font-bold hover:bg-brand-dark transition">
@@ -786,10 +815,18 @@
                     el._mapaInit = true;
 
                     const cfg = window._despachosMapCfg;
+                    // Tipo de mapa guardado en localStorage (default: hybrid = satélite + calles)
+                    const tipoGuardado = localStorage.getItem('despachos_mapa_tipo') || 'hybrid';
                     const map = new google.maps.Map(el, {
                         center: { lat: cfg.centerLat, lng: cfg.centerLng },
                         zoom: cfg.zoom,
-                        mapTypeControl: false,
+                        mapTypeId: tipoGuardado,
+                        mapTypeControl: true,
+                        mapTypeControlOptions: {
+                            style: google.maps.MapTypeControlStyle.DROPDOWN_MENU,
+                            position: google.maps.ControlPosition.TOP_RIGHT,
+                            mapTypeIds: ['roadmap', 'hybrid', 'satellite', 'terrain'],
+                        },
                         streetViewControl: false,
                         fullscreenControl: true,
                         zoomControl: true,
