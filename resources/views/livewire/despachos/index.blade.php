@@ -889,10 +889,10 @@
             ? collect($porDomiciliario)->flatMap(fn($info) => $info['pedidos'])->values()
             : collect();
 
-        // Unificar y separar
+        // Unificar y separar (usa la relación cargada — más seguro contra IDs huérfanos)
         $todosPedidos = $pedidosPrep->merge($pedidosRuta)->unique('id')->values();
-        $sinAsignar   = $todosPedidos->filter(fn($p) => empty($p->domiciliario_id))->sortBy('zona_cobertura_id')->values();
-        $asignados    = $todosPedidos->filter(fn($p) => !empty($p->domiciliario_id))->sortBy('domiciliario_id')->values();
+        $sinAsignar   = $todosPedidos->filter(fn($p) => empty($p->domiciliario_id) || !$p->domiciliario)->sortBy('zona_cobertura_id')->values();
+        $asignados    = $todosPedidos->filter(fn($p) => !empty($p->domiciliario_id) && $p->domiciliario)->sortBy('domiciliario_id')->values();
         $totalSinAsig = $sinAsignar->sum('total');
         $totalAsig    = $asignados->sum('total');
     @endphp
@@ -925,12 +925,12 @@
         <button type="button" wire:click="setFiltroAsignacion('sin_asignar')"
                 class="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition whitespace-nowrap
                        {{ $filtroAsignacion === 'sin_asignar'
-                            ? 'bg-amber-500 text-white shadow-sm'
-                            : 'bg-transparent text-slate-700 hover:bg-amber-50' }}">
+                            ? 'bg-rose-500 text-white shadow-sm'
+                            : 'bg-transparent text-slate-700 hover:bg-rose-50' }}">
             <i class="fa-solid fa-circle-exclamation"></i>
             <span>Faltan por asignar</span>
             <span class="inline-flex items-center justify-center min-w-[24px] h-5 px-1.5 rounded-full text-[11px] font-extrabold
-                       {{ $filtroAsignacion === 'sin_asignar' ? 'bg-white/25 text-white' : 'bg-amber-100 text-amber-700' }}">
+                       {{ $filtroAsignacion === 'sin_asignar' ? 'bg-white/25 text-white' : 'bg-rose-100 text-rose-700' }}">
                 {{ $countSinAsignar }}
             </span>
         </button>
@@ -1006,24 +1006,24 @@
 
                         {{-- ═══════════ SECCIÓN: SIN ASIGNAR ═══════════ --}}
                         @if($mostrarSin && $sinAsignar->isNotEmpty())
-                            <tr class="bg-gradient-to-r from-amber-50 to-amber-50/30">
+                            <tr class="bg-gradient-to-r from-rose-50 to-rose-50/30">
                                 <td colspan="8" class="px-4 py-2.5">
                                     <div class="flex items-center justify-between">
                                         <div class="flex items-center gap-2">
-                                            <span class="flex h-6 w-6 items-center justify-center rounded-md bg-amber-500 text-white">
+                                            <span class="flex h-6 w-6 items-center justify-center rounded-md bg-rose-500 text-white">
                                                 <i class="fa-solid fa-circle-exclamation text-[11px]"></i>
                                             </span>
-                                            <span class="text-xs font-extrabold uppercase tracking-wider text-amber-800">
-                                                Sin asignar
+                                            <span class="text-xs font-extrabold uppercase tracking-wider text-rose-800">
+                                                Faltan por asignar
                                             </span>
-                                            <span class="rounded-full bg-amber-200 text-amber-800 px-2 py-0.5 text-[10px] font-bold">
+                                            <span class="rounded-full bg-rose-200 text-rose-800 px-2 py-0.5 text-[10px] font-bold">
                                                 {{ $sinAsignar->count() }}
                                             </span>
-                                            <span class="text-xs text-amber-700 font-semibold">
+                                            <span class="text-xs text-rose-700 font-semibold">
                                                 ${{ number_format($totalSinAsig, 0, ',', '.') }}
                                             </span>
                                         </div>
-                                        <span class="text-[10px] uppercase tracking-wider text-amber-600 font-bold">
+                                        <span class="text-[10px] uppercase tracking-wider text-rose-600 font-bold">
                                             Selecciona un domiciliario →
                                         </span>
                                     </div>
@@ -1032,7 +1032,7 @@
 
                             @foreach($sinAsignar as $p)
                                 @php $isSelected = !empty($seleccionados[$p->id]); @endphp
-                                <tr class="hover:bg-amber-50/30 transition {{ $isSelected ? 'bg-amber-50' : '' }}">
+                                <tr class="hover:bg-rose-50/30 transition {{ $isSelected ? 'bg-rose-50' : '' }}">
                                     {{-- Checkbox --}}
                                     <td class="px-4 py-3">
                                         <input type="checkbox"
@@ -1125,7 +1125,7 @@
                                     <td class="px-3 py-3">
                                         <select
                                             onchange="if(this.value){ if(confirm('¿Asignar pedido #{{ $p->id }} a este domiciliario?')){ @this.call('reasignarPedido', {{ $p->id }}, this.value); } this.value=''; }"
-                                            class="w-full min-w-[160px] rounded-lg border-2 border-amber-300 bg-white px-2.5 py-1.5 text-xs font-bold text-amber-800 hover:border-amber-400 hover:bg-amber-50 focus:border-amber-500 focus:ring-amber-500 transition cursor-pointer">
+                                            class="w-full min-w-[160px] rounded-lg border-2 border-rose-300 bg-white px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:border-rose-400 hover:bg-rose-50 focus:border-rose-500 focus:ring-rose-500 transition cursor-pointer">
                                             <option value="">➕ Asignar a…</option>
                                             @foreach($domiciliarios as $dRe)
                                                 <option value="{{ $dRe->id }}">
@@ -1140,24 +1140,24 @@
 
                         {{-- ═══════════ SECCIÓN: YA ASIGNADOS ═══════════ --}}
                         @if($mostrarAsi && $asignados->isNotEmpty())
-                            <tr class="bg-gradient-to-r from-blue-50 to-blue-50/30">
+                            <tr class="bg-gradient-to-r from-brand/10 to-brand/5">
                                 <td colspan="8" class="px-4 py-2.5">
                                     <div class="flex items-center justify-between">
                                         <div class="flex items-center gap-2">
-                                            <span class="flex h-6 w-6 items-center justify-center rounded-md bg-blue-500 text-white">
+                                            <span class="flex h-6 w-6 items-center justify-center rounded-md bg-brand text-white">
                                                 <i class="fa-solid fa-motorcycle text-[11px]"></i>
                                             </span>
-                                            <span class="text-xs font-extrabold uppercase tracking-wider text-blue-800">
-                                                Asignados (en preparación)
+                                            <span class="text-xs font-extrabold uppercase tracking-wider text-brand-dark">
+                                                Ya asignados
                                             </span>
-                                            <span class="rounded-full bg-blue-200 text-blue-800 px-2 py-0.5 text-[10px] font-bold">
+                                            <span class="rounded-full bg-brand/20 text-brand-dark px-2 py-0.5 text-[10px] font-bold">
                                                 {{ $asignados->count() }}
                                             </span>
-                                            <span class="text-xs text-blue-700 font-semibold">
+                                            <span class="text-xs text-brand-dark font-semibold">
                                                 ${{ number_format($totalAsig, 0, ',', '.') }}
                                             </span>
                                         </div>
-                                        <span class="text-[10px] uppercase tracking-wider text-blue-600 font-bold">
+                                        <span class="text-[10px] uppercase tracking-wider text-brand-dark font-bold">
                                             Puedes reasignar si es necesario →
                                         </span>
                                     </div>
@@ -1172,7 +1172,7 @@
                                         ? collect(explode(' ', trim($domiAsig->nombre)))->filter()->take(2)->map(fn($x)=>mb_substr($x,0,1))->implode('')
                                         : '';
                                 @endphp
-                                <tr class="hover:bg-blue-50/30 transition {{ $isSelected ? 'bg-blue-50' : '' }}">
+                                <tr class="hover:bg-brand/5 transition {{ $isSelected ? 'bg-brand/10' : '' }}">
                                     {{-- Checkbox --}}
                                     <td class="px-4 py-3">
                                         <input type="checkbox"
@@ -1265,7 +1265,7 @@
                                     <td class="px-3 py-3">
                                         <div class="flex items-center gap-2">
                                             {{-- Avatar del domi --}}
-                                            <div class="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-700 text-white text-[10px] font-extrabold shrink-0"
+                                            <div class="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-brand to-brand-dark text-white text-[10px] font-extrabold shrink-0"
                                                  title="{{ $domiAsig?->nombre ?? 'Sin asignar' }}">
                                                 {{ $iniDom ?: '?' }}
                                             </div>
@@ -1273,7 +1273,7 @@
                                                 <div class="text-xs font-bold text-slate-800 truncate">{{ $domiAsig?->nombre ?? '—' }}</div>
                                                 <select
                                                     onchange="if(this.value){ if(confirm('¿Reasignar pedido #{{ $p->id }} a este domiciliario?')){ @this.call('reasignarPedido', {{ $p->id }}, this.value); } this.value=''; }"
-                                                    class="mt-0.5 w-full min-w-[140px] rounded-md border border-blue-200 bg-blue-50/50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 hover:bg-blue-100 focus:border-blue-400 focus:ring-blue-400 cursor-pointer">
+                                                    class="mt-0.5 w-full min-w-[140px] rounded-md border border-brand/30 bg-brand/5 px-1.5 py-0.5 text-[10px] font-semibold text-brand-dark hover:bg-brand/10 focus:border-brand focus:ring-brand cursor-pointer">
                                                     <option value="">🔄 Reasignar…</option>
                                                     @foreach($domiciliarios->where('id', '!=', $p->domiciliario_id) as $dRe)
                                                         <option value="{{ $dRe->id }}">
