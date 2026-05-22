@@ -645,6 +645,23 @@
         $mapCenterLat = (float) ($tenantActual?->google_maps_centro_lat ?: 6.3414);
         $mapCenterLng = (float) ($tenantActual?->google_maps_centro_lng ?: -75.5538);
         $mapZoom      = (int) ($tenantActual?->google_maps_zoom ?: 12);
+
+        // 🗺️ Zonas de cobertura (polígonos) para dibujar sobre el mapa
+        $zonasCobertura = \App\Models\ZonaCobertura::where('activa', true)
+            ->whereNotNull('coordenadas')
+            ->get(['id', 'nombre', 'color', 'coordenadas'])
+            ->map(function ($z) {
+                $coords = is_string($z->coordenadas) ? json_decode($z->coordenadas, true) : $z->coordenadas;
+                return [
+                    'id'     => $z->id,
+                    'nombre' => $z->nombre,
+                    'color'  => $z->color ?: '#f59e0b',
+                    'coords' => is_array($coords) ? $coords : [],
+                ];
+            })
+            ->filter(fn ($z) => count($z['coords']) > 2)
+            ->values()
+            ->toArray();
     @endphp
 
     <div x-data="{ abierto: (localStorage.getItem('despachos_mapa_abierto') ?? '1') === '1' }"
@@ -759,6 +776,7 @@
                 @push('scripts')
                 <script>
                 window._despachosDomis = @json($domisData);
+                window._despachosZonas = @json($zonasCobertura);
                 window._despachosMapCfg = {
                     centerLat: {{ $mapCenterLat }},
                     centerLng: {{ $mapCenterLng }},
@@ -831,53 +849,52 @@
                         fullscreenControl: true,
                         zoomControl: true,
                         gestureHandling: 'greedy',
-                        styles: [
-                            // Base limpia con tono pastel
-                            { elementType: 'geometry', stylers: [{ color: '#f1f5f9' }] },
-                            { elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
-                            { elementType: 'labels.text.fill', stylers: [{ color: '#475569' }] },
-                            { elementType: 'labels.text.stroke', stylers: [{ color: '#ffffff' }, { weight: 3 }] },
-
-                            // Áreas administrativas
-                            { featureType: 'administrative.land_parcel', stylers: [{ visibility: 'off' }] },
-                            { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#1e293b' }, { weight: 'bold' }] },
-                            { featureType: 'administrative.neighborhood', elementType: 'labels.text.fill', stylers: [{ color: '#64748b' }] },
-
-                            // POIs ocultos para limpiar
-                            { featureType: 'poi', stylers: [{ visibility: 'off' }] },
-                            { featureType: 'poi.business', stylers: [{ visibility: 'off' }] },
-
-                            // 🌳 Parques en verde marca
-                            { featureType: 'poi.park', stylers: [{ visibility: 'on' }] },
-                            { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#bbf7d0' }] },
-                            { featureType: 'poi.park', elementType: 'labels.text.fill', stylers: [{ color: '#15803d' }] },
-
-                            // 🏞️ Áreas naturales verde claro
-                            { featureType: 'landscape.natural', elementType: 'geometry', stylers: [{ color: '#d1fae5' }] },
-                            { featureType: 'landscape.natural.terrain', elementType: 'geometry', stylers: [{ color: '#a7f3d0' }] },
-                            { featureType: 'landscape.man_made', elementType: 'geometry', stylers: [{ color: '#e2e8f0' }] },
-
-                            // 🛣️ Carreteras blancas con jerarquía
-                            { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#ffffff' }] },
-                            { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#64748b' }] },
-                            { featureType: 'road.arterial', elementType: 'geometry', stylers: [{ color: '#ffffff' }] },
-                            { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#a3e635' }] },
-                            { featureType: 'road.highway', elementType: 'geometry.stroke', stylers: [{ color: '#65a30d' }] },
-                            { featureType: 'road.highway.controlled_access', elementType: 'geometry', stylers: [{ color: '#84cc16' }] },
-                            { featureType: 'road.local', elementType: 'labels.text.fill', stylers: [{ color: '#94a3b8' }] },
-
-                            // Transporte oculto
-                            { featureType: 'transit', stylers: [{ visibility: 'off' }] },
-
-                            // 💧 Agua celeste suave
-                            { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#7dd3fc' }] },
-                            { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#0369a1' }] }
-                        ],
+                        // Sin styles custom — usa los colores naturales de Google Maps
+                        styles: [],
                     });
 
                     el._gmap = map;
                     el._markers = {};
+                    el._zonas = [];
                     const bounds = new google.maps.LatLngBounds();
+
+                    // 🗺️ Dibujar zonas de cobertura como polígonos
+                    (window._despachosZonas || []).forEach(z => {
+                        if (!z.coords || z.coords.length < 3) return;
+                        const path = z.coords.map(pt => ({
+                            lat: parseFloat(pt.lat ?? pt[0]),
+                            lng: parseFloat(pt.lng ?? pt[1])
+                        })).filter(p => !isNaN(p.lat) && !isNaN(p.lng));
+                        if (path.length < 3) return;
+
+                        const poly = new google.maps.Polygon({
+                            paths: path,
+                            strokeColor: z.color,
+                            strokeOpacity: 0.9,
+                            strokeWeight: 2,
+                            fillColor: z.color,
+                            fillOpacity: 0.18,
+                            map: map,
+                            clickable: true,
+                            zIndex: 1,
+                        });
+
+                        // Label flotante con nombre de la zona
+                        const polyInfo = new google.maps.InfoWindow();
+                        poly.addListener('click', (e) => {
+                            polyInfo.setContent(`
+                                <div style="font-family:system-ui;padding:4px;min-width:140px">
+                                    <div style="font-weight:800;color:${z.color};font-size:13px">📍 ${z.nombre}</div>
+                                    <div style="font-size:11px;color:#64748b;margin-top:2px">Zona de cobertura</div>
+                                </div>
+                            `);
+                            polyInfo.setPosition(e.latLng);
+                            polyInfo.open({ map });
+                        });
+
+                        el._zonas.push(poly);
+                        path.forEach(p => bounds.extend(p));
+                    });
 
                     window._despachosDomis.forEach(d => {
                         const colorEstado = window._dpColorEstado(d.estado);
