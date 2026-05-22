@@ -1225,11 +1225,11 @@
                                         <div class="flex items-center gap-2">
                                             {{-- Avatar del domi --}}
                                             <div class="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-700 text-white text-[10px] font-extrabold shrink-0"
-                                                 title="{{ $domiAsig->nombre }}">
+                                                 title="{{ $domiAsig?->nombre ?? 'Sin asignar' }}">
                                                 {{ $iniDom ?: '?' }}
                                             </div>
                                             <div class="min-w-0 flex-1">
-                                                <div class="text-xs font-bold text-slate-800 truncate">{{ $domiAsig->nombre }}</div>
+                                                <div class="text-xs font-bold text-slate-800 truncate">{{ $domiAsig?->nombre ?? '—' }}</div>
                                                 <select
                                                     onchange="if(this.value){ if(confirm('¿Reasignar pedido #{{ $p->id }} a este domiciliario?')){ @this.call('reasignarPedido', {{ $p->id }}, this.value); } this.value=''; }"
                                                     class="mt-0.5 w-full min-w-[140px] rounded-md border border-blue-200 bg-blue-50/50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 hover:bg-blue-100 focus:border-blue-400 focus:ring-blue-400 cursor-pointer">
