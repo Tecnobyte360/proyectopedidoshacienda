@@ -577,56 +577,7 @@
         </div>
     @endif
 
-    {{-- KPI BAR --}}
-    <div class="mb-6 grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div class="rounded-2xl bg-white p-5 shadow">
-            <div class="flex items-center gap-3">
-                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
-                    <i class="fa-solid fa-fire"></i>
-                </div>
-                <div>
-                    <div class="text-2xl font-extrabold text-slate-800">{{ $totalPedidos }}</div>
-                    <div class="text-xs text-slate-500">Listos para despacho</div>
-                </div>
-            </div>
-        </div>
-
-        <div class="rounded-2xl bg-white p-5 shadow">
-            <div class="flex items-center gap-3">
-                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
-                    <i class="fa-solid fa-map-location-dot"></i>
-                </div>
-                <div>
-                    <div class="text-2xl font-extrabold text-slate-800">{{ $agrupados->count() }}</div>
-                    <div class="text-xs text-slate-500">Zonas con pedidos</div>
-                </div>
-            </div>
-        </div>
-
-        <div class="rounded-2xl bg-white p-5 shadow">
-            <div class="flex items-center gap-3">
-                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-green-50 text-green-600">
-                    <i class="fa-solid fa-circle-check"></i>
-                </div>
-                <div>
-                    <div class="text-2xl font-extrabold text-slate-800">{{ $domiciliarios->where('estado','disponible')->count() }}</div>
-                    <div class="text-xs text-slate-500">Domiciliarios libres</div>
-                </div>
-            </div>
-        </div>
-
-        <div class="rounded-2xl bg-white p-5 shadow">
-            <div class="flex items-center gap-3">
-                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-                    <i class="fa-solid fa-route"></i>
-                </div>
-                <div>
-                    <div class="text-2xl font-extrabold text-slate-800">{{ $domiciliarios->where('estado','ocupado')->count() }}</div>
-                    <div class="text-xs text-slate-500">En ruta</div>
-                </div>
-            </div>
-        </div>
-    </div>
+    {{-- KPI Bar removido a petición del usuario --}}
 
     {{-- 🗺️ MAPA EN VIVO DE DOMICILIARIOS (inline directo, sin Livewire anidado) --}}
     @php
@@ -1360,13 +1311,10 @@
     @else
         <div class="rounded-2xl bg-white shadow-sm border border-slate-200 overflow-hidden">
 
-            {{-- Scroll vertical contenido con altura máxima --}}
-            <div class="max-h-[70vh] overflow-y-auto">
-
-            {{-- TABLA --}}
+            {{-- TABLA (scroll horizontal solo si la pantalla es muy angosta) --}}
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
-                    <thead class="bg-slate-50 border-b border-slate-200 sticky top-0 z-10">
+                    <thead class="bg-slate-50 border-b border-slate-200">
                         <tr class="text-[10px] uppercase tracking-wider text-slate-500 font-bold">
                             <th class="px-4 py-3 text-left w-10">
                                 <i class="fa-solid fa-square-check text-slate-400"></i>
@@ -1669,7 +1617,6 @@
                     </tbody>
                 </table>
             </div>
-            </div>{{-- /max-h scroll --}}
         </div>
     @endif
 
