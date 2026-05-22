@@ -3,11 +3,37 @@
     @once
     @push('scripts')
     <script>
+        // Helper: encuentra el componente Livewire de Categorias buscando por método 'eliminar'
+        window._findCategoriaComponent = function() {
+            if (!window.Livewire) return null;
+            // Buscar todos los componentes con wire:id y elegir el que tenga el método 'eliminar'
+            const roots = document.querySelectorAll('[wire\\:id]');
+            for (const root of roots) {
+                const id = root.getAttribute('wire:id');
+                const cmp = Livewire.find(id);
+                // Verificar que sea el componente de Categorias buscando un wire:click="eliminar..."
+                if (root.querySelector('button[onclick*="confirmarEliminarCategoria"]')) {
+                    return cmp;
+                }
+            }
+            // Fallback: el primero
+            return roots.length > 0 ? Livewire.find(roots[0].getAttribute('wire:id')) : null;
+        };
+
         window.confirmarEliminarCategoria = function(catId, catNombre, productosCount) {
+            const callEliminar = function() {
+                const cmp = window._findCategoriaComponent();
+                if (cmp) {
+                    cmp.call('eliminar', catId);
+                } else {
+                    console.error('No se encontró el componente Livewire de Categorias');
+                    alert('Error: no se pudo conectar con el sistema. Recarga la página.');
+                }
+            };
+
             if (typeof Swal === 'undefined') {
                 if (confirm('¿Seguro que deseas eliminar la categoría "' + catNombre + '"?')) {
-                    const root = document.querySelector('[wire\\:id]');
-                    if (root) Livewire.find(root.getAttribute('wire:id'))?.call('eliminar', catId);
+                    callEliminar();
                 }
                 return;
             }
@@ -56,10 +82,7 @@
                 },
             }).then((result) => {
                 if (result.isConfirmed) {
-                    const root = document.querySelector('[wire\\:id]');
-                    if (root && window.Livewire) {
-                        Livewire.find(root.getAttribute('wire:id'))?.call('eliminar', catId);
-                    }
+                    callEliminar();
                 }
             });
         };
