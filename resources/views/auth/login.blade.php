@@ -66,39 +66,63 @@
         @else
             {{-- Modo automático: gradient verde + logo + efectos generados --}}
             <div class="relative hidden lg:flex flex-col items-center justify-center overflow-hidden"
-                 style="background: linear-gradient(135deg, {{ $colorPrim }} 0%, {{ $colorSec }} 55%, #047857 100%);">
+                 style="background: linear-gradient(135deg, {{ $colorPrim }} 0%, {{ $colorSec }} 50%, #065f46 100%);">
 
-                {{-- Anillo circular brillante alrededor del logo --}}
-                <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[44rem] h-[44rem] rounded-full"
-                     style="background: radial-gradient(circle, transparent 35%, rgba(255,255,255,0.18) 45%, transparent 60%);"></div>
+                {{-- Anillo circular VISIBLE alrededor del logo (borde + glow) --}}
+                <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[46rem] h-[46rem] rounded-full border-2 border-white/15"></div>
+                <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[40rem] h-[40rem] rounded-full"
+                     style="background: radial-gradient(circle, transparent 42%, rgba(255,255,255,0.12) 49%, transparent 56%);"></div>
                 <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[36rem] h-[36rem] rounded-full"
-                     style="background: radial-gradient(circle, rgba(255,255,255,0.12) 0%, transparent 70%);"></div>
+                     style="background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 65%);"></div>
 
-                {{-- Arco de luz en la esquina inferior izquierda (estilo mockup) --}}
-                <div class="absolute -bottom-40 -left-40 w-[36rem] h-[36rem] rounded-full"
-                     style="background: radial-gradient(circle at 70% 30%, rgba(187,247,208,0.4) 0%, rgba(110,231,183,0.2) 30%, transparent 70%);"></div>
+                {{-- Arco de luz BRILLANTE en la esquina inferior izquierda --}}
+                <div class="absolute -bottom-48 -left-48 w-[44rem] h-[44rem] rounded-full"
+                     style="background: radial-gradient(circle at 65% 35%, rgba(187,247,208,0.55) 0%, rgba(134,239,172,0.3) 25%, rgba(74,222,128,0.15) 45%, transparent 70%);"></div>
 
-                {{-- Brillo sutil esquina superior derecha --}}
-                <div class="absolute -top-32 -right-32 w-[28rem] h-[28rem] rounded-full"
-                     style="background: radial-gradient(circle, rgba(167,243,208,0.2) 0%, transparent 70%);"></div>
+                {{-- Curva de luz lateral inferior izquierda --}}
+                <div class="absolute bottom-0 left-0 w-[20rem] h-[20rem]"
+                     style="background: radial-gradient(ellipse at bottom left, rgba(220,252,231,0.4) 0%, transparent 60%);"></div>
 
-                {{-- Dots decorativos esquina superior izquierda --}}
-                <div class="absolute top-10 left-10 opacity-60">
-                    <svg width="120" height="120" xmlns="http://www.w3.org/2000/svg">
-                        @for($i = 0; $i < 6; $i++)
-                            @for($j = 0; $j < 6; $j++)
-                                <circle cx="{{ 8 + $i * 18 }}" cy="{{ 8 + $j * 18 }}" r="1.8" fill="white" opacity="{{ 0.3 + ($i + $j) * 0.05 }}"/>
+                {{-- Dots decorativos esquina superior izquierda — patrón pequeño --}}
+                <div class="absolute top-12 left-12">
+                    <svg width="140" height="140" xmlns="http://www.w3.org/2000/svg">
+                        @for($i = 0; $i < 7; $i++)
+                            @for($j = 0; $j < 7; $j++)
+                                @php
+                                    // Opacidad: más fuerte arriba-izquierda, se difumina hacia abajo-derecha
+                                    $opa = max(0, 0.7 - (($i + $j) * 0.07));
+                                @endphp
+                                @if($opa > 0.05)
+                                    <circle cx="{{ 8 + $i * 18 }}" cy="{{ 8 + $j * 18 }}" r="1.8" fill="white" opacity="{{ $opa }}"/>
+                                @endif
                             @endfor
                         @endfor
                     </svg>
                 </div>
 
-                {{-- Dots decorativos esquina inferior derecha --}}
-                <div class="absolute bottom-10 right-10 opacity-60">
-                    <svg width="120" height="120" xmlns="http://www.w3.org/2000/svg">
-                        @for($i = 0; $i < 6; $i++)
-                            @for($j = 0; $j < 6; $j++)
-                                <circle cx="{{ 8 + $i * 18 }}" cy="{{ 8 + $j * 18 }}" r="1.8" fill="white" opacity="{{ 0.3 + (5 - $i + 5 - $j) * 0.05 }}"/>
+                {{-- Dots decorativos esquina inferior derecha — patrón en arco/cluster --}}
+                <div class="absolute bottom-8 right-8">
+                    <svg width="180" height="180" xmlns="http://www.w3.org/2000/svg">
+                        @for($i = 0; $i < 9; $i++)
+                            @for($j = 0; $j < 9; $j++)
+                                @php
+                                    // Opacidad: más fuerte abajo-derecha, se difumina hacia arriba-izquierda
+                                    $opa = max(0, 0.65 - ((8 - $i + 8 - $j) * 0.05));
+                                @endphp
+                                @if($opa > 0.05)
+                                    <circle cx="{{ 8 + $i * 18 }}" cy="{{ 8 + $j * 18 }}" r="1.8" fill="white" opacity="{{ $opa }}"/>
+                                @endif
+                            @endfor
+                        @endfor
+                    </svg>
+                </div>
+
+                {{-- Pequeño cluster de dots adicional centro-bajo --}}
+                <div class="absolute bottom-32 left-1/3 opacity-30">
+                    <svg width="80" height="80" xmlns="http://www.w3.org/2000/svg">
+                        @for($i = 0; $i < 4; $i++)
+                            @for($j = 0; $j < 4; $j++)
+                                <circle cx="{{ 6 + $i * 20 }}" cy="{{ 6 + $j * 20 }}" r="1.5" fill="white" opacity="{{ 0.4 - ($i + $j) * 0.05 }}"/>
                             @endfor
                         @endfor
                     </svg>
@@ -108,8 +132,8 @@
                 <div class="relative z-10 flex flex-col items-center justify-center px-8 text-center h-full">
                     @if($brandLogo)
                         <img src="{{ $brandLogo }}" alt="{{ $brandName }}"
-                             class="max-h-[60vh] w-auto max-w-[24rem] object-contain"
-                             style="filter: drop-shadow(0 20px 40px rgba(0,0,0,0.4)) drop-shadow(0 0 30px rgba(255,255,255,0.2));">
+                             class="max-h-[58vh] w-auto max-w-[24rem] object-contain"
+                             style="filter: drop-shadow(0 25px 50px rgba(0,0,0,0.5)) drop-shadow(0 0 40px rgba(255,255,255,0.25));">
                     @else
                         <div class="relative">
                             <i class="fa-solid fa-utensils text-white text-9xl mb-6 drop-shadow-2xl"></i>
