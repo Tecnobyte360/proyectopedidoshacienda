@@ -72,32 +72,32 @@
             {{-- Contenido principal --}}
             <div class="relative z-10 text-center max-w-md flex flex-col items-center">
 
-                {{-- Logo card --}}
+                {{-- Logo card (compacto — logo ya contiene texto del brand) --}}
                 @if($brandLogo)
-                    <div class="relative mb-8 group">
+                    <div class="relative mb-6">
                         {{-- Glow detrás del logo --}}
-                        <div class="absolute inset-0 bg-white/40 rounded-3xl blur-2xl scale-110"></div>
+                        <div class="absolute inset-0 bg-white/40 rounded-2xl blur-2xl scale-110"></div>
                         {{-- Card del logo --}}
-                        <div class="relative h-36 w-36 flex items-center justify-center rounded-3xl bg-white shadow-2xl border border-white/40 overflow-hidden">
+                        <div class="relative h-28 w-28 flex items-center justify-center rounded-2xl bg-white shadow-2xl border border-white/40 overflow-hidden">
                             <img src="{{ $brandLogo }}" alt="{{ $brandName }}"
-                                 class="h-full w-full object-contain p-4">
+                                 class="h-full w-full object-contain p-3">
                         </div>
                     </div>
+                    {{-- Subtítulo (sin h1 — el logo ya tiene el nombre) --}}
+                    <p class="text-base text-white/95 font-medium">{{ $subtitulo }}</p>
                 @else
-                    <div class="relative mb-8">
-                        <div class="absolute inset-0 bg-white/40 rounded-3xl blur-2xl scale-110"></div>
-                        <div class="relative h-32 w-32 flex items-center justify-center rounded-3xl bg-white shadow-2xl">
-                            <i class="fa-solid fa-utensils text-5xl" style="color: {{ $colorPrim }};"></i>
+                    <div class="relative mb-6">
+                        <div class="absolute inset-0 bg-white/40 rounded-2xl blur-2xl scale-110"></div>
+                        <div class="relative h-24 w-24 flex items-center justify-center rounded-2xl bg-white shadow-2xl">
+                            <i class="fa-solid fa-utensils text-4xl" style="color: {{ $colorPrim }};"></i>
                         </div>
                     </div>
+                    <h1 class="text-4xl font-extrabold text-white drop-shadow-lg tracking-tight">{{ $brandName }}</h1>
+                    <p class="text-base text-white/95 mt-2 font-medium">{{ $subtitulo }}</p>
                 @endif
 
-                {{-- Nombre + subtítulo --}}
-                <h1 class="text-5xl font-extrabold text-white drop-shadow-lg tracking-tight">{{ $brandName }}</h1>
-                <p class="text-lg text-white/95 mt-3 font-medium">{{ $subtitulo }}</p>
-
                 {{-- Separador decorativo --}}
-                <div class="mt-10 mb-8 flex items-center gap-3 w-full max-w-xs">
+                <div class="mt-8 mb-6 flex items-center gap-3 w-full max-w-xs">
                     <span class="h-px flex-1 bg-white/30"></span>
                     <span class="text-[10px] uppercase tracking-[0.3em] text-white/70 font-bold">
                         Plataforma omnicanal

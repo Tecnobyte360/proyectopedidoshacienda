@@ -112,7 +112,7 @@
                                     'empresa' => 'bg-violet-100 text-violet-700',
                                 ][$t->plan] ?? 'bg-slate-100 text-slate-700';
 
-                                $dominio = $t->slug . '.tecnobyte360.com';
+                                $dominio = $t->slug . '.' . config('app.tenant_base_domain', 'kivox.co');
                             @endphp
                             <tr class="hover:bg-slate-50/80 transition {{ !$t->activo ? 'opacity-60 bg-rose-50/30' : '' }}">
                                 {{-- EMPRESA --}}
@@ -1290,7 +1290,7 @@
                         <div class="text-xs font-bold uppercase text-rose-700 mb-2">Se eliminará TODO esto:</div>
                         <ul class="text-sm text-slate-700 space-y-1.5">
                             <li><i class="fa-solid fa-circle-xmark text-rose-500 w-5"></i> Tenant <strong>{{ $eliminarTenantNombre }}</strong></li>
-                            <li><i class="fa-solid fa-circle-xmark text-rose-500 w-5"></i> Subdominio <code class="bg-white px-1.5 rounded text-xs">{{ $eliminarTenantSlug }}.tecnobyte360.com</code></li>
+                            <li><i class="fa-solid fa-circle-xmark text-rose-500 w-5"></i> Subdominio <code class="bg-white px-1.5 rounded text-xs">{{ $eliminarTenantSlug }}.{{ config('app.tenant_base_domain', 'kivox.co') }}</code></li>
                             <li><i class="fa-solid fa-circle-xmark text-rose-500 w-5"></i> Registro DNS en Hostinger</li>
                             <li><i class="fa-solid fa-circle-xmark text-rose-500 w-5"></i> Configuración Nginx + certificado SSL</li>
                             <li><i class="fa-solid fa-circle-xmark text-rose-500 w-5"></i> TODOS los datos: pedidos, clientes, productos, usuarios, sedes, pagos, suscripciones</li>

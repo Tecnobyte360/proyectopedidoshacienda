@@ -18,7 +18,7 @@ return [
     |   {tenant_slug}.{tenant_base_domain}  →  cliente.tecnobyte360.com
     | El middleware SetCurrentTenant lo usa para extraer el tenant del host.
     */
-    'tenant_base_domain' => env('TENANT_BASE_DOMAIN', 'tecnobyte360.com'),
+    'tenant_base_domain' => env('TENANT_BASE_DOMAIN', 'kivox.co'),
 
     /*
     |--------------------------------------------------------------------------
