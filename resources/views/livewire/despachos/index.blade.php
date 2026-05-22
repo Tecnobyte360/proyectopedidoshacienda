@@ -691,7 +691,41 @@
                     <p class="text-xs text-slate-500">Los repartidores enviarán su ubicación cuando abran el portal en su celular.</p>
                 </div>
             @else
-                <div id="mapaDespachosLive" style="width: 100%; height: 480px;"></div>
+                {{-- Leyenda + Stats arriba del mapa --}}
+                <div class="px-5 py-3 bg-gradient-to-r from-slate-50 to-white border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex items-center gap-4 text-xs">
+                        <div class="flex items-center gap-1.5">
+                            <span class="inline-block w-3 h-3 rounded-full" style="background:#10b981;box-shadow:0 0 0 3px rgba(16,185,129,0.2)"></span>
+                            <span class="font-semibold text-slate-700">Disponible</span>
+                            <span class="text-slate-500">({{ $domiciliarios->where('estado','disponible')->count() }})</span>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <span class="inline-block w-3 h-3 rounded-full" style="background:#f97316;box-shadow:0 0 0 3px rgba(249,115,22,0.2)"></span>
+                            <span class="font-semibold text-slate-700">Ocupado</span>
+                            <span class="text-slate-500">({{ $domiciliarios->where('estado','ocupado')->count() }})</span>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <span class="inline-block w-3 h-3 rounded-full" style="background:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,0.2)"></span>
+                            <span class="font-semibold text-slate-700">En ruta</span>
+                            <span class="text-slate-500">({{ $domiciliarios->where('estado','en_ruta')->count() }})</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button type="button"
+                                onclick="if(document.getElementById('mapaDespachosLive')?._gmap){ const m=document.getElementById('mapaDespachosLive')._gmap; const b=new google.maps.LatLngBounds(); Object.values(document.getElementById('mapaDespachosLive')._markers).forEach(e=>b.extend(e.marker.getPosition())); m.fitBounds(b,{top:60,right:40,bottom:60,left:40}); }"
+                                class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition">
+                            <i class="fa-solid fa-expand"></i>
+                            Centrar todos
+                        </button>
+                        <a href="/domiciliarios/mapa" target="_blank"
+                           class="inline-flex items-center gap-1.5 rounded-lg bg-brand text-white px-3 py-1.5 text-xs font-bold hover:bg-brand-dark transition">
+                            <i class="fa-solid fa-up-right-from-square"></i>
+                            Vista completa
+                        </a>
+                    </div>
+                </div>
+
+                <div id="mapaDespachosLive" style="width: 100%; height: 520px; background: #f1f5f9;"></div>
 
                 @push('scripts')
                 <script>
@@ -702,10 +736,53 @@
                     zoom: {{ $mapZoom }},
                 };
 
+                // 🎨 Colores por estado
+                window._dpColorEstado = function(estado) {
+                    switch(estado) {
+                        case 'disponible': return '#10b981'; // verde
+                        case 'en_ruta':    return '#3b82f6'; // azul
+                        case 'ocupado':    return '#f97316'; // naranja
+                        case 'descanso':   return '#64748b';
+                        default:           return '#94a3b8';
+                    }
+                };
+
+                // 🏍️ Pin grande con icono moto
+                window._dpSvgMoto = function(estado) {
+                    const color = window._dpColorEstado(estado);
+                    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="80" viewBox="0 0 64 80">
+  <defs>
+    <filter id="sh" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+  <path filter="url(#sh)" fill="${color}" stroke="white" stroke-width="3"
+        d="M32 2C16.5 2 4 14.5 4 30c0 22 28 48 28 48s28-26 28-48C60 14.5 47.5 2 32 2z"/>
+  <circle cx="32" cy="30" r="18" fill="white"/>
+  <text x="32" y="40" font-size="28" text-anchor="middle">🏍️</text>
+</svg>`;
+                    return 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
+                };
+
+                // ⚡ Pulso animado alrededor del pin
+                window._dpSvgPing = function(estado) {
+                    const color = window._dpColorEstado(estado);
+                    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">
+  <circle cx="50" cy="50" r="22" fill="${color}" opacity="0.3">
+    <animate attributeName="r" from="22" to="46" dur="1.8s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" from="0.45" to="0" dur="1.8s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="50" cy="50" r="22" fill="${color}" opacity="0.4"/>
+</svg>`;
+                    return 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
+                };
+
                 window.initDespachosMapa = function() {
                     const el = document.getElementById('mapaDespachosLive');
                     if (!el || !window.google || !window.google.maps) return;
-                    if (el._mapaInit) return; // ya inicializado
+                    if (el._mapaInit) return;
                     el._mapaInit = true;
 
                     const cfg = window._despachosMapCfg;
@@ -715,9 +792,27 @@
                         mapTypeControl: false,
                         streetViewControl: false,
                         fullscreenControl: true,
+                        zoomControl: true,
+                        gestureHandling: 'greedy',
                         styles: [
+                            { elementType: 'geometry', stylers: [{ color: '#f8fafc' }] },
+                            { elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
+                            { elementType: 'labels.text.fill', stylers: [{ color: '#64748b' }] },
+                            { elementType: 'labels.text.stroke', stylers: [{ color: '#ffffff' }] },
+                            { featureType: 'administrative.land_parcel', elementType: 'labels.text.fill', stylers: [{ color: '#bdbdbd' }] },
                             { featureType: 'poi.business', stylers: [{ visibility: 'off' }] },
+                            { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#dcfce7' }] },
+                            { featureType: 'poi.park', elementType: 'labels.text.fill', stylers: [{ color: '#16a34a' }] },
+                            { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#ffffff' }] },
+                            { featureType: 'road.arterial', elementType: 'geometry', stylers: [{ color: '#cbd5e1' }] },
+                            { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#94a3b8' }] },
+                            { featureType: 'road.highway', elementType: 'geometry.stroke', stylers: [{ color: '#64748b' }] },
+                            { featureType: 'road.local', elementType: 'labels.text.fill', stylers: [{ color: '#94a3b8' }] },
                             { featureType: 'transit', stylers: [{ visibility: 'off' }] },
+                            { featureType: 'transit.line', elementType: 'geometry', stylers: [{ color: '#e2e8f0' }] },
+                            { featureType: 'transit.station', elementType: 'labels.text.fill', stylers: [{ color: '#94a3b8' }] },
+                            { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#bae6fd' }] },
+                            { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#0284c7' }] }
                         ],
                     });
 
@@ -726,47 +821,66 @@
                     const bounds = new google.maps.LatLngBounds();
 
                     window._despachosDomis.forEach(d => {
-                        const colorEstado = d.estado === 'ocupado' ? '#ef4444' : (d.estado === 'disponible' ? '#10b981' : '#94a3b8');
+                        const colorEstado = window._dpColorEstado(d.estado);
+
+                        // Pin grande de moto
+                        const iconMoto = {
+                            url: window._dpSvgMoto(d.estado),
+                            scaledSize: new google.maps.Size(64, 80),
+                            anchor: new google.maps.Point(32, 80),
+                        };
+                        const iconPing = {
+                            url: window._dpSvgPing(d.estado),
+                            scaledSize: new google.maps.Size(100, 100),
+                            anchor: new google.maps.Point(50, 50),
+                        };
+
+                        // Ping (debajo)
+                        const pulse = new google.maps.Marker({
+                            position: { lat: d.lat, lng: d.lng },
+                            map, icon: iconPing,
+                            clickable: false, zIndex: 1,
+                        });
+
+                        // Pin (arriba)
                         const marker = new google.maps.Marker({
                             position: { lat: d.lat, lng: d.lng },
-                            map: map,
-                            title: d.nombre,
-                            label: { text: '🛵', fontSize: '24px' },
-                            icon: {
-                                path: google.maps.SymbolPath.CIRCLE,
-                                scale: 18,
-                                fillColor: colorEstado,
-                                fillOpacity: 0.95,
-                                strokeColor: '#fff',
-                                strokeWeight: 3,
-                            },
+                            map, title: d.nombre, icon: iconMoto, zIndex: 100,
+                            optimized: false,
                         });
-                        const info = new google.maps.InfoWindow({
+
+                        // Label flotante con nombre
+                        const labelDiv = new google.maps.InfoWindow({
                             content: `
-                                <div style="font-family:system-ui;padding:4px 2px;min-width:200px">
-                                    <div style="font-weight:800;color:#1e293b;font-size:14px;margin-bottom:4px">
-                                        ${d.nombre}
+                                <div style="font-family:system-ui,sans-serif;padding:6px 4px;min-width:220px">
+                                    <div style="font-weight:800;font-size:15px;color:#0f172a;line-height:1.2">${d.nombre}</div>
+                                    <div style="font-size:12px;color:#64748b;margin-top:2px">
+                                        🏍️ ${d.vehiculo || 'Vehículo'}${d.placa ? ' · '+d.placa : ''}
                                     </div>
-                                    <div style="font-size:12px;color:#64748b">
-                                        <i class="fa-solid fa-motorcycle"></i> ${d.vehiculo || 'Vehículo'} ${d.placa ? '· '+d.placa : ''}<br>
-                                        <i class="fa-solid fa-circle" style="color:${colorEstado};font-size:8px"></i>
-                                        ${d.estado}
-                                        ${d.telefono ? '<br>📞 '+d.telefono : ''}
+                                    <div style="margin-top:8px">
+                                        <span style="background:${colorEstado};color:white;padding:3px 12px;border-radius:999px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.06em">
+                                            ${(d.estado || '').replace('_',' ')}
+                                        </span>
                                     </div>
+                                    ${d.telefono ? `<a href="tel:${d.telefono}" style="display:inline-block;margin-top:10px;font-size:13px;color:#10b981;font-weight:700;text-decoration:none">📞 ${d.telefono}</a>` : ''}
                                 </div>
                             `,
                         });
-                        marker.addListener('click', () => info.open({ anchor: marker, map }));
-                        el._markers[d.id] = { marker, info };
+                        marker.addListener('click', () => labelDiv.open({ anchor: marker, map }));
+
+                        el._markers[d.id] = { marker, pulse, info: labelDiv };
                         bounds.extend(marker.getPosition());
                     });
 
                     if (window._despachosDomis.length > 1) {
-                        map.fitBounds(bounds);
-                        if (map.getZoom() > 14) map.setZoom(14);
+                        map.fitBounds(bounds, { top: 60, right: 40, bottom: 60, left: 40 });
+                        const listener = google.maps.event.addListener(map, 'idle', () => {
+                            if (map.getZoom() > 15) map.setZoom(15);
+                            google.maps.event.removeListener(listener);
+                        });
                     } else if (window._despachosDomis.length === 1) {
                         map.setCenter(window._despachosDomis[0]);
-                        map.setZoom(14);
+                        map.setZoom(15);
                     }
                 };
 
