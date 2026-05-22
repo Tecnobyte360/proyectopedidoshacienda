@@ -146,13 +146,26 @@ class Index extends Component
             $aniosDisponibles = [(int) now()->format('Y')];
         }
 
-        $conexionesUsadas = FelicitacionCumpleanos::query()
-            ->whereNotNull('connection_id')
-            ->select('connection_id')
-            ->distinct()
-            ->orderBy('connection_id')
-            ->pluck('connection_id')
-            ->toArray();
+        // Solo mostrar las conexiones de WhatsApp que pertenecen al tenant actual
+        // (no las históricas de otros tenants ni sesiones viejas)
+        try {
+            $resolver = app(\App\Services\WhatsappResolverService::class);
+            $conexionesUsadas = $resolver->connectionIdsDelTenant();
+        } catch (\Throwable) {
+            $conexionesUsadas = [];
+        }
+
+        // Fallback: si el resolver no tiene info, usar los IDs históricos de
+        // las felicitaciones de este tenant (ya filtrado por BelongsToTenant).
+        if (empty($conexionesUsadas)) {
+            $conexionesUsadas = FelicitacionCumpleanos::query()
+                ->whereNotNull('connection_id')
+                ->select('connection_id')
+                ->distinct()
+                ->orderBy('connection_id')
+                ->pluck('connection_id')
+                ->toArray();
+        }
 
         $detalle = $this->detalleId ? FelicitacionCumpleanos::find($this->detalleId) : null;
 

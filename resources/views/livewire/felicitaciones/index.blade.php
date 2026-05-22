@@ -2,36 +2,43 @@
 
     {{-- Header --}}
     <div class="flex flex-wrap items-center justify-between gap-4">
-        <div>
-            <h2 class="text-2xl font-extrabold text-slate-800 flex items-center gap-2">
-                <i class="fa-solid fa-cake-candles text-pink-500"></i>
-                Historial de felicitaciones
-            </h2>
-            <p class="text-sm text-slate-500">
-                Trazabilidad de los mensajes de cumpleaños enviados a los clientes.
-            </p>
+        <div class="flex items-center gap-3">
+            <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand/10 text-brand">
+                <i class="fa-solid fa-cake-candles text-xl"></i>
+            </div>
+            <div>
+                <h2 class="text-2xl font-extrabold text-slate-800">Historial de felicitaciones</h2>
+                <p class="text-sm text-slate-500">
+                    Trazabilidad de los mensajes de cumpleaños enviados a los clientes.
+                </p>
+            </div>
         </div>
     </div>
 
     {{-- Métricas --}}
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div class="rounded-2xl bg-white border border-slate-200 p-4">
-            <p class="text-xs uppercase tracking-wide text-slate-500 font-semibold">Total en {{ $anio }}</p>
-            <p class="mt-1 text-2xl font-extrabold text-slate-800">{{ $totales['total'] }}</p>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div class="rounded-2xl bg-gradient-to-br from-brand to-brand-dark p-5 text-white shadow-sm">
+            <div class="flex items-center justify-between">
+                <span class="text-[11px] font-bold uppercase tracking-wider opacity-80">Total en {{ $anio }}</span>
+                <i class="fa-solid fa-cake-candles opacity-70"></i>
+            </div>
+            <p class="mt-2 text-3xl font-extrabold">{{ $totales['total'] }}</p>
         </div>
-        <div class="rounded-2xl bg-white border border-slate-200 p-4">
-            <p class="text-xs uppercase tracking-wide text-slate-500 font-semibold"><i class="fa-solid fa-circle-check text-emerald-500"></i> Enviados</p>
-            <p class="mt-1 text-2xl font-extrabold text-emerald-600">{{ $totales['enviados'] }}</p>
+        <div class="rounded-2xl bg-white border border-emerald-200 p-5 shadow-sm">
+            <div class="flex items-center justify-between">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-emerald-600">Enviados</span>
+                <i class="fa-solid fa-circle-check text-emerald-500"></i>
+            </div>
+            <p class="mt-2 text-3xl font-extrabold text-emerald-700">{{ $totales['enviados'] }}</p>
         </div>
-        <div class="rounded-2xl bg-white border border-slate-200 p-4">
-            <p class="text-xs uppercase tracking-wide text-slate-500 font-semibold"><i class="fa-solid fa-circle-xmark text-rose-500"></i> Fallidos</p>
-            <p class="mt-1 text-2xl font-extrabold {{ $totales['fallidos'] > 0 ? 'text-rose-600' : 'text-slate-400' }}">
+        <div class="rounded-2xl bg-white border border-rose-200 p-5 shadow-sm">
+            <div class="flex items-center justify-between">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-rose-600">Fallidos</span>
+                <i class="fa-solid fa-circle-xmark text-rose-500"></i>
+            </div>
+            <p class="mt-2 text-3xl font-extrabold {{ $totales['fallidos'] > 0 ? 'text-rose-700' : 'text-slate-400' }}">
                 {{ $totales['fallidos'] }}
             </p>
-        </div>
-        <div class="rounded-2xl bg-white border border-slate-200 p-4">
-            <p class="text-xs uppercase tracking-wide text-slate-500 font-semibold"><i class="fa-solid fa-eye"></i> Dry-run (prueba)</p>
-            <p class="mt-1 text-2xl font-extrabold text-slate-500">{{ $totales['dry_run'] }}</p>
         </div>
     </div>
 
@@ -54,7 +61,6 @@
                     <option value="todas">Todos</option>
                     <option value="enviado">Enviados</option>
                     <option value="fallido">Fallidos</option>
-                    <option value="dry_run">Dry-run</option>
                 </select>
             </div>
             <div>
@@ -93,7 +99,7 @@
     <div class="rounded-2xl bg-white border border-slate-200 overflow-hidden">
         @if($felicitaciones->isEmpty())
             <div class="p-12 text-center text-slate-400">
-                <i class="fa-solid fa-cake-candles text-5xl text-pink-300 mb-3"></i>
+                <i class="fa-solid fa-cake-candles text-5xl text-brand/40 mb-3"></i>
                 <p class="text-lg font-semibold text-slate-600">Sin felicitaciones registradas</p>
                 <p class="text-sm">Cuando el sistema envíe (o intente enviar) felicitaciones, aparecerán aquí.</p>
             </div>
@@ -119,7 +125,7 @@
                                 <td class="px-4 py-3 font-mono text-xs text-slate-600">{{ $f->telefono }}</td>
                                 <td class="px-4 py-3">
                                     @if($f->connection_id)
-                                        <span class="inline-flex items-center gap-1 text-xs font-mono px-2 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">
+                                        <span class="inline-flex items-center gap-1 text-xs font-mono px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100">
                                             <i class="fa-brands fa-whatsapp"></i> #{{ $f->connection_id }}
                                         </span>
                                     @else
@@ -166,9 +172,9 @@
                                 </td>
                                 <td class="px-4 py-3 text-xs text-slate-600">
                                     @switch($f->origen)
-                                        @case('scheduled') <i class="fa-solid fa-robot text-violet-500"></i> Automático @break
+                                        @case('scheduled') <i class="fa-solid fa-robot text-brand"></i> Automático @break
                                         @case('manual')    <i class="fa-solid fa-hand text-amber-500"></i> Manual @break
-                                        @case('force')     <i class="fa-solid fa-bolt text-yellow-500"></i> Force @break
+                                        @case('force')     <i class="fa-solid fa-bolt text-amber-500"></i> Force @break
                                         @default           {{ $f->origen }}
                                     @endswitch
                                 </td>
@@ -206,10 +212,10 @@
         <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
              wire:click.self="cerrarDetalle">
             <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-                <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-pink-50 to-white">
+                <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-brand/10 to-white">
                     <div>
                         <h3 class="font-bold text-slate-800">
-                            <i class="fa-solid fa-cake-candles text-pink-500"></i>
+                            <i class="fa-solid fa-cake-candles text-brand"></i>
                             Felicitación a {{ $detalle->cliente_nombre }}
                         </h3>
                         <p class="text-xs text-slate-500">{{ $detalle->telefono }} · {{ $detalle->enviado_at?->format('d/m/Y H:i:s') }}</p>
@@ -271,8 +277,8 @@
                     @endphp
                     @if($beneficio)
                         <div>
-                            <p class="text-xs font-semibold uppercase text-slate-500 tracking-wide mb-1"><i class="fa-solid fa-gift text-pink-500"></i> Beneficio otorgado</p>
-                            <div class="rounded-xl bg-pink-50 border border-pink-200 p-4 text-sm space-y-1">
+                            <p class="text-xs font-semibold uppercase text-slate-500 tracking-wide mb-1"><i class="fa-solid fa-gift text-brand"></i> Beneficio otorgado</p>
+                            <div class="rounded-xl bg-brand/5 border border-brand/20 p-4 text-sm space-y-1">
                                 <div class="flex items-center justify-between">
                                     <span class="font-semibold text-slate-800">{{ $beneficio->etiquetaTipo() }}</span>
                                     @php $estado = $beneficio->estado(); @endphp
