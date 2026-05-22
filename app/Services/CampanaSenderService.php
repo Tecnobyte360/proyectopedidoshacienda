@@ -199,6 +199,8 @@ class CampanaSenderService
 
             try {
                 // Si hay imagen adjunta → enviarImagen con caption; si no → texto
+                $ok = false;
+                $usoFallback = false;
                 if (!empty($c->media_url)) {
                     $ok = $this->sender->enviarImagen(
                         $d->telefono,
@@ -206,6 +208,15 @@ class CampanaSenderService
                         $mensaje,
                         $connectionId
                     );
+
+                    // 🛟 FALLBACK: si TecnoByteApp no soporta media (404 endpoint),
+                    // enviar solo el caption como texto. Mejor enviar el mensaje
+                    // sin imagen que perder al destinatario.
+                    if (!$ok) {
+                        Log::info("📨 Campaña #{$c->id}: imagen falló, fallback a texto para {$d->telefono}");
+                        $ok = $this->sender->enviarTexto($d->telefono, $mensaje, $connectionId);
+                        $usoFallback = true;
+                    }
                 } else {
                     $ok = $this->sender->enviarTexto($d->telefono, $mensaje, $connectionId);
                 }
@@ -215,6 +226,9 @@ class CampanaSenderService
                         'mensaje_renderizado' => $mensaje,
                         'enviado_at'          => now(),
                         'intentos'            => $d->intentos + 1,
+                        'error_detalle'       => $usoFallback
+                            ? '⚠ Enviado solo como texto (API no soporta imagen)'
+                            : null,
                     ]);
                     $enviados++;
                 } else {
