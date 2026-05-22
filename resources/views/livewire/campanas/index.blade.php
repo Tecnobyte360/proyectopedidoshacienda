@@ -451,7 +451,7 @@
                             <i class="fa-solid fa-image text-sky-600"></i> Imagen (opcional)
                         </h4>
                         <p class="text-xs text-slate-600 mb-3">
-                            Se enviará a cada destinatario junto con el mensaje como caption. Tamaño máx: 8 MB.
+                            Se enviará a cada destinatario junto con el mensaje como caption. Tamaño máx: 20 MB.
                         </p>
                         <input type="file" wire:model="imagen" accept="image/*"
                                class="block w-full text-xs text-slate-600 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-sky-600 file:text-white file:font-semibold file:cursor-pointer hover:file:bg-sky-700">

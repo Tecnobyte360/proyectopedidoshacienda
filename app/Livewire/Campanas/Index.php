@@ -104,7 +104,7 @@ class Index extends Component
             'descansoLoteMin'  => 'integer|min:0|max:1440',
             'ventanaDesde'     => 'string',
             'ventanaHasta'     => 'string',
-            'imagen'           => 'nullable|image|max:8192', // 8 MB
+            'imagen'           => 'nullable|image|max:20480', // 20 MB
             'archivoExcel'     => 'nullable|file|mimes:xlsx,xls,csv,txt|max:5120', // 5 MB
         ];
     }

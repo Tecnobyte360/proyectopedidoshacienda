@@ -36,7 +36,9 @@ return [
     */
     'temporary_file_upload' => [
         'disk' => null,
-        'rules' => null,
+        // Reglas globales para uploads temporales — permite archivos hasta 25MB
+        // (default Livewire = 12MB que era el cuello de botella en campañas).
+        'rules' => ['file', 'max:25600'],
         'directory' => null,
         'middleware' => null,
         'preview_mimes' => [
