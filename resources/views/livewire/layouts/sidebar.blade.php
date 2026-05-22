@@ -130,88 +130,113 @@
     @endphp
 
     <style>
-        /* Sidebar — toma el color del tenant para sentirse parte de su marca.
-           El fondo es un tinte oscuro del color primario, no negro puro,
-           más amable a la vista en sesiones largas. */
+        /* Sidebar estilo NobleUI — claro, limpio, profesional */
         .app-sidebar {
             --brand-primary:   {{ $primario }};
             --brand-secondary: {{ $secundario }};
 
-            /* Fondo: 88% slate + 12% del color del tenant → dark suave con tinte */
-            --sb-bg:   color-mix(in srgb, var(--brand-primary) 12%, #1f242c);
-            --sb-bg-2: color-mix(in srgb, var(--brand-secondary) 8%, #2a3038);
+            --sb-bg:          #ffffff;
+            --sb-bg-hover:    #f8fafc;
+            --sb-line:        #eef2f6;
+            --sb-text:        #4b5563;
+            --sb-text-soft:   #9ca3af;
+            --sb-text-strong: #111827;
+            --sb-section:     #94a3b8;
+            --sb-hover:       #f1f5f9;
+            --sb-active-bg:   color-mix(in srgb, var(--brand-primary) 10%, transparent);
+            --sb-active-tx:   var(--brand-primary);
 
-            --sb-line:      rgba(255,255,255,0.07);
-            --sb-text:      rgba(255,255,255,0.72);
-            --sb-text-soft: rgba(255,255,255,0.50);
-            --sb-text-strong: #ffffff;
-            --sb-hover:     rgba(255,255,255,0.06);
-            --sb-active:    color-mix(in srgb, var(--brand-primary) 22%, transparent);
-
-            background: linear-gradient(180deg, var(--sb-bg) 0%, var(--sb-bg-2) 100%);
+            background: var(--sb-bg);
             color: var(--sb-text);
+            border-right: 1px solid var(--sb-line);
         }
         .sb-brand-block {
             display: flex;
-            flex-direction: column;
+            flex-direction: row;
             align-items: center;
-            gap: 0.625rem;
-            padding: 0.5rem 0.5rem 0;
+            gap: 0.75rem;
+            padding: 1.25rem 1rem;
+            border-bottom: 1px solid var(--sb-line);
         }
         .sb-brand-logo {
-            width: 4.5rem;            /* 72px — protagonista */
-            height: 4.5rem;
-            border-radius: 1.125rem;  /* 18px */
+            width: 2.75rem;           /* 44px — compacto */
+            height: 2.75rem;
             display: flex;
             align-items: center;
             justify-content: center;
-            background: linear-gradient(135deg,
-                color-mix(in srgb, var(--brand-primary) 22%, #ffffff15) 0%,
-                color-mix(in srgb, var(--brand-secondary) 22%, #ffffff10) 100%);
-            border: 1px solid rgba(255,255,255,0.10);
-            padding: 0.5rem;
+            background: transparent;   /* PNG transparente se ve limpio */
+            border: none;
+            padding: 0;
             flex-shrink: 0;
-            box-shadow: 0 6px 20px -6px rgba(0,0,0,0.55),
-                        inset 0 1px 0 rgba(255,255,255,0.10);
+            transition: transform 0.25s ease, filter 0.25s ease;
+        }
+        .sb-brand-logo:hover {
+            transform: scale(1.06);
+        }
+        .sb-brand-logo img {
+            max-width: 100%;
+            max-height: 100%;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            filter: drop-shadow(0 2px 4px color-mix(in srgb, var(--brand-primary) 30%, transparent));
+            transition: filter 0.25s ease;
+        }
+        .sb-brand-logo:hover img {
+            filter: drop-shadow(0 4px 8px color-mix(in srgb, var(--brand-primary) 45%, transparent));
+        }
+        .sb-brand-wrap {
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+            flex: 1;
+            min-width: 0;
         }
         .sb-brand {
-            color: var(--brand-primary);
+            color: var(--sb-text-strong);
             font-weight: 800;
-            letter-spacing: -0.018em;
+            letter-spacing: -0.02em;
             font-size: 0.95rem;
-            text-align: center;
             line-height: 1.2;
-            max-width: 100%;
+            /* Permite hasta 2 líneas con ellipsis si supera */
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            word-break: break-word;
+        }
+        .sb-brand-sub-inline {
+            font-size: 0.6875rem;
+            color: var(--sb-text-soft);
+            font-weight: 500;
+            letter-spacing: 0.01em;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            margin-top: 2px;
         }
         .sb-brand-sub {
-            font-size: 0.6875rem;
-            color: var(--sb-text-soft);
-            text-align: center;
-            font-weight: 500;
-            letter-spacing: 0.02em;
+            display: none;
         }
         body.sidebar-collapsed #sb-collapsed-logo { display: flex !important; }
         body.sidebar-collapsed #sb-collapsed-logo .sb-brand-logo {
-            width: 2.5rem; height: 2.5rem; border-radius: 0.75rem; padding: 0.25rem;
+            width: 2.25rem; height: 2.25rem;
         }
         .sb-collapse-btn {
-            background: rgba(255,255,255,0.05);
+            background: var(--sb-hover);
             color: var(--sb-text);
             transition: all 0.15s ease;
         }
-        .sb-collapse-btn:hover { background: rgba(255,255,255,0.10); color: var(--sb-text-strong); }
+        .sb-collapse-btn:hover { background: #e5e7eb; color: var(--sb-text-strong); }
 
         .sb-user-card {
-            background: rgba(255,255,255,0.03);
+            background: var(--sb-bg-hover);
             border: 1px solid var(--sb-line);
-            border-radius: 0.875rem;
+            border-radius: 0.75rem;
         }
         .sb-avatar {
-            width: 2.625rem;
-            height: 2.625rem;
+            width: 2.5rem;
+            height: 2.5rem;
             border-radius: 999px;
             display: flex; align-items: center; justify-content: center;
             font-weight: 700; color: white;
@@ -219,32 +244,34 @@
             flex-shrink: 0;
         }
         .sb-search {
-            background: rgba(255,255,255,0.04);
+            background: var(--sb-hover);
             border: 1px solid transparent;
-            color: var(--sb-text);
+            color: var(--sb-text-strong);
             transition: all 0.15s ease;
         }
         .sb-search::placeholder { color: var(--sb-text-soft); }
         .sb-search:focus {
-            background: rgba(255,255,255,0.06);
-            border-color: rgba(255,255,255,0.10);
+            background: #ffffff;
+            border-color: var(--sb-line);
             outline: none;
+            box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-primary) 10%, transparent);
         }
         .sb-section-title {
-            font-size: 0.6875rem;        /* 11px */
+            font-size: 0.6875rem;
             font-weight: 600;
-            color: var(--sb-text-soft);
-            letter-spacing: 0.04em;
-            text-transform: capitalize;
-            padding: 0 0.875rem;
-            margin-bottom: 0.375rem;
+            color: var(--sb-section);
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            padding: 0 1rem;
+            margin-bottom: 0.5rem;
+            margin-top: 0.25rem;
         }
         .sb-item {
             display: flex; align-items: center; gap: 0.75rem;
-            padding: 0.5rem 0.875rem;
-            border-radius: 0.625rem;
+            padding: 0.5rem 1rem;
+            border-radius: 0;
             color: var(--sb-text);
-            font-size: 0.8125rem;        /* 13px — compacto */
+            font-size: 0.875rem;
             font-weight: 500;
             transition: all 0.12s ease;
             position: relative;
@@ -257,25 +284,24 @@
         .sb-item .sb-icon {
             width: 1.125rem;
             text-align: center;
-            font-size: 0.875rem;
+            font-size: 0.9375rem;
             color: var(--sb-text-soft);
             transition: color 0.12s ease;
         }
-        .sb-item:hover .sb-icon { color: var(--sb-text-strong); }
+        .sb-item:hover .sb-icon { color: var(--brand-primary); }
 
         .sb-item.is-active {
-            background: var(--sb-active);
-            color: var(--sb-text-strong);
+            background: var(--sb-active-bg);
+            color: var(--sb-active-tx);
             font-weight: 600;
         }
         .sb-item.is-active::before {
             content: '';
             position: absolute;
-            left: 0; top: 50%; transform: translateY(-50%);
-            width: 3px; height: 70%;
+            left: 0; top: 0; bottom: 0;
+            width: 3px;
             background: var(--brand-primary);
             border-radius: 0 3px 3px 0;
-            box-shadow: 0 0 12px color-mix(in srgb, var(--brand-primary) 60%, transparent);
         }
         .sb-item.is-active .sb-icon { color: var(--brand-primary); }
 
@@ -298,15 +324,14 @@
 
         .sb-footer-item {
             display: flex; align-items: center; gap: 0.625rem;
-            padding: 0.5rem 0.625rem;
-            border-radius: 0.625rem;
+            padding: 0.625rem 1rem;
+            border-radius: 0.5rem;
             color: var(--sb-text);
-            font-size: 0.8125rem;
+            font-size: 0.875rem;
             transition: all 0.12s ease;
         }
         .sb-footer-item:hover { background: var(--sb-hover); color: var(--sb-text-strong); }
 
-        /* Cuando body.sidebar-collapsed está activo */
         body.sidebar-collapsed .app-sidebar {
             width: 4.5rem;
         }
@@ -315,41 +340,36 @@
         body.sidebar-collapsed .app-sidebar .sb-section-title { display: none; }
         body.sidebar-collapsed main { padding-left: 4.5rem !important; }
 
-        /* Custom scrollbar */
         .app-sidebar nav::-webkit-scrollbar { width: 6px; }
         .app-sidebar nav::-webkit-scrollbar-track { background: transparent; }
-        .app-sidebar nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
-        .app-sidebar nav::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.16); }
+        .app-sidebar nav::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 3px; }
+        .app-sidebar nav::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
     </style>
 
     {{-- ╔═══ SIDEBAR DESKTOP ═══╗ --}}
     <aside class="app-sidebar fixed inset-y-0 left-0 z-40 hidden lg:flex w-64 flex-col"
            x-data="{ q: '' }">
 
-        {{-- HEADER: collapse arriba a la derecha --}}
-        <div class="flex items-center justify-end px-4 pt-3 pb-1 sb-collapsible">
-            <button onclick="document.body.classList.toggle('sidebar-collapsed')"
-                    class="sb-collapse-btn h-7 w-7 inline-flex items-center justify-center rounded-lg"
-                    title="Colapsar sidebar">
-                <i class="fa-solid fa-angles-left text-[11px]"></i>
-            </button>
-        </div>
-
-        {{-- BRAND: logo arriba grande, nombre y sub debajo --}}
+        {{-- BRAND: logo elegante + nombre + sub + botón colapsar --}}
         <div class="sb-brand-block sb-collapsible">
             <div class="sb-brand-logo">
                 @if($brandLogo)
-                    <img src="{{ $brandLogo }}" alt="{{ $brandName }}" class="h-full w-full object-contain rounded-xl">
+                    <img src="{{ $brandLogo }}" alt="{{ $brandName }}">
                 @else
-                    <span class="text-2xl font-extrabold text-white">
+                    <span class="text-base font-extrabold text-white">
                         {{ mb_strtoupper(mb_substr($brandName, 0, 1)) }}
                     </span>
                 @endif
             </div>
-            <div class="flex flex-col items-center gap-0.5">
+            <div class="sb-brand-wrap">
                 <span class="sb-brand">{{ $brandName }}</span>
-                <span class="sb-brand-sub">{{ $brandSub }}</span>
+                <span class="sb-brand-sub-inline">{{ $brandSub }}</span>
             </div>
+            <button onclick="document.body.classList.toggle('sidebar-collapsed')"
+                    class="sb-collapse-btn h-8 w-8 inline-flex items-center justify-center rounded-lg flex-shrink-0"
+                    title="Colapsar sidebar">
+                <i class="fa-solid fa-bars text-[13px]"></i>
+            </button>
         </div>
 
         {{-- Mini logo cuando está colapsado --}}
@@ -424,7 +444,7 @@
         <div class="sb-brand-block">
             <div class="sb-brand-logo">
                 @if($brandLogo)
-                    <img src="{{ $brandLogo }}" alt="{{ $brandName }}" class="h-full w-full object-contain rounded-xl">
+                    <img src="{{ $brandLogo }}" alt="{{ $brandName }}" class="h-full w-full object-contain">
                 @else
                     <span class="text-2xl font-extrabold text-white">{{ mb_strtoupper(mb_substr($brandName, 0, 1)) }}</span>
                 @endif

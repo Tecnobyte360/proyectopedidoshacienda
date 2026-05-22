@@ -30,6 +30,43 @@ class Index extends Component
     public bool $modal = false;
     public ?int $editandoId = null;
 
+    /** 📡 Monitor en vivo */
+    public ?int $monitoreoId = null;
+    public string $filtroMonitor = 'todos'; // todos | enviado | fallido | pendiente
+
+    public function verProgreso(int $id): void
+    {
+        $this->monitoreoId   = $id;
+        $this->filtroMonitor = 'todos';
+    }
+
+    public function cerrarMonitor(): void
+    {
+        $this->monitoreoId = null;
+    }
+
+    public function reintentarFallidos(int $id): void
+    {
+        $c = CampanaWhatsapp::findOrFail($id);
+        $count = \App\Models\CampanaDestinatario::where('campana_id', $c->id)
+            ->where('estado', \App\Models\CampanaDestinatario::ESTADO_FALLIDO)
+            ->update([
+                'estado'        => \App\Models\CampanaDestinatario::ESTADO_PENDIENTE,
+                'error_detalle' => null,
+            ]);
+
+        $c->update([
+            'total_pendientes' => $c->destinatarios()->where('estado', \App\Models\CampanaDestinatario::ESTADO_PENDIENTE)->count(),
+            'total_fallidos'   => $c->destinatarios()->where('estado', \App\Models\CampanaDestinatario::ESTADO_FALLIDO)->count(),
+            'estado'           => $count > 0 ? CampanaWhatsapp::ESTADO_CORRIENDO : $c->estado,
+        ]);
+
+        $this->dispatch('notify', [
+            'type'    => 'success',
+            'message' => "🔁 {$count} fallidos marcados para reintento.",
+        ]);
+    }
+
     public string $nombre  = '';
     public string $mensaje = '';
     public string $audienciaTipo = 'todos';
@@ -187,8 +224,49 @@ class Index extends Component
         $zonas    = ZonaCobertura::where('activa', true)->orderBy('nombre')->get();
         $sedes    = Sede::orderBy('nombre')->get();
 
-        return view('livewire.campanas.index', compact('campanas', 'zonas', 'sedes'))
-            ->layout('layouts.app');
+        // 📡 Monitor en vivo
+        $monitorCampana = null;
+        $monitorDestinatarios = collect();
+        $monitorEstadisticas = ['enviado' => 0, 'fallido' => 0, 'pendiente' => 0, 'total' => 0, 'pct' => 0];
+
+        if ($this->monitoreoId) {
+            $monitorCampana = CampanaWhatsapp::find($this->monitoreoId);
+            if ($monitorCampana) {
+                $destinatariosQuery = \App\Models\CampanaDestinatario::where('campana_id', $monitorCampana->id);
+
+                // Conteos
+                $contadores = (clone $destinatariosQuery)
+                    ->selectRaw('estado, COUNT(*) as cnt')
+                    ->groupBy('estado')
+                    ->pluck('cnt', 'estado')
+                    ->toArray();
+
+                $monitorEstadisticas['enviado']   = (int) ($contadores['enviado'] ?? 0);
+                $monitorEstadisticas['fallido']   = (int) ($contadores['fallido'] ?? 0);
+                $monitorEstadisticas['pendiente'] = (int) ($contadores['pendiente'] ?? 0);
+                $monitorEstadisticas['omitido']   = (int) ($contadores['omitido'] ?? 0);
+                $monitorEstadisticas['total']     = array_sum($monitorEstadisticas) - $monitorEstadisticas['total'];
+                $monitorEstadisticas['pct']       = $monitorEstadisticas['total'] > 0
+                    ? (int) round((($monitorEstadisticas['enviado'] + $monitorEstadisticas['fallido']) / $monitorEstadisticas['total']) * 100)
+                    : 0;
+
+                // Lista filtrada (últimos 50 con orden por actividad)
+                if ($this->filtroMonitor !== 'todos') {
+                    $destinatariosQuery->where('estado', $this->filtroMonitor);
+                }
+                $monitorDestinatarios = $destinatariosQuery
+                    ->orderByRaw("FIELD(estado, 'pendiente', 'enviado', 'fallido', 'omitido')")
+                    ->orderByDesc('enviado_at')
+                    ->orderByDesc('id')
+                    ->limit(100)
+                    ->get();
+            }
+        }
+
+        return view('livewire.campanas.index', compact(
+            'campanas', 'zonas', 'sedes',
+            'monitorCampana', 'monitorDestinatarios', 'monitorEstadisticas'
+        ))->layout('layouts.app');
     }
 
     public function abrirCrear(): void

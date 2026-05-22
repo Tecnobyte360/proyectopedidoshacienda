@@ -119,6 +119,16 @@
                                             <i class="fa-solid fa-pause text-xs"></i>
                                         </button>
                                     @endif
+                                    <button wire:click="verProgreso({{ $c->id }})" title="Ver progreso en vivo"
+                                            class="h-8 w-8 rounded-lg bg-sky-100 hover:bg-sky-200 text-sky-700 transition relative">
+                                        <i class="fa-solid fa-chart-line text-xs"></i>
+                                        @if($c->estado === 'corriendo')
+                                            <span class="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">
+                                                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                                <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500 border-2 border-white"></span>
+                                            </span>
+                                        @endif
+                                    </button>
                                     <button wire:click="generarAudiencia({{ $c->id }})" title="Generar/regenerar audiencia"
                                             class="h-8 w-8 rounded-lg bg-violet-100 hover:bg-violet-200 text-violet-700 transition">
                                         <i class="fa-solid fa-users text-xs"></i>
@@ -153,6 +163,204 @@
             @endif
         </div>
     </div>
+
+    {{-- 📡 MODAL MONITOR EN VIVO --}}
+    @if($monitoreoId && $monitorCampana)
+        <div class="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto"
+             style="background: rgba(15,23,42,0.55); backdrop-filter: blur(4px);"
+             wire:click.self="cerrarMonitor"
+             wire:poll.3s>
+            <div class="w-full max-w-5xl bg-white rounded-2xl shadow-2xl my-8 overflow-hidden" @click.stop>
+
+                {{-- Header --}}
+                <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-sky-50 via-white to-emerald-50">
+                    <div class="flex items-center gap-3">
+                        <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-emerald-500 text-white shadow-lg">
+                            <i class="fa-solid fa-chart-line"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-extrabold text-slate-800 flex items-center gap-2">
+                                {{ $monitorCampana->nombre }}
+                                @if($monitorCampana->estado === 'corriendo')
+                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 text-emerald-700 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+                                        <span class="relative flex h-1.5 w-1.5">
+                                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                            <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                                        </span>
+                                        En vivo · actualiza cada 3s
+                                    </span>
+                                @else
+                                    <span class="inline-flex items-center rounded-full bg-slate-100 text-slate-600 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+                                        {{ ucfirst($monitorCampana->estado) }}
+                                    </span>
+                                @endif
+                            </h3>
+                            <p class="text-xs text-slate-500">
+                                {{ $monitorEstadisticas['total'] }} destinatarios ·
+                                Iniciada {{ $monitorCampana->iniciada_at?->diffForHumans() ?? '—' }}
+                                @if($monitorCampana->completada_at)
+                                    · Finalizada {{ $monitorCampana->completada_at->diffForHumans() }}
+                                @endif
+                            </p>
+                        </div>
+                    </div>
+                    <button wire:click="cerrarMonitor" class="text-slate-400 hover:text-slate-700 transition">
+                        <i class="fa-solid fa-xmark text-xl"></i>
+                    </button>
+                </div>
+
+                <div class="p-6 space-y-5 max-h-[80vh] overflow-y-auto">
+
+                    {{-- KPIs grandes --}}
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div class="rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 p-4 text-white shadow-sm">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-[10px] font-bold uppercase tracking-wider opacity-80">Enviados</span>
+                                <i class="fa-solid fa-circle-check"></i>
+                            </div>
+                            <div class="text-3xl font-extrabold">{{ $monitorEstadisticas['enviado'] }}</div>
+                        </div>
+                        <div class="rounded-2xl bg-gradient-to-br from-rose-500 to-rose-600 p-4 text-white shadow-sm">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-[10px] font-bold uppercase tracking-wider opacity-80">Fallidos</span>
+                                <i class="fa-solid fa-circle-xmark"></i>
+                            </div>
+                            <div class="text-3xl font-extrabold">{{ $monitorEstadisticas['fallido'] }}</div>
+                        </div>
+                        <div class="rounded-2xl bg-gradient-to-br from-amber-400 to-amber-500 p-4 text-white shadow-sm">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-[10px] font-bold uppercase tracking-wider opacity-90">Pendientes</span>
+                                <i class="fa-regular fa-clock"></i>
+                            </div>
+                            <div class="text-3xl font-extrabold">{{ $monitorEstadisticas['pendiente'] }}</div>
+                        </div>
+                        <div class="rounded-2xl bg-gradient-to-br from-slate-700 to-slate-900 p-4 text-white shadow-sm">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-[10px] font-bold uppercase tracking-wider opacity-80">Total</span>
+                                <i class="fa-solid fa-users"></i>
+                            </div>
+                            <div class="text-3xl font-extrabold">{{ $monitorEstadisticas['total'] }}</div>
+                        </div>
+                    </div>
+
+                    {{-- Barra de progreso --}}
+                    <div>
+                        <div class="flex items-center justify-between mb-2 text-xs">
+                            <span class="font-bold text-slate-700">Progreso</span>
+                            <span class="font-extrabold text-emerald-600">{{ $monitorEstadisticas['pct'] }}%</span>
+                        </div>
+                        <div class="w-full h-3 bg-slate-200 rounded-full overflow-hidden">
+                            <div class="h-full bg-gradient-to-r from-emerald-500 via-emerald-400 to-sky-500 rounded-full transition-all duration-500"
+                                 style="width: {{ $monitorEstadisticas['pct'] }}%"></div>
+                        </div>
+                        <p class="text-[10px] text-slate-500 mt-1 text-center">
+                            {{ $monitorEstadisticas['enviado'] + $monitorEstadisticas['fallido'] }} procesados de {{ $monitorEstadisticas['total'] }}
+                        </p>
+                    </div>
+
+                    {{-- Filtros + acciones --}}
+                    <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
+                        <div class="flex items-center gap-1.5 flex-wrap">
+                            <button wire:click="$set('filtroMonitor', 'todos')"
+                                    class="rounded-lg px-3 py-1.5 text-xs font-bold transition
+                                           {{ $filtroMonitor === 'todos' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' }}">
+                                Todos
+                            </button>
+                            <button wire:click="$set('filtroMonitor', 'enviado')"
+                                    class="rounded-lg px-3 py-1.5 text-xs font-bold transition flex items-center gap-1
+                                           {{ $filtroMonitor === 'enviado' ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100' }}">
+                                <i class="fa-solid fa-check"></i> Enviados
+                            </button>
+                            <button wire:click="$set('filtroMonitor', 'fallido')"
+                                    class="rounded-lg px-3 py-1.5 text-xs font-bold transition flex items-center gap-1
+                                           {{ $filtroMonitor === 'fallido' ? 'bg-rose-600 text-white' : 'bg-rose-50 text-rose-700 hover:bg-rose-100' }}">
+                                <i class="fa-solid fa-xmark"></i> Fallidos
+                            </button>
+                            <button wire:click="$set('filtroMonitor', 'pendiente')"
+                                    class="rounded-lg px-3 py-1.5 text-xs font-bold transition flex items-center gap-1
+                                           {{ $filtroMonitor === 'pendiente' ? 'bg-amber-500 text-white' : 'bg-amber-50 text-amber-700 hover:bg-amber-100' }}">
+                                <i class="fa-regular fa-clock"></i> Pendientes
+                            </button>
+                        </div>
+                        @if($monitorEstadisticas['fallido'] > 0)
+                            <button wire:click="reintentarFallidos({{ $monitorCampana->id }})"
+                                    wire:confirm="¿Reintentar los {{ $monitorEstadisticas['fallido'] }} fallidos?"
+                                    class="inline-flex items-center gap-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold px-3 py-1.5 transition shadow-sm">
+                                <i class="fa-solid fa-rotate-right"></i>
+                                Reintentar fallidos ({{ $monitorEstadisticas['fallido'] }})
+                            </button>
+                        @endif
+                    </div>
+
+                    {{-- Lista de destinatarios --}}
+                    <div class="rounded-xl border border-slate-200 overflow-hidden">
+                        <table class="w-full text-sm">
+                            <thead class="bg-slate-50 text-[10px] uppercase tracking-wider text-slate-500 font-bold">
+                                <tr>
+                                    <th class="px-3 py-2 text-left">Estado</th>
+                                    <th class="px-3 py-2 text-left">Nombre</th>
+                                    <th class="px-3 py-2 text-left">Teléfono</th>
+                                    <th class="px-3 py-2 text-left">Enviado</th>
+                                    <th class="px-3 py-2 text-left">Detalle</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                @forelse($monitorDestinatarios as $d)
+                                    @php
+                                        $estilo = match($d->estado) {
+                                            'enviado'   => ['bg' => 'bg-emerald-100', 'text' => 'text-emerald-700', 'dot' => 'bg-emerald-500', 'icon' => 'fa-check', 'label' => 'Enviado'],
+                                            'fallido'   => ['bg' => 'bg-rose-100',    'text' => 'text-rose-700',    'dot' => 'bg-rose-500',    'icon' => 'fa-xmark', 'label' => 'Fallido'],
+                                            'pendiente' => ['bg' => 'bg-amber-100',   'text' => 'text-amber-700',   'dot' => 'bg-amber-500',   'icon' => 'fa-clock', 'label' => 'Pendiente'],
+                                            'omitido'   => ['bg' => 'bg-slate-100',   'text' => 'text-slate-600',   'dot' => 'bg-slate-400',   'icon' => 'fa-ban',   'label' => 'Omitido'],
+                                            default     => ['bg' => 'bg-slate-100',   'text' => 'text-slate-600',   'dot' => 'bg-slate-400',   'icon' => 'fa-circle', 'label' => $d->estado],
+                                        };
+                                    @endphp
+                                    <tr class="hover:bg-slate-50 transition">
+                                        <td class="px-3 py-2">
+                                            <span class="inline-flex items-center gap-1.5 rounded-full {{ $estilo['bg'] }} px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider {{ $estilo['text'] }}">
+                                                <i class="fa-solid {{ $estilo['icon'] }}"></i>
+                                                {{ $estilo['label'] }}
+                                            </span>
+                                        </td>
+                                        <td class="px-3 py-2 text-slate-800 font-semibold truncate max-w-[180px]">{{ $d->nombre }}</td>
+                                        <td class="px-3 py-2 text-slate-600 font-mono text-xs">{{ $d->telefono }}</td>
+                                        <td class="px-3 py-2 text-xs text-slate-500">
+                                            {{ $d->enviado_at?->diffForHumans() ?? '—' }}
+                                        </td>
+                                        <td class="px-3 py-2 text-xs text-slate-500 truncate max-w-[280px]">
+                                            @if($d->error_detalle)
+                                                <span class="text-rose-600" title="{{ $d->error_detalle }}">
+                                                    <i class="fa-solid fa-triangle-exclamation"></i>
+                                                    {{ Str::limit($d->error_detalle, 60) }}
+                                                </span>
+                                            @elseif($d->intentos > 0)
+                                                <span class="text-slate-400">{{ $d->intentos }} intento(s)</span>
+                                            @else
+                                                <span class="text-slate-300">—</span>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="5" class="px-4 py-8 text-center text-slate-400">
+                                            <i class="fa-solid fa-inbox text-2xl block mb-2"></i>
+                                            No hay destinatarios con este estado.
+                                        </td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="px-6 py-3 border-t border-slate-100 bg-slate-50 flex justify-end">
+                    <button wire:click="cerrarMonitor" class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                        Cerrar
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
 
     @if($modal)
         <div class="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto"
