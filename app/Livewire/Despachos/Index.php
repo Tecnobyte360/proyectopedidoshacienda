@@ -23,6 +23,16 @@ class Index extends Component
     /** Filtro de estado para la vista del domiciliario (todos|por_recoger|en_camino|entregados) */
     public string $filtroEstadoDomi = 'todos';
 
+    /** Filtro tabs admin: todos|sin_asignar|asignados */
+    public string $filtroAsignacion = 'todos';
+
+    public function setFiltroAsignacion(string $valor): void
+    {
+        $this->filtroAsignacion = in_array($valor, ['todos', 'sin_asignar', 'asignados'], true)
+            ? $valor
+            : 'todos';
+    }
+
     /** Pedidos seleccionados para despachar (id => true) */
     public array $seleccionados = [];
 

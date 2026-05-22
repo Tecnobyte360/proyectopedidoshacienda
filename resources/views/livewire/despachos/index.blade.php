@@ -897,56 +897,97 @@
         $totalAsig    = $asignados->sum('total');
     @endphp
 
-    @if($todosPedidos->isEmpty())
+    {{-- ════════════════ TABS DE FILTRO (estilo /pedidos) ════════════════ --}}
+    @php
+        $countTodos      = $todosPedidos->count();
+        $countSinAsignar = $sinAsignar->count();
+        $countAsignados  = $asignados->count();
+        $mostrarSin = in_array($filtroAsignacion, ['todos', 'sin_asignar'], true);
+        $mostrarAsi = in_array($filtroAsignacion, ['todos', 'asignados'], true);
+    @endphp
+
+    <div class="mb-5 rounded-2xl bg-white border border-slate-200 shadow-sm p-2 flex flex-wrap items-center gap-1.5 overflow-x-auto">
+        {{-- TODOS --}}
+        <button type="button" wire:click="setFiltroAsignacion('todos')"
+                class="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition whitespace-nowrap
+                       {{ $filtroAsignacion === 'todos'
+                            ? 'bg-slate-900 text-white shadow-sm'
+                            : 'bg-transparent text-slate-700 hover:bg-slate-100' }}">
+            <i class="fa-solid fa-table-list"></i>
+            <span>Todos</span>
+            <span class="inline-flex items-center justify-center min-w-[24px] h-5 px-1.5 rounded-full text-[11px] font-extrabold
+                       {{ $filtroAsignacion === 'todos' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700' }}">
+                {{ $countTodos }}
+            </span>
+        </button>
+
+        {{-- SIN ASIGNAR --}}
+        <button type="button" wire:click="setFiltroAsignacion('sin_asignar')"
+                class="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition whitespace-nowrap
+                       {{ $filtroAsignacion === 'sin_asignar'
+                            ? 'bg-amber-500 text-white shadow-sm'
+                            : 'bg-transparent text-slate-700 hover:bg-amber-50' }}">
+            <i class="fa-solid fa-circle-exclamation"></i>
+            <span>Faltan por asignar</span>
+            <span class="inline-flex items-center justify-center min-w-[24px] h-5 px-1.5 rounded-full text-[11px] font-extrabold
+                       {{ $filtroAsignacion === 'sin_asignar' ? 'bg-white/25 text-white' : 'bg-amber-100 text-amber-700' }}">
+                {{ $countSinAsignar }}
+            </span>
+        </button>
+
+        {{-- ASIGNADOS --}}
+        <button type="button" wire:click="setFiltroAsignacion('asignados')"
+                class="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition whitespace-nowrap
+                       {{ $filtroAsignacion === 'asignados'
+                            ? 'bg-brand text-white shadow-sm'
+                            : 'bg-transparent text-slate-700 hover:bg-brand/10' }}">
+            <i class="fa-solid fa-motorcycle"></i>
+            <span>Ya asignados</span>
+            <span class="inline-flex items-center justify-center min-w-[24px] h-5 px-1.5 rounded-full text-[11px] font-extrabold
+                       {{ $filtroAsignacion === 'asignados' ? 'bg-white/25 text-white' : 'bg-brand/10 text-brand' }}">
+                {{ $countAsignados }}
+            </span>
+        </button>
+
+        <div class="ml-auto pr-2 text-xs text-slate-500 hidden md:block">
+            Total: <span class="font-bold text-slate-700">${{ number_format($todosPedidos->sum('total'), 0, ',', '.') }}</span>
+        </div>
+    </div>
+
+    @if($todosPedidos->isEmpty() || ($filtroAsignacion === 'sin_asignar' && $sinAsignar->isEmpty()) || ($filtroAsignacion === 'asignados' && $asignados->isEmpty()))
         <div class="rounded-2xl bg-white p-16 text-center shadow-sm border border-slate-100">
             <div class="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-brand/10 to-brand/5">
                 <i class="fa-solid fa-mug-hot text-3xl text-brand"></i>
             </div>
-            <h3 class="font-extrabold text-slate-800 mb-1">Todo despachado</h3>
-            <p class="text-sm text-slate-500">No hay pedidos en preparación esperando.</p>
+            <h3 class="font-extrabold text-slate-800 mb-1">
+                @if($filtroAsignacion === 'sin_asignar')
+                    No hay pedidos pendientes
+                @elseif($filtroAsignacion === 'asignados')
+                    Aún no has asignado pedidos
+                @else
+                    Todo despachado
+                @endif
+            </h3>
+            <p class="text-sm text-slate-500">
+                @if($filtroAsignacion === 'sin_asignar')
+                    Todos los pedidos ya tienen un domiciliario asignado.
+                @elseif($filtroAsignacion === 'asignados')
+                    Los pedidos asignados aparecerán aquí.
+                @else
+                    No hay pedidos en preparación esperando.
+                @endif
+            </p>
         </div>
     @else
         <div class="rounded-2xl bg-white shadow-sm border border-slate-200 overflow-hidden">
 
-            {{-- Header de la tabla --}}
-            <div class="flex flex-wrap items-center justify-between gap-3 px-5 py-4 bg-gradient-to-r from-slate-50 to-white border-b border-slate-100">
-                <div class="flex items-center gap-3">
-                    <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand/10 text-brand">
-                        <i class="fa-solid fa-list-check"></i>
-                    </div>
-                    <div>
-                        <h3 class="font-extrabold text-slate-800">Pedidos por despachar</h3>
-                        <p class="text-xs text-slate-500">
-                            <span class="font-semibold text-amber-600">{{ $sinAsignar->count() }} sin asignar</span>
-                            ·
-                            <span class="font-semibold text-blue-600">{{ $asignados->count() }} asignados</span>
-                            · Total
-                            <span class="font-semibold text-slate-700">${{ number_format($todosPedidos->sum('total'), 0, ',', '.') }}</span>
-                        </p>
-                    </div>
-                </div>
-
-                {{-- Resumen rápido --}}
-                <div class="flex items-center gap-2">
-                    @if($sinAsignar->isNotEmpty())
-                        <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-100 text-amber-700 px-3 py-1 text-xs font-bold">
-                            <i class="fa-solid fa-circle-exclamation"></i>
-                            {{ $sinAsignar->count() }} pendientes
-                        </span>
-                    @endif
-                    @if($asignados->isNotEmpty())
-                        <span class="inline-flex items-center gap-1.5 rounded-full bg-blue-100 text-blue-700 px-3 py-1 text-xs font-bold">
-                            <i class="fa-solid fa-motorcycle"></i>
-                            {{ $asignados->count() }} con repartidor
-                        </span>
-                    @endif
-                </div>
-            </div>
+            {{-- Scroll vertical contenido con altura máxima --}}
+            <div class="max-h-[70vh] overflow-y-auto">
 
             {{-- TABLA --}}
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
-                    <thead class="bg-slate-50 border-b border-slate-200">
+                    <thead class="bg-slate-50 border-b border-slate-200 sticky top-0 z-10">
                         <tr class="text-[10px] uppercase tracking-wider text-slate-500 font-bold">
                             <th class="px-4 py-3 text-left w-10">
                                 <i class="fa-solid fa-square-check text-slate-400"></i>
@@ -964,7 +1005,7 @@
                     <tbody class="divide-y divide-slate-100">
 
                         {{-- ═══════════ SECCIÓN: SIN ASIGNAR ═══════════ --}}
-                        @if($sinAsignar->isNotEmpty())
+                        @if($mostrarSin && $sinAsignar->isNotEmpty())
                             <tr class="bg-gradient-to-r from-amber-50 to-amber-50/30">
                                 <td colspan="8" class="px-4 py-2.5">
                                     <div class="flex items-center justify-between">
@@ -1098,7 +1139,7 @@
                         @endif
 
                         {{-- ═══════════ SECCIÓN: YA ASIGNADOS ═══════════ --}}
-                        @if($asignados->isNotEmpty())
+                        @if($mostrarAsi && $asignados->isNotEmpty())
                             <tr class="bg-gradient-to-r from-blue-50 to-blue-50/30">
                                 <td colspan="8" class="px-4 py-2.5">
                                     <div class="flex items-center justify-between">
@@ -1249,6 +1290,7 @@
                     </tbody>
                 </table>
             </div>
+            </div>{{-- /max-h scroll --}}
         </div>
     @endif
 
