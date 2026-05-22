@@ -57,24 +57,23 @@
             <div class="absolute -bottom-40 -right-40 w-[40rem] h-[40rem] bg-white/10 rounded-full blur-3xl"></div>
             <div class="absolute top-1/4 right-1/4 w-72 h-72 bg-white/8 rounded-full blur-2xl"></div>
 
-            {{-- Logo grande centrado --}}
+            {{-- Logo grande centrado SIN fondo --}}
             <div class="relative z-10 flex items-center justify-center">
                 @if($brandLogo)
                     <div class="relative">
-                        {{-- Glow detrás del logo --}}
-                        <div class="absolute inset-0 bg-white/50 rounded-[2.5rem] blur-3xl scale-125"></div>
-                        {{-- Card del logo --}}
-                        <div class="relative h-72 w-72 flex items-center justify-center rounded-[2.5rem] bg-white shadow-2xl border border-white/30 overflow-hidden">
-                            <img src="{{ $brandLogo }}" alt="{{ $brandName }}"
-                                 class="h-full w-full object-contain p-6">
-                        </div>
+                        {{-- Glow blanco difuso detrás del logo --}}
+                        <div class="absolute inset-0 bg-white/30 rounded-full blur-3xl scale-110"></div>
+                        {{-- Logo sin card --}}
+                        <img src="{{ $brandLogo }}" alt="{{ $brandName }}"
+                             class="relative h-80 w-auto max-w-[22rem] object-contain"
+                             style="filter: drop-shadow(0 18px 28px rgba(0,0,0,0.28));">
                     </div>
                 @else
-                    <div class="relative">
-                        <div class="absolute inset-0 bg-white/50 rounded-[2.5rem] blur-3xl scale-125"></div>
-                        <div class="relative h-72 w-72 flex flex-col items-center justify-center rounded-[2.5rem] bg-white shadow-2xl">
-                            <i class="fa-solid fa-utensils text-7xl mb-4" style="color: {{ $colorPrim }};"></i>
-                            <h1 class="text-3xl font-extrabold" style="color: {{ $colorPrim }};">{{ $brandName }}</h1>
+                    <div class="relative text-center">
+                        <div class="absolute inset-0 bg-white/30 rounded-full blur-3xl scale-110"></div>
+                        <div class="relative">
+                            <i class="fa-solid fa-utensils text-white text-9xl mb-6 drop-shadow-2xl"></i>
+                            <h1 class="text-5xl font-extrabold text-white drop-shadow-lg tracking-tight">{{ $brandName }}</h1>
                         </div>
                     </div>
                 @endif
