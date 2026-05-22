@@ -628,9 +628,27 @@
         </div>
     </div>
 
-    {{-- 🗺️ MAPA EN VIVO DE DOMICILIARIOS (integrado de /domiciliarios/mapa) --}}
-    <div x-data="{ abierto: localStorage.getItem('despachos_mapa_abierto') === '1' }"
-         x-init="$watch('abierto', v => localStorage.setItem('despachos_mapa_abierto', v ? '1' : '0'))"
+    {{-- 🗺️ MAPA EN VIVO DE DOMICILIARIOS (inline directo, sin Livewire anidado) --}}
+    @php
+        $domisActivos = $domiciliarios->filter(fn($d) => $d->lat_actual && $d->lng_actual)->values();
+        $domisData = $domisActivos->map(fn($d) => [
+            'id'       => $d->id,
+            'nombre'   => $d->nombre,
+            'lat'      => (float) $d->lat_actual,
+            'lng'      => (float) $d->lng_actual,
+            'estado'   => $d->estado,
+            'vehiculo' => $d->vehiculo,
+            'placa'    => $d->placa,
+            'telefono' => $d->telefono,
+        ])->values()->toArray();
+        $tenantActual = app(\App\Services\TenantManager::class)->current();
+        $mapCenterLat = (float) ($tenantActual?->google_maps_centro_lat ?: 6.3414);
+        $mapCenterLng = (float) ($tenantActual?->google_maps_centro_lng ?: -75.5538);
+        $mapZoom      = (int) ($tenantActual?->google_maps_zoom ?: 12);
+    @endphp
+
+    <div x-data="{ abierto: (localStorage.getItem('despachos_mapa_abierto') ?? '1') === '1' }"
+         x-init="$watch('abierto', v => { localStorage.setItem('despachos_mapa_abierto', v ? '1' : '0'); if(v && window.initDespachosMapa) setTimeout(window.initDespachosMapa, 100); })"
          class="mb-6 rounded-2xl bg-white border border-slate-200 shadow-sm overflow-hidden">
         <button type="button" @click="abierto = !abierto"
                 class="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-50 transition">
@@ -646,13 +664,13 @@
                             En vivo
                         </span>
                     </h3>
-                    <p class="text-xs text-slate-500">Ubicación actual de todos los repartidores · rutas hacia sus pedidos asignados</p>
+                    <p class="text-xs text-slate-500">{{ $domisActivos->count() }} repartidor(es) con ubicación · se actualiza en tiempo real</p>
                 </div>
             </div>
             <div class="flex items-center gap-2">
                 <span class="hidden sm:inline-flex items-center gap-1.5 rounded-full bg-brand/10 text-brand px-3 py-1 text-xs font-bold">
                     <i class="fa-solid fa-motorcycle"></i>
-                    {{ $domiciliarios->where('estado','ocupado')->count() }} activos
+                    {{ $domiciliarios->where('estado','ocupado')->count() }} en ruta
                 </span>
                 <i class="fa-solid fa-chevron-down text-slate-400 transition-transform"
                    :class="abierto ? 'rotate-180' : ''"></i>
@@ -660,7 +678,126 @@
         </button>
 
         <div x-show="abierto" x-cloak x-transition class="border-t border-slate-100">
-            <livewire:domiciliarios.mapa />
+            @if(empty($googleMapsApiKey))
+                <div class="p-10 text-center">
+                    <i class="fa-solid fa-key text-3xl text-amber-400 mb-3"></i>
+                    <p class="text-sm font-bold text-slate-700">Google Maps no está configurado</p>
+                    <p class="text-xs text-slate-500">Configura la API key del tenant para ver el mapa en vivo.</p>
+                </div>
+            @elseif($domisActivos->isEmpty())
+                <div class="p-10 text-center">
+                    <i class="fa-solid fa-location-crosshairs text-3xl text-slate-300 mb-3"></i>
+                    <p class="text-sm font-bold text-slate-700">Aún no hay ubicaciones</p>
+                    <p class="text-xs text-slate-500">Los repartidores enviarán su ubicación cuando abran el portal en su celular.</p>
+                </div>
+            @else
+                <div id="mapaDespachosLive" style="width: 100%; height: 480px;"></div>
+
+                @push('scripts')
+                <script>
+                window._despachosDomis = @json($domisData);
+                window._despachosMapCfg = {
+                    centerLat: {{ $mapCenterLat }},
+                    centerLng: {{ $mapCenterLng }},
+                    zoom: {{ $mapZoom }},
+                };
+
+                window.initDespachosMapa = function() {
+                    const el = document.getElementById('mapaDespachosLive');
+                    if (!el || !window.google || !window.google.maps) return;
+                    if (el._mapaInit) return; // ya inicializado
+                    el._mapaInit = true;
+
+                    const cfg = window._despachosMapCfg;
+                    const map = new google.maps.Map(el, {
+                        center: { lat: cfg.centerLat, lng: cfg.centerLng },
+                        zoom: cfg.zoom,
+                        mapTypeControl: false,
+                        streetViewControl: false,
+                        fullscreenControl: true,
+                        styles: [
+                            { featureType: 'poi.business', stylers: [{ visibility: 'off' }] },
+                            { featureType: 'transit', stylers: [{ visibility: 'off' }] },
+                        ],
+                    });
+
+                    el._gmap = map;
+                    el._markers = {};
+                    const bounds = new google.maps.LatLngBounds();
+
+                    window._despachosDomis.forEach(d => {
+                        const colorEstado = d.estado === 'ocupado' ? '#ef4444' : (d.estado === 'disponible' ? '#10b981' : '#94a3b8');
+                        const marker = new google.maps.Marker({
+                            position: { lat: d.lat, lng: d.lng },
+                            map: map,
+                            title: d.nombre,
+                            label: { text: '🛵', fontSize: '24px' },
+                            icon: {
+                                path: google.maps.SymbolPath.CIRCLE,
+                                scale: 18,
+                                fillColor: colorEstado,
+                                fillOpacity: 0.95,
+                                strokeColor: '#fff',
+                                strokeWeight: 3,
+                            },
+                        });
+                        const info = new google.maps.InfoWindow({
+                            content: `
+                                <div style="font-family:system-ui;padding:4px 2px;min-width:200px">
+                                    <div style="font-weight:800;color:#1e293b;font-size:14px;margin-bottom:4px">
+                                        ${d.nombre}
+                                    </div>
+                                    <div style="font-size:12px;color:#64748b">
+                                        <i class="fa-solid fa-motorcycle"></i> ${d.vehiculo || 'Vehículo'} ${d.placa ? '· '+d.placa : ''}<br>
+                                        <i class="fa-solid fa-circle" style="color:${colorEstado};font-size:8px"></i>
+                                        ${d.estado}
+                                        ${d.telefono ? '<br>📞 '+d.telefono : ''}
+                                    </div>
+                                </div>
+                            `,
+                        });
+                        marker.addListener('click', () => info.open({ anchor: marker, map }));
+                        el._markers[d.id] = { marker, info };
+                        bounds.extend(marker.getPosition());
+                    });
+
+                    if (window._despachosDomis.length > 1) {
+                        map.fitBounds(bounds);
+                        if (map.getZoom() > 14) map.setZoom(14);
+                    } else if (window._despachosDomis.length === 1) {
+                        map.setCenter(window._despachosDomis[0]);
+                        map.setZoom(14);
+                    }
+                };
+
+                // Inicializar cuando Google Maps cargue
+                (function poll() {
+                    if (window.google && window.google.maps) {
+                        window.initDespachosMapa();
+                    } else {
+                        setTimeout(poll, 300);
+                    }
+                })();
+
+                // Reverb: escuchar cambios de ubicación
+                @if($tenantId = app(\App\Services\TenantManager::class)->id())
+                document.addEventListener('livewire:initialized', () => {
+                    if (window.Echo) {
+                        window.Echo.channel('domiciliarios.tenant.{{ $tenantId }}')
+                            .listen('.domiciliario.ubicacion', (data) => {
+                                const el = document.getElementById('mapaDespachosLive');
+                                if (!el || !el._markers) return;
+                                const m = el._markers[data.id];
+                                if (m && data.lat && data.lng) {
+                                    m.marker.setPosition({ lat: parseFloat(data.lat), lng: parseFloat(data.lng) });
+                                }
+                            });
+                    }
+                });
+                @endif
+                </script>
+                @endpush
+            @endif
         </div>
     </div>
 
