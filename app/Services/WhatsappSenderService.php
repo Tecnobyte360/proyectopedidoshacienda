@@ -157,27 +157,74 @@ class WhatsappSenderService
         $token = $this->obtenerToken($cred, $cacheKey);
         if (!$token) return false;
 
-        $payload = [
-            'number'   => $telefono,
-            'mediaUrl' => $imagenUrl,
-            'caption'  => $caption,
-        ];
-        if ($connectionId) $payload['whatsappId'] = $connectionId;
-
+        // 📎 TecnoByteApp / EstradaHubWhatsApp legacy: usa POST /api/messages/send
+        // con multipart/form-data y el archivo bajo el campo "medias" (array).
+        // NO acepta media_url como JSON — debe ser un attachment binario.
         try {
-            $endpoint = rtrim($cred['api_base_url'], '/') . '/api/messages/send-media';
-            $resp = Http::withoutVerifying()
+            // 1. Obtener bytes de la imagen (desde storage local si es nuestra URL, sino HTTP)
+            $bytes    = null;
+            $filename = 'image.jpg';
+            $mime     = 'image/jpeg';
+
+            $publicBase = config('app.url', '');
+            if ($publicBase && str_starts_with($imagenUrl, $publicBase)) {
+                // URL de nuestro propio storage → leer directamente del disco
+                $relativo = ltrim(str_replace($publicBase, '', $imagenUrl), '/');
+                if (str_starts_with($relativo, 'storage/')) {
+                    $pathDisco = substr($relativo, strlen('storage/'));
+                    if (\Illuminate\Support\Facades\Storage::disk('public')->exists($pathDisco)) {
+                        $bytes    = \Illuminate\Support\Facades\Storage::disk('public')->get($pathDisco);
+                        $filename = basename($pathDisco);
+                        $mime     = \Illuminate\Support\Facades\Storage::disk('public')->mimeType($pathDisco) ?: 'image/jpeg';
+                    }
+                }
+            }
+
+            // Fallback: descargar la URL externa
+            if ($bytes === null) {
+                $download = Http::withoutVerifying()->timeout(20)->get($imagenUrl);
+                if (!$download->successful()) {
+                    Log::warning('WA Sender imagen: no se pudo descargar URL', [
+                        'url' => $imagenUrl,
+                        'status' => $download->status(),
+                    ]);
+                    return false;
+                }
+                $bytes = $download->body();
+                $filename = basename(parse_url($imagenUrl, PHP_URL_PATH) ?: 'image.jpg');
+                $mime = $download->header('Content-Type') ?: 'image/jpeg';
+            }
+
+            // 2. POST multipart al endpoint correcto con el archivo como "medias"
+            $endpoint = rtrim($cred['api_base_url'], '/') . '/api/messages/send';
+            $request  = Http::withoutVerifying()
                 ->withToken($token)
-                ->timeout(30)
-                ->post($endpoint, $payload);
+                ->timeout(45)
+                ->attach('medias', $bytes, $filename, ['Content-Type' => $mime]);
+
+            $payload = [
+                'number' => $telefono,
+                'body'   => $caption,
+            ];
+            if ($connectionId) $payload['whatsappId'] = $connectionId;
+
+            $resp = $request->post($endpoint, $payload);
 
             $ok = $resp->successful();
             if (!$ok) {
                 Log::warning('WA Sender imagen legacy: falló', [
-                    'status' => $resp->status(),
-                    'body'   => mb_substr($resp->body(), 0, 300),
+                    'endpoint' => $endpoint,
+                    'status'   => $resp->status(),
+                    'body'     => mb_substr($resp->body(), 0, 300),
+                ]);
+            } else {
+                Log::info('WA Sender imagen legacy: enviada ✓', [
+                    'to' => $telefono,
+                    'filename' => $filename,
+                    'size' => strlen($bytes),
                 ]);
             }
+
             if ($ok && $persistirEnConversacion) {
                 $this->persistirEnConversacion(
                     $telefono,
@@ -188,7 +235,9 @@ class WhatsappSenderService
             }
             return $ok;
         } catch (\Throwable $e) {
-            Log::error('WA Sender imagen excepción: ' . $e->getMessage());
+            Log::error('WA Sender imagen excepción: ' . $e->getMessage(), [
+                'trace' => mb_substr($e->getTraceAsString(), 0, 500),
+            ]);
             return false;
         }
     }
