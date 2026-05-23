@@ -491,13 +491,17 @@ class Index extends Component
             'ventana_desde'      => $this->ventanaDesde . ':00',
             'ventana_hasta'      => $this->ventanaHasta . ':00',
             'programada_para'    => $this->programadaPara ?: null,
-            // 🚀 Estado automático:
-            //   - Con fecha programada → "programada" (cron la activará en su momento)
-            //   - Sin fecha programada → "corriendo" (envía YA, sin click manual)
+            // 🛡️ Estado automático SEGURO (nunca envía sin acción explícita):
+            //   - Con fecha programada → "programada" (cron la activa en su hora)
+            //   - Sin fecha programada → "borrador" (espera click manual en "Iniciar")
+            //
+            // ⚠️ El comportamiento previo era enviar YA sin fecha, lo cual causaba
+            // envíos accidentales al guardar. Ahora SIEMPRE requiere acción
+            // explícita: o programación, o click manual.
             'estado'             => $this->programadaPara
                 ? CampanaWhatsapp::ESTADO_PROGRAMADA
-                : CampanaWhatsapp::ESTADO_CORRIENDO,
-            'iniciada_at'        => $this->programadaPara ? null : now(),
+                : CampanaWhatsapp::ESTADO_BORRADOR,
+            'iniciada_at'        => null,  // se llena cuando arranque (cron o click)
             'creado_por'         => auth()->id(),
         ];
 
@@ -516,36 +520,31 @@ class Index extends Component
             // Si falla, no bloquear el guardado
         }
 
-        // 🚀 DISPATCH del job — se procesa en background por el queue worker
-        try {
-            if ($this->programadaPara) {
-                // Campaña programada → job con delay hasta la hora exacta
+        // 🚀 DISPATCH del job SOLO si está programada con fecha. Sin fecha
+        // queda en BORRADOR esperando click manual en "Iniciar" — el método
+        // iniciar() de este componente hace el dispatch en ese momento.
+        if ($this->programadaPara) {
+            try {
                 \App\Jobs\ProcesarCampanaJob::dispatch($c->id)
                     ->delay(\Carbon\Carbon::parse($this->programadaPara));
-            } else {
-                // Sin programar → procesa lo más pronto posible
-                \App\Jobs\ProcesarCampanaJob::dispatch($c->id);
+            } catch (\Throwable $e) {
+                // Si falla el dispatch, el cron campanas:procesar es la red de
+                // seguridad: rescata las "programada" cuya hora ya pasó.
+                \Illuminate\Support\Facades\Log::warning('No se pudo despachar ProcesarCampanaJob: ' . $e->getMessage());
             }
-        } catch (\Throwable $e) {
-            // Si falla el dispatch, no pasa nada: el cron campanas:procesar
-            // funciona como respaldo y la procesará en máximo 1 min.
-            \Illuminate\Support\Facades\Log::warning('No se pudo despachar ProcesarCampanaJob: ' . $e->getMessage());
         }
 
         $this->modal = false;
 
         // Mensaje contextual según lo que pasó
         if ($this->programadaPara) {
-            $msg = "Campaña guardada para enviar el " . \Carbon\Carbon::parse($this->programadaPara)->format('d/m/Y H:i') . " ({$c->total_destinatarios} destinatarios)";
+            $msg = "✅ Campaña programada para el " . \Carbon\Carbon::parse($this->programadaPara)->format('d/m/Y H:i') . " ({$c->total_destinatarios} destinatarios). Se enviará automáticamente a esa hora.";
             $type = 'success';
         } elseif ($c->total_destinatarios === 0) {
-            $msg = 'Campaña guardada pero sin destinatarios. Revisa la audiencia.';
-            $type = 'warning';
-        } elseif (!$c->enHorario()) {
-            $msg = "Campaña guardada con {$c->total_destinatarios} destinatarios. Estás fuera de la ventana horaria ({$c->ventana_desde} - {$c->ventana_hasta}): se enviará automáticamente cuando vuelva a estar dentro.";
+            $msg = '📝 Campaña guardada como BORRADOR pero sin destinatarios. Revisa la audiencia y luego haz clic en "Iniciar".';
             $type = 'warning';
         } else {
-            $msg = "Campaña iniciada con {$c->total_destinatarios} destinatarios. Procesará el primer lote en menos de 1 min.";
+            $msg = "📝 Campaña guardada como BORRADOR con {$c->total_destinatarios} destinatarios. Haz clic en \"Iniciar\" cuando quieras enviarla.";
             $type = 'success';
         }
 
