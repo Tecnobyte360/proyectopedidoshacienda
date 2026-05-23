@@ -285,7 +285,7 @@ class Index extends Component
                     ? round(($monitorEstadisticas['leyeron'] / $monitorEstadisticas['enviado']) * 100, 1)
                     : 0;
 
-                // Lista filtrada (últimos 50 con orden por actividad)
+                // Lista filtrada (últimos 100 con orden por actividad)
                 if ($this->filtroMonitor !== 'todos') {
                     $destinatariosQuery->where('estado', $this->filtroMonitor);
                 }
@@ -295,6 +295,23 @@ class Index extends Component
                     ->orderByDesc('id')
                     ->limit(100)
                     ->get();
+
+                // 🔍 Enriquecer cada destinatario con su ACK máximo (entregado/leído)
+                foreach ($monitorDestinatarios as $d) {
+                    if (!$d->enviado_at) {
+                        $d->ack_max = null;
+                        continue;
+                    }
+                    try {
+                        $d->ack_max = (int) \App\Models\MensajeWhatsapp::where('rol', 'assistant')
+                            ->whereHas('conversacion.cliente', fn ($q) => $q->where('telefono_normalizado', $d->telefono))
+                            ->where('created_at', '>=', \Carbon\Carbon::parse($d->enviado_at)->subMinutes(2))
+                            ->where('created_at', '<=', \Carbon\Carbon::parse($d->enviado_at)->addHours(24))
+                            ->max('ack');
+                    } catch (\Throwable $e) {
+                        $d->ack_max = null;
+                    }
+                }
             }
         }
 
