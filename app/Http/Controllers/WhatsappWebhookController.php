@@ -5430,6 +5430,16 @@ TXT;
    *   email       → orderData['email']
    *   metodo_pago → orderData['payment_method']
    */
+  /**
+   * 🌐 API pública: expuesta para que OrderValidatorAgent y otros servicios
+   * puedan reutilizar la misma lógica de validación deterministica sin
+   * duplicar las reglas (flujo_pedido_orden + ERP lookup + integraciones).
+   */
+  public function validarOrderDataPublic(array $orderData): array
+  {
+      return $this->validarDatosObligatoriosPedido($orderData);
+  }
+
   private function validarDatosObligatoriosPedido(array $orderData): array
   {
       $faltantes = [];

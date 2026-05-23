@@ -77,6 +77,25 @@ class RouterDeterminista
         // ── 1) AFIRMACIÓN EXPLÍCITA + RESUMEN PREVIO → CIERRE DIRECTO ───────
         if ($estado->estaCompleto() && !$estado->confirmado_at && $this->esAfirmacion($msgN)) {
             if ($this->ultimoMensajeBotPidioConfirmar($conv)) {
+
+                // 🛡️ OrderValidatorAgent: aunque el estado dice "completo" y el cliente
+                // afirma, validamos OBJECIONES en el mensaje actual ("Si pero yo no me
+                // llamo test") y consistencia del estado (envío perdido, etc).
+                try {
+                    $validation = app(OrderValidatorAgent::class)->validar($conv, $mensaje);
+                    if (!$validation['ready_to_close'] && !empty($validation['suggested_reply'])) {
+                        Log::info('🛡️ Router: cierre BLOQUEADO por validator', [
+                            'conv_id'     => $conv->id,
+                            'missing'     => $validation['missing_fields'],
+                            'objection'   => $validation['objection_reason'],
+                            'consistency' => $validation['consistency_alert'],
+                        ]);
+                        return ['accion' => 'reply', 'reply' => $validation['suggested_reply']];
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning('OrderValidatorAgent falló (no bloquea cierre): ' . $e->getMessage());
+                }
+
                 Log::info('🤖 Router: cliente afirmó confirmación tras resumen', ['conv_id' => $conv->id]);
                 return [
                     'accion'    => 'cerrar_pedido',
@@ -89,6 +108,23 @@ class RouterDeterminista
         // ── 2) ESTADO COMPLETO Y BOT NO HA MOSTRADO RESUMEN → mostrarlo ─────
         if ($estado->estaCompleto() && !$estado->confirmado_at && !$this->esAfirmacion($msgN)) {
             if (!$this->ultimoMensajeBotPidioConfirmar($conv)) {
+
+                // 🛡️ OrderValidatorAgent: valida ANTES de mostrar el resumen.
+                // Si faltan datos obligatorios, el bot los pide ANTES del resumen
+                // para evitar el flujo feo de "resumen → confirma → falta X → otro resumen".
+                try {
+                    $validation = app(OrderValidatorAgent::class)->validar($conv, $mensaje);
+                    if (!$validation['ready_to_summarize'] && !empty($validation['suggested_reply'])) {
+                        Log::info('🛡️ Router: resumen BLOQUEADO por validator', [
+                            'conv_id' => $conv->id,
+                            'missing' => $validation['missing_fields'],
+                        ]);
+                        return ['accion' => 'reply', 'reply' => $validation['suggested_reply']];
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning('OrderValidatorAgent falló (no bloquea resumen): ' . $e->getMessage());
+                }
+
                 Log::info('🤖 Router: estado completo — mostrando resumen', ['conv_id' => $conv->id]);
                 return ['accion' => 'reply', 'reply' => $this->construirResumenParaConfirmar($estado, $primerNombre)];
             }
