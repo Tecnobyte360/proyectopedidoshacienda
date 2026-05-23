@@ -174,11 +174,46 @@ class BotPromptInspectorService
             ? $config->system_prompt
             : BotPromptService::plantillaGenerica();
 
-        $prompt = $promptService->renderizar($base, $contexto);
+        // 💰 Replicar lógica de prompt-caching de getSystemPrompt():
+        // las vars volátiles se anulan en el cuerpo y van al footer detrás
+        // del marcador <<<CACHE_BREAK>>>.
+        $varsVolatiles = [
+            'fecha_actual', 'hora_actual', 'saludo_hora',
+            'sede_estado_actual',
+            'memoria_cliente', 'memoria_conversacion',
+            'historial_cliente',
+        ];
+        $contextoEstable = $contexto;
+        foreach ($varsVolatiles as $k) {
+            $contextoEstable[$k] = '';
+        }
+
+        $prompt = $promptService->renderizar($base, $contextoEstable);
 
         $extra = trim((string) ($config->instrucciones_extra ?? ''));
         if ($extra !== '') {
             $prompt .= "\n\n--- INSTRUCCIONES EXTRA ---\n" . $extra;
+        }
+
+        // Footer volátil (igual que el real)
+        $prompt .= "\n\n<<<CACHE_BREAK>>>\n\n"
+                 . "═══════════════════════════════════════════════════════════════════════════════\n"
+                 . "# 📅 CONTEXTO ACTUAL DEL TURNO (volátil — cambia cada mensaje)\n\n"
+                 . "Hoy es **" . ($contexto['fecha_actual'] ?? '') . "** ("
+                 . ($contexto['hora_actual'] ?? '') . "). Saludo: "
+                 . ($contexto['saludo_hora'] ?? '') . ".\n";
+
+        if (trim((string)($contexto['sede_estado_actual'] ?? '')) !== '') {
+            $prompt .= "\nEstado de la sede: **" . $contexto['sede_estado_actual'] . "**\n";
+        }
+        if (trim((string)($contexto['memoria_cliente'] ?? '')) !== '') {
+            $prompt .= "\n# 🧠 MEMORIA DEL CLIENTE\n" . $contexto['memoria_cliente'] . "\n";
+        }
+        if (trim((string)($contexto['memoria_conversacion'] ?? '')) !== '') {
+            $prompt .= "\n# 💬 MEMORIA DE LA CONVERSACIÓN\n" . $contexto['memoria_conversacion'] . "\n";
+        }
+        if (trim((string)($contexto['historial_cliente'] ?? '')) !== '') {
+            $prompt .= "\n# 📋 HISTORIAL DE PEDIDOS PREVIOS\n" . $contexto['historial_cliente'] . "\n";
         }
 
         return $prompt;
