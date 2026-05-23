@@ -63,7 +63,9 @@ class WatchdogConversacionesEstancadas extends Command
 
         $rescatadas = 0;
         foreach ($candidatas as $conv) {
-            $ultimoMsg = $conv->mensajes()
+            // ⚠️ withoutGlobalScopes(): la relación filtra por tenant scope.
+            $ultimoMsg = MensajeWhatsapp::withoutGlobalScopes()
+                ->where('conversacion_id', $conv->id)
                 ->orderByDesc('id')
                 ->first();
 
@@ -195,19 +197,40 @@ class WatchdogConversacionesEstancadas extends Command
             ->where('updated_at', '<=', now()->subSeconds($modoMinSegs))
             ->get();
 
+        Log::info('🐕 MODO 2 query devolvió convs:', [
+            'total'         => $convsBotPasmado->count(),
+            'ids'           => $convsBotPasmado->pluck('id')->all(),
+            'modoMaxMins'   => $modoMaxMins,
+            'modoMinSegs'   => $modoMinSegs,
+        ]);
+
         foreach ($convsBotPasmado as $conv) {
-            $ultimoMsg = $conv->mensajes()->orderByDesc('id')->first();
-            if (!$ultimoMsg) continue;
+            // ⚠️ withoutGlobalScopes(): la relación mensajes() también filtra por
+            // tenant scope y devuelve mensajes viejos si no hay tenant set.
+            $ultimoMsg = MensajeWhatsapp::withoutGlobalScopes()
+                ->where('conversacion_id', $conv->id)
+                ->orderByDesc('id')
+                ->first();
+            if (!$ultimoMsg) { Log::info("MODO2 conv {$conv->id}: skip — sin mensajes"); continue; }
 
             // ⚠️ Diferencia clave: aquí queremos que el ÚLTIMO mensaje sea del BOT
-            if ($ultimoMsg->rol !== MensajeWhatsapp::ROL_ASSISTANT) continue;
+            if ($ultimoMsg->rol !== MensajeWhatsapp::ROL_ASSISTANT) {
+                Log::info("MODO2 conv {$conv->id}: skip — último msg rol={$ultimoMsg->rol}");
+                continue;
+            }
 
             // Evitar loops si ya fue rescatado
-            if (str_starts_with((string) ($ultimoMsg->mensaje_externo_id ?? ''), 'watchdog_')) continue;
+            if (str_starts_with((string) ($ultimoMsg->mensaje_externo_id ?? ''), 'watchdog_')) {
+                Log::info("MODO2 conv {$conv->id}: skip — ya es watchdog_");
+                continue;
+            }
 
             // ¿El último mensaje del bot contiene una promesa sin cumplir?
             $contenido = (string) $ultimoMsg->contenido;
-            if (!preg_match(self::FRASES_ESPERA_REGEX, $contenido)) continue;
+            if (!preg_match(self::FRASES_ESPERA_REGEX, $contenido)) {
+                Log::info("MODO2 conv {$conv->id}: skip — no match regex en: " . mb_substr($contenido, 0, 60));
+                continue;
+            }
 
             $segundosDesde = abs((int) now()->diffInSeconds($ultimoMsg->created_at));
             $modoMaxSegs = $modoMaxMins * 60;
