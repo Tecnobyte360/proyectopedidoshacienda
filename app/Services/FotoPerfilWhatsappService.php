@@ -156,7 +156,9 @@ class FotoPerfilWhatsappService
     }
 
     /**
-     * Llama a POST /api/contact para obtener el contacto con profilePicUrl.
+     * Llama a GET /api/messages/contact/profile-pic?number=X para obtener
+     * la URL de foto del contacto desde EstradaHub. Endpoint custom que
+     * agregamos en mayo 2026 para Kivox.
      */
     private function consultarContacto(string $baseUrl, string $token, string $name, string $number): ?string
     {
@@ -164,13 +166,12 @@ class FotoPerfilWhatsappService
             $resp = Http::withoutVerifying()
                 ->withToken($token)
                 ->timeout(15)
-                ->post(rtrim($baseUrl, '/') . '/api/contact', [
-                    'name'   => $name,
+                ->get(rtrim($baseUrl, '/') . '/api/messages/contact/profile-pic', [
                     'number' => $number,
                 ]);
 
             if (!$resp->successful()) {
-                Log::info('📸 FotoPerfil: /api/contact respondió ' . $resp->status(), [
+                Log::info('📸 FotoPerfil: /api/messages/contact/profile-pic respondió ' . $resp->status(), [
                     'numero' => $number,
                     'body'   => mb_substr($resp->body(), 0, 200),
                 ]);
