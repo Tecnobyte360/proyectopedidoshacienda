@@ -172,152 +172,236 @@
              wire:poll.3s>
             <div class="w-full max-w-5xl bg-white rounded-2xl shadow-2xl my-8 overflow-hidden" @click.stop>
 
-                {{-- Header --}}
-                <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-sky-50 via-white to-emerald-50">
-                    <div class="flex items-center gap-3">
-                        <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-emerald-500 text-white shadow-lg">
-                            <i class="fa-solid fa-chart-line"></i>
-                        </div>
-                        <div>
-                            <h3 class="font-extrabold text-slate-800 flex items-center gap-2">
-                                {{ $monitorCampana->nombre }}
+                {{-- Header con gradient brand --}}
+                <div class="relative px-6 py-5 border-b border-slate-100 overflow-hidden"
+                     style="background: linear-gradient(135deg, rgba(16,185,129,0.08) 0%, rgba(5,150,105,0.04) 50%, rgba(255,255,255,1) 100%);">
+
+                    {{-- Decoración suave --}}
+                    <div class="absolute -top-20 -right-20 w-72 h-72 rounded-full bg-brand/5 blur-3xl"></div>
+
+                    <div class="relative flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-4">
+                            <div class="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-brand to-brand-dark text-white shadow-lg shadow-brand/30">
+                                <i class="fa-solid fa-chart-line text-xl"></i>
                                 @if($monitorCampana->estado === 'corriendo')
-                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 text-emerald-700 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider">
-                                        <span class="relative flex h-1.5 w-1.5">
-                                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                            <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                                    <span class="absolute -top-1 -right-1 flex h-3 w-3">
+                                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                        <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500 border-2 border-white"></span>
+                                    </span>
+                                @endif
+                            </div>
+                            <div>
+                                <h3 class="font-extrabold text-slate-800 text-lg leading-tight">{{ $monitorCampana->nombre }}</h3>
+                                <div class="flex items-center gap-2 mt-1">
+                                    @if($monitorCampana->estado === 'corriendo')
+                                        <span class="inline-flex items-center gap-1.5 rounded-full bg-brand/10 text-brand-dark px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+                                            <span class="h-1.5 w-1.5 rounded-full bg-brand animate-pulse"></span>
+                                            En vivo · 3s
                                         </span>
-                                        En vivo · actualiza cada 3s
+                                    @else
+                                        <span class="inline-flex items-center rounded-full bg-slate-100 text-slate-600 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+                                            ✓ {{ ucfirst($monitorCampana->estado) }}
+                                        </span>
+                                    @endif
+                                    <span class="text-xs text-slate-500">
+                                        Iniciada {{ $monitorCampana->iniciada_at?->diffForHumans() ?? '—' }}
+                                        @if($monitorCampana->completada_at)
+                                            · Finalizada {{ $monitorCampana->completada_at->diffForHumans() }}
+                                        @endif
                                     </span>
-                                @else
-                                    <span class="inline-flex items-center rounded-full bg-slate-100 text-slate-600 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider">
-                                        {{ ucfirst($monitorCampana->estado) }}
-                                    </span>
-                                @endif
-                            </h3>
-                            <p class="text-xs text-slate-500">
-                                {{ $monitorEstadisticas['total'] }} destinatarios ·
-                                Iniciada {{ $monitorCampana->iniciada_at?->diffForHumans() ?? '—' }}
-                                @if($monitorCampana->completada_at)
-                                    · Finalizada {{ $monitorCampana->completada_at->diffForHumans() }}
-                                @endif
-                            </p>
+                                </div>
+                            </div>
                         </div>
+                        <button wire:click="cerrarMonitor" class="h-10 w-10 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-500 hover:text-slate-700 transition flex items-center justify-center shadow-sm">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
                     </div>
-                    <button wire:click="cerrarMonitor" class="text-slate-400 hover:text-slate-700 transition">
-                        <i class="fa-solid fa-xmark text-xl"></i>
-                    </button>
                 </div>
 
-                <div class="p-6 space-y-5 max-h-[80vh] overflow-y-auto">
+                <div class="p-6 space-y-6 max-h-[80vh] overflow-y-auto bg-gradient-to-b from-white to-slate-50/30">
 
-                    {{-- KPIs grandes --}}
-                    <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                        <div class="rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 p-4 text-white shadow-sm">
-                            <div class="flex items-center justify-between mb-2">
-                                <span class="text-[10px] font-bold uppercase tracking-wider opacity-80">Enviados</span>
-                                <i class="fa-solid fa-circle-check"></i>
+                    {{-- KPI HERO (Respondieron) + KPIs secundarios --}}
+                    <div class="grid grid-cols-12 gap-3">
+
+                        {{-- ⭐ KPI HERO: Respondieron (la métrica MÁS importante) --}}
+                        <div class="col-span-12 sm:col-span-5 relative rounded-2xl p-5 text-white shadow-xl shadow-brand/20 overflow-hidden"
+                             style="background: linear-gradient(135deg, #10b981 0%, #047857 100%);">
+                            {{-- Decoración --}}
+                            <div class="absolute -right-8 -top-8 w-40 h-40 rounded-full bg-white/10"></div>
+                            <div class="absolute -right-12 -bottom-12 w-48 h-48 rounded-full bg-white/5"></div>
+
+                            <div class="relative">
+                                <div class="flex items-center justify-between mb-3">
+                                    <span class="text-xs font-bold uppercase tracking-widest opacity-90 flex items-center gap-1.5">
+                                        <i class="fa-solid fa-reply"></i> Respondieron
+                                    </span>
+                                    @if($monitorEstadisticas['enviado'] > 0)
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-white/20 backdrop-blur px-2 py-0.5 text-[10px] font-extrabold">
+                                            <i class="fa-solid fa-arrow-trend-up"></i>
+                                            {{ $monitorEstadisticas['tasa_respuesta'] ?? 0 }}%
+                                        </span>
+                                    @endif
+                                </div>
+                                <div class="flex items-end gap-3">
+                                    <div class="text-6xl font-black leading-none drop-shadow">
+                                        {{ $monitorEstadisticas['respondieron'] ?? 0 }}
+                                    </div>
+                                    <div class="text-xs opacity-90 pb-1">
+                                        de {{ $monitorEstadisticas['enviado'] }}<br>enviados
+                                    </div>
+                                </div>
+                                <p class="text-[11px] opacity-80 mt-3">
+                                    <i class="fa-solid fa-circle-info text-[9px]"></i>
+                                    Clientes que vieron y contestaron tu mensaje
+                                </p>
                             </div>
-                            <div class="text-3xl font-extrabold">{{ $monitorEstadisticas['enviado'] }}</div>
                         </div>
 
-                        {{-- ⭐ NUEVO: Respondieron --}}
-                        <div class="rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 p-4 text-white shadow-sm">
-                            <div class="flex items-center justify-between mb-2">
-                                <span class="text-[10px] font-bold uppercase tracking-wider opacity-90">Respondieron</span>
-                                <i class="fa-solid fa-reply"></i>
-                            </div>
-                            <div class="text-3xl font-extrabold">{{ $monitorEstadisticas['respondieron'] ?? 0 }}</div>
-                            <div class="text-[10px] opacity-80 mt-1">
-                                @if($monitorEstadisticas['enviado'] > 0)
-                                    {{ $monitorEstadisticas['tasa_respuesta'] ?? 0 }}% tasa respuesta
-                                @endif
-                            </div>
-                        </div>
+                        {{-- KPIs secundarios en grid --}}
+                        <div class="col-span-12 sm:col-span-7 grid grid-cols-2 gap-3">
 
-                        <div class="rounded-2xl bg-gradient-to-br from-rose-500 to-rose-600 p-4 text-white shadow-sm">
-                            <div class="flex items-center justify-between mb-2">
-                                <span class="text-[10px] font-bold uppercase tracking-wider opacity-80">Fallidos</span>
-                                <i class="fa-solid fa-circle-xmark"></i>
+                            {{-- Enviados --}}
+                            <div class="relative rounded-2xl bg-white border border-emerald-200 p-4 shadow-sm overflow-hidden">
+                                <div class="absolute top-0 right-0 w-20 h-20 bg-emerald-50 rounded-full blur-2xl"></div>
+                                <div class="relative">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-600">Enviados</span>
+                                        <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600">
+                                            <i class="fa-solid fa-check text-xs"></i>
+                                        </span>
+                                    </div>
+                                    <div class="text-3xl font-black text-slate-800">{{ $monitorEstadisticas['enviado'] }}</div>
+                                </div>
                             </div>
-                            <div class="text-3xl font-extrabold">{{ $monitorEstadisticas['fallido'] }}</div>
-                        </div>
-                        <div class="rounded-2xl bg-gradient-to-br from-amber-400 to-amber-500 p-4 text-white shadow-sm">
-                            <div class="flex items-center justify-between mb-2">
-                                <span class="text-[10px] font-bold uppercase tracking-wider opacity-90">Pendientes</span>
-                                <i class="fa-regular fa-clock"></i>
+
+                            {{-- Fallidos --}}
+                            <div class="relative rounded-2xl bg-white border border-rose-200 p-4 shadow-sm overflow-hidden">
+                                <div class="absolute top-0 right-0 w-20 h-20 bg-rose-50 rounded-full blur-2xl"></div>
+                                <div class="relative">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <span class="text-[10px] font-bold uppercase tracking-wider text-rose-600">Fallidos</span>
+                                        <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-rose-100 text-rose-600">
+                                            <i class="fa-solid fa-xmark text-xs"></i>
+                                        </span>
+                                    </div>
+                                    <div class="text-3xl font-black text-slate-800">{{ $monitorEstadisticas['fallido'] }}</div>
+                                </div>
                             </div>
-                            <div class="text-3xl font-extrabold">{{ $monitorEstadisticas['pendiente'] }}</div>
-                        </div>
-                        <div class="rounded-2xl bg-gradient-to-br from-slate-700 to-slate-900 p-4 text-white shadow-sm">
-                            <div class="flex items-center justify-between mb-2">
-                                <span class="text-[10px] font-bold uppercase tracking-wider opacity-80">Total</span>
-                                <i class="fa-solid fa-users"></i>
+
+                            {{-- Pendientes --}}
+                            <div class="relative rounded-2xl bg-white border border-amber-200 p-4 shadow-sm overflow-hidden">
+                                <div class="absolute top-0 right-0 w-20 h-20 bg-amber-50 rounded-full blur-2xl"></div>
+                                <div class="relative">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <span class="text-[10px] font-bold uppercase tracking-wider text-amber-600">Pendientes</span>
+                                        <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
+                                            <i class="fa-regular fa-clock text-xs"></i>
+                                        </span>
+                                    </div>
+                                    <div class="text-3xl font-black text-slate-800">{{ $monitorEstadisticas['pendiente'] }}</div>
+                                </div>
                             </div>
-                            <div class="text-3xl font-extrabold">{{ $monitorEstadisticas['total'] }}</div>
+
+                            {{-- Total --}}
+                            <div class="relative rounded-2xl bg-white border border-slate-200 p-4 shadow-sm overflow-hidden">
+                                <div class="absolute top-0 right-0 w-20 h-20 bg-slate-100 rounded-full blur-2xl"></div>
+                                <div class="relative">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-600">Audiencia</span>
+                                        <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
+                                            <i class="fa-solid fa-users text-xs"></i>
+                                        </span>
+                                    </div>
+                                    <div class="text-3xl font-black text-slate-800">{{ $monitorEstadisticas['total'] }}</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    {{-- Barra de progreso --}}
-                    <div>
-                        <div class="flex items-center justify-between mb-2 text-xs">
-                            <span class="font-bold text-slate-700">Progreso</span>
-                            <span class="font-extrabold text-emerald-600">{{ $monitorEstadisticas['pct'] }}%</span>
+                    {{-- Barra de progreso con brand --}}
+                    <div class="rounded-2xl bg-white border border-slate-200 p-5 shadow-sm">
+                        <div class="flex items-center justify-between mb-3">
+                            <div>
+                                <h4 class="text-sm font-extrabold text-slate-800">Progreso del envío</h4>
+                                <p class="text-xs text-slate-500 mt-0.5">
+                                    {{ $monitorEstadisticas['enviado'] + $monitorEstadisticas['fallido'] }} procesados de {{ $monitorEstadisticas['total'] }}
+                                </p>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-3xl font-black text-brand">{{ $monitorEstadisticas['pct'] }}%</div>
+                                <div class="text-[10px] text-slate-500 uppercase tracking-wider font-bold">completado</div>
+                            </div>
                         </div>
-                        <div class="w-full h-3 bg-slate-200 rounded-full overflow-hidden">
-                            <div class="h-full bg-gradient-to-r from-emerald-500 via-emerald-400 to-sky-500 rounded-full transition-all duration-500"
+                        <div class="relative w-full h-4 bg-slate-100 rounded-full overflow-hidden">
+                            <div class="absolute inset-y-0 left-0 rounded-full transition-all duration-500 shadow-inner"
+                                 style="width: {{ $monitorEstadisticas['pct'] }}%; background: linear-gradient(90deg, #10b981 0%, #34d399 50%, #6ee7b7 100%);">
+                            </div>
+                            {{-- Shine effect --}}
+                            <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent opacity-50 animate-pulse"
                                  style="width: {{ $monitorEstadisticas['pct'] }}%"></div>
                         </div>
-                        <p class="text-[10px] text-slate-500 mt-1 text-center">
-                            {{ $monitorEstadisticas['enviado'] + $monitorEstadisticas['fallido'] }} procesados de {{ $monitorEstadisticas['total'] }}
-                        </p>
                     </div>
 
-                    {{-- Filtros + acciones --}}
-                    <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
-                        <div class="flex items-center gap-1.5 flex-wrap">
-                            <button wire:click="$set('filtroMonitor', 'todos')"
-                                    class="rounded-lg px-3 py-1.5 text-xs font-bold transition
-                                           {{ $filtroMonitor === 'todos' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' }}">
-                                Todos
-                            </button>
-                            <button wire:click="$set('filtroMonitor', 'enviado')"
-                                    class="rounded-lg px-3 py-1.5 text-xs font-bold transition flex items-center gap-1
-                                           {{ $filtroMonitor === 'enviado' ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100' }}">
-                                <i class="fa-solid fa-check"></i> Enviados
-                            </button>
-                            <button wire:click="$set('filtroMonitor', 'fallido')"
-                                    class="rounded-lg px-3 py-1.5 text-xs font-bold transition flex items-center gap-1
-                                           {{ $filtroMonitor === 'fallido' ? 'bg-rose-600 text-white' : 'bg-rose-50 text-rose-700 hover:bg-rose-100' }}">
-                                <i class="fa-solid fa-xmark"></i> Fallidos
-                            </button>
-                            <button wire:click="$set('filtroMonitor', 'pendiente')"
-                                    class="rounded-lg px-3 py-1.5 text-xs font-bold transition flex items-center gap-1
-                                           {{ $filtroMonitor === 'pendiente' ? 'bg-amber-500 text-white' : 'bg-amber-50 text-amber-700 hover:bg-amber-100' }}">
-                                <i class="fa-regular fa-clock"></i> Pendientes
-                            </button>
+                    {{-- Filtros tipo pills + acción --}}
+                    <div class="rounded-2xl bg-white border border-slate-200 p-3 shadow-sm">
+                        <div class="flex flex-wrap items-center justify-between gap-3">
+                            <div class="inline-flex items-center bg-slate-50 rounded-xl p-1 gap-0.5 flex-wrap">
+                                <button wire:click="$set('filtroMonitor', 'todos')"
+                                        class="inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-bold transition
+                                               {{ $filtroMonitor === 'todos' ? 'bg-slate-900 text-white shadow' : 'text-slate-600 hover:bg-white' }}">
+                                    <i class="fa-solid fa-table-list text-[10px]"></i> Todos
+                                    <span class="text-[10px] {{ $filtroMonitor === 'todos' ? 'bg-white/25 text-white' : 'bg-slate-200 text-slate-700' }} rounded-full px-1.5 font-extrabold">{{ $monitorEstadisticas['total'] }}</span>
+                                </button>
+                                <button wire:click="$set('filtroMonitor', 'enviado')"
+                                        class="inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-bold transition
+                                               {{ $filtroMonitor === 'enviado' ? 'bg-brand text-white shadow' : 'text-emerald-700 hover:bg-white' }}">
+                                    <i class="fa-solid fa-check text-[10px]"></i> Enviados
+                                    <span class="text-[10px] {{ $filtroMonitor === 'enviado' ? 'bg-white/25 text-white' : 'bg-emerald-100 text-emerald-700' }} rounded-full px-1.5 font-extrabold">{{ $monitorEstadisticas['enviado'] }}</span>
+                                </button>
+                                <button wire:click="$set('filtroMonitor', 'fallido')"
+                                        class="inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-bold transition
+                                               {{ $filtroMonitor === 'fallido' ? 'bg-rose-600 text-white shadow' : 'text-rose-700 hover:bg-white' }}">
+                                    <i class="fa-solid fa-xmark text-[10px]"></i> Fallidos
+                                    <span class="text-[10px] {{ $filtroMonitor === 'fallido' ? 'bg-white/25 text-white' : 'bg-rose-100 text-rose-700' }} rounded-full px-1.5 font-extrabold">{{ $monitorEstadisticas['fallido'] }}</span>
+                                </button>
+                                <button wire:click="$set('filtroMonitor', 'pendiente')"
+                                        class="inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-bold transition
+                                               {{ $filtroMonitor === 'pendiente' ? 'bg-amber-500 text-white shadow' : 'text-amber-700 hover:bg-white' }}">
+                                    <i class="fa-regular fa-clock text-[10px]"></i> Pendientes
+                                    <span class="text-[10px] {{ $filtroMonitor === 'pendiente' ? 'bg-white/25 text-white' : 'bg-amber-100 text-amber-700' }} rounded-full px-1.5 font-extrabold">{{ $monitorEstadisticas['pendiente'] }}</span>
+                                </button>
+                            </div>
+                            @if($monitorEstadisticas['fallido'] > 0)
+                                <button wire:click="reintentarFallidos({{ $monitorCampana->id }})"
+                                        wire:confirm="¿Reintentar los {{ $monitorEstadisticas['fallido'] }} fallidos?"
+                                        class="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700 text-white text-xs font-bold px-4 py-2 transition shadow-md shadow-rose-200">
+                                    <i class="fa-solid fa-rotate-right"></i>
+                                    Reintentar ({{ $monitorEstadisticas['fallido'] }})
+                                </button>
+                            @endif
                         </div>
-                        @if($monitorEstadisticas['fallido'] > 0)
-                            <button wire:click="reintentarFallidos({{ $monitorCampana->id }})"
-                                    wire:confirm="¿Reintentar los {{ $monitorEstadisticas['fallido'] }} fallidos?"
-                                    class="inline-flex items-center gap-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold px-3 py-1.5 transition shadow-sm">
-                                <i class="fa-solid fa-rotate-right"></i>
-                                Reintentar fallidos ({{ $monitorEstadisticas['fallido'] }})
-                            </button>
-                        @endif
                     </div>
 
-                    {{-- Lista de destinatarios --}}
-                    <div class="rounded-xl border border-slate-200 overflow-hidden">
+                    {{-- Lista de destinatarios con estética premium --}}
+                    <div class="rounded-2xl bg-white border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="px-5 py-3 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white flex items-center justify-between">
+                            <h4 class="text-sm font-extrabold text-slate-800 flex items-center gap-2">
+                                <i class="fa-solid fa-list-ul text-brand"></i>
+                                Detalle de destinatarios
+                            </h4>
+                            <span class="text-[10px] uppercase tracking-wider font-bold text-slate-500">
+                                {{ $monitorDestinatarios->count() }} {{ $filtroMonitor !== 'todos' ? '· '.$filtroMonitor : '' }}
+                            </span>
+                        </div>
                         <table class="w-full text-sm">
-                            <thead class="bg-slate-50 text-[10px] uppercase tracking-wider text-slate-500 font-bold">
+                            <thead class="bg-slate-50/50 text-[10px] uppercase tracking-wider text-slate-500 font-bold border-b border-slate-100">
                                 <tr>
-                                    <th class="px-3 py-2 text-left">Estado</th>
-                                    <th class="px-3 py-2 text-left">Nombre</th>
-                                    <th class="px-3 py-2 text-left">Teléfono</th>
-                                    <th class="px-3 py-2 text-left">Enviado</th>
-                                    <th class="px-3 py-2 text-center">Respondió</th>
-                                    <th class="px-3 py-2 text-left">Detalle</th>
+                                    <th class="px-4 py-3 text-left">Estado</th>
+                                    <th class="px-4 py-3 text-left">Cliente</th>
+                                    <th class="px-4 py-3 text-left">Teléfono</th>
+                                    <th class="px-4 py-3 text-left">Enviado</th>
+                                    <th class="px-4 py-3 text-center">Respondió</th>
+                                    <th class="px-4 py-3 text-left">Detalle</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-100">
@@ -384,8 +468,12 @@
                     </div>
                 </div>
 
-                <div class="px-6 py-3 border-t border-slate-100 bg-slate-50 flex justify-end">
-                    <button wire:click="cerrarMonitor" class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                <div class="px-6 py-4 border-t border-slate-100 bg-gradient-to-r from-slate-50 to-white flex justify-between items-center">
+                    <p class="text-xs text-slate-500">
+                        <i class="fa-solid fa-shield-halved text-brand"></i>
+                        Anti-baneo activo · Lotes pausados automáticamente
+                    </p>
+                    <button wire:click="cerrarMonitor" class="rounded-xl bg-slate-900 hover:bg-slate-800 px-5 py-2 text-sm font-bold text-white transition shadow">
                         Cerrar
                     </button>
                 </div>
