@@ -36,13 +36,15 @@ class ProcesarCampanaJob implements ShouldQueue
     /** Timeout 5 min (suficiente para lotes grandes con sleeps) */
     public int $timeout = 300;
 
-    /** Cola específica: database (no sync) para que delays funcionen */
-    public string $connection = 'database';
-    public string $queue = 'campanas';
+    // ⚠️ NO redeclarar $connection/$queue como typed properties — el trait
+    // Queueable ya las define como mixed. Usamos el constructor para setearlas.
 
     public function __construct(int $campanaId)
     {
         $this->campanaId = $campanaId;
+        // Forzar uso de la cola database (no sync) para que delay() funcione
+        $this->onConnection('database');
+        $this->onQueue('campanas');
     }
 
     public function handle(CampanaSenderService $sender, TenantManager $tm): void
@@ -86,12 +88,13 @@ class ProcesarCampanaJob implements ShouldQueue
         $r = $sender->procesarLote($c);
         Log::info("ProcesarCampanaJob: campaña #{$c->id} → {$r['enviados']} enviados, {$r['fallidos']} fallidos, razón: {$r['razon']}");
 
-        // Si todavía hay pendientes, encolar otro job en 30s para seguir procesando
+        // Si todavía hay pendientes, encolar otro job para seguir procesando
         // (respeta el descanso entre lotes configurado)
         $c->refresh();
         if ($c->estado === CampanaWhatsapp::ESTADO_CORRIENDO && $c->total_pendientes > 0) {
             $delaySegundos = max(30, $c->descanso_lote_min * 60);
-            static::dispatch($c->id)->delay(now()->addSeconds($delaySegundos));
+            $job = (new static($c->id))->delay(now()->addSeconds($delaySegundos));
+            dispatch($job);
             Log::info("ProcesarCampanaJob: campaña #{$c->id} tiene {$c->total_pendientes} pendientes, próximo lote en {$delaySegundos}s");
         }
 
