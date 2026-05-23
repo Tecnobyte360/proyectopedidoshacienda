@@ -7132,16 +7132,45 @@ TXT;
                             return implode("\n", $lineas);
                         }
 
-                        // Crear cliente en SGI
-                        $okCrear = $clienteSrv->crear($integErp, $datosCrear);
-                        if (!$okCrear) {
-                            Log::error('❌ Falló creación de cliente en ERP', ['datos' => $datosCrear]);
-                            return "⚠️ Tuve un problema al registrarte en nuestro sistema. Intenta de nuevo en un momento o llama a la sede.";
+                        // Crear cliente en SGI (con captura de error para encolar si falla)
+                        $errorCrear = null;
+                        $okCrear = false;
+                        try {
+                            $okCrear = $clienteSrv->crear($integErp, $datosCrear);
+                        } catch (\Throwable $eCrear) {
+                            $errorCrear = $eCrear->getMessage();
                         }
 
-                        Log::info('✅ Cliente creado en SGI antes del pedido', [
-                            'cedula' => $orderData['cedula'],
-                        ]);
+                        if (!$okCrear) {
+                            // 🔄 ERP CAÍDO O ERROR — encolar para reintentar en background
+                            // y NO bloquear el flujo del cliente. El pedido se crea localmente
+                            // y se sincroniza con ERP cuando el ERP vuelva.
+                            Log::warning('⚠️ Creación de cliente en ERP falló — encolando para reintento', [
+                                'datos' => $datosCrear,
+                                'error' => $errorCrear,
+                            ]);
+
+                            try {
+                                app(\App\Services\ErpRetryQueueService::class)->encolarCrearCliente(
+                                    tenantId:        $conversacion->tenant_id,
+                                    integracionId:   $integErp->id,
+                                    datosCliente:    $datosCrear,
+                                    conversacionId:  $conversacion->id,
+                                    pedidoId:        null, // pedido se crea más abajo
+                                    telefono:        $datosCrear['telefono'] ?? $from,
+                                    errorOriginal:   $errorCrear ?: 'crear() devolvió false'
+                                );
+                            } catch (\Throwable $eEnq) {
+                                Log::error('💥 ErpRetryQueue::encolarCrearCliente falló: ' . $eEnq->getMessage());
+                            }
+
+                            // Continuar — NO retornar el mensaje genérico de error al cliente.
+                            // El pedido se crea localmente y el cliente recibe confirmación normal.
+                        } else {
+                            Log::info('✅ Cliente creado en SGI antes del pedido', [
+                                'cedula' => $orderData['cedula'],
+                            ]);
+                        }
                     } else {
                         Log::info('✅ Cliente ya existía en SGI', [
                             'cedula' => $orderData['cedula'],

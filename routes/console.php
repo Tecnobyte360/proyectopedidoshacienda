@@ -104,6 +104,16 @@ Schedule::command('integraciones:reintentar-export')
     ->withoutOverlapping(10)
     ->runInBackground();
 
+// 🔄 ErpRetryQueue — clientes/pedidos encolados cuando el ERP estaba caído.
+// Cada 5 min los reintenta con backoff exponencial hasta éxito o max 20 intentos.
+// Reemplaza el flujo viejo de "ERP cayó → pedido perdido" por
+// "ERP cayó → pedido guardado local → sincroniza después".
+Schedule::command('erp:procesar-cola')
+    ->everyFiveMinutes()
+    ->timezone('America/Bogota')
+    ->withoutOverlapping(10)
+    ->runInBackground();
+
 // 🛵 Auto-asignar domiciliario a pedidos a domicilio huerfanos (sin asignar).
 // Red de seguridad si el hook 'created' de Pedido no disparó. Cada 2 minutos.
 Schedule::command('pedidos:asignar-huerfanos')
