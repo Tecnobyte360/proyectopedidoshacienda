@@ -5440,6 +5440,32 @@ TXT;
       return $this->validarDatosObligatoriosPedido($orderData);
   }
 
+  /**
+   * Compara dos listas de productos y devuelve true si son IGUALES.
+   * Usado para detectar duplicados vs pedidos nuevos.
+   */
+  private function productosSonIguales(array $existentes, array $nuevos): bool
+  {
+      $normalizar = function ($lista) {
+          return collect($lista)
+              ->map(function ($p) {
+                  // soporta tanto rows de BD (nombre/cantidad) como orderData (name/quantity)
+                  $nombre = mb_strtolower(trim((string) ($p['name'] ?? $p['nombre'] ?? '')));
+                  $cantidad = (float) ($p['quantity'] ?? $p['cantidad'] ?? 0);
+                  return $nombre . '|' . number_format($cantidad, 2);
+              })
+              ->filter()
+              ->sort()
+              ->values()
+              ->all();
+      };
+
+      $a = $normalizar($existentes);
+      $b = $normalizar($nuevos);
+
+      return count($a) === count($b) && $a === $b;
+  }
+
   private function validarDatosObligatoriosPedido(array $orderData): array
   {
       $faltantes = [];
@@ -7185,20 +7211,48 @@ TXT;
         }
 
         // 🛡️ GUARD ANTI-DUPLICACIÓN POR BD (red de seguridad)
-        // Si el Cache se perdió (restart, expiración) pero el cliente confirma
-        // de nuevo o el bot dispara confirmar_pedido sobre un pedido que ya
-        // existe en BD (últimos 30 min, mismo teléfono, estado=nuevo),
-        // actualizamos los datos en vez de crear duplicado.
+        //
+        // Un cliente PUEDE pedir varias veces al día (legítimo). Solo bloqueamos
+        // si es claramente el MISMO pedido reactivado, no un pedido nuevo.
+        //
+        // Criterios para considerar "duplicado" (TODOS deben cumplirse):
+        //   1. Hay pedido del mismo teléfono en últimos 10 minutos
+        //   2. En estado 'nuevo' (NO 'confirmado', 'preparando', 'entregado' —
+        //      esos ya fueron procesados, cualquier nueva confirmación es PEDIDO NUEVO)
+        //   3. Y al menos UNA de:
+        //      a) El orderData NO trae productos (solo actualiza datos del cliente)
+        //      b) Los productos del orderData son IDÉNTICOS al pedido existente
+        //
+        // Si NO se cumple → flujo normal de creación.
         if (!Cache::has($confirmKey)) {
             try {
                 $pedidoReciente = Pedido::where('telefono_whatsapp', $telNorm)
-                    ->where('created_at', '>=', now()->subMinutes(30))
-                    ->whereIn('estado', ['nuevo', 'confirmado', 'preparando'])
+                    ->where('created_at', '>=', now()->subMinutes(10))
+                    ->where('estado', 'nuevo')
                     ->orderByDesc('id')
                     ->first();
 
+                $esDuplicadoOActualizacion = false;
                 if ($pedidoReciente) {
-                    Log::warning('🛡️ ANTI-DUPLICACIÓN: pedido reciente detectado en BD — actualizando en vez de duplicar', [
+                    $productosNuevos = $orderData['products'] ?? [];
+
+                    // (a) orderData SIN productos = es claramente actualización de datos
+                    if (empty($productosNuevos)) {
+                        $esDuplicadoOActualizacion = true;
+                    } else {
+                        // (b) Comparar productos: si son iguales → mismo pedido
+                        try {
+                            $productosExistentes = $pedidoReciente->productos()->get(['nombre', 'cantidad'])->toArray();
+                            $esDuplicadoOActualizacion = $this->productosSonIguales($productosExistentes, $productosNuevos);
+                        } catch (\Throwable $eProd) {
+                            // si falla la comparación, ser conservador y dejar crear
+                            $esDuplicadoOActualizacion = false;
+                        }
+                    }
+                }
+
+                if ($pedidoReciente && $esDuplicadoOActualizacion) {
+                    Log::warning('🛡️ ANTI-DUPLICACIÓN: pedido reciente con MISMOS productos — actualizando datos', [
                         'pedido_id' => $pedidoReciente->id,
                         'from'      => $from,
                         'edad_min'  => abs(\Carbon\Carbon::parse($pedidoReciente->created_at)->diffInMinutes(now())),
@@ -7233,6 +7287,14 @@ TXT;
                     $msg .= "\n\nCualquier consulta usa este número: *#{$pedidoReciente->id}*";
 
                     return $msg;
+                }
+
+                // Si pedido reciente existe pero con productos DISTINTOS → log y permitir crear
+                if ($pedidoReciente && !$esDuplicadoOActualizacion) {
+                    Log::info('📝 Cliente con pedido reciente PERO productos distintos — creando pedido nuevo', [
+                        'pedido_anterior_id' => $pedidoReciente->id,
+                        'from'               => $from,
+                    ]);
                 }
             } catch (\Throwable $e) {
                 Log::warning('Guard anti-duplicación falló (no bloquea creación): ' . $e->getMessage());
