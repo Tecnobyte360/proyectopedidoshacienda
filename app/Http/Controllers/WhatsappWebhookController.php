@@ -347,7 +347,7 @@ class WhatsappWebhookController extends Controller
         try {
             Log::info('✅ MENSAJE CLIENTE', compact('from', 'name', 'message', 'messageId', 'connectionId'));
 
-            $reply = $this->procesarMensaje($from, $name, $message, $connectionId);
+            $reply = $this->procesarMensaje($from, $name, $message, $connectionId, $messageId);
 
             // Si el reply está vacío, este request perdió el debounce — otro request
             // (el último mensaje del cliente) está procesando todo agrupado. Salir
@@ -630,7 +630,7 @@ class WhatsappWebhookController extends Controller
     |==========================================================================
     */
 
-    private function procesarMensaje(string $from, string $name, string $message, ?string $connectionId): string
+    private function procesarMensaje(string $from, string $name, string $message, ?string $connectionId, ?string $messageId = null): string
     {
         // ── CAPA -2: Kill switch global del bot ──────────────────────────────
         // Si el operador apagó el bot desde /configuracion/bot, NO responde a nadie.
