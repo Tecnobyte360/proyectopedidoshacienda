@@ -139,54 +139,73 @@
         </div>
     </div>
 
+    {{-- 📱 MODAL FLOTANTE del QR — no rompe el layout, aparece como overlay --}}
     @if ($showQr && $qrCode && in_array($status, ['qrcode', 'pairing']))
         <div
-            wire:key="qr-panel-{{ $qrHash }}"
-            class="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-4">
-            <div class="flex flex-col items-center gap-3 sm:flex-row sm:items-start sm:gap-6">
+            wire:key="qr-modal-{{ $qrHash }}"
+            class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/70 backdrop-blur-sm p-4"
+            wire:click.self="$set('showQr', false)">
 
-                <div class="flex shrink-0 flex-col items-center gap-2">
-                    <div class="rounded-xl border-4 border-white bg-white p-2 shadow-md">
-                        <img
-                            wire:key="qr-image-{{ $qrHash }}"
-                            src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=4&data={{ urlencode($qrCode) }}"
-                            alt="QR WhatsApp"
-                            width="200"
-                            height="200"
-                            class="rounded-lg"
-                        >
+            <div class="relative w-full max-w-md rounded-2xl bg-white shadow-2xl overflow-hidden"
+                 wire:click.stop>
+
+                {{-- Header del modal --}}
+                <div class="flex items-center justify-between border-b border-amber-100 bg-gradient-to-r from-amber-50 to-orange-50 px-4 py-3">
+                    <div class="flex items-center gap-2">
+                        <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500 text-white shadow">
+                            <i class="fa-solid fa-qrcode"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-bold text-amber-900">Vincular WhatsApp</h3>
+                            <p class="text-[11px] text-amber-700">Escanea con tu teléfono</p>
+                        </div>
                     </div>
-
-                    <span class="text-[10px] font-semibold uppercase tracking-wide text-amber-600">
-                        Escanea con WhatsApp
-                    </span>
+                    <button
+                        wire:click="$set('showQr', false)"
+                        type="button"
+                        class="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
                 </div>
 
-                <div class="flex-1">
-                    <h4 class="text-sm font-bold text-amber-800">¿Cómo reconectar?</h4>
+                {{-- Contenido --}}
+                <div class="p-5">
+                    <div class="flex flex-col items-center gap-3">
+                        <div class="rounded-xl border-4 border-white bg-white p-2 shadow-md ring-1 ring-amber-200">
+                            <img
+                                wire:key="qr-image-{{ $qrHash }}"
+                                src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=2&data={{ urlencode($qrCode) }}"
+                                alt="QR WhatsApp"
+                                width="180"
+                                height="180"
+                                class="rounded-md"
+                            >
+                        </div>
 
-                    <ol class="mt-2 space-y-1.5 text-xs text-amber-700">
+                        <span class="rounded-full bg-amber-100 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-700">
+                            Escanea con WhatsApp
+                        </span>
+                    </div>
+
+                    {{-- Pasos compactos --}}
+                    <ol class="mt-4 space-y-1.5 text-[12px] text-slate-700">
                         <li class="flex items-start gap-2">
                             <span class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-amber-500 text-[9px] font-bold text-white">1</span>
-                            Abre WhatsApp en tu teléfono.
+                            <span>Abre WhatsApp en tu teléfono</span>
                         </li>
                         <li class="flex items-start gap-2">
                             <span class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-amber-500 text-[9px] font-bold text-white">2</span>
-                            Ve a <strong>Dispositivos vinculados</strong> → <strong>Vincular dispositivo</strong>.
+                            <span><strong>Dispositivos vinculados</strong> → <strong>Vincular dispositivo</strong></span>
                         </li>
                         <li class="flex items-start gap-2">
                             <span class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-amber-500 text-[9px] font-bold text-white">3</span>
-                            Escanea el código QR que aparece a la izquierda.
-                        </li>
-                        <li class="flex items-start gap-2">
-                            <span class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-amber-500 text-[9px] font-bold text-white">4</span>
-                            El sistema verificará automáticamente la reconexión.
+                            <span>Apunta la cámara al QR</span>
                         </li>
                     </ol>
 
-                    <div class="mt-3 flex items-center gap-1.5 rounded-lg border border-amber-200 bg-white/70 px-3 py-2 text-[11px] text-amber-700">
+                    <div class="mt-4 flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-700">
                         <i class="fa-solid fa-circle-info text-amber-500"></i>
-                        El QR expira en pocos minutos. Si expiró, presiona <strong class="ml-1">Nuevo QR</strong>.
+                        <span>El QR expira en pocos minutos. Si expiró, presiona <strong>Nuevo QR</strong>.</span>
                     </div>
                 </div>
             </div>
