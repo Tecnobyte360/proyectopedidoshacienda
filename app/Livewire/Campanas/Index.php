@@ -87,8 +87,9 @@ class Index extends Component
     public int    $intervaloMaxSeg   = 20;
     public int    $loteTamano        = 50;
     public int    $descansoLoteMin   = 30;
-    public string $ventanaDesde      = '08:00';
-    public string $ventanaHasta      = '20:00';
+    // ⏰ Por defecto 24/7 (cualquier hora). El usuario puede restringir si quiere.
+    public string $ventanaDesde      = '00:00';
+    public string $ventanaHasta      = '23:59';
 
     public ?string $programadaPara = null;
 
@@ -332,8 +333,9 @@ class Index extends Component
         $this->intervaloMaxSeg = 20;
         $this->loteTamano      = 50;
         $this->descansoLoteMin = 30;
-        $this->ventanaDesde    = '08:00';
-        $this->ventanaHasta    = '20:00';
+        // Por defecto 24/7 — puede enviarse a cualquier hora
+        $this->ventanaDesde    = '00:00';
+        $this->ventanaHasta    = '23:59';
         $this->modal = true;
     }
 
@@ -353,8 +355,8 @@ class Index extends Component
         $this->intervaloMaxSeg  = $c->intervalo_max_seg;
         $this->loteTamano       = $c->lote_tamano;
         $this->descansoLoteMin  = $c->descanso_lote_min;
-        $this->ventanaDesde     = substr($c->ventana_desde ?: '08:00:00', 0, 5);
-        $this->ventanaHasta     = substr($c->ventana_hasta ?: '20:00:00', 0, 5);
+        $this->ventanaDesde     = substr($c->ventana_desde ?: '00:00:00', 0, 5);
+        $this->ventanaHasta     = substr($c->ventana_hasta ?: '23:59:00', 0, 5);
         $this->programadaPara   = $c->programada_para?->format('Y-m-d\TH:i');
         $this->mediaUrlExistente= $c->media_url;
         $this->imagen           = null;
