@@ -194,7 +194,7 @@ class ConversationRescueAgent
                     'tenant_id'       => $conv->tenant_id,
                     'telefono'        => $telefono,
                     'cliente'         => $cliente,
-                    'severidad'       => \App\Models\BotAlerta::SEV_ALTA,
+                    'severidad'       => \App\Models\BotAlerta::SEV_CRITICA,
                     'link'            => $linkChat,
                 ]
             );
