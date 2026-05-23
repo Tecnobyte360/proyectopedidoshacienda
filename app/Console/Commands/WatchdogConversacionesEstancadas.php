@@ -48,7 +48,9 @@ class WatchdogConversacionesEstancadas extends Command
         $cooldownMin = max(1,  min(180, (int) ($cfgGlobal->watchdog_cooldown_conv_min ?? 30)));
 
         // Ventana configurable. Mensajes >X min YA NO se rescatan (evita spam).
-        $candidatas = ConversacionWhatsapp::query()
+        // ⚠️ withoutGlobalScopes(): el comando corre desde scheduler SIN tenant
+        // set, el global scope BelongsToTenant filtra a 0 sin esto.
+        $candidatas = ConversacionWhatsapp::withoutGlobalScopes()
             ->where('updated_at', '>=', now()->subMinutes($maxMins + 5))
             ->where('updated_at', '<=', now()->subSeconds(25))
             ->whereHas('mensajes', function ($q) use ($minSegs, $maxMins) {
@@ -183,7 +185,7 @@ class WatchdogConversacionesEstancadas extends Command
         // ("un momento", "déjame buscar") y >30s después no envió nada,
         // forzamos al bot a retomar inyectando un mensaje virtual.
         $rescatadasBot = 0;
-        $convsBotPasmado = ConversacionWhatsapp::query()
+        $convsBotPasmado = ConversacionWhatsapp::withoutGlobalScopes()
             ->where('updated_at', '>=', now()->subMinutes($maxMins + 5))
             ->where('updated_at', '<=', now()->subSeconds($minSegs))
             ->get();
@@ -224,6 +226,7 @@ class WatchdogConversacionesEstancadas extends Command
 
             Log::warning('🐕 Watchdog MODO 2: BOT PASMADO — re-disparando flujo', [
                 'conversacion_id' => $conv->id,
+                'tenant_id'       => $conv->tenant_id,
                 'telefono'        => $conv->telefono_normalizado,
                 'segundos_desde'  => $segundosDesde,
                 'frase'           => mb_substr($contenido, 0, 100),
