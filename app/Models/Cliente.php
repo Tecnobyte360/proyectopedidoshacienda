@@ -17,6 +17,9 @@ class Cliente extends Model
         'tenant_id',
         'nombre',
         'profile_pic_url',
+        'foto_url',
+        'foto_actualizada_at',
+        'foto_origen',
         'pais_codigo',
         'telefono',
         'telefono_normalizado',
@@ -44,6 +47,7 @@ class Cliente extends Model
     protected $casts = [
         'preferencias'             => 'array',
         'activo'                   => 'boolean',
+        'foto_actualizada_at'      => 'datetime',
         'lat'                      => 'float',
         'lng'                      => 'float',
         'total_pedidos'            => 'integer',
@@ -134,6 +138,11 @@ class Cliente extends Model
             ) {
                 $cliente->update(['nombre' => $nombreLimpio]);
             }
+
+            // 📸 Auto-sync de foto si no la tiene o lleva >7 días sin actualizar.
+            // El job va a background, NO bloquea el flujo del webhook.
+            self::dispatchFotoSyncSiNecesario($cliente);
+
             return $cliente;
         }
 
@@ -149,7 +158,7 @@ class Cliente extends Model
         // Si el nombre no parece persona, usar fallback genérico (no contaminar el ERP)
         $nombreInicial = $pareceNombre ? $nombreLimpio : 'Cliente';
 
-        return self::create([
+        $nuevoCliente = self::create([
             'nombre'               => $nombreInicial,
             'pais_codigo'          => $paisCodigo,
             'telefono'             => $telefonoCorto,
@@ -157,6 +166,61 @@ class Cliente extends Model
             'canal_origen'         => $canalOrigen,
             'activo'               => true,
         ]);
+
+        // 📸 Cliente nuevo → sincronizar foto desde WhatsApp en background
+        self::dispatchFotoSyncSiNecesario($nuevoCliente);
+
+        return $nuevoCliente;
+    }
+
+    /**
+     * 📸 Dispatch del job de sincronización si el cliente:
+     *   - No tiene foto y nunca se intentó (foto_actualizada_at = null)
+     *   - O la foto está vieja (>7 días)
+     *
+     * No-op si el cliente NO viene del canal WhatsApp.
+     */
+    private static function dispatchFotoSyncSiNecesario(self $cliente): void
+    {
+        try {
+            // Solo aplica a clientes con teléfono de WhatsApp real
+            if (empty($cliente->telefono_normalizado)) return;
+            $solo = preg_replace('/\D+/', '', $cliente->telefono_normalizado);
+            if (strlen($solo) < 8 || str_starts_with($cliente->telefono_normalizado, 'w')) {
+                return; // ID de widget chat — skip
+            }
+
+            $necesita = empty($cliente->foto_actualizada_at)
+                || $cliente->foto_actualizada_at->isBefore(now()->subDays(7));
+
+            if (!$necesita) return;
+
+            \App\Jobs\SincronizarFotoClienteJob::dispatch($cliente->id);
+        } catch (\Throwable $e) {
+            \Log::warning('📸 dispatch foto sync falló: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * 🖼️ Accessor: URL pública del avatar.
+     * Si el cliente NO tiene foto sincronizada, devuelve un fallback
+     * con iniciales (ui-avatars.com — sin dependencias adicionales).
+     */
+    public function getAvatarUrlAttribute(): string
+    {
+        if (!empty($this->foto_url)) {
+            return $this->foto_url;
+        }
+
+        $nombre = trim((string) ($this->nombre ?: 'Cliente'));
+        $iniciales = collect(explode(' ', $nombre))
+            ->filter()
+            ->take(2)
+            ->map(fn ($p) => mb_strtoupper(mb_substr($p, 0, 1)))
+            ->implode('');
+
+        return 'https://ui-avatars.com/api/?name=' . urlencode($iniciales ?: 'CL')
+            . '&background=10b981&color=fff&size=128&bold=true';
     }
 
     /**

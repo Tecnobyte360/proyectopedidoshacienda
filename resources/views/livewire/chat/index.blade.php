@@ -116,11 +116,16 @@
                               {{ $isActiva ? 'bg-amber-50' : ($tieneNoLeidos ? 'bg-emerald-50/40' : '') }}">
 
                     <div class="relative flex-shrink-0">
-                        @if($c->cliente?->profile_pic_url)
-                            <img src="{{ $c->cliente->profile_pic_url }}"
+                        @php
+                            // 📸 Foto del cliente: usar foto_url local (descargada de WA), o fallback
+                            $fotoCliente = $c->cliente?->foto_url ?: $c->cliente?->profile_pic_url;
+                        @endphp
+                        @if($fotoCliente)
+                            <img src="{{ $fotoCliente }}"
                                  class="h-12 w-12 rounded-full object-cover bg-slate-100"
                                  onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
-                                 alt="avatar">
+                                 alt="avatar"
+                                 loading="lazy">
                             <div class="h-12 w-12 rounded-full bg-gradient-to-br from-brand to-brand-secondary text-white font-bold items-center justify-center" style="display:none;">
                                 {{ $iniciales ?: 'C' }}
                             </div>
