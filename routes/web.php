@@ -62,6 +62,68 @@ Route::post('/logout', [AuthController::class, 'logout'])
 | RUTAS AUTENTICADAS — protegidas con permisos
 |--------------------------------------------------------------------------
 */
+// 📱 Ruta pública para escanear QR de WhatsApp del tenant actual
+// (sin auth porque a veces necesitas verlo en cel sin login)
+Route::get('/wa-qr/{tenantId?}', function ($tenantId = null) {
+    try {
+        $tenant = $tenantId
+            ? \App\Models\Tenant::withoutGlobalScopes()->find($tenantId)
+            : \App\Models\Tenant::withoutGlobalScopes()->where('slug', 'la-hacienda')->first();
+
+        if (!$tenant) abort(404, 'Tenant no encontrado');
+
+        app(\App\Services\TenantManager::class)->set($tenant);
+        $resolver = app(\App\Services\WhatsappResolverService::class);
+        $cred = $resolver->credenciales();
+        $token = $resolver->token();
+        $ids = $resolver->connectionIdsDelTenant();
+        $connId = $ids[0] ?? null;
+        if (!$connId) abort(404, 'Sin conexión configurada');
+
+        $base = rtrim($cred['api_base_url'] ?? '', '/');
+        $resp = \Illuminate\Support\Facades\Http::withoutVerifying()
+            ->withToken($token)->timeout(10)
+            ->get("{$base}/whatsapp/{$connId}");
+        $data = $resp->json();
+
+        return view('wa-qr', [
+            'tenant'  => $tenant,
+            'status'  => $data['status'] ?? '?',
+            'qrcode'  => $data['qrcode'] ?? null,
+            'phone'   => $data['phoneNumber'] ?? null,
+            'battery' => $data['battery'] ?? null,
+            'connId'  => $connId,
+        ]);
+    } catch (\Throwable $e) {
+        return response('Error: ' . $e->getMessage(), 500);
+    }
+});
+
+// 🔄 Endpoint para regenerar QR (DELETE + POST session)
+Route::post('/wa-qr/{tenantId}/regenerar', function ($tenantId) {
+    try {
+        $tenant = \App\Models\Tenant::withoutGlobalScopes()->find($tenantId);
+        if (!$tenant) abort(404);
+
+        app(\App\Services\TenantManager::class)->set($tenant);
+        $resolver = app(\App\Services\WhatsappResolverService::class);
+        $cred = $resolver->credenciales();
+        $token = $resolver->token();
+        $ids = $resolver->connectionIdsDelTenant();
+        $connId = $ids[0] ?? null;
+        if (!$connId) abort(404);
+
+        $base = rtrim($cred['api_base_url'] ?? '', '/');
+        \Illuminate\Support\Facades\Http::withoutVerifying()->withToken($token)->timeout(15)->delete("{$base}/whatsappsession/{$connId}");
+        sleep(2);
+        \Illuminate\Support\Facades\Http::withoutVerifying()->withToken($token)->timeout(15)->post("{$base}/whatsappsession/{$connId}");
+
+        return redirect("/wa-qr/{$tenantId}");
+    } catch (\Throwable $e) {
+        return response('Error: ' . $e->getMessage(), 500);
+    }
+});
+
 Route::middleware(['auth'])->group(function () {
 
 Route::get('/', function () {
