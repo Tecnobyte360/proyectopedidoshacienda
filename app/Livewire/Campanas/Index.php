@@ -250,12 +250,39 @@ class Index extends Component
                     ? (int) round((($monitorEstadisticas['enviado'] + $monitorEstadisticas['fallido']) / $monitorEstadisticas['total']) * 100)
                     : 0;
 
-                // 📩 Métrica de respuestas: cuántos destinatarios respondieron tras la campaña
+                // 📩 Respondieron: contestaron al mensaje (certeza 100%)
                 $monitorEstadisticas['respondieron'] = (int) \App\Models\CampanaDestinatario::where('campana_id', $monitorCampana->id)
                     ->whereNotNull('respondio_at')
                     ->count();
+
+                // 👁️ Leyeron: ACK >= 3 en algún mensaje saliente al teléfono después del envío
+                // O respondieron (si respondieron, obvio leyeron)
+                $telefonosEnviados = \App\Models\CampanaDestinatario::where('campana_id', $monitorCampana->id)
+                    ->where('estado', 'enviado')
+                    ->pluck('enviado_at', 'telefono');
+
+                $leyeron = 0;
+                $entregados = 0;
+                foreach ($telefonosEnviados as $telefono => $enviadoAt) {
+                    try {
+                        $maxAck = \App\Models\MensajeWhatsapp::where('rol', 'assistant')
+                            ->whereHas('conversacion.cliente', fn ($q) => $q->where('telefono_normalizado', $telefono))
+                            ->where('created_at', '>=', \Carbon\Carbon::parse($enviadoAt)->subMinutes(2))
+                            ->where('created_at', '<=', \Carbon\Carbon::parse($enviadoAt)->addHours(24))
+                            ->max('ack');
+                        if ($maxAck >= 3) $leyeron++;
+                        if ($maxAck >= 2) $entregados++;
+                    } catch (\Throwable $e) { /* skip */ }
+                }
+                // Si respondieron, también cuentan como leyeron (lo cual implica que también entregaron)
+                $monitorEstadisticas['leyeron']    = max($leyeron, $monitorEstadisticas['respondieron']);
+                $monitorEstadisticas['entregados'] = max($entregados, $monitorEstadisticas['leyeron']);
+
                 $monitorEstadisticas['tasa_respuesta'] = $monitorEstadisticas['enviado'] > 0
                     ? round(($monitorEstadisticas['respondieron'] / $monitorEstadisticas['enviado']) * 100, 1)
+                    : 0;
+                $monitorEstadisticas['tasa_lectura'] = $monitorEstadisticas['enviado'] > 0
+                    ? round(($monitorEstadisticas['leyeron'] / $monitorEstadisticas['enviado']) * 100, 1)
                     : 0;
 
                 // Lista filtrada (últimos 50 con orden por actividad)

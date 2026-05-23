@@ -170,7 +170,7 @@
              style="background: rgba(15,23,42,0.55); backdrop-filter: blur(4px);"
              wire:click.self="cerrarMonitor"
              wire:poll.3s>
-            <div class="w-full max-w-5xl bg-white rounded-2xl shadow-2xl my-8 overflow-hidden" @click.stop>
+            <div class="w-full max-w-7xl bg-white rounded-2xl shadow-2xl my-8 overflow-hidden" @click.stop>
 
                 {{-- Header con gradient brand --}}
                 <div class="relative px-6 py-5 border-b border-slate-100 overflow-hidden"
@@ -220,16 +220,46 @@
 
                 <div class="p-6 space-y-6 max-h-[80vh] overflow-y-auto bg-gradient-to-b from-white to-slate-50/30">
 
-                    {{-- KPI HERO (Respondieron) + KPIs secundarios --}}
-                    <div class="grid grid-cols-12 gap-3">
+                    {{-- 📊 3 KPI HERO + 3 KPI secundarios --}}
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
-                        {{-- ⭐ KPI HERO: Respondieron (la métrica MÁS importante) --}}
-                        <div class="col-span-12 sm:col-span-5 relative rounded-2xl p-5 text-white shadow-xl shadow-brand/20 overflow-hidden"
+                        {{-- 👁️ HERO 1: LEYERON --}}
+                        <div class="relative rounded-2xl p-5 text-white shadow-xl shadow-violet-500/20 overflow-hidden"
+                             style="background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);">
+                            <div class="absolute -right-12 -top-12 w-48 h-48 rounded-full bg-white/10"></div>
+                            <div class="absolute -left-8 -bottom-8 w-32 h-32 rounded-full bg-white/5"></div>
+                            <div class="relative">
+                                <div class="flex items-center justify-between mb-3">
+                                    <span class="text-xs font-bold uppercase tracking-widest opacity-90 flex items-center gap-1.5">
+                                        <i class="fa-solid fa-eye"></i> Leyeron
+                                    </span>
+                                    @if($monitorEstadisticas['enviado'] > 0)
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-white/20 backdrop-blur px-2 py-0.5 text-[10px] font-extrabold">
+                                            <i class="fa-solid fa-check-double"></i>
+                                            {{ $monitorEstadisticas['tasa_lectura'] ?? 0 }}%
+                                        </span>
+                                    @endif
+                                </div>
+                                <div class="flex items-end gap-3">
+                                    <div class="text-6xl font-black leading-none drop-shadow">
+                                        {{ $monitorEstadisticas['leyeron'] ?? 0 }}
+                                    </div>
+                                    <div class="text-xs opacity-90 pb-2">
+                                        de {{ $monitorEstadisticas['enviado'] }}<br>enviados
+                                    </div>
+                                </div>
+                                <p class="text-[11px] opacity-80 mt-3 leading-snug">
+                                    <i class="fa-solid fa-circle-info text-[9px]"></i>
+                                    Abrieron el chat y vieron tu mensaje (✓✓ azul)
+                                </p>
+                            </div>
+                        </div>
+
+                        {{-- 💬 HERO 2: RESPONDIERON (brand color) --}}
+                        <div class="relative rounded-2xl p-5 text-white shadow-xl shadow-brand/20 overflow-hidden"
                              style="background: linear-gradient(135deg, #10b981 0%, #047857 100%);">
-                            {{-- Decoración --}}
-                            <div class="absolute -right-8 -top-8 w-40 h-40 rounded-full bg-white/10"></div>
-                            <div class="absolute -right-12 -bottom-12 w-48 h-48 rounded-full bg-white/5"></div>
-
+                            <div class="absolute -right-12 -top-12 w-48 h-48 rounded-full bg-white/10"></div>
+                            <div class="absolute -left-8 -bottom-8 w-32 h-32 rounded-full bg-white/5"></div>
                             <div class="relative">
                                 <div class="flex items-center justify-between mb-3">
                                     <span class="text-xs font-bold uppercase tracking-widest opacity-90 flex items-center gap-1.5">
@@ -246,74 +276,101 @@
                                     <div class="text-6xl font-black leading-none drop-shadow">
                                         {{ $monitorEstadisticas['respondieron'] ?? 0 }}
                                     </div>
-                                    <div class="text-xs opacity-90 pb-1">
+                                    <div class="text-xs opacity-90 pb-2">
                                         de {{ $monitorEstadisticas['enviado'] }}<br>enviados
                                     </div>
                                 </div>
-                                <p class="text-[11px] opacity-80 mt-3">
+                                <p class="text-[11px] opacity-80 mt-3 leading-snug">
                                     <i class="fa-solid fa-circle-info text-[9px]"></i>
-                                    Clientes que vieron y contestaron tu mensaje
+                                    Contestaron al mensaje (engagement real)
                                 </p>
                             </div>
                         </div>
 
-                        {{-- KPIs secundarios en grid --}}
-                        <div class="col-span-12 sm:col-span-7 grid grid-cols-2 gap-3">
-
-                            {{-- Enviados --}}
-                            <div class="relative rounded-2xl bg-white border border-emerald-200 p-4 shadow-sm overflow-hidden">
-                                <div class="absolute top-0 right-0 w-20 h-20 bg-emerald-50 rounded-full blur-2xl"></div>
-                                <div class="relative">
-                                    <div class="flex items-center justify-between mb-2">
-                                        <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-600">Enviados</span>
-                                        <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600">
-                                            <i class="fa-solid fa-check text-xs"></i>
+                        {{-- ✅ HERO 3: ENTREGADOS --}}
+                        <div class="relative rounded-2xl p-5 text-white shadow-xl shadow-sky-500/20 overflow-hidden"
+                             style="background: linear-gradient(135deg, #0ea5e9 0%, #0369a1 100%);">
+                            <div class="absolute -right-12 -top-12 w-48 h-48 rounded-full bg-white/10"></div>
+                            <div class="absolute -left-8 -bottom-8 w-32 h-32 rounded-full bg-white/5"></div>
+                            <div class="relative">
+                                <div class="flex items-center justify-between mb-3">
+                                    <span class="text-xs font-bold uppercase tracking-widest opacity-90 flex items-center gap-1.5">
+                                        <i class="fa-solid fa-check-circle"></i> Entregados
+                                    </span>
+                                    @if($monitorEstadisticas['enviado'] > 0)
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-white/20 backdrop-blur px-2 py-0.5 text-[10px] font-extrabold">
+                                            <i class="fa-solid fa-mobile-screen"></i>
+                                            {{ round(($monitorEstadisticas['entregados'] / max($monitorEstadisticas['enviado'], 1)) * 100, 1) }}%
                                         </span>
-                                    </div>
-                                    <div class="text-3xl font-black text-slate-800">{{ $monitorEstadisticas['enviado'] }}</div>
+                                    @endif
                                 </div>
+                                <div class="flex items-end gap-3">
+                                    <div class="text-6xl font-black leading-none drop-shadow">
+                                        {{ $monitorEstadisticas['entregados'] ?? 0 }}
+                                    </div>
+                                    <div class="text-xs opacity-90 pb-2">
+                                        de {{ $monitorEstadisticas['enviado'] }}<br>enviados
+                                    </div>
+                                </div>
+                                <p class="text-[11px] opacity-80 mt-3 leading-snug">
+                                    <i class="fa-solid fa-circle-info text-[9px]"></i>
+                                    Llegaron al teléfono del destinatario (✓✓)
+                                </p>
                             </div>
+                        </div>
+                    </div>
 
-                            {{-- Fallidos --}}
-                            <div class="relative rounded-2xl bg-white border border-rose-200 p-4 shadow-sm overflow-hidden">
-                                <div class="absolute top-0 right-0 w-20 h-20 bg-rose-50 rounded-full blur-2xl"></div>
-                                <div class="relative">
-                                    <div class="flex items-center justify-between mb-2">
-                                        <span class="text-[10px] font-bold uppercase tracking-wider text-rose-600">Fallidos</span>
-                                        <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-rose-100 text-rose-600">
-                                            <i class="fa-solid fa-xmark text-xs"></i>
-                                        </span>
-                                    </div>
-                                    <div class="text-3xl font-black text-slate-800">{{ $monitorEstadisticas['fallido'] }}</div>
+                    {{-- 📊 KPIs secundarios --}}
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div class="relative rounded-2xl bg-white border border-emerald-200 p-4 shadow-sm overflow-hidden">
+                            <div class="absolute top-0 right-0 w-20 h-20 bg-emerald-50 rounded-full blur-2xl"></div>
+                            <div class="relative">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-600">Enviados</span>
+                                    <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600">
+                                        <i class="fa-solid fa-paper-plane text-xs"></i>
+                                    </span>
                                 </div>
+                                <div class="text-3xl font-black text-slate-800">{{ $monitorEstadisticas['enviado'] }}</div>
                             </div>
+                        </div>
 
-                            {{-- Pendientes --}}
-                            <div class="relative rounded-2xl bg-white border border-amber-200 p-4 shadow-sm overflow-hidden">
-                                <div class="absolute top-0 right-0 w-20 h-20 bg-amber-50 rounded-full blur-2xl"></div>
-                                <div class="relative">
-                                    <div class="flex items-center justify-between mb-2">
-                                        <span class="text-[10px] font-bold uppercase tracking-wider text-amber-600">Pendientes</span>
-                                        <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
-                                            <i class="fa-regular fa-clock text-xs"></i>
-                                        </span>
-                                    </div>
-                                    <div class="text-3xl font-black text-slate-800">{{ $monitorEstadisticas['pendiente'] }}</div>
+                        <div class="relative rounded-2xl bg-white border border-rose-200 p-4 shadow-sm overflow-hidden">
+                            <div class="absolute top-0 right-0 w-20 h-20 bg-rose-50 rounded-full blur-2xl"></div>
+                            <div class="relative">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="text-[10px] font-bold uppercase tracking-wider text-rose-600">Fallidos</span>
+                                    <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-rose-100 text-rose-600">
+                                        <i class="fa-solid fa-xmark text-xs"></i>
+                                    </span>
                                 </div>
+                                <div class="text-3xl font-black text-slate-800">{{ $monitorEstadisticas['fallido'] }}</div>
                             </div>
+                        </div>
 
-                            {{-- Total --}}
-                            <div class="relative rounded-2xl bg-white border border-slate-200 p-4 shadow-sm overflow-hidden">
-                                <div class="absolute top-0 right-0 w-20 h-20 bg-slate-100 rounded-full blur-2xl"></div>
-                                <div class="relative">
-                                    <div class="flex items-center justify-between mb-2">
-                                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-600">Audiencia</span>
-                                        <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
-                                            <i class="fa-solid fa-users text-xs"></i>
-                                        </span>
-                                    </div>
-                                    <div class="text-3xl font-black text-slate-800">{{ $monitorEstadisticas['total'] }}</div>
+                        <div class="relative rounded-2xl bg-white border border-amber-200 p-4 shadow-sm overflow-hidden">
+                            <div class="absolute top-0 right-0 w-20 h-20 bg-amber-50 rounded-full blur-2xl"></div>
+                            <div class="relative">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="text-[10px] font-bold uppercase tracking-wider text-amber-600">Pendientes</span>
+                                    <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
+                                        <i class="fa-regular fa-clock text-xs"></i>
+                                    </span>
                                 </div>
+                                <div class="text-3xl font-black text-slate-800">{{ $monitorEstadisticas['pendiente'] }}</div>
+                            </div>
+                        </div>
+
+                        <div class="relative rounded-2xl bg-white border border-slate-200 p-4 shadow-sm overflow-hidden">
+                            <div class="absolute top-0 right-0 w-20 h-20 bg-slate-100 rounded-full blur-2xl"></div>
+                            <div class="relative">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="text-[10px] font-bold uppercase tracking-wider text-slate-600">Audiencia</span>
+                                    <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
+                                        <i class="fa-solid fa-users text-xs"></i>
+                                    </span>
+                                </div>
+                                <div class="text-3xl font-black text-slate-800">{{ $monitorEstadisticas['total'] }}</div>
                             </div>
                         </div>
                     </div>
