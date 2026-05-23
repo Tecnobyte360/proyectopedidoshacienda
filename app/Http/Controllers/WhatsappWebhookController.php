@@ -7184,6 +7184,61 @@ TXT;
             }
         }
 
+        // 🛡️ GUARD ANTI-DUPLICACIÓN POR BD (red de seguridad)
+        // Si el Cache se perdió (restart, expiración) pero el cliente confirma
+        // de nuevo o el bot dispara confirmar_pedido sobre un pedido que ya
+        // existe en BD (últimos 30 min, mismo teléfono, estado=nuevo),
+        // actualizamos los datos en vez de crear duplicado.
+        if (!Cache::has($confirmKey)) {
+            try {
+                $pedidoReciente = Pedido::where('telefono_whatsapp', $telNorm)
+                    ->where('created_at', '>=', now()->subMinutes(30))
+                    ->whereIn('estado', ['nuevo', 'confirmado', 'preparando'])
+                    ->orderByDesc('id')
+                    ->first();
+
+                if ($pedidoReciente) {
+                    Log::warning('🛡️ ANTI-DUPLICACIÓN: pedido reciente detectado en BD — actualizando en vez de duplicar', [
+                        'pedido_id' => $pedidoReciente->id,
+                        'from'      => $from,
+                        'edad_min'  => abs(\Carbon\Carbon::parse($pedidoReciente->created_at)->diffInMinutes(now())),
+                    ]);
+
+                    // Actualizar datos del cliente si vienen nuevos en orderData
+                    $cambios = [];
+                    $nuevoNombre = trim((string) ($orderData['customer_name'] ?? ''));
+                    if ($nuevoNombre !== '' && $nuevoNombre !== $pedidoReciente->customer_name && mb_strtolower($nuevoNombre) !== 'test') {
+                        $cambios['customer_name'] = $nuevoNombre;
+                    }
+                    $nuevoEmail = trim((string) ($orderData['email'] ?? ''));
+                    if ($nuevoEmail !== '' && $nuevoEmail !== ($pedidoReciente->email ?? '')) {
+                        $cambios['email'] = $nuevoEmail;
+                    }
+
+                    if (!empty($cambios)) {
+                        $pedidoReciente->update($cambios);
+                        Log::info('✅ Pedido actualizado con nuevos datos', [
+                            'pedido_id' => $pedidoReciente->id,
+                            'cambios'   => array_keys($cambios),
+                        ]);
+                    }
+
+                    $totalFmt = '$' . number_format((float) $pedidoReciente->total, 0, ',', '.');
+                    $saludo = $nuevoNombre !== '' ? " {$nuevoNombre}" : '';
+
+                    $msg = "Listo{$saludo} 🙌 Tu pedido #{$pedidoReciente->id} ya está registrado por *{$totalFmt}*.";
+                    if (!empty($cambios)) {
+                        $msg .= "\n\nActualicé tus datos correctamente ✅";
+                    }
+                    $msg .= "\n\nCualquier consulta usa este número: *#{$pedidoReciente->id}*";
+
+                    return $msg;
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Guard anti-duplicación falló (no bloquea creación): ' . $e->getMessage());
+            }
+        }
+
         if (Cache::has($confirmKey)) {
             // El cliente acaba de confirmar un pedido. Traemos el último pedido
             // para darle una respuesta útil y no un mensaje genérico.
