@@ -77,6 +77,16 @@
                 {{ $coPendientes }}
             </span>
         </button>
+        <button type="button" wire:click="$set('tab', 'erp')"
+                class="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition
+                       {{ $tab === 'erp' ? 'bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow' : 'text-slate-600 hover:bg-slate-50' }}">
+            <i class="fa-solid fa-database text-[12px]"></i>
+            ERP Queue
+            <span class="inline-flex items-center justify-center min-w-[20px] h-[20px] px-1.5 rounded-full text-[10px] font-bold
+                         {{ $tab === 'erp' ? 'bg-white/25 text-white' : ($erpPendientes > 0 ? 'bg-amber-200 text-amber-800 animate-pulse' : 'bg-amber-100 text-amber-700') }}">
+                {{ $erpPendientes }}
+            </span>
+        </button>
     </div>
 
     @if($tab === 'llm')
@@ -834,6 +844,211 @@
                 </table>
             </div>
         @endif
+    </div>
+
+    @elseif($tab === 'erp')
+
+    {{-- ═════════════════════════════════════════════════════════════
+         🔄 TAB ERP RETRY QUEUE
+         Pedidos/clientes que fallaron al sincronizar con el ERP
+         (SQL Server caído) y se están reintentando en background.
+         ═════════════════════════════════════════════════════════════ --}}
+    <div class="space-y-5">
+
+        {{-- ─── KPIs principales ─── --}}
+        <div class="grid grid-cols-2 md:grid-cols-6 gap-3">
+            <div class="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                <div class="text-xs uppercase tracking-wide text-amber-700 font-bold flex items-center gap-1">
+                    <i class="fa-solid fa-hourglass-half"></i> Pendientes
+                </div>
+                <div class="text-3xl font-black text-amber-900 mt-1">{{ $erpPendientes }}</div>
+                <div class="text-[11px] text-amber-700 mt-1">esperando reintento</div>
+            </div>
+            <div class="rounded-2xl border border-orange-200 bg-orange-50 p-4">
+                <div class="text-xs uppercase tracking-wide text-orange-700 font-bold flex items-center gap-1">
+                    <i class="fa-solid fa-bolt"></i> Listos ahora
+                </div>
+                <div class="text-3xl font-black text-orange-900 mt-1">{{ $erpReady }}</div>
+                <div class="text-[11px] text-orange-700 mt-1">próximo intento ya pasó</div>
+            </div>
+            <div class="rounded-2xl border border-blue-200 bg-blue-50 p-4">
+                <div class="text-xs uppercase tracking-wide text-blue-700 font-bold flex items-center gap-1">
+                    <i class="fa-solid fa-spinner"></i> Procesando
+                </div>
+                <div class="text-3xl font-black text-blue-900 mt-1">{{ $erpProcesando }}</div>
+                <div class="text-[11px] text-blue-700 mt-1">en ejecución</div>
+            </div>
+            <div class="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                <div class="text-xs uppercase tracking-wide text-emerald-700 font-bold flex items-center gap-1">
+                    <i class="fa-solid fa-circle-check"></i> Completados 24h
+                </div>
+                <div class="text-3xl font-black text-emerald-900 mt-1">{{ $erpCompletados24h }}</div>
+                <div class="text-[11px] text-emerald-700 mt-1">sincronizados con ERP</div>
+            </div>
+            <div class="rounded-2xl border border-rose-200 bg-rose-50 p-4">
+                <div class="text-xs uppercase tracking-wide text-rose-700 font-bold flex items-center gap-1">
+                    <i class="fa-solid fa-circle-exclamation"></i> Máx alcanzado
+                </div>
+                <div class="text-3xl font-black text-rose-900 mt-1">{{ $erpFallidosMax }}</div>
+                <div class="text-[11px] text-rose-700 mt-1">requieren intervención manual</div>
+            </div>
+            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div class="text-xs uppercase tracking-wide text-slate-700 font-bold flex items-center gap-1">
+                    <i class="fa-solid fa-clock"></i> Próximo intento
+                </div>
+                <div class="text-sm font-bold text-slate-900 mt-1">
+                    @if($erpProximoIntento)
+                        {{ \Carbon\Carbon::parse($erpProximoIntento)->diffForHumans() }}
+                    @else
+                        —
+                    @endif
+                </div>
+                <div class="text-[11px] text-slate-600 mt-1">scheduler corre c/5min</div>
+            </div>
+        </div>
+
+        {{-- ─── Acciones ─── --}}
+        <div class="rounded-2xl border border-slate-200 bg-white p-4 flex flex-wrap items-center justify-between gap-3">
+            <div class="text-sm text-slate-600">
+                <i class="fa-solid fa-circle-info text-amber-500"></i>
+                Cuando el ERP cae (SQL Server, timeout, deadlock), los clientes/pedidos se
+                encolan aquí y se reintentan automáticamente con <strong>backoff exponencial</strong>
+                (5min → 10min → 20min → 40min → 1h máx, hasta 20 intentos).
+            </div>
+            <div class="flex items-center gap-2">
+                <button type="button" wire:click="erpProcesarTodos"
+                        class="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 px-3 py-2 text-xs font-bold text-white shadow hover:shadow-lg transition">
+                    <i class="fa-solid fa-play"></i>
+                    Procesar todos ahora
+                </button>
+                <button type="button" wire:click="erpLimpiarHistorico"
+                        wire:confirm="¿Eliminar items completados/descartados con más de 7 días?"
+                        class="inline-flex items-center gap-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 px-3 py-2 text-xs font-bold text-slate-700 transition">
+                    <i class="fa-solid fa-broom"></i>
+                    Limpiar histórico >7d
+                </button>
+            </div>
+        </div>
+
+        {{-- ─── Tabla de items recientes ─── --}}
+        <div class="rounded-2xl border border-slate-200 bg-white overflow-hidden">
+            <div class="px-4 py-3 border-b border-slate-200 bg-slate-50">
+                <h3 class="text-sm font-bold text-slate-700 flex items-center gap-2">
+                    <i class="fa-solid fa-list-check text-amber-600"></i>
+                    Últimos 50 items de la cola
+                </h3>
+            </div>
+
+            @if($erpUltimos->isEmpty())
+                <div class="p-8 text-center text-slate-500">
+                    <i class="fa-solid fa-check-circle text-4xl text-emerald-400 mb-2"></i>
+                    <p class="text-sm">No hay items en la cola. Todo está sincronizado ✨</p>
+                </div>
+            @else
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-600">
+                            <tr>
+                                <th class="px-3 py-2 text-left">#</th>
+                                <th class="px-3 py-2 text-left">Tipo</th>
+                                <th class="px-3 py-2 text-left">Tenant</th>
+                                <th class="px-3 py-2 text-left">Pedido / Datos</th>
+                                <th class="px-3 py-2 text-left">Estado</th>
+                                <th class="px-3 py-2 text-center">Intentos</th>
+                                <th class="px-3 py-2 text-left">Próximo intento</th>
+                                <th class="px-3 py-2 text-left">Último error</th>
+                                <th class="px-3 py-2 text-right">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            @foreach($erpUltimos as $p)
+                                <tr class="hover:bg-slate-50">
+                                    <td class="px-3 py-2 text-slate-500 font-mono text-[11px]">{{ $p->id }}</td>
+                                    <td class="px-3 py-2">
+                                        @if($p->tipo === \App\Models\ErpPedidoPendiente::TIPO_CLIENTE_CREAR)
+                                            <span class="inline-flex items-center gap-1 rounded-md bg-violet-100 text-violet-800 px-2 py-0.5 text-[10px] font-bold">
+                                                <i class="fa-solid fa-user-plus"></i> Crear cliente
+                                            </span>
+                                        @else
+                                            <span class="inline-flex items-center gap-1 rounded-md bg-blue-100 text-blue-800 px-2 py-0.5 text-[10px] font-bold">
+                                                <i class="fa-solid fa-file-export"></i> Exportar pedido
+                                            </span>
+                                        @endif
+                                    </td>
+                                    <td class="px-3 py-2 text-slate-700">
+                                        {{ $p->tenant?->nombre ?? 'tenant#' . $p->tenant_id }}
+                                    </td>
+                                    <td class="px-3 py-2 text-slate-700">
+                                        @if($p->pedido_id)
+                                            <a href="{{ url('/pedidos/' . $p->pedido_id) }}"
+                                               class="text-blue-600 hover:underline font-bold">#{{ $p->pedido_id }}</a>
+                                        @endif
+                                        @if(!empty($p->payload['cedula']))
+                                            <div class="text-[11px] text-slate-500">
+                                                Céd: {{ $p->payload['cedula'] }}
+                                                @if(!empty($p->payload['nombre']))
+                                                    · {{ $p->payload['nombre'] }}
+                                                @endif
+                                            </div>
+                                        @endif
+                                    </td>
+                                    <td class="px-3 py-2">
+                                        @php
+                                            $badge = match($p->estado) {
+                                                'pendiente'   => 'bg-amber-100 text-amber-800',
+                                                'procesando'  => 'bg-blue-100 text-blue-800 animate-pulse',
+                                                'completado'  => 'bg-emerald-100 text-emerald-800',
+                                                'fallido_max' => 'bg-rose-100 text-rose-800',
+                                                'descartado'  => 'bg-slate-200 text-slate-700',
+                                                default       => 'bg-slate-100 text-slate-700',
+                                            };
+                                        @endphp
+                                        <span class="inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-bold uppercase {{ $badge }}">
+                                            {{ $p->estado }}
+                                        </span>
+                                    </td>
+                                    <td class="px-3 py-2 text-center text-slate-700">
+                                        <span class="font-bold">{{ $p->intentos }}</span>
+                                        <span class="text-slate-400">/ {{ $p->max_intentos }}</span>
+                                    </td>
+                                    <td class="px-3 py-2 text-[11px] text-slate-600">
+                                        @if($p->proximo_intento_at && $p->estado === 'pendiente')
+                                            {{ \Carbon\Carbon::parse($p->proximo_intento_at)->diffForHumans() }}
+                                        @elseif($p->completado_at)
+                                            <span class="text-emerald-700">✓ {{ \Carbon\Carbon::parse($p->completado_at)->diffForHumans() }}</span>
+                                        @else
+                                            —
+                                        @endif
+                                    </td>
+                                    <td class="px-3 py-2 text-[11px] text-slate-600 max-w-[280px]">
+                                        @if($p->ultimo_error)
+                                            <span title="{{ $p->ultimo_error }}" class="text-rose-700">
+                                                {{ \Illuminate\Support\Str::limit($p->ultimo_error, 80) }}
+                                            </span>
+                                        @endif
+                                    </td>
+                                    <td class="px-3 py-2 text-right">
+                                        @if(in_array($p->estado, ['pendiente', 'fallido_max']))
+                                            <button type="button" wire:click="erpReintentar({{ $p->id }})"
+                                                    class="inline-flex items-center gap-1 rounded-lg bg-amber-100 hover:bg-amber-200 px-2 py-1 text-[10px] font-bold text-amber-800 mr-1"
+                                                    title="Reintentar ahora">
+                                                <i class="fa-solid fa-rotate-right"></i>
+                                            </button>
+                                            <button type="button" wire:click="erpDescartar({{ $p->id }})"
+                                                    wire:confirm="¿Descartar este item? No se reintentará más."
+                                                    class="inline-flex items-center gap-1 rounded-lg bg-rose-100 hover:bg-rose-200 px-2 py-1 text-[10px] font-bold text-rose-700"
+                                                    title="Descartar">
+                                                <i class="fa-solid fa-trash"></i>
+                                            </button>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
+        </div>
     </div>
 
     @endif

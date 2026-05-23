@@ -12,7 +12,7 @@ use Livewire\Attributes\Computed;
 class Llm extends Component
 {
     public int $minutos = 30;  // Ventana de análisis
-    public string $tab = 'llm';  // 'llm' | 'watchdog' | 'agente' | 'envivo' | 'cola'
+    public string $tab = 'llm';  // 'llm' | 'watchdog' | 'agente' | 'envivo' | 'cola' | 'erp'
 
     // 📬 Parámetros editables de cola de salida
     public bool $coActiva = true;
@@ -123,6 +123,74 @@ class Llm extends Component
                 'updated_at' => now(),
             ]);
         $this->dispatch('notify', ['type' => 'success', 'message' => 'Mensaje descartado.']);
+    }
+
+    /**
+     * 🔄 ERP — reintentar manualmente un item de la cola ahora mismo.
+     */
+    public function erpReintentar(int $id): void
+    {
+        try {
+            \App\Models\ErpPedidoPendiente::withoutGlobalScopes()
+                ->where('id', $id)
+                ->whereIn('estado', [
+                    \App\Models\ErpPedidoPendiente::ESTADO_PENDIENTE,
+                    \App\Models\ErpPedidoPendiente::ESTADO_FALLIDO_MAX,
+                ])
+                ->update([
+                    'estado'             => \App\Models\ErpPedidoPendiente::ESTADO_PENDIENTE,
+                    'proximo_intento_at' => now()->subSecond(),
+                    'updated_at'         => now(),
+                ]);
+
+            \Artisan::call('erp:procesar-cola', ['--limit' => 5]);
+            $this->dispatch('notify', ['type' => 'success', 'message' => 'Reintento ejecutado.']);
+        } catch (\Throwable $e) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Error: ' . $e->getMessage()]);
+        }
+    }
+
+    /**
+     * 🗑️ ERP — descartar un item (marcar como descartado, no se reintenta).
+     */
+    public function erpDescartar(int $id): void
+    {
+        \App\Models\ErpPedidoPendiente::withoutGlobalScopes()
+            ->where('id', $id)
+            ->update([
+                'estado'        => \App\Models\ErpPedidoPendiente::ESTADO_DESCARTADO,
+                'ultimo_error'  => 'Descartado manualmente desde panel',
+                'updated_at'    => now(),
+            ]);
+        $this->dispatch('notify', ['type' => 'success', 'message' => 'Item descartado.']);
+    }
+
+    /**
+     * 🧹 ERP — limpiar items completados/descartados antiguos (>7 días).
+     */
+    public function erpLimpiarHistorico(): void
+    {
+        $borrados = \App\Models\ErpPedidoPendiente::withoutGlobalScopes()
+            ->whereIn('estado', [
+                \App\Models\ErpPedidoPendiente::ESTADO_COMPLETADO,
+                \App\Models\ErpPedidoPendiente::ESTADO_DESCARTADO,
+            ])
+            ->where('updated_at', '<', now()->subDays(7))
+            ->delete();
+        $this->dispatch('notify', ['type' => 'success', 'message' => "Eliminados {$borrados} registros antiguos."]);
+    }
+
+    /**
+     * ▶️ ERP — procesar TODOS los pendientes ahora (no esperar al scheduler).
+     */
+    public function erpProcesarTodos(): void
+    {
+        try {
+            \Artisan::call('erp:procesar-cola', ['--limit' => 100]);
+            $this->dispatch('notify', ['type' => 'success', 'message' => '✅ Cola procesada — refresca para ver resultados.']);
+        } catch (\Throwable $e) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Error: ' . $e->getMessage()]);
+        }
     }
 
     /**
@@ -256,6 +324,29 @@ class Llm extends Component
             ->groupBy('connection_id')
             ->get();
 
+        // 🔄 ERP RETRY QUEUE — KPIs e items recientes
+        $erpQuery = \App\Models\ErpPedidoPendiente::withoutGlobalScopes();
+        $erpPendientes      = (clone $erpQuery)->where('estado', \App\Models\ErpPedidoPendiente::ESTADO_PENDIENTE)->count();
+        $erpReady           = (clone $erpQuery)->where('estado', \App\Models\ErpPedidoPendiente::ESTADO_PENDIENTE)
+                                ->where(function ($q) {
+                                    $q->whereNull('proximo_intento_at')
+                                      ->orWhere('proximo_intento_at', '<=', now());
+                                })->count();
+        $erpProcesando      = (clone $erpQuery)->where('estado', \App\Models\ErpPedidoPendiente::ESTADO_PROCESANDO)->count();
+        $erpCompletados24h  = (clone $erpQuery)->where('estado', \App\Models\ErpPedidoPendiente::ESTADO_COMPLETADO)
+                                ->where('completado_at', '>=', now()->subDay())->count();
+        $erpFallidosMax     = (clone $erpQuery)->where('estado', \App\Models\ErpPedidoPendiente::ESTADO_FALLIDO_MAX)->count();
+        $erpDescartados     = (clone $erpQuery)->where('estado', \App\Models\ErpPedidoPendiente::ESTADO_DESCARTADO)
+                                ->where('updated_at', '>=', $desde)->count();
+        $erpUltimos         = (clone $erpQuery)
+                                ->with(['integracion:id,nombre', 'tenant:id,nombre'])
+                                ->orderByDesc('id')
+                                ->limit(50)
+                                ->get();
+        $erpProximoIntento  = (clone $erpQuery)->where('estado', \App\Models\ErpPedidoPendiente::ESTADO_PENDIENTE)
+                                ->orderBy('proximo_intento_at')
+                                ->value('proximo_intento_at');
+
         return view('livewire.monitoreo.llm', [
             'invocaciones'      => $invocaciones,
             'total'             => $total,
@@ -300,6 +391,15 @@ class Llm extends Component
             'coFallidosPerm'    => $coFallidosPerm,
             'coUltimosMensajes' => $coUltimosMensajes,
             'coEstadoWa'        => $coEstadoWa,
+            // 🔄 ERP Retry Queue
+            'erpPendientes'      => $erpPendientes,
+            'erpReady'           => $erpReady,
+            'erpProcesando'      => $erpProcesando,
+            'erpCompletados24h'  => $erpCompletados24h,
+            'erpFallidosMax'     => $erpFallidosMax,
+            'erpDescartados'     => $erpDescartados,
+            'erpUltimos'         => $erpUltimos,
+            'erpProximoIntento'  => $erpProximoIntento,
         ])->layout('layouts.app');
     }
 }
