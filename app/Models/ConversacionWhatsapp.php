@@ -175,10 +175,14 @@ class ConversacionWhatsapp extends Model
             $longitudPura = mb_strlen($contenido);
             if ($longitudPura === 0) continue;
 
-            // 🧹 FILTRO 2: descartar basura tipo "ererererer", "fffffff", "aaaaa"
-            // (carácter único repetido N veces sin espacios)
-            if ($longitudPura >= 5 && preg_match('/^(.)\1{4,}$/u', $contenido)) {
-                continue;
+            // 🧹 FILTRO 2: descartar basura tipo "ererererer", "fffffff", "aaaaa",
+            // "ababab", "asdfasdf". Heurística: si el mensaje tiene ≥5 chars y
+            // solo 1-2 caracteres distintos (sin espacios), es tecleo de prueba.
+            if ($longitudPura >= 5 && !preg_match('/\s/u', $contenido)) {
+                $unicos = count(array_unique(mb_str_split(mb_strtolower($contenido))));
+                if ($unicos <= 2) {
+                    continue;
+                }
             }
 
             // 🧹 FILTRO 3: dedupe consecutivo — mismo rol + mismo contenido seguido
