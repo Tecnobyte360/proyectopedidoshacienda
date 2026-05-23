@@ -186,14 +186,58 @@
         function domiPortal() {
             return {
                 cargandoUbicacion: false,
+                watchId: null,
+                ultimoEnvio: 0,
                 init() {
-                    // Pedir ubicación al entrar (con permiso del usuario)
-                    if (navigator.geolocation) {
-                        navigator.geolocation.getCurrentPosition(
-                            pos => this.$wire.actualizarMiUbicacion(pos.coords.latitude, pos.coords.longitude),
-                            () => {} // si rechaza, no pasa nada
-                        );
+                    if (!navigator.geolocation) {
+                        console.warn('Geolocation no soportado');
+                        return;
                     }
+
+                    // 🛰️ watchPosition: SE SUSCRIBE a cambios del GPS y nos avisa
+                    // automáticamente cada vez que el celular se mueve.
+                    // El navegador pide permiso UNA SOLA VEZ — si el usuario
+                    // elige "Permitir siempre", nunca más vuelve a preguntar.
+                    //
+                    // No interrumpe al domiciliario, no pide nada cada vez.
+                    this.watchId = navigator.geolocation.watchPosition(
+                        pos => {
+                            const ahora = Date.now();
+                            // Throttle: máximo 1 envío cada 15 seg para no spam
+                            if (ahora - this.ultimoEnvio < 15000) return;
+                            this.ultimoEnvio = ahora;
+                            this.$wire.actualizarMiUbicacion(
+                                pos.coords.latitude,
+                                pos.coords.longitude
+                            );
+                        },
+                        err => {
+                            console.warn('GPS error:', err.message);
+                            // Si rechaza, mostramos botón manual (no bloqueamos)
+                        },
+                        {
+                            enableHighAccuracy: true,   // GPS, no IP
+                            maximumAge: 10000,           // cache 10s aceptable
+                            timeout: 30000,              // espera hasta 30s por fix
+                        }
+                    );
+
+                    // 🛟 Red de seguridad: cada 60 seg pide ubicación fresca aunque
+                    // no se haya movido. Por si watchPosition se duerme en algunos
+                    // navegadores móviles cuando la pestaña pierde el foco.
+                    setInterval(() => {
+                        navigator.geolocation.getCurrentPosition(
+                            pos => {
+                                this.ultimoEnvio = Date.now();
+                                this.$wire.actualizarMiUbicacion(
+                                    pos.coords.latitude,
+                                    pos.coords.longitude
+                                );
+                            },
+                            () => {}, // rechazo silencioso
+                            { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
+                        );
+                    }, 60000);
                 },
                 async actualizarUbicacion() {
                     if (!navigator.geolocation) {
@@ -203,13 +247,16 @@
                     this.cargandoUbicacion = true;
                     navigator.geolocation.getCurrentPosition(
                         pos => {
+                            this.ultimoEnvio = Date.now();
                             this.$wire.actualizarMiUbicacion(pos.coords.latitude, pos.coords.longitude);
                             this.cargandoUbicacion = false;
                         },
                         err => {
-                            alert('No pudimos obtener tu ubicación: ' + err.message);
+                            alert('No pudimos obtener tu ubicación: ' + err.message
+                                + '\n\nVerifica que diste permiso de GPS al navegador.');
                             this.cargandoUbicacion = false;
-                        }
+                        },
+                        { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
                     );
                 }
             }
