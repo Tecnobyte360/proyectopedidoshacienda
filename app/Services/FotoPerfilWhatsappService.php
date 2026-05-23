@@ -219,16 +219,16 @@ class FotoPerfilWhatsappService
             };
 
             $slug = $tenant->slug ?: ('tenant-' . $tenant->id);
-            $relativaStorage = "public/tenants/{$slug}/avatars/{$numero}.{$ext}";
-            $publica = "/storage/tenants/{$slug}/avatars/{$numero}.{$ext}";
+            // ⚠️ Usar disk 'public' explícito (default local va a app/private/)
+            $relativa = "tenants/{$slug}/avatars/{$numero}.{$ext}";
+            $publica  = '/storage/' . $relativa;
 
-            // Asegurar carpeta
-            $directorio = "public/tenants/{$slug}/avatars";
-            if (!Storage::exists($directorio)) {
-                Storage::makeDirectory($directorio);
+            $directorio = "tenants/{$slug}/avatars";
+            if (!Storage::disk('public')->exists($directorio)) {
+                Storage::disk('public')->makeDirectory($directorio);
             }
 
-            Storage::put($relativaStorage, $bytes);
+            Storage::disk('public')->put($relativa, $bytes);
 
             return $publica;
         } catch (\Throwable $e) {
