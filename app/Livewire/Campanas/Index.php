@@ -630,6 +630,14 @@ class Index extends Component
             'estado'      => CampanaWhatsapp::ESTADO_CORRIENDO,
             'iniciada_at' => $c->iniciada_at ?: now(),
         ]);
+
+        // 🚀 DISPATCH inmediato del job — sin esperar al cron (max 1 min).
+        // Si esto falla, el cron campanas:procesar es la red de seguridad.
+        try {
+            \App\Jobs\ProcesarCampanaJob::dispatch($c->id);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('iniciar(): no se pudo despachar ProcesarCampanaJob: ' . $e->getMessage());
+        }
     }
 
     public function pausar(int $id): void
