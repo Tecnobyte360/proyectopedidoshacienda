@@ -585,11 +585,25 @@ class Index extends Component
     {
         $c = CampanaWhatsapp::findOrFail($id);
 
-        // ✅ SIEMPRE regenerar audiencia al iniciar (no solo si está en 0).
-        // Esto asegura que si el usuario editó los filtros después de la primera
-        // generación, los nuevos destinatarios se creen y los viejos se limpien.
-        app(CampanaSenderService::class)->generarAudiencia($c);
-        $c->refresh();
+        // 🛡️ AUDIENCIA — REGLA CRÍTICA igual que en guardar():
+        //   - Sin envíos previos → puede regenerar (no se pierde nada)
+        //   - CON envíos previos → preservar (sino doble-envío → baneo de WA)
+        //
+        // Si necesitas re-generar, hay un botón "Generar audiencia" separado.
+        $tieneEnviosPrevios = $c->destinatarios()
+            ->whereIn('estado', ['enviado', 'fallido'])
+            ->exists();
+
+        if (!$tieneEnviosPrevios) {
+            app(CampanaSenderService::class)->generarAudiencia($c);
+            $c->refresh();
+        } else {
+            \Illuminate\Support\Facades\Log::info('🛡️ iniciar(): audiencia PRESERVADA — hay envíos previos', [
+                'campana_id' => $c->id,
+                'enviados'   => $c->total_enviados,
+                'pendientes' => $c->total_pendientes,
+            ]);
+        }
 
         if ($c->total_destinatarios === 0) {
             $this->dispatch('notify', [
