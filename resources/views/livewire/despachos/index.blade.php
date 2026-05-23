@@ -61,7 +61,9 @@
                 showCancelButton: true,
                 confirmButtonColor: colorPrimario,
                 cancelButtonColor: '#94a3b8',
-                confirmButtonText: esReasignar ? '🔄 Sí, reasignar' : '✓ Sí, asignar',
+                confirmButtonText: esReasignar
+                    ? '<i class="fa-solid fa-rotate"></i> Sí, reasignar'
+                    : '<i class="fa-solid fa-check"></i> Sí, asignar',
                 cancelButtonText: 'Cancelar',
                 reverseButtons: true,
                 customClass: {
@@ -1524,7 +1526,7 @@
                                         <select
                                             onchange="window.confirmarReasignar(this, {{ $p->id }}, 'asignar')"
                                             class="w-full min-w-[160px] rounded-lg border-2 border-rose-300 bg-white px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:border-rose-400 hover:bg-rose-50 focus:border-rose-500 focus:ring-rose-500 transition cursor-pointer">
-                                            <option value="">➕ Asignar a…</option>
+                                            <option value="">— Asignar a un domiciliario —</option>
                                             @foreach($domiciliarios as $dRe)
                                                 <option value="{{ $dRe->id }}">
                                                     {{ $dRe->nombre }} · {{ ucfirst($dRe->estado) }}{{ $dRe->vehiculo ? ' · '.$dRe->vehiculo : '' }}
@@ -1672,7 +1674,7 @@
                                                 <select
                                                     onchange="window.confirmarReasignar(this, {{ $p->id }}, 'reasignar')"
                                                     class="mt-0.5 w-full min-w-[140px] rounded-md border border-brand/30 bg-brand/5 px-1.5 py-0.5 text-[10px] font-semibold text-brand-dark hover:bg-brand/10 focus:border-brand focus:ring-brand cursor-pointer">
-                                                    <option value="">🔄 Reasignar…</option>
+                                                    <option value="">— Reasignar a otro domiciliario —</option>
                                                     @foreach($domiciliarios->where('id', '!=', $p->domiciliario_id) as $dRe)
                                                         <option value="{{ $dRe->id }}">
                                                             {{ $dRe->nombre }} · {{ ucfirst($dRe->estado) }}{{ $dRe->vehiculo ? ' · '.$dRe->vehiculo : '' }}
@@ -1791,7 +1793,7 @@
                                                 onchange="window.confirmarReasignar(this, {{ $p->id }}, 'reasignar')"
                                                 class="w-full rounded-lg border-2 border-amber-300 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-amber-800 hover:border-amber-400 hover:bg-amber-50 focus:border-amber-500 focus:ring-amber-500 transition cursor-pointer"
                                                 title="Reasignar a otro domiciliario">
-                                                <option value="">🔄 Reasignar…</option>
+                                                <option value="">— Reasignar a otro domiciliario —</option>
                                                 @foreach($domiciliarios->where('id', '!=', $p->domiciliario_id) as $dRe)
                                                     <option value="{{ $dRe->id }}">
                                                         {{ $dRe->nombre }} ({{ ucfirst($dRe->estado) }}){{ $dRe->vehiculo ? ' · '.$dRe->vehiculo : '' }}

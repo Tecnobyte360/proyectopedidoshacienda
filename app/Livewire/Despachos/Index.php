@@ -158,7 +158,7 @@ class Index extends Component
         if (!empty($sinDomiciliario)) {
             $this->dispatch('notify', [
                 'type'    => 'error',
-                'message' => '⚠️ Asigna un domiciliario para: ' . implode(', ', $sinDomiciliario),
+                'message' => 'Asigna un domiciliario para: ' . implode(', ', $sinDomiciliario),
             ]);
             return;
         }
@@ -388,7 +388,7 @@ class Index extends Component
             ]);
             $this->dispatch('notify', [
                 'type'    => 'error',
-                'message' => '❌ No se pudo reasignar: ' . mb_substr($e->getMessage(), 0, 180),
+                'message' => 'No se pudo reasignar: ' . mb_substr($e->getMessage(), 0, 180),
             ]);
         }
     }
@@ -709,7 +709,7 @@ class Index extends Component
         ]);
 
         $this->modalPagoPedidoId = null;
-        $this->dispatch('notify', ['type' => 'success', 'message' => '💰 Pago registrado correctamente']);
+        $this->dispatch('notify', ['type' => 'success', 'message' => 'Pago registrado correctamente']);
     }
 
     public function abrirModalEntrega(int $pedidoId): void
@@ -742,7 +742,7 @@ class Index extends Component
 
         // Validar pago
         if ($pedido->estado_pago !== 'aprobado') {
-            $this->modalEntregaError = '⚠️ Este pedido NO está pagado. Cierra este modal, marca el pago primero y luego entrega.';
+            $this->modalEntregaError = 'Este pedido NO está pagado. Cierra este modal, marca el pago primero y luego entrega.';
             return;
         }
 
@@ -764,7 +764,7 @@ class Index extends Component
         $this->modalEntregaPedidoId = null;
         $this->modalEntregaCodigo = '';
         $this->modalEntregaError = '';
-        $this->dispatch('notify', ['type' => 'success', 'message' => '✅ Pedido entregado correctamente']);
+        $this->dispatch('notify', ['type' => 'success', 'message' => 'Pedido entregado correctamente']);
     }
 
     /**
@@ -812,7 +812,7 @@ class Index extends Component
         if ($pedido->estado_pago !== 'aprobado') {
             $this->dispatch('notify', [
                 'type' => 'error',
-                'message' => '⚠️ Este pedido NO está pagado. Marca el pago primero (efectivo) y luego entrega.',
+                'message' => 'Este pedido NO está pagado. Marca el pago primero (efectivo) y luego entrega.',
             ]);
             return;
         }
@@ -822,7 +822,7 @@ class Index extends Component
             "Entregado por {$dom->nombre}",
             'Entregado'
         );
-        $this->dispatch('notify', ['type' => 'success', 'message' => '✅ Pedido entregado']);
+        $this->dispatch('notify', ['type' => 'success', 'message' => 'Pedido entregado']);
     }
 
     /**
@@ -850,7 +850,7 @@ class Index extends Component
             'pagado_at'    => now(),
         ]);
 
-        $this->dispatch('notify', ['type' => 'success', 'message' => '💰 Pago marcado como recibido en efectivo']);
+        $this->dispatch('notify', ['type' => 'success', 'message' => 'Pago marcado como recibido en efectivo']);
     }
 
     /**

@@ -46,12 +46,12 @@
                     <div style="text-align:left;font-size:14px;color:#475569">
                         <div style="background:#fef2f2;padding:12px 14px;border-radius:10px;border-left:4px solid #ef4444;margin-bottom:10px">
                             <div style="font-size:11px;text-transform:uppercase;color:#dc2626;letter-spacing:0.05em;font-weight:700">Categoría a eliminar</div>
-                            <div style="font-weight:800;color:#0f172a;font-size:16px;margin-top:2px">📂 ${catNombre}</div>
+                            <div style="font-weight:800;color:#0f172a;font-size:16px;margin-top:2px"><i class="fa-solid fa-folder" style="color:#f59e0b"></i> ${catNombre}</div>
                         </div>
                         ${tieneProductos ? `
                             <div style="background:#fef3c7;padding:12px 14px;border-radius:10px;border-left:4px solid #f59e0b">
                                 <div style="font-size:12px;color:#92400e;font-weight:700">
-                                    ⚠️ Esta categoría tiene <b>${productosCount} producto(s)</b> asignados.
+                                    <i class="fa-solid fa-triangle-exclamation"></i> Esta categoría tiene <b>${productosCount} producto(s)</b> asignados.
                                 </div>
                                 <div style="font-size:11px;color:#a16207;margin-top:4px">
                                     Los productos quedarán sin categoría tras eliminarla.
@@ -59,7 +59,7 @@
                             </div>
                         ` : `
                             <div style="background:#f0fdf4;padding:10px 14px;border-radius:10px;font-size:12px;color:#166534">
-                                ✓ Esta categoría no tiene productos asociados.
+                                <i class="fa-solid fa-circle-check"></i> Esta categoría no tiene productos asociados.
                             </div>
                         `}
                         <div style="margin-top:10px;font-size:12px;color:#94a3b8;text-align:center">
@@ -71,7 +71,7 @@
                 showCancelButton: true,
                 confirmButtonColor: '#ef4444',
                 cancelButtonColor: '#94a3b8',
-                confirmButtonText: '🗑️ Sí, eliminar',
+                confirmButtonText: '<i class="fa-solid fa-trash-can"></i> Sí, eliminar',
                 cancelButtonText: 'Cancelar',
                 reverseButtons: true,
                 focusCancel: true,

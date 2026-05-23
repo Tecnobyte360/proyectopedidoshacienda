@@ -63,7 +63,7 @@ class Index extends Component
 
         $this->dispatch('notify', [
             'type'    => 'success',
-            'message' => "🔁 {$count} fallidos marcados para reintento.",
+            'message' => "{$count} fallidos marcados para reintento.",
         ]);
     }
 
@@ -167,7 +167,7 @@ class Index extends Component
 
             $this->dispatch('notify', [
                 'type'    => 'success',
-                'message' => "✓ Importados {$this->numerosImportados} números. Audiencia cambiada a 'manual'.",
+                'message' => "Importados {$this->numerosImportados} números. Audiencia cambiada a 'manual'.",
             ]);
         } catch (\Throwable $e) {
             $this->dispatch('notify', [
@@ -412,7 +412,7 @@ class Index extends Component
         }
 
         $this->modal = false;
-        $this->dispatch('notify', ['type' => 'success', 'message' => '✓ Campaña guardada']);
+        $this->dispatch('notify', ['type' => 'success', 'message' => 'Campaña guardada']);
     }
 
     public function generarAudiencia(int $id): void
@@ -440,30 +440,30 @@ class Index extends Component
             'estado'      => CampanaWhatsapp::ESTADO_CORRIENDO,
             'iniciada_at' => $c->iniciada_at ?: now(),
         ]);
-        $this->dispatch('notify', ['type' => 'success', 'message' => '▶️ Campaña iniciada. Procesará en lotes según el cron.']);
+        $this->dispatch('notify', ['type' => 'success', 'message' => 'Campaña iniciada. Procesará en lotes según el cron.']);
     }
 
     public function pausar(int $id): void
     {
         CampanaWhatsapp::findOrFail($id)->update(['estado' => CampanaWhatsapp::ESTADO_PAUSADA]);
-        $this->dispatch('notify', ['type' => 'success', 'message' => '⏸ Pausada']);
+        $this->dispatch('notify', ['type' => 'success', 'message' => 'Campaña pausada']);
     }
 
     public function reanudar(int $id): void
     {
         CampanaWhatsapp::findOrFail($id)->update(['estado' => CampanaWhatsapp::ESTADO_CORRIENDO]);
-        $this->dispatch('notify', ['type' => 'success', 'message' => '▶️ Reanudada']);
+        $this->dispatch('notify', ['type' => 'success', 'message' => 'Campaña reanudada']);
     }
 
     public function cancelar(int $id): void
     {
         CampanaWhatsapp::findOrFail($id)->update(['estado' => CampanaWhatsapp::ESTADO_CANCELADA]);
-        $this->dispatch('notify', ['type' => 'warning', 'message' => '✕ Cancelada']);
+        $this->dispatch('notify', ['type' => 'warning', 'message' => 'Campaña cancelada']);
     }
 
     public function eliminar(int $id): void
     {
         CampanaWhatsapp::findOrFail($id)->delete();
-        $this->dispatch('notify', ['type' => 'success', 'message' => '✓ Eliminada']);
+        $this->dispatch('notify', ['type' => 'success', 'message' => 'Campaña eliminada']);
     }
 }
