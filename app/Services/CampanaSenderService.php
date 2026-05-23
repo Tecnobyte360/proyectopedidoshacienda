@@ -189,6 +189,18 @@ class CampanaSenderService
         $enviados = 0; $fallidos = 0;
 
         foreach ($pendientes as $d) {
+            // 🛡️ KILL-SWITCH MID-LOTE
+            // Re-leer estado de la campaña antes de cada destinatario.
+            // Si el admin la pausó/canceló mientras el worker procesaba
+            // el lote, queremos DETENER de inmediato, no terminar el lote.
+            // Sin esto, pausar puede tardar hasta 8 destinatarios más en
+            // efectivizar (= varios minutos con el throttle).
+            $estadoActual = $c->fresh()->estado;
+            if ($estadoActual !== CampanaWhatsapp::ESTADO_CORRIENDO) {
+                Log::warning("⏸️ Campaña #{$c->id} cambió a '{$estadoActual}' mid-lote — DETENIENDO inmediato (enviados hasta ahora: {$enviados})");
+                break;
+            }
+
             // Respetar ventana en cada iteración (puede cerrarse a media tanda)
             if (!$c->enHorario()) {
                 Log::info("📭 Campaña #{$c->id} fuera de ventana — pausando lote.");
@@ -196,6 +208,39 @@ class CampanaSenderService
             }
 
             $mensaje = $this->renderizar($c->mensaje, $d);
+
+            // 🛡️ GUARD ANTI-DUPLICACIÓN
+            // ¿Este teléfono YA recibió este mismo mensaje en las últimas 24h?
+            // Protege contra:
+            //   1) Retries internos del sender (timeout API pero msg sí enviado)
+            //   2) Fallback imagen→texto cuando la imagen SÍ se entregó
+            //   3) Reactivaciones manuales de campañas pausadas
+            //   4) Cualquier flujo que vuelva a procesar al mismo destinatario
+            try {
+                $telefonoNorm = preg_replace('/\D+/', '', $d->telefono);
+                $yaRecibio = \Illuminate\Support\Facades\DB::table('mensajes_whatsapp')
+                    ->join('conversaciones_whatsapp', 'conversaciones_whatsapp.id', '=', 'mensajes_whatsapp.conversacion_id')
+                    ->where('conversaciones_whatsapp.telefono_normalizado', $telefonoNorm)
+                    ->where('mensajes_whatsapp.rol', 'assistant')
+                    ->where('mensajes_whatsapp.contenido', $mensaje)
+                    ->where('mensajes_whatsapp.created_at', '>=', now()->subHours(24))
+                    ->exists();
+
+                if ($yaRecibio) {
+                    Log::warning("🛡️ Campaña #{$c->id}: SKIP duplicado — {$d->telefono} ya recibió este mensaje en últimas 24h");
+                    $d->update([
+                        'estado'              => CampanaDestinatario::ESTADO_ENVIADO,
+                        'mensaje_renderizado' => $mensaje,
+                        'enviado_at'          => now(),
+                        'intentos'            => $d->intentos + 1,
+                        'error_detalle'       => '🛡️ Deduplicado: ya recibió este mensaje antes (skip)',
+                    ]);
+                    $enviados++;
+                    continue;
+                }
+            } catch (\Throwable $eGuard) {
+                Log::warning("Guard anti-dup falló (no bloquea): " . $eGuard->getMessage());
+            }
 
             try {
                 // Si hay imagen adjunta → enviarImagen con caption; si no → texto
@@ -210,12 +255,27 @@ class CampanaSenderService
                     );
 
                     // 🛟 FALLBACK: si TecnoByteApp no soporta media (404 endpoint),
-                    // enviar solo el caption como texto. Mejor enviar el mensaje
-                    // sin imagen que perder al destinatario.
+                    // enviar solo el caption como texto. PERO antes verificar que
+                    // la imagen no haya entregado el mensaje (a veces falla la
+                    // confirmación pero el msg sí llegó → fallback duplica).
                     if (!$ok) {
-                        Log::info("📨 Campaña #{$c->id}: imagen falló, fallback a texto para {$d->telefono}");
-                        $ok = $this->sender->enviarTexto($d->telefono, $mensaje, $connectionId);
-                        $usoFallback = true;
+                        sleep(2); // dar tiempo a que WhatsApp sincronice si entregó
+                        $imagenSiEntrego = \Illuminate\Support\Facades\DB::table('mensajes_whatsapp')
+                            ->join('conversaciones_whatsapp', 'conversaciones_whatsapp.id', '=', 'mensajes_whatsapp.conversacion_id')
+                            ->where('conversaciones_whatsapp.telefono_normalizado', preg_replace('/\D+/', '', $d->telefono))
+                            ->where('mensajes_whatsapp.rol', 'assistant')
+                            ->where('mensajes_whatsapp.created_at', '>=', now()->subMinute())
+                            ->exists();
+
+                        if ($imagenSiEntrego) {
+                            Log::info("🛡️ Campaña #{$c->id}: imagen SÍ se entregó a pesar del error — skip fallback de texto para {$d->telefono}");
+                            $ok = true; // tratar como éxito
+                            $usoFallback = false;
+                        } else {
+                            Log::info("📨 Campaña #{$c->id}: imagen falló, fallback a texto para {$d->telefono}");
+                            $ok = $this->sender->enviarTexto($d->telefono, $mensaje, $connectionId);
+                            $usoFallback = true;
+                        }
                     }
                 } else {
                     $ok = $this->sender->enviarTexto($d->telefono, $mensaje, $connectionId);
