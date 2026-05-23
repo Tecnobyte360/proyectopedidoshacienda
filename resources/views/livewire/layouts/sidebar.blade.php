@@ -72,6 +72,7 @@
                     ['name' => 'Estados WhatsApp', 'icon' => 'fa-circle-info',         'route' => 'estados-whatsapp.index', 'badge' => 'NUEVO', 'permission' => 'campanas.ver'],
                     ['name' => 'Widgets de Chat',   'icon' => 'fa-code',               'route' => 'chat-widgets.index',     'badge' => null, 'permission' => 'conversaciones.ver', 'solo_super_admin' => true],
                     ['name' => 'Domiciliarios',     'icon' => 'fa-motorcycle',         'route' => 'domiciliarios.index',    'badge' => null, 'permission' => 'domiciliarios.gestionar'],
+                    ['name' => 'Mapa en vivo',      'icon' => 'fa-location-crosshairs','route' => 'despachos.index',        'badge' => 'EN VIVO', 'permission' => 'despachos.gestionar'],
                     ['name' => 'Zonas',             'icon' => 'fa-map-location-dot',   'route' => 'zonas.index',            'badge' => null, 'permission' => 'zonas.gestionar'],
                     ['name' => 'Reportes',          'icon' => 'fa-chart-line',         'route' => 'reportes.index',         'badge' => null, 'permission' => 'reportes.ver'],
                     ['name' => 'Rutas',             'icon' => 'fa-route',              'route' => 'rutas.index',            'badge' => null, 'permission' => 'despachos.gestionar'],
