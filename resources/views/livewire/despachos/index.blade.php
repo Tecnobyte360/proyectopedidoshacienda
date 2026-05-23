@@ -655,16 +655,38 @@
     {{-- 🗺️ MAPA EN VIVO DE DOMICILIARIOS (inline directo, sin Livewire anidado) --}}
     @php
         $domisActivos = $domiciliarios->filter(fn($d) => $d->lat_actual && $d->lng_actual)->values();
-        $domisData = $domisActivos->map(fn($d) => [
-            'id'       => $d->id,
-            'nombre'   => $d->nombre,
-            'lat'      => (float) $d->lat_actual,
-            'lng'      => (float) $d->lng_actual,
-            'estado'   => $d->estado,
-            'vehiculo' => $d->vehiculo,
-            'placa'    => $d->placa,
-            'telefono' => $d->telefono,
-        ])->values()->toArray();
+
+        // 🛡️ Umbral: ubicación con >5 min se considera "desconectado"
+        $umbralMinutosVivo = 5;
+
+        $domisData = $domisActivos->map(function($d) use ($umbralMinutosVivo) {
+            $ubicAt = $d->ubicacion_actualizada_at
+                ? \Carbon\Carbon::parse($d->ubicacion_actualizada_at)
+                : null;
+            $minutosDesde = $ubicAt ? abs((int) $ubicAt->diffInMinutes(now())) : 99999;
+            $desconectado = $minutosDesde > $umbralMinutosVivo;
+
+            return [
+                'id'           => $d->id,
+                'nombre'       => $d->nombre,
+                'lat'          => (float) $d->lat_actual,
+                'lng'          => (float) $d->lng_actual,
+                'estado'       => $d->estado,
+                'vehiculo'     => $d->vehiculo,
+                'placa'        => $d->placa,
+                'telefono'     => $d->telefono,
+                'token'        => $d->token_acceso,
+                'desconectado' => $desconectado,
+                'minutos_desde' => $minutosDesde,
+                'ubicacion_human' => $ubicAt
+                    ? $ubicAt->locale('es')->diffForHumans()
+                    : 'Sin ubicación',
+            ];
+        })->values()->toArray();
+
+        // KPIs reales: en vivo vs desconectados
+        $domisEnVivo = collect($domisData)->where('desconectado', false)->count();
+        $domisDesconectados = collect($domisData)->where('desconectado', true)->count();
         $tenantActual = app(\App\Services\TenantManager::class)->current();
         $mapCenterLat = (float) ($tenantActual?->google_maps_centro_lat ?: 6.3414);
         $mapCenterLng = (float) ($tenantActual?->google_maps_centro_lng ?: -75.5538);
@@ -703,13 +725,30 @@
                 </div>
                 <div class="text-left">
                     <h3 class="font-extrabold text-slate-800 flex items-center gap-2">
-                        Mapa en vivo de domiciliarios
-                        <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 text-emerald-700 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
-                            <span class="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                            En vivo
-                        </span>
+                        Mapa de domiciliarios
+                        @if($domisEnVivo > 0)
+                            <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 text-emerald-700 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+                                <span class="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                {{ $domisEnVivo }} en vivo
+                            </span>
+                        @endif
+                        @if($domisDesconectados > 0)
+                            <span class="inline-flex items-center gap-1.5 rounded-full bg-slate-200 text-slate-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider"
+                                  title="Última ubicación hace más de 5 min — el domiciliario debe abrir su portal para actualizar GPS">
+                                <i class="fa-solid fa-circle-exclamation text-[9px]"></i>
+                                {{ $domisDesconectados }} desconectado{{ $domisDesconectados > 1 ? 's' : '' }}
+                            </span>
+                        @endif
                     </h3>
-                    <p class="text-xs text-slate-500">{{ $domisActivos->count() }} repartidor(es) con ubicación · se actualiza en tiempo real</p>
+                    <p class="text-xs text-slate-500">
+                        @if($domisEnVivo === 0 && $domisDesconectados > 0)
+                            ⚠️ Ningún domiciliario tiene su portal abierto. Mostrando últimas ubicaciones conocidas.
+                        @elseif($domisActivos->isEmpty())
+                            Los repartidores enviarán su ubicación cuando abran el portal en su celular
+                        @else
+                            {{ $domisActivos->count() }} repartidor(es) con ubicación · se actualiza en tiempo real
+                        @endif
+                    </p>
                 </div>
             </div>
             <div class="flex items-center gap-2">
@@ -813,8 +852,9 @@
                     zoom: {{ $mapZoom }},
                 };
 
-                // 🎨 Colores por estado
-                window._dpColorEstado = function(estado) {
+                // 🎨 Colores por estado — gris si desconectado (>5min sin GPS)
+                window._dpColorEstado = function(estado, desconectado) {
+                    if (desconectado) return '#94a3b8'; // gris
                     switch(estado) {
                         case 'disponible': return '#10b981'; // verde
                         case 'en_ruta':    return '#3b82f6'; // azul
@@ -825,10 +865,12 @@
                 };
 
                 // 🏍️ Pin grande con icono moto
-                window._dpSvgMoto = function(estado) {
-                    const color = window._dpColorEstado(estado);
+                window._dpSvgMoto = function(estado, desconectado) {
+                    const color = window._dpColorEstado(estado, desconectado);
+                    const opacity = desconectado ? '0.65' : '1';
+                    const icono = desconectado ? '📵' : '🏍️';
                     const svg = `
-<svg xmlns="http://www.w3.org/2000/svg" width="64" height="80" viewBox="0 0 64 80">
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="80" viewBox="0 0 64 80" opacity="${opacity}">
   <defs>
     <filter id="sh" x="-50%" y="-50%" width="200%" height="200%">
       <feDropShadow dx="0" dy="4" stdDeviation="4" flood-opacity="0.45"/>
@@ -837,14 +879,15 @@
   <path filter="url(#sh)" fill="${color}" stroke="white" stroke-width="3"
         d="M32 2C16.5 2 4 14.5 4 30c0 22 28 48 28 48s28-26 28-48C60 14.5 47.5 2 32 2z"/>
   <circle cx="32" cy="30" r="18" fill="white"/>
-  <text x="32" y="40" font-size="28" text-anchor="middle">🏍️</text>
+  <text x="32" y="40" font-size="22" text-anchor="middle">${icono}</text>
 </svg>`;
                     return 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
                 };
 
-                // ⚡ Pulso animado alrededor del pin
-                window._dpSvgPing = function(estado) {
-                    const color = window._dpColorEstado(estado);
+                // ⚡ Pulso animado alrededor del pin (solo si está EN VIVO)
+                window._dpSvgPing = function(estado, desconectado) {
+                    if (desconectado) return ''; // sin pulse cuando está desconectado
+                    const color = window._dpColorEstado(estado, false);
                     const svg = `
 <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">
   <circle cx="50" cy="50" r="22" fill="${color}" opacity="0.3">
@@ -927,38 +970,59 @@
                     });
 
                     window._despachosDomis.forEach(d => {
-                        const colorEstado = window._dpColorEstado(d.estado);
+                        const colorEstado = window._dpColorEstado(d.estado, d.desconectado);
 
-                        // Pin grande de moto
+                        // Pin grande de moto (gris si desconectado)
                         const iconMoto = {
-                            url: window._dpSvgMoto(d.estado),
+                            url: window._dpSvgMoto(d.estado, d.desconectado),
                             scaledSize: new google.maps.Size(64, 80),
                             anchor: new google.maps.Point(32, 80),
                         };
-                        const iconPing = {
-                            url: window._dpSvgPing(d.estado),
-                            scaledSize: new google.maps.Size(100, 100),
-                            anchor: new google.maps.Point(50, 50),
-                        };
 
-                        // Ping (debajo)
-                        const pulse = new google.maps.Marker({
-                            position: { lat: d.lat, lng: d.lng },
-                            map, icon: iconPing,
-                            clickable: false, zIndex: 1,
-                        });
+                        // Ping (debajo) — solo si está EN VIVO
+                        let pulse = null;
+                        if (!d.desconectado) {
+                            const iconPing = {
+                                url: window._dpSvgPing(d.estado, false),
+                                scaledSize: new google.maps.Size(100, 100),
+                                anchor: new google.maps.Point(50, 50),
+                            };
+                            pulse = new google.maps.Marker({
+                                position: { lat: d.lat, lng: d.lng },
+                                map, icon: iconPing,
+                                clickable: false, zIndex: 1,
+                            });
+                        }
 
                         // Pin (arriba)
                         const marker = new google.maps.Marker({
                             position: { lat: d.lat, lng: d.lng },
-                            map, title: d.nombre, icon: iconMoto, zIndex: 100,
+                            map,
+                            title: d.nombre + ' · ' + d.ubicacion_human,
+                            icon: iconMoto,
+                            zIndex: d.desconectado ? 50 : 100,
                             optimized: false,
                         });
 
-                        // Label flotante con nombre
+                        // 🪟 Tooltip mejorado con edad + botón reactivar
+                        const estadoConexion = d.desconectado
+                            ? `<div style="margin-top:8px;padding:6px 10px;background:#f1f5f9;border-radius:8px;border-left:3px solid #94a3b8">
+                                  <div style="font-size:11px;color:#475569;font-weight:600">📵 Desconectado</div>
+                                  <div style="font-size:10px;color:#64748b;margin-top:2px">Última ubicación: ${d.ubicacion_human}</div>
+                               </div>`
+                            : `<div style="margin-top:8px;padding:6px 10px;background:#ecfdf5;border-radius:8px;border-left:3px solid #10b981">
+                                  <div style="font-size:11px;color:#047857;font-weight:600">🟢 En vivo</div>
+                                  <div style="font-size:10px;color:#059669;margin-top:2px">Actualizado: ${d.ubicacion_human}</div>
+                               </div>`;
+
+                        const linkPortal = d.token ? `${window.location.origin}/d/${d.token}` : '';
+                        const msgWhatsApp = d.token && d.telefono
+                            ? `https://wa.me/${d.telefono}?text=${encodeURIComponent('Hola ' + d.nombre + ', abre tu portal de domiciliario para que veamos tu ubicación: ' + linkPortal + ' (déjalo abierto durante tu turno)')}`
+                            : '';
+
                         const labelDiv = new google.maps.InfoWindow({
                             content: `
-                                <div style="font-family:system-ui,sans-serif;padding:6px 4px;min-width:220px">
+                                <div style="font-family:system-ui,sans-serif;padding:6px 4px;min-width:240px;max-width:280px">
                                     <div style="font-weight:800;font-size:15px;color:#0f172a;line-height:1.2">${d.nombre}</div>
                                     <div style="font-size:12px;color:#64748b;margin-top:2px">
                                         🏍️ ${d.vehiculo || 'Vehículo'}${d.placa ? ' · '+d.placa : ''}
@@ -968,7 +1032,13 @@
                                             ${(d.estado || '').replace('_',' ')}
                                         </span>
                                     </div>
-                                    ${d.telefono ? `<a href="tel:${d.telefono}" style="display:inline-block;margin-top:10px;font-size:13px;color:#10b981;font-weight:700;text-decoration:none">📞 ${d.telefono}</a>` : ''}
+                                    ${estadoConexion}
+                                    <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px">
+                                        ${d.telefono ? `<a href="tel:${d.telefono}" style="font-size:13px;color:#10b981;font-weight:700;text-decoration:none">📞 ${d.telefono}</a>` : ''}
+                                        ${d.desconectado && msgWhatsApp
+                                            ? `<a href="${msgWhatsApp}" target="_blank" style="display:inline-block;background:#25D366;color:white;text-align:center;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;text-decoration:none">📤 Enviar link de reactivación por WhatsApp</a>`
+                                            : ''}
+                                    </div>
                                 </div>
                             `,
                         });
