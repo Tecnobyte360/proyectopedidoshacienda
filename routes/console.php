@@ -114,6 +114,15 @@ Schedule::command('erp:procesar-cola')
     ->withoutOverlapping(10)
     ->runInBackground();
 
+// 🚑 ConversationRescueAgent — detecta conversaciones donde el bot quedó
+// atorado en error repetido (ej. ERP caído, API timeout) y rescata al
+// cliente activando modo humano + notificando al operador.
+Schedule::command('bot:detectar-atorados')
+    ->everyTwoMinutes()
+    ->timezone('America/Bogota')
+    ->withoutOverlapping(2)
+    ->runInBackground();
+
 // 🛵 Auto-asignar domiciliario a pedidos a domicilio huerfanos (sin asignar).
 // Red de seguridad si el hook 'created' de Pedido no disparó. Cada 2 minutos.
 Schedule::command('pedidos:asignar-huerfanos')
