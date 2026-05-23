@@ -164,9 +164,29 @@ class ConversacionWhatsapp extends Model
 
         $bytesAcumulados = 0;
         $resultado = [];
+        $contenidoAnterior = null;  // para deduplicar mensajes idénticos consecutivos
+        $rolAnterior = null;
 
         foreach ($mensajes as $m) {
-            $contenido = (string) $m->contenido;
+            $contenido = trim((string) $m->contenido);
+
+            // 🧹 FILTRO 1: descartar mensajes vacíos o demasiado cortos sin sentido
+            // (no aplica a respuestas naturales como "sí", "ok", "dale")
+            $longitudPura = mb_strlen($contenido);
+            if ($longitudPura === 0) continue;
+
+            // 🧹 FILTRO 2: descartar basura tipo "ererererer", "fffffff", "aaaaa"
+            // (carácter único repetido N veces sin espacios)
+            if ($longitudPura >= 5 && preg_match('/^(.)\1{4,}$/u', $contenido)) {
+                continue;
+            }
+
+            // 🧹 FILTRO 3: dedupe consecutivo — mismo rol + mismo contenido seguido
+            // (ej: 5 veces el mismo mensaje de "Caminata Canina" del bot)
+            if ($m->rol === $rolAnterior && $contenido === $contenidoAnterior) {
+                continue;
+            }
+
             // Truncar mensajes individuales muy largos (ej: dumps de tool results)
             if (mb_strlen($contenido) > $maxMsg) {
                 $contenido = mb_substr($contenido, 0, $maxMsg) . ' …[truncado]';
@@ -174,10 +194,13 @@ class ConversacionWhatsapp extends Model
             $bytesAcumulados += mb_strlen($contenido);
             // Si el total ya supera el max, paramos (mantenemos los más recientes)
             if ($bytesAcumulados > $maxBloque) break;
+
             $resultado[] = [
                 'role'    => $m->rol,
                 'content' => $contenido,
             ];
+            $contenidoAnterior = $contenido;
+            $rolAnterior = $m->rol;
         }
 
         return $resultado;

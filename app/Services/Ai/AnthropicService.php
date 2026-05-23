@@ -71,17 +71,36 @@ class AnthropicService
             'messages'    => $messagesAnt,
         ];
 
-        // 💰 PROMPT CACHING — system prompt + tools se cachean 5 min en Anthropic.
-        // Reduce ~90% del costo y NO cuenta hacia el rate limit de input tokens.
-        // System debe ir como array con cache_control.
+        // 💰 PROMPT CACHING POR CAPAS — split en marcador <<<CACHE_BREAK>>>.
+        //
+        // Estrategia: el system prompt se divide en N segmentos por el marker.
+        // A cada segmento EXCEPTO el último le aplicamos cache_control. El
+        // último contiene info volátil (hora, sede abierta/cerrada, paso del
+        // orquestador) y NO debe cachearse, porque invalidaría todo lo demás.
+        //
+        // Sin esto: cualquier cambio en hora invalida 30KB de cache cada minuto.
+        // Con esto: solo se recalcula el último bloque (~2KB), el resto persiste.
+        //
+        // Anthropic permite hasta 4 puntos de cache_control. Si hay más
+        // segmentos, fusionamos los del medio sin marker (siguen cacheando
+        // como un solo bloque grande).
         if ($systemAnt !== '') {
-            $payload['system'] = [
-                [
-                    'type'          => 'text',
-                    'text'          => $systemAnt,
-                    'cache_control' => ['type' => 'ephemeral'],
-                ],
-            ];
+            $segmentos = $this->dividirSystemEnCapas($systemAnt);
+            $payload['system'] = [];
+            $totalSegs = count($segmentos);
+            foreach ($segmentos as $idx => $texto) {
+                if ($texto === '') continue;
+                $bloque = ['type' => 'text', 'text' => $texto];
+                // cache_control en TODOS excepto el último (volátil)
+                if ($idx < $totalSegs - 1) {
+                    $bloque['cache_control'] = ['type' => 'ephemeral'];
+                }
+                $payload['system'][] = $bloque;
+            }
+            // Garantía: si por alguna razón quedó vacío, evitar payload sin system
+            if (empty($payload['system'])) {
+                unset($payload['system']);
+            }
         }
         if (!empty($toolsAnt)) {
             // Cachear también la definición de tools (es grande y repetitiva)
@@ -206,6 +225,33 @@ class AnthropicService
         }
 
         return null;
+    }
+
+    /**
+     * Divide el system prompt en capas usando el marcador `<<<CACHE_BREAK>>>`.
+     *
+     * Anthropic permite máximo 4 cache_control breakpoints. Si hay más de 4
+     * marcadores, fusionamos los primeros (siguen siendo cacheados juntos
+     * como un solo bloque grande, pero pierden granularidad).
+     *
+     * El último segmento NUNCA recibe cache_control en chat() porque
+     * contiene info volátil (hora, sede abierta/cerrada, orquestador).
+     */
+    private function dividirSystemEnCapas(string $system): array
+    {
+        $partes = preg_split('/<<<CACHE_BREAK>>>\s*/', $system);
+        $partes = array_values(array_filter(array_map('trim', $partes), fn ($p) => $p !== ''));
+
+        // Anthropic: máx 4 cache_control. Nuestro último siempre va sin cache,
+        // así que tenemos hasta 3 bloques cacheables + 1 volátil = 4 partes max.
+        if (count($partes) > 4) {
+            // Fusionar todos los primeros en uno solo, preservando los últimos 3
+            $fusionar = array_slice($partes, 0, count($partes) - 3);
+            $resto    = array_slice($partes, -3);
+            $partes   = array_merge([implode("\n\n", $fusionar)], $resto);
+        }
+
+        return $partes;
     }
 
     /**
