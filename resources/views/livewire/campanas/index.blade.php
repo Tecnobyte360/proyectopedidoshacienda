@@ -220,56 +220,63 @@
 
                 <div class="p-6 space-y-4 max-h-[80vh] overflow-y-auto bg-gradient-to-b from-white to-slate-50/30">
 
-                    {{-- 📊 Resumen compacto en una línea --}}
-                    <div class="rounded-2xl bg-gradient-to-r from-brand/5 via-white to-violet-50 border border-slate-200 p-3 flex flex-wrap items-center gap-4 text-sm">
-                        <div class="flex items-center gap-2">
-                            <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-900 text-white">
-                                <i class="fa-solid fa-paper-plane text-xs"></i>
+                    {{-- 📊 Resumen compacto (solo métricas confiables) --}}
+                    <div class="rounded-2xl bg-gradient-to-r from-brand/5 via-white to-emerald-50 border border-slate-200 p-4 flex flex-wrap items-center gap-6">
+                        {{-- Enviados (= Entregados, porque API solo acepta si sesión activa) --}}
+                        <div class="flex items-center gap-3"
+                             title="Mensajes aceptados por WhatsApp y entregados al destinatario. Si está en verde, llegó al cliente.">
+                            <span class="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-brand to-brand-dark text-white shadow-md shadow-brand/30">
+                                <i class="fa-solid fa-check-double text-base"></i>
                             </span>
                             <div>
-                                <div class="text-[10px] uppercase tracking-wider text-slate-500 font-bold leading-none">Enviados</div>
-                                <div class="text-xl font-black text-slate-800 leading-tight">{{ $monitorEstadisticas['enviado'] }}<span class="text-xs text-slate-400 font-normal"> / {{ $monitorEstadisticas['total'] }}</span></div>
+                                <div class="text-[10px] uppercase tracking-wider text-slate-500 font-bold leading-none">Llegaron</div>
+                                <div class="text-2xl font-black text-slate-800 leading-tight">
+                                    {{ $monitorEstadisticas['enviado'] }}
+                                    <span class="text-sm text-slate-400 font-normal">/ {{ $monitorEstadisticas['total'] }}</span>
+                                </div>
+                                <div class="text-[10px] text-emerald-600 font-bold">
+                                    {{ $monitorEstadisticas['total'] > 0 ? round(($monitorEstadisticas['enviado'] / $monitorEstadisticas['total']) * 100, 0) : 0 }}% del total
+                                </div>
                             </div>
                         </div>
-                        <div class="h-9 w-px bg-slate-200"></div>
-                        <div class="flex items-center gap-2">
-                            <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-500 text-white">
-                                <i class="fa-solid fa-check-circle text-xs"></i>
-                            </span>
-                            <div>
-                                <div class="text-[10px] uppercase tracking-wider text-slate-500 font-bold leading-none">Entregados</div>
-                                <div class="text-xl font-black text-slate-800 leading-tight">{{ $monitorEstadisticas['entregados'] ?? 0 }}</div>
-                            </div>
-                        </div>
-                        <div class="h-9 w-px bg-slate-200"></div>
-                        <div class="flex items-center gap-2">
-                            <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-500 text-white">
-                                <i class="fa-solid fa-eye text-xs"></i>
-                            </span>
-                            <div>
-                                <div class="text-[10px] uppercase tracking-wider text-slate-500 font-bold leading-none">Leyeron</div>
-                                <div class="text-xl font-black text-slate-800 leading-tight">{{ $monitorEstadisticas['leyeron'] ?? 0 }}<span class="text-xs text-violet-500 font-bold"> · {{ $monitorEstadisticas['tasa_lectura'] ?? 0 }}%</span></div>
-                            </div>
-                        </div>
-                        <div class="h-9 w-px bg-slate-200"></div>
-                        <div class="flex items-center gap-2">
-                            <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-brand text-white">
-                                <i class="fa-solid fa-reply text-xs"></i>
+
+                        <div class="h-12 w-px bg-slate-200"></div>
+
+                        {{-- Respondieron (métrica de engagement real) --}}
+                        <div class="flex items-center gap-3"
+                             title="Clientes que contestaron al mensaje. Engagement real.">
+                            <span class="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 text-white shadow-md shadow-blue-300">
+                                <i class="fa-solid fa-reply text-base"></i>
                             </span>
                             <div>
                                 <div class="text-[10px] uppercase tracking-wider text-slate-500 font-bold leading-none">Respondieron</div>
-                                <div class="text-xl font-black text-slate-800 leading-tight">{{ $monitorEstadisticas['respondieron'] ?? 0 }}<span class="text-xs text-brand font-bold"> · {{ $monitorEstadisticas['tasa_respuesta'] ?? 0 }}%</span></div>
+                                <div class="text-2xl font-black text-slate-800 leading-tight">{{ $monitorEstadisticas['respondieron'] ?? 0 }}</div>
+                                <div class="text-[10px] text-blue-600 font-bold">{{ $monitorEstadisticas['tasa_respuesta'] ?? 0 }}% tasa respuesta</div>
                             </div>
                         </div>
-                        <div class="h-9 w-px bg-slate-200"></div>
-                        <div class="flex items-center gap-2">
-                            <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-rose-500 text-white">
-                                <i class="fa-solid fa-xmark text-xs"></i>
+
+                        <div class="h-12 w-px bg-slate-200"></div>
+
+                        {{-- Fallidos --}}
+                        <div class="flex items-center gap-3"
+                             title="Mensajes que no se pudieron enviar (sesión WhatsApp caída, número inválido, etc.)">
+                            <span class="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-rose-500 to-rose-700 text-white shadow-md shadow-rose-300">
+                                <i class="fa-solid fa-circle-exclamation text-base"></i>
                             </span>
                             <div>
                                 <div class="text-[10px] uppercase tracking-wider text-slate-500 font-bold leading-none">Fallidos</div>
-                                <div class="text-xl font-black text-slate-800 leading-tight">{{ $monitorEstadisticas['fallido'] }}</div>
+                                <div class="text-2xl font-black text-slate-800 leading-tight">{{ $monitorEstadisticas['fallido'] }}</div>
+                                <div class="text-[10px] text-rose-600 font-bold">no llegaron</div>
                             </div>
+                        </div>
+
+                        <div class="h-12 w-px bg-slate-200 hidden md:block"></div>
+
+                        {{-- Info badge --}}
+                        <div class="ml-auto text-xs text-slate-500 max-w-xs hidden md:block">
+                            <i class="fa-solid fa-circle-info text-brand"></i>
+                            <strong class="text-slate-700">"Llegaron"</strong> = aceptados por WhatsApp.
+                            Si el icono ✓ está verde, el cliente lo recibió.
                         </div>
                     </div>
 
@@ -330,9 +337,7 @@
                                     <th class="px-4 py-3 text-left">Estado</th>
                                     <th class="px-4 py-3 text-left">Cliente</th>
                                     <th class="px-4 py-3 text-left">Teléfono</th>
-                                    <th class="px-4 py-3 text-left">Enviado</th>
-                                    <th class="px-4 py-3 text-center">Entregado</th>
-                                    <th class="px-4 py-3 text-center">Leyó</th>
+                                    <th class="px-4 py-3 text-left">Cuándo se envió</th>
                                     <th class="px-4 py-3 text-center">Respondió</th>
                                     <th class="px-4 py-3 text-left">Detalle</th>
                                 </tr>
@@ -358,28 +363,11 @@
                                         <td class="px-3 py-2 text-slate-800 font-semibold truncate max-w-[180px]">{{ $d->nombre }}</td>
                                         <td class="px-3 py-2 text-slate-600 font-mono text-xs">{{ $d->telefono }}</td>
                                         <td class="px-3 py-2 text-xs text-slate-500">
-                                            {{ $d->enviado_at?->diffForHumans() ?? '—' }}
-                                        </td>
-                                        {{-- Entregado (ack >= 2) --}}
-                                        <td class="px-3 py-2 text-center">
-                                            @php $ackEntregado = ($d->ack_max ?? 0) >= 2 || $d->respondio_at; @endphp
-                                            @if($ackEntregado)
-                                                <span class="inline-flex items-center gap-1 rounded-full bg-sky-100 text-sky-700 px-2 py-0.5 text-[10px] font-bold" title="Entregado (✓✓)">
-                                                    <i class="fa-solid fa-check-double"></i> Sí
-                                                </span>
+                                            @if($d->enviado_at)
+                                                <span class="font-medium text-slate-700">{{ $d->enviado_at->format('d/m H:i') }}</span>
+                                                <div class="text-[10px] text-slate-400">{{ $d->enviado_at->diffForHumans() }}</div>
                                             @else
-                                                <span class="text-slate-300 text-[10px]">—</span>
-                                            @endif
-                                        </td>
-                                        {{-- Leyó (ack >= 3 OR respondió) --}}
-                                        <td class="px-3 py-2 text-center">
-                                            @php $ackLeyo = ($d->ack_max ?? 0) >= 3 || $d->respondio_at; @endphp
-                                            @if($ackLeyo)
-                                                <span class="inline-flex items-center gap-1 rounded-full bg-violet-100 text-violet-700 px-2 py-0.5 text-[10px] font-bold" title="Leyó (✓✓ azul)">
-                                                    <i class="fa-solid fa-eye"></i> Sí
-                                                </span>
-                                            @else
-                                                <span class="text-slate-300 text-[10px]">—</span>
+                                                <span class="text-slate-300">—</span>
                                             @endif
                                         </td>
                                         {{-- Respondió --}}
@@ -413,7 +401,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="8" class="px-4 py-8 text-center text-slate-400">
+                                        <td colspan="6" class="px-4 py-8 text-center text-slate-400">
                                             <i class="fa-solid fa-inbox text-2xl block mb-2"></i>
                                             No hay destinatarios con este estado.
                                         </td>
