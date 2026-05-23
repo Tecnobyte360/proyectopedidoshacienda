@@ -23,11 +23,21 @@ class ProcesarCampanasWhatsapp extends Command
             ->get();
 
         foreach ($programadas as $c) {
+            // Garantizar que tenga audiencia generada antes de activar
+            if ($c->total_destinatarios === 0) {
+                try {
+                    $sender->generarAudiencia($c);
+                    $c->refresh();
+                } catch (\Throwable $e) {
+                    $this->error("⚠️ Campaña #{$c->id}: no se pudo generar audiencia - " . $e->getMessage());
+                }
+            }
+
             $c->update([
                 'estado'      => CampanaWhatsapp::ESTADO_CORRIENDO,
                 'iniciada_at' => $c->iniciada_at ?: now(),
             ]);
-            $this->info("▶️ Campaña #{$c->id} '{$c->nombre}' iniciada.");
+            $this->info("▶️ Campaña #{$c->id} '{$c->nombre}' iniciada con {$c->total_destinatarios} destinatarios.");
         }
 
         // 2) Procesar campañas corriendo (un lote por cada una)

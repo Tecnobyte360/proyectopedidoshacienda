@@ -401,18 +401,49 @@ class Index extends Component
             'ventana_desde'      => $this->ventanaDesde . ':00',
             'ventana_hasta'      => $this->ventanaHasta . ':00',
             'programada_para'    => $this->programadaPara ?: null,
-            'estado'             => $this->programadaPara ? CampanaWhatsapp::ESTADO_PROGRAMADA : CampanaWhatsapp::ESTADO_BORRADOR,
+            // 🚀 Estado automático:
+            //   - Con fecha programada → "programada" (cron la activará en su momento)
+            //   - Sin fecha programada → "corriendo" (envía YA, sin click manual)
+            'estado'             => $this->programadaPara
+                ? CampanaWhatsapp::ESTADO_PROGRAMADA
+                : CampanaWhatsapp::ESTADO_CORRIENDO,
+            'iniciada_at'        => $this->programadaPara ? null : now(),
             'creado_por'         => auth()->id(),
         ];
 
         if ($this->editandoId) {
-            CampanaWhatsapp::findOrFail($this->editandoId)->update($data);
+            $c = CampanaWhatsapp::findOrFail($this->editandoId);
+            $c->update($data);
         } else {
-            CampanaWhatsapp::create($data);
+            $c = CampanaWhatsapp::create($data);
+        }
+
+        // 🎯 Generar audiencia automáticamente (siempre, así los filtros nuevos aplican)
+        try {
+            app(CampanaSenderService::class)->generarAudiencia($c);
+            $c->refresh();
+        } catch (\Throwable $e) {
+            // Si falla, no bloquear el guardado
         }
 
         $this->modal = false;
-        $this->dispatch('notify', ['type' => 'success', 'message' => 'Campaña guardada']);
+
+        // Mensaje contextual según lo que pasó
+        if ($this->programadaPara) {
+            $msg = "Campaña guardada para enviar el " . \Carbon\Carbon::parse($this->programadaPara)->format('d/m/Y H:i') . " ({$c->total_destinatarios} destinatarios)";
+            $type = 'success';
+        } elseif ($c->total_destinatarios === 0) {
+            $msg = 'Campaña guardada pero sin destinatarios. Revisa la audiencia.';
+            $type = 'warning';
+        } elseif (!$c->enHorario()) {
+            $msg = "Campaña guardada con {$c->total_destinatarios} destinatarios. Estás fuera de la ventana horaria ({$c->ventana_desde} - {$c->ventana_hasta}): se enviará automáticamente cuando vuelva a estar dentro.";
+            $type = 'warning';
+        } else {
+            $msg = "Campaña iniciada con {$c->total_destinatarios} destinatarios. Procesará el primer lote en menos de 1 min.";
+            $type = 'success';
+        }
+
+        $this->dispatch('notify', ['type' => $type, 'message' => $msg]);
     }
 
     public function generarAudiencia(int $id): void
