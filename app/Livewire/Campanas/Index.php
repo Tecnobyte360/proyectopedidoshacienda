@@ -505,6 +505,7 @@ class Index extends Component
             'creado_por'         => auth()->id(),
         ];
 
+        $esNueva = !$this->editandoId;
         if ($this->editandoId) {
             $c = CampanaWhatsapp::findOrFail($this->editandoId);
             $c->update($data);
@@ -512,12 +513,34 @@ class Index extends Component
             $c = CampanaWhatsapp::create($data);
         }
 
-        // 🎯 Generar audiencia automáticamente (siempre, así los filtros nuevos aplican)
+        // 🛡️ AUDIENCIA — REGLA CRÍTICA contra borrado accidental:
+        //
+        //   - Campaña NUEVA → siempre generar audiencia
+        //   - Campaña EXISTENTE sin envíos previos → puede regenerar (no se pierde nada)
+        //   - Campaña EXISTENTE CON envíos previos → NO regenerar (preserva los
+        //     que ya recibieron + los pendientes; sino el doble-envío al
+        //     reactivar dispara baneos de WhatsApp)
+        //
+        // Si necesitas RE-generar audiencia explícitamente, usa el botón
+        // "Generar audiencia" en la lista (método generarAudiencia()).
         try {
-            app(CampanaSenderService::class)->generarAudiencia($c);
-            $c->refresh();
+            $tieneEnviosPrevios = $c->destinatarios()
+                ->whereIn('estado', ['enviado', 'fallido'])
+                ->exists();
+
+            if ($esNueva || !$tieneEnviosPrevios) {
+                app(CampanaSenderService::class)->generarAudiencia($c);
+                $c->refresh();
+            } else {
+                \Illuminate\Support\Facades\Log::info('🛡️ Campaña editada con envíos previos — audiencia PRESERVADA', [
+                    'campana_id' => $c->id,
+                    'enviados'   => $c->total_enviados,
+                    'pendientes' => $c->total_pendientes,
+                ]);
+            }
         } catch (\Throwable $e) {
             // Si falla, no bloquear el guardado
+            \Illuminate\Support\Facades\Log::warning('Generar audiencia falló: ' . $e->getMessage());
         }
 
         // 🚀 DISPATCH del job SOLO si está programada con fecha. Sin fecha
