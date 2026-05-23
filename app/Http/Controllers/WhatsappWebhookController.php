@@ -708,7 +708,16 @@ class WhatsappWebhookController extends Controller
         $config = \App\Models\ConfiguracionBot::actual();
         $mensajesYaPersistidos = false;
 
-        if ($config->agrupar_mensajes_activo && (int) $config->agrupar_mensajes_segundos > 0) {
+        // 🐕 Mensajes virtuales del watchdog SKIPEAN el buffer/debounce. El
+        // watchdog ya garantizó que el cliente esperó ≥30s sin respuesta, no
+        // tiene sentido agregar 5s más de espera ni arriesgar perder el msg
+        // por debounce de un cliente que no está escribiendo otra cosa.
+        $esMensajeVirtualWatchdog = is_string($messageId)
+            && str_starts_with($messageId, 'watchdog_');
+
+        if (!$esMensajeVirtualWatchdog
+            && $config->agrupar_mensajes_activo
+            && (int) $config->agrupar_mensajes_segundos > 0) {
             $resultadoAgrupado = $this->agruparOEsperarMensajes(
                 $from,
                 $name,
