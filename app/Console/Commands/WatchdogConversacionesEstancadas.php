@@ -184,10 +184,15 @@ class WatchdogConversacionesEstancadas extends Command
         // El cliente NO necesita volver a escribir. Si el bot prometió algo
         // ("un momento", "déjame buscar") y >30s después no envió nada,
         // forzamos al bot a retomar inyectando un mensaje virtual.
+        // 🆕 MODO 2 — ventana más amplia (15 min) porque el cliente puede no
+        // escribir más después de ver "ahora confirmo" y solo esperar.
+        // Distinto del MODO 1 que depende de actividad reciente del cliente.
         $rescatadasBot = 0;
+        $modoMaxMins = 15;
+        $modoMinSegs = 30;
         $convsBotPasmado = ConversacionWhatsapp::withoutGlobalScopes()
-            ->where('updated_at', '>=', now()->subMinutes($maxMins + 5))
-            ->where('updated_at', '<=', now()->subSeconds($minSegs))
+            ->where('updated_at', '>=', now()->subMinutes($modoMaxMins + 5))
+            ->where('updated_at', '<=', now()->subSeconds($modoMinSegs))
             ->get();
 
         foreach ($convsBotPasmado as $conv) {
@@ -205,8 +210,8 @@ class WatchdogConversacionesEstancadas extends Command
             if (!preg_match(self::FRASES_ESPERA_REGEX, $contenido)) continue;
 
             $segundosDesde = abs((int) now()->diffInSeconds($ultimoMsg->created_at));
-            $maxSegs = $maxMins * 60;
-            if ($segundosDesde < $minSegs || $segundosDesde > $maxSegs) continue;
+            $modoMaxSegs = $modoMaxMins * 60;
+            if ($segundosDesde < $modoMinSegs || $segundosDesde > $modoMaxSegs) continue;
 
             // 🛡️ MODO 2: NO skipeamos por pedido reciente. Justamente cuando el
             // bot prometió "ahora confirmo" Y existe el pedido, el cliente
