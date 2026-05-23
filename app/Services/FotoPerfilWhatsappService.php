@@ -63,29 +63,37 @@ class FotoPerfilWhatsappService
             return null;
         }
 
-        // 1) Resolver credenciales WA del tenant
-        try {
-            $resolver = app(WhatsappResolverService::class);
-            $cred = $resolver->credenciales();
-        } catch (\Throwable $e) {
-            Log::warning('📸 FotoPerfil: no se pudieron resolver credenciales: ' . $e->getMessage());
-            return null;
+        // 🚀 RUTA RÁPIDA: si llegó profilePicUrl en el webhook reciente,
+        // está en cache — saltamos el API call.
+        $cacheKey = 'wa_profilepic_' . $numero;
+        $profilePicUrl = \Cache::get($cacheKey);
+
+        if (empty($profilePicUrl)) {
+            // RUTA LENTA: consultar API. Solo si no llegó en webhook.
+            try {
+                $resolver = app(WhatsappResolverService::class);
+                $cred = $resolver->credenciales();
+            } catch (\Throwable $e) {
+                Log::warning('📸 FotoPerfil: no se pudieron resolver credenciales: ' . $e->getMessage());
+                return null;
+            }
+
+            if (empty($cred['api_base_url'])) {
+                Log::warning('📸 FotoPerfil: tenant sin api_base_url', ['tenant_id' => $tenant->id]);
+                return null;
+            }
+
+            $token = $this->obtenerToken($cred, $resolver);
+            if (!$token) {
+                Log::warning('📸 FotoPerfil: sin token WhatsApp', ['tenant_id' => $tenant->id]);
+                return null;
+            }
+
+            $profilePicUrl = $this->consultarContacto($cred['api_base_url'], $token, $cliente->nombre ?: 'Cliente', $numero);
+        } else {
+            Log::info('📸 FotoPerfil: usando URL de cache (webhook reciente)', ['numero' => $numero]);
         }
 
-        if (empty($cred['api_base_url'])) {
-            Log::warning('📸 FotoPerfil: tenant sin api_base_url', ['tenant_id' => $tenant->id]);
-            return null;
-        }
-
-        // 2) Obtener token (login si no hay cache)
-        $token = $this->obtenerToken($cred, $resolver);
-        if (!$token) {
-            Log::warning('📸 FotoPerfil: sin token WhatsApp', ['tenant_id' => $tenant->id]);
-            return null;
-        }
-
-        // 3) POST /api/contact para obtener profilePicUrl
-        $profilePicUrl = $this->consultarContacto($cred['api_base_url'], $token, $cliente->nombre ?: 'Cliente', $numero);
         if (empty($profilePicUrl)) {
             Log::info('📸 FotoPerfil: contacto sin foto', [
                 'tenant_id' => $tenant->id,

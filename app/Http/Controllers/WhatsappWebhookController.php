@@ -113,6 +113,15 @@ class WhatsappWebhookController extends Controller
         $fromMe       = (bool) ($data['mensaje']['fromMe'] ?? $data['fromMe'] ?? false);
         $connectionId = $data['conexion']['id'] ?? $data['connectionId'] ?? $data['whatsappId'] ?? null;
 
+        // 📸 profilePicUrl ahora viene en chat.profilePicUrl (cambio en EstradaHub
+        // mayo 2026). Si está presente, lo guardamos en cache para que el job
+        // de sincronización lo use directamente sin re-llamar al API.
+        $waProfilePicUrl = $data['chat']['profilePicUrl'] ?? $data['profilePicUrl'] ?? null;
+        if ($waProfilePicUrl && !$fromMe && $from) {
+            $cacheKey = 'wa_profilepic_' . preg_replace('/\D+/', '', $from);
+            Cache::put($cacheKey, $waProfilePicUrl, now()->addMinutes(30));
+        }
+
         // 🎤/🖼️ MEDIA: detectar tipo y URL del archivo
         $tipoMensaje = strtolower(
             $data['mensaje']['type']
