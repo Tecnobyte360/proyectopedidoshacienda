@@ -77,6 +77,8 @@ class Index extends Component
     public string $wompi_integrity_secret   = '';
 
     // WhatsApp por tenant
+    public string $whatsapp_provider          = 'auto'; // auto | meta | tecnobyte
+    public bool   $whatsapp_fallback_enabled  = true;
     public string $whatsapp_email           = '';
     public string $whatsapp_password        = '';
     public array  $whatsapp_conexiones_disponibles = [];   // [{id, name, status, phoneNumber}]
@@ -140,6 +142,8 @@ class Index extends Component
             'subscription_ends_at' => 'nullable|date',
             'notas_internas'      => 'nullable|string|max:2000',
 
+            'whatsapp_provider'         => 'nullable|in:auto,meta,tecnobyte',
+            'whatsapp_fallback_enabled' => 'boolean',
             'whatsapp_email'         => 'nullable|email|max:150',
             'whatsapp_password'      => 'nullable|string|max:150',
             'whatsapp_api_base_url'  => 'nullable|string|max:200',
@@ -220,6 +224,10 @@ class Index extends Component
         $this->trial_ends_at        = $t->trial_ends_at?->format('Y-m-d');
         $this->subscription_ends_at = $t->subscription_ends_at?->format('Y-m-d');
         $this->notas_internas       = (string) $t->notas_internas;
+
+        // Proveedor WhatsApp (auto/meta/tecnobyte)
+        $this->whatsapp_provider          = (string) ($t->whatsapp_provider ?: 'auto');
+        $this->whatsapp_fallback_enabled  = (bool) ($t->whatsapp_fallback_enabled ?? true);
 
         // WhatsApp config
         $waConfig = $t->whatsapp_config ?? [];
@@ -522,6 +530,14 @@ class Index extends Component
                     Storage::disk('public')->delete($oldPath);
                 }
             }
+        }
+
+        // Proveedor de WhatsApp (auto/meta/tecnobyte)
+        if (\Illuminate\Support\Facades\Schema::hasColumn('tenants', 'whatsapp_provider')) {
+            $data['whatsapp_provider'] = in_array($this->whatsapp_provider, ['auto','meta','tecnobyte'], true)
+                ? $this->whatsapp_provider
+                : 'auto';
+            $data['whatsapp_fallback_enabled'] = (bool) $this->whatsapp_fallback_enabled;
         }
 
         // Solo guardar whatsapp_config si hay datos
@@ -895,6 +911,8 @@ class Index extends Component
         $this->trial_ends_at        = null;
         $this->subscription_ends_at = null;
         $this->notas_internas       = '';
+        $this->whatsapp_provider         = 'auto';
+        $this->whatsapp_fallback_enabled = true;
         $this->whatsapp_email           = '';
         $this->whatsapp_password        = '';
         $this->whatsapp_api_base_url    = 'https://wa-api.tecnobyteapp.com:1422';

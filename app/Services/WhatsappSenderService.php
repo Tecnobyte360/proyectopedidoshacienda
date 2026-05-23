@@ -30,23 +30,39 @@ class WhatsappSenderService
         bool $persistirEnConversacion = true,
         array $metaExtra = []
     ): bool {
-        // 📱 Dual provider: si el tenant tiene Meta WhatsApp activo, mandamos por ahí.
-        // Si no, sigue con la API legacy (TecnoByteApp) como hasta hoy.
-        try {
-            $metaCfg = app(\App\Services\Meta\MetaWhatsappCloudService::class)->resolverConfig();
-            if ($metaCfg) {
-                $ok = app(\App\Services\Meta\MetaWhatsappCloudService::class)
-                    ->enviarTexto($telefono, $mensaje, $metaCfg->tenant_id);
-                if ($ok && $persistirEnConversacion) {
-                    $this->persistirEnConversacion($telefono, $mensaje, $connectionId, array_merge(
-                        $metaExtra,
-                        ['provider' => 'meta']
-                    ));
+        // 📱 Dual provider: respeta la elección del tenant (auto / meta / tecnobyte).
+        $tenant = app(\App\Services\TenantManager::class)->current();
+        $provider = $tenant ? $tenant->proveedorWhatsappResuelto() : \App\Models\Tenant::WA_PROVIDER_TECNOBYTE;
+        $fallback = $tenant ? $tenant->fallbackWhatsappHabilitado() : true;
+
+        if ($provider === \App\Models\Tenant::WA_PROVIDER_META) {
+            try {
+                $metaCfg = app(\App\Services\Meta\MetaWhatsappCloudService::class)->resolverConfig();
+                if ($metaCfg) {
+                    $ok = app(\App\Services\Meta\MetaWhatsappCloudService::class)
+                        ->enviarTexto($telefono, $mensaje, $metaCfg->tenant_id);
+                    if ($ok) {
+                        if ($persistirEnConversacion) {
+                            $this->persistirEnConversacion($telefono, $mensaje, $connectionId, array_merge(
+                                $metaExtra,
+                                ['provider' => 'meta']
+                            ));
+                        }
+                        return true;
+                    }
+                    if (!$fallback) {
+                        Log::warning('WA Sender: Meta falló y fallback deshabilitado', ['to' => $telefono]);
+                        return false;
+                    }
+                    Log::info('WA Sender: Meta falló, intentando fallback legacy', ['to' => $telefono]);
+                } elseif (!$fallback) {
+                    Log::warning('WA Sender: provider=meta sin config y fallback deshabilitado');
+                    return false;
                 }
-                return $ok;
+            } catch (\Throwable $e) {
+                Log::warning('WA Sender: Meta excepción: ' . $e->getMessage());
+                if (!$fallback) return false;
             }
-        } catch (\Throwable $e) {
-            Log::warning('WA Sender: chequeo Meta falló, usando legacy: ' . $e->getMessage());
         }
 
         // Resolver credenciales del tenant actual (provider legacy)
@@ -129,24 +145,37 @@ class WhatsappSenderService
         bool $persistirEnConversacion = true,
         array $metaExtra = []
     ): bool {
-        // 📱 Dual provider: Meta primero
-        try {
-            $metaCfg = app(\App\Services\Meta\MetaWhatsappCloudService::class)->resolverConfig();
-            if ($metaCfg) {
-                $ok = app(\App\Services\Meta\MetaWhatsappCloudService::class)
-                    ->enviarImagen($telefono, $imagenUrl, $caption ?: null, $metaCfg->tenant_id);
-                if ($ok && $persistirEnConversacion) {
-                    $this->persistirEnConversacion(
-                        $telefono,
-                        $caption ?: '[imagen]',
-                        $connectionId,
-                        array_merge($metaExtra, ['provider' => 'meta', 'media_url' => $imagenUrl, 'tipo' => 'image'])
-                    );
+        // 📱 Dual provider: respeta elección del tenant
+        $tenant = app(\App\Services\TenantManager::class)->current();
+        $provider = $tenant ? $tenant->proveedorWhatsappResuelto() : \App\Models\Tenant::WA_PROVIDER_TECNOBYTE;
+        $fallback = $tenant ? $tenant->fallbackWhatsappHabilitado() : true;
+
+        if ($provider === \App\Models\Tenant::WA_PROVIDER_META) {
+            try {
+                $metaCfg = app(\App\Services\Meta\MetaWhatsappCloudService::class)->resolverConfig();
+                if ($metaCfg) {
+                    $ok = app(\App\Services\Meta\MetaWhatsappCloudService::class)
+                        ->enviarImagen($telefono, $imagenUrl, $caption ?: null, $metaCfg->tenant_id);
+                    if ($ok) {
+                        if ($persistirEnConversacion) {
+                            $this->persistirEnConversacion(
+                                $telefono,
+                                $caption ?: '[imagen]',
+                                $connectionId,
+                                array_merge($metaExtra, ['provider' => 'meta', 'media_url' => $imagenUrl, 'tipo' => 'image'])
+                            );
+                        }
+                        return true;
+                    }
+                    if (!$fallback) return false;
+                    Log::info('WA Sender imagen: Meta falló, intentando fallback legacy', ['to' => $telefono]);
+                } elseif (!$fallback) {
+                    return false;
                 }
-                return $ok;
+            } catch (\Throwable $e) {
+                Log::warning('WA Sender imagen: Meta excepción: ' . $e->getMessage());
+                if (!$fallback) return false;
             }
-        } catch (\Throwable $e) {
-            Log::warning('WA Sender imagen: chequeo Meta falló, usando legacy: ' . $e->getMessage());
         }
 
         // Legacy: TecnoByteApp expone /api/messages/send-media o similar.

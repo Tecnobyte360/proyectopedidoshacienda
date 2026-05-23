@@ -939,6 +939,50 @@
                         </div>
                     </div>
 
+                    {{-- 🔀 Selector de proveedor WhatsApp por tenant --}}
+                    <div class="rounded-xl border-2 border-indigo-200 bg-indigo-50/40 p-4 space-y-3">
+                        <div class="flex items-center gap-2">
+                            <i class="fa-solid fa-shuffle text-indigo-600 text-xl"></i>
+                            <div class="flex-1">
+                                <h4 class="font-bold text-slate-800 text-sm">Proveedor de WhatsApp</h4>
+                                <p class="text-xs text-slate-500">
+                                    Elige por qué canal saldrán los mensajes salientes de este tenant.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="space-y-2">
+                            <label class="flex items-start gap-2 cursor-pointer rounded-lg border border-slate-200 bg-white p-2 hover:border-indigo-300">
+                                <input type="radio" wire:model="whatsapp_provider" value="auto" class="mt-0.5">
+                                <div class="text-xs">
+                                    <span class="font-semibold text-slate-800">⚡ Automático</span>
+                                    <p class="text-slate-500">Usa Meta si hay configuración activa, sino TecnoByteApp.</p>
+                                </div>
+                            </label>
+                            <label class="flex items-start gap-2 cursor-pointer rounded-lg border border-slate-200 bg-white p-2 hover:border-indigo-300">
+                                <input type="radio" wire:model="whatsapp_provider" value="meta" class="mt-0.5">
+                                <div class="text-xs">
+                                    <span class="font-semibold text-slate-800">🟢 Meta WhatsApp Cloud API (oficial)</span>
+                                    <p class="text-slate-500">Requiere configurar en /meta-whatsapp con la WABA del tenant.</p>
+                                </div>
+                            </label>
+                            <label class="flex items-start gap-2 cursor-pointer rounded-lg border border-slate-200 bg-white p-2 hover:border-indigo-300">
+                                <input type="radio" wire:model="whatsapp_provider" value="tecnobyte" class="mt-0.5">
+                                <div class="text-xs">
+                                    <span class="font-semibold text-slate-800">🟡 TecnoByteApp (no oficial)</span>
+                                    <p class="text-slate-500">whatsapp-web.js. Más libre pero con riesgo de baneo.</p>
+                                </div>
+                            </label>
+                        </div>
+
+                        <label class="flex items-center gap-2 mt-2 text-xs cursor-pointer">
+                            <input type="checkbox" wire:model="whatsapp_fallback_enabled" class="rounded">
+                            <span class="text-slate-700">
+                                <strong>Habilitar fallback automático:</strong> si Meta falla, intentar por TecnoByteApp.
+                            </span>
+                        </label>
+                    </div>
+
                     {{-- 📱 WhatsApp del tenant: cada tenant tiene su PROPIA cuenta
                          TecnoByteApp + sus connection_ids. El sistema usa estas
                          credenciales para autenticarse y enviar/recibir mensajes

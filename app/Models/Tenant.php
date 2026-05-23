@@ -54,9 +54,21 @@ class Tenant extends Model
         'openai_api_key',
         'anthropic_api_key',
         'whatsapp_config',
+        'whatsapp_provider',
+        'whatsapp_fallback_enabled',
         'wompi_config',
         'wompi_modo',
         'notas_internas',
+    ];
+
+    public const WA_PROVIDER_AUTO      = 'auto';
+    public const WA_PROVIDER_META      = 'meta';
+    public const WA_PROVIDER_TECNOBYTE = 'tecnobyte';
+
+    public const WA_PROVIDERS = [
+        self::WA_PROVIDER_AUTO      => '⚡ Automático (Meta si está activo, sino TecnoByteApp)',
+        self::WA_PROVIDER_META      => '🟢 Meta WhatsApp Cloud API (oficial)',
+        self::WA_PROVIDER_TECNOBYTE => '🟡 TecnoByteApp (no oficial)',
     ];
 
     protected $casts = [
@@ -318,6 +330,41 @@ class Tenant extends Model
         }
         $global = trim((string) env('ANTHROPIC_API_KEY'));
         return $global !== '' ? $global : null;
+    }
+
+    /* ─── WHATSAPP PROVIDER ─────────────────────────────────────────── */
+
+    /**
+     * Devuelve qué proveedor de WhatsApp debe usar este tenant para envíos
+     * salientes: 'meta' | 'tecnobyte'. Resuelve 'auto' consultando si hay
+     * config Meta activa.
+     */
+    public function proveedorWhatsappResuelto(): string
+    {
+        $eleccion = $this->whatsapp_provider ?: self::WA_PROVIDER_AUTO;
+
+        if ($eleccion === self::WA_PROVIDER_META) {
+            return self::WA_PROVIDER_META;
+        }
+        if ($eleccion === self::WA_PROVIDER_TECNOBYTE) {
+            return self::WA_PROVIDER_TECNOBYTE;
+        }
+
+        // AUTO: Meta si hay config activa, sino TecnoByteApp
+        try {
+            $hayMeta = \App\Models\MetaWhatsappConfig::query()
+                ->where('tenant_id', $this->id)
+                ->where('activo', true)
+                ->exists();
+            return $hayMeta ? self::WA_PROVIDER_META : self::WA_PROVIDER_TECNOBYTE;
+        } catch (\Throwable $e) {
+            return self::WA_PROVIDER_TECNOBYTE;
+        }
+    }
+
+    public function fallbackWhatsappHabilitado(): bool
+    {
+        return (bool) ($this->whatsapp_fallback_enabled ?? true);
     }
 
     /* ─── WOMPI (pagos) ──────────────────────────────────────────────── */
