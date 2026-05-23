@@ -171,8 +171,112 @@ class WatchdogConversacionesEstancadas extends Command
             }
         }
 
-        if ($rescatadas > 0) {
-            $this->info("🐕 Watchdog: {$rescatadas} conversación(es) rescatada(s)");
+        // ──────────────────────────────────────────────────────────────
+        // 🆕 MODO 2 — BOT PASMADO ("déjame revisar" y se quedó callado)
+        // ──────────────────────────────────────────────────────────────
+        // El cliente NO necesita volver a escribir. Si el bot prometió algo
+        // ("un momento", "déjame buscar") y >30s después no envió nada,
+        // forzamos al bot a retomar inyectando un mensaje virtual.
+        $rescatadasBot = 0;
+        $convsBotPasmado = ConversacionWhatsapp::query()
+            ->where('updated_at', '>=', now()->subMinutes($maxMins + 5))
+            ->where('updated_at', '<=', now()->subSeconds($minSegs))
+            ->get();
+
+        foreach ($convsBotPasmado as $conv) {
+            $ultimoMsg = $conv->mensajes()->orderByDesc('id')->first();
+            if (!$ultimoMsg) continue;
+
+            // ⚠️ Diferencia clave: aquí queremos que el ÚLTIMO mensaje sea del BOT
+            if ($ultimoMsg->rol !== MensajeWhatsapp::ROL_ASSISTANT) continue;
+
+            // Evitar loops si ya fue rescatado
+            if (str_starts_with((string) ($ultimoMsg->mensaje_externo_id ?? ''), 'watchdog_')) continue;
+
+            // ¿El último mensaje del bot contiene una promesa sin cumplir?
+            $contenido = (string) $ultimoMsg->contenido;
+            if (!preg_match(self::FRASES_ESPERA_REGEX, $contenido)) continue;
+
+            $segundosDesde = abs((int) now()->diffInSeconds($ultimoMsg->created_at));
+            $maxSegs = $maxMins * 60;
+            if ($segundosDesde < $minSegs || $segundosDesde > $maxSegs) continue;
+
+            // Skip si ya hay pedido reciente
+            $tienePedidoReciente = $skipPedMin > 0 && \App\Models\Pedido::where('telefono_whatsapp', $conv->telefono_normalizado)
+                ->where('created_at', '>=', now()->subMinutes($skipPedMin))
+                ->whereNotIn('estado', [\App\Models\Pedido::ESTADO_CANCELADO])
+                ->exists();
+            if ($tienePedidoReciente) continue;
+
+            // Skip si está en modo humano (un operador atenderá)
+            if ($conv->atendida_por_humano) continue;
+
+            // Cooldowns separados del modo 1
+            $cooldownConv = "watchdog_bot_pasmado_conv_{$conv->id}";
+            $cooldownMsg  = "watchdog_bot_pasmado_msg_{$ultimoMsg->id}";
+            if (\Cache::has($cooldownConv) || \Cache::has($cooldownMsg)) continue;
+            \Cache::put($cooldownConv, true, now()->addMinutes($cooldownMin));
+            \Cache::put($cooldownMsg,  true, now()->addHours(24));
+
+            Log::warning('🐕 Watchdog MODO 2: BOT PASMADO — re-disparando flujo', [
+                'conversacion_id' => $conv->id,
+                'telefono'        => $conv->telefono_normalizado,
+                'segundos_desde'  => $segundosDesde,
+                'frase'           => mb_substr($contenido, 0, 100),
+            ]);
+
+            try {
+                // Inyectar mensaje virtual del cliente para que el bot retome
+                // El contenido pide explícitamente que continúe lo que prometió
+                $payload = [
+                    'usuario'  => ['id' => 0, 'name' => 'Watchdog', 'email' => ''],
+                    'conexion' => ['id' => $conv->connection_id ?? 0, 'name' => 'WATCHDOG', 'status' => 'CONNECTED'],
+                    'chat'     => [
+                        'id'             => $conv->id,
+                        'name'           => $conv->cliente?->nombre ?? 'Cliente',
+                        'phone'          => $conv->telefono_normalizado,
+                        'status'         => 'open',
+                        'isGroup'        => false,
+                        'unreadMessages' => 1,
+                    ],
+                    'mensaje'  => [
+                        'id'        => 'watchdog_botpasmado_' . $ultimoMsg->id,
+                        // Mensaje neutro que dispara al bot a continuar.
+                        // El bot procesa el historial y completa la promesa.
+                        'body'      => '(continúa)',
+                        'fromMe'    => false,
+                        'read'      => false,
+                        'mediaType' => 'chat',
+                        'createdAt' => now()->toIso8601String(),
+                        '_virtual'  => true,
+                    ],
+                ];
+
+                $url  = config('app.url') . '/api/whatsapp-webhook';
+                $resp = \Http::timeout(30)->post($url, $payload);
+                $exitoso = $resp->successful();
+
+                try {
+                    \App\Models\WatchdogRescate::create([
+                        'tenant_id'          => $conv->tenant_id ?? null,
+                        'conversacion_id'    => $conv->id,
+                        'telefono'           => $conv->telefono_normalizado,
+                        'mensaje_origen_id'  => $ultimoMsg->id,
+                        'mensaje_contenido'  => '[BOT PASMADO] ' . mb_substr($contenido, 0, 400),
+                        'segundos_estancada' => $segundosDesde,
+                        'exitoso'            => $exitoso,
+                        'error_mensaje'      => $exitoso ? null : mb_substr($resp->body(), 0, 500),
+                    ]);
+                } catch (\Throwable $e) {}
+
+                $rescatadasBot++;
+            } catch (\Throwable $e) {
+                Log::warning('🐕 Watchdog MODO 2: error', ['conv' => $conv->id, 'err' => $e->getMessage()]);
+            }
+        }
+
+        if ($rescatadas > 0 || $rescatadasBot > 0) {
+            $this->info("🐕 Watchdog: cliente_esperando={$rescatadas} bot_pasmado={$rescatadasBot}");
         }
 
         return self::SUCCESS;
