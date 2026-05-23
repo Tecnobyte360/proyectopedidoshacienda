@@ -225,6 +225,71 @@ class Index extends Component
         $zonas    = ZonaCobertura::where('activa', true)->orderBy('nombre')->get();
         $sedes    = Sede::orderBy('nombre')->get();
 
+        // 📋 Cola de jobs pendientes (en cola 'campanas')
+        $colaJobs = collect();
+        $failedJobs = collect();
+        try {
+            $tenantActual = app(\App\Services\TenantManager::class)->current();
+            $campanasIds = $tenantActual
+                ? CampanaWhatsapp::where('tenant_id', $tenantActual->id)->pluck('id')->toArray()
+                : [];
+
+            // Jobs pendientes en cola
+            $rawJobs = \Illuminate\Support\Facades\DB::table('jobs')
+                ->where('queue', 'campanas')
+                ->orderBy('available_at')
+                ->limit(20)
+                ->get(['id', 'queue', 'payload', 'attempts', 'available_at', 'created_at']);
+
+            $colaJobs = $rawJobs->map(function ($j) use ($campanasIds) {
+                $payload = json_decode($j->payload, true);
+                $cmdSerialized = $payload['data']['command'] ?? '';
+                // Extraer campanaId del payload (objeto serializado de PHP)
+                $campanaId = null;
+                if (preg_match('/campanaId";i:(\d+)/', $cmdSerialized, $m)) {
+                    $campanaId = (int) $m[1];
+                }
+                $campana = $campanaId ? CampanaWhatsapp::find($campanaId) : null;
+                $isMyTenant = $campanaId && in_array($campanaId, $campanasIds);
+
+                return (object) [
+                    'id'           => $j->id,
+                    'campana_id'   => $campanaId,
+                    'campana'      => $campana,
+                    'is_mine'      => $isMyTenant,
+                    'attempts'     => $j->attempts,
+                    'available_at' => \Carbon\Carbon::createFromTimestamp($j->available_at),
+                    'created_at'   => \Carbon\Carbon::createFromTimestamp($j->created_at),
+                ];
+            })->filter(fn ($j) => $j->is_mine);
+
+            // Jobs fallidos del tenant
+            $failedJobs = \Illuminate\Support\Facades\DB::table('failed_jobs')
+                ->where('queue', 'campanas')
+                ->orderByDesc('failed_at')
+                ->limit(10)
+                ->get(['id', 'payload', 'exception', 'failed_at'])
+                ->map(function ($j) use ($campanasIds) {
+                    $payload = json_decode($j->payload, true);
+                    $cmdSerialized = $payload['data']['command'] ?? '';
+                    $campanaId = null;
+                    if (preg_match('/campanaId";i:(\d+)/', $cmdSerialized, $m)) {
+                        $campanaId = (int) $m[1];
+                    }
+                    return (object) [
+                        'id'         => $j->id,
+                        'campana_id' => $campanaId,
+                        'campana'    => $campanaId ? CampanaWhatsapp::find($campanaId) : null,
+                        'is_mine'    => $campanaId && in_array($campanaId, $campanasIds),
+                        'error'      => mb_substr(strtok($j->exception, "\n"), 0, 200),
+                        'failed_at'  => \Carbon\Carbon::parse($j->failed_at),
+                    ];
+                })
+                ->filter(fn ($j) => $j->is_mine);
+        } catch (\Throwable $e) {
+            // Si falla, no rompe la página
+        }
+
         // 📡 Monitor en vivo
         $monitorCampana = null;
         $monitorDestinatarios = collect();
@@ -318,8 +383,31 @@ class Index extends Component
 
         return view('livewire.campanas.index', compact(
             'campanas', 'zonas', 'sedes',
-            'monitorCampana', 'monitorDestinatarios', 'monitorEstadisticas'
+            'monitorCampana', 'monitorDestinatarios', 'monitorEstadisticas',
+            'colaJobs', 'failedJobs'
         ))->layout('layouts.app');
+    }
+
+    /** Reintentar un job fallido */
+    public function reintentarJobFallido(int $failedJobId): void
+    {
+        try {
+            \Illuminate\Support\Facades\Artisan::call('queue:retry', ['id' => [$failedJobId]]);
+            $this->dispatch('notify', ['type' => 'success', 'message' => 'Job re-encolado para reintento']);
+        } catch (\Throwable $e) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Error: ' . $e->getMessage()]);
+        }
+    }
+
+    /** Borrar un job fallido */
+    public function borrarJobFallido(int $failedJobId): void
+    {
+        try {
+            \Illuminate\Support\Facades\DB::table('failed_jobs')->where('id', $failedJobId)->delete();
+            $this->dispatch('notify', ['type' => 'success', 'message' => 'Job fallido eliminado']);
+        } catch (\Throwable $e) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Error: ' . $e->getMessage()]);
+        }
     }
 
     public function abrirCrear(): void

@@ -51,6 +51,130 @@
             <p>El envío usa intervalos aleatorios entre cada mensaje y descansos por lote para evitar que WhatsApp banee tu número (ya que estamos usando whatsapp-web.js, no la API oficial de Meta). Asegúrate que el cron <code class="bg-white px-1 rounded">campanas:procesar</code> corra cada minuto.</p>
         </div>
 
+        {{-- 🔄 MONITOR DE COLA DE JOBS (auto-refresh 5s) --}}
+        @if(($colaJobs && $colaJobs->isNotEmpty()) || ($failedJobs && $failedJobs->isNotEmpty()))
+            <div class="rounded-2xl bg-gradient-to-br from-slate-900 to-slate-800 text-white p-5 shadow-lg" wire:poll.5s>
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-3">
+                        <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 backdrop-blur">
+                            <i class="fa-solid fa-list-check text-brand"></i>
+                        </span>
+                        <div>
+                            <h3 class="font-extrabold text-base flex items-center gap-2">
+                                Cola de envíos
+                                <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 text-emerald-300 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+                                    <span class="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                                    En vivo · 5s
+                                </span>
+                            </h3>
+                            <p class="text-[11px] text-slate-400">Worker procesando jobs en background</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3 text-xs">
+                        <div class="text-center">
+                            <div class="text-2xl font-black text-brand">{{ $colaJobs->count() }}</div>
+                            <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Pendientes</div>
+                        </div>
+                        @if($failedJobs->isNotEmpty())
+                            <div class="text-center">
+                                <div class="text-2xl font-black text-rose-400">{{ $failedJobs->count() }}</div>
+                                <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Fallidos</div>
+                            </div>
+                        @endif
+                    </div>
+                </div>
+
+                {{-- Jobs pendientes --}}
+                @if($colaJobs->isNotEmpty())
+                    <div class="space-y-2 mb-4">
+                        <p class="text-[10px] uppercase tracking-wider font-bold text-slate-400">📋 Esperando ejecución</p>
+                        @foreach($colaJobs as $job)
+                            @php
+                                $eta = $job->available_at->diffForHumans(['parts' => 2, 'short' => true]);
+                                $listo = $job->available_at->isPast();
+                            @endphp
+                            <div class="flex items-center justify-between gap-3 rounded-xl bg-white/5 backdrop-blur border border-white/10 px-4 py-2.5 hover:bg-white/10 transition">
+                                <div class="flex items-center gap-3 min-w-0 flex-1">
+                                    <span class="flex h-8 w-8 items-center justify-center rounded-lg {{ $listo ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300' }}">
+                                        @if($listo)
+                                            <i class="fa-solid fa-bolt text-xs"></i>
+                                        @else
+                                            <i class="fa-regular fa-clock text-xs"></i>
+                                        @endif
+                                    </span>
+                                    <div class="min-w-0 flex-1">
+                                        <p class="text-sm font-bold truncate">
+                                            @if($job->campana)
+                                                {{ $job->campana->nombre }}
+                                            @else
+                                                <span class="text-slate-400 italic">Campaña #{{ $job->campana_id }}</span>
+                                            @endif
+                                        </p>
+                                        <p class="text-[11px] text-slate-400">
+                                            @if($listo)
+                                                <span class="text-emerald-300 font-semibold">⚡ Procesando ahora...</span>
+                                            @else
+                                                Se ejecutará {{ $eta }}
+                                                <span class="text-slate-500">·</span>
+                                                {{ $job->available_at->format('d/m H:i:s') }}
+                                            @endif
+                                            @if($job->attempts > 0)
+                                                <span class="text-amber-400 ml-2">· {{ $job->attempts }} intento(s)</span>
+                                            @endif
+                                        </p>
+                                    </div>
+                                </div>
+                                <div class="text-[10px] text-slate-500 font-mono">#{{ $job->id }}</div>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
+
+                {{-- Jobs fallidos --}}
+                @if($failedJobs->isNotEmpty())
+                    <div class="space-y-2">
+                        <p class="text-[10px] uppercase tracking-wider font-bold text-rose-400">
+                            <i class="fa-solid fa-triangle-exclamation"></i> Fallos recientes
+                        </p>
+                        @foreach($failedJobs as $job)
+                            <div class="flex items-center justify-between gap-3 rounded-xl bg-rose-500/10 border border-rose-500/30 px-4 py-2.5">
+                                <div class="flex items-center gap-3 min-w-0 flex-1">
+                                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-500/20 text-rose-300">
+                                        <i class="fa-solid fa-circle-xmark text-xs"></i>
+                                    </span>
+                                    <div class="min-w-0 flex-1">
+                                        <p class="text-sm font-bold truncate">
+                                            @if($job->campana)
+                                                {{ $job->campana->nombre }}
+                                            @else
+                                                <span class="text-slate-400 italic">Campaña #{{ $job->campana_id }}</span>
+                                            @endif
+                                        </p>
+                                        <p class="text-[11px] text-rose-300 truncate" title="{{ $job->error }}">
+                                            {{ $job->error }}
+                                        </p>
+                                        <p class="text-[10px] text-slate-500 mt-0.5">Falló {{ $job->failed_at->diffForHumans() }}</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-1">
+                                    <button wire:click="reintentarJobFallido({{ $job->id }})"
+                                            class="h-8 w-8 inline-flex items-center justify-center rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 transition"
+                                            title="Reintentar">
+                                        <i class="fa-solid fa-rotate-right text-xs"></i>
+                                    </button>
+                                    <button wire:click="borrarJobFallido({{ $job->id }})"
+                                            class="h-8 w-8 inline-flex items-center justify-center rounded-lg bg-slate-700/50 hover:bg-slate-600/50 text-slate-300 transition"
+                                            title="Eliminar">
+                                        <i class="fa-solid fa-trash-can text-xs"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
+            </div>
+        @endif
+
         <div class="rounded-2xl bg-white border border-slate-200 shadow-sm overflow-hidden">
             <table class="w-full text-sm">
                 <thead class="bg-slate-50 border-b border-slate-200">
