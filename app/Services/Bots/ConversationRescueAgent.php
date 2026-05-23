@@ -139,9 +139,13 @@ class ConversationRescueAgent
         if (!$clienteRespondioDespues) return false;
 
         // 3) ¿Pasaron ≥3 min desde el último mensaje del bot?
+        // ⚠️ Carbon 3 devuelve negativo en diffInMinutes de fecha pasada — abs()
         $ultimoMsgBot = $msgs->where('rol', MensajeWhatsapp::ROL_ASSISTANT)->last();
-        if ($ultimoMsgBot && now()->diffInMinutes($ultimoMsgBot->created_at) < self::ESPERAR_MIN_ANTES_RESCATAR) {
-            return false;
+        if ($ultimoMsgBot) {
+            $minutosDesdeUltimo = abs(\Carbon\Carbon::parse($ultimoMsgBot->created_at)->diffInMinutes(now()));
+            if ($minutosDesdeUltimo < self::ESPERAR_MIN_ANTES_RESCATAR) {
+                return false;
+            }
         }
 
         return true;
