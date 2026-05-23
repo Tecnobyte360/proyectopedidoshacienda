@@ -8491,7 +8491,24 @@ TXT;
             ? $config->system_prompt
             : BotPromptService::plantillaGenerica();
 
-        $prompt = $promptService->renderizar($base, $contexto);
+        // 💰 PROMPT CACHING: las vars VOLÁTILES (fecha, hora, estado sede,
+        // memoria por turno) cambian cada minuto y si se renderizan inline
+        // dentro del prompt, invalidan el cache de Anthropic en cada request.
+        // Las sacamos del cuerpo (poniéndolas vacías) y las re-inyectamos
+        // al final como footer separado por <<<CACHE_BREAK>>>. Anthropic
+        // splittea ahí y cachea solo lo estable.
+        $varsVolatiles = [
+            'fecha_actual', 'hora_actual', 'saludo_hora',
+            'sede_estado_actual',
+            'memoria_cliente', 'memoria_conversacion',
+            'historial_cliente',
+        ];
+        $contextoEstable = $contexto;
+        foreach ($varsVolatiles as $k) {
+            $contextoEstable[$k] = ''; // las anulamos para el render del cuerpo
+        }
+
+        $prompt = $promptService->renderizar($base, $contextoEstable);
 
         // Si hay INSTRUCCIONES EXTRA definidas por el usuario, las APPENDEAMOS al final.
         // No reemplazan nada — se suman. Útiles para reglas específicas del negocio
@@ -8744,6 +8761,38 @@ TXT;
                  . "  Si en los DATOS YA CAPTURADOS aparece un nombre y al hablar con el cliente este no coincide,\n"
                  . "  o tienes dudas, **pregunta de nuevo nombre + cédula** antes de cerrar pedido.\n"
                  . "  Mejor preguntar 1 vez más que registrar pedido a nombre equivocado.\n";
+
+        // 💰 FOOTER VOLÁTIL — separado por <<<CACHE_BREAK>>> para que TODO lo
+        // anterior se cachee en Anthropic. Todo lo que cambia por turno
+        // (fecha/hora) o por conversación (memoria/historial) va aquí.
+        $fechaActual    = $contexto['fecha_actual']        ?? '';
+        $horaActual     = $contexto['hora_actual']         ?? '';
+        $saludoHora     = $contexto['saludo_hora']         ?? '';
+        $sedeEstadoNow  = $contexto['sede_estado_actual']  ?? '';
+        $memCliente     = $contexto['memoria_cliente']     ?? '';
+        $memConv        = $contexto['memoria_conversacion'] ?? '';
+        $histCli        = $contexto['historial_cliente']   ?? '';
+
+        $prompt .= "\n\n<<<CACHE_BREAK>>>\n\n"
+                 . "═══════════════════════════════════════════════════════════════════════════════\n"
+                 . "# 📅 CONTEXTO ACTUAL DEL TURNO (volátil — cambia cada mensaje)\n\n"
+                 . "Hoy es **{$fechaActual}** ({$horaActual}). Saludo apropiado: {$saludoHora}.\n";
+
+        if ($sedeEstadoNow !== '') {
+            $prompt .= "\nEstado de la sede ahora: **{$sedeEstadoNow}**\n";
+        }
+
+        if (trim($memCliente) !== '') {
+            $prompt .= "\n# 🧠 MEMORIA DEL CLIENTE\n{$memCliente}\n";
+        }
+
+        if (trim($memConv) !== '') {
+            $prompt .= "\n# 💬 MEMORIA DE LA CONVERSACIÓN\n{$memConv}\n";
+        }
+
+        if (trim($histCli) !== '') {
+            $prompt .= "\n# 📋 HISTORIAL DE PEDIDOS PREVIOS\n{$histCli}\n";
+        }
 
         return $prompt;
     }
