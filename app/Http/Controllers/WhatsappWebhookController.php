@@ -9721,6 +9721,19 @@ PROMPT;
 
     private function enviarRespuestaWhatsapp(string $from, string $reply, $connectionId = null): bool
     {
+        // 🛡️ GUARD: solo enviar a números reales de WhatsApp. El espejo del
+        // widget de chat web usa "telefono_normalizado" tipo "w<hash>" que
+        // NO es número y la API rechaza. Antes esto ensuciaba la cola con
+        // 76 mensajes fallidos a "w0c098ed2154a" etc.
+        $telNum = preg_replace('/\D+/', '', $from);
+        if ($telNum === '' || strlen($telNum) < 8 || str_starts_with($from, 'w')) {
+            Log::info('🌐 Conversación de widget — NO enviar por WhatsApp', [
+                'from'    => $from,
+                'preview' => mb_substr($reply, 0, 80),
+            ]);
+            return true; // retornamos true para no romper el flujo del bot
+        }
+
         try {
             $payload = [
                 'number' => $from,
@@ -10438,6 +10451,19 @@ PROMPT;
     private function encolarMensajeSalida(string $telefono, $connectionId, array $payload, string $error): void
     {
         try {
+            // 🛡️ GUARD: el "teléfono" debe ser un número real para WhatsApp.
+            // El widget de chat genera espejos en conversaciones_whatsapp con
+            // telefono_normalizado = "w<hash>" (no es número). Si esto llega
+            // acá, NO encolamos — WhatsApp lo rechazará 12 veces y ensucia la cola.
+            $telNum = preg_replace('/\D+/', '', $telefono);
+            if ($telNum === '' || strlen($telNum) < 8 || str_starts_with($telefono, 'w')) {
+                Log::warning('🚫 NO encolando — teléfono inválido (probablemente espejo del widget)', [
+                    'telefono'  => $telefono,
+                    'preview'   => mb_substr(($payload['body'] ?? ''), 0, 80),
+                ]);
+                return;
+            }
+
             $tenantId = app(\App\Services\TenantManager::class)->id();
 
             // Buscar conversación asociada por teléfono (para poder mostrarla en monitoreo)

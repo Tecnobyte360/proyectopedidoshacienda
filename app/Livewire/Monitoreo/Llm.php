@@ -30,6 +30,39 @@ class Llm extends Component
         $this->cargarParametrosCola();
     }
 
+    /**
+     * 🛡️ AISLAMIENTO POR TENANT
+     *
+     * Devuelve el tenant_id actual o null si es super-admin (que puede ver todo).
+     * Si retorna int → todas las queries deben filtrar por ese tenant.
+     * Si retorna null → super-admin viendo "todos los tenants".
+     */
+    private function tenantFilter(): ?int
+    {
+        try {
+            // Super-admin: si puede ver todos los tenants, no filtra
+            $user = auth()->user();
+            if ($user && method_exists($user, 'esSuperAdmin') && $user->esSuperAdmin()) {
+                // Si está "imitando" un tenant desde el panel super-admin, sí filtramos
+                if ($imit = session('tenant_imitado_id')) return (int) $imit;
+                return null;
+            }
+            return app(\App\Services\TenantManager::class)->id();
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Aplica filtro de tenant a una query DB Builder si hay tenant activo.
+     */
+    private function scoTenant($query, string $col = 'tenant_id')
+    {
+        $tid = $this->tenantFilter();
+        if ($tid !== null) $query->where($col, $tid);
+        return $query;
+    }
+
     private function cargarParametrosCola(): void
     {
         try {
@@ -194,13 +227,13 @@ class Llm extends Component
     }
 
     /**
-     * 🧹 Limpiar mensajes enviados/fallidos antiguos (>7 días).
+     * 🧹 Limpiar mensajes enviados/fallidos antiguos (>7 días) — solo del tenant actual.
      */
     public function limpiarColaSalida(): void
     {
-        $borrados = DB::table('mensajes_salida_pendientes')
-            ->where(function ($q) {
-                $q->whereNotNull('enviado_at')->orWhereNotNull('fallido_permanente_at');
+        $q = $this->scoTenant(DB::table('mensajes_salida_pendientes'));
+        $borrados = $q->where(function ($q2) {
+                $q2->whereNotNull('enviado_at')->orWhereNotNull('fallido_permanente_at');
             })
             ->where('updated_at', '<', now()->subDays(7))
             ->delete();
@@ -290,13 +323,13 @@ class Llm extends Component
             ->limit(50)
             ->get();
 
-        // 📬 COLA DE SALIDA — KPIs y mensajes recientes
+        // 📬 COLA DE SALIDA — KPIs y mensajes recientes (FILTRADO POR TENANT)
         $coTabla = 'mensajes_salida_pendientes';
-        $coPendientes = DB::table($coTabla)
+        $coPendientes = $this->scoTenant(DB::table($coTabla))
             ->whereNull('enviado_at')
             ->whereNull('fallido_permanente_at')
             ->count();
-        $coReady = DB::table($coTabla)
+        $coReady = $this->scoTenant(DB::table($coTabla))
             ->whereNull('enviado_at')
             ->whereNull('fallido_permanente_at')
             ->where(function ($q) {
@@ -304,28 +337,30 @@ class Llm extends Component
                   ->orWhere('proximo_intento_at', '<=', now());
             })
             ->count();
-        $coEnviadosVentana = DB::table($coTabla)
+        $coEnviadosVentana = $this->scoTenant(DB::table($coTabla))
             ->whereNotNull('enviado_at')
             ->where('updated_at', '>=', $desde)
             ->count();
-        $coFallidosPerm = DB::table($coTabla)
+        $coFallidosPerm = $this->scoTenant(DB::table($coTabla))
             ->whereNotNull('fallido_permanente_at')
             ->where('updated_at', '>=', $desde)
             ->count();
-        $coUltimosMensajes = DB::table($coTabla)
+        $coUltimosMensajes = $this->scoTenant(DB::table($coTabla))
             ->orderByDesc('id')
             ->limit(50)
             ->get();
         // Estados WhatsApp por conexión (lo que vemos de la API)
-        $coEstadoWa = DB::table($coTabla)
+        $coEstadoWa = $this->scoTenant(DB::table($coTabla))
             ->selectRaw('connection_id, COUNT(*) as total')
             ->whereNull('enviado_at')
             ->whereNull('fallido_permanente_at')
             ->groupBy('connection_id')
             ->get();
 
-        // 🔄 ERP RETRY QUEUE — KPIs e items recientes
+        // 🔄 ERP RETRY QUEUE — KPIs e items recientes (FILTRADO POR TENANT)
+        $tidErp = $this->tenantFilter();
         $erpQuery = \App\Models\ErpPedidoPendiente::withoutGlobalScopes();
+        if ($tidErp !== null) $erpQuery->where('tenant_id', $tidErp);
         $erpPendientes      = (clone $erpQuery)->where('estado', \App\Models\ErpPedidoPendiente::ESTADO_PENDIENTE)->count();
         $erpReady           = (clone $erpQuery)->where('estado', \App\Models\ErpPedidoPendiente::ESTADO_PENDIENTE)
                                 ->where(function ($q) {
