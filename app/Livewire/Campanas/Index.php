@@ -426,21 +426,37 @@ class Index extends Component
     {
         $c = CampanaWhatsapp::findOrFail($id);
 
-        if ($c->total_destinatarios === 0) {
-            app(CampanaSenderService::class)->generarAudiencia($c);
-            $c->refresh();
-        }
+        // ✅ SIEMPRE regenerar audiencia al iniciar (no solo si está en 0).
+        // Esto asegura que si el usuario editó los filtros después de la primera
+        // generación, los nuevos destinatarios se creen y los viejos se limpien.
+        app(CampanaSenderService::class)->generarAudiencia($c);
+        $c->refresh();
 
         if ($c->total_destinatarios === 0) {
-            $this->dispatch('notify', ['type' => 'error', 'message' => 'Sin destinatarios. Revisa la audiencia.']);
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'Sin destinatarios. Verifica que los teléfonos sean válidos o que haya clientes activos.',
+            ]);
             return;
+        }
+
+        // ⚠️ Avisar si la hora actual está fuera de la ventana configurada
+        if (!$c->enHorario()) {
+            $this->dispatch('notify', [
+                'type'    => 'warning',
+                'message' => "Campaña iniciada pero estás fuera de la ventana horaria ({$c->ventana_desde} - {$c->ventana_hasta}). Se enviará mañana cuando vuelva a estar dentro del horario.",
+            ]);
+        } else {
+            $this->dispatch('notify', [
+                'type' => 'success',
+                'message' => "Campaña iniciada con {$c->total_destinatarios} destinatario(s). Procesará en el próximo lote (max 1 min).",
+            ]);
         }
 
         $c->update([
             'estado'      => CampanaWhatsapp::ESTADO_CORRIENDO,
             'iniciada_at' => $c->iniciada_at ?: now(),
         ]);
-        $this->dispatch('notify', ['type' => 'success', 'message' => 'Campaña iniciada. Procesará en lotes según el cron.']);
     }
 
     public function pausar(int $id): void
