@@ -428,6 +428,22 @@ class Index extends Component
             // Si falla, no bloquear el guardado
         }
 
+        // 🚀 DISPATCH del job — se procesa en background por el queue worker
+        try {
+            if ($this->programadaPara) {
+                // Campaña programada → job con delay hasta la hora exacta
+                \App\Jobs\ProcesarCampanaJob::dispatch($c->id)
+                    ->delay(\Carbon\Carbon::parse($this->programadaPara));
+            } else {
+                // Sin programar → procesa lo más pronto posible
+                \App\Jobs\ProcesarCampanaJob::dispatch($c->id);
+            }
+        } catch (\Throwable $e) {
+            // Si falla el dispatch, no pasa nada: el cron campanas:procesar
+            // funciona como respaldo y la procesará en máximo 1 min.
+            \Illuminate\Support\Facades\Log::warning('No se pudo despachar ProcesarCampanaJob: ' . $e->getMessage());
+        }
+
         $this->modal = false;
 
         // Mensaje contextual según lo que pasó
