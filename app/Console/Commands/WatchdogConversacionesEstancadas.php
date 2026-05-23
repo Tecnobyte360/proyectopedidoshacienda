@@ -25,7 +25,12 @@ class WatchdogConversacionesEstancadas extends Command
     protected $signature = 'bot:watchdog-estancadas';
     protected $description = 'Rescata conversaciones donde el bot prometió respuesta y no continuó';
 
-    private const FRASES_ESPERA_REGEX = '/\b(?:un\s+momento|d[eé]jame\s+(?:verificar|revisar|consultar)|verificando|consultando|revisando|ya\s+(?:te|le)\s+(?:respondo|aviso|consulto)|enseguida\s+(?:te|le)|en\s+un\s+momento)\b/iu';
+    /**
+     * Frases típicas del bot que prometen acción pero NO siempre la cumplen.
+     * Si el último mensaje del bot matchea esto y queda callado >30s, lo
+     * forzamos a retomar el flujo.
+     */
+    private const FRASES_ESPERA_REGEX = '/\b(?:un\s+momento|d[eé]jame\s+(?:verificar|revisar|consultar|buscar)|verificando|consultando|revisando|buscando|procesando|registrando|creando|confirmando|ya\s+(?:te|le)\s+(?:respondo|aviso|consulto|confirmo|registro)|enseguida\s+(?:te|le)|en\s+un\s+momento|(?:ahora|voy\s+a)\s+(?:confirmo|registro|verifico|reviso|consulto|busco)|estoy\s+(?:verificando|revisando|buscando|confirmando|procesando|registrando)|me\s+permito\s+(?:verificar|revisar|consultar))\b/iu';
 
     public function handle(): int
     {
@@ -201,12 +206,11 @@ class WatchdogConversacionesEstancadas extends Command
             $maxSegs = $maxMins * 60;
             if ($segundosDesde < $minSegs || $segundosDesde > $maxSegs) continue;
 
-            // Skip si ya hay pedido reciente
-            $tienePedidoReciente = $skipPedMin > 0 && \App\Models\Pedido::where('telefono_whatsapp', $conv->telefono_normalizado)
-                ->where('created_at', '>=', now()->subMinutes($skipPedMin))
-                ->whereNotIn('estado', [\App\Models\Pedido::ESTADO_CANCELADO])
-                ->exists();
-            if ($tienePedidoReciente) continue;
+            // 🛡️ MODO 2: NO skipeamos por pedido reciente. Justamente cuando el
+            // bot prometió "ahora confirmo" Y existe el pedido, el cliente
+            // está esperando la confirmación final. Forzamos al bot a retomar
+            // y el guard anti-dup en guardarPedidoDesdeToolCall responderá
+            // con el pedido existente.
 
             // Skip si está en modo humano (un operador atenderá)
             if ($conv->atendida_por_humano) continue;
