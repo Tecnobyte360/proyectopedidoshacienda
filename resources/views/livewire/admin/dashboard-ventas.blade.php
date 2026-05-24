@@ -21,54 +21,74 @@
         </div>
     </div>
 
-    {{-- KPIs HERMOSOS --}}
+    {{-- KPIs SOFT PASTEL --}}
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
 
         {{-- Ingresos del rango --}}
-        <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-700 p-5 text-white shadow-xl">
-            <div class="absolute -right-4 -bottom-4 opacity-10">
-                <i class="fa-solid fa-sack-dollar text-9xl"></i>
+        <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-50 to-emerald-100/60 p-5 border border-emerald-200/60 hover:shadow-lg transition group">
+            <div class="absolute -right-3 -bottom-3 text-emerald-200/40 group-hover:text-emerald-200/60 transition">
+                <i class="fa-solid fa-sack-dollar text-8xl"></i>
             </div>
             <div class="relative">
-                <p class="text-[10px] uppercase tracking-wider opacity-80 font-bold">Ingresos del rango</p>
-                <p class="text-3xl font-extrabold mt-1">${{ number_format($k['ingresosRango'], 0, ',', '.') }}</p>
-                <p class="text-[11px] opacity-80 mt-1">COP · {{ $k['pagosRangoCount'] }} pago{{ $k['pagosRangoCount'] === 1 ? '' : 's' }}</p>
+                <div class="flex items-center gap-2 mb-2">
+                    <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600">
+                        <i class="fa-solid fa-sack-dollar text-sm"></i>
+                    </div>
+                    <p class="text-[10px] uppercase tracking-wider text-emerald-700 font-bold">Ingresos del rango</p>
+                </div>
+                <p class="text-3xl font-extrabold text-emerald-900">${{ number_format($k['ingresosRango'], 0, ',', '.') }}</p>
+                <p class="text-[11px] text-emerald-700/70 mt-1">COP · {{ $k['pagosRangoCount'] }} pago{{ $k['pagosRangoCount'] === 1 ? '' : 's' }}</p>
             </div>
         </div>
 
         {{-- MRR --}}
-        <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-700 p-5 text-white shadow-xl">
-            <div class="absolute -right-4 -bottom-4 opacity-10">
-                <i class="fa-solid fa-arrows-rotate text-9xl"></i>
+        <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-sky-50 to-sky-100/60 p-5 border border-sky-200/60 hover:shadow-lg transition group">
+            <div class="absolute -right-3 -bottom-3 text-sky-200/40 group-hover:text-sky-200/60 transition">
+                <i class="fa-solid fa-arrows-rotate text-8xl"></i>
             </div>
             <div class="relative">
-                <p class="text-[10px] uppercase tracking-wider opacity-80 font-bold">MRR (recurrente)</p>
-                <p class="text-3xl font-extrabold mt-1">${{ number_format($k['mrr'], 0, ',', '.') }}</p>
-                <p class="text-[11px] opacity-80 mt-1">COP / mes</p>
+                <div class="flex items-center gap-2 mb-2">
+                    <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-500/10 text-sky-600">
+                        <i class="fa-solid fa-arrows-rotate text-sm"></i>
+                    </div>
+                    <p class="text-[10px] uppercase tracking-wider text-sky-700 font-bold">MRR (recurrente)</p>
+                </div>
+                <p class="text-3xl font-extrabold text-sky-900">${{ number_format($k['mrr'], 0, ',', '.') }}</p>
+                <p class="text-[11px] text-sky-700/70 mt-1">COP / mes</p>
             </div>
         </div>
 
         {{-- Ticket promedio --}}
-        <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-500 via-purple-600 to-fuchsia-700 p-5 text-white shadow-xl">
-            <div class="absolute -right-4 -bottom-4 opacity-10">
-                <i class="fa-solid fa-receipt text-9xl"></i>
+        <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-50 to-violet-100/60 p-5 border border-violet-200/60 hover:shadow-lg transition group">
+            <div class="absolute -right-3 -bottom-3 text-violet-200/40 group-hover:text-violet-200/60 transition">
+                <i class="fa-solid fa-receipt text-8xl"></i>
             </div>
             <div class="relative">
-                <p class="text-[10px] uppercase tracking-wider opacity-80 font-bold">Ticket promedio</p>
-                <p class="text-3xl font-extrabold mt-1">${{ number_format($k['ticketPromedio'], 0, ',', '.') }}</p>
-                <p class="text-[11px] opacity-80 mt-1">COP por pago</p>
+                <div class="flex items-center gap-2 mb-2">
+                    <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-500/10 text-violet-600">
+                        <i class="fa-solid fa-receipt text-sm"></i>
+                    </div>
+                    <p class="text-[10px] uppercase tracking-wider text-violet-700 font-bold">Ticket promedio</p>
+                </div>
+                <p class="text-3xl font-extrabold text-violet-900">${{ number_format($k['ticketPromedio'], 0, ',', '.') }}</p>
+                <p class="text-[11px] text-violet-700/70 mt-1">COP por pago</p>
             </div>
         </div>
 
         {{-- Tenants --}}
-        <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-500 via-orange-600 to-rose-600 p-5 text-white shadow-xl">
-            <div class="absolute -right-4 -bottom-4 opacity-10">
-                <i class="fa-solid fa-users text-9xl"></i>
+        <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-50 to-orange-100/60 p-5 border border-amber-200/60 hover:shadow-lg transition group">
+            <div class="absolute -right-3 -bottom-3 text-amber-200/40 group-hover:text-amber-200/60 transition">
+                <i class="fa-solid fa-users text-8xl"></i>
             </div>
             <div class="relative">
-                <p class="text-[10px] uppercase tracking-wider opacity-80 font-bold">Tenants activos</p>
-                <p class="text-3xl font-extrabold mt-1">{{ $k['tenantsActivos'] }}</p>
-                <p class="text-[11px] opacity-80 mt-1">
+                <div class="flex items-center gap-2 mb-2">
+                    <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600">
+                        <i class="fa-solid fa-users text-sm"></i>
+                    </div>
+                    <p class="text-[10px] uppercase tracking-wider text-amber-700 font-bold">Tenants activos</p>
+                </div>
+                <p class="text-3xl font-extrabold text-amber-900">{{ $k['tenantsActivos'] }}</p>
+                <p class="text-[11px] text-amber-700/70 mt-1">
                     @if($k['tenantsNuevos'] > 0)
                         <i class="fa-solid fa-arrow-up"></i> +{{ $k['tenantsNuevos'] }} nuevos en el rango
                     @else
@@ -191,29 +211,35 @@
                 <h3 class="text-base font-bold text-slate-800">Alertas operativas</h3>
             </div>
             <div class="space-y-3">
-                <div class="flex items-center justify-between rounded-xl bg-amber-50 border border-amber-200 px-4 py-3">
+                <div class="rounded-xl bg-gradient-to-br from-amber-50 to-amber-100/40 border border-amber-200/60 px-4 py-3 hover:shadow-md transition">
                     <div class="flex items-center gap-3">
-                        <i class="fa-solid fa-hourglass-half text-amber-600 text-lg"></i>
+                        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600">
+                            <i class="fa-solid fa-hourglass-half"></i>
+                        </div>
                         <div>
-                            <p class="text-[10px] uppercase text-amber-700 font-bold">Por cobrar</p>
-                            <p class="text-xl font-extrabold text-amber-800">${{ number_format($k['pendientes'], 0, ',', '.') }}</p>
+                            <p class="text-[10px] uppercase text-amber-700 font-bold tracking-wider">Por cobrar</p>
+                            <p class="text-xl font-extrabold text-amber-900">${{ number_format($k['pendientes'], 0, ',', '.') }}</p>
                         </div>
                     </div>
                 </div>
-                <div class="flex items-center justify-between rounded-xl bg-rose-50 border border-rose-200 px-4 py-3">
+                <div class="rounded-xl bg-gradient-to-br from-rose-50 to-rose-100/40 border border-rose-200/60 px-4 py-3 hover:shadow-md transition">
                     <div class="flex items-center gap-3">
-                        <i class="fa-solid fa-fire text-rose-600 text-lg"></i>
+                        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-rose-500/10 text-rose-600">
+                            <i class="fa-solid fa-fire"></i>
+                        </div>
                         <div>
-                            <p class="text-[10px] uppercase text-rose-700 font-bold">Morosos</p>
-                            <p class="text-xl font-extrabold text-rose-800">{{ $k['morosos'] }}</p>
+                            <p class="text-[10px] uppercase text-rose-700 font-bold tracking-wider">Morosos</p>
+                            <p class="text-xl font-extrabold text-rose-900">{{ $k['morosos'] }}</p>
                         </div>
                     </div>
                 </div>
-                <div class="flex items-center justify-between rounded-xl bg-slate-100 border border-slate-200 px-4 py-3">
+                <div class="rounded-xl bg-gradient-to-br from-slate-50 to-slate-100/40 border border-slate-200/60 px-4 py-3 hover:shadow-md transition">
                     <div class="flex items-center gap-3">
-                        <i class="fa-solid fa-lock text-slate-600 text-lg"></i>
+                        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-500/10 text-slate-600">
+                            <i class="fa-solid fa-lock"></i>
+                        </div>
                         <div>
-                            <p class="text-[10px] uppercase text-slate-600 font-bold">Suspendidos</p>
+                            <p class="text-[10px] uppercase text-slate-600 font-bold tracking-wider">Suspendidos</p>
                             <p class="text-xl font-extrabold text-slate-700">{{ $k['suspendidos'] }}</p>
                         </div>
                     </div>
@@ -310,18 +336,22 @@
             // === 1. Ingresos diarios (área) ===
             const fechas = Object.keys(opts.serieDiaria);
             const valores = Object.values(opts.serieDiaria).map(v => parseFloat(v));
+            // Paleta suave coordinada
+            const palette = ['#86efac', '#7dd3fc', '#c4b5fd', '#fcd34d', '#fda4af', '#67e8f9', '#fdba74', '#a5b4fc'];
+
             window._chartsVentas.ingresos = new ApexCharts(document.querySelector("#chart-ingresos"), {
-                chart: { type: 'area', height: 320, fontFamily: 'inherit', toolbar: { show: false } },
+                chart: { type: 'area', height: 320, fontFamily: 'inherit', toolbar: { show: false }, sparkline: { enabled: false } },
                 series: [{ name: 'Ingresos', data: valores }],
-                xaxis: { categories: fechas, labels: { style: { fontSize: '11px' } } },
-                yaxis: { labels: { formatter: v => '$' + Math.round(v).toLocaleString('es-CO') } },
-                colors: ['#10b981'],
-                stroke: { curve: 'smooth', width: 3 },
-                fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.5, opacityTo: 0.05, stops: [0, 90, 100] } },
+                xaxis: { categories: fechas, labels: { style: { fontSize: '11px', colors: '#64748b' } }, axisBorder: { show: false }, axisTicks: { show: false } },
+                yaxis: { labels: { formatter: v => '$' + Math.round(v).toLocaleString('es-CO'), style: { colors: '#94a3b8', fontSize: '11px' } } },
+                colors: ['#34d399'], // emerald suave
+                stroke: { curve: 'smooth', width: 2.5 },
+                fill: { type: 'gradient', gradient: { shadeIntensity: 0.8, opacityFrom: 0.35, opacityTo: 0.02, stops: [0, 90, 100] } },
                 dataLabels: { enabled: false },
-                grid: { borderColor: '#e2e8f0', strokeDashArray: 4 },
+                grid: { borderColor: '#f1f5f9', strokeDashArray: 4, padding: { left: 10, right: 10 } },
+                markers: { size: 0, hover: { size: 5 } },
                 tooltip: { y: { formatter: v => '$' + Math.round(v).toLocaleString('es-CO') + ' COP' } },
-                noData: { text: 'Sin datos en este rango', style: { color: '#94a3b8' } },
+                noData: { text: 'Sin datos en este rango', style: { color: '#cbd5e1', fontSize: '13px' } },
             });
             window._chartsVentas.ingresos.render();
 
@@ -330,12 +360,13 @@
                 chart: { type: 'donut', height: 280, fontFamily: 'inherit' },
                 series: opts.porPlan.map(p => p.count),
                 labels: opts.porPlan.map(p => p.nombre),
-                colors: ['#d68643', '#a85f24', '#8b5cf6', '#06b6d4', '#f59e0b'],
-                plotOptions: { pie: { donut: { size: '65%', labels: { show: true, total: { show: true, label: 'Activas', formatter: w => w.globals.seriesTotals.reduce((a,b)=>a+b,0) } } } } },
-                legend: { position: 'bottom', fontSize: '12px' },
-                dataLabels: { enabled: true, formatter: (v, opts) => opts.w.globals.series[opts.seriesIndex] },
+                colors: palette,
+                plotOptions: { pie: { donut: { size: '70%', labels: { show: true, name: { fontSize: '12px', color: '#94a3b8' }, value: { fontSize: '24px', fontWeight: 700, color: '#334155' }, total: { show: true, label: 'Activas', color: '#94a3b8', fontSize: '11px', formatter: w => w.globals.seriesTotals.reduce((a,b)=>a+b,0) } } } } },
+                legend: { position: 'bottom', fontSize: '12px', labels: { colors: '#64748b' }, markers: { radius: 6 } },
+                dataLabels: { enabled: true, style: { fontSize: '13px', fontWeight: 700, colors: ['#fff'] }, dropShadow: { enabled: false }, formatter: (v, opts) => opts.w.globals.series[opts.seriesIndex] },
+                stroke: { width: 3, colors: ['#ffffff'] },
                 tooltip: { y: { formatter: v => v + ' suscripciones' } },
-                noData: { text: 'Sin planes activos', style: { color: '#94a3b8' } },
+                noData: { text: 'Sin planes activos', style: { color: '#cbd5e1', fontSize: '13px' } },
             });
             window._chartsVentas.planes.render();
 
@@ -343,15 +374,15 @@
             window._chartsVentas.metodos = new ApexCharts(document.querySelector("#chart-metodos"), {
                 chart: { type: 'bar', height: 280, fontFamily: 'inherit', toolbar: { show: false } },
                 series: [{ name: 'Total', data: opts.porMetodo.map(m => m.total) }],
-                xaxis: { categories: opts.porMetodo.map(m => m.metodo), labels: { style: { fontSize: '11px' } } },
-                yaxis: { labels: { formatter: v => '$' + Math.round(v).toLocaleString('es-CO') } },
-                colors: ['#0ea5e9'],
-                plotOptions: { bar: { borderRadius: 8, columnWidth: '55%', distributed: true } },
+                xaxis: { categories: opts.porMetodo.map(m => m.metodo), labels: { style: { fontSize: '11px', colors: '#64748b' } }, axisBorder: { show: false }, axisTicks: { show: false } },
+                yaxis: { labels: { formatter: v => '$' + Math.round(v).toLocaleString('es-CO'), style: { colors: '#94a3b8', fontSize: '11px' } } },
+                colors: palette,
+                plotOptions: { bar: { borderRadius: 10, borderRadiusApplication: 'end', columnWidth: '50%', distributed: true } },
                 dataLabels: { enabled: false },
-                grid: { borderColor: '#e2e8f0', strokeDashArray: 4 },
+                grid: { borderColor: '#f1f5f9', strokeDashArray: 4 },
                 legend: { show: false },
                 tooltip: { y: { formatter: v => '$' + Math.round(v).toLocaleString('es-CO') + ' COP' } },
-                noData: { text: 'Sin métodos registrados', style: { color: '#94a3b8' } },
+                noData: { text: 'Sin métodos registrados', style: { color: '#cbd5e1', fontSize: '13px' } },
             });
             window._chartsVentas.metodos.render();
         })();
