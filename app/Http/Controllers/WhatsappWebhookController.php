@@ -3017,7 +3017,7 @@ TXT;
         string $name,
         array &$conversationHistory,
         string $cacheKey,
-        ?int $connectionId,
+        int|string|null $connectionId,
         $conversacion,
         $convService,
         string $contextoTool = 'general'
@@ -6101,7 +6101,7 @@ TXT;
   private function capturarAgregadosImplicitos(
       \App\Models\ConversacionWhatsapp $conv,
       string $respuestaBot,
-      ?int $connectionId
+      int|string|null $connectionId
   ): array {
       $estadoSrv  = app(\App\Services\EstadoPedidoService::class);
       $catalogo   = app(\App\Services\BotCatalogoService::class);
@@ -6233,7 +6233,7 @@ TXT;
       string $code,
       float $quantity,
       string $unitRaw,
-      ?int $connectionId,
+      int|string|null $connectionId,
       string $corte = ''
   ): array {
       $estadoSrv  = app(\App\Services\EstadoPedidoService::class);
