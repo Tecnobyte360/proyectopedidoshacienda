@@ -231,8 +231,31 @@ class WhatsappWebhookController extends Controller
             return response()->json(['status' => 'ignored']);
         }
 
-        // 🏢 MULTI-TENANT: detectar a qué tenant pertenece esta conexión
-        if ($connectionId) {
+        // 🏢 MULTI-TENANT: detectar a qué tenant pertenece esta conexión.
+        // Soporta dos formatos:
+        //  - TecnoByteApp: connectionId numérico (ej. 25)
+        //  - Meta: connectionId con prefijo "meta:<phone_number_id>"
+        $webhookEsMeta = is_string($connectionId) && str_starts_with($connectionId, 'meta:');
+        $tenant = null;
+
+        if ($webhookEsMeta) {
+            $phoneNumberId = substr($connectionId, 5); // quitar 'meta:'
+            $metaCfg = \App\Models\MetaWhatsappConfig::query()
+                ->withoutGlobalScopes()
+                ->where('phone_number_id', $phoneNumberId)
+                ->where('activo', true)
+                ->first();
+            if ($metaCfg) {
+                $tenant = \App\Models\Tenant::find($metaCfg->tenant_id);
+                if ($tenant) {
+                    app(\App\Services\TenantManager::class)->set($tenant);
+                    Log::info('🏢 Tenant detectado por Meta phone_number_id', [
+                        'phone_number_id' => $phoneNumberId,
+                        'tenant_id'       => $tenant->id,
+                    ]);
+                }
+            }
+        } elseif ($connectionId) {
             $tenant = app(\App\Services\WhatsappResolverService::class)
                 ->tenantPorConnectionId((int) $connectionId);
 
@@ -249,12 +272,45 @@ class WhatsappWebhookController extends Controller
                     fn () => \App\Models\Tenant::where('activo', true)->orderBy('id')->first()
                 );
                 if ($defaultTenant) {
+                    $tenant = $defaultTenant;
                     app(\App\Services\TenantManager::class)->set($defaultTenant);
                     Log::warning('⚠️ Connection_id sin tenant asignado, usando default', [
                         'connection_id' => $connectionId,
                         'tenant_default' => $defaultTenant->nombre,
                     ]);
                 }
+            }
+        }
+
+        // 🛡️ GUARD PROVIDER: si el tenant decidió un proveedor concreto,
+        // ignorar webhooks que vengan del otro canal. Así un tenant que
+        // eligió Meta no procesa accidentalmente mensajes que llegan por
+        // TecnoByteApp (sesiones QR viejas que siguen activas).
+        if ($tenant) {
+            $proveedorTenant = $tenant->proveedorWhatsappResuelto();
+            $webhookEsTecnoByte = $connectionId && !$webhookEsMeta;
+
+            if ($proveedorTenant === \App\Models\Tenant::WA_PROVIDER_META && $webhookEsTecnoByte) {
+                Log::warning('🚫 Webhook TecnoByteApp ignorado: tenant usa Meta', [
+                    'tenant_id'     => $tenant->id,
+                    'connection_id' => $connectionId,
+                    'from'          => $from,
+                ]);
+                return response()->json([
+                    'status' => 'ignored_provider_mismatch',
+                    'reason' => 'tenant_uses_meta_not_tecnobyte',
+                ]);
+            }
+            if ($proveedorTenant === \App\Models\Tenant::WA_PROVIDER_TECNOBYTE && $webhookEsMeta) {
+                Log::warning('🚫 Webhook Meta ignorado: tenant usa TecnoByteApp', [
+                    'tenant_id'        => $tenant->id,
+                    'phone_number_id'  => substr((string) $connectionId, 5),
+                    'from'             => $from,
+                ]);
+                return response()->json([
+                    'status' => 'ignored_provider_mismatch',
+                    'reason' => 'tenant_uses_tecnobyte_not_meta',
+                ]);
             }
         }
 
