@@ -1275,6 +1275,78 @@
                         </div>
                     </label>
 
+                    {{-- 💳 Crear suscripción inicial (solo en creación) --}}
+                    @if(!$editandoId)
+                        <div class="rounded-xl border-2 border-dashed border-emerald-200 bg-emerald-50/50 p-4 space-y-3">
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" wire:model.live="crear_suscripcion" class="rounded border-emerald-300 text-emerald-500">
+                                <span class="text-sm font-bold text-emerald-900">
+                                    <i class="fa-solid fa-credit-card"></i> Crear suscripción automáticamente al guardar
+                                </span>
+                            </label>
+
+                            @if($crear_suscripcion)
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-[11px] font-bold text-emerald-800 mb-1">Plan *</label>
+                                        <select wire:model.live="suscripcion_plan_id" class="w-full rounded-xl border border-emerald-200 px-3 py-2 text-sm">
+                                            <option value="">— Seleccionar plan —</option>
+                                            @foreach($planesDisponibles as $p)
+                                                <option value="{{ $p->id }}">
+                                                    {{ $p->nombre }} — ${{ number_format($p->precio_mensual, 0, ',', '.') }} /mes
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                        @error('suscripcion_plan_id') <p class="text-xs text-rose-600 mt-1">{{ $message }}</p> @enderror
+                                    </div>
+                                    <div>
+                                        <label class="block text-[11px] font-bold text-emerald-800 mb-1">Ciclo de cobro *</label>
+                                        <select wire:model="suscripcion_ciclo" class="w-full rounded-xl border border-emerald-200 px-3 py-2 text-sm">
+                                            <option value="mensual">Mensual</option>
+                                            <option value="anual">Anual</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-[11px] font-bold text-emerald-800 mb-1">
+                                            Duración del primer período (días) *
+                                        </label>
+                                        <div class="flex items-center gap-2">
+                                            <input type="number" min="1" max="730" wire:model="suscripcion_dias"
+                                                   class="w-24 rounded-xl border border-emerald-200 px-3 py-2 text-sm text-center font-bold">
+                                            <span class="text-xs text-slate-500">días</span>
+                                        </div>
+                                        <p class="text-[10px] text-slate-500 mt-0.5">
+                                            Default 30 (mensual) o 365 (anual). Si das trial, pon 15.
+                                        </p>
+                                        @error('suscripcion_dias') <p class="text-xs text-rose-600 mt-1">{{ $message }}</p> @enderror
+                                    </div>
+                                    <div>
+                                        <label class="block text-[11px] font-bold text-emerald-800 mb-1">Estado inicial *</label>
+                                        <select wire:model="suscripcion_estado" class="w-full rounded-xl border border-emerald-200 px-3 py-2 text-sm">
+                                            <option value="activa">✓ Activa (paga desde el principio)</option>
+                                            <option value="en_trial">🧪 En trial (período gratis)</option>
+                                        </select>
+                                    </div>
+                                    <div class="md:col-span-2">
+                                        <label class="block text-[11px] font-bold text-emerald-800 mb-1">
+                                            Monto a cobrar (opcional, override del precio del plan)
+                                        </label>
+                                        <input type="number" step="0.01" wire:model="suscripcion_monto"
+                                               placeholder="Vacío = usar el precio del plan"
+                                               class="w-full rounded-xl border border-emerald-200 px-3 py-2 text-sm">
+                                        <p class="text-[10px] text-slate-500 mt-0.5">
+                                            Útil si quieres dar descuento personalizado a un cliente específico.
+                                        </p>
+                                    </div>
+                                </div>
+                                <p class="text-[11px] text-emerald-700 bg-emerald-100 rounded-lg px-3 py-2">
+                                    📅 La suscripción vencerá el día <strong>{{ now()->addDays((int) $suscripcion_dias)->format('d/m/Y') }}</strong>.
+                                    El cron de facturación creará el siguiente Pago automáticamente días antes según tu Política de cobros.
+                                </p>
+                            @endif
+                        </div>
+                    @endif
+
                     {{-- Crear admin inicial (solo en creación) --}}
                     @if(!$editandoId)
                         <div class="rounded-xl border-2 border-dashed border-violet-200 bg-violet-50/50 p-4 space-y-3">

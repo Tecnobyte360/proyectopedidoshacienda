@@ -93,6 +93,14 @@ class Index extends Component
     public string $admin_email           = '';
     public string $admin_password        = '';
 
+    // 💳 Suscripción automática al crear tenant
+    public bool    $crear_suscripcion    = true;
+    public ?int    $suscripcion_plan_id  = null;
+    public string  $suscripcion_ciclo    = 'mensual';   // mensual | anual
+    public ?float  $suscripcion_monto    = null;        // si null, toma el del plan
+    public int     $suscripcion_dias     = 30;          // duración del primer período
+    public string  $suscripcion_estado   = 'activa';    // activa | en_trial
+
     // 🗑️ Eliminación definitiva
     public bool   $eliminarModalAbierto  = false;
     public ?int   $eliminarTenantId      = null;
@@ -159,6 +167,14 @@ class Index extends Component
             'admin_nombre'        => 'required_if:crear_admin_inicial,true|nullable|string|max:120',
             'admin_email'         => 'required_if:crear_admin_inicial,true|nullable|email|max:150|unique:users,email',
             'admin_password'      => 'required_if:crear_admin_inicial,true|nullable|string|min:6',
+
+            // 💳 Suscripción inicial
+            'crear_suscripcion'    => 'boolean',
+            'suscripcion_plan_id'  => 'required_if:crear_suscripcion,true|nullable|exists:planes,id',
+            'suscripcion_ciclo'    => 'required_if:crear_suscripcion,true|in:mensual,anual',
+            'suscripcion_monto'    => 'nullable|numeric|min:0',
+            'suscripcion_dias'     => 'required_if:crear_suscripcion,true|integer|min:1|max:730',
+            'suscripcion_estado'   => 'required_if:crear_suscripcion,true|in:activa,en_trial',
         ];
     }
 
@@ -459,6 +475,14 @@ class Index extends Component
         $adminEmail  = $data['admin_email']  ?? '';
         $adminPass   = $data['admin_password'] ?? '';
 
+        // 💳 Datos de suscripción a crear
+        $crearSus       = $data['crear_suscripcion']  ?? false;
+        $susPlanId      = $data['suscripcion_plan_id'] ?? null;
+        $susCiclo       = $data['suscripcion_ciclo']  ?? 'mensual';
+        $susMontoIn     = $data['suscripcion_monto']  ?? null;
+        $susDias        = (int) ($data['suscripcion_dias'] ?? 30);
+        $susEstado      = $data['suscripcion_estado'] ?? 'activa';
+
         // Construir whatsapp_config desde los campos
         $waEmail   = $data['whatsapp_email']   ?? '';
         $waPass    = $data['whatsapp_password'] ?? '';
@@ -474,7 +498,13 @@ class Index extends Component
             $data['whatsapp_password'],
             $data['whatsapp_api_base_url'],
             $data['whatsapp_connection_ids'],
-            $data['logo_archivo']
+            $data['logo_archivo'],
+            $data['crear_suscripcion'],
+            $data['suscripcion_plan_id'],
+            $data['suscripcion_ciclo'],
+            $data['suscripcion_monto'],
+            $data['suscripcion_dias'],
+            $data['suscripcion_estado'],
         );
 
         // Subida del logo (si vino data URL base64 desde el input)
@@ -596,6 +626,37 @@ class Index extends Component
                 'activo'    => true,
             ]);
             $u->assignRole('admin');
+        }
+
+        // 💳 Crear suscripción automática si solicitado (solo en creación, no edición)
+        if ($crearSus && !$this->editandoId && $susPlanId) {
+            $plan = \App\Models\Plan::find($susPlanId);
+            if ($plan) {
+                $monto = $susMontoIn !== null && $susMontoIn !== ''
+                    ? (float) $susMontoIn
+                    : (float) ($susCiclo === 'anual' ? $plan->precio_anual : $plan->precio_mensual);
+
+                $inicio = now();
+                $fin    = $inicio->copy()->addDays($susDias);
+
+                \App\Models\Suscripcion::create([
+                    'tenant_id'          => $tenant->id,
+                    'plan_id'            => $plan->id,
+                    'estado'             => $susEstado, // activa | en_trial
+                    'ciclo'              => $susCiclo,
+                    'monto'              => $monto,
+                    'moneda'             => $plan->moneda ?: 'COP',
+                    'fecha_inicio'       => $inicio->toDateString(),
+                    'fecha_fin'          => $fin->toDateString(),
+                    'proxima_factura_at' => $fin->toDateString(),
+                    'notas'              => 'Generada automáticamente al crear tenant',
+                ]);
+
+                // Sincronizar fecha_fin en el propio tenant (subscription_ends_at)
+                if (\Illuminate\Support\Facades\Schema::hasColumn('tenants', 'subscription_ends_at')) {
+                    $tenant->update(['subscription_ends_at' => $fin->toDateString()]);
+                }
+            }
         }
 
         $this->cerrarModal();
@@ -929,6 +990,13 @@ class Index extends Component
         $this->admin_nombre         = '';
         $this->admin_email          = '';
         $this->admin_password       = '';
+        // Suscripción auto
+        $this->crear_suscripcion   = true;
+        $this->suscripcion_plan_id = null;
+        $this->suscripcion_ciclo   = 'mensual';
+        $this->suscripcion_monto   = null;
+        $this->suscripcion_dias    = 30;
+        $this->suscripcion_estado  = 'activa';
         $this->resetValidation();
     }
 
@@ -959,10 +1027,15 @@ class Index extends Component
             ];
         });
 
+        $planesDisponibles = app(TenantManager::class)->withoutTenant(function () {
+            return \App\Models\Plan::where('activo', true)->orderBy('orden')->orderBy('precio_mensual')->get();
+        });
+
         return view('livewire.admin.tenants.index', [
             'tenants'         => $tenants,
             'kpis'            => $kpis,
             'tenantImitadoId' => session('tenant_imitado_id'),
+            'planesDisponibles' => $planesDisponibles,
         ])->layout('layouts.app');
     }
 }
