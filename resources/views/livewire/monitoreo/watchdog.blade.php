@@ -79,12 +79,29 @@
                     <h2 class="text-sm font-bold text-slate-700 flex items-center gap-2">
                         <i class="fa-solid fa-clock-rotate-left text-slate-400"></i>
                         Últimos rescates
+                        @if(!$mostrarResueltos)
+                            <span class="text-[10px] font-normal text-slate-400">(ocultos resueltos)</span>
+                        @endif
                     </h2>
-                    @if($k['ultimo_at'])
-                        <span class="text-[11px] text-slate-500">
-                            Último: hace {{ $k['ultimo_at']->diffForHumans() }}
-                        </span>
-                    @endif
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <label class="inline-flex items-center gap-1 text-[11px] text-slate-600 cursor-pointer">
+                            <input type="checkbox" wire:model.live="mostrarResueltos" class="rounded">
+                            <span>Mostrar resueltos</span>
+                        </label>
+                        @if($k['fallidos'] > 0)
+                            <button wire:click="marcarTodosResueltos"
+                                    wire:confirm="¿Marcar los {{ $k['fallidos'] }} fallidos como resueltos?"
+                                    class="inline-flex items-center gap-1 rounded-md bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2 py-1 text-[10px] font-semibold text-emerald-700 transition">
+                                <i class="fa-solid fa-check-double text-[9px]"></i>
+                                Resolver todos ({{ $k['fallidos'] }})
+                            </button>
+                        @endif
+                        @if($k['ultimo_at'])
+                            <span class="text-[11px] text-slate-500">
+                                Último: hace {{ $k['ultimo_at']->diffForHumans() }}
+                            </span>
+                        @endif
+                    </div>
                 </div>
 
                 <div class="overflow-x-auto">
@@ -97,6 +114,7 @@
                                 <th class="px-3 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-slate-500">Mensaje del cliente</th>
                                 <th class="px-3 py-2.5 text-right text-[10px] font-bold uppercase tracking-wider text-slate-500">Esperó</th>
                                 <th class="px-3 py-2.5 text-center text-[10px] font-bold uppercase tracking-wider text-slate-500">Estado</th>
+                                <th class="px-3 py-2.5 text-center text-[10px] font-bold uppercase tracking-wider text-slate-500">Acción</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
@@ -155,11 +173,30 @@
                                                 <i class="fa-solid fa-circle-check text-[9px]"></i>
                                                 Rescatado
                                             </span>
+                                        @elseif($r->resuelto_at)
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500"
+                                                  title="Resuelto manualmente el {{ $r->resuelto_at->format('d/m H:i') }}">
+                                                <i class="fa-solid fa-check text-[9px]"></i>
+                                                Resuelto
+                                            </span>
                                         @else
                                             <span class="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-bold text-rose-700">
                                                 <i class="fa-solid fa-circle-xmark text-[9px]"></i>
                                                 Falló
                                             </span>
+                                        @endif
+                                    </td>
+                                    <td class="px-3 py-3 align-middle text-center whitespace-nowrap">
+                                        @if(!$r->exitoso && !$r->resuelto_at)
+                                            <button wire:click="marcarResuelto({{ $r->id }})"
+                                                    wire:confirm="¿Marcar este rescate fallido como resuelto?"
+                                                    class="inline-flex items-center gap-1 rounded-md bg-slate-100 hover:bg-emerald-100 px-2 py-1 text-[10px] font-semibold text-slate-600 hover:text-emerald-700 transition"
+                                                    title="Marcar como resuelto (lo oculta del dashboard)">
+                                                <i class="fa-solid fa-check text-[9px]"></i>
+                                                Resolver
+                                            </button>
+                                        @else
+                                            <span class="text-slate-300 text-[10px]">—</span>
                                         @endif
                                     </td>
                                 </tr>

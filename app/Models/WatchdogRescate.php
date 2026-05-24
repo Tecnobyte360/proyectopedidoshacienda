@@ -19,11 +19,14 @@ class WatchdogRescate extends Model
         'segundos_estancada',
         'exitoso',
         'error_mensaje',
+        'resuelto_at',
+        'resuelto_por_user_id',
     ];
 
     protected $casts = [
         'exitoso'            => 'boolean',
         'segundos_estancada' => 'integer',
+        'resuelto_at'        => 'datetime',
     ];
 
     public function conversacion()
