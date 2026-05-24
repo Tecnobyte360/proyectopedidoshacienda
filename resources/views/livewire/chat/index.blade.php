@@ -250,39 +250,38 @@
                     </div>
                 </div>
 
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-1.5 flex-shrink-0">
                     {{-- 🛒 Crear pedido manual (precarga datos del estado) --}}
                     <a href="{{ route('pedidos.crear-manual', ['conv' => $conversacionActiva->id]) }}"
                        title="Crear pedido manualmente con datos del chat ya pre-cargados"
-                       class="rounded-xl bg-emerald-500 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-600 transition inline-flex items-center gap-1">
+                       class="rounded-lg bg-emerald-500 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-emerald-600 transition inline-flex items-center gap-1">
                         <i class="fa-solid fa-cart-plus"></i>
-                        <span>Crear pedido</span>
+                        <span class="hidden md:inline">Crear pedido</span>
                     </a>
 
                     {{-- 📋 Modal de estado del pedido (datos estructurados) --}}
                     <button type="button"
                             wire:click="abrirPedidoEstadoModal"
                             title="Ver qué datos del pedido tiene el bot recopilados"
-                            class="rounded-xl bg-violet-500 px-3 py-2 text-xs font-bold text-white hover:bg-violet-600 transition inline-flex items-center gap-1">
+                            class="rounded-lg bg-violet-500 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-violet-600 transition inline-flex items-center gap-1">
                         <i class="fa-solid fa-clipboard-list"></i>
-                        <span>Estado del pedido</span>
+                        <span class="hidden md:inline">Estado del pedido</span>
                     </button>
 
                     @if($conversacionActiva->atendida_por_humano)
                         <button wire:click="devolverAlBot"
                                 wire:confirm="¿Devolver al bot? La conversación volverá al área general y otros agentes podrán verla."
                                 title="El bot retomará automáticamente la conversación. Si estaba derivada a un departamento, también se libera."
-                                class="rounded-xl bg-emerald-500 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-600 transition">
-                            <i class="fa-solid fa-robot mr-1"></i> Devolver al bot
-                            @if($conversacionActiva->departamento_id)
-                                <span class="ml-1 text-[10px] opacity-90">(libera depto)</span>
-                            @endif
+                                class="rounded-lg bg-emerald-500 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-emerald-600 transition inline-flex items-center gap-1">
+                            <i class="fa-solid fa-robot"></i>
+                            <span class="hidden md:inline">Devolver al bot</span>
                         </button>
                     @else
                         <button wire:click="tomarControl"
                                 title="Silencia al bot — solo TÚ respondes a este cliente"
-                                class="rounded-xl bg-blue-500 px-3 py-2 text-xs font-bold text-white hover:bg-blue-600 transition">
-                            <i class="fa-solid fa-hand mr-1"></i> Silenciar bot
+                                class="rounded-lg bg-blue-500 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-blue-600 transition inline-flex items-center gap-1">
+                            <i class="fa-solid fa-hand"></i>
+                            <span class="hidden md:inline">Silenciar bot</span>
                         </button>
                     @endif
 
@@ -290,7 +289,8 @@
             </div>
 
             {{-- Área de mensajes --}}
-            <div class="flex-1 overflow-y-auto px-4 py-4 space-y-2" id="chat-messages">
+            <div class="flex-1 overflow-y-auto overflow-x-hidden px-3 md:px-4 py-4 space-y-2 w-full max-w-full" id="chat-messages"
+                 style="word-break: break-word; overflow-wrap: anywhere;">
                 @foreach($conversacionActiva->mensajes as $m)
                     @php
                         $mediaUrl = $m->meta['media_url'] ?? null;
@@ -309,7 +309,7 @@
                             };
                         @endphp
                         <div class="flex justify-start">
-                            <div class="max-w-[70%] rounded-2xl rounded-tl-sm {{ $rescatadoPor ? 'bg-amber-50 border border-amber-200' : 'bg-white' }} px-3 py-2 shadow-sm">
+                            <div class="max-w-[85%] md:max-w-[70%] rounded-2xl rounded-tl-sm {{ $rescatadoPor ? 'bg-amber-50 border border-amber-200' : 'bg-white' }} px-3 py-2 shadow-sm">
                                 @if($rescatadoPor)
                                     <div class="flex items-center gap-1 mb-1 text-[10px] font-semibold text-amber-700"
                                          title="{{ $motivoLabel }}">
@@ -337,7 +337,7 @@
                     @elseif($m->rol === 'assistant')
                         @php $esHumano = ($m->meta['enviado_por_humano'] ?? false); @endphp
                         <div class="flex justify-end">
-                            <div class="max-w-[70%] rounded-2xl rounded-tr-sm px-3 py-2 shadow-sm
+                            <div class="max-w-[85%] md:max-w-[70%] rounded-2xl rounded-tr-sm px-3 py-2 shadow-sm
                                         {{ $esHumano ? 'bg-blue-100' : 'bg-[#dcf8c6]' }}">
                                 @if($esHumano)
                                     <div class="text-[10px] uppercase font-bold text-blue-700 mb-0.5">
