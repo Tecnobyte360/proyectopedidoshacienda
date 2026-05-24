@@ -161,6 +161,50 @@ class Index extends Component
         $this->dispatch('notify', ['type' => 'success', 'message' => 'Pago eliminado.']);
     }
 
+    /** 💳 Genera (o rota) el link Wompi para que el tenant pague. */
+    public function generarLinkWompi(int $id): void
+    {
+        $pago = app(TenantManager::class)->withoutTenant(fn () => Pago::findOrFail($id));
+        $url = app(\App\Services\SaasBilling\SaasBillingWompiService::class)
+            ->generarLinkPago($pago, forzarRotacion: true);
+
+        if (!$url) {
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'No se generó el link. Verifica config SAAS_WOMPI_* en .env (o que el pago no esté ya confirmado).',
+            ]);
+            return;
+        }
+        $this->dispatch('notify', ['type' => 'success', 'message' => '🔗 Link Wompi generado. Cópialo o envíalo al tenant.']);
+    }
+
+    /** 📤 Envía el link Wompi al admin del tenant por WhatsApp (plantilla). */
+    public function enviarLinkWhatsapp(int $id): void
+    {
+        $pago = app(TenantManager::class)->withoutTenant(fn () => Pago::with('tenant')->findOrFail($id));
+        if (!$pago->link_pago_url) {
+            $this->generarLinkWompi($id);
+            $pago->refresh();
+        }
+        $tel = $pago->tenant?->telefono_contacto ?? $pago->tenant?->whatsapp_contacto;
+        if (!$tel) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'El tenant no tiene teléfono de contacto registrado.']);
+            return;
+        }
+        // Envío simple por texto (si el cliente está dentro de ventana 24h) — para llegar
+        // siempre habría que usar plantilla aprobada. Por ahora solo intentamos texto.
+        $msg = "Hola {$pago->tenant->nombre}, tu pago mensual de Kivox por $" . number_format((float)$pago->monto, 0, ',', '.')
+             . " COP está pendiente. Paga aquí: {$pago->link_pago_url}";
+        $ok = app(\App\Services\WhatsappSenderService::class)
+            ->enviarTexto($tel, $msg, (int) $pago->tenant_id);
+        if ($ok) {
+            $pago->update(['link_enviado_at' => now(), 'link_canal_envio' => 'whatsapp']);
+            $this->dispatch('notify', ['type' => 'success', 'message' => '📱 Link enviado por WhatsApp']);
+        } else {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'No se pudo enviar. Probable causa: cliente fuera de ventana 24h (necesita plantilla).']);
+        }
+    }
+
     private function resetCampos(): void
     {
         $this->editandoId       = null;

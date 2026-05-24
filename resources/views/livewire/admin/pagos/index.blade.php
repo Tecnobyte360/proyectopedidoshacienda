@@ -122,6 +122,34 @@
                                             <i class="fa-solid fa-receipt text-xs"></i>
                                         </a>
                                     @endif
+
+                                    {{-- 💳 Botones Wompi (solo si está pendiente) --}}
+                                    @if($p->estado === 'pendiente')
+                                        @if(!$p->link_pago_url)
+                                            <button wire:click="generarLinkWompi({{ $p->id }})"
+                                                    title="Generar link de pago Wompi"
+                                                    class="inline-flex h-8 px-2 items-center justify-center gap-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[11px] font-bold">
+                                                <i class="fa-solid fa-link text-xs"></i> Link
+                                            </button>
+                                        @else
+                                            <a href="{{ $p->link_pago_url }}" target="_blank"
+                                               title="Abrir link Wompi"
+                                               class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700">
+                                                <i class="fa-solid fa-up-right-from-square text-xs"></i>
+                                            </a>
+                                            <button wire:click="enviarLinkWhatsapp({{ $p->id }})"
+                                                    title="Enviar link al tenant por WhatsApp"
+                                                    class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-green-50 hover:bg-green-100 text-green-700">
+                                                <i class="fa-brands fa-whatsapp text-xs"></i>
+                                            </button>
+                                            <button onclick="navigator.clipboard.writeText('{{ $p->link_pago_url }}'); window.Livewire.dispatch('notify', { type:'success', message:'Link copiado' })"
+                                                    title="Copiar link"
+                                                    class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-600">
+                                                <i class="fa-regular fa-copy text-xs"></i>
+                                            </button>
+                                        @endif
+                                    @endif
+
                                     <button wire:click="abrirModalEditar({{ $p->id }})"
                                             class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700">
                                         <i class="fa-solid fa-pen-to-square text-xs"></i>

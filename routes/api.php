@@ -61,6 +61,11 @@ Route::post('/wompi/webhook/{slug}', [\App\Http\Controllers\WompiWebhookControll
 Route::post('/wompi/webhook', [\App\Http\Controllers\WompiWebhookController::class, 'recibir'])
     ->name('wompi.webhook.legacy');
 
+// 💳 SaaS Billing — webhook de Wompi del DUEÑO de Kivox (TecnoByte360).
+// Cobro de mensualidades a los tenants. Diferente de los webhooks tenant→cliente arriba.
+Route::post('/saas-billing/wompi/webhook', \App\Http\Controllers\SaasBillingWompiWebhookController::class)
+    ->name('saas-billing.wompi.webhook');
+
 // Endpoints de intervención humana (chat en vivo del admin)
 Route::post('/chat/enviar-manual',   [WhatsappWebhookController::class, 'enviarMensajeManual']);
 Route::post('/chat/tomar-control',   [WhatsappWebhookController::class, 'tomarControl']);

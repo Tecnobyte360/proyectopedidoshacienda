@@ -7,12 +7,12 @@
         <div class="rounded-2xl border border-[#fbe9d7] bg-gradient-to-r from-brand-soft/40 via-white to-white p-5 shadow-sm">
             <div class="flex flex-wrap items-center justify-between gap-4">
                 <div class="flex items-center gap-4">
-                    <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-violet-700 text-white shadow-lg">
+                    <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-brand to-brand-dark text-white shadow-lg">
                         <i class="fa-solid fa-building text-xl"></i>
                     </div>
                     <div>
-                        <h2 class="text-2xl font-extrabold text-slate-800">Tenants (Empresas Cliente)</h2>
-                        <p class="text-sm text-slate-500">Gestiona las empresas que usan tu plataforma SaaS</p>
+                        <h2 class="text-2xl font-extrabold text-slate-800">Tenants Kivox</h2>
+                        <p class="text-sm text-slate-500">Empresas cliente que usan la plataforma</p>
                     </div>
                 </div>
                 <div class="flex items-center gap-2">
