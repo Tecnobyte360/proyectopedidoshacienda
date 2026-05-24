@@ -14,6 +14,7 @@ class CampanaWhatsapp extends Model
 
     protected $fillable = [
         'tenant_id', 'nombre', 'mensaje', 'media_url',
+        'plantilla_meta_nombre', 'plantilla_meta_idioma', 'plantilla_meta_variables',
         'audiencia_tipo', 'audiencia_filtros',
         'intervalo_min_seg', 'intervalo_max_seg',
         'lote_tamano', 'descanso_lote_min',
@@ -25,7 +26,8 @@ class CampanaWhatsapp extends Model
     ];
 
     protected $casts = [
-        'audiencia_filtros'  => 'array',
+        'audiencia_filtros'         => 'array',
+        'plantilla_meta_variables'  => 'array',
         'programada_para'    => 'datetime',
         'iniciada_at'        => 'datetime',
         'completada_at'      => 'datetime',
@@ -50,6 +52,14 @@ class CampanaWhatsapp extends Model
     public function destinatarios(): HasMany
     {
         return $this->hasMany(CampanaDestinatario::class, 'campana_id');
+    }
+
+    /**
+     * ¿Esta campaña debe enviarse como plantilla Meta (en vez de texto libre)?
+     */
+    public function usaPlantillaMeta(): bool
+    {
+        return !empty($this->plantilla_meta_nombre);
     }
 
     public function enHorario(): bool

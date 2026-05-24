@@ -243,6 +243,43 @@ class CampanaSenderService
             }
 
             try {
+                // 🟢 Si la campaña usa plantilla Meta → enviar como plantilla
+                // (única opción válida para tenants con provider=meta fuera de
+                // ventana 24h, y obligatoria para mensajes proactivos masivos).
+                if ($c->usaPlantillaMeta()) {
+                    $varsCampana = is_array($c->plantilla_meta_variables)
+                        ? array_values($c->plantilla_meta_variables)
+                        : [];
+
+                    $ok = app(\App\Services\Meta\MetaWhatsappCloudService::class)
+                        ->enviarPlantilla(
+                            $d->telefono,
+                            $c->plantilla_meta_nombre,
+                            $varsCampana,
+                            $c->tenant_id,
+                            $c->plantilla_meta_idioma ?: 'es'
+                        );
+
+                    if ($ok) {
+                        $d->update([
+                            'estado'              => CampanaDestinatario::ESTADO_ENVIADO,
+                            'mensaje_renderizado' => '[plantilla:' . $c->plantilla_meta_nombre . ']',
+                            'enviado_at'          => now(),
+                            'intentos'            => $d->intentos + 1,
+                            'error_detalle'       => null,
+                        ]);
+                        $enviados++;
+                    } else {
+                        $d->update([
+                            'estado'        => CampanaDestinatario::ESTADO_FALLIDO,
+                            'error_detalle' => 'Meta plantilla rechazó el envío',
+                            'intentos'      => $d->intentos + 1,
+                        ]);
+                        $fallidos++;
+                    }
+                    continue;
+                }
+
                 // Si hay imagen adjunta → enviarImagen con caption; si no → texto
                 $ok = false;
                 $usoFallback = false;

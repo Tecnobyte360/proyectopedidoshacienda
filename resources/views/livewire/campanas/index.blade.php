@@ -565,14 +565,73 @@
                                class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm">
                     </div>
 
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1">Mensaje *</label>
-                        <textarea wire:model="mensaje" rows="4" placeholder="¡Hola {primer_nombre}! Tenemos un 20% de descuento en chuletas hasta el domingo. ¿Te animas? 🥩"
-                                  class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-mono"></textarea>
-                        <p class="text-[10px] text-slate-500 mt-1">
-                            Variables: <code>{nombre}</code>, <code>{primer_nombre}</code>, <code>{telefono}</code>
-                        </p>
-                    </div>
+                    @if($providerMeta)
+                        {{-- 🟢 PROVIDER META: usa plantillas aprobadas (oblig. >24h) --}}
+                        <div class="rounded-xl border-2 border-emerald-200 bg-emerald-50/40 p-4 space-y-3">
+                            <div class="flex items-center gap-2">
+                                <i class="fa-brands fa-meta text-emerald-600"></i>
+                                <h4 class="font-bold text-slate-800 text-sm">Plantilla Meta WhatsApp *</h4>
+                            </div>
+                            <p class="text-[11px] text-slate-600">
+                                Este tenant usa Meta WhatsApp Cloud API. Para envíos masivos es obligatorio
+                                usar una <strong>plantilla aprobada</strong> por Meta. Si no tienes plantillas,
+                                créalas en <a href="/meta-whatsapp" class="text-emerald-700 underline" target="_blank">/meta-whatsapp</a>.
+                            </p>
+
+                            @if($plantillasMeta->isEmpty())
+                                <div class="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800">
+                                    <i class="fa-solid fa-triangle-exclamation"></i>
+                                    No tienes plantillas aprobadas todavía. Ve a /meta-whatsapp y sincroniza desde Meta o crea una nueva.
+                                </div>
+                            @else
+                                <select wire:model.live="plantillaMetaId" class="w-full rounded-xl border border-emerald-300 px-3 py-2 text-sm">
+                                    <option value="">— Selecciona plantilla aprobada —</option>
+                                    @foreach($plantillasMeta as $tpl)
+                                        <option value="{{ $tpl->id }}">{{ $tpl->nombre }} ({{ $tpl->idioma }}) — {{ $tpl->categoria }}</option>
+                                    @endforeach
+                                </select>
+
+                                @if($plantillaSeleccionada)
+                                    <div class="rounded-lg bg-white border border-slate-200 px-3 py-2 text-xs">
+                                        <p class="font-semibold text-slate-700 mb-1">Vista previa:</p>
+                                        <pre class="whitespace-pre-wrap text-slate-600">{{ $plantillaSeleccionada->body_preview ?: '(sin body)' }}</pre>
+                                    </div>
+
+                                    @if(($plantillaSeleccionada->num_variables ?? 0) > 0)
+                                        <div class="space-y-2">
+                                            <p class="text-xs font-semibold text-slate-700">
+                                                Variables ({{ $plantillaSeleccionada->num_variables }}):
+                                            </p>
+                                            @for($i = 1; $i <= $plantillaSeleccionada->num_variables; $i++)
+                                                <div class="flex items-center gap-2">
+                                                    <span class="inline-flex items-center justify-center w-8 h-8 rounded bg-emerald-100 text-emerald-700 text-xs font-bold">
+                                                        {{ '{{' . $i . '}}' }}
+                                                    </span>
+                                                    <input type="text" wire:model="plantillaVariables.{{ $i }}"
+                                                           placeholder="Valor para {{ '{{' . $i . '}}' }}"
+                                                           class="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-sm">
+                                                </div>
+                                            @endfor
+                                            <p class="text-[10px] text-slate-500">
+                                                Estas variables se enviarán igual para TODOS los destinatarios.
+                                                Para personalización por cliente, usa los placeholders que Meta soporte en la plantilla.
+                                            </p>
+                                        </div>
+                                    @endif
+                                @endif
+                            @endif
+                        </div>
+                    @else
+                        {{-- 🟡 PROVIDER TecnoByteApp: texto libre (modo legacy) --}}
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Mensaje *</label>
+                            <textarea wire:model="mensaje" rows="4" placeholder="¡Hola {primer_nombre}! Tenemos un 20% de descuento en chuletas hasta el domingo. ¿Te animas? 🥩"
+                                      class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-mono"></textarea>
+                            <p class="text-[10px] text-slate-500 mt-1">
+                                Variables: <code>{nombre}</code>, <code>{primer_nombre}</code>, <code>{telefono}</code>
+                            </p>
+                        </div>
+                    @endif
 
                     <div class="rounded-xl border-2 border-slate-200 p-4 space-y-3">
                         <h4 class="font-bold text-slate-800 text-sm"><i class="fa-solid fa-users text-brand"></i> Audiencia</h4>

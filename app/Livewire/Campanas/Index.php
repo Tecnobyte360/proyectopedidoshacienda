@@ -69,6 +69,11 @@ class Index extends Component
 
     public string $nombre  = '';
     public string $mensaje = '';
+
+    // 🟢 Para tenants Meta: en lugar de texto libre, se envía plantilla
+    public ?int   $plantillaMetaId  = null;
+    public array  $plantillaVariables = []; // posicional: ['1'=>'Cliente', '2'=>'30%']
+
     public string $audienciaTipo = 'todos';
     public ?int   $zonaId = null;
     public ?int   $sedeId = null;
@@ -97,7 +102,9 @@ class Index extends Component
     {
         return [
             'nombre'           => 'required|string|max:150',
-            'mensaje'          => 'required|string|max:2000',
+            'mensaje'          => 'nullable|string|max:2000', // opcional si se usa plantilla
+            'plantillaMetaId'  => 'nullable|integer|exists:meta_whatsapp_plantillas,id',
+            'plantillaVariables' => 'array',
             'audienciaTipo'    => 'required|in:todos,zona,sede,con_pedidos,sin_pedidos,manual',
             'intervaloMinSeg'  => 'integer|min:1|max:300',
             'intervaloMaxSeg'  => 'integer|min:1|max:600',
@@ -381,10 +388,26 @@ class Index extends Component
             }
         }
 
+        // 🟢 Provider del tenant + plantillas Meta aprobadas (para UI)
+        $tenant = app(\App\Services\TenantManager::class)->current();
+        $providerMeta = $tenant && $tenant->proveedorWhatsappResuelto() === \App\Models\Tenant::WA_PROVIDER_META;
+        $plantillasMeta = $providerMeta
+            ? \App\Models\MetaWhatsappPlantilla::where('activa', true)
+                ->where('estado', 'APPROVED')
+                ->orderBy('nombre')
+                ->get()
+            : collect();
+
+        // Si hay plantilla seleccionada, calcular cuántas variables tiene
+        $plantillaSeleccionada = $this->plantillaMetaId
+            ? \App\Models\MetaWhatsappPlantilla::find($this->plantillaMetaId)
+            : null;
+
         return view('livewire.campanas.index', compact(
             'campanas', 'zonas', 'sedes',
             'monitorCampana', 'monitorDestinatarios', 'monitorEstadisticas',
-            'colaJobs', 'failedJobs'
+            'colaJobs', 'failedJobs',
+            'providerMeta', 'plantillasMeta', 'plantillaSeleccionada'
         ))->layout('layouts.app');
     }
 
@@ -414,7 +437,8 @@ class Index extends Component
     {
         $this->reset(['editandoId', 'nombre', 'mensaje', 'zonaId', 'sedeId',
                       'telefonosManual', 'programadaPara', 'imagen',
-                      'archivoExcel', 'numerosImportados', 'mediaUrlExistente']);
+                      'archivoExcel', 'numerosImportados', 'mediaUrlExistente',
+                      'plantillaMetaId', 'plantillaVariables']);
         $this->audienciaTipo   = 'todos';
         $this->minPedidos      = 1;
         $this->intervaloMinSeg = 8;
@@ -450,6 +474,19 @@ class Index extends Component
         $this->imagen           = null;
         $this->archivoExcel     = null;
         $this->numerosImportados= 0;
+        // 🟢 Plantilla Meta si la campaña la usa
+        if ($c->plantilla_meta_nombre) {
+            $tpl = \App\Models\MetaWhatsappPlantilla::where('nombre', $c->plantilla_meta_nombre)
+                ->where('idioma', $c->plantilla_meta_idioma ?: 'es')
+                ->first();
+            $this->plantillaMetaId = $tpl?->id;
+            $this->plantillaVariables = is_array($c->plantilla_meta_variables)
+                ? $c->plantilla_meta_variables
+                : [];
+        } else {
+            $this->plantillaMetaId = null;
+            $this->plantillaVariables = [];
+        }
         $this->modal = true;
     }
 
@@ -478,10 +515,27 @@ class Index extends Component
             $mediaUrl = Storage::disk('public')->url($path);
         }
 
+        // 🟢 Si hay plantilla seleccionada, resolver nombre/idioma y guardar vars
+        $plantillaNombre = null;
+        $plantillaIdioma = null;
+        $plantillaVars   = null;
+        if ($this->plantillaMetaId) {
+            $tpl = \App\Models\MetaWhatsappPlantilla::find($this->plantillaMetaId);
+            if ($tpl) {
+                $plantillaNombre = $tpl->nombre;
+                $plantillaIdioma = $tpl->idioma ?: 'es';
+                // Filtrar y mantener solo las claves numéricas relevantes
+                $plantillaVars = array_filter($this->plantillaVariables, fn($v) => $v !== null && $v !== '');
+            }
+        }
+
         $data = [
             'nombre'             => $this->nombre,
             'mensaje'            => $this->mensaje,
             'media_url'          => $mediaUrl,
+            'plantilla_meta_nombre'    => $plantillaNombre,
+            'plantilla_meta_idioma'    => $plantillaIdioma,
+            'plantilla_meta_variables' => $plantillaVars,
             'audiencia_tipo'     => $this->audienciaTipo,
             'audiencia_filtros'  => $filtros,
             'intervalo_min_seg'  => $this->intervaloMinSeg,

@@ -465,6 +465,29 @@ MSG;
 
     public function notificarClienteCambioEstado(): void
     {
+        // 🟢 META: si el tenant usa Meta + hay disparador configurado para este
+        // estado → enviar plantilla y salir (la regla 24h obliga a esto fuera
+        // de ventana). Si falla o no hay disparador, continúa al flujo legacy.
+        try {
+            $eventoMeta = match ($this->estado) {
+                self::ESTADO_EN_PREPARACION       => 'pedido_en_proceso',
+                self::ESTADO_REPARTIDOR_EN_CAMINO => 'pedido_en_camino',
+                self::ESTADO_ENTREGADO            => 'pedido_entregado',
+                self::ESTADO_CANCELADO            => 'pedido_cancelado',
+                default                            => null,
+            };
+            if ($eventoMeta) {
+                $tenant = \App\Models\Tenant::find($this->tenant_id);
+                if ($tenant && $tenant->proveedorWhatsappResuelto() === \App\Models\Tenant::WA_PROVIDER_META) {
+                    $disparado = app(\App\Services\Whatsapp\DispararEventoMetaService::class)
+                        ->dispararParaPedido($eventoMeta, $this);
+                    if ($disparado) return;
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Disparador Meta evento pedido falló (continúa legacy): ' . $e->getMessage());
+        }
+
         // Mapear estado → tipo de notificación configurable
         $tipoMap = [
             self::ESTADO_EN_PREPARACION       => 'en_preparacion',

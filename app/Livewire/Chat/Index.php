@@ -1014,6 +1014,24 @@ class Index extends Component
             return;
         }
 
+        // 🟢 GUARD META 24h: si el tenant usa Meta y la ventana 24h está
+        // cerrada, NO se puede enviar texto libre. Bloquear y avisar.
+        try {
+            $tenant = app(\App\Services\TenantManager::class)->current();
+            if ($tenant && $tenant->proveedorWhatsappResuelto() === \App\Models\Tenant::WA_PROVIDER_META) {
+                $checker = app(\App\Services\Whatsapp\Ventana24hChecker::class);
+                if (!$checker->abierta($conv)) {
+                    $this->dispatch('notify', [
+                        'type'    => 'error',
+                        'message' => '🔒 Ventana 24h cerrada. Meta requiere enviar una plantilla aprobada para reabrir la conversación. Configura disparadores en /meta-whatsapp.',
+                    ]);
+                    return;
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Guard 24h Meta falló (continúa): ' . $e->getMessage());
+        }
+
         // Resolver connection_id del tenant actual (evita enviar desde el número de otro tenant)
         $connectionId = $this->resolverConnectionId($conv->connection_id);
         if (!$connectionId) {
