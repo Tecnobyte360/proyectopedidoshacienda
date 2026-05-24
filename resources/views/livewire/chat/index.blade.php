@@ -117,23 +117,19 @@
 
                     <div class="relative flex-shrink-0">
                         @php
-                            // 📸 Foto del cliente: usar foto_url local (descargada de WA), o fallback
-                            $fotoCliente = $c->cliente?->foto_url ?: $c->cliente?->profile_pic_url;
+                            // 📸 Avatar unificado: foto_url > profile_pic_url > ui-avatars con iniciales
+                            $avatarUrl = $c->cliente
+                                ? $c->cliente->avatar_url
+                                : 'https://ui-avatars.com/api/?name=' . urlencode($iniciales ?: 'C') . '&background=10b981&color=fff&size=128&bold=true';
                         @endphp
-                        @if($fotoCliente)
-                            <img src="{{ $fotoCliente }}"
-                                 class="h-12 w-12 rounded-full object-cover bg-slate-100"
-                                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
-                                 alt="avatar"
-                                 loading="lazy">
-                            <div class="h-12 w-12 rounded-full bg-gradient-to-br from-brand to-brand-secondary text-white font-bold items-center justify-center" style="display:none;">
-                                {{ $iniciales ?: 'C' }}
-                            </div>
-                        @else
-                            <div class="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-brand to-brand-secondary text-white font-bold">
-                                {{ $iniciales ?: 'C' }}
-                            </div>
-                        @endif
+                        <img src="{{ $avatarUrl }}"
+                             class="h-12 w-12 rounded-full object-cover bg-slate-100"
+                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+                             alt="avatar"
+                             loading="lazy">
+                        <div class="h-12 w-12 rounded-full bg-gradient-to-br from-brand to-brand-secondary text-white font-bold items-center justify-center" style="display:none;">
+                            {{ $iniciales ?: 'C' }}
+                        </div>
                         @if($c->canal === 'widget')
                             <span class="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-sky-500 text-white text-[10px] border-2 border-white" title="Chat desde web (widget)">
                                 <i class="fa-solid fa-globe"></i>
@@ -203,15 +199,20 @@
             {{-- Header del chat --}}
             <div class="relative z-10 bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between gap-3 shadow-sm">
                 <div class="flex items-center gap-3 min-w-0">
-                    @if($conversacionActiva->cliente?->profile_pic_url)
-                        <img src="{{ $conversacionActiva->cliente->profile_pic_url }}"
-                             class="h-10 w-10 rounded-full object-cover bg-slate-100 flex-shrink-0"
+                    @php
+                        $avatarHeader = $conversacionActiva->cliente
+                            ? $conversacionActiva->cliente->avatar_url
+                            : 'https://ui-avatars.com/api/?name=' . urlencode($iniAct ?: 'C') . '&background=10b981&color=fff&size=128&bold=true';
+                    @endphp
+                    <div class="relative flex-shrink-0">
+                        <img src="{{ $avatarHeader }}"
+                             class="h-10 w-10 rounded-full object-cover bg-slate-100"
+                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
                              alt="avatar">
-                    @else
-                        <div class="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-brand to-brand-secondary text-white font-bold text-sm flex-shrink-0">
+                        <div class="h-10 w-10 rounded-full bg-gradient-to-br from-brand to-brand-secondary text-white font-bold text-sm items-center justify-center" style="display:none;">
                             {{ $iniAct ?: 'C' }}
                         </div>
-                    @endif
+                    </div>
                     <div class="min-w-0">
                         <div class="font-semibold text-slate-800 truncate flex items-center gap-2">
                             <span>{{ $conversacionActiva->cliente?->nombre ?? 'Cliente' }}</span>

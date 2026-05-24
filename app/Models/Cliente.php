@@ -208,8 +208,14 @@ class Cliente extends Model
      */
     public function getAvatarUrlAttribute(): string
     {
+        // Prioridad: foto_url (descargada localmente) > profile_pic_url
+        // (URL externa de WhatsApp que viene en webhook TecnoByteApp).
+        // Meta NO entrega foto del cliente, asi que solo aplica fallback.
         if (!empty($this->foto_url)) {
             return $this->foto_url;
+        }
+        if (!empty($this->profile_pic_url)) {
+            return $this->profile_pic_url;
         }
 
         $nombre = trim((string) ($this->nombre ?: 'Cliente'));
