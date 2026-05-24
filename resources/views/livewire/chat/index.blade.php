@@ -512,13 +512,43 @@
 
                 <form wire:submit.prevent="enviar"
                       class="px-3 py-3 flex items-center gap-2"
-                      @if($tenantUsaMeta && !$ventana24hAbierta) style="opacity:0.4; pointer-events:none;" @endif>
-                    <textarea wire:model="nuevoMensaje"
-                              placeholder="Escribe tu respuesta..."
-                              rows="1"
-                              x-show="!recording && !preview"
-                              @keydown.enter.prevent="$wire.enviar()"
-                              class="flex-1 resize-none rounded-2xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-2 focus:ring-amber-100"></textarea>
+                      @if($tenantUsaMeta && !$ventana24hAbierta) style="opacity:0.4; pointer-events:none;" @endif
+                      x-data="slashMenu({{ $respuestasRapidas->toJson() }})">
+                    <div class="flex-1 relative" x-show="!recording && !preview">
+                        {{-- 💡 Popup respuestas rápidas (estilo Slack /comando) --}}
+                        <div x-show="open && filtradas.length > 0"
+                             x-cloak
+                             @click.outside="open = false"
+                             class="absolute bottom-full left-0 right-0 mb-2 max-h-72 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl z-30">
+                            <div class="px-3 py-1.5 border-b border-slate-100 bg-slate-50 text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                                ⚡ Respuestas rápidas <span class="font-normal normal-case text-slate-400">(↑↓ navegar · Enter usar · Esc cerrar)</span>
+                            </div>
+                            <template x-for="(r, i) in filtradas" :key="r.id">
+                                <button type="button"
+                                        @click="seleccionar(r)"
+                                        @mouseenter="indice = i"
+                                        :class="indice === i ? 'bg-amber-50 border-l-4 border-amber-500' : 'border-l-4 border-transparent'"
+                                        class="w-full text-left px-3 py-2 hover:bg-amber-50 transition">
+                                    <div class="flex items-center gap-2 mb-0.5">
+                                        <i class="fa-solid fa-bolt text-amber-500 text-[10px]"></i>
+                                        <span class="text-xs font-bold text-slate-800" x-text="r.atajo || '(sin atajo)'"></span>
+                                    </div>
+                                    <p class="text-[11px] text-slate-600 truncate" x-text="r.texto"></p>
+                                </button>
+                            </template>
+                        </div>
+
+                        <textarea wire:model="nuevoMensaje"
+                                  x-ref="ta"
+                                  placeholder="Escribe / para respuestas rápidas..."
+                                  rows="1"
+                                  @input="onInput($event)"
+                                  @keydown.escape="open = false"
+                                  @keydown.arrow-down.prevent="if (open) indice = Math.min(indice + 1, filtradas.length - 1)"
+                                  @keydown.arrow-up.prevent="if (open) indice = Math.max(indice - 1, 0)"
+                                  @keydown.enter="onEnter($event)"
+                                  class="w-full resize-none rounded-2xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-2 focus:ring-amber-100"></textarea>
+                    </div>
 
                     {{-- Indicador de grabación --}}
                     <div x-show="recording" x-cloak
@@ -676,6 +706,56 @@
                     this.imgDataUrl = null;
                     this.imgCaption = '';
                     this.imgError = '';
+                },
+            };
+        }
+    </script>
+
+    {{-- Slash menu para respuestas rápidas (estilo Slack) --}}
+    <script>
+        function slashMenu(respuestas) {
+            return {
+                respuestas: respuestas || [],
+                open: false,
+                filtro: '',
+                indice: 0,
+
+                get filtradas() {
+                    if (!this.filtro) return this.respuestas.slice(0, 8);
+                    const q = this.filtro.toLowerCase();
+                    return this.respuestas.filter(r =>
+                        (r.atajo || '').toLowerCase().includes(q) ||
+                        (r.texto || '').toLowerCase().includes(q)
+                    ).slice(0, 8);
+                },
+
+                onInput(e) {
+                    const v = (e.target.value || '');
+                    // Solo se activa si el texto EMPIEZA con /
+                    if (v.startsWith('/')) {
+                        this.filtro = v.slice(1).trim();
+                        this.open = true;
+                        this.indice = 0;
+                    } else {
+                        this.open = false;
+                    }
+                },
+
+                onEnter(e) {
+                    if (this.open && this.filtradas.length > 0) {
+                        e.preventDefault();
+                        this.seleccionar(this.filtradas[this.indice]);
+                        return;
+                    }
+                    // Enter normal → enviar
+                    e.preventDefault();
+                    this.$wire.enviar();
+                },
+
+                seleccionar(r) {
+                    this.$wire.set('nuevoMensaje', r.texto);
+                    this.open = false;
+                    this.$nextTick(() => this.$refs.ta?.focus());
                 },
             };
         }
