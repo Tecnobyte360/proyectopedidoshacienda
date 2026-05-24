@@ -14,12 +14,9 @@ return new class extends Migration
             }
         });
 
-        Schema::table('configuracion_bot', function (Blueprint $table) {
-            if (!Schema::hasColumn('configuracion_bot', 'enviar_ficha_tecnica')) {
-                $table->boolean('enviar_ficha_tecnica')->default(false)->after('activo');
-            }
-            if (!Schema::hasColumn('configuracion_bot', 'enviar_imagenes_productos')) {
-                $table->boolean('enviar_imagenes_productos')->default(true)->after('enviar_ficha_tecnica');
+        Schema::table('configuraciones_bot', function (Blueprint $table) {
+            if (!Schema::hasColumn('configuraciones_bot', 'enviar_ficha_tecnica')) {
+                $table->boolean('enviar_ficha_tecnica')->default(false);
             }
         });
     }
@@ -32,11 +29,9 @@ return new class extends Migration
             }
         });
 
-        Schema::table('configuracion_bot', function (Blueprint $table) {
-            foreach (['enviar_imagenes_productos', 'enviar_ficha_tecnica'] as $col) {
-                if (Schema::hasColumn('configuracion_bot', $col)) {
-                    $table->dropColumn($col);
-                }
+        Schema::table('configuraciones_bot', function (Blueprint $table) {
+            if (Schema::hasColumn('configuraciones_bot', 'enviar_ficha_tecnica')) {
+                $table->dropColumn('enviar_ficha_tecnica');
             }
         });
     }
