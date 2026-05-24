@@ -468,27 +468,16 @@
                     @endif
                 @endif
 
-                @if($respuestasRapidas->isNotEmpty() || ($tenantUsaMeta && $plantillasMetaAprobadas->isNotEmpty()))
-                    {{-- ⚡ Respuestas rápidas + atajo de plantillas Meta --}}
-                    <div class="px-3 pt-2 pb-1 flex items-center gap-1.5 overflow-x-auto whitespace-nowrap border-b border-slate-100 bg-slate-50/50">
-                        @foreach($respuestasRapidas as $r)
-                            <button type="button"
-                                    wire:click="usarRespuestaRapida({{ $r->id }})"
-                                    title="{{ mb_substr($r->texto, 0, 100) }}"
-                                    class="inline-flex items-center gap-1 rounded-full bg-white border border-slate-200 hover:border-brand hover:bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-slate-700 transition flex-shrink-0">
-                                <i class="fa-solid fa-bolt text-amber-500 text-[10px]"></i>
-                                {{ $r->atajo ?: mb_substr($r->texto, 0, 18) . '…' }}
-                            </button>
-                        @endforeach
-
-                        @if($tenantUsaMeta && $plantillasMetaAprobadas->isNotEmpty() && $ventana24hAbierta)
-                            <button type="button"
-                                    onclick="document.getElementById('plantilla-meta-quick').classList.toggle('hidden')"
-                                    class="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 transition flex-shrink-0">
-                                <i class="fa-brands fa-meta text-[10px]"></i>
-                                Plantilla
-                            </button>
-                        @endif
+                @if($tenantUsaMeta && $plantillasMetaAprobadas->isNotEmpty() && $ventana24hAbierta)
+                    {{-- 🟢 Atajo de plantillas Meta (sin chips de respuestas: usa "/" para esas) --}}
+                    <div class="px-3 pt-2 pb-1 flex items-center gap-1.5 border-b border-slate-100 bg-slate-50/50">
+                        <button type="button"
+                                onclick="document.getElementById('plantilla-meta-quick').classList.toggle('hidden')"
+                                class="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 transition flex-shrink-0">
+                            <i class="fa-brands fa-meta text-[10px]"></i>
+                            Plantilla Meta
+                        </button>
+                        <span class="text-[10px] text-slate-400">o escribe <kbd class="px-1.5 py-0.5 rounded bg-white border border-slate-300 text-slate-600 font-mono text-[10px]">/</kbd> para respuestas rápidas</span>
                     </div>
 
                     @if($tenantUsaMeta && $plantillasMetaAprobadas->isNotEmpty() && $ventana24hAbierta)
