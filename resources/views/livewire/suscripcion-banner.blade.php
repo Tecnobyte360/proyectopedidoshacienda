@@ -1,7 +1,7 @@
 <div>
 @php $info = $this->info; @endphp
 @if($info && !$oculto)
-    <div class="rounded-2xl bg-gradient-to-r {{ $info['estilos']['bg'] }} text-white shadow-lg p-4 mb-4 flex items-center gap-4 flex-wrap"
+    <div class="rounded-2xl bg-gradient-to-r {{ $info['estilos']['bg'] }} text-white shadow-xl ring-1 ring-white/20 p-4 mb-4 flex items-center gap-4 flex-wrap"
          x-data
          x-on:abrir-url.window="window.open($event.detail[0]?.url || $event.detail.url, '_blank')">
 
@@ -33,14 +33,14 @@
             @if($info['monto'] > 0)
                 @if($info['link_pago'])
                     <a href="{{ $info['link_pago'] }}" target="_blank"
-                       class="inline-flex items-center gap-2 bg-white text-slate-800 hover:bg-slate-100 rounded-xl px-4 py-2 text-sm font-bold shadow transition">
+                       class="inline-flex items-center gap-2 bg-white text-slate-900 hover:bg-amber-50 hover:text-brand-dark rounded-xl px-5 py-2.5 text-sm font-extrabold shadow-lg ring-2 ring-white/40 transition-all hover:scale-105">
                         <i class="fa-solid fa-credit-card"></i>
                         Pagar ahora
                     </a>
                 @else
                     <button type="button" wire:click="pagarAhora"
                             wire:loading.attr="disabled"
-                            class="inline-flex items-center gap-2 bg-white text-slate-800 hover:bg-slate-100 rounded-xl px-4 py-2 text-sm font-bold shadow transition disabled:opacity-50">
+                            class="inline-flex items-center gap-2 bg-white text-slate-900 hover:bg-amber-50 hover:text-brand-dark rounded-xl px-5 py-2.5 text-sm font-extrabold shadow-lg ring-2 ring-white/40 transition-all hover:scale-105 disabled:opacity-50 disabled:hover:scale-100">
                         <i class="fa-solid fa-credit-card" wire:loading.remove wire:target="pagarAhora"></i>
                         <i class="fa-solid fa-spinner animate-spin" wire:loading wire:target="pagarAhora"></i>
                         Pagar ahora

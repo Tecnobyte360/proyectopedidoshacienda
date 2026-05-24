@@ -92,11 +92,13 @@ class SuscripcionBanner extends Component
             default     => 'verde',
         };
 
+        // Paleta que contrasta con el color de marca (naranja/amber)
+        // Verde → Teal (azul-verde) · Amarillo → Indigo · Naranja → Violet · Rojo → Rose oscuro
         $estilos = [
-            'verde'    => ['bg' => 'from-emerald-500 to-emerald-600', 'icon' => 'fa-circle-info'],
-            'amarillo' => ['bg' => 'from-amber-400 to-amber-500',     'icon' => 'fa-triangle-exclamation'],
-            'naranja'  => ['bg' => 'from-orange-500 to-orange-600',   'icon' => 'fa-bell'],
-            'rojo'     => ['bg' => 'from-rose-500 to-rose-600',       'icon' => 'fa-circle-exclamation'],
+            'verde'    => ['bg' => 'from-teal-600 to-cyan-700',      'icon' => 'fa-circle-info'],
+            'amarillo' => ['bg' => 'from-indigo-500 to-indigo-700',  'icon' => 'fa-triangle-exclamation'],
+            'naranja'  => ['bg' => 'from-violet-600 to-purple-700',  'icon' => 'fa-bell'],
+            'rojo'     => ['bg' => 'from-rose-600 to-pink-700',      'icon' => 'fa-circle-exclamation'],
         ];
 
         $mensaje = match ($sev) {
