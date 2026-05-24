@@ -3,6 +3,11 @@
     $usaMeta = $tenant && $tenant->proveedorWhatsappResuelto() === \App\Models\Tenant::WA_PROVIDER_META;
 @endphp
 
+{{-- ⚠️ Livewire 3 exige UN solo root. Envolvemos todo aquí y dentro
+     condicionamos qué variante mostrar. Si tenant=Meta, el wire:poll
+     no aplica (no hay sesión que monitorear). --}}
+<div @if(!$usaMeta) wire:poll.{{ in_array($status, ['qrcode', 'pairing']) ? '5000ms' : '30000ms' }}="verificarEstado" @endif>
+
 @if($usaMeta)
     {{-- 🟢 Tenant usa Meta Cloud API: no hay QR ni sesión que monitorear --}}
     <div class="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 shadow-sm">
@@ -20,7 +25,6 @@
         </div>
     </div>
 @else
-<div wire:poll.{{ in_array($status, ['qrcode', 'pairing']) ? '5000ms' : '30000ms' }}="verificarEstado">
     @php
         $config = match ($status) {
             'connected' => [
@@ -233,5 +237,6 @@
             </div>
         </div>
     @endif
-</div>
 @endif
+
+</div>{{-- Root unico Livewire 3 --}}
