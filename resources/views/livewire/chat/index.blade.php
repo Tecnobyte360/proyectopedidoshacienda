@@ -456,6 +456,60 @@
                     @endif
                 @endif
 
+                @if($respuestasRapidas->isNotEmpty() || ($tenantUsaMeta && $plantillasMetaAprobadas->isNotEmpty()))
+                    {{-- ⚡ Respuestas rápidas + atajo de plantillas Meta --}}
+                    <div class="px-3 pt-2 pb-1 flex items-center gap-1.5 overflow-x-auto whitespace-nowrap border-b border-slate-100 bg-slate-50/50">
+                        @foreach($respuestasRapidas as $r)
+                            <button type="button"
+                                    wire:click="usarRespuestaRapida({{ $r->id }})"
+                                    title="{{ mb_substr($r->texto, 0, 100) }}"
+                                    class="inline-flex items-center gap-1 rounded-full bg-white border border-slate-200 hover:border-brand hover:bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-slate-700 transition flex-shrink-0">
+                                <i class="fa-solid fa-bolt text-amber-500 text-[10px]"></i>
+                                {{ $r->atajo ?: mb_substr($r->texto, 0, 18) . '…' }}
+                            </button>
+                        @endforeach
+
+                        @if($tenantUsaMeta && $plantillasMetaAprobadas->isNotEmpty() && $ventana24hAbierta)
+                            <button type="button"
+                                    onclick="document.getElementById('plantilla-meta-quick').classList.toggle('hidden')"
+                                    class="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 transition flex-shrink-0">
+                                <i class="fa-brands fa-meta text-[10px]"></i>
+                                Plantilla
+                            </button>
+                        @endif
+                    </div>
+
+                    @if($tenantUsaMeta && $plantillasMetaAprobadas->isNotEmpty() && $ventana24hAbierta)
+                        <div id="plantilla-meta-quick" class="hidden px-3 py-2 bg-emerald-50/60 border-b border-emerald-100 space-y-2">
+                            <select wire:model.live="plantillaChatId" class="w-full rounded-lg border border-emerald-300 px-2 py-1.5 text-xs bg-white">
+                                <option value="">— Selecciona plantilla —</option>
+                                @foreach($plantillasMetaAprobadas as $tpl)
+                                    <option value="{{ $tpl->id }}">{{ $tpl->nombre }} ({{ $tpl->num_variables }} vars)</option>
+                                @endforeach
+                            </select>
+                            @if($plantillaChatSeleccionada && ($plantillaChatSeleccionada->num_variables ?? 0) > 0)
+                                <div class="space-y-1">
+                                    @for($i = 1; $i <= $plantillaChatSeleccionada->num_variables; $i++)
+                                        @php $ph = '{{' . $i . '}}'; @endphp
+                                        <div class="flex items-center gap-2">
+                                            <span class="inline-flex w-12 h-7 items-center justify-center rounded bg-emerald-100 text-emerald-700 text-[10px] font-bold">{{ $ph }}</span>
+                                            <input type="text" wire:model="plantillaChatVars.{{ $i }}" placeholder="Valor"
+                                                   class="flex-1 rounded border border-slate-200 px-2 py-1 text-xs">
+                                        </div>
+                                    @endfor
+                                </div>
+                            @endif
+                            @if($plantillaChatSeleccionada)
+                                <button type="button" wire:click="enviarPlantilla"
+                                        class="w-full inline-flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-1.5 transition">
+                                    <i class="fa-solid fa-paper-plane text-[10px]"></i>
+                                    Enviar plantilla
+                                </button>
+                            @endif
+                        </div>
+                    @endif
+                @endif
+
                 <form wire:submit.prevent="enviar"
                       class="px-3 py-3 flex items-center gap-2"
                       @if($tenantUsaMeta && !$ventana24hAbierta) style="opacity:0.4; pointer-events:none;" @endif>

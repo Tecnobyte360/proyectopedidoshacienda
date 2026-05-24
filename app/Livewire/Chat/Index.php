@@ -1545,14 +1545,44 @@ class Index extends Component
             }
         }
 
+        // 🟢 Recalcular ventana 24h en cada render (no solo al seleccionar)
+        // para que el contador se actualice con el wire:poll.
+        if ($this->tenantUsaMeta && $conversacionActiva) {
+            try {
+                $checker = app(\App\Services\Whatsapp\Ventana24hChecker::class);
+                $this->ventana24hAbierta = $checker->abierta($conversacionActiva);
+                $this->ventana24hMinutosRestantes = $checker->minutosRestantes($conversacionActiva);
+            } catch (\Throwable $e) { /* silent */ }
+        }
+
+        // 🟢 Respuestas rápidas del tenant
+        $respuestasRapidas = collect();
+        try {
+            $respuestasRapidas = \App\Models\RespuestaRapida::where('activa', true)
+                ->orderBy('orden')
+                ->orderBy('id')
+                ->get();
+        } catch (\Throwable $e) { /* tabla puede no existir aún */ }
+
         return view('livewire.chat.index', compact(
             'conversaciones',
             'conversacionActiva',
             'pedidoEstado',
             'promptInspeccion',
             'plantillasMetaAprobadas',
-            'plantillaChatSeleccionada'
+            'plantillaChatSeleccionada',
+            'respuestasRapidas'
         ))->layout('layouts.app');
+    }
+
+    /** 🟢 Insertar el texto de una respuesta rápida en el input */
+    public function usarRespuestaRapida(int $id): void
+    {
+        try {
+            $resp = \App\Models\RespuestaRapida::find($id);
+            if (!$resp) return;
+            $this->nuevoMensaje = $resp->texto;
+        } catch (\Throwable $e) { /* silent */ }
     }
 
     /**

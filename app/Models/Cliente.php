@@ -132,10 +132,19 @@ class Cliente extends Model
             && self::nombreNoEsProducto($nombreLimpio);
 
         if ($cliente) {
-            if (
-                $pareceNombre
-                && in_array(strtolower(trim($cliente->nombre)), ['cliente', 'usuario', ''], true)
-            ) {
+            // Sobreescribir el nombre si el actual es placeholder genérico,
+            // o si el nuevo tiene MAS palabras (ej. tenemos "Stiven" y llega
+            // "Stiven Madrid" → preferimos el completo).
+            $nombreActualLow = strtolower(trim((string) $cliente->nombre));
+            $esPlaceholder = in_array($nombreActualLow, [
+                'cliente', 'usuario', 'test', 'prueba', 'pruebas',
+                'demo', 'sin nombre', 'whatsapp', '',
+            ], true);
+            $palabrasActual = str_word_count((string) $cliente->nombre);
+            $palabrasNuevo  = str_word_count($nombreLimpio);
+            $masCompleto    = $palabrasNuevo > $palabrasActual;
+
+            if ($pareceNombre && ($esPlaceholder || $masCompleto)) {
                 $cliente->update(['nombre' => $nombreLimpio]);
             }
 
