@@ -62,10 +62,10 @@ class Index extends Component
 
         if ($this->editandoId) {
             RespuestaRapida::findOrFail($this->editandoId)->update($data);
-            $this->dispatch('notify', ['type' => 'success', 'message' => '✓ Respuesta actualizada']);
+            $this->dispatch('notify', ['type' => 'success', 'message' => 'Respuesta actualizada']);
         } else {
             RespuestaRapida::create($data);
-            $this->dispatch('notify', ['type' => 'success', 'message' => '✓ Respuesta creada']);
+            $this->dispatch('notify', ['type' => 'success', 'message' => 'Respuesta creada']);
         }
 
         $this->modal = false;
@@ -74,7 +74,7 @@ class Index extends Component
     public function eliminar(int $id): void
     {
         RespuestaRapida::where('id', $id)->delete();
-        $this->dispatch('notify', ['type' => 'success', 'message' => '🗑️ Eliminada']);
+        $this->dispatch('notify', ['type' => 'success', 'message' => 'Eliminada']);
     }
 
     public function toggleActiva(int $id): void
