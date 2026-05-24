@@ -160,19 +160,17 @@ class ReintentarMensajesSalida extends Command
     private function reenviar(array $payload, string $telefono, $connectionId): bool
     {
         try {
-            $controller = app(\App\Http\Controllers\WhatsappWebhookController::class);
-            // Usar el método de envío "raw" sin re-encolar si falla — eso
-            // sería un loop infinito. Aquí solo el HTTP call directo.
-            $rm = new \ReflectionMethod($controller, 'postWhatsappSend');
-            $rm->setAccessible(true);
+            // 🟢 Respetar provider del tenant: WhatsappSenderService tiene la
+            // lógica dual (Meta vs TecnoByteApp) y elige por tenant. NO
+            // persistimos en conversación porque ya está persistido (este es
+            // un reintento de algo que ya se intentó enviar).
+            $body = (string) ($payload['body'] ?? '');
+            if ($body === '' || !$telefono) return false;
 
-            $tokenM = new \ReflectionMethod($controller, 'obtenerTokenWhatsapp');
-            $tokenM->setAccessible(true);
-            $token = $tokenM->invoke($controller);
-            if (!$token) return false;
+            $cid = is_numeric($connectionId) ? (int) $connectionId : null;
 
-            $resp = $rm->invoke($controller, $token, $payload);
-            return $resp->successful();
+            return app(\App\Services\WhatsappSenderService::class)
+                ->enviarTexto($telefono, $body, $cid, persistirEnConversacion: false);
         } catch (\Throwable $e) {
             Log::warning('Reintento HTTP falló: ' . $e->getMessage());
             return false;
