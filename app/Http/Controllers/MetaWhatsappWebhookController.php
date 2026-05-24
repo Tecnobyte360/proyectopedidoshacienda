@@ -104,6 +104,18 @@ class MetaWhatsappWebhookController extends Controller
                 foreach ($value['statuses'] ?? [] as $status) {
                     $this->procesarStatus($status, $config);
                 }
+
+                // 📞 Procesar eventos de Calling API (calls + call_permission_updates)
+                if (!empty($value['calls']) || !empty($value['call_permission_updates'])) {
+                    try {
+                        app(\App\Services\Meta\MetaCallingService::class)
+                            ->procesarWebhook($value, $config->tenant_id);
+                    } catch (\Throwable $e) {
+                        Log::error('📞 Error procesando webhook calls', [
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
             }
         }
 
