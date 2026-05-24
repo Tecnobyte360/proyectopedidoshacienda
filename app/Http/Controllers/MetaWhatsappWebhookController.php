@@ -133,15 +133,27 @@ class MetaWhatsappWebhookController extends Controller
             case 'audio':
             case 'voice':
                 $mediaType = 'audio';
-                // Meta entrega audio.id — habría que llamar a /MEDIA_ID para sacar URL temporal
-                // Para Fase 1 logueamos y pasamos vacío; se atiende en Fase 2.
-                $body = '[audio recibido — descarga pendiente]';
-                $mediaUrl = $msg['audio']['id'] ?? null;
+                $mediaId = $msg['audio']['id'] ?? null;
+                $body = '[Audio]';
+                $mediaUrl = $this->descargarMediaMeta($mediaId, $config, 'ogg') ?? $mediaId;
                 break;
             case 'image':
                 $mediaType = 'image';
                 $body = $msg['image']['caption'] ?? '[imagen]';
-                $mediaUrl = $msg['image']['id'] ?? null;
+                $mediaId = $msg['image']['id'] ?? null;
+                $mediaUrl = $this->descargarMediaMeta($mediaId, $config, 'jpg') ?? $mediaId;
+                break;
+            case 'video':
+                $mediaType = 'video';
+                $body = $msg['video']['caption'] ?? '[video]';
+                $mediaId = $msg['video']['id'] ?? null;
+                $mediaUrl = $this->descargarMediaMeta($mediaId, $config, 'mp4') ?? $mediaId;
+                break;
+            case 'document':
+                $mediaType = 'document';
+                $body = $msg['document']['caption'] ?? $msg['document']['filename'] ?? '[documento]';
+                $mediaId = $msg['document']['id'] ?? null;
+                $mediaUrl = $this->descargarMediaMeta($mediaId, $config, 'bin') ?? $mediaId;
                 break;
             case 'interactive':
                 // Botón / lista
@@ -240,6 +252,81 @@ class MetaWhatsappWebhookController extends Controller
                 ->update(['ack' => $ack]);
         } catch (\Throwable $e) {
             Log::warning('No se pudo actualizar ack Meta: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Descarga un media entrante de Meta (image/audio/video/document) y lo
+     * guarda en storage público. Meta requiere 2 llamadas autenticadas:
+     *   1. GET /{media_id} → devuelve { url: "https://lookaside.fbsbx.com/..." }
+     *   2. GET de esa URL con Bearer token → binario
+     *
+     * @return string|null URL pública local del archivo (o null si falla)
+     */
+    private function descargarMediaMeta(?string $mediaId, \App\Models\MetaWhatsappConfig $config, string $extDefault = 'bin'): ?string
+    {
+        if (!$mediaId) return null;
+
+        try {
+            // 1. Obtener URL real autenticada
+            $resp = \Illuminate\Support\Facades\Http::withToken($config->access_token)
+                ->timeout(15)
+                ->get(sprintf('https://graph.facebook.com/%s/%s', $config->api_version ?: 'v25.0', $mediaId));
+
+            if (!$resp->successful()) {
+                Log::warning('Meta media: falló GET metadata', [
+                    'media_id' => $mediaId, 'status' => $resp->status(), 'body' => mb_substr($resp->body(), 0, 200),
+                ]);
+                return null;
+            }
+
+            $url = $resp->json('url');
+            $mime = $resp->json('mime_type') ?: '';
+            if (!$url) return null;
+
+            // 2. Descargar el binario CON token
+            $bin = \Illuminate\Support\Facades\Http::withToken($config->access_token)
+                ->withOptions(['stream' => false])
+                ->timeout(60)
+                ->get($url);
+
+            if (!$bin->successful() || strlen($bin->body()) < 50) {
+                Log::warning('Meta media: falló descarga binaria', [
+                    'media_id' => $mediaId, 'status' => $bin->status(),
+                ]);
+                return null;
+            }
+
+            // Determinar extensión por mime real (preferible al default)
+            $ext = match (true) {
+                str_contains($mime, 'jpeg')    => 'jpg',
+                str_contains($mime, 'png')     => 'png',
+                str_contains($mime, 'webp')    => 'webp',
+                str_contains($mime, 'gif')     => 'gif',
+                str_contains($mime, 'ogg')     => 'ogg',
+                str_contains($mime, 'mpeg')    => 'mp3',
+                str_contains($mime, 'mp4')     => 'mp4',
+                str_contains($mime, 'amr')     => 'amr',
+                str_contains($mime, 'pdf')     => 'pdf',
+                default                        => $extDefault,
+            };
+
+            // Guardar en storage público (por tenant)
+            $tenant = \App\Models\Tenant::find($config->tenant_id);
+            $slug = $tenant?->slug ?: 'tenant-' . $config->tenant_id;
+            $filename = "tenants/{$slug}/meta-inbound/{$mediaId}.{$ext}";
+            \Illuminate\Support\Facades\Storage::disk('public')->put($filename, $bin->body());
+
+            $publicUrl = rtrim(config('app.url'), '/') . \Illuminate\Support\Facades\Storage::url($filename);
+
+            Log::info('📥 Meta media descargado', [
+                'media_id' => $mediaId, 'mime' => $mime, 'bytes' => strlen($bin->body()), 'url' => $publicUrl,
+            ]);
+
+            return $publicUrl;
+        } catch (\Throwable $e) {
+            Log::error('Meta media: excepción descarga: ' . $e->getMessage(), ['media_id' => $mediaId]);
+            return null;
         }
     }
 }
