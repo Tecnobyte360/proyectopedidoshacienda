@@ -249,7 +249,7 @@
                 </div>
 
                 <div class="mt-4 text-center">
-                    <a href="#" onclick="alert('Contacta al administrador para restablecer tu contraseña.'); return false;"
+                    <a href="{{ route('password.request') }}"
                        class="inline-flex items-center gap-2 text-sm font-semibold transition hover:underline"
                        style="color: {{ $colorPrim }};">
                         <i class="fa-solid fa-shield-halved text-xs"></i>

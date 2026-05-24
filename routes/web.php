@@ -51,6 +51,12 @@ use App\Models\DetallePedido;
 Route::middleware('guest')->group(function () {
     Route::get('/login',  [AuthController::class, 'showLogin'])->name('login');
     Route::post('/login', [AuthController::class, 'login']);
+
+    // 🔑 Recuperación de contraseña
+    Route::get('/forgot-password',          [\App\Http\Controllers\PasswordResetController::class, 'showForgot'])->name('password.request');
+    Route::post('/forgot-password',         [\App\Http\Controllers\PasswordResetController::class, 'sendResetLink']);
+    Route::get('/reset-password/{token}',   [\App\Http\Controllers\PasswordResetController::class, 'showReset'])->name('password.reset');
+    Route::post('/reset-password',          [\App\Http\Controllers\PasswordResetController::class, 'reset'])->name('password.update');
 });
 
 Route::post('/logout', [AuthController::class, 'logout'])
