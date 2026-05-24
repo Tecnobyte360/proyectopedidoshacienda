@@ -5,6 +5,7 @@ namespace App\Livewire\Monitoreo;
 use App\Models\WhatsappCall;
 use App\Models\WhatsappCallPermission;
 use App\Services\Meta\MetaCallingService;
+use App\Services\TenantManager;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 
@@ -75,9 +76,9 @@ class Llamadas extends Component
     public function solicitarPermisoManual(): void
     {
         $this->validate(['telPermiso' => 'required|string|min:10']);
-        $tenantId = auth()->user()->tenant_id ?? null;
+        $tenantId = app(TenantManager::class)->id() ?? auth()->user()->tenant_id ?? null;
         if (!$tenantId) {
-            $this->dispatch('notify', ['type' => 'error', 'message' => 'Sin tenant']);
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Sin tenant activo. Selecciona un tenant en el header.']);
             return;
         }
         $ok = app(MetaCallingService::class)->solicitarPermiso($this->telPermiso, (int) $tenantId);
