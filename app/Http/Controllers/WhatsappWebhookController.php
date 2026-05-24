@@ -831,7 +831,7 @@ class WhatsappWebhookController extends Controller
             return $reply;
         }
 
-        return $this->procesarConIA($from, $name, $message, $connectionId, $mensajesYaPersistidos);
+        return $this->procesarConIA($from, $name, $message, $connectionId, $mensajesYaPersistidos, $messageId);
     }
 
     /**
@@ -922,7 +922,7 @@ class WhatsappWebhookController extends Controller
         return $textoCompleto;
     }
 
-    private function procesarConIA(string $from, string $name, string $message, ?string $connectionId = null, bool $yaPersisitido = false): string
+    private function procesarConIA(string $from, string $name, string $message, $connectionId = null, bool $yaPersisitido = false, ?string $messageId = null): string
     {
         $tenantId = app(\App\Services\TenantManager::class)->id() ?? 'none';
         $cacheKey = "whatsapp_chat_t{$tenantId}_{$from}";

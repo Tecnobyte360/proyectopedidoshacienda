@@ -106,6 +106,17 @@ class ReintentarMensajesSalida extends Command
                     continue;
                 }
 
+                // 🟢 Setear tenant antes de invocar al sender para que el
+                // WhatsappSenderService detecte correctamente provider=Meta vs
+                // TecnoByte. Sin esto, TenantManager::current() = null y siempre
+                // cae al ramo legacy → ERR_NO_WAPP_FOUND para tenants Meta.
+                try {
+                    if (!empty($msg->tenant_id)) {
+                        $t = \App\Models\Tenant::find($msg->tenant_id);
+                        if ($t) app(\App\Services\TenantManager::class)->set($t);
+                    }
+                } catch (\Throwable $e) { /* continuar igual */ }
+
                 $ok = $this->reenviar($payload, $msg->telefono, $msg->connection_id);
 
                 if ($ok) {
