@@ -1046,8 +1046,9 @@ class Index extends Component
             return;
         }
 
-        // 🟢 GUARD META 24h: si el tenant usa Meta y la ventana 24h está
-        // cerrada, NO se puede enviar texto libre. Bloquear y avisar.
+        // 🟢 RUTA META: si el tenant usa Meta, mandamos directo por la Cloud API
+        // (sin connection_id de TecnoByteApp). Si la ventana 24h está cerrada,
+        // bloqueamos y sugerimos enviar plantilla con el panel de arriba.
         try {
             $tenant = app(\App\Services\TenantManager::class)->current();
             if ($tenant && $tenant->proveedorWhatsappResuelto() === \App\Models\Tenant::WA_PROVIDER_META) {
@@ -1055,15 +1056,47 @@ class Index extends Component
                 if (!$checker->abierta($conv)) {
                     $this->dispatch('notify', [
                         'type'    => 'error',
-                        'message' => '🔒 Ventana 24h cerrada. Meta requiere enviar una plantilla aprobada para reabrir la conversación. Configura disparadores en /meta-whatsapp.',
+                        'message' => '🔒 Ventana 24h cerrada. Usa el panel ámbar de arriba para enviar una plantilla aprobada.',
                     ]);
                     return;
                 }
+
+                $ok = app(\App\Services\Meta\MetaWhatsappCloudService::class)
+                    ->enviarTexto($conv->telefono_normalizado, $texto, $conv->tenant_id);
+
+                if (!$ok) {
+                    $this->dispatch('notify', [
+                        'type'    => 'error',
+                        'message' => '⚠️ Meta rechazó el envío. Revisa logs o credenciales en /meta-whatsapp.',
+                    ]);
+                    return;
+                }
+
+                try {
+                    app(ConversacionService::class)->agregarMensaje(
+                        $conv,
+                        MensajeWhatsapp::ROL_ASSISTANT,
+                        $texto,
+                        ['meta' => [
+                            'enviado_por_humano' => true,
+                            'usuario_id'         => auth()->id(),
+                            'provider'           => 'meta',
+                        ]]
+                    );
+                } catch (\Throwable $e) {
+                    Log::warning('No persistió mensaje manual Meta: ' . $e->getMessage());
+                }
+
+                $this->nuevoMensaje = '';
+                $this->dispatch('mensaje-enviado');
+                $this->dispatch('notify', ['type' => 'success', 'message' => '✓ Mensaje enviado por Meta']);
+                return;
             }
         } catch (\Throwable $e) {
-            Log::warning('Guard 24h Meta falló (continúa): ' . $e->getMessage());
+            Log::warning('Ruta Meta chat falló (cae a legacy): ' . $e->getMessage());
         }
 
+        // ─── RUTA LEGACY (TecnoByteApp) ─────────────────────────────
         // Resolver connection_id del tenant actual (evita enviar desde el número de otro tenant)
         $connectionId = $this->resolverConnectionId($conv->connection_id);
         if (!$connectionId) {
