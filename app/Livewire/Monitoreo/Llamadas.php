@@ -87,7 +87,10 @@ class Llamadas extends Component
             unset($this->permisos, $this->kpis);
             $this->dispatch('notify', ['type' => 'success', 'message' => 'Solicitud de permiso enviada al cliente']);
         } else {
-            $this->dispatch('notify', ['type' => 'error', 'message' => 'No se pudo enviar (revisar config Meta + Calling API habilitado)']);
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'No se pudo enviar. Calling API aún no está habilitada en tu WABA (esperar aprobación de Meta - Tarea #50)',
+            ]);
         }
     }
 

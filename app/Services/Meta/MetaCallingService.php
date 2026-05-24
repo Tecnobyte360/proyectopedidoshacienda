@@ -274,8 +274,16 @@ class MetaCallingService
                 ]);
                 return true;
             }
-            Log::warning('📞 Fallo solicitar permiso', [
+            // Detectar caso típico: Calling API no habilitado en WABA
+            $errMsg = (string) $resp->json('error.message', '');
+            $errCode = $resp->json('error.code');
+            $hint = '';
+            if ($errCode === 2500 || str_contains(strtolower($errMsg), 'unknown path')) {
+                $hint = ' → Calling API NO está habilitada en esta WABA. Solicítalo a Meta (Tarea #50).';
+            }
+            Log::warning('📞 Fallo solicitar permiso' . $hint, [
                 'status' => $resp->status(),
+                'code'   => $errCode,
                 'body'   => mb_substr($resp->body(), 0, 400),
             ]);
             return false;
