@@ -85,6 +85,7 @@
                     ['name' => 'Meta WhatsApp',     'icon' => 'fa-brands fa-whatsapp', 'route' => 'meta-whatsapp.index',    'badge' => 'NUEVO', 'permission' => 'bot.configurar'],
                     ['name' => 'Monitor LLM',       'icon' => 'fa-microchip',          'route' => 'monitoreo.llm',          'badge' => null,    'permission' => 'bot.configurar'],
                     ['name' => 'Llamadas Meta',     'icon' => 'fa-phone',              'route' => 'monitoreo.llamadas',     'badge' => 'NUEVO', 'permission' => 'bot.configurar'],
+                    ['name' => 'Costos Meta',       'icon' => 'fa-coins',              'route' => 'monitoreo.costos-meta',  'badge' => 'NUEVO', 'permission' => 'bot.configurar'],
                     ['name' => 'Sedes',             'icon' => 'fa-shop',               'route' => 'sedes.index',            'badge' => null, 'permission' => 'sedes.gestionar'],
                 ],
             ],

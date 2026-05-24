@@ -255,15 +255,62 @@ class MetaWhatsappWebhookController extends Controller
             'failed'    => -1,
         ];
         $ack = $mapAck[$estado] ?? null;
-        if ($ack === null) return;
+        if ($ack !== null) {
+            try {
+                \App\Models\MensajeWhatsapp::query()
+                    ->withoutGlobalScopes()
+                    ->where('mensaje_externo_id', $waId)
+                    ->update(['ack' => $ack]);
+            } catch (\Throwable $e) {
+                Log::warning('No se pudo actualizar ack Meta: ' . $e->getMessage());
+            }
+        }
 
-        try {
-            \App\Models\MensajeWhatsapp::query()
-                ->withoutGlobalScopes()
-                ->where('mensaje_externo_id', $waId)
-                ->update(['ack' => $ack]);
-        } catch (\Throwable $e) {
-            Log::warning('No se pudo actualizar ack Meta: ' . $e->getMessage());
+        // 💰 Persistir evento de billing si Meta lo incluyó
+        $pricing      = $status['pricing'] ?? null;
+        $conversation = $status['conversation'] ?? null;
+        $convId       = $conversation['id'] ?? null;
+        if ($pricing && $convId && (($pricing['billable'] ?? true) === true)) {
+            $categoria = $pricing['category']
+                ?? ($conversation['origin']['type'] ?? null)
+                ?? 'service';
+
+            // Tabla de precios aproximada Colombia (USD por conversación)
+            $tarifaCo = [
+                'service'        => 0.000,
+                'utility'        => 0.0080,
+                'authentication' => 0.0080,
+                'marketing'      => 0.0265,
+                'referral_conversion' => 0.000,
+            ];
+            $cost = $tarifaCo[$categoria] ?? 0;
+
+            try {
+                \App\Models\WhatsappBillingEvent::query()
+                    ->withoutGlobalScopes()
+                    ->updateOrCreate(
+                        [
+                            'tenant_id'       => $config->tenant_id,
+                            'conversation_id' => $convId,
+                        ],
+                        [
+                            'message_id'    => $waId,
+                            'telefono'      => $status['recipient_id'] ?? null,
+                            'categoria'     => $categoria,
+                            'pricing_model' => $pricing['pricing_model'] ?? null,
+                            'billable'      => (bool) ($pricing['billable'] ?? true),
+                            'cost_usd'      => $cost,
+                            'moneda'        => 'USD',
+                            'origin_type'   => $conversation['origin']['type'] ?? null,
+                            'raw_payload'   => ['pricing' => $pricing, 'conversation' => $conversation],
+                            'ocurrido_at'   => isset($status['timestamp'])
+                                ? \Carbon\Carbon::createFromTimestamp((int) $status['timestamp'])
+                                : now(),
+                        ]
+                    );
+            } catch (\Throwable $e) {
+                Log::warning('No se pudo persistir billing Meta: ' . $e->getMessage());
+            }
         }
     }
 

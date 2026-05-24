@@ -218,6 +218,10 @@ Route::middleware(['no_super_sin_imp'])->group(function () {
         ->middleware('permission:bot.configurar')
         ->name('monitoreo.llamadas');
 
+    Route::get('/monitoreo/costos-meta', \App\Livewire\Monitoreo\CostosMeta::class)
+        ->middleware('permission:bot.configurar')
+        ->name('monitoreo.costos-meta');
+
     Route::get('/rutas', \App\Livewire\Rutas\Index::class)
         ->middleware('permission:despachos.gestionar')
         ->name('rutas.index');
