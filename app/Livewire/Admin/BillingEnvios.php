@@ -99,19 +99,27 @@ class BillingEnvios extends Component
         $tm = app(TenantManager::class);
         $envio = $tm->withoutTenant(fn () => SaasBillingEnvio::find($envioId));
         if (!$envio) {
-            $this->dispatch('notify', ['type' => 'error', 'message' => 'Envío no encontrado']);
+            $this->dispatch('reintento-resultado', [
+                'ok'       => false,
+                'telefono' => '',
+                'intentos' => 0,
+                'error'    => 'Envío no encontrado',
+            ]);
             return;
         }
 
         $ok = $tm->withoutTenant(fn () => $envio->reintentar());
+        $envio->refresh();
 
         unset($this->envios, $this->kpis);
 
-        $this->dispatch('notify', [
-            'type'    => $ok ? 'success' : 'error',
-            'message' => $ok
-                ? "✓ Reintento exitoso. Mensaje enviado a {$envio->telefono}"
-                : "✗ Falló de nuevo. Ver detalle del error en la tabla. (Intentos: {$envio->intentos})",
+        // Evento detallado para el modal SweetAlert
+        $this->dispatch('reintento-resultado', [
+            'ok'       => $ok,
+            'telefono' => $envio->telefono,
+            'intentos' => $envio->intentos,
+            'error'    => $envio->error,
+            'tenant'   => $envio->tenant?->nombre,
         ]);
     }
 

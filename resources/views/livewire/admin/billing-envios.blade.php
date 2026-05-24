@@ -318,12 +318,9 @@
                                         @endif
                                         @if(!$e->ok)
                                             <button type="button"
-                                                    wire:click="reintentar({{ $e->id }})"
-                                                    wire:loading.attr="disabled"
-                                                    wire:target="reintentar({{ $e->id }})"
-                                                    class="mt-1 inline-flex items-center gap-1 rounded-lg bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 text-[11px] font-bold shadow-sm transition disabled:opacity-50">
-                                                <i class="fa-solid fa-rotate-right" wire:loading.remove wire:target="reintentar({{ $e->id }})"></i>
-                                                <i class="fa-solid fa-spinner animate-spin" wire:loading wire:target="reintentar({{ $e->id }})"></i>
+                                                    onclick="confirmarReintento({{ $e->id }}, '{{ addslashes($e->tenant?->nombre ?? 'tenant') }}', '{{ $e->telefono }}', {{ $e->intentos ?? 1 }})"
+                                                    class="mt-1 inline-flex items-center gap-1 rounded-lg bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 text-[11px] font-bold shadow-sm transition">
+                                                <i class="fa-solid fa-rotate-right"></i>
                                                 Reintentar
                                             </button>
                                         @endif
@@ -340,4 +337,130 @@
             </div>
         @endif
     </div>
+
+    {{-- 🎨 Script para confirmación y feedback estilo SweetAlert2 --}}
+    <script>
+        // Confirmar reintento con modal bonito
+        window.confirmarReintento = function (envioId, tenantNombre, telefono, intentos) {
+            Swal.fire({
+                title: '¿Reintentar envío?',
+                html: `
+                    <div style="text-align: left; font-size: 14px; line-height: 1.6;">
+                        <div style="background: #f1f5f9; border-radius: 12px; padding: 16px; margin: 12px 0;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                                <span style="color: #64748b;">Tenant:</span>
+                                <strong style="color: #0f172a;">${tenantNombre}</strong>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                                <span style="color: #64748b;">Teléfono:</span>
+                                <code style="background: #e2e8f0; padding: 2px 8px; border-radius: 4px; font-size: 12px;">+${telefono || '(sin tel)'}</code>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="color: #64748b;">Intentos previos:</span>
+                                <span style="background: #fef3c7; color: #92400e; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 700;">${intentos}</span>
+                            </div>
+                        </div>
+                        <p style="color: #64748b; font-size: 13px;">Se enviará el mismo mensaje al mismo destinatario. Si vuelve a fallar, podrás ver el error actualizado.</p>
+                    </div>
+                `,
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: '<i class="fa-solid fa-paper-plane"></i> Sí, reintentar ahora',
+                cancelButtonText: 'Cancelar',
+                reverseButtons: true,
+                customClass: { confirmButton: 'swal2-confirm', cancelButton: 'swal2-cancel' },
+            }).then(result => {
+                if (!result.isConfirmed) return;
+
+                // Modal de loading mientras procesa
+                Swal.fire({
+                    title: 'Enviando...',
+                    html: `
+                        <div style="text-align: center; padding: 20px 0;">
+                            <div style="display: inline-block; width: 70px; height: 70px; border-radius: 50%; background: linear-gradient(135deg, #3b82f6, #1d4ed8); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px;">
+                                <i class="fa-solid fa-paper-plane" style="font-size: 28px; color: white; animation: pulse 1.5s infinite;"></i>
+                            </div>
+                            <p style="color: #64748b; font-size: 13px;">Reintentando envío a <strong>+${telefono}</strong>...</p>
+                            <div style="margin-top: 12px;">
+                                <div style="height: 4px; background: #e2e8f0; border-radius: 999px; overflow: hidden;">
+                                    <div style="height: 100%; background: linear-gradient(90deg, #3b82f6, #06b6d4); border-radius: 999px; animation: barProgress 2s ease-in-out infinite;"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <style>
+                            @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+                            @keyframes barProgress { 0% { width: 0%; margin-left: 0; } 50% { width: 70%; margin-left: 15%; } 100% { width: 0%; margin-left: 100%; } }
+                        </style>
+                    `,
+                    showConfirmButton: false,
+                    allowOutsideClick: false,
+                    allowEscapeKey: false,
+                });
+
+                // Llamar al método Livewire
+                @this.call('reintentar', envioId);
+            });
+        };
+
+        // Escuchar el resultado del reintento desde Livewire
+        document.addEventListener('livewire:initialized', () => {
+            Livewire.on('reintento-resultado', payload => {
+                const data = Array.isArray(payload) ? payload[0] : payload;
+                if (data.ok) {
+                    Swal.fire({
+                        title: '¡Enviado!',
+                        html: `
+                            <div style="text-align: center; padding: 10px 0;">
+                                <div style="display: inline-block; width: 80px; height: 80px; border-radius: 50%; background: linear-gradient(135deg, #10b981, #059669); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; box-shadow: 0 10px 30px rgba(16,185,129,0.3);">
+                                    <i class="fa-solid fa-check" style="font-size: 36px; color: white;"></i>
+                                </div>
+                                <p style="color: #475569; font-size: 14px; line-height: 1.6;">
+                                    Mensaje entregado correctamente a<br>
+                                    <strong style="color: #0f172a; font-size: 16px;">+${data.telefono || ''}</strong>
+                                </p>
+                                <div style="background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 10px; padding: 10px 14px; margin-top: 14px; font-size: 12px; color: #065f46;">
+                                    <i class="fa-solid fa-circle-check"></i>
+                                    Intentos totales: ${data.intentos}
+                                </div>
+                            </div>
+                        `,
+                        showConfirmButton: false,
+                        timer: 3500,
+                        timerProgressBar: true,
+                    });
+                } else {
+                    Swal.fire({
+                        title: 'Falló de nuevo',
+                        html: `
+                            <div style="text-align: left; padding: 10px 0;">
+                                <div style="display: flex; gap: 12px; align-items: flex-start; background: #fef2f2; border: 1px solid #fecaca; border-radius: 12px; padding: 14px; margin-bottom: 12px;">
+                                    <div style="flex-shrink: 0; width: 38px; height: 38px; border-radius: 10px; background: #fee2e2; display: flex; align-items: center; justify-content: center;">
+                                        <i class="fa-solid fa-circle-exclamation" style="color: #dc2626; font-size: 18px;"></i>
+                                    </div>
+                                    <div style="flex: 1; min-width: 0;">
+                                        <p style="margin: 0; font-weight: 700; color: #991b1b; font-size: 13px;">Detalle del error</p>
+                                        <p style="margin: 4px 0 0; color: #7f1d1d; font-size: 12px; line-height: 1.5; word-break: break-word;">
+                                            ${data.error || 'Sin detalle disponible'}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div style="display: flex; gap: 8px; justify-content: space-between; align-items: center; font-size: 12px; color: #64748b;">
+                                    <span><i class="fa-solid fa-phone"></i> +${data.telefono || ''}</span>
+                                    <span style="background: #fee2e2; color: #991b1b; padding: 3px 10px; border-radius: 999px; font-weight: 700;">
+                                        ${data.intentos} intento${data.intentos === 1 ? '' : 's'}
+                                    </span>
+                                </div>
+                                <p style="color: #64748b; font-size: 11px; margin-top: 12px; line-height: 1.5;">
+                                    💡 <strong>Sugerencia:</strong> revisa el tenant en <code style="background:#f1f5f9; padding:2px 6px; border-radius:4px;">/admin/tenants</code> o el panel <code style="background:#f1f5f9; padding:2px 6px; border-radius:4px;">/admin/configuracion-plataforma</code> → Conexiones WhatsApp.
+                                </p>
+                            </div>
+                        `,
+                        icon: 'error',
+                        confirmButtonText: 'Entendido',
+                        customClass: { confirmButton: 'swal2-confirm' },
+                    });
+                }
+            });
+        });
+    </script>
 </div>
