@@ -520,7 +520,8 @@
                         <div x-show="open && filtradas.length > 0"
                              x-cloak
                              @click.outside="open = false"
-                             class="absolute bottom-full left-0 mb-1 w-full max-w-md max-h-56 overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-xl z-30">
+                             style="bottom: 100%; margin-bottom: 4px;"
+                             class="absolute left-0 w-full max-w-md max-h-56 overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-xl z-50">
                             <div class="sticky top-0 px-2.5 py-1 border-b border-slate-100 bg-slate-50 text-[9px] font-bold uppercase tracking-wide text-slate-500">
                                 ⚡ Respuestas <span class="font-normal normal-case text-slate-400 text-[9px]">(↑↓ Enter Esc)</span>
                             </div>
