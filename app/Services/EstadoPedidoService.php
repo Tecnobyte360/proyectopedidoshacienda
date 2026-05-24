@@ -126,13 +126,39 @@ class EstadoPedidoService
                         $estado->nombre_cliente = $cliente->nombre;
                         $touched = true;
                     }
+
+                    // 🏠 Hidratar dirección/barrio del último pedido del cliente
+                    // si el estado actual no los tiene. Asi los clientes recurrentes
+                    // no tienen que volver a dictar la direccion en cada pedido.
+                    if (empty($estado->direccion) || empty($estado->barrio)) {
+                        try {
+                            $ultPedido = \App\Models\Pedido::where('cliente_id', $cliente->id)
+                                ->whereNotNull('direccion')
+                                ->where('direccion', '!=', '')
+                                ->orderByDesc('id')
+                                ->first();
+                            if ($ultPedido) {
+                                if (empty($estado->direccion) && !empty($ultPedido->direccion)) {
+                                    $estado->direccion = $ultPedido->direccion;
+                                    $touched = true;
+                                }
+                                if (empty($estado->barrio) && !empty($ultPedido->barrio)) {
+                                    $estado->barrio = $ultPedido->barrio;
+                                    $touched = true;
+                                }
+                            }
+                        } catch (\Throwable $e) { /* ignore */ }
+                    }
+
                     if ($touched) {
                         $estado->save();
                         Log::info('🛡️ Estado hidratado con datos del cliente local', [
-                            'conv_id' => $conv->id,
-                            'cedula'  => $estado->cedula,
-                            'email'   => $estado->email,
-                            'nombre'  => $estado->nombre_cliente,
+                            'conv_id'   => $conv->id,
+                            'cedula'    => $estado->cedula,
+                            'email'     => $estado->email,
+                            'nombre'    => $estado->nombre_cliente,
+                            'direccion' => $estado->direccion,
+                            'barrio'    => $estado->barrio,
                         ]);
                     }
                 }
