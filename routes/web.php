@@ -262,6 +262,11 @@ Route::middleware(['no_super_sin_imp'])->group(function () {
     // principal puede tocarlos. Lo movemos abajo con `solo_principal`.
 });
 
+// 💳 Página pública de Wompi (sin login) — Wompi redirige aquí tras el pago
+// del tenant. NO requiere auth porque el tenant no es usuario interno de Kivox.
+Route::get('/billing/gracias', [\App\Http\Controllers\BillingPublicController::class, 'gracias'])
+    ->name('billing.gracias');
+
 // Roles: cada admin gestiona los roles propios de su tenant.
 // El componente filtra y bloquea edición de roles globales para no super-admin.
 Route::get('/roles', RolesIndex::class)
