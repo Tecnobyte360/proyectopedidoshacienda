@@ -603,12 +603,13 @@
                                                 Variables ({{ $plantillaSeleccionada->num_variables }}):
                                             </p>
                                             @for($i = 1; $i <= $plantillaSeleccionada->num_variables; $i++)
+                                                @php $ph = '{{' . $i . '}}'; @endphp
                                                 <div class="flex items-center gap-2">
-                                                    <span class="inline-flex items-center justify-center w-8 h-8 rounded bg-emerald-100 text-emerald-700 text-xs font-bold">
-                                                        {{ '{{' . $i . '}}' }}
+                                                    <span class="inline-flex items-center justify-center w-12 h-8 rounded bg-emerald-100 text-emerald-700 text-xs font-bold">
+                                                        {{ $ph }}
                                                     </span>
                                                     <input type="text" wire:model="plantillaVariables.{{ $i }}"
-                                                           placeholder="Valor para {{ '{{' . $i . '}}' }}"
+                                                           placeholder="Valor para {{ $ph }}"
                                                            class="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-sm">
                                                 </div>
                                             @endfor
