@@ -9743,6 +9743,25 @@ PROMPT;
             return true; // retornamos true para no romper el flujo del bot
         }
 
+        // 🟢 RUTA META: si el connectionId viene con prefijo "meta:" o el tenant
+        // actual usa Meta como provider, enviar por Meta Cloud API (texto libre
+        // permitido porque el cliente acaba de escribir → ventana 24h abierta).
+        $vieneDeMeta = is_string($connectionId) && str_starts_with($connectionId, 'meta:');
+        $tenant = app(\App\Services\TenantManager::class)->current();
+        $tenantUsaMeta = $tenant && $tenant->proveedorWhatsappResuelto() === \App\Models\Tenant::WA_PROVIDER_META;
+
+        if ($vieneDeMeta || $tenantUsaMeta) {
+            try {
+                $ok = app(\App\Services\Meta\MetaWhatsappCloudService::class)
+                    ->enviarTexto($from, $reply, $tenant?->id);
+                Log::info('📤 BOT → Meta', ['to' => $from, 'ok' => $ok, 'preview' => mb_substr($reply, 0, 60)]);
+                return $ok;
+            } catch (\Throwable $e) {
+                Log::error('Meta bot reply falló: ' . $e->getMessage());
+                if (!$vieneDeMeta) return false; // si no hay fallback claro, abortar
+            }
+        }
+
         try {
             $payload = [
                 'number' => $from,
@@ -9982,6 +10001,24 @@ PROMPT;
 
     private function enviarImagenWhatsapp(string $from, string $imagenUrl, string $caption = '', $connectionId = null): bool
     {
+        // 🟢 RUTA META: si el connectionId viene con prefijo "meta:" o el tenant
+        // actual usa Meta, mandar imagen por Meta Cloud API.
+        $vieneDeMeta = is_string($connectionId) && str_starts_with($connectionId, 'meta:');
+        $tenant = app(\App\Services\TenantManager::class)->current();
+        $tenantUsaMeta = $tenant && $tenant->proveedorWhatsappResuelto() === \App\Models\Tenant::WA_PROVIDER_META;
+
+        if ($vieneDeMeta || $tenantUsaMeta) {
+            try {
+                $ok = app(\App\Services\Meta\MetaWhatsappCloudService::class)
+                    ->enviarImagen($from, $imagenUrl, $caption ?: null, $tenant?->id);
+                Log::info('📷 BOT imagen → Meta', ['to' => $from, 'ok' => $ok, 'url' => $imagenUrl]);
+                return $ok;
+            } catch (\Throwable $e) {
+                Log::error('Meta bot imagen falló: ' . $e->getMessage());
+                if (!$vieneDeMeta) return false;
+            }
+        }
+
         try {
             $payload = [
                 'number'   => $from,
