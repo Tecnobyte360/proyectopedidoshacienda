@@ -810,9 +810,19 @@ class WhatsappWebhookController extends Controller
         }
 
         if ($this->esSolicitudModificarPedido($message)) {
-            $reply = $this->resolverSolicitudModificacionPedido($from, $name, $message);
-            Log::info('🛠️ CAPA 2a: Modificación de pedido', compact('from', 'message', 'reply'));
-            return $reply;
+            // 🛡️ Guard: si el cliente está ARMANDO un pedido nuevo en esta
+            // misma conversación (estado en construcción, no confirmado),
+            // NO interpretar "agregame X" como modificación de pedido viejo.
+            // El bot conversacional debe seguir armando el pedido en curso.
+            if ($this->tienePedidoEnConstruccion($from)) {
+                Log::info('🛠️ CAPA 2a SKIP: pedido en construcción — continúa flujo armado', [
+                    'from' => $from, 'message' => $message,
+                ]);
+            } else {
+                $reply = $this->resolverSolicitudModificacionPedido($from, $name, $message);
+                Log::info('🛠️ CAPA 2a: Modificación de pedido', compact('from', 'message', 'reply'));
+                return $reply;
+            }
         }
 
         if ($this->esConsultaEstadoPedido($message)) {
@@ -5022,6 +5032,46 @@ TXT;
         $lineas[] = "Para consultar uno en detalle, escríbeme: *pedido #{$pedidos->first()->id}*";
 
         return implode("\n", $lineas);
+    }
+
+    /**
+     * 🛡️ Detecta si la conversación está en medio de armar un pedido NUEVO
+     * (estado en construcción, no confirmado todavía). Usamos esto como
+     * guard para que "agregame X" se sume al pedido en curso en vez de
+     * interpretarse como modificación de un pedido viejo.
+     */
+    private function tienePedidoEnConstruccion(string $from): bool
+    {
+        try {
+            $telNorm = $this->normalizarTelefono($from);
+            $conv = \App\Models\ConversacionWhatsapp::query()
+                ->where('telefono_normalizado', $telNorm)
+                ->orderByDesc('id')
+                ->first();
+            if (!$conv) return false;
+
+            $estado = \App\Models\ConversacionPedidoEstado::query()
+                ->where('conversacion_id', $conv->id)
+                ->first();
+            if (!$estado) return false;
+
+            // Si el paso actual es 'confirmado' y ya tiene pedido_id, el pedido
+            // está cerrado — entonces SÍ es modificación de un pedido viejo.
+            $cerrado = $estado->paso_actual === \App\Models\ConversacionPedidoEstado::PASO_CONFIRMADO
+                && !empty($estado->pedido_id);
+            if ($cerrado) return false;
+
+            // Tiene productos en el carrito o un paso intermedio (direccion,
+            // metodo entrega, etc) → SÍ está en construcción.
+            $tieneProductos = is_array($estado->productos) && count($estado->productos) > 0;
+            $pasoIntermedio = !empty($estado->paso_actual)
+                && $estado->paso_actual !== \App\Models\ConversacionPedidoEstado::PASO_CONFIRMADO;
+
+            return $tieneProductos || $pasoIntermedio;
+        } catch (\Throwable $e) {
+            \Log::warning('tienePedidoEnConstruccion falló: ' . $e->getMessage());
+            return false;
+        }
     }
 
     private function esSolicitudModificarPedido(string $message): bool
