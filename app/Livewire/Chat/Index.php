@@ -43,6 +43,15 @@ class Index extends Component
     // 🔄 Sincronización de historial de WhatsApp (por tenant)
     public ?array $resultadoSyncHistorial = null;
 
+    // 🟢 Meta: estado de la ventana 24h para la conversación activa
+    public bool   $ventana24hAbierta = true;
+    public int    $ventana24hMinutosRestantes = 0;
+    public bool   $tenantUsaMeta = false;
+
+    // 🟢 Meta: envío de plantilla cuando ventana cerrada
+    public ?int   $plantillaChatId = null;
+    public array  $plantillaChatVars = [];
+
     /**
      * Permite abrir el chat directamente en una conversación específica
      * vía query string: /chat?conv=123. Útil para el banner de handoff en
@@ -432,6 +441,29 @@ class Index extends Component
 
         $this->conversacionActivaId = $id;
         $this->nuevoMensaje = '';
+        $this->plantillaChatId = null;
+        $this->plantillaChatVars = [];
+
+        // 🟢 Meta: calcular estado de ventana 24h para esta conversación
+        try {
+            $tenant = app(\App\Services\TenantManager::class)->current();
+            $this->tenantUsaMeta = $tenant
+                && $tenant->proveedorWhatsappResuelto() === \App\Models\Tenant::WA_PROVIDER_META;
+
+            if ($this->tenantUsaMeta) {
+                $convFull = ConversacionWhatsapp::find($id);
+                $checker = app(\App\Services\Whatsapp\Ventana24hChecker::class);
+                $this->ventana24hAbierta = $convFull ? $checker->abierta($convFull) : false;
+                $this->ventana24hMinutosRestantes = $convFull ? $checker->minutosRestantes($convFull) : 0;
+            } else {
+                $this->ventana24hAbierta = true;
+                $this->ventana24hMinutosRestantes = 0;
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Cálculo ventana 24h falló: ' . $e->getMessage());
+            $this->ventana24hAbierta = true;
+            $this->tenantUsaMeta = false;
+        }
 
         // Marcar como leída
         ConversacionWhatsapp::where('id', $id)->update([
@@ -1351,11 +1383,93 @@ class Index extends Component
             }
         }
 
+        // 🟢 Meta: plantillas aprobadas disponibles para envío manual
+        $plantillasMetaAprobadas = collect();
+        $plantillaChatSeleccionada = null;
+        if ($this->tenantUsaMeta) {
+            $plantillasMetaAprobadas = \App\Models\MetaWhatsappPlantilla::where('activa', true)
+                ->where('estado', 'APPROVED')
+                ->orderBy('nombre')
+                ->get();
+            if ($this->plantillaChatId) {
+                $plantillaChatSeleccionada = $plantillasMetaAprobadas->firstWhere('id', $this->plantillaChatId);
+            }
+        }
+
         return view('livewire.chat.index', compact(
             'conversaciones',
             'conversacionActiva',
             'pedidoEstado',
-            'promptInspeccion'
+            'promptInspeccion',
+            'plantillasMetaAprobadas',
+            'plantillaChatSeleccionada'
         ))->layout('layouts.app');
+    }
+
+    /**
+     * 🟢 Envía una plantilla Meta aprobada desde el chat manual.
+     * Esto sirve para reabrir conversaciones que pasaron la ventana 24h
+     * (Meta solo permite plantillas fuera de ese rango).
+     */
+    public function enviarPlantilla(): void
+    {
+        if (!$this->conversacionActivaId || !$this->plantillaChatId) return;
+
+        $conv = ConversacionWhatsapp::find($this->conversacionActivaId);
+        if (!$conv) return;
+
+        $tpl = \App\Models\MetaWhatsappPlantilla::find($this->plantillaChatId);
+        if (!$tpl) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Plantilla no encontrada.']);
+            return;
+        }
+
+        // Construir array posicional de variables a partir del input del operador
+        $varsOrdenadas = [];
+        for ($i = 1; $i <= ($tpl->num_variables ?? 0); $i++) {
+            $varsOrdenadas[] = (string) ($this->plantillaChatVars[$i] ?? '');
+        }
+
+        $ok = app(\App\Services\Meta\MetaWhatsappCloudService::class)
+            ->enviarPlantilla(
+                $conv->telefono_normalizado,
+                $tpl->nombre,
+                $varsOrdenadas,
+                $conv->tenant_id,
+                $tpl->idioma ?: 'es'
+            );
+
+        if (!$ok) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => '⚠️ No se pudo enviar la plantilla.']);
+            return;
+        }
+
+        // Persistir mensaje en conversación renderizando body con variables
+        $body = $tpl->body_preview ?: ('[plantilla:' . $tpl->nombre . ']');
+        foreach ($varsOrdenadas as $i => $valor) {
+            $body = str_replace(['{{' . ($i + 1) . '}}', '{{ ' . ($i + 1) . ' }}'], $valor, $body);
+        }
+        try {
+            app(\App\Services\ConversacionService::class)->agregarMensaje(
+                $conv,
+                MensajeWhatsapp::ROL_ASSISTANT,
+                $body,
+                ['meta' => [
+                    'enviado_por_humano' => true,
+                    'usuario_id'         => auth()->id(),
+                    'origen'             => 'plantilla_meta',
+                    'plantilla'          => $tpl->nombre,
+                    'plantilla_idioma'   => $tpl->idioma,
+                ]]
+            );
+        } catch (\Throwable $e) {
+            Log::warning('No se persistió mensaje plantilla en conversación: ' . $e->getMessage());
+        }
+
+        $this->plantillaChatId = null;
+        $this->plantillaChatVars = [];
+        $this->ventana24hAbierta = true; // la plantilla "reabre" la sesión
+        $this->dispatch('notify', ['type' => 'success', 'message' => '✓ Plantilla enviada.']);
+        $this->dispatch('mensaje-enviado');
     }
 }

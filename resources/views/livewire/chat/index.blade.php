@@ -385,8 +385,63 @@
                 <div class="bg-white border-t border-slate-200"
                      x-data="audioRecorder()"
                      x-init="init()">
+
+                @if($tenantUsaMeta)
+                    {{-- 🟢 Indicador de ventana 24h Meta --}}
+                    @if($ventana24hAbierta)
+                        <div class="px-4 py-1.5 bg-emerald-50 border-b border-emerald-100 flex items-center gap-2 text-[11px] text-emerald-700">
+                            <i class="fa-solid fa-circle text-emerald-500 text-[6px]"></i>
+                            <span><strong>Ventana 24h abierta</strong> — puedes enviar texto libre. Restan ~{{ $ventana24hMinutosRestantes }} min.</span>
+                        </div>
+                    @else
+                        <div class="px-4 py-2 bg-amber-50 border-b border-amber-200">
+                            <div class="flex items-center gap-2 text-[11px] text-amber-800 mb-2">
+                                <i class="fa-solid fa-lock text-amber-600"></i>
+                                <span><strong>Ventana 24h cerrada.</strong> Meta solo permite enviar plantillas aprobadas para reabrir la conversación.</span>
+                            </div>
+                            <select wire:model.live="plantillaChatId" class="w-full rounded-lg border border-amber-300 px-2 py-1.5 text-xs bg-white">
+                                <option value="">— Selecciona plantilla para enviar —</option>
+                                @foreach($plantillasMetaAprobadas as $tpl)
+                                    <option value="{{ $tpl->id }}">{{ $tpl->nombre }} ({{ $tpl->categoria }}, {{ $tpl->num_variables }} vars)</option>
+                                @endforeach
+                            </select>
+
+                            @if($plantillaChatSeleccionada)
+                                <div class="mt-2 rounded-lg bg-white border border-amber-200 px-2.5 py-1.5 text-[11px] text-slate-600">
+                                    <p class="font-semibold text-amber-800 mb-1">Vista previa:</p>
+                                    <pre class="whitespace-pre-wrap">{{ $plantillaChatSeleccionada->body_preview ?: '(sin body)' }}</pre>
+                                </div>
+
+                                @if(($plantillaChatSeleccionada->num_variables ?? 0) > 0)
+                                    <div class="mt-2 space-y-1">
+                                        @for($i = 1; $i <= $plantillaChatSeleccionada->num_variables; $i++)
+                                            @php $ph = '{{' . $i . '}}'; @endphp
+                                            <div class="flex items-center gap-2">
+                                                <span class="inline-flex w-12 h-7 items-center justify-center rounded bg-amber-100 text-amber-700 text-[10px] font-bold">{{ $ph }}</span>
+                                                <input type="text"
+                                                       wire:model="plantillaChatVars.{{ $i }}"
+                                                       placeholder="Valor"
+                                                       class="flex-1 rounded border border-slate-200 px-2 py-1 text-xs">
+                                            </div>
+                                        @endfor
+                                    </div>
+                                @endif
+
+                                <button type="button" wire:click="enviarPlantilla"
+                                        wire:loading.attr="disabled"
+                                        wire:target="enviarPlantilla"
+                                        class="mt-2 w-full inline-flex items-center justify-center gap-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold px-3 py-2 transition disabled:opacity-50">
+                                    <i class="fa-solid fa-paper-plane text-[10px]" wire:loading.class="fa-spin fa-circle-notch" wire:target="enviarPlantilla"></i>
+                                    Enviar plantilla
+                                </button>
+                            @endif
+                        </div>
+                    @endif
+                @endif
+
                 <form wire:submit.prevent="enviar"
-                      class="px-3 py-3 flex items-center gap-2">
+                      class="px-3 py-3 flex items-center gap-2"
+                      @if($tenantUsaMeta && !$ventana24hAbierta) style="opacity:0.4; pointer-events:none;" @endif>
                     <textarea wire:model="nuevoMensaje"
                               placeholder="Escribe tu respuesta..."
                               rows="1"
