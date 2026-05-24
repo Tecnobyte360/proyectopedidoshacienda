@@ -582,6 +582,63 @@ class Index extends Component
         [$bytesEnvio, $extEnvio] = $this->convertirAOggOpus($bytes, $ext);
 
         $nombreEnvio = 'voice_' . uniqid() . '.' . $extEnvio;
+
+        // 🟢 RUTA META: si el tenant usa Meta, mandamos el audio por URL pública
+        // a la Cloud API. Meta soporta ogg/opus y mp3 sin convertir.
+        try {
+            $tenant = app(\App\Services\TenantManager::class)->current();
+            if ($tenant && $tenant->proveedorWhatsappResuelto() === \App\Models\Tenant::WA_PROVIDER_META) {
+                $checker = app(\App\Services\Whatsapp\Ventana24hChecker::class);
+                if (!$checker->abierta($conv)) {
+                    $this->dispatch('notify', [
+                        'type'    => 'error',
+                        'message' => '🔒 Ventana 24h cerrada. Meta no permite enviar audio fuera de la ventana — pide al cliente que escriba primero o envía una plantilla.',
+                    ]);
+                    return;
+                }
+
+                $ok = app(\App\Services\Meta\MetaWhatsappCloudService::class)
+                    ->enviarAudio($conv->telefono_normalizado, $mediaUrl, $conv->tenant_id);
+
+                if (!$ok) {
+                    $this->dispatch('notify', [
+                        'type'    => 'error',
+                        'message' => '⚠️ Meta rechazó el audio. Revisa logs.',
+                    ]);
+                    return;
+                }
+
+                try {
+                    $mensaje = app(ConversacionService::class)->agregarMensaje(
+                        $conv,
+                        MensajeWhatsapp::ROL_ASSISTANT,
+                        '🎤 Nota de voz',
+                        [
+                            'tipo' => 'audio',
+                            'meta' => [
+                                'enviado_por_humano' => true,
+                                'usuario_id'         => auth()->id(),
+                                'media_url'          => $mediaUrl,
+                                'mime'               => $mime,
+                                'bytes'              => strlen($bytes),
+                                'provider'           => 'meta',
+                            ],
+                        ]
+                    );
+                    $mensaje->update(['ack' => MensajeWhatsapp::ACK_SENT]);
+                } catch (\Throwable $e) {
+                    Log::warning('No persistió audio Meta: ' . $e->getMessage());
+                }
+
+                $this->dispatch('mensaje-enviado');
+                $this->dispatch('notify', ['type' => 'success', 'message' => '✓ Audio enviado por Meta']);
+                return;
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Ruta Meta audio falló (cae a legacy): ' . $e->getMessage());
+        }
+
+        // ─── RUTA LEGACY (TecnoByteApp) ─────────────────────────────
         $connectionId = $this->resolverConnectionId($conv->connection_id);
         if (!$connectionId) {
             $this->dispatch('notify', ['type' => 'error', 'message' => '⚠️ Este tenant no tiene conexión WhatsApp configurada.']);
@@ -805,6 +862,58 @@ class Index extends Component
         $mediaUrl = rtrim(config('app.url'), '/') . Storage::url($filename);
 
         $nombreEnvio = 'image_' . uniqid() . '.' . $extOrig;
+
+        // 🟢 RUTA META: tenant con Meta envía imagen vía URL pública
+        try {
+            $tenant = app(\App\Services\TenantManager::class)->current();
+            if ($tenant && $tenant->proveedorWhatsappResuelto() === \App\Models\Tenant::WA_PROVIDER_META) {
+                $checker = app(\App\Services\Whatsapp\Ventana24hChecker::class);
+                if (!$checker->abierta($conv)) {
+                    $this->dispatch('notify', [
+                        'type'    => 'error',
+                        'message' => '🔒 Ventana 24h cerrada. Para enviar imagen, usa el panel ámbar de plantilla para reabrir.',
+                    ]);
+                    return;
+                }
+
+                $ok = app(\App\Services\Meta\MetaWhatsappCloudService::class)
+                    ->enviarImagen($conv->telefono_normalizado, $mediaUrl, $caption ?: null, $conv->tenant_id);
+
+                if (!$ok) {
+                    $this->dispatch('notify', ['type' => 'error', 'message' => '⚠️ Meta rechazó la imagen.']);
+                    return;
+                }
+
+                try {
+                    $mensaje = app(ConversacionService::class)->agregarMensaje(
+                        $conv,
+                        MensajeWhatsapp::ROL_ASSISTANT,
+                        $caption !== '' ? $caption : '🖼️ Imagen',
+                        [
+                            'tipo' => 'image',
+                            'meta' => [
+                                'enviado_por_humano' => true,
+                                'usuario_id'         => auth()->id(),
+                                'media_url'          => $mediaUrl,
+                                'caption'            => $caption,
+                                'provider'           => 'meta',
+                            ],
+                        ]
+                    );
+                    $mensaje->update(['ack' => MensajeWhatsapp::ACK_SENT]);
+                } catch (\Throwable $e) {
+                    Log::warning('No persistió imagen Meta: ' . $e->getMessage());
+                }
+
+                $this->dispatch('mensaje-enviado');
+                $this->dispatch('notify', ['type' => 'success', 'message' => '✓ Imagen enviada por Meta']);
+                return;
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Ruta Meta imagen falló (cae a legacy): ' . $e->getMessage());
+        }
+
+        // ─── RUTA LEGACY (TecnoByteApp) ─────────────────────────────
         $connectionId = $this->resolverConnectionId($conv->connection_id);
         if (!$connectionId) {
             $this->dispatch('notify', ['type' => 'error', 'message' => '⚠️ Este tenant no tiene conexión WhatsApp configurada.']);

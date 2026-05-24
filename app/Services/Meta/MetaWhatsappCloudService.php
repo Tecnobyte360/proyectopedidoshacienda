@@ -97,6 +97,23 @@ class MetaWhatsappCloudService
     }
 
     /**
+     * Envía audio (nota de voz / mp3) por URL pública.
+     * Meta soporta audio/ogg (opus) y audio/mpeg.
+     */
+    public function enviarAudio(string $telefono, string $url, ?int $tenantId = null): bool
+    {
+        $config = $this->resolverConfig($tenantId);
+        if (!$config) return false;
+
+        return $this->ejecutar($config, [
+            'messaging_product' => 'whatsapp',
+            'to'                => $this->normalizar($telefono),
+            'type'              => 'audio',
+            'audio'             => ['link' => $url],
+        ], 'audio');
+    }
+
+    /**
      * Sincroniza plantillas desde Meta (`GET /{waba_id}/message_templates`)
      * hacia la tabla `meta_whatsapp_plantillas` (updateOrCreate por nombre+idioma).
      *
