@@ -81,6 +81,7 @@
                     ['name' => 'ANS Tiempos',       'icon' => 'fa-stopwatch',          'route' => 'ans.index',              'badge' => null, 'permission' => 'ans.gestionar'],
                     ['name' => 'Bot WhatsApp',      'icon' => 'fa-robot',              'route' => 'configuracion.bot',      'badge' => null, 'permission' => 'bot.configurar'],
                     ['name' => 'Respuestas rápidas','icon' => 'fa-bolt',               'route' => 'configuracion.respuestas-rapidas', 'badge' => null, 'permission' => 'bot.configurar'],
+                    ['name' => 'Lecciones del bot','icon' => 'fa-graduation-cap',    'route' => 'configuracion.bot-lecciones', 'badge' => 'NUEVO', 'permission' => 'bot.configurar'],
                     ['name' => 'Meta WhatsApp',     'icon' => 'fa-brands fa-whatsapp', 'route' => 'meta-whatsapp.index',    'badge' => 'NUEVO', 'permission' => 'bot.configurar'],
                     ['name' => 'Monitor LLM',       'icon' => 'fa-microchip',          'route' => 'monitoreo.llm',          'badge' => null,    'permission' => 'bot.configurar'],
                     ['name' => 'Sedes',             'icon' => 'fa-shop',               'route' => 'sedes.index',            'badge' => null, 'permission' => 'sedes.gestionar'],

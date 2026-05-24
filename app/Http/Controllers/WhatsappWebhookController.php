@@ -8818,6 +8818,17 @@ TXT;
                      . $extraRendered . "\n";
         }
 
+        // 📚 LECCIONES APRENDIDAS — inyectar antes de las reglas duras
+        try {
+            $tenantId = app(\App\Services\TenantManager::class)->id();
+            if ($tenantId) {
+                $bloqueLecciones = \App\Models\BotLeccion::bloquePrompt($tenantId, 25);
+                if ($bloqueLecciones !== '') {
+                    $prompt .= "\n\n" . $bloqueLecciones;
+                }
+            }
+        } catch (\Throwable $e) { /* silencioso */ }
+
         // 🛡️ REGLAS DURAS DE ENFORCEMENT (siempre activas, NO configurables).
         // El cliente DEBE seguir el flujo del bot — no al revés. El bot guía con asertividad.
         $prompt .= "\n\n═══════════════════════════════════════════════════════════════════════════════\n"
