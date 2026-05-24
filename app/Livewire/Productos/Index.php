@@ -34,6 +34,7 @@ class Index extends Component
     public string $imagen_url        = '';
     public ?string $imagen_path      = null;
     public $imagenFile               = null;   // archivo temporal Livewire
+    public string $ficha_tecnica_url = '';
     public string $palabrasClaveTexto = '';
     public bool   $activo    = true;
     public bool   $destacado = false;
@@ -57,6 +58,7 @@ class Index extends Component
             'precio_base'       => 'required|numeric|min:0',
             'imagen_url'        => 'nullable|url|max:500',
             'imagenFile'        => 'nullable|image|max:2048|mimes:jpg,jpeg,png,webp',
+            'ficha_tecnica_url' => 'nullable|url|max:500',
             'activo'            => 'boolean',
             'destacado'         => 'boolean',
             'orden'             => 'integer|min:0',
@@ -90,6 +92,7 @@ class Index extends Component
         $this->imagen_url        = (string) $producto->imagen_url;
         $this->imagen_path       = $producto->imagen_path;
         $this->imagenFile        = null;
+        $this->ficha_tecnica_url = (string) $producto->ficha_tecnica_url;
         $this->palabrasClaveTexto = implode(', ', $producto->palabras_clave ?? []);
         $this->activo            = (bool) $producto->activo;
         $this->destacado         = (bool) $producto->destacado;
@@ -229,6 +232,7 @@ class Index extends Component
         $this->imagen_url         = '';
         $this->imagen_path        = null;
         $this->imagenFile         = null;
+        $this->ficha_tecnica_url  = '';
         $this->palabrasClaveTexto = '';
         $this->activo             = true;
         $this->destacado          = false;

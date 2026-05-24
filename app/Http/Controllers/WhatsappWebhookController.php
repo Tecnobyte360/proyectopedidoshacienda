@@ -9125,6 +9125,12 @@ TXT;
               "- NO la uses en cada mensaje — solo cuando aporte valor."
             : '';
 
+        // 📄 Ficha técnica: si está habilitada, incluir nota para el bot
+        $notaFichaTecnica = ($config->enviar_ficha_tecnica ?? false)
+            ? "\n# 📄 FICHAS TÉCNICAS\n" .
+              "Si el cliente pregunta detalles, ingredientes, valores nutricionales o composición de un producto y el producto TIENE ficha técnica configurada en el catálogo, comparte el link de la ficha al cliente. Si NO la tiene, responde con la información que conozcas del catálogo."
+            : '';
+
         $hora = (int) now()->format('H');
         $saludoHora = $hora < 12 ? 'buenos días' : ($hora < 19 ? 'buenas tardes' : 'buenas noches');
 
@@ -9139,6 +9145,7 @@ amiga que trabaja en el local.
 Si el cliente pregunta si eres bot o humano, responde:
 "Soy {$nombreAsesora}, del equipo de La Hacienda. Estoy aquí pa ayudarte con tu pedido 😊"
 {$notaImagenes}
+{$notaFichaTecnica}
 
 # Cómo hablas
 - Cercana y natural. Usa expresiones como "claro que sí", "listo", "dale", "a la orden", "con gusto", "perfecto".
@@ -10261,6 +10268,11 @@ PROMPT;
                 number_format((float) $producto->precio_base, 0, ',', '.'),
                 $producto->unidad
             );
+
+            // 📄 Adjuntar ficha técnica si está habilitada y producto tiene URL
+            if (($config->enviar_ficha_tecnica ?? false) && !empty($producto->ficha_tecnica_url)) {
+                $caption .= "\n📄 Ficha técnica: " . $producto->ficha_tecnica_url;
+            }
 
             if ($this->enviarImagenWhatsapp($from, $url, $caption, $connectionId)) {
                 $enviadas++;

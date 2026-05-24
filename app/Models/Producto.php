@@ -24,6 +24,7 @@ class Producto extends Model
         'precio_base',
         'imagen_url',
         'imagen_path',
+        'ficha_tecnica_url',
         'palabras_clave',
         'activo',
         'destacado',

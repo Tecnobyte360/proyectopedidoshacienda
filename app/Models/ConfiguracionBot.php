@@ -18,6 +18,7 @@ class ConfiguracionBot extends Model
     protected $fillable = [
         'tenant_id',
         'enviar_imagenes_productos',
+        'enviar_ficha_tecnica',
         'transcribir_audios',
         'max_imagenes_por_mensaje',
         'enviar_imagen_destacados',

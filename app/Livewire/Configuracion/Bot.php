@@ -9,6 +9,7 @@ use Livewire\Component;
 class Bot extends Component
 {
     public bool   $enviar_imagenes_productos = false;
+    public bool   $enviar_ficha_tecnica      = false;
     public bool   $transcribir_audios        = true;
     public int    $max_imagenes_por_mensaje  = 3;
     public bool   $enviar_imagen_destacados  = false;
@@ -169,6 +170,7 @@ class Bot extends Component
         $cfg = ConfiguracionBot::actual();
 
         $this->enviar_imagenes_productos = (bool) $cfg->enviar_imagenes_productos;
+        $this->enviar_ficha_tecnica      = (bool) ($cfg->enviar_ficha_tecnica ?? false);
         $this->transcribir_audios        = (bool) ($cfg->transcribir_audios ?? true);
         $this->max_imagenes_por_mensaje  = (int) $cfg->max_imagenes_por_mensaje;
         $this->enviar_imagen_destacados  = (bool) $cfg->enviar_imagen_destacados;
@@ -700,6 +702,7 @@ class Bot extends Component
     {
         return [
             'enviar_imagenes_productos' => 'boolean',
+            'enviar_ficha_tecnica'      => 'boolean',
             'transcribir_audios'        => 'boolean',
             'max_imagenes_por_mensaje'  => 'integer|min:1|max:10',
             'enviar_imagen_destacados'  => 'boolean',

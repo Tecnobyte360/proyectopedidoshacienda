@@ -423,6 +423,23 @@
                         </div>
                     </div>
 
+                    {{-- 📄 Ficha técnica (PDF, link) --}}
+                    <div class="rounded-xl border-2 border-dashed border-blue-200 bg-blue-50/40 p-4">
+                        <label class="block text-sm font-bold text-slate-800 mb-1 flex items-center gap-2">
+                            <i class="fa-solid fa-file-pdf text-blue-600"></i>
+                            Ficha técnica del producto <span class="text-xs text-slate-400 font-normal">(opcional)</span>
+                        </label>
+                        <p class="text-[11px] text-slate-500 mb-2">
+                            URL pública a un PDF / página web con detalles del producto (ingredientes, nutrición, etc).
+                            El bot puede enviar este link al cliente cuando le pregunte por el producto
+                            (configurable en <a href="/configuracion/bot" class="text-blue-700 underline">/configuracion/bot</a>).
+                        </p>
+                        <input type="url" wire:model="ficha_tecnica_url"
+                               placeholder="https://hacienda.com/fichas/chuleta-pierna.pdf"
+                               class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-100">
+                        @error('ficha_tecnica_url') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
+                    </div>
+
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1">
                             Palabras clave <span class="text-xs text-slate-400">(coma — para que el bot encuentre el producto)</span>

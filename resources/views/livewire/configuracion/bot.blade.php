@@ -408,6 +408,21 @@
                         </div>
                     </div>
                 @endif
+
+                {{-- 📄 Toggle ficha técnica --}}
+                <label class="flex items-start gap-3 cursor-pointer rounded-xl border border-slate-200 p-4 hover:border-blue-300 transition mt-3">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-2">
+                            <i class="fa-solid fa-file-pdf text-blue-600"></i>
+                            <span class="font-bold text-slate-800 text-sm">Enviar ficha técnica del producto</span>
+                        </div>
+                        <div class="text-xs text-slate-600 mt-0.5">
+                            Si el producto tiene URL de ficha técnica configurada en el catálogo, el bot la enviará al cliente cuando pregunte por detalles.
+                        </div>
+                    </div>
+                    <input type="checkbox" wire:model.live="enviar_ficha_tecnica"
+                           class="mt-1 rounded border-slate-300 text-blue-600 h-6 w-6">
+                </label>
             </div>
         </section>
 
