@@ -161,7 +161,7 @@
     {{-- CONTENIDO --}}
     @php
         $rutaActual = request()->route()?->getName();
-        $rutasFullBleed = ['chat.index', 'pedidos.index', 'pedidos.seguimiento'];
+        $rutasFullBleed = ['chat.index', 'pedidos.index', 'pedidos.seguimiento', 'admin.billing-envios', 'admin.dashboard', 'monitoreo.llamadas', 'monitoreo.costos-meta'];
         $aplicarCard = $rutaActual && !in_array($rutaActual, $rutasFullBleed, true);
     @endphp
 
