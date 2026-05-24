@@ -12,8 +12,11 @@
         </div>
     @endif
 
-    {{-- ╔═══ COLUMNA IZQUIERDA: lista de conversaciones ═══╗ --}}
-    <aside class="w-full lg:w-96 flex-shrink-0 bg-white border-r border-slate-200 flex flex-col">
+    {{-- ╔═══ COLUMNA IZQUIERDA: lista de conversaciones ═══╗
+         En móvil: solo se ve si NO hay chat activo (al seleccionar uno se oculta).
+         En desktop (lg+): siempre visible. --}}
+    <aside class="w-full lg:w-96 flex-shrink-0 bg-white border-r border-slate-200 flex-col
+                  {{ $conversacionActivaId ? 'hidden lg:flex' : 'flex' }}">
 
         {{-- Header --}}
         <div class="p-4 border-b border-slate-200 bg-gradient-to-br from-brand to-brand-secondary text-white">
@@ -186,7 +189,8 @@
     </aside>
 
     {{-- ╔═══ COLUMNA DERECHA: chat seleccionado ═══╗ --}}
-    <section class="flex-1 flex flex-col min-w-0 bg-[#efeae2]">
+    <section class="flex-1 flex-col min-w-0 bg-[#efeae2]
+                    {{ $conversacionActivaId ? 'flex' : 'hidden lg:flex' }}">
 
         @if($conversacionActiva)
             @php
@@ -197,8 +201,16 @@
             @endphp
 
             {{-- Header del chat --}}
-            <div class="relative z-10 bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between gap-3 shadow-sm">
-                <div class="flex items-center gap-3 min-w-0">
+            <div class="relative z-10 bg-white border-b border-slate-200 px-3 py-3 flex items-center justify-between gap-2 shadow-sm">
+                <div class="flex items-center gap-2 min-w-0">
+                    {{-- ⬅️ Volver (solo móvil): cierra el chat para regresar a la lista --}}
+                    <button type="button"
+                            wire:click="$set('conversacionActivaId', null)"
+                            class="lg:hidden flex h-9 w-9 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100 flex-shrink-0"
+                            title="Volver a conversaciones">
+                        <i class="fa-solid fa-arrow-left"></i>
+                    </button>
+
                     @php
                         $avatarHeader = $conversacionActiva->cliente
                             ? $conversacionActiva->cliente->avatar_url
@@ -519,21 +531,21 @@
                         <div x-show="open && filtradas.length > 0"
                              x-cloak
                              @click.outside="open = false"
-                             class="absolute bottom-full left-0 right-0 mb-2 max-h-72 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl z-30">
-                            <div class="px-3 py-1.5 border-b border-slate-100 bg-slate-50 text-[10px] font-bold uppercase tracking-wide text-slate-500">
-                                ⚡ Respuestas rápidas <span class="font-normal normal-case text-slate-400">(↑↓ navegar · Enter usar · Esc cerrar)</span>
+                             class="absolute bottom-full left-0 mb-1 w-full max-w-md max-h-56 overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-xl z-30">
+                            <div class="sticky top-0 px-2.5 py-1 border-b border-slate-100 bg-slate-50 text-[9px] font-bold uppercase tracking-wide text-slate-500">
+                                ⚡ Respuestas <span class="font-normal normal-case text-slate-400 text-[9px]">(↑↓ Enter Esc)</span>
                             </div>
                             <template x-for="(r, i) in filtradas" :key="r.id">
                                 <button type="button"
                                         @click="seleccionar(r)"
                                         @mouseenter="indice = i"
-                                        :class="indice === i ? 'bg-amber-50 border-l-4 border-amber-500' : 'border-l-4 border-transparent'"
-                                        class="w-full text-left px-3 py-2 hover:bg-amber-50 transition">
-                                    <div class="flex items-center gap-2 mb-0.5">
-                                        <i class="fa-solid fa-bolt text-amber-500 text-[10px]"></i>
-                                        <span class="text-xs font-bold text-slate-800" x-text="r.atajo || '(sin atajo)'"></span>
+                                        :class="indice === i ? 'bg-amber-50 border-l-2 border-amber-500' : 'border-l-2 border-transparent'"
+                                        class="w-full text-left px-2.5 py-1.5 hover:bg-amber-50 transition">
+                                    <div class="flex items-center gap-1.5 mb-0.5">
+                                        <i class="fa-solid fa-bolt text-amber-500 text-[9px]"></i>
+                                        <span class="text-[11px] font-bold text-slate-800" x-text="r.atajo || '(sin atajo)'"></span>
                                     </div>
-                                    <p class="text-[11px] text-slate-600 truncate" x-text="r.texto"></p>
+                                    <p class="text-[10px] text-slate-500 truncate" x-text="r.texto"></p>
                                 </button>
                             </template>
                         </div>
@@ -638,25 +650,37 @@
         @endif
     </section>
 
-    {{-- Auto-scroll al final del chat al abrir y al recibir mensaje --}}
+    {{-- Auto-scroll INTELIGENTE: solo si el usuario YA está cerca del fondo.
+         Si scrolleó hacia arriba para leer mensajes viejos, NO lo devolvemos. --}}
     <script>
         (function () {
-            function scrollToBottom() {
+            const UMBRAL = 120; // px de tolerancia desde el fondo
+
+            function estaAlFondo() {
                 const el = document.getElementById('chat-messages');
-                if (el) el.scrollTop = el.scrollHeight;
+                if (!el) return true;
+                return (el.scrollHeight - el.scrollTop - el.clientHeight) < UMBRAL;
             }
 
-            // Al cambiar de chat
+            function scrollToBottom(force = false) {
+                const el = document.getElementById('chat-messages');
+                if (!el) return;
+                if (force || estaAlFondo()) {
+                    el.scrollTop = el.scrollHeight;
+                }
+            }
+
+            // Al cambiar de chat: SIEMPRE forzar (recién entró)
             document.addEventListener('livewire:initialized', () => {
-                Livewire.on('chat-cambiado', () => setTimeout(scrollToBottom, 100));
-                Livewire.on('mensaje-enviado', () => setTimeout(scrollToBottom, 100));
+                Livewire.on('chat-cambiado', () => setTimeout(() => scrollToBottom(true), 100));
+                Livewire.on('mensaje-enviado', () => setTimeout(() => scrollToBottom(true), 100));
 
                 if (window.Livewire?.hook) {
                     Livewire.hook('morph.updated', () => setTimeout(scrollToBottom, 50));
                 }
             });
 
-            scrollToBottom();
+            scrollToBottom(true);
         })();
     </script>
 
