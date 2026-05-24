@@ -142,6 +142,15 @@
     @endphp
 
     <main class="min-h-screen pt-16 lg:pl-64 transition-all duration-300">
+        {{-- 🔔 Banner global: alerta de suscripción del tenant próxima a vencer / vencida --}}
+        @auth
+            @if(app(\App\Services\TenantManager::class)->current())
+                <div class="px-4 pt-4 lg:px-6">
+                    @livewire('suscripcion-banner')
+                </div>
+            @endif
+        @endauth
+
         @if($aplicarCard)
             <div class="px-4 py-5 lg:px-6 lg:py-6">
                 <div class="page-shell bg-white rounded-2xl border border-slate-200/70 shadow-[0_2px_12px_-4px_rgba(15,23,42,0.06)] p-4 lg:p-6 min-h-[calc(100vh-7.5rem)]">
