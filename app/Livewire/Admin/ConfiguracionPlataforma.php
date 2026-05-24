@@ -30,6 +30,15 @@ class ConfiguracionPlataforma extends Component
     public string $saas_wompi_events_secret    = '';
     public string $saas_wompi_redirect_url     = '';
 
+    // ⚙️ Política de cobros SaaS
+    public bool $saas_billing_activo      = true;
+    public int  $saas_dias_antes_factura  = 7;
+    public int  $saas_dias_gracia         = 7;
+    public bool $saas_aviso_preaviso      = true;
+    public bool $saas_aviso_vence_hoy     = true;
+    public bool $saas_aviso_vencio_ayer   = true;
+    public bool $saas_aviso_urgencia      = true;
+
     /** Logo nuevo (data URL base64 desde Alpine FileReader) */
     public string $logo_data_url = '';
     public string $logo_nombre   = '';
@@ -57,6 +66,14 @@ class ConfiguracionPlataforma extends Component
         $this->saas_wompi_integrity_secret = (string) ($cfg->saas_wompi_integrity_secret ?? '');
         $this->saas_wompi_events_secret    = (string) ($cfg->saas_wompi_events_secret ?? '');
         $this->saas_wompi_redirect_url     = (string) ($cfg->saas_wompi_redirect_url ?? '');
+
+        $this->saas_billing_activo     = (bool)   ($cfg->saas_billing_activo ?? true);
+        $this->saas_dias_antes_factura = (int)    ($cfg->saas_dias_antes_factura ?? 7);
+        $this->saas_dias_gracia        = (int)    ($cfg->saas_dias_gracia ?? 7);
+        $this->saas_aviso_preaviso     = (bool)   ($cfg->saas_aviso_preaviso ?? true);
+        $this->saas_aviso_vence_hoy    = (bool)   ($cfg->saas_aviso_vence_hoy ?? true);
+        $this->saas_aviso_vencio_ayer  = (bool)   ($cfg->saas_aviso_vencio_ayer ?? true);
+        $this->saas_aviso_urgencia     = (bool)   ($cfg->saas_aviso_urgencia ?? true);
     }
 
     protected function rules(): array
@@ -79,6 +96,13 @@ class ConfiguracionPlataforma extends Component
             'saas_wompi_integrity_secret' => 'nullable|string|max:200',
             'saas_wompi_events_secret'    => 'nullable|string|max:200',
             'saas_wompi_redirect_url'     => 'nullable|url|max:255',
+            'saas_billing_activo'         => 'boolean',
+            'saas_dias_antes_factura'     => 'required|integer|min:1|max:60',
+            'saas_dias_gracia'            => 'required|integer|min:0|max:60',
+            'saas_aviso_preaviso'         => 'boolean',
+            'saas_aviso_vence_hoy'        => 'boolean',
+            'saas_aviso_vencio_ayer'      => 'boolean',
+            'saas_aviso_urgencia'         => 'boolean',
         ];
     }
 
@@ -127,6 +151,13 @@ class ConfiguracionPlataforma extends Component
             'saas_wompi_integrity_secret' => $data['saas_wompi_integrity_secret'] ?: null,
             'saas_wompi_events_secret'    => $data['saas_wompi_events_secret']    ?: null,
             'saas_wompi_redirect_url'     => $data['saas_wompi_redirect_url']     ?: null,
+            'saas_billing_activo'         => $data['saas_billing_activo'],
+            'saas_dias_antes_factura'     => $data['saas_dias_antes_factura'],
+            'saas_dias_gracia'            => $data['saas_dias_gracia'],
+            'saas_aviso_preaviso'         => $data['saas_aviso_preaviso'],
+            'saas_aviso_vence_hoy'        => $data['saas_aviso_vence_hoy'],
+            'saas_aviso_vencio_ayer'      => $data['saas_aviso_vencio_ayer'],
+            'saas_aviso_urgencia'         => $data['saas_aviso_urgencia'],
         ]);
 
         ConfiguracionPlataformaModel::limpiarCache();

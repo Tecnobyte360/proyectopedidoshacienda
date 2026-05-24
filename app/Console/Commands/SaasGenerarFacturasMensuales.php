@@ -33,7 +33,14 @@ class SaasGenerarFacturasMensuales extends Command
 
     public function handle(SaasBillingWompiService $wompi): int
     {
-        $dias    = (int) $this->option('dias');
+        $cfg = \App\Models\ConfiguracionPlataforma::actual();
+        if (!$cfg->saas_billing_activo) {
+            $this->warn('⏸ Facturación SaaS desactivada en Configuración Plataforma.');
+            return Command::SUCCESS;
+        }
+
+        // Si no llega --dias, usar la config; lo mismo con --enviar
+        $dias    = (int) ($this->option('dias') ?: $cfg->saas_dias_antes_factura ?: 7);
         $enviar  = (bool) $this->option('enviar');
         $dryRun  = (bool) $this->option('dry-run');
         $hasta   = now()->addDays($dias);

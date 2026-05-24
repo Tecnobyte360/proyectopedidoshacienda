@@ -33,12 +33,26 @@ class SuspenderTenantsVencidos extends Command
 
     public function handle(WhatsappSenderService $sender): int
     {
-        $gracia = (int) $this->option('gracia');
+        $cfg = \App\Models\ConfiguracionPlataforma::actual();
+        if (!$cfg->saas_billing_activo) {
+            $this->warn('⏸ Gestión morosidad SaaS desactivada en Configuración Plataforma.');
+            return Command::SUCCESS;
+        }
+
+        $gracia = (int) ($this->option('gracia') ?: $cfg->saas_dias_gracia ?: 7);
         $enviar = (bool) $this->option('enviar');
         $dryRun = (bool) $this->option('dry-run');
         $tm = app(TenantManager::class);
 
-        $resultado = $tm->withoutTenant(function () use ($sender, $gracia, $enviar, $dryRun) {
+        // Toggles de etapas activas
+        $stagesActivas = [
+            'preaviso'    => (bool) $cfg->saas_aviso_preaviso,
+            'vence_hoy'   => (bool) $cfg->saas_aviso_vence_hoy,
+            'vencio_ayer' => (bool) $cfg->saas_aviso_vencio_ayer,
+            'urgencia'    => (bool) $cfg->saas_aviso_urgencia,
+        ];
+
+        $resultado = $tm->withoutTenant(function () use ($sender, $gracia, $enviar, $dryRun, $stagesActivas) {
             // Considerar suscripciones activas/trial dentro de la ventana [-3, +gracia+5] días
             $hoy = now()->startOfDay();
             $desde = $hoy->copy()->subDays(3);
@@ -80,6 +94,11 @@ class SuspenderTenantsVencidos extends Command
                 };
 
                 if (!$stage) continue;
+
+                // Respetar toggles del admin (excepto 'suspender' que es ineludible)
+                if ($stage !== 'suspender' && !($stagesActivas[$stage] ?? true)) {
+                    continue;
+                }
 
                 $tag = "{$sus->tenant->nombre} (suscripción #{$sus->id}, días {$diasParaVencer})";
 

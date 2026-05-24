@@ -339,6 +339,139 @@
             </div>
         </section>
 
+        {{-- ⚙️ POLÍTICA DE COBROS SAAS --}}
+        <section class="rounded-2xl bg-white shadow-sm border border-slate-200 p-5">
+            <div class="flex items-center gap-2 mb-3">
+                <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+                    <i class="fa-solid fa-calendar-days"></i>
+                </span>
+                <div class="flex-1">
+                    <h3 class="text-base font-bold text-slate-800">Política de cobros y morosidad</h3>
+                    <p class="text-xs text-slate-500">
+                        Define cuándo se factura y cuántos días esperas antes de suspender un tenant moroso.
+                        Los crons leen estos valores en cada ejecución.
+                    </p>
+                </div>
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" wire:model="saas_billing_activo"
+                           class="h-5 w-5 rounded border-slate-300 text-emerald-500 focus:ring-emerald-400">
+                    <span class="text-sm font-bold {{ $saas_billing_activo ? 'text-emerald-700' : 'text-rose-600' }}">
+                        {{ $saas_billing_activo ? '✓ Activo' : '⏸ Pausado' }}
+                    </span>
+                </label>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">
+                        Días ANTES del vencimiento para facturar
+                    </label>
+                    <div class="flex items-center gap-2">
+                        <input type="number" min="1" max="60" wire:model="saas_dias_antes_factura"
+                               class="w-24 rounded-xl border border-slate-200 px-3 py-2 text-sm text-center font-bold">
+                        <span class="text-xs text-slate-500">días antes</span>
+                    </div>
+                    <p class="text-[10px] text-slate-400 mt-1">Cuándo crear el Pago pendiente + mandar el link Wompi.</p>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">
+                        Días de GRACIA tras vencimiento
+                    </label>
+                    <div class="flex items-center gap-2">
+                        <input type="number" min="0" max="60" wire:model="saas_dias_gracia"
+                               class="w-24 rounded-xl border border-slate-200 px-3 py-2 text-sm text-center font-bold">
+                        <span class="text-xs text-slate-500">días de gracia → suspender</span>
+                    </div>
+                    <p class="text-[10px] text-slate-400 mt-1">Cuánto tiempo esperar tras vencer antes de bloquear el acceso del tenant.</p>
+                </div>
+            </div>
+
+            <div class="mt-4">
+                <label class="block text-xs font-bold text-slate-700 mb-2">
+                    Recordatorios escalonados (activa los que quieras enviar)
+                </label>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    <label class="flex items-start gap-2 p-3 rounded-xl border border-slate-200 hover:border-amber-300 cursor-pointer transition">
+                        <input type="checkbox" wire:model="saas_aviso_preaviso" class="mt-0.5 h-4 w-4 rounded border-slate-300 text-amber-500 focus:ring-amber-400">
+                        <div>
+                            <div class="text-xs font-bold text-slate-800">📅 Pre-aviso</div>
+                            <div class="text-[10px] text-slate-500">3 días antes "vence en 3 días"</div>
+                        </div>
+                    </label>
+                    <label class="flex items-start gap-2 p-3 rounded-xl border border-slate-200 hover:border-amber-300 cursor-pointer transition">
+                        <input type="checkbox" wire:model="saas_aviso_vence_hoy" class="mt-0.5 h-4 w-4 rounded border-slate-300 text-amber-500 focus:ring-amber-400">
+                        <div>
+                            <div class="text-xs font-bold text-slate-800">⏰ Vence hoy</div>
+                            <div class="text-[10px] text-slate-500">Día 0 — recordatorio urgente</div>
+                        </div>
+                    </label>
+                    <label class="flex items-start gap-2 p-3 rounded-xl border border-slate-200 hover:border-amber-300 cursor-pointer transition">
+                        <input type="checkbox" wire:model="saas_aviso_vencio_ayer" class="mt-0.5 h-4 w-4 rounded border-slate-300 text-amber-500 focus:ring-amber-400">
+                        <div>
+                            <div class="text-xs font-bold text-slate-800">⚠️ Venció ayer</div>
+                            <div class="text-[10px] text-slate-500">Día +1 — primer atraso</div>
+                        </div>
+                    </label>
+                    <label class="flex items-start gap-2 p-3 rounded-xl border border-slate-200 hover:border-rose-300 cursor-pointer transition">
+                        <input type="checkbox" wire:model="saas_aviso_urgencia" class="mt-0.5 h-4 w-4 rounded border-slate-300 text-rose-500 focus:ring-rose-400">
+                        <div>
+                            <div class="text-xs font-bold text-slate-800">🚨 Urgencia</div>
+                            <div class="text-[10px] text-slate-500">Día +3 "será suspendido pronto"</div>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            {{-- Visualización tipo timeline --}}
+            <div class="mt-5 rounded-xl bg-slate-50 border border-slate-200 p-4">
+                <p class="text-xs font-bold text-slate-700 mb-3">📍 Línea de tiempo de un cobro</p>
+                <div class="relative">
+                    <div class="absolute top-3 left-0 right-0 h-0.5 bg-slate-300"></div>
+                    <div class="relative flex justify-between text-center text-[10px]">
+                        <div class="flex flex-col items-center">
+                            <div class="h-6 w-6 rounded-full bg-blue-500 text-white flex items-center justify-center text-[10px] font-bold relative z-10">📨</div>
+                            <div class="mt-1 font-bold text-slate-700">Día -{{ $saas_dias_antes_factura }}</div>
+                            <div class="text-slate-500">Factura<br>+ link</div>
+                        </div>
+                        @if($saas_aviso_preaviso)
+                        <div class="flex flex-col items-center">
+                            <div class="h-6 w-6 rounded-full bg-amber-400 text-white flex items-center justify-center text-[10px] font-bold relative z-10">📅</div>
+                            <div class="mt-1 font-bold text-slate-700">Día -3</div>
+                            <div class="text-slate-500">Pre-aviso</div>
+                        </div>
+                        @endif
+                        @if($saas_aviso_vence_hoy)
+                        <div class="flex flex-col items-center">
+                            <div class="h-6 w-6 rounded-full bg-orange-500 text-white flex items-center justify-center text-[10px] font-bold relative z-10">⏰</div>
+                            <div class="mt-1 font-bold text-slate-700">Día 0</div>
+                            <div class="text-slate-500">Vence hoy</div>
+                        </div>
+                        @endif
+                        @if($saas_aviso_vencio_ayer)
+                        <div class="flex flex-col items-center">
+                            <div class="h-6 w-6 rounded-full bg-orange-600 text-white flex items-center justify-center text-[10px] font-bold relative z-10">⚠️</div>
+                            <div class="mt-1 font-bold text-slate-700">Día +1</div>
+                            <div class="text-slate-500">Venció</div>
+                        </div>
+                        @endif
+                        @if($saas_aviso_urgencia)
+                        <div class="flex flex-col items-center">
+                            <div class="h-6 w-6 rounded-full bg-rose-500 text-white flex items-center justify-center text-[10px] font-bold relative z-10">🚨</div>
+                            <div class="mt-1 font-bold text-slate-700">Día +3</div>
+                            <div class="text-slate-500">Urgencia</div>
+                        </div>
+                        @endif
+                        <div class="flex flex-col items-center">
+                            <div class="h-6 w-6 rounded-full bg-rose-700 text-white flex items-center justify-center text-[10px] font-bold relative z-10">🚫</div>
+                            <div class="mt-1 font-bold text-rose-700">Día +{{ $saas_dias_gracia }}</div>
+                            <div class="text-rose-600">SUSPENDIDO</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         {{-- GESTOR DE CONEXIONES --}}
         <section class="rounded-2xl bg-white shadow-sm border border-slate-200 p-5">
             <div class="flex items-center gap-2 mb-3">

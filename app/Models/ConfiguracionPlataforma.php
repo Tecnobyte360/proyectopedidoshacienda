@@ -38,6 +38,26 @@ class ConfiguracionPlataforma extends Model
         'saas_wompi_integrity_secret',
         'saas_wompi_events_secret',
         'saas_wompi_redirect_url',
+        // ⚙️ Política de cobros SaaS
+        'saas_dias_antes_factura',
+        'saas_dias_gracia',
+        'saas_aviso_preaviso',
+        'saas_aviso_vence_hoy',
+        'saas_aviso_vencio_ayer',
+        'saas_aviso_urgencia',
+        'saas_mensaje_factura',
+        'saas_mensaje_suspendido',
+        'saas_billing_activo',
+    ];
+
+    protected $casts = [
+        'saas_aviso_preaviso'      => 'boolean',
+        'saas_aviso_vence_hoy'     => 'boolean',
+        'saas_aviso_vencio_ayer'   => 'boolean',
+        'saas_aviso_urgencia'      => 'boolean',
+        'saas_billing_activo'      => 'boolean',
+        'saas_dias_antes_factura'  => 'integer',
+        'saas_dias_gracia'         => 'integer',
     ];
 
     protected $hidden = [
