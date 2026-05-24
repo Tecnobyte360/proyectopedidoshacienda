@@ -250,11 +250,26 @@
                     </div>
 
                     {{-- ═════════ WhatsApp de la sede ═════════ --}}
+                    @php
+                        $tenantActual = app(\App\Services\TenantManager::class)->current();
+                        $tenantEsMeta = $tenantActual
+                            && $tenantActual->proveedorWhatsappResuelto() === \App\Models\Tenant::WA_PROVIDER_META;
+                    @endphp
                     <div class="rounded-xl border border-emerald-100 bg-emerald-50/40 p-4">
                         <div class="flex items-center gap-2 mb-3">
                             <i class="fa-brands fa-whatsapp text-emerald-600"></i>
                             <span class="text-sm font-semibold text-slate-800">WhatsApp de esta sede</span>
                         </div>
+
+                        @if($tenantEsMeta)
+                            {{-- 🟢 Meta: 1 solo número por tenant — no se asigna por sede --}}
+                            <div class="rounded-lg border border-emerald-200 bg-white px-3 py-2.5 text-xs text-emerald-800">
+                                <i class="fa-brands fa-meta mr-1"></i>
+                                Este tenant usa <strong>Meta WhatsApp Cloud API</strong> (1 número por tenant compartido entre todas las sedes).
+                                No necesitas asignar conexión por sede — las notificaciones salen por el número Meta configurado en
+                                <a href="/meta-whatsapp" class="underline">/meta-whatsapp</a>.
+                            </div>
+                        @else
                         <p class="text-xs text-slate-500 mb-3">
                             Selecciona qué número de WhatsApp atiende los pedidos de esta sede.
                             Los mensajes que entren a ese número se asignarán automáticamente aquí,
@@ -294,6 +309,7 @@
                                 </div>
                             </div>
                         @endif
+                        @endif {{-- /tenantEsMeta --}}
                     </div>
 
                     {{-- ╔═══════════════════════════════════════════════╗

@@ -220,6 +220,11 @@ class Index extends Component
     {
         try {
             $tenant = app(\App\Services\TenantManager::class)->current();
+            // 🟢 Si el tenant usa Meta no aplican conexiones TecnoByteApp: el
+            // bloque se reemplaza por un infobox informativo en el blade.
+            if ($tenant && $tenant->proveedorWhatsappResuelto() === \App\Models\Tenant::WA_PROVIDER_META) {
+                return [];
+            }
             $resolver = app(\App\Services\WhatsappResolverService::class);
             $token = $resolver->token();
 
