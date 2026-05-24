@@ -423,6 +423,53 @@
                 </div>
             </div>
 
+            {{-- ⏰ Horarios de envío configurable --}}
+            <div class="mt-5 rounded-xl border border-amber-200 bg-amber-50/40 p-4">
+                <label class="block text-xs font-bold text-amber-900 mb-2">
+                    <i class="fa-solid fa-clock"></i> Horarios de envío de WhatsApp (cuántas veces al día)
+                </label>
+                <p class="text-[11px] text-amber-800/80 mb-3">
+                    El cron revisa cada minuto y se dispara si la hora actual coincide con alguna de esta lista.
+                    Útil para insistirle al cliente vencido (ej. 09:00, 14:00 y 18:00).
+                </p>
+
+                {{-- Chips de horas actuales --}}
+                <div class="flex flex-wrap gap-2 mb-3">
+                    @foreach($saas_horas_envio as $idx => $h)
+                        <span class="inline-flex items-center gap-2 rounded-full bg-amber-200/60 border border-amber-300 px-3 py-1 text-xs font-bold text-amber-900">
+                            <i class="fa-solid fa-clock"></i> {{ $h }}
+                            @if(count($saas_horas_envio) > 1)
+                                <button type="button" wire:click="quitarHora({{ $idx }})"
+                                        class="ml-1 text-amber-700 hover:text-rose-600">
+                                    <i class="fa-solid fa-xmark"></i>
+                                </button>
+                            @endif
+                        </span>
+                    @endforeach
+                </div>
+
+                {{-- Agregar nueva hora --}}
+                <div class="flex items-center gap-2">
+                    <input type="time" wire:model="nuevaHora"
+                           class="rounded-lg border border-amber-300 px-3 py-1.5 text-sm w-32 focus:border-amber-500 focus:ring-2 focus:ring-amber-200">
+                    <button type="button" wire:click="agregarHora"
+                            class="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 text-xs font-bold transition">
+                        <i class="fa-solid fa-plus"></i> Agregar hora
+                    </button>
+                    <span class="text-[10px] text-slate-500">
+                        Máx 8 horarios · Mín 1 · Formato HH:MM (zona horaria Bogotá)
+                    </span>
+                </div>
+                @error('saas_horas_envio') <p class="text-xs text-rose-600 mt-1">{{ $message }}</p> @enderror
+                @error('saas_horas_envio.*') <p class="text-xs text-rose-600 mt-1">{{ $message }}</p> @enderror
+
+                <p class="text-[11px] text-amber-900 bg-amber-200/30 rounded px-3 py-2 mt-3 font-semibold">
+                    📤 <strong>Resumen:</strong> el cliente recibirá hasta
+                    <strong>{{ count($saas_horas_envio) }}</strong> mensaje{{ count($saas_horas_envio) === 1 ? '' : 's' }}/día
+                    en: {{ implode(' · ', $saas_horas_envio) }}
+                </p>
+            </div>
+
             {{-- Visualización tipo timeline --}}
             <div class="mt-5 rounded-xl bg-slate-50 border border-slate-200 p-4">
                 <p class="text-xs font-bold text-slate-700 mb-3">📍 Línea de tiempo de un cobro</p>

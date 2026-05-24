@@ -41,6 +41,7 @@ class ConfiguracionPlataforma extends Model
         // ⚙️ Política de cobros SaaS
         'saas_dias_antes_factura',
         'saas_dias_gracia',
+        'saas_horas_envio',
         'saas_aviso_preaviso',
         'saas_aviso_vence_hoy',
         'saas_aviso_vencio_ayer',
@@ -58,6 +59,7 @@ class ConfiguracionPlataforma extends Model
         'saas_billing_activo'      => 'boolean',
         'saas_dias_antes_factura'  => 'integer',
         'saas_dias_gracia'         => 'integer',
+        'saas_horas_envio'         => 'array',
     ];
 
     protected $hidden = [

@@ -18,19 +18,37 @@ Artisan::command('inspire', function () {
 // 🎂 Felicitaciones de cumpleaños
 // Evaluamos cada minuto y comparamos HH:MM exacto con la hora configurada
 // en ConfiguracionBot. Así el admin puede elegir cualquier hora (incluso :22).
-// 🚫 Gestión de morosidad SaaS — recordatorios escalonados (día -3/0/+1/+3) + suspensión al día +7
-// Corre todos los días a las 10:00 (hora "humana" para que llegue WhatsApp en horario laboral).
-Schedule::command('tenants:suspender-vencidos --gracia=7 --enviar')
-    ->dailyAt('10:00')
+// 🚫 Gestión de morosidad SaaS — corre CADA MINUTO y se dispara en las horas
+// configuradas en /admin/configuracion-plataforma → "Horarios de envío".
+// Permite N envíos al día (ej. 09:00, 14:00, 18:00) para insistirle al tenant moroso.
+$leerHorasSaas = function (): array {
+    try {
+        $cfg = \App\Models\ConfiguracionPlataforma::actual();
+        $horas = is_array($cfg->saas_horas_envio) ? $cfg->saas_horas_envio : ['10:00'];
+        return array_map('trim', $horas);
+    } catch (\Throwable $e) {
+        return ['10:00'];
+    }
+};
+
+Schedule::command('tenants:suspender-vencidos --enviar')
+    ->everyMinute()
     ->timezone('America/Bogota')
+    ->when(function () use ($leerHorasSaas) {
+        $ahora = now('America/Bogota')->format('H:i');
+        return in_array($ahora, $leerHorasSaas(), true);
+    })
     ->withoutOverlapping()
     ->runInBackground();
 
-// 📅 Generar facturas mensuales SaaS — 7 días antes del vencimiento crea Pago pendiente
-// + link Wompi y lo manda al admin del tenant por WhatsApp. Corre cada día a las 09:00.
-Schedule::command('saas:generar-facturas-mensuales --dias=7 --enviar')
-    ->dailyAt('09:00')
+// 📅 Generar facturas mensuales SaaS — mismas horas que morosidad
+Schedule::command('saas:generar-facturas-mensuales --enviar')
+    ->everyMinute()
     ->timezone('America/Bogota')
+    ->when(function () use ($leerHorasSaas) {
+        $ahora = now('America/Bogota')->format('H:i');
+        return in_array($ahora, $leerHorasSaas(), true);
+    })
     ->withoutOverlapping()
     ->runInBackground();
 

@@ -34,6 +34,8 @@ class ConfiguracionPlataforma extends Component
     public bool $saas_billing_activo      = true;
     public int  $saas_dias_antes_factura  = 7;
     public int  $saas_dias_gracia         = 7;
+    public array $saas_horas_envio        = ['10:00'];
+    public string $nuevaHora              = '10:00'; // input temporal para agregar
     public bool $saas_aviso_preaviso      = true;
     public bool $saas_aviso_vence_hoy     = true;
     public bool $saas_aviso_vencio_ayer   = true;
@@ -70,6 +72,9 @@ class ConfiguracionPlataforma extends Component
         $this->saas_billing_activo     = (bool)   ($cfg->saas_billing_activo ?? true);
         $this->saas_dias_antes_factura = (int)    ($cfg->saas_dias_antes_factura ?? 7);
         $this->saas_dias_gracia        = (int)    ($cfg->saas_dias_gracia ?? 7);
+        $this->saas_horas_envio        = is_array($cfg->saas_horas_envio ?? null) && count($cfg->saas_horas_envio)
+                                          ? array_values($cfg->saas_horas_envio)
+                                          : ['10:00'];
         $this->saas_aviso_preaviso     = (bool)   ($cfg->saas_aviso_preaviso ?? true);
         $this->saas_aviso_vence_hoy    = (bool)   ($cfg->saas_aviso_vence_hoy ?? true);
         $this->saas_aviso_vencio_ayer  = (bool)   ($cfg->saas_aviso_vencio_ayer ?? true);
@@ -99,6 +104,8 @@ class ConfiguracionPlataforma extends Component
             'saas_billing_activo'         => 'boolean',
             'saas_dias_antes_factura'     => 'required|integer|min:1|max:60',
             'saas_dias_gracia'            => 'required|integer|min:0|max:60',
+            'saas_horas_envio'            => 'required|array|min:1|max:8',
+            'saas_horas_envio.*'          => ['required','regex:/^([01]\d|2[0-3]):[0-5]\d$/'],
             'saas_aviso_preaviso'         => 'boolean',
             'saas_aviso_vence_hoy'        => 'boolean',
             'saas_aviso_vencio_ayer'      => 'boolean',
@@ -154,6 +161,7 @@ class ConfiguracionPlataforma extends Component
             'saas_billing_activo'         => $data['saas_billing_activo'],
             'saas_dias_antes_factura'     => $data['saas_dias_antes_factura'],
             'saas_dias_gracia'            => $data['saas_dias_gracia'],
+            'saas_horas_envio'            => array_values(array_unique($data['saas_horas_envio'])),
             'saas_aviso_preaviso'         => $data['saas_aviso_preaviso'],
             'saas_aviso_vence_hoy'        => $data['saas_aviso_vence_hoy'],
             'saas_aviso_vencio_ayer'      => $data['saas_aviso_vencio_ayer'],
@@ -321,6 +329,38 @@ class ConfiguracionPlataforma extends Component
                 ? "✓ Conexión #{$connectionId} asignada al tenant."
                 : "✓ Conexión #{$connectionId} desasignada.",
         ]);
+    }
+
+    /** ⏰ Agrega una hora al array (validada en formato HH:MM) */
+    public function agregarHora(): void
+    {
+        $h = trim($this->nuevaHora);
+        if (!preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $h)) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Formato debe ser HH:MM (ej. 09:30)']);
+            return;
+        }
+        if (count($this->saas_horas_envio) >= 8) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Máximo 8 horarios por día']);
+            return;
+        }
+        if (in_array($h, $this->saas_horas_envio, true)) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Esa hora ya está agregada']);
+            return;
+        }
+        $this->saas_horas_envio[] = $h;
+        sort($this->saas_horas_envio);
+        $this->nuevaHora = '';
+    }
+
+    /** ⏰ Elimina una hora del array por índice */
+    public function quitarHora(int $idx): void
+    {
+        if (isset($this->saas_horas_envio[$idx]) && count($this->saas_horas_envio) > 1) {
+            unset($this->saas_horas_envio[$idx]);
+            $this->saas_horas_envio = array_values($this->saas_horas_envio);
+        } else {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Debe haber al menos 1 horario configurado']);
+        }
     }
 
     /** 💳 Prueba que las credenciales Wompi sean válidas llamando /v1/merchants/{public_key} */
