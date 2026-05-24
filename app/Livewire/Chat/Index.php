@@ -584,7 +584,8 @@ class Index extends Component
         $nombreEnvio = 'voice_' . uniqid() . '.' . $extEnvio;
 
         // 🟢 RUTA META: si el tenant usa Meta, mandamos el audio por URL pública
-        // a la Cloud API. Meta soporta ogg/opus y mp3 sin convertir.
+        // a la Cloud API. Meta NO acepta video/webm — debe ser audio/mpeg, ogg,
+        // amr, mp4 o aac. Persistimos el archivo YA CONVERTIDO y usamos esa URL.
         try {
             $tenant = app(\App\Services\TenantManager::class)->current();
             if ($tenant && $tenant->proveedorWhatsappResuelto() === \App\Models\Tenant::WA_PROVIDER_META) {
@@ -597,8 +598,14 @@ class Index extends Component
                     return;
                 }
 
+                // Guardar el archivo CONVERTIDO (mp3) en storage público y
+                // generar URL pública para que Meta pueda descargarlo.
+                $filenameConv = 'audios-out/audio_' . now()->format('Ymd_His') . '_' . uniqid() . '.' . $extEnvio;
+                Storage::disk('public')->put($filenameConv, $bytesEnvio);
+                $mediaUrlMeta = rtrim(config('app.url'), '/') . Storage::url($filenameConv);
+
                 $ok = app(\App\Services\Meta\MetaWhatsappCloudService::class)
-                    ->enviarAudio($conv->telefono_normalizado, $mediaUrl, $conv->tenant_id);
+                    ->enviarAudio($conv->telefono_normalizado, $mediaUrlMeta, $conv->tenant_id);
 
                 if (!$ok) {
                     $this->dispatch('notify', [
@@ -618,9 +625,9 @@ class Index extends Component
                             'meta' => [
                                 'enviado_por_humano' => true,
                                 'usuario_id'         => auth()->id(),
-                                'media_url'          => $mediaUrl,
-                                'mime'               => $mime,
-                                'bytes'              => strlen($bytes),
+                                'media_url'          => $mediaUrlMeta,
+                                'mime'               => 'audio/mpeg',
+                                'bytes'              => strlen($bytesEnvio),
                                 'provider'           => 'meta',
                             ],
                         ]
