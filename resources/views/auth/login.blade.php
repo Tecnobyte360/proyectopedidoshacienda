@@ -26,8 +26,15 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Iniciar sesión | {{ $brandName }}</title>
+    <style>
+        @media screen and (max-width: 768px) {
+            input[type="text"], input[type="email"], input[type="password"],
+            input[type="tel"], input[type="number"], input[type="search"],
+            textarea { font-size: 16px !important; }
+        }
+    </style>
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
     <link rel="icon" type="image/png" href="{{ $faviconUrl }}">

@@ -2,8 +2,20 @@
 <html lang="es" class="scroll-smooth">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title> Pedidos | Tecnobyte</title>
+    <style>
+        /* 🚫 Prevenir zoom automatico de iOS/Android cuando el input
+           tiene font-size < 16px. Aplicar 16px en movil. */
+        @media screen and (max-width: 768px) {
+            input[type="text"], input[type="email"], input[type="password"],
+            input[type="tel"], input[type="number"], input[type="search"],
+            input[type="url"], input[type="date"], input[type="time"],
+            input[type="datetime-local"], textarea, select {
+                font-size: 16px !important;
+            }
+        }
+    </style>
 
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
