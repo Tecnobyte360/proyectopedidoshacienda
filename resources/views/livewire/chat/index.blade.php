@@ -1,4 +1,4 @@
-<div class="h-[calc(100vh-5rem)] flex flex-col lg:flex-row bg-slate-100"
+<div class="h-[calc(100vh-5rem)] flex flex-col lg:flex-row bg-slate-100 overflow-x-hidden w-full max-w-full"
      wire:poll.2s="refrescar">
 
     @php $cfgBot = \App\Models\ConfiguracionBot::actual(); @endphp
@@ -200,8 +200,8 @@
                     ->implode('');
             @endphp
 
-            {{-- Header del chat --}}
-            <div class="relative z-10 bg-white border-b border-slate-200 px-3 py-3 flex items-center justify-between gap-2 shadow-sm">
+            {{-- Header del chat — sticky para que quede fijo al hacer scroll --}}
+            <div class="sticky top-0 z-20 bg-white border-b border-slate-200 px-3 py-3 flex items-center justify-between gap-2 shadow-sm">
                 <div class="flex items-center gap-2 min-w-0">
                     {{-- ⬅️ Volver (solo móvil): cierra el chat para regresar a la lista --}}
                     <button type="button"
