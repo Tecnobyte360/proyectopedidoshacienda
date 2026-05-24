@@ -30,20 +30,33 @@ class User extends Authenticatable
         'sede_id',
         'activo',
         'ultimo_login_at',
+        'two_factor_secret',
+        'two_factor_recovery_codes',
+        'two_factor_enabled_at',
     ];
 
     protected $hidden = [
         'password',
         'remember_token',
+        'two_factor_secret',
+        'two_factor_recovery_codes',
     ];
+
+    public function tieneDosFactor(): bool
+    {
+        return !empty($this->two_factor_secret) && !empty($this->two_factor_enabled_at);
+    }
 
     protected function casts(): array
     {
         return [
-            'email_verified_at' => 'datetime',
-            'password'          => 'hashed',
-            'activo'            => 'boolean',
-            'ultimo_login_at'   => 'datetime',
+            'email_verified_at'         => 'datetime',
+            'password'                  => 'hashed',
+            'activo'                    => 'boolean',
+            'ultimo_login_at'           => 'datetime',
+            'two_factor_secret'         => 'encrypted',
+            'two_factor_recovery_codes' => 'encrypted',
+            'two_factor_enabled_at'     => 'datetime',
         ];
     }
 

@@ -63,6 +63,20 @@ Route::post('/logout', [AuthController::class, 'logout'])
     ->middleware('auth')
     ->name('logout');
 
+// 🔐 2FA Challenge (entre login y dashboard cuando user tiene 2FA activado)
+Route::get('/two-factor-challenge',  [\App\Http\Controllers\TwoFactorController::class, 'showChallenge'])
+    ->name('two-factor.challenge');
+Route::post('/two-factor-challenge', [\App\Http\Controllers\TwoFactorController::class, 'verifyChallenge'])
+    ->name('two-factor.verify');
+
+// 🔐 2FA Settings (gestión usuario logueado)
+Route::middleware('auth')->group(function () {
+    Route::get('/perfil/seguridad',                \App\Livewire\Auth\SecuritySettings::class)->name('perfil.seguridad');
+    Route::post('/perfil/seguridad/iniciar-2fa',   [\App\Http\Controllers\TwoFactorController::class, 'startEnroll'])->name('two-factor.start');
+    Route::post('/perfil/seguridad/confirmar-2fa', [\App\Http\Controllers\TwoFactorController::class, 'confirmEnroll'])->name('two-factor.confirm');
+    Route::post('/perfil/seguridad/desactivar',    [\App\Http\Controllers\TwoFactorController::class, 'disable'])->name('two-factor.disable');
+});
+
 /*
 |--------------------------------------------------------------------------
 | RUTAS AUTENTICADAS — protegidas con permisos

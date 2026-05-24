@@ -31,6 +31,8 @@ class BloqueaSiMoroso
         $rutaActual = $request->path();
         $whitelist  = [
             'login', 'logout', 'register',
+            'forgot-password', 'reset-password',
+            'two-factor-challenge',
             'billing/expirado', 'billing/gracias',
             'api/saas-billing/wompi/webhook',
             'livewire/update', // permitir el banner Livewire si se renderea

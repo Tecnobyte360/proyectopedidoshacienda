@@ -122,15 +122,27 @@ class AuthController extends Controller
 
         $remember = $request->boolean('remember');
 
-        if (!Auth::attempt(['email' => $data['email'], 'password' => $data['password'], 'activo' => true], $remember)) {
+        // Validar credenciales SIN loguear (para poder interceptar 2FA primero)
+        $user = \App\Models\User::where('email', $data['email'])->where('activo', true)->first();
+        if (!$user || !\Hash::check($data['password'], $user->password)) {
             return back()
                 ->withInput($request->only('email', 'remember'))
                 ->withErrors(['email' => 'Credenciales inválidas o usuario inactivo.']);
         }
 
-        $request->session()->regenerate();
+        // 🔐 Si tiene 2FA activado, NO logueamos todavía. Guardamos en sesión
+        //    y mandamos a la pantalla challenge para que ingrese el código.
+        if ($user->tieneDosFactor()) {
+            $request->session()->put([
+                '2fa.user_id'  => $user->id,
+                '2fa.remember' => $remember,
+            ]);
+            return redirect()->route('two-factor.challenge');
+        }
 
-        $user = Auth::user();
+        // Login normal sin 2FA
+        Auth::login($user, $remember);
+        $request->session()->regenerate();
         $user->update(['ultimo_login_at' => now()]);
 
         // Limpiar la URL "intended"
