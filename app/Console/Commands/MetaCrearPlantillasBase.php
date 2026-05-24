@@ -139,7 +139,7 @@ class MetaCrearPlantillasBase extends Command
                 'components' => [
                     [
                         'type' => 'BODY',
-                        'text' => "{{1}}, tu pedido *#{{2}}* ya va en camino 🛵\n\nDomiciliario: {{3}}\nTiempo estimado: {{4}} minutos",
+                        'text' => "Hola {{1}}, tu pedido *#{{2}}* ya va en camino 🛵\n\nDomiciliario: {{3}}\nTiempo estimado: {{4}} minutos. ¡Atento!",
                         'example' => ['body_text' => [['Stiven', '18', 'Juan Pérez', '20']]],
                     ],
                 ],
@@ -175,7 +175,7 @@ class MetaCrearPlantillasBase extends Command
                 'components' => [
                     [
                         'type' => 'BODY',
-                        'text' => "{{1}}, ¿cómo te pareció tu pedido *#{{2}}*? 🌟\n\nCalifícanos del 1 al 5 respondiendo a este mensaje. Tu opinión nos ayuda a mejorar.",
+                        'text' => "Hola {{1}}, ¿cómo te pareció tu pedido *#{{2}}*? 🌟\n\nCalifícanos del 1 al 5 respondiendo a este mensaje. Tu opinión nos ayuda a mejorar el servicio.",
                         'example' => ['body_text' => [['Stiven', '18']]],
                     ],
                 ],
