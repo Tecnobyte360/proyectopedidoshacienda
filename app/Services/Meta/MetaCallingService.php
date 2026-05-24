@@ -5,6 +5,7 @@ namespace App\Services\Meta;
 use App\Models\Conversacion;
 use App\Models\MetaWhatsappConfig;
 use App\Models\WhatsappCall;
+use App\Models\WhatsappCallPermission;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -230,6 +231,71 @@ class MetaCallingService
     }
 
     /**
+     * Envía solicitud de permiso de llamada al cliente.
+     * El cliente verá un botón "Permitir / Bloquear" en su WhatsApp.
+     * La respuesta llega vía webhook call_permission_updates.
+     *
+     * Endpoint: POST /{phone_id}/call_permission_requests
+     */
+    public function solicitarPermiso(string $telefono, int $tenantId): bool
+    {
+        $config = $this->resolverConfig($tenantId);
+        if (!$config) return false;
+
+        $telefono = $this->normalizar($telefono);
+        $url = sprintf(
+            'https://graph.facebook.com/%s/%s/call_permission_requests',
+            $config->api_version ?: 'v25.0',
+            $config->phone_number_id
+        );
+
+        try {
+            $resp = Http::withToken($config->access_token)
+                ->acceptJson()
+                ->timeout(15)
+                ->post($url, [
+                    'messaging_product' => 'whatsapp',
+                    'recipient_type'    => 'individual',
+                    'to'                => $telefono,
+                ]);
+
+            if ($resp->successful()) {
+                WhatsappCallPermission::updateOrCreate(
+                    ['tenant_id' => $tenantId, 'telefono' => $telefono],
+                    [
+                        'estado'        => WhatsappCallPermission::PENDING,
+                        'solicitado_at' => now(),
+                        'payload'       => $resp->json(),
+                    ]
+                );
+                Log::info('📞 Permiso de llamada solicitado', [
+                    'tenant_id' => $tenantId,
+                    'to'        => $telefono,
+                ]);
+                return true;
+            }
+            Log::warning('📞 Fallo solicitar permiso', [
+                'status' => $resp->status(),
+                'body'   => mb_substr($resp->body(), 0, 400),
+            ]);
+            return false;
+        } catch (\Throwable $e) {
+            Log::error('📞 Exception solicitar permiso', ['error' => $e->getMessage()]);
+            return false;
+        }
+    }
+
+    /** ¿El cliente tiene permiso vigente para que lo llamemos? */
+    public function tienePermiso(string $telefono, int $tenantId): bool
+    {
+        $perm = WhatsappCallPermission::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('telefono', $this->normalizar($telefono))
+            ->first();
+        return $perm && $perm->vigente();
+    }
+
+    /**
      * Procesa webhook de calls que llega de Meta.
      * Estructura: entry[].changes[].value (field='calls').
      */
@@ -305,12 +371,40 @@ class MetaCallingService
 
         // 2. Actualización de permiso de llamada (call_permission_update)
         foreach ($value['call_permission_updates'] ?? [] as $upd) {
+            $tel      = $this->normalizar((string) ($upd['from'] ?? ''));
+            $response = strtolower((string) ($upd['response'] ?? '')); // accept|reject
+            if (!$tel) continue;
+
+            $estado = match ($response) {
+                'accept'  => WhatsappCallPermission::ACCEPTED,
+                'reject'  => WhatsappCallPermission::REJECTED,
+                default   => WhatsappCallPermission::PENDING,
+            };
+
+            // Meta envía expiration_timestamp cuando es accept
+            $expira = null;
+            if (!empty($upd['expiration_timestamp'])) {
+                $expira = Carbon::createFromTimestamp((int) $upd['expiration_timestamp']);
+            } elseif ($estado === WhatsappCallPermission::ACCEPTED) {
+                $expira = now()->addDays(7); // fallback razonable
+            }
+
+            WhatsappCallPermission::updateOrCreate(
+                ['tenant_id' => $tenantId, 'telefono' => $tel],
+                [
+                    'estado'        => $estado,
+                    'respondido_at' => now(),
+                    'expira_at'     => $expira,
+                    'payload'       => $upd,
+                ]
+            );
+
             Log::info('📞 Call permission update', [
                 'tenant_id' => $tenantId,
-                'from'      => $upd['from'] ?? null,
-                'response'  => $upd['response'] ?? null,
+                'from'      => $tel,
+                'response'  => $response,
+                'expira_at' => $expira?->toDateTimeString(),
             ]);
-            // TODO: persistir en tabla call_permissions (tenant, telefono, expira_at)
         }
     }
 
