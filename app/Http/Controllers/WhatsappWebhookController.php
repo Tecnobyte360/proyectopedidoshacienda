@@ -542,6 +542,23 @@ class WhatsappWebhookController extends Controller
                 }
             }
 
+            // 🛡️ PrecioAlucinacionGuard: si el LLM se invento precios en un
+            // resumen, los reemplaza con el render exacto desde el estado
+            // persistente. Asi el cliente NUNCA ve precios inflados.
+            try {
+                $telefonoNorm = $this->normalizarTelefono($from);
+                $convGuard = \App\Models\ConversacionWhatsapp::query()
+                    ->where('telefono_normalizado', $telefonoNorm)
+                    ->orderByDesc('id')
+                    ->first();
+                if ($convGuard) {
+                    $reply = app(\App\Services\Bots\PrecioAlucinacionGuard::class)
+                        ->validarYCorregir($reply, $convGuard);
+                }
+            } catch (\Throwable $e) {
+                Log::warning('PrecioAlucinacionGuard fallo (continua): ' . $e->getMessage());
+            }
+
             Log::info('💬 RESPUESTA GENERADA', compact('reply', 'from', 'messageId', 'connectionId'));
 
             $sent = $this->enviarRespuestaWhatsapp($from, $reply, $connectionId);
