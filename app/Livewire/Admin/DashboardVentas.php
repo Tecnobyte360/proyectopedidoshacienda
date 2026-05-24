@@ -92,11 +92,26 @@ class DashboardVentas extends Component
                 ->orderByDesc('activas_count')
                 ->get();
 
+            // Próximos vencimientos (15 días) — heredado del DashboardSaas viejo
+            $proximosVenc = Suscripcion::with('tenant', 'plan')
+                ->whereIn('estado', [Suscripcion::ESTADO_ACTIVA, Suscripcion::ESTADO_TRIAL])
+                ->whereBetween('fecha_fin', [now()->toDateString(), now()->addDays(15)->toDateString()])
+                ->orderBy('fecha_fin')
+                ->limit(10)
+                ->get();
+
+            $pendientes  = (float) Pago::where('estado', Pago::ESTADO_PENDIENTE)->sum('monto');
+            $suspendidos = Tenant::where('suspendido_por_mora', true)->count();
+            $morosos     = Suscripcion::where('fecha_fin', '<', now()->toDateString())
+                ->whereIn('estado', [Suscripcion::ESTADO_ACTIVA, Suscripcion::ESTADO_EXPIRADA])
+                ->count();
+
             return compact(
                 'ingresosRango', 'ingresosMes', 'ingresosMesP', 'deltaPct',
                 'mrr', 'ticketPromedio', 'pagosRangoCount',
                 'tenantsActivos', 'tenantsNuevos',
                 'serieDiaria', 'porMetodo', 'topTenants', 'porPlan',
+                'proximosVenc', 'pendientes', 'suspendidos', 'morosos',
                 'desde', 'hasta'
             );
         });

@@ -281,7 +281,9 @@ Route::get('/roles', RolesIndex::class)
 // 🌟 SUPER-ADMIN — solo TecnoByte360 (dueño plataforma).
 // Doble blindaje: permiso + middleware "solo_principal" (404 si entran desde subdominio).
 Route::middleware(['solo_principal'])->group(function () {
-    Route::get('/admin/dashboard',     \App\Livewire\Admin\DashboardSaas::class)->middleware('permission:tenants.gestionar')->name('admin.dashboard');
+    // Dashboard unificado (ventas + KPIs SaaS) — apunta a DashboardVentas
+    Route::get('/admin/dashboard',     \App\Livewire\Admin\DashboardVentas::class)->middleware('permission:tenants.gestionar')->name('admin.dashboard');
+    // Mantener /admin/ventas como alias para no romper enlaces
     Route::get('/admin/ventas',        \App\Livewire\Admin\DashboardVentas::class)->middleware('permission:tenants.gestionar')->name('admin.ventas');
     Route::get('/admin/billing-envios',\App\Livewire\Admin\BillingEnvios::class)->middleware('permission:tenants.gestionar')->name('admin.billing-envios');
     Route::get('/admin/tenants',       AdminTenantsIndex::class)->middleware('permission:tenants.gestionar')->name('admin.tenants.index');

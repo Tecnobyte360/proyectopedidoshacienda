@@ -105,8 +105,7 @@
             [
                 'title' => 'Super Admin',
                 'items' => [
-                    ['name' => 'Dashboard',     'icon' => 'fa-chart-line',         'route' => 'admin.dashboard',           'badge' => 'NUEVO', 'permission' => 'tenants.gestionar'],
-                    ['name' => 'Ventas',        'icon' => 'fa-chart-pie',          'route' => 'admin.ventas',              'badge' => 'WOW', 'permission' => 'tenants.gestionar'],
+                    ['name' => 'Dashboard',     'icon' => 'fa-chart-line',         'route' => 'admin.dashboard',           'badge' => 'WOW', 'permission' => 'tenants.gestionar'],
                     ['name' => 'Tenants',       'icon' => 'fa-building',           'route' => 'admin.tenants.index',       'badge' => null, 'permission' => 'tenants.gestionar'],
                     ['name' => 'Plantillas Bot','icon' => 'fa-layer-group',        'route' => 'admin.plantillas-bot',      'badge' => 'NUEVO', 'permission' => 'tenants.gestionar'],
                     ['name' => 'Planes',        'icon' => 'fa-money-check-dollar', 'route' => 'admin.planes.index',        'badge' => null, 'permission' => 'planes.gestionar'],

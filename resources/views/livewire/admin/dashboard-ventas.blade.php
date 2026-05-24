@@ -133,6 +133,95 @@
         </div>
     </div>
 
+    {{-- 2 cards: Próximos vencimientos + Alertas operativas --}}
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
+        {{-- Próximos vencimientos --}}
+        <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+            <div class="flex items-center gap-2 px-5 py-4 border-b border-slate-100 bg-gradient-to-r from-amber-50 to-white">
+                <i class="fa-solid fa-clock text-amber-500 text-lg"></i>
+                <h3 class="text-base font-bold text-slate-800">Próximos vencimientos (15 días)</h3>
+            </div>
+            @if($k['proximosVenc']->isEmpty())
+                <div class="p-8 text-center text-slate-400">
+                    <i class="fa-solid fa-circle-check text-emerald-400 text-3xl mb-2"></i>
+                    <p class="text-sm">Ninguna suscripción vence pronto.</p>
+                </div>
+            @else
+                <table class="w-full text-sm">
+                    <thead class="bg-slate-50 text-[10px] uppercase text-slate-500 font-semibold">
+                        <tr>
+                            <th class="px-4 py-2.5 text-left">Tenant</th>
+                            <th class="px-4 py-2.5 text-left">Plan</th>
+                            <th class="px-4 py-2.5 text-center">Vence</th>
+                            <th class="px-4 py-2.5 text-right">Monto</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        @foreach($k['proximosVenc'] as $sus)
+                            @php
+                                $dias = (int) now()->startOfDay()->diffInDays($sus->fecha_fin->startOfDay(), false);
+                                $color = $dias <= 3 ? 'text-rose-600 bg-rose-50' : ($dias <= 7 ? 'text-amber-600 bg-amber-50' : 'text-emerald-700 bg-emerald-50');
+                            @endphp
+                            <tr class="hover:bg-slate-50">
+                                <td class="px-4 py-2.5">
+                                    <div class="flex items-center gap-2">
+                                        <i class="fa-solid fa-building text-violet-500 text-xs"></i>
+                                        <span class="font-bold text-slate-800">{{ $sus->tenant?->nombre ?? '—' }}</span>
+                                    </div>
+                                </td>
+                                <td class="px-4 py-2.5 text-slate-600 text-xs">{{ $sus->plan?->nombre ?? '—' }}</td>
+                                <td class="px-4 py-2.5 text-center">
+                                    <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold {{ $color }}">
+                                        {{ $sus->fecha_fin->format('d/m') }} ({{ $dias }}d)
+                                    </span>
+                                </td>
+                                <td class="px-4 py-2.5 text-right font-bold text-slate-700">${{ number_format($sus->monto, 0, ',', '.') }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            @endif
+        </div>
+
+        {{-- Alertas operativas --}}
+        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+            <div class="flex items-center gap-2 mb-4">
+                <i class="fa-solid fa-triangle-exclamation text-rose-500 text-lg"></i>
+                <h3 class="text-base font-bold text-slate-800">Alertas operativas</h3>
+            </div>
+            <div class="space-y-3">
+                <div class="flex items-center justify-between rounded-xl bg-amber-50 border border-amber-200 px-4 py-3">
+                    <div class="flex items-center gap-3">
+                        <i class="fa-solid fa-hourglass-half text-amber-600 text-lg"></i>
+                        <div>
+                            <p class="text-[10px] uppercase text-amber-700 font-bold">Por cobrar</p>
+                            <p class="text-xl font-extrabold text-amber-800">${{ number_format($k['pendientes'], 0, ',', '.') }}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between rounded-xl bg-rose-50 border border-rose-200 px-4 py-3">
+                    <div class="flex items-center gap-3">
+                        <i class="fa-solid fa-fire text-rose-600 text-lg"></i>
+                        <div>
+                            <p class="text-[10px] uppercase text-rose-700 font-bold">Morosos</p>
+                            <p class="text-xl font-extrabold text-rose-800">{{ $k['morosos'] }}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between rounded-xl bg-slate-100 border border-slate-200 px-4 py-3">
+                    <div class="flex items-center gap-3">
+                        <i class="fa-solid fa-lock text-slate-600 text-lg"></i>
+                        <div>
+                            <p class="text-[10px] uppercase text-slate-600 font-bold">Suspendidos</p>
+                            <p class="text-xl font-extrabold text-slate-700">{{ $k['suspendidos'] }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     {{-- TOP CLIENTES --}}
     <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
         <div class="flex items-center gap-2 px-5 py-4 border-b border-slate-100 bg-gradient-to-r from-amber-50 to-white">
