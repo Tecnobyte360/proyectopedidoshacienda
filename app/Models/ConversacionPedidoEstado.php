@@ -58,6 +58,7 @@ class ConversacionPedidoEstado extends Model
         'confirmado_at',
         'abandonado_at',
         'motivo_abandono',
+        'tipo_cliente',
     ];
 
     protected $casts = [

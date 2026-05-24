@@ -8847,7 +8847,23 @@ TXT;
                  . "6. **NO ACEPTES INFO VAGA**: 'me das 1 kilo de carne' es vago. Pide:\n"
                  . "   ¿qué tipo? (res, cerdo, pollo) → ¿qué corte específico? → ¿con qué preparación?\n\n"
                  . "REGLA DE ORO: cada turno tuyo debe MOVER al cliente hacia el cierre del pedido.\n"
-                 . "Si el cliente divaga, retómalo: 'Volviendo a tu pedido, me faltaba saber [X]'.\n";
+                 . "Si el cliente divaga, retómalo: 'Volviendo a tu pedido, me faltaba saber [X]'.\n\n"
+                 . "═══════════════════════════════════════════════════════════════════════════════\n"
+                 . "# 🎯 ORDEN OBLIGATORIO DEL FLUJO (CRÍTICO)\n\n"
+                 . "ANTES de hablar de productos o calcular cobertura, DEBES recopilar en este orden:\n\n"
+                 . "  1. **Nombre completo** del cliente\n"
+                 . "  2. **Cédula** (o NIT si es empresa)\n"
+                 . "  3. **Dirección completa** (calle, número, complemento, barrio, ciudad)\n"
+                 . "  4. **Celular** (si es diferente al del chat, sino confirma el actual)\n"
+                 . "  5. **Tipo de cliente**: pregunta '¿Eres MAYORISTA, HOGAR o RESTAURANTE?' — guarda en `tipo_cliente`\n\n"
+                 . "PASOS 6-7 (después de los 5 datos):\n"
+                 . "  6. Llama `validar_cobertura` con la dirección. Si NO hay cobertura, ofrece pickup o despide cordialmente.\n"
+                 . "  7. Si hay cobertura → comunica el costo de domicilio y tiempo estimado.\n\n"
+                 . "SOLO ENTONCES → preguntas qué productos quiere.\n\n"
+                 . "Si el cliente menciona productos ANTES de los 5 datos, responde:\n"
+                 . "'Con gusto te ayudo, pero primero necesito unos datos rápidos para validar cobertura y armar tu pedido. ¿Me regalas tu **nombre completo**?'\n\n"
+                 . "Si el cliente ya tiene datos en BD (sistema te lo dirá arriba), NO los pidas otra vez — confírmalos:\n"
+                 . "'Veo que tu nombre es Stiven, cédula 1007767612 y solías enviar a Cra 50 #47-80. ¿Lo enviamos a la misma dirección? ¿Sigues siendo cliente tipo Hogar?'\n";
 
         // 🎯 REGLA: ORDEN DEL FLUJO DEL PEDIDO (configurable desde panel)
         try {
@@ -8865,6 +8881,7 @@ TXT;
                     'ciudad'    => '🏙️ Ciudad',
                     'telefono'  => '📞 Teléfono',
                     'email'     => '📧 Correo',
+                    'tipo_cliente' => '🏷️ Tipo de cliente (mayor / hogar / restaurante)',
                     'metodo_pago' => '💳 Método de pago',
                     'notas'     => '📝 Notas',
                 ];

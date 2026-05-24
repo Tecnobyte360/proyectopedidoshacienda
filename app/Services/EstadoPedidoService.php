@@ -127,6 +127,12 @@ class EstadoPedidoService
                         $touched = true;
                     }
 
+                    // 🏷️ Hidratar tipo_cliente desde el cliente
+                    if (empty($estado->tipo_cliente) && !empty($cliente->tipo_cliente)) {
+                        $estado->tipo_cliente = $cliente->tipo_cliente;
+                        $touched = true;
+                    }
+
                     // 🏠 Hidratar dirección/barrio del último pedido del cliente
                     // si el estado actual no los tiene. Asi los clientes recurrentes
                     // no tienen que volver a dictar la direccion en cada pedido.

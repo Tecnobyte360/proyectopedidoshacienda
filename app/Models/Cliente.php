@@ -42,6 +42,7 @@ class Cliente extends Model
         'canal_origen',
         'activo',
         'empresa_id',
+        'tipo_cliente',
     ];
 
     protected $casts = [
