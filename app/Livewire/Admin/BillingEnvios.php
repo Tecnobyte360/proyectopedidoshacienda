@@ -94,6 +94,27 @@ class BillingEnvios extends Component
         );
     }
 
+    public function reintentar(int $envioId): void
+    {
+        $tm = app(TenantManager::class);
+        $envio = $tm->withoutTenant(fn () => SaasBillingEnvio::find($envioId));
+        if (!$envio) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Envío no encontrado']);
+            return;
+        }
+
+        $ok = $tm->withoutTenant(fn () => $envio->reintentar());
+
+        unset($this->envios, $this->kpis);
+
+        $this->dispatch('notify', [
+            'type'    => $ok ? 'success' : 'error',
+            'message' => $ok
+                ? "✓ Reintento exitoso. Mensaje enviado a {$envio->telefono}"
+                : "✗ Falló de nuevo. Ver detalle del error en la tabla. (Intentos: {$envio->intentos})",
+        ]);
+    }
+
     public function render()
     {
         return view('livewire.admin.billing-envios')->layout('layouts.app');

@@ -171,16 +171,27 @@ class SuspenderTenantsVencidos extends Command
         $errorMsg = null;
 
         if (!$tel) {
-            $errorMsg = 'Tenant sin contacto_telefono registrado';
+            $errorMsg = 'Tenant sin contacto_telefono registrado. Edita el tenant en /admin/tenants.';
         } else {
-            try {
-                $okEnvio = (bool) $sender->enviarTexto($tel, $msg, (int) $sus->tenant_id);
-                if (!$okEnvio) {
-                    $errorMsg = 'enviarTexto devolvió false';
+            // Validar formato del teléfono
+            $telLimpio = preg_replace('/[^0-9]/', '', $tel);
+            if (strlen($telLimpio) < 10) {
+                $errorMsg = "Teléfono '{$tel}' inválido (solo {$telLimpio}, mínimo 10 dígitos con código país).";
+            } else {
+                try {
+                    $okEnvio = (bool) $sender->enviarTexto($telLimpio, $msg, (int) $sus->tenant_id);
+                    if (!$okEnvio) {
+                        $proveedor = $sus->tenant->proveedorWhatsappResuelto();
+                        $errorMsg = "Envío rechazado por proveedor '{$proveedor}'. "
+                            . ($proveedor === 'meta'
+                                ? 'Posible: token Meta caducado, fuera de ventana 24h o número no en WABA.'
+                                : 'Posible: TecnoByteApp sin sesión activa o credenciales inválidas.');
+                    }
+                    $tel = $telLimpio;
+                } catch (\Throwable $e) {
+                    $errorMsg = 'Excepción: ' . mb_substr($e->getMessage(), 0, 350);
+                    Log::warning('SaaS morosidad: falló envío WhatsApp', ['error' => $e->getMessage(), 'tenant_id' => $sus->tenant_id]);
                 }
-            } catch (\Throwable $e) {
-                $errorMsg = mb_substr($e->getMessage(), 0, 400);
-                Log::warning('SaaS morosidad: falló envío WhatsApp', ['error' => $e->getMessage(), 'tenant_id' => $sus->tenant_id]);
             }
         }
 
@@ -190,19 +201,21 @@ class SuspenderTenantsVencidos extends Command
             : \App\Models\SaasBillingEnvio::TIPO_RECORDATORIO;
 
         \App\Models\SaasBillingEnvio::create([
-            'tenant_id'      => $sus->tenant_id,
-            'pago_id'        => $pago?->id,
-            'suscripcion_id' => $sus->id,
-            'tipo'           => $tipo,
-            'etapa'          => $stage,
-            'canal'          => 'whatsapp',
-            'telefono'       => $tel,
-            'monto'          => $pago?->monto ?? $sus->monto,
-            'moneda'         => $sus->moneda ?: 'COP',
-            'ok'             => $okEnvio,
-            'mensaje'        => $msg,
-            'link_pago'      => $pago?->link_pago_url,
-            'error'          => $errorMsg,
+            'tenant_id'         => $sus->tenant_id,
+            'pago_id'           => $pago?->id,
+            'suscripcion_id'    => $sus->id,
+            'tipo'              => $tipo,
+            'etapa'             => $stage,
+            'canal'             => 'whatsapp',
+            'telefono'          => $tel,
+            'monto'             => $pago?->monto ?? $sus->monto,
+            'moneda'            => $sus->moneda ?: 'COP',
+            'ok'                => $okEnvio,
+            'intentos'          => 1,
+            'ultimo_intento_at' => now(),
+            'mensaje'           => $msg,
+            'link_pago'         => $pago?->link_pago_url,
+            'error'             => $errorMsg,
         ]);
     }
 }

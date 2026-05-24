@@ -145,6 +145,21 @@
         </div>
     </div>
 
+    {{-- Banner informativo sobre auto-reintento --}}
+    <div class="rounded-xl bg-sky-50 border border-sky-200 p-3 text-xs text-sky-800 flex items-start gap-2">
+        <i class="fa-solid fa-circle-info text-sky-500 mt-0.5 text-base"></i>
+        <div>
+            <strong>¿Cómo funcionan los reintentos?</strong>
+            Los envíos fallidos se reintentan automáticamente en el siguiente horario configurado
+            (revisa <code class="bg-white px-1.5 rounded">/admin/configuracion-plataforma</code> → "Horarios de envío").
+            También puedes reintentar manualmente con el botón
+            <span class="inline-flex items-center gap-1 bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-bold">
+                <i class="fa-solid fa-rotate-right"></i> Reintentar
+            </span>
+            en cada fila fallida.
+        </div>
+    </div>
+
     {{-- TABLA --}}
     <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
         @if($this->envios->isEmpty())
@@ -167,6 +182,7 @@
                             <th class="px-4 py-3 text-left w-36"><i class="fa-solid fa-phone mr-1"></i> Teléfono</th>
                             <th class="px-4 py-3 text-right w-28"><i class="fa-solid fa-coins mr-1"></i> Monto</th>
                             <th class="px-4 py-3 text-left"><i class="fa-solid fa-message mr-1"></i> Mensaje / Error</th>
+                            <th class="px-4 py-3 text-center w-32"><i class="fa-solid fa-rotate-right mr-1"></i> Reintentos</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
@@ -285,9 +301,33 @@
                                     @else
                                         <div class="flex items-start gap-1.5 text-xs text-rose-700 font-semibold">
                                             <i class="fa-solid fa-circle-exclamation mt-0.5"></i>
-                                            <span>{{ \Illuminate\Support\Str::limit($e->error ?? 'Sin detalle del error', 120) }}</span>
+                                            <span>{{ \Illuminate\Support\Str::limit($e->error ?? 'Sin detalle del error', 200) }}</span>
                                         </div>
                                     @endif
+                                </td>
+                                <td class="px-4 py-3 text-center align-top">
+                                    <div class="flex flex-col items-center gap-1">
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-700">
+                                            <i class="fa-solid fa-rotate-right"></i>
+                                            {{ $e->intentos ?? 1 }} {{ ($e->intentos ?? 1) === 1 ? 'intento' : 'intentos' }}
+                                        </span>
+                                        @if($e->ultimo_intento_at)
+                                            <span class="text-[9px] text-slate-400">
+                                                último: {{ $e->ultimo_intento_at->diffForHumans() }}
+                                            </span>
+                                        @endif
+                                        @if(!$e->ok)
+                                            <button type="button"
+                                                    wire:click="reintentar({{ $e->id }})"
+                                                    wire:loading.attr="disabled"
+                                                    wire:target="reintentar({{ $e->id }})"
+                                                    class="mt-1 inline-flex items-center gap-1 rounded-lg bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 text-[11px] font-bold shadow-sm transition disabled:opacity-50">
+                                                <i class="fa-solid fa-rotate-right" wire:loading.remove wire:target="reintentar({{ $e->id }})"></i>
+                                                <i class="fa-solid fa-spinner animate-spin" wire:loading wire:target="reintentar({{ $e->id }})"></i>
+                                                Reintentar
+                                            </button>
+                                        @endif
+                                    </div>
                                 </td>
                             </tr>
                         @endforeach

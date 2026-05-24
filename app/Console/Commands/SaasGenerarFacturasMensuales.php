@@ -130,40 +130,53 @@ class SaasGenerarFacturasMensuales extends Command
                     $errorMsg = null;
 
                     if (!$tel) {
-                        $errorMsg = 'Tenant sin contacto_telefono registrado';
+                        $errorMsg = 'Tenant sin contacto_telefono registrado. Edita el tenant en /admin/tenants.';
                         $this->warn("    ⚠️ {$errorMsg}");
                     } else {
-                        try {
-                            $okEnvio = (bool) app(WhatsappSenderService::class)
-                                ->enviarTexto($tel, $msg, (int) $sus->tenant_id);
-                            if ($okEnvio) {
-                                $pago->update(['link_enviado_at' => now(), 'link_canal_envio' => 'whatsapp']);
-                                $enviados++;
-                                $this->line("    📱 Link enviado por WhatsApp a {$tel}");
-                            } else {
-                                $errorMsg = 'enviarTexto devolvió false';
+                        $telLimpio = preg_replace('/[^0-9]/', '', $tel);
+                        if (strlen($telLimpio) < 10) {
+                            $errorMsg = "Teléfono '{$tel}' inválido (solo {$telLimpio}, mínimo 10 dígitos con código país).";
+                            $this->warn("    ⚠️ {$errorMsg}");
+                        } else {
+                            try {
+                                $okEnvio = (bool) app(WhatsappSenderService::class)
+                                    ->enviarTexto($telLimpio, $msg, (int) $sus->tenant_id);
+                                if ($okEnvio) {
+                                    $pago->update(['link_enviado_at' => now(), 'link_canal_envio' => 'whatsapp']);
+                                    $enviados++;
+                                    $this->line("    📱 Link enviado por WhatsApp a {$telLimpio}");
+                                } else {
+                                    $proveedor = $sus->tenant->proveedorWhatsappResuelto();
+                                    $errorMsg = "Envío rechazado por proveedor '{$proveedor}'. "
+                                        . ($proveedor === 'meta'
+                                            ? 'Posible: token Meta caducado, fuera de ventana 24h o número no en WABA.'
+                                            : 'Posible: TecnoByteApp sin sesión activa o credenciales inválidas.');
+                                }
+                                $tel = $telLimpio;
+                            } catch (\Throwable $e) {
+                                $errorMsg = 'Excepción: ' . mb_substr($e->getMessage(), 0, 350);
+                                $this->warn("    ⚠️ Falló envío WhatsApp: " . $errorMsg);
                             }
-                        } catch (\Throwable $e) {
-                            $errorMsg = mb_substr($e->getMessage(), 0, 400);
-                            $this->warn("    ⚠️ Falló envío WhatsApp: " . $errorMsg);
                         }
                     }
 
                     // 📤 Log para monitoreo
                     \App\Models\SaasBillingEnvio::create([
-                        'tenant_id'      => $sus->tenant_id,
-                        'pago_id'        => $pago->id,
-                        'suscripcion_id' => $sus->id,
-                        'tipo'           => \App\Models\SaasBillingEnvio::TIPO_FACTURA,
-                        'etapa'          => 'factura',
-                        'canal'          => 'whatsapp',
-                        'telefono'       => $tel,
-                        'monto'          => $monto,
-                        'moneda'         => $pago->moneda,
-                        'ok'             => $okEnvio,
-                        'mensaje'        => $msg,
-                        'link_pago'      => $linkUrl,
-                        'error'          => $errorMsg,
+                        'tenant_id'         => $sus->tenant_id,
+                        'pago_id'           => $pago->id,
+                        'suscripcion_id'    => $sus->id,
+                        'tipo'              => \App\Models\SaasBillingEnvio::TIPO_FACTURA,
+                        'etapa'             => 'factura',
+                        'canal'             => 'whatsapp',
+                        'telefono'          => $tel,
+                        'monto'             => $monto,
+                        'moneda'            => $pago->moneda,
+                        'ok'                => $okEnvio,
+                        'intentos'          => 1,
+                        'ultimo_intento_at' => now(),
+                        'mensaje'           => $msg,
+                        'link_pago'         => $linkUrl,
+                        'error'             => $errorMsg,
                     ]);
                 }
             }
