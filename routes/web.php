@@ -267,6 +267,11 @@ Route::middleware(['no_super_sin_imp'])->group(function () {
 Route::get('/billing/gracias', [\App\Http\Controllers\BillingPublicController::class, 'gracias'])
     ->name('billing.gracias');
 
+// 🚫 Pantalla de bloqueo por mora (requiere login para que vea su info)
+Route::get('/billing/expirado', [\App\Http\Controllers\BillingPublicController::class, 'expirado'])
+    ->middleware('auth')
+    ->name('billing.expirado');
+
 // Roles: cada admin gestiona los roles propios de su tenant.
 // El componente filtra y bloquea edición de roles globales para no super-admin.
 Route::get('/roles', RolesIndex::class)

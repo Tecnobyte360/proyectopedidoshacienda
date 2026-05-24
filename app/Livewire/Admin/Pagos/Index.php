@@ -137,9 +137,10 @@ class Index extends Component
                         'estado'    => Suscripcion::ESTADO_ACTIVA,
                     ]);
 
-                    // Reactivar el tenant si estaba suspendido
+                    // Reactivar el tenant si estaba suspendido por mora
                     Tenant::where('id', $sus->tenant_id)->update([
-                        'activo'               => true,
+                        'suspendido_por_mora'  => false,
+                        'suspendido_at'        => null,
                         'subscription_ends_at' => $pago->cubre_hasta,
                     ]);
                 }

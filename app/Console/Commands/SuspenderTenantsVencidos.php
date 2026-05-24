@@ -103,11 +103,16 @@ class SuspenderTenantsVencidos extends Command
                 $tag = "{$sus->tenant->nombre} (suscripción #{$sus->id}, días {$diasParaVencer})";
 
                 if ($stage === 'suspender') {
-                    $this->error("  🚫 SUSPENDER → {$tag}");
+                    $this->error("  🚫 SUSPENDER (soft) → {$tag}");
                     if (!$dryRun) {
                         $sus->update(['estado' => Suscripcion::ESTADO_EXPIRADA]);
-                        Tenant::where('id', $sus->tenant_id)->update(['activo' => false]);
-                        Log::warning('🚫 Tenant suspendido por mora', [
+                        // ⚠️ NO bloqueamos login (activo=true sigue), solo activamos
+                        //    suspendido_por_mora=true → middleware redirige a /billing/expirado.
+                        Tenant::where('id', $sus->tenant_id)->update([
+                            'suspendido_por_mora' => true,
+                            'suspendido_at'       => now(),
+                        ]);
+                        Log::warning('🚫 Tenant suspendido por mora (soft block)', [
                             'tenant_id'      => $sus->tenant_id,
                             'tenant'         => $sus->tenant?->nombre,
                             'suscripcion_id' => $sus->id,

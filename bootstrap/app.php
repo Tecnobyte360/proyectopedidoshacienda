@@ -35,6 +35,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'no_super_sin_imp' => \App\Http\Middleware\BloquearSuperAdminSinImpersonar::class,
             'solo_principal'   => \App\Http\Middleware\SoloDominioPrincipal::class,
             'whatsapp.webhook' => \App\Http\Middleware\VerificarWebhookWhatsapp::class,
+            'bloquea_moroso'   => \App\Http\Middleware\BloqueaSiMoroso::class,
         ]);
 
         // Si no está autenticado y golpea una ruta protegida, redirigir al login
@@ -47,6 +48,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // Multi-tenant: setea tenant actual en cada request web
         $middleware->web(append: [
             \App\Http\Middleware\SetCurrentTenant::class,
+            // 🚫 Bloqueo soft por mora: si tenant.suspendido_por_mora=true, redirige
+            // a /billing/expirado (excepto rutas whitelist: login, logout, billing/*).
+            \App\Http\Middleware\BloqueaSiMoroso::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

@@ -153,8 +153,11 @@ class SaasBillingWompiService
 
             // Reactivar tenant si estaba suspendido por mora
             $tenant = $susc->tenant;
-            if ($tenant && $tenant->activo === false) {
-                $tenant->update(['activo' => true]);
+            if ($tenant && $tenant->suspendido_por_mora) {
+                $tenant->update([
+                    'suspendido_por_mora' => false,
+                    'suspendido_at'       => null,
+                ]);
             }
         }
 

@@ -34,6 +34,8 @@ class Tenant extends Model
         'favicon_url',
         'plan',
         'activo',
+        'suspendido_por_mora',
+        'suspendido_at',
         'trial_ends_at',
         'subscription_ends_at',
         'contacto_nombre',
@@ -73,6 +75,8 @@ class Tenant extends Model
 
     protected $casts = [
         'activo'               => 'boolean',
+        'suspendido_por_mora'  => 'boolean',
+        'suspendido_at'        => 'datetime',
         'trial_ends_at'        => 'date',
         'subscription_ends_at' => 'date',
         'whatsapp_config'      => 'array',
