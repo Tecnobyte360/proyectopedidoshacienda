@@ -92,13 +92,45 @@ class SuscripcionBanner extends Component
             default     => 'verde',
         };
 
-        // Paleta que contrasta con el color de marca (naranja/amber)
-        // Verde → Teal (azul-verde) · Amarillo → Indigo · Naranja → Violet · Rojo → Rose oscuro
+        // Paleta clara/pastel — fondos suaves con texto oscuro
+        // Verde → Teal · Amarillo → Sky · Naranja → Violet · Rojo → Rose (todos en versión soft)
         $estilos = [
-            'verde'    => ['bg' => 'from-teal-600 to-cyan-700',      'icon' => 'fa-circle-info'],
-            'amarillo' => ['bg' => 'from-indigo-500 to-indigo-700',  'icon' => 'fa-triangle-exclamation'],
-            'naranja'  => ['bg' => 'from-violet-600 to-purple-700',  'icon' => 'fa-bell'],
-            'rojo'     => ['bg' => 'from-rose-600 to-pink-700',      'icon' => 'fa-circle-exclamation'],
+            'verde'    => [
+                'bg'      => 'bg-teal-50',
+                'border'  => 'border-teal-200',
+                'text'    => 'text-teal-800',
+                'textSub' => 'text-teal-700',
+                'iconBg'  => 'bg-teal-100 text-teal-600',
+                'btnBg'   => 'bg-teal-600 hover:bg-teal-700',
+                'icon'    => 'fa-circle-info',
+            ],
+            'amarillo' => [
+                'bg'      => 'bg-sky-50',
+                'border'  => 'border-sky-200',
+                'text'    => 'text-sky-800',
+                'textSub' => 'text-sky-700',
+                'iconBg'  => 'bg-sky-100 text-sky-600',
+                'btnBg'   => 'bg-sky-600 hover:bg-sky-700',
+                'icon'    => 'fa-triangle-exclamation',
+            ],
+            'naranja'  => [
+                'bg'      => 'bg-violet-50',
+                'border'  => 'border-violet-200',
+                'text'    => 'text-violet-800',
+                'textSub' => 'text-violet-700',
+                'iconBg'  => 'bg-violet-100 text-violet-600',
+                'btnBg'   => 'bg-violet-600 hover:bg-violet-700',
+                'icon'    => 'fa-bell',
+            ],
+            'rojo'     => [
+                'bg'      => 'bg-rose-50',
+                'border'  => 'border-rose-200',
+                'text'    => 'text-rose-800',
+                'textSub' => 'text-rose-700',
+                'iconBg'  => 'bg-rose-100 text-rose-600',
+                'btnBg'   => 'bg-rose-600 hover:bg-rose-700',
+                'icon'    => 'fa-circle-exclamation',
+            ],
         ];
 
         $mensaje = match ($sev) {
