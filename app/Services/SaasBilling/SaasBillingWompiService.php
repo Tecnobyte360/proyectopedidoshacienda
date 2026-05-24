@@ -205,8 +205,16 @@ class SaasBillingWompiService
         }
     }
 
+    /**
+     * Resuelve credenciales: primero la fila singleton ConfiguracionPlataforma
+     * (configurable desde la UI), si no hay, cae a config/saas.php (env).
+     */
     private function credenciales(): ?array
     {
+        $cfg = \App\Models\ConfiguracionPlataforma::actual();
+        $dbCred = $cfg->wompiSaasCredenciales();
+        if ($dbCred) return $dbCred;
+
         $cred = (array) config('saas.wompi');
         if (empty($cred['public_key']) || empty($cred['integrity_secret'])) return null;
         return $cred;

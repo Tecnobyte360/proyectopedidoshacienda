@@ -22,6 +22,14 @@ class ConfiguracionPlataforma extends Component
     public string $whatsapp_admin_password  = '';
     public string $whatsapp_api_base_url    = 'https://wa-api.tecnobyteapp.com:1422';
 
+    // 💳 Wompi del dueño Kivox (para cobrar mensualidades a tenants)
+    public string $saas_wompi_modo             = 'sandbox';
+    public string $saas_wompi_public_key       = '';
+    public string $saas_wompi_private_key      = '';
+    public string $saas_wompi_integrity_secret = '';
+    public string $saas_wompi_events_secret    = '';
+    public string $saas_wompi_redirect_url     = '';
+
     /** Logo nuevo (data URL base64 desde Alpine FileReader) */
     public string $logo_data_url = '';
     public string $logo_nombre   = '';
@@ -42,6 +50,13 @@ class ConfiguracionPlataforma extends Component
         $this->whatsapp_admin_email    = (string) ($cfg->whatsapp_admin_email ?? '');
         $this->whatsapp_admin_password = (string) ($cfg->whatsapp_admin_password ?? '');
         $this->whatsapp_api_base_url   = (string) ($cfg->whatsapp_api_base_url ?: 'https://wa-api.tecnobyteapp.com:1422');
+
+        $this->saas_wompi_modo             = (string) ($cfg->saas_wompi_modo ?: 'sandbox');
+        $this->saas_wompi_public_key       = (string) ($cfg->saas_wompi_public_key ?? '');
+        $this->saas_wompi_private_key      = (string) ($cfg->saas_wompi_private_key ?? '');
+        $this->saas_wompi_integrity_secret = (string) ($cfg->saas_wompi_integrity_secret ?? '');
+        $this->saas_wompi_events_secret    = (string) ($cfg->saas_wompi_events_secret ?? '');
+        $this->saas_wompi_redirect_url     = (string) ($cfg->saas_wompi_redirect_url ?? '');
     }
 
     protected function rules(): array
@@ -58,6 +73,12 @@ class ConfiguracionPlataforma extends Component
             'whatsapp_admin_email'     => 'nullable|email|max:120',
             'whatsapp_admin_password'  => 'nullable|string|max:200',
             'whatsapp_api_base_url'    => 'nullable|string|max:200',
+            'saas_wompi_modo'             => 'required|in:sandbox,produccion',
+            'saas_wompi_public_key'       => 'nullable|string|max:200',
+            'saas_wompi_private_key'      => 'nullable|string|max:200',
+            'saas_wompi_integrity_secret' => 'nullable|string|max:200',
+            'saas_wompi_events_secret'    => 'nullable|string|max:200',
+            'saas_wompi_redirect_url'     => 'nullable|url|max:255',
         ];
     }
 
@@ -100,6 +121,12 @@ class ConfiguracionPlataforma extends Component
             'whatsapp_admin_email'    => $data['whatsapp_admin_email']    ?: null,
             'whatsapp_admin_password' => $data['whatsapp_admin_password'] ?: null,
             'whatsapp_api_base_url'   => $data['whatsapp_api_base_url']   ?: 'https://wa-api.tecnobyteapp.com:1422',
+            'saas_wompi_modo'             => $data['saas_wompi_modo'],
+            'saas_wompi_public_key'       => $data['saas_wompi_public_key']       ?: null,
+            'saas_wompi_private_key'      => $data['saas_wompi_private_key']      ?: null,
+            'saas_wompi_integrity_secret' => $data['saas_wompi_integrity_secret'] ?: null,
+            'saas_wompi_events_secret'    => $data['saas_wompi_events_secret']    ?: null,
+            'saas_wompi_redirect_url'     => $data['saas_wompi_redirect_url']     ?: null,
         ]);
 
         ConfiguracionPlataformaModel::limpiarCache();
@@ -263,6 +290,36 @@ class ConfiguracionPlataforma extends Component
                 ? "✓ Conexión #{$connectionId} asignada al tenant."
                 : "✓ Conexión #{$connectionId} desasignada.",
         ]);
+    }
+
+    /** 💳 Prueba que las credenciales Wompi sean válidas llamando /v1/merchants/{public_key} */
+    public function probarWompiSaas(): void
+    {
+        if (empty($this->saas_wompi_public_key)) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Pega primero el public_key']);
+            return;
+        }
+        $base = $this->saas_wompi_modo === 'produccion'
+            ? 'https://production.wompi.co/v1'
+            : 'https://sandbox.wompi.co/v1';
+        try {
+            $resp = \Illuminate\Support\Facades\Http::timeout(10)
+                ->get("{$base}/merchants/{$this->saas_wompi_public_key}");
+            if ($resp->successful()) {
+                $name = $resp->json('data.name') ?? '—';
+                $this->dispatch('notify', [
+                    'type' => 'success',
+                    'message' => "✅ Wompi OK · Comercio: {$name} · Modo: {$this->saas_wompi_modo}",
+                ]);
+            } else {
+                $this->dispatch('notify', [
+                    'type' => 'error',
+                    'message' => '❌ Wompi rechazó: ' . ($resp->json('error.reason') ?? $resp->status()),
+                ]);
+            }
+        } catch (\Throwable $e) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Error: ' . $e->getMessage()]);
+        }
     }
 
     public function render()

@@ -31,11 +31,42 @@ class ConfiguracionPlataforma extends Model
         'whatsapp_admin_email',
         'whatsapp_admin_password',
         'whatsapp_api_base_url',
+        // 💳 Credenciales Wompi del dueño Kivox para cobrar a los tenants
+        'saas_wompi_modo',
+        'saas_wompi_public_key',
+        'saas_wompi_private_key',
+        'saas_wompi_integrity_secret',
+        'saas_wompi_events_secret',
+        'saas_wompi_redirect_url',
     ];
 
     protected $hidden = [
         'whatsapp_admin_password',
+        'saas_wompi_private_key',
+        'saas_wompi_integrity_secret',
+        'saas_wompi_events_secret',
     ];
+
+    /** ¿Tenemos credenciales Wompi suficientes para cobrar a tenants? */
+    public function tieneWompiSaas(): bool
+    {
+        return !empty($this->saas_wompi_public_key)
+            && !empty($this->saas_wompi_integrity_secret);
+    }
+
+    /** Devuelve credenciales Wompi del SaaS en formato del service. */
+    public function wompiSaasCredenciales(): ?array
+    {
+        if (!$this->tieneWompiSaas()) return null;
+        return [
+            'modo'             => $this->saas_wompi_modo ?: 'sandbox',
+            'public_key'       => $this->saas_wompi_public_key,
+            'private_key'      => $this->saas_wompi_private_key,
+            'integrity_secret' => $this->saas_wompi_integrity_secret,
+            'events_secret'    => $this->saas_wompi_events_secret,
+            'redirect_url'     => $this->saas_wompi_redirect_url ?: 'https://admin.kivox.co/billing/gracias',
+        ];
+    }
 
     /** Cache la fila para no leerla en cada request */
     public static function actual(): self

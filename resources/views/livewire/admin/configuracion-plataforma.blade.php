@@ -256,6 +256,89 @@
             </div>
         </section>
 
+        {{-- 💳 WOMPI DEL DUEÑO KIVOX (para cobrar mensualidades a tenants) --}}
+        <section class="rounded-2xl bg-white shadow-sm border border-slate-200 p-5">
+            <div class="flex items-center gap-2 mb-3">
+                <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+                    <i class="fa-solid fa-credit-card"></i>
+                </span>
+                <div class="flex-1">
+                    <h3 class="text-base font-bold text-slate-800">Wompi — Cobro a tenants (SaaS)</h3>
+                    <p class="text-xs text-slate-500">
+                        Credenciales Wompi de <strong>TU empresa (Kivox / TecnoByte360)</strong>.
+                        Sirven para cobrarle la mensualidad a Hacienda, Guayacán y demás tenants.
+                        NO confundir con las credenciales Wompi de cada tenant (que están en /admin/tenants editar).
+                    </p>
+                </div>
+                <button type="button" wire:click="probarWompiSaas"
+                        class="text-xs px-3 py-1.5 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold inline-flex items-center gap-1">
+                    <i class="fa-solid fa-plug"></i> Probar conexión
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Modo</label>
+                    <select wire:model="saas_wompi_modo"
+                            class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-brand focus:ring-2 focus:ring-brand/20">
+                        <option value="sandbox">🧪 Sandbox (pruebas)</option>
+                        <option value="produccion">🚀 Producción (cobros reales)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Redirect URL</label>
+                    <input type="url" wire:model="saas_wompi_redirect_url"
+                           placeholder="https://admin.kivox.co/billing/gracias"
+                           class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-brand focus:ring-2 focus:ring-brand/20">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">
+                        Public Key
+                        <span class="text-slate-400 font-normal">(pub_prod_… o pub_test_…)</span>
+                    </label>
+                    <input type="text" wire:model="saas_wompi_public_key"
+                           placeholder="pub_prod_xxxxxxxxxxxxxxxx"
+                           class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-mono focus:border-brand focus:ring-2 focus:ring-brand/20">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">
+                        Private Key
+                        <span class="text-slate-400 font-normal">(prv_prod_… o prv_test_…)</span>
+                    </label>
+                    <input type="password" wire:model="saas_wompi_private_key"
+                           placeholder="prv_prod_xxxxxxxxxxxxxxxx"
+                           class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-mono focus:border-brand focus:ring-2 focus:ring-brand/20">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Integrity Secret</label>
+                    <input type="password" wire:model="saas_wompi_integrity_secret"
+                           placeholder="prod_integrity_xxxxxxxx"
+                           class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-mono focus:border-brand focus:ring-2 focus:ring-brand/20">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Events Secret</label>
+                    <input type="password" wire:model="saas_wompi_events_secret"
+                           placeholder="prod_events_xxxxxxxx"
+                           class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-mono focus:border-brand focus:ring-2 focus:ring-brand/20">
+                </div>
+            </div>
+
+            <div class="mt-3 rounded-lg bg-sky-50 border border-sky-200 px-3 py-2.5 text-[11px] text-sky-900 space-y-1">
+                <p class="font-bold"><i class="fa-solid fa-circle-info"></i> Cómo obtener estas llaves:</p>
+                <ol class="list-decimal list-inside ml-2 space-y-0.5">
+                    <li>Entra a tu cuenta Wompi: <a href="https://comercios.wompi.co" target="_blank" class="underline">comercios.wompi.co</a></li>
+                    <li>Menú lateral → <strong>Configuración</strong> → <strong>API</strong></li>
+                    <li>Copia las 4 llaves (Public, Private, Integrity, Events)</li>
+                    <li>En la sección <strong>Webhooks</strong>, agrega esta URL:<br>
+                        <code class="bg-white px-1.5 py-0.5 rounded">https://admin.kivox.co/api/saas-billing/wompi/webhook</code>
+                        — suscríbete al evento <code>transaction.updated</code>
+                    </li>
+                </ol>
+            </div>
+        </section>
+
         {{-- GESTOR DE CONEXIONES --}}
         <section class="rounded-2xl bg-white shadow-sm border border-slate-200 p-5">
             <div class="flex items-center gap-2 mb-3">
