@@ -127,7 +127,7 @@ class SuspenderTenantsVencidos extends Command
         bool $enviar
     ): void {
         if (!$enviar) return;
-        $tel = $sus->tenant->telefono_contacto ?? $sus->tenant->whatsapp_contacto ?? null;
+        $tel = $sus->tenant->contacto_telefono ?? null;
         if (!$tel) return;
 
         $monto = number_format((float)($pago?->monto ?? $sus->monto ?? 0), 0, ',', '.');

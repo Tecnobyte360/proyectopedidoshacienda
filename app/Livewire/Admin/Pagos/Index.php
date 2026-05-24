@@ -186,9 +186,9 @@ class Index extends Component
             $this->generarLinkWompi($id);
             $pago->refresh();
         }
-        $tel = $pago->tenant?->telefono_contacto ?? $pago->tenant?->whatsapp_contacto;
+        $tel = $pago->tenant?->contacto_telefono;
         if (!$tel) {
-            $this->dispatch('notify', ['type' => 'error', 'message' => 'El tenant no tiene teléfono de contacto registrado.']);
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'El tenant no tiene contacto_telefono registrado. Edita el tenant en /admin/tenants.']);
             return;
         }
         // Envío simple por texto (si el cliente está dentro de ventana 24h) — para llegar

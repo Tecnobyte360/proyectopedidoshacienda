@@ -112,7 +112,7 @@ class SaasGenerarFacturasMensuales extends Command
 
                 // Enviar por WhatsApp si fue solicitado y hay link
                 if ($enviar && $linkUrl) {
-                    $tel = $sus->tenant->telefono_contacto ?? $sus->tenant->whatsapp_contacto ?? null;
+                    $tel = $sus->tenant->contacto_telefono ?? null;
                     if ($tel) {
                         try {
                             $msg = "Hola {$sus->tenant->nombre} 👋\n\n"
