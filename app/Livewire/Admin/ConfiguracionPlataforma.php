@@ -35,7 +35,7 @@ class ConfiguracionPlataforma extends Component
     public int  $saas_dias_antes_factura  = 7;
     public int  $saas_dias_gracia         = 7;
     public array $saas_horas_envio        = ['10:00'];
-    public string $nuevaHora              = '10:00'; // input temporal para agregar
+    public string $nuevaHora              = ''; // input temporal para agregar (vacío para que usuario elija)
     public bool $saas_aviso_preaviso      = true;
     public bool $saas_aviso_vence_hoy     = true;
     public bool $saas_aviso_vencio_ayer   = true;
@@ -275,10 +275,55 @@ class ConfiguracionPlataforma extends Component
         }
 
         // Ordenar: primero las asignadas, luego por id
-        return collect($todas)
+        $legacy = collect($todas)
             ->sortBy(fn ($c) => $c['asignadoA'] ? "0_{$c['id']}" : "1_{$c['id']}")
             ->values()
             ->all();
+
+        // 📱 Sumar conexiones Meta de cada tenant con config activa
+        $metaConfigs = \App\Models\MetaWhatsappConfig::query()
+            ->withoutGlobalScopes()
+            ->where('activo', true)
+            ->get();
+
+        foreach ($metaConfigs as $mc) {
+            $tenant = $tenants->firstWhere('id', $mc->tenant_id);
+
+            // Validar token en vivo con un GET ligero
+            $estadoToken = '???';
+            $errorToken  = null;
+            try {
+                $base = ($mc->api_version ?: 'v25.0');
+                $resp = \Illuminate\Support\Facades\Http::withToken($mc->access_token)
+                    ->timeout(5)
+                    ->get("https://graph.facebook.com/{$base}/me");
+                if ($resp->successful()) {
+                    $estadoToken = 'CONNECTED';
+                } else {
+                    $estadoToken = 'ERROR';
+                    $errorToken  = $resp->json('error.message') ?? "HTTP {$resp->status()}";
+                }
+            } catch (\Throwable $e) {
+                $estadoToken = 'ERROR';
+                $errorToken  = 'Timeout o error red: ' . mb_substr($e->getMessage(), 0, 80);
+            }
+
+            $legacy[] = [
+                'id'           => 'meta:' . $mc->phone_number_id,
+                'name'         => 'Meta Cloud · ' . ($mc->display_name ?: 'WABA'),
+                'phoneNumber'  => $mc->phone_number_id,
+                'profileName'  => 'WABA ' . ($mc->waba_id ?: '—'),
+                'status'       => $estadoToken,
+                'isDefault'    => true,
+                'ownerId'      => 'meta',
+                'vistoPor'     => ['Meta Cloud API'],
+                'asignadoA'    => $tenant ? ['id' => $tenant->id, 'nombre' => $tenant->nombre, 'slug' => $tenant->slug] : null,
+                'esMeta'       => true,
+                'errorMeta'    => $errorToken,
+            ];
+        }
+
+        return $legacy;
     }
 
     public function getTenantsProperty()
@@ -335,21 +380,30 @@ class ConfiguracionPlataforma extends Component
     public function agregarHora(): void
     {
         $h = trim($this->nuevaHora);
+        if ($h === '') {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Selecciona primero una hora en el reloj']);
+            return;
+        }
+        // Normalizar HH:MM (algunos navegadores envían "HH:MM:SS")
+        if (strlen($h) === 8 && substr_count($h, ':') === 2) {
+            $h = substr($h, 0, 5);
+        }
         if (!preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $h)) {
-            $this->dispatch('notify', ['type' => 'error', 'message' => 'Formato debe ser HH:MM (ej. 09:30)']);
+            $this->dispatch('notify', ['type' => 'error', 'message' => "Formato inválido '{$h}'. Usa HH:MM (ej. 09:30)"]);
             return;
         }
         if (count($this->saas_horas_envio) >= 8) {
-            $this->dispatch('notify', ['type' => 'error', 'message' => 'Máximo 8 horarios por día']);
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Máximo 8 horarios por día (ya tienes 8)']);
             return;
         }
         if (in_array($h, $this->saas_horas_envio, true)) {
-            $this->dispatch('notify', ['type' => 'error', 'message' => 'Esa hora ya está agregada']);
+            $this->dispatch('notify', ['type' => 'error', 'message' => "La hora {$h} ya está en la lista. Elige una distinta."]);
             return;
         }
         $this->saas_horas_envio[] = $h;
         sort($this->saas_horas_envio);
-        $this->nuevaHora = '';
+        $this->nuevaHora = ''; // reset para que el siguiente pick sea diferente
+        $this->dispatch('notify', ['type' => 'success', 'message' => "✓ Hora {$h} agregada. Total: " . count($this->saas_horas_envio) . " horarios."]);
     }
 
     /** ⏰ Elimina una hora del array por índice */

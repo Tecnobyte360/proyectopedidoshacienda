@@ -217,5 +217,38 @@ class SuspenderTenantsVencidos extends Command
             'link_pago'         => $pago?->link_pago_url,
             'error'             => $errorMsg,
         ]);
+
+        // 📧 Email de respaldo branded Kivox (si tenant tiene contacto_email)
+        $email = $sus->tenant->contacto_email ?? null;
+        if ($email && filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            try {
+                \Illuminate\Support\Facades\Mail::to($email)
+                    ->send(new \App\Mail\BillingRecordatorioMail(
+                        $sus->tenant,
+                        $sus,
+                        $pago,
+                        $stage,
+                        $pago?->link_pago_url
+                    ));
+                \App\Models\SaasBillingEnvio::create([
+                    'tenant_id' => $sus->tenant_id, 'pago_id' => $pago?->id, 'suscripcion_id' => $sus->id,
+                    'tipo' => $tipo, 'etapa' => $stage, 'canal' => 'email',
+                    'telefono' => $email, 'monto' => $pago?->monto ?? $sus->monto, 'moneda' => $sus->moneda ?: 'COP',
+                    'ok' => true, 'intentos' => 1, 'ultimo_intento_at' => now(),
+                    'mensaje' => "Email enviado a {$email}",
+                    'link_pago' => $pago?->link_pago_url,
+                ]);
+            } catch (\Throwable $e) {
+                Log::warning('SaaS email recordatorio fallo: ' . $e->getMessage(), ['tenant' => $sus->tenant_id, 'email' => $email]);
+                \App\Models\SaasBillingEnvio::create([
+                    'tenant_id' => $sus->tenant_id, 'pago_id' => $pago?->id, 'suscripcion_id' => $sus->id,
+                    'tipo' => $tipo, 'etapa' => $stage, 'canal' => 'email',
+                    'telefono' => $email, 'monto' => $pago?->monto ?? $sus->monto, 'moneda' => $sus->moneda ?: 'COP',
+                    'ok' => false, 'intentos' => 1, 'ultimo_intento_at' => now(),
+                    'mensaje' => "Intento email a {$email}",
+                    'error' => 'SMTP: ' . mb_substr($e->getMessage(), 0, 350),
+                ]);
+            }
+        }
     }
 }

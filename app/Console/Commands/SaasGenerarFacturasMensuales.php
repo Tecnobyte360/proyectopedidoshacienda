@@ -178,6 +178,34 @@ class SaasGenerarFacturasMensuales extends Command
                         'link_pago'         => $linkUrl,
                         'error'             => $errorMsg,
                     ]);
+
+                    // 📧 Email branded de respaldo
+                    $email = $sus->tenant->contacto_email ?? null;
+                    if ($email && filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                        try {
+                            \Illuminate\Support\Facades\Mail::to($email)
+                                ->send(new \App\Mail\BillingRecordatorioMail(
+                                    $sus->tenant, $sus, $pago, 'factura', $linkUrl
+                                ));
+                            \App\Models\SaasBillingEnvio::create([
+                                'tenant_id' => $sus->tenant_id, 'pago_id' => $pago->id, 'suscripcion_id' => $sus->id,
+                                'tipo' => \App\Models\SaasBillingEnvio::TIPO_FACTURA, 'etapa' => 'factura', 'canal' => 'email',
+                                'telefono' => $email, 'monto' => $monto, 'moneda' => $pago->moneda,
+                                'ok' => true, 'intentos' => 1, 'ultimo_intento_at' => now(),
+                                'mensaje' => "Email enviado a {$email}", 'link_pago' => $linkUrl,
+                            ]);
+                            $this->line("    📧 Email enviado a {$email}");
+                        } catch (\Throwable $e) {
+                            \App\Models\SaasBillingEnvio::create([
+                                'tenant_id' => $sus->tenant_id, 'pago_id' => $pago->id, 'suscripcion_id' => $sus->id,
+                                'tipo' => \App\Models\SaasBillingEnvio::TIPO_FACTURA, 'etapa' => 'factura', 'canal' => 'email',
+                                'telefono' => $email, 'monto' => $monto, 'moneda' => $pago->moneda,
+                                'ok' => false, 'intentos' => 1, 'ultimo_intento_at' => now(),
+                                'mensaje' => "Intento email a {$email}",
+                                'error' => 'SMTP: ' . mb_substr($e->getMessage(), 0, 350),
+                            ]);
+                        }
+                    }
                 }
             }
 

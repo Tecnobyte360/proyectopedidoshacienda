@@ -449,12 +449,16 @@
                 </div>
 
                 {{-- Agregar nueva hora --}}
-                <div class="flex items-center gap-2">
-                    <input type="time" wire:model="nuevaHora"
-                           class="rounded-lg border border-amber-300 px-3 py-1.5 text-sm w-32 focus:border-amber-500 focus:ring-2 focus:ring-amber-200">
+                <div class="flex items-center gap-2 flex-wrap">
+                    <input type="time" wire:model.live="nuevaHora"
+                           placeholder="Selecciona hora"
+                           class="rounded-lg border border-amber-300 px-3 py-1.5 text-sm w-36 focus:border-amber-500 focus:ring-2 focus:ring-amber-200">
                     <button type="button" wire:click="agregarHora"
-                            class="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 text-xs font-bold transition">
-                        <i class="fa-solid fa-plus"></i> Agregar hora
+                            wire:loading.attr="disabled" wire:target="agregarHora"
+                            class="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 text-xs font-bold transition disabled:opacity-50">
+                        <i class="fa-solid fa-plus" wire:loading.remove wire:target="agregarHora"></i>
+                        <i class="fa-solid fa-spinner animate-spin" wire:loading wire:target="agregarHora"></i>
+                        Agregar hora
                     </button>
                     <span class="text-[10px] text-slate-500">
                         Máx 8 horarios · Mín 1 · Formato HH:MM (zona horaria Bogotá)
@@ -573,12 +577,18 @@
                                     </td>
                                     <td class="px-3 py-2.5">
                                         <div class="flex items-center gap-2">
-                                            <i class="fa-brands fa-whatsapp text-emerald-500"></i>
+                                            @if($c['esMeta'] ?? false)
+                                                <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-blue-700 text-white text-[10px] font-extrabold flex-shrink-0" title="Meta Cloud API oficial">M</span>
+                                            @else
+                                                <i class="fa-brands fa-whatsapp text-emerald-500 text-base"></i>
+                                            @endif
                                             <div class="min-w-0">
                                                 <div class="font-semibold text-slate-800 text-[13px] truncate">{{ $c['name'] ?: 'Sin nombre' }}</div>
                                                 <div class="text-[11px] text-slate-500">
                                                     {{ $c['phoneNumber'] ?: '(sin número)' }}
-                                                    @if($c['isDefault']) <span class="ml-1 text-amber-600 font-bold">★ Default</span> @endif
+                                                    @if($c['isDefault'] && !($c['esMeta'] ?? false))
+                                                        <span class="ml-1 text-amber-600 font-bold">★ Default</span>
+                                                    @endif
                                                 </div>
                                             </div>
                                         </div>
@@ -588,7 +598,7 @@
                                             $colores = match($c['status']) {
                                                 'CONNECTED'   => 'bg-emerald-100 text-emerald-700',
                                                 'PAIRING','QRCODE','OPENING' => 'bg-amber-100 text-amber-700',
-                                                'TIMEOUT','DISCONNECTED','NOT_CONNECTED' => 'bg-rose-100 text-rose-700',
+                                                'TIMEOUT','DISCONNECTED','NOT_CONNECTED','ERROR' => 'bg-rose-100 text-rose-700',
                                                 default       => 'bg-slate-100 text-slate-600',
                                             };
                                         @endphp
@@ -596,6 +606,12 @@
                                             <span class="w-1.5 h-1.5 rounded-full bg-current"></span>
                                             {{ $c['status'] }}
                                         </span>
+                                        @if(($c['esMeta'] ?? false) && !empty($c['errorMeta']))
+                                            <div class="text-[9px] text-rose-600 mt-1 max-w-[200px]" title="{{ $c['errorMeta'] }}">
+                                                <i class="fa-solid fa-circle-exclamation"></i>
+                                                {{ \Illuminate\Support\Str::limit($c['errorMeta'], 60) }}
+                                            </div>
+                                        @endif
                                     </td>
                                     <td class="px-3 py-2.5">
                                         <div class="flex flex-wrap gap-1">
@@ -607,21 +623,31 @@
                                         </div>
                                     </td>
                                     <td class="px-3 py-2.5">
-                                        <select
-                                            class="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs focus:border-brand focus:ring-2 focus:ring-brand/20"
-                                            onchange="@this.call('asignarConexion', {{ $c['id'] }}, this.value === '' ? null : parseInt(this.value))">
-                                            <option value="">— Sin asignar —</option>
-                                            @foreach($tenants as $t)
-                                                <option value="{{ $t->id }}"
-                                                    {{ ($c['asignadoA']['id'] ?? null) == $t->id ? 'selected' : '' }}>
-                                                    {{ $t->nombre }}
-                                                </option>
-                                            @endforeach
-                                        </select>
-                                        @if($c['asignadoA'])
-                                            <div class="text-[10px] text-emerald-600 mt-0.5 truncate">
-                                                ✓ {{ $c['asignadoA']['nombre'] }}
+                                        @if($c['esMeta'] ?? false)
+                                            {{-- Meta: asignación viene de meta_whatsapp_configs.tenant_id, no editable aquí --}}
+                                            <div class="text-[11px] text-slate-700 font-semibold">
+                                                {{ $c['asignadoA']['nombre'] ?? '—' }}
                                             </div>
+                                            <div class="text-[10px] text-slate-400">
+                                                <i class="fa-solid fa-lock"></i> Editar en /admin/tenants
+                                            </div>
+                                        @else
+                                            <select
+                                                class="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs focus:border-brand focus:ring-2 focus:ring-brand/20"
+                                                onchange="@this.call('asignarConexion', {{ $c['id'] }}, this.value === '' ? null : parseInt(this.value))">
+                                                <option value="">— Sin asignar —</option>
+                                                @foreach($tenants as $t)
+                                                    <option value="{{ $t->id }}"
+                                                        {{ ($c['asignadoA']['id'] ?? null) == $t->id ? 'selected' : '' }}>
+                                                        {{ $t->nombre }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                            @if($c['asignadoA'])
+                                                <div class="text-[10px] text-emerald-600 mt-0.5 truncate">
+                                                    ✓ {{ $c['asignadoA']['nombre'] }}
+                                                </div>
+                                            @endif
                                         @endif
                                     </td>
                                 </tr>
