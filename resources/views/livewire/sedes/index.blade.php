@@ -52,7 +52,20 @@
                         </div>
                     </div>
 
-                    @if($sede->whatsapp_connection_id || $sede->whatsapp_telefono)
+                    @php
+                        $tenantActualList = app(\App\Services\TenantManager::class)->current();
+                        $tenantEsMetaList = $tenantActualList
+                            && $tenantActualList->proveedorWhatsappResuelto() === \App\Models\Tenant::WA_PROVIDER_META;
+                    @endphp
+                    @if($tenantEsMetaList)
+                        <div class="rounded-xl bg-emerald-50 border border-emerald-100 px-3 py-2 text-xs">
+                            <div class="flex items-center gap-2 text-emerald-700 font-semibold">
+                                <i class="fa-brands fa-meta"></i>
+                                Meta WhatsApp Cloud API
+                            </div>
+                            <div class="text-[10px] text-emerald-600 mt-0.5">Número del tenant (compartido entre sedes)</div>
+                        </div>
+                    @elseif($sede->whatsapp_connection_id || $sede->whatsapp_telefono)
                         <div class="rounded-xl bg-emerald-50 border border-emerald-100 px-3 py-2 text-xs">
                             <div class="flex items-center gap-2 text-emerald-700 font-semibold">
                                 <i class="fa-brands fa-whatsapp"></i>
