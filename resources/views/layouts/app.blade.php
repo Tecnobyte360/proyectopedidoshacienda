@@ -76,6 +76,30 @@
         body.is-fullscreen header.app-topbar { display: none !important; }
         body.is-fullscreen main             { padding-top: 0 !important; padding-left: 0 !important; }
         body.is-fullscreen #btn-exit-fullscreen { display: flex !important; }
+
+        /* 🔒 Modo tenant moroso — solo lectura. Bloqueamos visualmente todas las
+           acciones interactivas (botones submit, inputs, selects) excepto los
+           que estén dentro de #billing-allowed (botones de "Pagar ahora") y
+           los links de navegación (la lectura sigue OK). */
+        main.tenant-moroso button[type="submit"],
+        main.tenant-moroso input:not([type="hidden"]):not([readonly]),
+        main.tenant-moroso textarea,
+        main.tenant-moroso select,
+        main.tenant-moroso [wire\:click]:not([data-billing-allowed]),
+        main.tenant-moroso [wire\:submit]:not([data-billing-allowed]) button[type="submit"] {
+            pointer-events: none !important;
+            opacity: 0.55 !important;
+            filter: grayscale(0.4);
+            cursor: not-allowed !important;
+        }
+        /* Botones "Pagar ahora" siempre activos aunque estén moroso */
+        main.tenant-moroso [data-billing-allowed],
+        main.tenant-moroso [data-billing-allowed] * {
+            pointer-events: auto !important;
+            opacity: 1 !important;
+            filter: none !important;
+            cursor: pointer !important;
+        }
     </style>
 
     @php
@@ -141,10 +165,30 @@
         $aplicarCard = $rutaActual && !in_array($rutaActual, $rutasFullBleed, true);
     @endphp
 
-    <main class="min-h-screen pt-16 lg:pl-64 transition-all duration-300">
-        {{-- 🔔 Banner global: alerta de suscripción del tenant próxima a vencer / vencida --}}
+    <main class="min-h-screen pt-16 lg:pl-64 transition-all duration-300 {{ ($tenantMoroso ?? false) ? 'tenant-moroso' : '' }}">
+        {{-- 🔒 Banner persistente NO dismissable cuando tenant está en mora --}}
         @auth
-            @if(app(\App\Services\TenantManager::class)->current())
+            @if($tenantMoroso ?? false)
+                <div class="px-4 pt-4 lg:px-6">
+                    <div class="rounded-2xl bg-gradient-to-r from-red-500 to-rose-600 text-white shadow-xl ring-2 ring-red-300 p-4 mb-2 flex items-center gap-4 flex-wrap">
+                        <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-white/20 flex-shrink-0">
+                            <i class="fa-solid fa-lock text-xl"></i>
+                        </div>
+                        <div class="flex-1 min-w-[200px]">
+                            <div class="font-extrabold text-base">Tu suscripción está vencida 🔒</div>
+                            <div class="text-xs text-white/90 mt-0.5">
+                                Estás navegando en modo de solo lectura. Para crear, editar o usar el bot, paga la mensualidad.
+                            </div>
+                        </div>
+                        <a href="{{ route('billing.expirado') }}" data-billing-allowed
+                           class="inline-flex items-center gap-2 bg-white text-rose-600 hover:bg-rose-50 rounded-xl px-5 py-2.5 text-sm font-extrabold shadow-lg ring-2 ring-white/40 transition-all hover:scale-105">
+                            <i class="fa-solid fa-credit-card"></i>
+                            Pagar ahora
+                        </a>
+                    </div>
+                </div>
+            @elseif(app(\App\Services\TenantManager::class)->current())
+                {{-- Banner normal de "próximo a vencer" solo si NO está moroso aún --}}
                 <div class="px-4 pt-4 lg:px-6">
                     @livewire('suscripcion-banner')
                 </div>
