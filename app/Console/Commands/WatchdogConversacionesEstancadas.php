@@ -80,6 +80,17 @@ class WatchdogConversacionesEstancadas extends Command
             // Excepción: si es un mensaje watchdog previo, no entrar en loop.
             if (str_starts_with((string) ($ultimoMsg->mensaje_externo_id ?? ''), 'watchdog_')) continue;
 
+            // 🧍 NO rescatar conversaciones en MODO HUMANO: el bot está
+            // silenciado a propósito porque hay un operador atendiendo. El
+            // watchdog asumia 'bot pasmado' y reinyectaba duplicando el mensaje.
+            if ($conv->atendida_por_humano) {
+                Log::info('🐕 Watchdog: skip — conv en modo humano (operador atendiendo)', [
+                    'conversacion_id' => $conv->id,
+                    'telefono'        => $conv->telefono_normalizado,
+                ]);
+                continue;
+            }
+
             // 🛡️ NO rescatar si la conv YA generó un pedido reciente (configurable).
             $tienePedidoReciente = $skipPedMin > 0 && \App\Models\Pedido::where('telefono_whatsapp', $conv->telefono_normalizado)
                 ->where('created_at', '>=', now()->subMinutes($skipPedMin))
@@ -222,6 +233,12 @@ class WatchdogConversacionesEstancadas extends Command
             // Evitar loops si ya fue rescatado
             if (str_starts_with((string) ($ultimoMsg->mensaje_externo_id ?? ''), 'watchdog_')) {
                 Log::info("MODO2 conv {$conv->id}: skip — ya es watchdog_");
+                continue;
+            }
+
+            // 🧍 NO rescatar conversaciones en MODO HUMANO (operador atiende)
+            if ($conv->atendida_por_humano) {
+                Log::info("MODO2 conv {$conv->id}: skip — modo humano (operador atiende)");
                 continue;
             }
 
