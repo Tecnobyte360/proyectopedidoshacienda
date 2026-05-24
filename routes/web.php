@@ -214,6 +214,10 @@ Route::middleware(['no_super_sin_imp'])->group(function () {
         ->middleware('permission:bot.configurar')
         ->name('monitoreo.watchdog');
 
+    Route::get('/monitoreo/llamadas', \App\Livewire\Monitoreo\Llamadas::class)
+        ->middleware('permission:bot.configurar')
+        ->name('monitoreo.llamadas');
+
     Route::get('/rutas', \App\Livewire\Rutas\Index::class)
         ->middleware('permission:despachos.gestionar')
         ->name('rutas.index');
