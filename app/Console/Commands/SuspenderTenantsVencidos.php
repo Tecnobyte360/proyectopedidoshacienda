@@ -152,7 +152,6 @@ class SuspenderTenantsVencidos extends Command
     ): void {
         if (!$enviar) return;
         $tel = $sus->tenant->contacto_telefono ?? null;
-        if (!$tel) return;
 
         $monto = number_format((float)($pago?->monto ?? $sus->monto ?? 0), 0, ',', '.');
         $link  = $pago?->link_pago_url ? "\n\nPaga aquí: {$pago->link_pago_url}" : '';
@@ -168,10 +167,42 @@ class SuspenderTenantsVencidos extends Command
         };
         if (!$msg) return;
 
-        try {
-            $sender->enviarTexto($tel, $msg, (int) $sus->tenant_id);
-        } catch (\Throwable $e) {
-            Log::warning('SaaS morosidad: falló envío WhatsApp', ['error' => $e->getMessage(), 'tenant_id' => $sus->tenant_id]);
+        $okEnvio = false;
+        $errorMsg = null;
+
+        if (!$tel) {
+            $errorMsg = 'Tenant sin contacto_telefono registrado';
+        } else {
+            try {
+                $okEnvio = (bool) $sender->enviarTexto($tel, $msg, (int) $sus->tenant_id);
+                if (!$okEnvio) {
+                    $errorMsg = 'enviarTexto devolvió false';
+                }
+            } catch (\Throwable $e) {
+                $errorMsg = mb_substr($e->getMessage(), 0, 400);
+                Log::warning('SaaS morosidad: falló envío WhatsApp', ['error' => $e->getMessage(), 'tenant_id' => $sus->tenant_id]);
+            }
         }
+
+        // 📤 Log para monitoreo
+        $tipo = $stage === 'suspendido'
+            ? \App\Models\SaasBillingEnvio::TIPO_SUSPENDIDO
+            : \App\Models\SaasBillingEnvio::TIPO_RECORDATORIO;
+
+        \App\Models\SaasBillingEnvio::create([
+            'tenant_id'      => $sus->tenant_id,
+            'pago_id'        => $pago?->id,
+            'suscripcion_id' => $sus->id,
+            'tipo'           => $tipo,
+            'etapa'          => $stage,
+            'canal'          => 'whatsapp',
+            'telefono'       => $tel,
+            'monto'          => $pago?->monto ?? $sus->monto,
+            'moneda'         => $sus->moneda ?: 'COP',
+            'ok'             => $okEnvio,
+            'mensaje'        => $msg,
+            'link_pago'      => $pago?->link_pago_url,
+            'error'          => $errorMsg,
+        ]);
     }
 }

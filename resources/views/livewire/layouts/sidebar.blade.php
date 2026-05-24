@@ -111,6 +111,7 @@
                     ['name' => 'Planes',        'icon' => 'fa-money-check-dollar', 'route' => 'admin.planes.index',        'badge' => null, 'permission' => 'planes.gestionar'],
                     ['name' => 'Suscripciones', 'icon' => 'fa-receipt',            'route' => 'admin.suscripciones.index', 'badge' => null, 'permission' => 'suscripciones.gestionar'],
                     ['name' => 'Pagos',         'icon' => 'fa-money-bills',        'route' => 'admin.pagos.index',         'badge' => null, 'permission' => 'pagos.gestionar'],
+                    ['name' => 'Envíos Billing','icon' => 'fa-paper-plane',        'route' => 'admin.billing-envios',      'badge' => 'NUEVO', 'permission' => 'tenants.gestionar'],
                     ['name' => 'Documentación',         'icon' => 'fa-book-open',  'route' => 'admin.documentacion',          'badge' => null, 'permission' => 'tenants.gestionar'],
                     ['name' => 'Branding plataforma',   'icon' => 'fa-palette',    'route' => 'admin.configuracion-plataforma','badge' => null, 'permission' => 'tenants.gestionar'],
                 ],

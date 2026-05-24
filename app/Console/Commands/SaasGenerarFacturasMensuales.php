@@ -120,25 +120,51 @@ class SaasGenerarFacturasMensuales extends Command
                 // Enviar por WhatsApp si fue solicitado y hay link
                 if ($enviar && $linkUrl) {
                     $tel = $sus->tenant->contacto_telefono ?? null;
-                    if ($tel) {
+                    $msg = "Hola {$sus->tenant->nombre} 👋\n\n"
+                         . "Tu mensualidad de Kivox por *$" . number_format($monto, 0, ',', '.') . " COP* está disponible.\n"
+                         . "Período: {$cubreDesde->format('d M')} → {$cubreHasta->format('d M Y')}\n\n"
+                         . "Paga aquí: {$linkUrl}\n\n"
+                         . "Vence el {$sus->fecha_fin->format('d/m/Y')}.";
+
+                    $okEnvio = false;
+                    $errorMsg = null;
+
+                    if (!$tel) {
+                        $errorMsg = 'Tenant sin contacto_telefono registrado';
+                        $this->warn("    ⚠️ {$errorMsg}");
+                    } else {
                         try {
-                            $msg = "Hola {$sus->tenant->nombre} 👋\n\n"
-                                 . "Tu mensualidad de Kivox por *$" . number_format($monto, 0, ',', '.') . " COP* está disponible.\n"
-                                 . "Período: {$cubreDesde->format('d M')} → {$cubreHasta->format('d M Y')}\n\n"
-                                 . "Paga aquí: {$linkUrl}\n\n"
-                                 . "Vence el {$sus->fecha_fin->format('d/m/Y')}.";
-                            $ok = app(WhatsappSenderService::class)->enviarTexto($tel, $msg, (int) $sus->tenant_id);
-                            if ($ok) {
+                            $okEnvio = (bool) app(WhatsappSenderService::class)
+                                ->enviarTexto($tel, $msg, (int) $sus->tenant_id);
+                            if ($okEnvio) {
                                 $pago->update(['link_enviado_at' => now(), 'link_canal_envio' => 'whatsapp']);
                                 $enviados++;
                                 $this->line("    📱 Link enviado por WhatsApp a {$tel}");
+                            } else {
+                                $errorMsg = 'enviarTexto devolvió false';
                             }
                         } catch (\Throwable $e) {
-                            $this->warn("    ⚠️ Falló envío WhatsApp: " . $e->getMessage());
+                            $errorMsg = mb_substr($e->getMessage(), 0, 400);
+                            $this->warn("    ⚠️ Falló envío WhatsApp: " . $errorMsg);
                         }
-                    } else {
-                        $this->warn("    ⚠️ Tenant sin teléfono de contacto");
                     }
+
+                    // 📤 Log para monitoreo
+                    \App\Models\SaasBillingEnvio::create([
+                        'tenant_id'      => $sus->tenant_id,
+                        'pago_id'        => $pago->id,
+                        'suscripcion_id' => $sus->id,
+                        'tipo'           => \App\Models\SaasBillingEnvio::TIPO_FACTURA,
+                        'etapa'          => 'factura',
+                        'canal'          => 'whatsapp',
+                        'telefono'       => $tel,
+                        'monto'          => $monto,
+                        'moneda'         => $pago->moneda,
+                        'ok'             => $okEnvio,
+                        'mensaje'        => $msg,
+                        'link_pago'      => $linkUrl,
+                        'error'          => $errorMsg,
+                    ]);
                 }
             }
 
