@@ -24,7 +24,7 @@
     </div>
 
     {{-- KPIs con FontAwesome --}}
-    <div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3">
+    <div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-9 gap-3">
 
         <div class="bg-white border border-slate-200 rounded-2xl p-4 hover:shadow-md transition">
             <div class="flex items-center justify-between mb-1">
@@ -86,6 +86,26 @@
             <div class="text-3xl font-extrabold text-red-700">{{ $this->kpis['suspendido'] }}</div>
         </div>
 
+        <div class="bg-white border border-emerald-200 rounded-2xl p-4 hover:shadow-md transition">
+            <div class="flex items-center justify-between mb-1">
+                <span class="text-[10px] uppercase text-emerald-600 font-bold tracking-wider">WhatsApp</span>
+                <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600">
+                    <i class="fa-brands fa-whatsapp text-sm"></i>
+                </div>
+            </div>
+            <div class="text-3xl font-extrabold text-emerald-700">{{ $this->kpis['whatsapp'] }}</div>
+        </div>
+
+        <div class="bg-white border border-blue-200 rounded-2xl p-4 hover:shadow-md transition">
+            <div class="flex items-center justify-between mb-1">
+                <span class="text-[10px] uppercase text-blue-600 font-bold tracking-wider">Emails</span>
+                <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
+                    <i class="fa-solid fa-envelope text-sm"></i>
+                </div>
+            </div>
+            <div class="text-3xl font-extrabold text-blue-700">{{ $this->kpis['emails'] }}</div>
+        </div>
+
         <div class="bg-white border border-violet-200 rounded-2xl p-4 hover:shadow-md transition">
             <div class="flex items-center justify-between mb-1">
                 <span class="text-[10px] uppercase text-violet-600 font-bold tracking-wider">Tenants</span>
@@ -103,7 +123,7 @@
             <i class="fa-solid fa-filter text-slate-400"></i>
             <span class="text-sm font-bold text-slate-700">Filtros</span>
         </div>
-        <div class="grid grid-cols-1 md:grid-cols-5 gap-3">
+        <div class="grid grid-cols-1 md:grid-cols-6 gap-3">
             <div class="md:col-span-2 relative">
                 <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
                 <input type="text" wire:model.live.debounce.400ms="busqueda"
@@ -140,6 +160,16 @@
                     <option value="">Todos los resultados</option>
                     <option value="1">Solo exitosos</option>
                     <option value="0">Solo fallidos</option>
+                </select>
+            </div>
+
+            <div class="relative">
+                <i class="fa-solid fa-paper-plane absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                <select wire:model.live="filtroCanal"
+                        class="w-full rounded-xl border border-slate-200 pl-9 pr-3 py-2 text-sm appearance-none focus:border-brand focus:ring-2 focus:ring-brand/20">
+                    <option value="">Todos los canales</option>
+                    <option value="whatsapp">📱 Solo WhatsApp</option>
+                    <option value="email">📧 Solo Email</option>
                 </select>
             </div>
         </div>
@@ -179,7 +209,7 @@
                             <th class="px-4 py-3 text-left w-40"><i class="fa-solid fa-clock mr-1"></i> Cuándo</th>
                             <th class="px-4 py-3 text-left"><i class="fa-solid fa-building mr-1"></i> Tenant</th>
                             <th class="px-4 py-3 text-left w-44"><i class="fa-solid fa-tag mr-1"></i> Tipo · Etapa</th>
-                            <th class="px-4 py-3 text-left w-36"><i class="fa-solid fa-phone mr-1"></i> Teléfono</th>
+                            <th class="px-4 py-3 text-left w-56"><i class="fa-solid fa-paper-plane mr-1"></i> Canal · Destinatario</th>
                             <th class="px-4 py-3 text-right w-28"><i class="fa-solid fa-coins mr-1"></i> Monto</th>
                             <th class="px-4 py-3 text-left"><i class="fa-solid fa-message mr-1"></i> Mensaje / Error</th>
                             <th class="px-4 py-3 text-center w-32"><i class="fa-solid fa-rotate-right mr-1"></i> Reintentos</th>
@@ -261,15 +291,35 @@
                                     @endif
                                 </td>
                                 <td class="px-4 py-3 align-top">
-                                    @if($e->telefono)
-                                        <div class="flex items-center gap-1.5 font-mono text-xs text-slate-700">
-                                            <i class="fa-brands fa-whatsapp text-emerald-500"></i>
-                                            +{{ $e->telefono }}
+                                    @php
+                                        $canal = $e->canal ?: 'whatsapp';
+                                        $destino = $e->telefono;
+                                        $esEmail = $canal === 'email' || (is_string($destino) && str_contains($destino, '@'));
+                                    @endphp
+                                    @if(!$destino)
+                                        <span class="text-slate-400 text-xs inline-flex items-center gap-1">
+                                            <i class="fa-solid fa-circle-question"></i> sin destinatario
+                                        </span>
+                                    @elseif($esEmail)
+                                        <div class="inline-flex items-center gap-2">
+                                            <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-blue-100 text-blue-600 flex-shrink-0" title="Email">
+                                                <i class="fa-solid fa-envelope text-xs"></i>
+                                            </span>
+                                            <div class="min-w-0">
+                                                <div class="text-[9px] uppercase tracking-wider text-blue-600 font-bold">Email</div>
+                                                <div class="text-xs text-slate-700 break-all">{{ $destino }}</div>
+                                            </div>
                                         </div>
                                     @else
-                                        <span class="text-slate-400 text-xs">
-                                            <i class="fa-solid fa-phone-slash"></i> sin teléfono
-                                        </span>
+                                        <div class="inline-flex items-center gap-2">
+                                            <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600 flex-shrink-0" title="WhatsApp">
+                                                <i class="fa-brands fa-whatsapp text-sm"></i>
+                                            </span>
+                                            <div class="min-w-0">
+                                                <div class="text-[9px] uppercase tracking-wider text-emerald-600 font-bold">WhatsApp</div>
+                                                <div class="text-xs text-slate-700 font-mono">+{{ $destino }}</div>
+                                            </div>
+                                        </div>
                                     @endif
                                 </td>
                                 <td class="px-4 py-3 text-right align-top">

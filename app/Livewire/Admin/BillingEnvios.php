@@ -17,12 +17,13 @@ class BillingEnvios extends Component
     public string $filtroTipo  = '';     // factura | recordatorio | suspendido
     public string $filtroEtapa = '';
     public string $filtroOk    = '';     // '' | 1 | 0
+    public string $filtroCanal = '';     // '' | whatsapp | email
     public ?int   $filtroTenant = null;
     public string $busqueda    = '';
 
     public function updating($prop): void
     {
-        if (in_array($prop, ['rango', 'filtroTipo', 'filtroEtapa', 'filtroOk', 'filtroTenant', 'busqueda'], true)) {
+        if (in_array($prop, ['rango', 'filtroTipo', 'filtroEtapa', 'filtroOk', 'filtroCanal', 'filtroTenant', 'busqueda'], true)) {
             $this->resetPage();
         }
     }
@@ -45,6 +46,7 @@ class BillingEnvios extends Component
             ->when($this->filtroTipo, fn($q) => $q->where('tipo', $this->filtroTipo))
             ->when($this->filtroEtapa, fn($q) => $q->where('etapa', $this->filtroEtapa))
             ->when($this->filtroOk !== '', fn($q) => $q->where('ok', (bool) $this->filtroOk))
+            ->when($this->filtroCanal, fn($q) => $q->where('canal', $this->filtroCanal))
             ->when($this->filtroTenant, fn($q) => $q->where('tenant_id', $this->filtroTenant))
             ->when($this->busqueda, function ($q) {
                 $b = $this->busqueda;
@@ -67,6 +69,8 @@ class BillingEnvios extends Component
                 'total'        => (clone $base)->count(),
                 'ok'           => (clone $base)->where('ok', true)->count(),
                 'fallidos'     => (clone $base)->where('ok', false)->count(),
+                'whatsapp'     => (clone $base)->where('canal', 'whatsapp')->count(),
+                'emails'       => (clone $base)->where('canal', 'email')->count(),
                 'facturas'     => (clone $base)->where('tipo', 'factura')->count(),
                 'recordat'     => (clone $base)->where('tipo', 'recordatorio')->count(),
                 'suspendido'   => (clone $base)->where('tipo', 'suspendido')->count(),
