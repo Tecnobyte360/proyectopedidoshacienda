@@ -40,8 +40,30 @@ class WhatsappStatusMonitor extends Component
         $this->verificarEstado();
     }
 
+    /**
+     * Este componente solo aplica a TecnoByteApp (que requiere QR scaneado).
+     * Para tenants que usan Meta Cloud API no hay sesión que monitorear —
+     * Meta es servicio cloud sin estado QR del lado del cliente.
+     */
+    private function tenantUsaMeta(): bool
+    {
+        try {
+            $tenant = app(\App\Services\TenantManager::class)->current();
+            return $tenant
+                && $tenant->proveedorWhatsappResuelto() === \App\Models\Tenant::WA_PROVIDER_META;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
     public function verificarEstado(): void
     {
+        // 🟢 Si el tenant usa Meta, no hay sesión TecnoByteApp que monitorear
+        if ($this->tenantUsaMeta()) {
+            $this->setEstado('connected', 'Meta Cloud API');
+            return;
+        }
+
         try {
             $token = $this->obtenerTokenForzado();
 

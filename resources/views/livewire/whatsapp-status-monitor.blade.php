@@ -1,3 +1,25 @@
+@php
+    $tenant = app(\App\Services\TenantManager::class)->current();
+    $usaMeta = $tenant && $tenant->proveedorWhatsappResuelto() === \App\Models\Tenant::WA_PROVIDER_META;
+@endphp
+
+@if($usaMeta)
+    {{-- 🟢 Tenant usa Meta Cloud API: no hay QR ni sesión que monitorear --}}
+    <div class="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 shadow-sm">
+        <div class="flex items-center gap-3">
+            <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-emerald-100 bg-white shadow-sm">
+                <i class="fa-brands fa-whatsapp text-base text-emerald-500"></i>
+            </div>
+            <div class="leading-tight">
+                <div class="flex flex-wrap items-center gap-2">
+                    <span class="text-xs font-bold text-emerald-700">WhatsApp · Meta Cloud API</span>
+                    <span class="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700">Activa</span>
+                </div>
+                <p class="mt-0.5 text-[11px] text-emerald-600">Sin sesión que monitorear (servicio cloud oficial)</p>
+            </div>
+        </div>
+    </div>
+@else
 <div wire:poll.{{ in_array($status, ['qrcode', 'pairing']) ? '5000ms' : '30000ms' }}="verificarEstado">
     @php
         $config = match ($status) {
@@ -212,3 +234,4 @@
         </div>
     @endif
 </div>
+@endif
