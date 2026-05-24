@@ -699,7 +699,7 @@ class WhatsappWebhookController extends Controller
                 $cliente      = \App\Models\Cliente::encontrarOCrearPorTelefono($telefonoNorm, $name);
                 $convService  = app(\App\Services\ConversacionService::class);
                 $conv         = $convService->obtenerOCrearActiva($telefonoNorm, $cliente->id);
-                $convService->agregarMensaje($conv, \App\Models\MensajeWhatsapp::ROL_USER, $message);
+                $convService->agregarMensaje($conv, \App\Models\MensajeWhatsapp::ROL_USER, $message, $this->opcionesMensajeEntrante($messageId));
             } catch (\Throwable $e) {
                 Log::warning('No se persistió mensaje (bot OFF): ' . $e->getMessage());
             }
@@ -947,7 +947,7 @@ class WhatsappWebhookController extends Controller
 
         // Persistir mensaje del cliente (a menos que el buffer ya lo haya hecho al instante)
         if (!$yaPersisitido) {
-            $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_USER, $message);
+            $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_USER, $message, $this->opcionesMensajeEntrante($messageId));
         }
 
         // ── HISTORIAL: reducido a últimos 10 (en vez de 20) para evitar
@@ -9783,6 +9783,33 @@ PROMPT;
     | WHATSAPP API
     |==========================================================================
     */
+
+    /**
+     * Devuelve las opciones para agregarMensaje cuando llega un mensaje
+     * entrante, agregando metadata si fue reinyectado por el watchdog para
+     * que el chat lo marque visualmente.
+     */
+    private function opcionesMensajeEntrante(?string $messageId): array
+    {
+        if (!$messageId) return [];
+
+        if (str_starts_with($messageId, 'watchdog_retry_')) {
+            return ['meta' => [
+                'rescatado_por' => 'watchdog',
+                'motivo'        => 'bot_estancado',
+                'mensaje_origen_externo_id' => $messageId,
+            ]];
+        }
+        if (str_starts_with($messageId, 'watchdog_botpasmado_')) {
+            return ['meta' => [
+                'rescatado_por' => 'watchdog',
+                'motivo'        => 'bot_pasmado',
+                'mensaje_origen_externo_id' => $messageId,
+            ]];
+        }
+
+        return [];
+    }
 
     private function enviarRespuestaWhatsapp(string $from, string $reply, $connectionId = null): bool
     {

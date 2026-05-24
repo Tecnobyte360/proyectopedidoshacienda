@@ -287,8 +287,24 @@
                         $caption  = $m->meta['caption'] ?? null;
                     @endphp
                     @if($m->rol === 'user')
+                        @php
+                            $rescatadoPor = $m->meta['rescatado_por'] ?? null;
+                            $motivoRescate = $m->meta['motivo'] ?? null;
+                            $motivoLabel = match ($motivoRescate) {
+                                'bot_estancado' => 'Mensaje reprocesado: el bot no respondió a tiempo',
+                                'bot_pasmado'   => 'Mensaje reprocesado: el bot prometió revisar y no continuó',
+                                default         => 'Mensaje reprocesado por el watchdog',
+                            };
+                        @endphp
                         <div class="flex justify-start">
-                            <div class="max-w-[70%] rounded-2xl rounded-tl-sm bg-white px-3 py-2 shadow-sm">
+                            <div class="max-w-[70%] rounded-2xl rounded-tl-sm {{ $rescatadoPor ? 'bg-amber-50 border border-amber-200' : 'bg-white' }} px-3 py-2 shadow-sm">
+                                @if($rescatadoPor)
+                                    <div class="flex items-center gap-1 mb-1 text-[10px] font-semibold text-amber-700"
+                                         title="{{ $motivoLabel }}">
+                                        <i class="fa-solid fa-rotate-right"></i>
+                                        <span>Recuperado por watchdog</span>
+                                    </div>
+                                @endif
                                 @if($esAudio)
                                     <audio src="{{ $mediaUrl }}" controls class="w-64 max-w-full"></audio>
                                 @elseif($esImagen)
