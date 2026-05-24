@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Scopes\BelongsToTenant;
+use App\Models\Concerns\BelongsToTenant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -11,6 +11,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class WhatsappCall extends Model
 {
+    use BelongsToTenant;
+
     protected $table = 'whatsapp_calls';
 
     public const ESTADO_REQUESTED     = 'requested';
@@ -44,11 +46,6 @@ class WhatsappCall extends Model
         'duracion_seg'  => 'int',
         'costo_usd'     => 'decimal:6',
     ];
-
-    protected static function booted(): void
-    {
-        static::addGlobalScope(new BelongsToTenant);
-    }
 
     public function conversacion(): BelongsTo
     {

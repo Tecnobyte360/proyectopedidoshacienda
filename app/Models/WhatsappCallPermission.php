@@ -2,11 +2,13 @@
 
 namespace App\Models;
 
-use App\Scopes\BelongsToTenant;
+use App\Models\Concerns\BelongsToTenant;
 use Illuminate\Database\Eloquent\Model;
 
 class WhatsappCallPermission extends Model
 {
+    use BelongsToTenant;
+
     protected $table = 'whatsapp_call_permissions';
 
     public const PENDING  = 'pending';
@@ -26,11 +28,6 @@ class WhatsappCallPermission extends Model
         'respondido_at' => 'datetime',
         'expira_at'     => 'datetime',
     ];
-
-    protected static function booted(): void
-    {
-        static::addGlobalScope(new BelongsToTenant);
-    }
 
     /** ¿El permiso está vigente para llamar ahora? */
     public function vigente(): bool
