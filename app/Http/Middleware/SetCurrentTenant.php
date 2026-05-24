@@ -71,9 +71,23 @@ class SetCurrentTenant
         }
 
         if ($tenant) {
-            // Bloquear si el tenant no tiene acceso activo
-            if (!$tenant->tieneAccesoActivo() && !auth()->user()?->isSuperAdmin()) {
-                abort(403, "Tu cuenta está suspendida o tu suscripción venció. Contacta al soporte.");
+            // Bloquear ÚNICAMENTE si el tenant fue suspendido manualmente (activo=false)
+            // por el super-admin. Las rutas siempre permitidas (login, logout, billing)
+            // las dejamos pasar para que el cliente pueda ver la situación.
+            $rutaActual = $request->path();
+            $rutasSiempre = ['login', 'logout', 'register', 'billing/expirado', 'billing/gracias'];
+            $esRutaSiempre = false;
+            foreach ($rutasSiempre as $r) {
+                if ($rutaActual === $r || str_starts_with($rutaActual, $r . '/')) {
+                    $esRutaSiempre = true;
+                    break;
+                }
+            }
+
+            if (!$tenant->tieneAccesoActivo()
+                && !auth()->user()?->isSuperAdmin()
+                && !$esRutaSiempre) {
+                abort(403, "Tu cuenta está suspendida. Contacta a soporte: comercial@tecnobyte360.com");
             }
 
             // Si el usuario está logueado pero pertenece a OTRO tenant,

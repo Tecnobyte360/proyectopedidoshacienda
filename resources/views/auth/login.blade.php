@@ -169,6 +169,24 @@
                     </div>
                 @endif
 
+                {{-- 🔒 Aviso si el tenant está suspendido por mora --}}
+                @if(!empty($tenantMoroso))
+                    <div class="rounded-xl bg-red-50 border border-red-300 p-4 mb-5">
+                        <div class="flex items-start gap-3">
+                            <div class="flex h-9 w-9 items-center justify-center rounded-full bg-red-100 text-red-600 flex-shrink-0">
+                                <i class="fa-solid fa-lock"></i>
+                            </div>
+                            <div class="flex-1">
+                                <div class="font-bold text-red-800 text-sm">Suscripción vencida</div>
+                                <div class="text-xs text-red-700 mt-1 leading-relaxed">
+                                    Tu suscripción de Kivox está vencida. Inicia sesión normalmente y desde
+                                    adentro podrás ver el monto y pagar para reactivar todas las funciones.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                @endif
+
                 <form method="POST" action="/login" class="space-y-5">
                     @csrf
 

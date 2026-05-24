@@ -242,21 +242,16 @@ class Tenant extends Model
     }
 
     /**
-     * ¿Está activo y dentro de su período de subscripción?
+     * ¿Está activo? (solo verifica suspensión administrativa manual)
+     *
+     * NOTA: La fecha subscription_ends_at NO bloquea aquí — el cron de morosidad
+     * usa días de gracia configurables y activa tenant.suspendido_por_mora=true
+     * cuando se acaba el plazo. El middleware BloqueaSiMoroso se encarga de
+     * redirigir a /billing/expirado. Aquí solo bloqueamos suspensión manual.
      */
     public function tieneAccesoActivo(): bool
     {
-        if (!$this->activo) return false;
-
-        if ($this->subscription_ends_at && $this->subscription_ends_at->isPast()) {
-            // Verificar si está en trial
-            if ($this->trial_ends_at && $this->trial_ends_at->isFuture()) {
-                return true;
-            }
-            return false;
-        }
-
-        return true;
+        return (bool) $this->activo;
     }
 
     public function estaEnTrial(): bool

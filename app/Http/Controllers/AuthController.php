@@ -30,7 +30,13 @@ class AuthController extends Controller
         // Resolver tenant por subdominio para branding dinámico
         $tenant = $this->resolverTenantLogin();
 
-        return view('auth.login', ['tenantBranding' => $tenant]);
+        // Si el tenant está moroso, mostramos un aviso amistoso en el login
+        $tenantMoroso = $tenant && $tenant->suspendido_por_mora;
+
+        return view('auth.login', [
+            'tenantBranding' => $tenant,
+            'tenantMoroso'   => $tenantMoroso,
+        ]);
     }
 
     /**
@@ -100,9 +106,10 @@ class AuthController extends Controller
         $reservados = ['www', 'api', 'admin', 'app', 'mail', 'pedidosonline'];
         if (in_array($sub, $reservados, true)) return null;
 
+        // Buscar tenant sin filtrar por activo — queremos mostrar branding
+        // incluso para tenants morosos para que sepan dónde están parados.
         return \App\Models\Tenant::withoutGlobalScopes()
             ->where('slug', $sub)
-            ->where('activo', true)
             ->first();
     }
 
