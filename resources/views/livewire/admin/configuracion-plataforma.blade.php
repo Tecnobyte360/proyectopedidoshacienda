@@ -423,54 +423,128 @@
                 </div>
             </div>
 
-            {{-- ⏰ Horarios de envío configurable --}}
-            <div class="mt-5 rounded-xl border border-amber-200 bg-amber-50/40 p-4">
-                <label class="block text-xs font-bold text-amber-900 mb-2">
-                    <i class="fa-solid fa-clock"></i> Horarios de envío de WhatsApp (cuántas veces al día)
-                </label>
-                <p class="text-[11px] text-amber-800/80 mb-3">
-                    El cron revisa cada minuto y se dispara si la hora actual coincide con alguna de esta lista.
-                    Útil para insistirle al cliente vencido (ej. 09:00, 14:00 y 18:00).
-                </p>
+            {{-- 📅 Horarios de envío POR DÍA DE LA SEMANA --}}
+            <div class="mt-5 rounded-xl border border-amber-200 bg-amber-50/30 p-4">
+                <div class="flex items-start gap-2 mb-3">
+                    <i class="fa-solid fa-calendar-week text-amber-600 mt-0.5"></i>
+                    <div class="flex-1">
+                        <label class="block text-sm font-bold text-amber-900">
+                            Horarios de envío por día de la semana
+                        </label>
+                        <p class="text-[11px] text-amber-800/80 mt-0.5">
+                            Define qué horarios usar para cada día. Si un día está vacío, no se envía nada ese día.
+                            Útil para no molestar fines de semana o solo enviar en horas específicas.
+                        </p>
+                    </div>
+                </div>
 
-                {{-- Chips de horas actuales --}}
-                <div class="flex flex-wrap gap-2 mb-3">
-                    @foreach($saas_horas_envio as $idx => $h)
-                        <span class="inline-flex items-center gap-2 rounded-full bg-amber-200/60 border border-amber-300 px-3 py-1 text-xs font-bold text-amber-900">
-                            <i class="fa-solid fa-clock"></i> {{ $h }}
-                            @if(count($saas_horas_envio) > 1)
-                                <button type="button" wire:click="quitarHora({{ $idx }})"
-                                        class="ml-1 text-amber-700 hover:text-rose-600">
-                                    <i class="fa-solid fa-xmark"></i>
+                {{-- Input compartido para agregar horas --}}
+                <div class="flex items-center gap-2 flex-wrap bg-white rounded-xl border border-amber-200 p-3 mb-3">
+                    <span class="text-[11px] text-slate-500 font-semibold">Hora a agregar:</span>
+                    <input type="time" wire:model.live="nuevaHora"
+                           class="rounded-lg border border-amber-300 px-3 py-1.5 text-sm w-32 focus:border-amber-500 focus:ring-2 focus:ring-amber-200">
+                    <span class="text-[10px] text-slate-400">↑ usa los botones <strong>+</strong> de cada día</span>
+                </div>
+
+                {{-- Grid de días --}}
+                @php
+                    $diasLabels = [
+                        'lun' => ['nombre' => 'Lunes', 'corta' => 'Lun', 'icon' => 'L'],
+                        'mar' => ['nombre' => 'Martes', 'corta' => 'Mar', 'icon' => 'M'],
+                        'mie' => ['nombre' => 'Miércoles', 'corta' => 'Mié', 'icon' => 'M'],
+                        'jue' => ['nombre' => 'Jueves', 'corta' => 'Jue', 'icon' => 'J'],
+                        'vie' => ['nombre' => 'Viernes', 'corta' => 'Vie', 'icon' => 'V'],
+                        'sab' => ['nombre' => 'Sábado', 'corta' => 'Sáb', 'icon' => 'S'],
+                        'dom' => ['nombre' => 'Domingo', 'corta' => 'Dom', 'icon' => 'D'],
+                    ];
+                @endphp
+                <div class="space-y-2">
+                    @foreach($diasLabels as $dia => $info)
+                        @php
+                            $horasDia = $saas_horas_envio[$dia] ?? [];
+                            $activo = count($horasDia) > 0;
+                            $esFinSemana = in_array($dia, ['sab','dom'], true);
+                        @endphp
+                        <div class="flex items-center gap-3 rounded-xl border p-3 {{ $activo ? 'bg-white border-amber-300' : ($esFinSemana ? 'bg-slate-50/50 border-slate-200' : 'bg-slate-50 border-slate-200') }}">
+
+                            {{-- Día con icono --}}
+                            <div class="flex items-center gap-2 w-28 flex-shrink-0">
+                                <div class="flex h-9 w-9 items-center justify-center rounded-lg font-extrabold text-sm
+                                            {{ $activo ? 'bg-gradient-to-br from-brand to-brand-dark text-white' : 'bg-slate-200 text-slate-500' }}">
+                                    {{ $info['icon'] }}
+                                </div>
+                                <div>
+                                    <div class="text-xs font-bold text-slate-800">{{ $info['nombre'] }}</div>
+                                    <div class="text-[10px] {{ $activo ? 'text-emerald-600' : 'text-slate-400' }} font-semibold">
+                                        {{ $activo ? count($horasDia) . ' envío' . (count($horasDia) === 1 ? '' : 's') : 'Inactivo' }}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {{-- Chips de horas --}}
+                            <div class="flex-1 flex flex-wrap gap-1.5 min-h-[28px] items-center">
+                                @if(empty($horasDia))
+                                    <span class="text-[10px] text-slate-400 italic">Sin horarios — no se enviará nada este día</span>
+                                @else
+                                    @foreach($horasDia as $idx => $h)
+                                        <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-soft border border-amber-300 px-2.5 py-0.5 text-xs font-bold text-brand-dark">
+                                            <i class="fa-solid fa-clock text-[9px]"></i>
+                                            {{ $h }}
+                                            <button type="button" wire:click="quitarHoraDia('{{ $dia }}', {{ $idx }})"
+                                                    class="ml-0.5 text-brand-dark/60 hover:text-rose-600 transition">
+                                                <i class="fa-solid fa-xmark text-[10px]"></i>
+                                            </button>
+                                        </span>
+                                    @endforeach
+                                @endif
+                            </div>
+
+                            {{-- Acciones --}}
+                            <div class="flex items-center gap-1 flex-shrink-0">
+                                <button type="button" wire:click="agregarHoraDia('{{ $dia }}')"
+                                        title="Agregar hora seleccionada arriba"
+                                        class="inline-flex items-center justify-center h-8 w-8 rounded-lg bg-brand hover:bg-brand-dark text-white text-xs transition">
+                                    <i class="fa-solid fa-plus"></i>
                                 </button>
-                            @endif
-                        </span>
+                                @if($activo)
+                                    <button type="button" wire:click="limpiarDia('{{ $dia }}')"
+                                            title="Limpiar todos los horarios de este día"
+                                            class="inline-flex items-center justify-center h-8 w-8 rounded-lg bg-slate-100 hover:bg-rose-100 hover:text-rose-600 text-slate-500 text-xs transition">
+                                        <i class="fa-solid fa-trash-can"></i>
+                                    </button>
+                                @endif
+                                <div x-data="{open: false}" class="relative">
+                                    <button type="button" @click="open = !open" @click.outside="open = false"
+                                            title="Copiar estos horarios a otros días"
+                                            class="inline-flex items-center justify-center h-8 w-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 text-xs transition">
+                                        <i class="fa-solid fa-copy"></i>
+                                    </button>
+                                    <div x-show="open" x-cloak x-transition
+                                         class="absolute right-0 top-full mt-1 w-52 bg-white rounded-xl shadow-lg ring-1 ring-slate-200 z-10 overflow-hidden">
+                                        <button type="button" @click="open = false" wire:click="copiarADiasLaborales('{{ $dia }}')"
+                                                class="w-full text-left px-3 py-2 text-xs hover:bg-amber-50 border-b border-slate-100">
+                                            <i class="fa-solid fa-briefcase text-amber-500"></i>
+                                            Copiar a lunes-viernes
+                                        </button>
+                                        <button type="button" @click="open = false" wire:click="copiarATodosLosDias('{{ $dia }}')"
+                                                class="w-full text-left px-3 py-2 text-xs hover:bg-amber-50">
+                                            <i class="fa-solid fa-calendar text-amber-500"></i>
+                                            Copiar a TODOS los días
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     @endforeach
                 </div>
 
-                {{-- Agregar nueva hora --}}
-                <div class="flex items-center gap-2 flex-wrap">
-                    <input type="time" wire:model.live="nuevaHora"
-                           placeholder="Selecciona hora"
-                           class="rounded-lg border border-amber-300 px-3 py-1.5 text-sm w-36 focus:border-amber-500 focus:ring-2 focus:ring-amber-200">
-                    <button type="button" wire:click="agregarHora"
-                            wire:loading.attr="disabled" wire:target="agregarHora"
-                            class="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 text-xs font-bold transition disabled:opacity-50">
-                        <i class="fa-solid fa-plus" wire:loading.remove wire:target="agregarHora"></i>
-                        <i class="fa-solid fa-spinner animate-spin" wire:loading wire:target="agregarHora"></i>
-                        Agregar hora
-                    </button>
-                    <span class="text-[10px] text-slate-500">
-                        Máx 8 horarios · Mín 1 · Formato HH:MM (zona horaria Bogotá)
-                    </span>
-                </div>
-                @error('saas_horas_envio') <p class="text-xs text-rose-600 mt-1">{{ $message }}</p> @enderror
-                @error('saas_horas_envio.*') <p class="text-xs text-rose-600 mt-1">{{ $message }}</p> @enderror
-
-                <p class="text-[11px] text-amber-900 bg-amber-200/30 rounded px-3 py-2 mt-3 font-semibold">
-                    📤 <strong>Resumen:</strong> el cliente recibirá hasta
-                    <strong>{{ count($saas_horas_envio) }}</strong> mensaje{{ count($saas_horas_envio) === 1 ? '' : 's' }}/día
-                    en: {{ implode(' · ', $saas_horas_envio) }}
+                @php
+                    $totalSemana = array_sum(array_map('count', $saas_horas_envio));
+                    $diasActivos = count(array_filter($saas_horas_envio, fn($a) => count($a) > 0));
+                @endphp
+                <p class="text-[11px] text-amber-900 bg-amber-200/30 rounded-lg px-3 py-2 mt-3 font-semibold">
+                    📤 <strong>Resumen semanal:</strong> {{ $totalSemana }} envío(s) totales en {{ $diasActivos }} día(s) activo(s).
+                    {{ $totalSemana === 0 ? '⚠️ Actualmente NADIE recibirá recordatorios.' : '' }}
                 </p>
             </div>
 

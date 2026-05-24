@@ -34,8 +34,21 @@ class ConfiguracionPlataforma extends Component
     public bool $saas_billing_activo      = true;
     public int  $saas_dias_antes_factura  = 7;
     public int  $saas_dias_gracia         = 7;
-    public array $saas_horas_envio        = ['10:00'];
-    public string $nuevaHora              = ''; // input temporal para agregar (vacío para que usuario elija)
+    /**
+     * Horarios por día. Estructura: ['lun' => ['09:00','14:00'], 'mar' => [...], ...]
+     * Días de la semana: lun, mar, mie, jue, vie, sab, dom
+     */
+    public array $saas_horas_envio = [
+        'lun' => ['10:00'],
+        'mar' => ['10:00'],
+        'mie' => ['10:00'],
+        'jue' => ['10:00'],
+        'vie' => ['10:00'],
+        'sab' => [],
+        'dom' => [],
+    ];
+    public string $nuevaHora = '';   // input temporal para agregar
+    public string $diaActivo = 'lun'; // día del cual estoy editando la hora nueva
     public bool $saas_aviso_preaviso      = true;
     public bool $saas_aviso_vence_hoy     = true;
     public bool $saas_aviso_vencio_ayer   = true;
@@ -72,9 +85,28 @@ class ConfiguracionPlataforma extends Component
         $this->saas_billing_activo     = (bool)   ($cfg->saas_billing_activo ?? true);
         $this->saas_dias_antes_factura = (int)    ($cfg->saas_dias_antes_factura ?? 7);
         $this->saas_dias_gracia        = (int)    ($cfg->saas_dias_gracia ?? 7);
-        $this->saas_horas_envio        = is_array($cfg->saas_horas_envio ?? null) && count($cfg->saas_horas_envio)
-                                          ? array_values($cfg->saas_horas_envio)
-                                          : ['10:00'];
+        // Cargar horarios: si es array plano viejo, migramos a estructura por día
+        $horas = $cfg->saas_horas_envio ?? null;
+        $diasSemana = ['lun','mar','mie','jue','vie','sab','dom'];
+
+        if (is_array($horas) && !empty($horas)) {
+            $primerKey = array_keys($horas)[0];
+            if (is_string($primerKey) && in_array($primerKey, $diasSemana, true)) {
+                // Ya está en formato por día
+                $estructura = [];
+                foreach ($diasSemana as $d) {
+                    $estructura[$d] = array_values(array_filter($horas[$d] ?? [], fn($h) => preg_match('/^\d{2}:\d{2}$/', (string)$h)));
+                }
+                $this->saas_horas_envio = $estructura;
+            } else {
+                // Formato plano viejo → aplicar a todos los días laborales
+                $flat = array_values(array_filter($horas, fn($h) => preg_match('/^\d{2}:\d{2}$/', (string)$h)));
+                $this->saas_horas_envio = [
+                    'lun' => $flat, 'mar' => $flat, 'mie' => $flat, 'jue' => $flat, 'vie' => $flat,
+                    'sab' => [], 'dom' => [],
+                ];
+            }
+        }
         $this->saas_aviso_preaviso     = (bool)   ($cfg->saas_aviso_preaviso ?? true);
         $this->saas_aviso_vence_hoy    = (bool)   ($cfg->saas_aviso_vence_hoy ?? true);
         $this->saas_aviso_vencio_ayer  = (bool)   ($cfg->saas_aviso_vencio_ayer ?? true);
@@ -104,8 +136,9 @@ class ConfiguracionPlataforma extends Component
             'saas_billing_activo'         => 'boolean',
             'saas_dias_antes_factura'     => 'required|integer|min:1|max:60',
             'saas_dias_gracia'            => 'required|integer|min:0|max:60',
-            'saas_horas_envio'            => 'required|array|min:1|max:8',
-            'saas_horas_envio.*'          => ['required','regex:/^([01]\d|2[0-3]):[0-5]\d$/'],
+            'saas_horas_envio'            => 'required|array',
+            'saas_horas_envio.*'          => 'array',
+            'saas_horas_envio.*.*'        => ['regex:/^([01]\d|2[0-3]):[0-5]\d$/'],
             'saas_aviso_preaviso'         => 'boolean',
             'saas_aviso_vence_hoy'        => 'boolean',
             'saas_aviso_vencio_ayer'      => 'boolean',
@@ -161,7 +194,7 @@ class ConfiguracionPlataforma extends Component
             'saas_billing_activo'         => $data['saas_billing_activo'],
             'saas_dias_antes_factura'     => $data['saas_dias_antes_factura'],
             'saas_dias_gracia'            => $data['saas_dias_gracia'],
-            'saas_horas_envio'            => array_values(array_unique($data['saas_horas_envio'])),
+            'saas_horas_envio'            => $this->normalizarHorasPorDia($data['saas_horas_envio']),
             'saas_aviso_preaviso'         => $data['saas_aviso_preaviso'],
             'saas_aviso_vence_hoy'        => $data['saas_aviso_vence_hoy'],
             'saas_aviso_vencio_ayer'      => $data['saas_aviso_vencio_ayer'],
@@ -376,15 +409,17 @@ class ConfiguracionPlataforma extends Component
         ]);
     }
 
-    /** ⏰ Agrega una hora al array (validada en formato HH:MM) */
-    public function agregarHora(): void
+    /** ⏰ Agrega una hora al día especificado */
+    public function agregarHoraDia(string $dia): void
     {
+        $diasValidos = ['lun','mar','mie','jue','vie','sab','dom'];
+        if (!in_array($dia, $diasValidos, true)) return;
+
         $h = trim($this->nuevaHora);
         if ($h === '') {
             $this->dispatch('notify', ['type' => 'error', 'message' => 'Selecciona primero una hora en el reloj']);
             return;
         }
-        // Normalizar HH:MM (algunos navegadores envían "HH:MM:SS")
         if (strlen($h) === 8 && substr_count($h, ':') === 2) {
             $h = substr($h, 0, 5);
         }
@@ -392,29 +427,67 @@ class ConfiguracionPlataforma extends Component
             $this->dispatch('notify', ['type' => 'error', 'message' => "Formato inválido '{$h}'. Usa HH:MM (ej. 09:30)"]);
             return;
         }
-        if (count($this->saas_horas_envio) >= 8) {
-            $this->dispatch('notify', ['type' => 'error', 'message' => 'Máximo 8 horarios por día (ya tienes 8)']);
+        $actuales = $this->saas_horas_envio[$dia] ?? [];
+        if (count($actuales) >= 8) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => "Máximo 8 horarios por día (ya tienes 8 en {$dia})"]);
             return;
         }
-        if (in_array($h, $this->saas_horas_envio, true)) {
-            $this->dispatch('notify', ['type' => 'error', 'message' => "La hora {$h} ya está en la lista. Elige una distinta."]);
+        if (in_array($h, $actuales, true)) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => "La hora {$h} ya está en el día {$dia}."]);
             return;
         }
-        $this->saas_horas_envio[] = $h;
-        sort($this->saas_horas_envio);
-        $this->nuevaHora = ''; // reset para que el siguiente pick sea diferente
-        $this->dispatch('notify', ['type' => 'success', 'message' => "✓ Hora {$h} agregada. Total: " . count($this->saas_horas_envio) . " horarios."]);
+        $actuales[] = $h;
+        sort($actuales);
+        $this->saas_horas_envio[$dia] = $actuales;
+        $this->nuevaHora = '';
+        $this->dispatch('notify', ['type' => 'success', 'message' => "✓ {$h} agregada a {$dia}."]);
     }
 
-    /** ⏰ Elimina una hora del array por índice */
-    public function quitarHora(int $idx): void
+    /** ⏰ Quita una hora del día especificado */
+    public function quitarHoraDia(string $dia, int $idx): void
     {
-        if (isset($this->saas_horas_envio[$idx]) && count($this->saas_horas_envio) > 1) {
-            unset($this->saas_horas_envio[$idx]);
-            $this->saas_horas_envio = array_values($this->saas_horas_envio);
-        } else {
-            $this->dispatch('notify', ['type' => 'error', 'message' => 'Debe haber al menos 1 horario configurado']);
+        if (isset($this->saas_horas_envio[$dia][$idx])) {
+            unset($this->saas_horas_envio[$dia][$idx]);
+            $this->saas_horas_envio[$dia] = array_values($this->saas_horas_envio[$dia]);
         }
+    }
+
+    /** 📋 Copia los horarios de un día a todos los demás (utility) */
+    public function copiarADiasLaborales(string $diaFuente): void
+    {
+        $horas = $this->saas_horas_envio[$diaFuente] ?? [];
+        foreach (['lun','mar','mie','jue','vie'] as $d) {
+            $this->saas_horas_envio[$d] = $horas;
+        }
+        $this->dispatch('notify', ['type' => 'success', 'message' => '✓ Horarios copiados a lunes-viernes']);
+    }
+
+    public function copiarATodosLosDias(string $diaFuente): void
+    {
+        $horas = $this->saas_horas_envio[$diaFuente] ?? [];
+        foreach (['lun','mar','mie','jue','vie','sab','dom'] as $d) {
+            $this->saas_horas_envio[$d] = $horas;
+        }
+        $this->dispatch('notify', ['type' => 'success', 'message' => '✓ Horarios copiados a TODOS los días']);
+    }
+
+    public function limpiarDia(string $dia): void
+    {
+        $this->saas_horas_envio[$dia] = [];
+    }
+
+    /** Normaliza la estructura antes de persistir: solo horas HH:MM válidas, sin duplicados, ordenadas */
+    private function normalizarHorasPorDia(array $struct): array
+    {
+        $out = [];
+        foreach (['lun','mar','mie','jue','vie','sab','dom'] as $d) {
+            $arr = $struct[$d] ?? [];
+            if (!is_array($arr)) $arr = [];
+            $arr = array_values(array_unique(array_filter($arr, fn($h) => preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', (string)$h))));
+            sort($arr);
+            $out[$d] = $arr;
+        }
+        return $out;
     }
 
     /** 💳 Prueba que las credenciales Wompi sean válidas llamando /v1/merchants/{public_key} */

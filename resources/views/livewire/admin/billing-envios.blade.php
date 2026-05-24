@@ -388,6 +388,15 @@
         @endif
     </div>
 
+    {{-- 🎨 Estilo del ícono brand en SweetAlert --}}
+    <style>
+        .swal2-icon-brand {
+            border-color: #d68643 !important;
+            color: #d68643 !important;
+        }
+        .swal2-icon-brand i { font-size: 38px; }
+    </style>
+
     {{-- 🎨 Script para confirmación y feedback estilo SweetAlert2 --}}
     <script>
         // Confirmar reintento con modal bonito
@@ -396,29 +405,29 @@
                 title: '¿Reintentar envío?',
                 html: `
                     <div style="text-align: left; font-size: 14px; line-height: 1.6;">
-                        <div style="background: #f1f5f9; border-radius: 12px; padding: 16px; margin: 12px 0;">
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
-                                <span style="color: #64748b;">Tenant:</span>
-                                <strong style="color: #0f172a;">${tenantNombre}</strong>
+                        <div style="background: linear-gradient(135deg, #fff7ed, #fef3c7); border: 1px solid #fed7aa; border-radius: 12px; padding: 16px; margin: 12px 0;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                                <span style="color: #92400e; font-weight: 600;"><i class="fa-solid fa-building" style="margin-right: 6px;"></i>Tenant:</span>
+                                <strong style="color: #7c2d12;">${tenantNombre}</strong>
                             </div>
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
-                                <span style="color: #64748b;">Teléfono:</span>
-                                <code style="background: #e2e8f0; padding: 2px 8px; border-radius: 4px; font-size: 12px;">+${telefono || '(sin tel)'}</code>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                                <span style="color: #92400e; font-weight: 600;"><i class="fa-solid fa-phone" style="margin-right: 6px;"></i>Teléfono:</span>
+                                <code style="background: white; border: 1px solid #fed7aa; padding: 2px 10px; border-radius: 6px; font-size: 12px; color: #7c2d12;">+${telefono || '(sin tel)'}</code>
                             </div>
                             <div style="display: flex; justify-content: space-between;">
-                                <span style="color: #64748b;">Intentos previos:</span>
-                                <span style="background: #fef3c7; color: #92400e; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 700;">${intentos}</span>
+                                <span style="color: #92400e; font-weight: 600;"><i class="fa-solid fa-rotate-right" style="margin-right: 6px;"></i>Intentos previos:</span>
+                                <span style="background: white; border: 1px solid #fed7aa; color: #7c2d12; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 700;">${intentos}</span>
                             </div>
                         </div>
-                        <p style="color: #64748b; font-size: 13px;">Se enviará el mismo mensaje al mismo destinatario. Si vuelve a fallar, podrás ver el error actualizado.</p>
+                        <p style="color: #64748b; font-size: 13px; margin-top: 12px;"><i class="fa-solid fa-circle-info" style="color: #d68643;"></i> Se enviará el mismo mensaje al mismo destinatario. Si vuelve a fallar, verás el error actualizado.</p>
                     </div>
                 `,
-                icon: 'question',
+                iconHtml: '<i class="fa-solid fa-paper-plane" style="color: #d68643;"></i>',
                 showCancelButton: true,
                 confirmButtonText: '<i class="fa-solid fa-paper-plane"></i> Sí, reintentar ahora',
                 cancelButtonText: 'Cancelar',
                 reverseButtons: true,
-                customClass: { confirmButton: 'swal2-confirm', cancelButton: 'swal2-cancel' },
+                customClass: { confirmButton: 'swal2-confirm', cancelButton: 'swal2-cancel', icon: 'swal2-icon-brand' },
             }).then(result => {
                 if (!result.isConfirmed) return;
 

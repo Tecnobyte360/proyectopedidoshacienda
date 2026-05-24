@@ -24,10 +24,25 @@ Artisan::command('inspire', function () {
 $leerHorasSaas = function (): array {
     try {
         $cfg = \App\Models\ConfiguracionPlataforma::actual();
-        $horas = is_array($cfg->saas_horas_envio) ? $cfg->saas_horas_envio : ['10:00'];
+        $horas = $cfg->saas_horas_envio ?? null;
+        if (!is_array($horas) || empty($horas)) return ['10:00'];
+
+        // Detectar formato: por día o flat
+        $primerKey = array_keys($horas)[0];
+        $dias = ['lun','mar','mie','jue','vie','sab','dom'];
+        if (is_string($primerKey) && in_array($primerKey, $dias, true)) {
+            // Estructura por día → obtener horarios del día actual
+            $diaMap = [
+                'Mon' => 'lun', 'Tue' => 'mar', 'Wed' => 'mie', 'Thu' => 'jue',
+                'Fri' => 'vie', 'Sat' => 'sab', 'Sun' => 'dom',
+            ];
+            $diaActual = $diaMap[now('America/Bogota')->format('D')] ?? 'lun';
+            return array_map('trim', $horas[$diaActual] ?? []);
+        }
+        // Formato flat (legacy)
         return array_map('trim', $horas);
     } catch (\Throwable $e) {
-        return ['10:00'];
+        return [];
     }
 };
 
