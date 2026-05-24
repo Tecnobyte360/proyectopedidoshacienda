@@ -992,10 +992,14 @@ MSG;
     public function renderizarPlantilla(string $plantilla, array $extras = []): string
     {
         $primerNombre = trim(explode(' ', (string) $this->cliente_nombre)[0] ?: 'cliente');
+        $envio = (float) ($this->costo_envio ?? 0);
         $vars = array_merge([
             'nombre'            => $primerNombre,
             'nombre_completo'   => $this->cliente_nombre ?: '',
             'pedido'            => $this->id,
+            'subtotal'          => '$' . number_format((float) $this->subtotal, 0, ',', '.'),
+            'envio'             => '$' . number_format($envio, 0, ',', '.'),
+            'envio_o_gratis'    => $envio > 0 ? '$' . number_format($envio, 0, ',', '.') : 'GRATIS',
             'total'             => '$' . number_format((float) $this->total, 0, ',', '.'),
             'token'             => $this->token_entrega ?? '',
             'direccion'         => $this->direccion ?? '',
