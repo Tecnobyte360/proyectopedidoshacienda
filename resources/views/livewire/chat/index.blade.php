@@ -251,6 +251,47 @@
                 </div>
 
                 <div class="flex items-center gap-1.5 flex-shrink-0">
+                    {{-- 📞 Llamar al cliente (lite: abre wa.me en pestaña nueva, o tel: para celular) --}}
+                    @php
+                        $telLlamar = preg_replace('/[^0-9]/', '', $conversacionActiva->telefono_normalizado ?? '');
+                    @endphp
+                    <div x-data="{ open: false }" class="relative">
+                        <button type="button" @click="open = !open" @click.outside="open = false"
+                                title="Llamar al cliente"
+                                class="rounded-lg bg-sky-500 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-sky-600 transition inline-flex items-center gap-1">
+                            <i class="fa-solid fa-phone"></i>
+                            <span class="hidden md:inline">Llamar</span>
+                        </button>
+                        <div x-show="open" x-transition x-cloak
+                             class="absolute right-0 mt-1 w-60 rounded-lg border border-slate-200 bg-white shadow-xl z-50 overflow-hidden">
+                            <a href="https://wa.me/{{ $telLlamar }}" target="_blank" rel="noopener"
+                               class="flex items-center gap-2 px-3 py-2 text-xs hover:bg-emerald-50 border-b border-slate-100">
+                                <i class="fa-brands fa-whatsapp text-emerald-500 text-base"></i>
+                                <div class="flex-1">
+                                    <div class="font-semibold text-slate-800">Llamar por WhatsApp</div>
+                                    <div class="text-[10px] text-slate-500">Abre WhatsApp Web en pestaña nueva</div>
+                                </div>
+                            </a>
+                            <a href="tel:+{{ $telLlamar }}"
+                               class="flex items-center gap-2 px-3 py-2 text-xs hover:bg-sky-50 border-b border-slate-100">
+                                <i class="fa-solid fa-phone text-sky-500 text-base"></i>
+                                <div class="flex-1">
+                                    <div class="font-semibold text-slate-800">Llamada normal</div>
+                                    <div class="text-[10px] text-slate-500">Marca al celular del cliente</div>
+                                </div>
+                            </a>
+                            <button type="button"
+                                    @click="navigator.clipboard.writeText('+{{ $telLlamar }}'); $dispatch('notify', { type:'success', message:'Número copiado: +{{ $telLlamar }}' }); open = false"
+                                    class="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-slate-50">
+                                <i class="fa-regular fa-copy text-slate-500 text-base"></i>
+                                <div class="flex-1 text-left">
+                                    <div class="font-semibold text-slate-800">Copiar número</div>
+                                    <div class="text-[10px] text-slate-500 font-mono">+{{ $telLlamar }}</div>
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+
                     {{-- 🛒 Crear pedido manual (precarga datos del estado) --}}
                     <a href="{{ route('pedidos.crear-manual', ['conv' => $conversacionActiva->id]) }}"
                        title="Crear pedido manualmente con datos del chat ya pre-cargados"
