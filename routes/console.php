@@ -18,9 +18,18 @@ Artisan::command('inspire', function () {
 // 🎂 Felicitaciones de cumpleaños
 // Evaluamos cada minuto y comparamos HH:MM exacto con la hora configurada
 // en ConfiguracionBot. Así el admin puede elegir cualquier hora (incluso :22).
-// 🚫 Auto-suspender tenants con suscripción vencida (corre 1 vez al día a las 03:00)
-Schedule::command('tenants:suspender-vencidos')
-    ->dailyAt('03:00')
+// 🚫 Gestión de morosidad SaaS — recordatorios escalonados (día -3/0/+1/+3) + suspensión al día +7
+// Corre todos los días a las 10:00 (hora "humana" para que llegue WhatsApp en horario laboral).
+Schedule::command('tenants:suspender-vencidos --gracia=7 --enviar')
+    ->dailyAt('10:00')
+    ->timezone('America/Bogota')
+    ->withoutOverlapping()
+    ->runInBackground();
+
+// 📅 Generar facturas mensuales SaaS — 7 días antes del vencimiento crea Pago pendiente
+// + link Wompi y lo manda al admin del tenant por WhatsApp. Corre cada día a las 09:00.
+Schedule::command('saas:generar-facturas-mensuales --dias=7 --enviar')
+    ->dailyAt('09:00')
     ->timezone('America/Bogota')
     ->withoutOverlapping()
     ->runInBackground();
