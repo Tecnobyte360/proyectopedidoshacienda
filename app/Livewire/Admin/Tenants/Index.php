@@ -638,13 +638,22 @@ class Index extends Component
             $data['requiere_2fa_desde'] = now();
         }
 
+        $eraNuevo = !$this->editandoId;
         $tenant = Tenant::updateOrCreate(['id' => $this->editandoId], $data);
 
         // Limpiar caché de mapeos de WhatsApp
         app(\App\Services\WhatsappResolverService::class)->limpiarCache();
 
+        // 🧬 Auto-clonar roles del sistema al tenant nuevo para aislamiento total
+        if ($eraNuevo) {
+            \Illuminate\Support\Facades\Artisan::call('tenants:bootstrap-roles', [
+                '--tenant'       => $tenant->slug,
+                '--keep-globals' => true, // mantener globales para futuros tenants
+            ]);
+        }
+
         // Crear admin inicial si solicitado y es nuevo tenant
-        if ($crear && !$this->editandoId) {
+        if ($crear && $eraNuevo) {
             $u = User::create([
                 'name'      => $adminNombre,
                 'email'     => $adminEmail,
@@ -652,7 +661,15 @@ class Index extends Component
                 'tenant_id' => $tenant->id,
                 'activo'    => true,
             ]);
-            $u->assignRole('admin');
+            // Asignar el rol 'admin' ya clonado al tenant (no el global)
+            $rolAdminTenant = \Spatie\Permission\Models\Role::where('name', 'admin')
+                ->where('tenant_id', $tenant->id)
+                ->first();
+            if ($rolAdminTenant) {
+                $u->assignRole($rolAdminTenant);
+            } else {
+                $u->assignRole('admin'); // fallback al global si por alguna razón no se clonó
+            }
         }
 
         // 💳 Crear suscripción automática si solicitado (solo en creación, no edición)

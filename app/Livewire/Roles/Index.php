@@ -269,31 +269,30 @@ class Index extends Component
             : null;
         $enSubdominioTenant = $sub && !in_array($sub, $reservados, true);
 
-        // Mostrar: roles globales (tenant_id NULL) + los del tenant actual.
-        // 🔧 IMPORTANTE: el count de usuarios SOLO debe contar usuarios del
-        //    tenant actual. Si no filtramos, un rol global mostraría usuarios
-        //    de TODOS los tenants, lo cual es confuso ("Chat-Only · 1 usuario"
-        //    aunque mi tenant no tenga ninguno con ese rol).
+        // 🏢 Aislamiento total por tenant:
+        //   - Si hay tenant en contexto → mostrar SOLO sus propios roles.
+        //   - Si NO hay tenant (super-admin en admin.kivox.co) → mostrar
+        //     solo los roles globales (plantillas/sistema).
         $rolesQuery = Role::with('permissions')
             ->withCount([
                 'users as users_count' => function ($q) use ($tenantId) {
                     if ($tenantId) {
                         $q->where('users.tenant_id', $tenantId);
                     } else {
-                        // En el dominio principal (super-admin sin tenant), contar
-                        // los super-admins globales (sin tenant).
                         $q->whereNull('users.tenant_id');
                     }
                 },
-            ])
-            ->where(function ($q) use ($tenantId) {
-                $q->whereNull('tenant_id');
-                if ($tenantId) {
-                    $q->orWhere('tenant_id', $tenantId);
-                }
-            })
-            ->orderByRaw('tenant_id IS NULL DESC') // globales primero
-            ->orderBy('name');
+            ]);
+
+        if ($tenantId) {
+            // Vista de tenant: solo sus roles (no globales)
+            $rolesQuery->where('tenant_id', $tenantId);
+        } else {
+            // Vista de super-admin en dominio principal: solo roles globales
+            $rolesQuery->whereNull('tenant_id');
+        }
+
+        $rolesQuery->orderBy('name');
 
         // 🚫 Ocultar rol 'super-admin' en subdominios de tenant. Ese rol es del
         //    dueño de la plataforma — solo debe verse desde admin.kivox.co.
