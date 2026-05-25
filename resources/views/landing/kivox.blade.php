@@ -8,12 +8,11 @@
     $host = request()->getHost();
 @endphp
 <!DOCTYPE html>
-<html lang="es" class="scroll-smooth">
+<html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ $brand }} · Próximamente</title>
-    <meta name="description" content="Estamos construyendo algo increíble. Pronto disponible.">
     <meta name="robots" content="noindex,nofollow">
     <link rel="icon" href="{{ $cfg->favicon_url ?? '/favicon.ico' }}">
     <script src="https://cdn.tailwindcss.com"></script>
@@ -28,56 +27,74 @@
             --ink: #0a0a0a;
         }
         * { -webkit-font-smoothing: antialiased; }
-        body { font-family: 'Inter', sans-serif; letter-spacing: -0.011em; overflow: hidden; }
-
-        .display { font-family: 'Inter', sans-serif; letter-spacing: -0.04em; line-height: 0.95; font-weight: 800; }
+        body { font-family: 'Inter', sans-serif; letter-spacing: -0.011em; overflow: hidden; background: #0a0a0a; color: white; }
+        .display { font-family: 'Inter', sans-serif; letter-spacing: -0.04em; line-height: 0.92; font-weight: 800; }
         .serif { font-family: 'Instrument Serif', serif; font-style: italic; letter-spacing: -0.02em; font-weight: 400; }
         .gradient-text {
             background: linear-gradient(135deg, var(--brand), var(--brand-2));
             -webkit-background-clip: text; background-clip: text; color: transparent;
         }
 
-        /* ── Animated mesh background ── */
+        /* ── Mesh gradient background ── */
         .mesh-bg {
             position: absolute; inset: 0;
             background:
-                radial-gradient(at 20% 30%, {{ $primario }}30 0px, transparent 50%),
-                radial-gradient(at 80% 70%, {{ $secundario }}30 0px, transparent 50%),
-                radial-gradient(at 50% 50%, {{ $primario }}15 0px, transparent 40%);
+                radial-gradient(at 20% 30%, {{ $primario }}40 0px, transparent 50%),
+                radial-gradient(at 80% 70%, {{ $secundario }}40 0px, transparent 50%),
+                radial-gradient(at 50% 50%, {{ $primario }}20 0px, transparent 40%);
             animation: mesh 20s ease-in-out infinite;
         }
         @keyframes mesh {
             0%, 100% { transform: scale(1) rotate(0deg); }
-            50%      { transform: scale(1.1) rotate(2deg); }
+            50%      { transform: scale(1.15) rotate(3deg); }
         }
 
-        /* ── Floating particles ── */
-        .particle {
-            position: absolute; border-radius: 50%;
-            background: linear-gradient(135deg, var(--brand), var(--brand-2));
-            opacity: .1; pointer-events: none;
-            animation: float-particle 15s infinite ease-in-out;
-        }
-        @keyframes float-particle {
-            0%, 100% { transform: translate(0, 0); }
-            33%      { transform: translate(80px, -60px); }
-            66%      { transform: translate(-50px, 40px); }
+        /* ── Grain texture ── */
+        .grain::after {
+            content: '';
+            position: absolute; inset: 0;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+            opacity: 0.06; pointer-events: none; mix-blend-mode: overlay;
         }
 
         /* ── Grid pattern ── */
         .grid-pattern {
             background-image:
-                linear-gradient(rgba(10,10,10,.04) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(10,10,10,.04) 1px, transparent 1px);
-            background-size: 60px 60px;
+                linear-gradient(rgba(255,255,255,.04) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,.04) 1px, transparent 1px);
+            background-size: 80px 80px;
             mask-image: radial-gradient(ellipse at center, black 30%, transparent 70%);
             -webkit-mask-image: radial-gradient(ellipse at center, black 30%, transparent 70%);
         }
 
-        /* ── Pulse ring ── */
+        /* ── Particles ── */
+        .particle {
+            position: absolute; border-radius: 50%;
+            background: linear-gradient(135deg, var(--brand), var(--brand-2));
+            opacity: .12; pointer-events: none; filter: blur(40px);
+            animation: float 25s infinite ease-in-out;
+        }
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            33%      { transform: translate(100px, -80px) scale(1.2); }
+            66%      { transform: translate(-60px, 50px) scale(.9); }
+        }
+
+        /* ── Reveal sequence ── */
+        @keyframes fade-up {
+            from { opacity: 0; transform: translateY(20px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .fade-1 { opacity: 0; animation: fade-up 1s .1s forwards; }
+        .fade-2 { opacity: 0; animation: fade-up 1s .4s forwards; }
+        .fade-3 { opacity: 0; animation: fade-up 1s .7s forwards; }
+        .fade-4 { opacity: 0; animation: fade-up 1s 1s forwards; }
+        .fade-5 { opacity: 0; animation: fade-up 1s 1.3s forwards; }
+
+        /* ── Play button pulse ── */
         @keyframes pulse-ring {
-            0%   { transform: scale(.85); opacity: .8; }
-            100% { transform: scale(1.8); opacity: 0; }
+            0%   { transform: scale(.85); opacity: .9; }
+            100% { transform: scale(1.6); opacity: 0; }
         }
         .pulse-ring::before, .pulse-ring::after {
             content: ''; position: absolute; inset: 0; border-radius: 50%;
@@ -86,144 +103,201 @@
         }
         .pulse-ring::after { animation-delay: 1.25s; }
 
-        /* ── Reveal sequence ── */
-        @keyframes fade-up {
-            from { opacity: 0; transform: translateY(20px); }
-            to   { opacity: 1; transform: translateY(0); }
+        /* ── Audio bars equalizer ── */
+        .bar {
+            display: inline-block;
+            width: 3px;
+            margin: 0 2px;
+            background: linear-gradient(180deg, var(--brand), var(--brand-2));
+            border-radius: 2px;
+            transform-origin: center;
         }
-        .fade-in-1 { opacity: 0; animation: fade-up .8s .2s forwards; }
-        .fade-in-2 { opacity: 0; animation: fade-up .8s .5s forwards; }
-        .fade-in-3 { opacity: 0; animation: fade-up .8s .8s forwards; }
-        .fade-in-4 { opacity: 0; animation: fade-up .8s 1.1s forwards; }
-        .fade-in-5 { opacity: 0; animation: fade-up .8s 1.4s forwards; }
+        .playing .bar { animation: bounce 1s ease-in-out infinite; }
+        .bar:nth-child(1)  { animation-delay: -0.0s; }
+        .bar:nth-child(2)  { animation-delay: -0.2s; }
+        .bar:nth-child(3)  { animation-delay: -0.4s; }
+        .bar:nth-child(4)  { animation-delay: -0.6s; }
+        .bar:nth-child(5)  { animation-delay: -0.8s; }
+        .bar:nth-child(6)  { animation-delay: -0.3s; }
+        .bar:nth-child(7)  { animation-delay: -0.5s; }
+        .bar:nth-child(8)  { animation-delay: -0.7s; }
+        .bar:nth-child(9)  { animation-delay: -0.9s; }
+        .bar:nth-child(10) { animation-delay: -0.1s; }
+        .bar:nth-child(11) { animation-delay: -0.4s; }
+        .bar:nth-child(12) { animation-delay: -0.6s; }
+        .bar:nth-child(13) { animation-delay: -0.2s; }
+        .bar:nth-child(14) { animation-delay: -0.8s; }
+        .bar:nth-child(15) { animation-delay: -0.5s; }
+        @keyframes bounce {
+            0%, 100% { height: 12px; }
+            50%      { height: 60px; }
+        }
+        .bar.idle { height: 12px; transition: height .3s; }
 
-        /* ── Subtle shimmer on logo ── */
-        @keyframes shimmer {
-            0%   { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        /* ── Big animated text ── */
+        @keyframes text-glow {
+            0%, 100% { text-shadow: 0 0 20px {{ $primario }}40, 0 0 40px {{ $primario }}20; }
+            50%      { text-shadow: 0 0 30px {{ $primario }}80, 0 0 60px {{ $primario }}40; }
         }
-        .shimmer { animation: shimmer 20s linear infinite; }
+        .glow-text { animation: text-glow 4s ease-in-out infinite; }
 
-        /* ── Btn ── */
-        .btn-primary {
-            background: var(--ink); color: white;
-            transition: all .3s cubic-bezier(.4,0,.2,1);
+        /* ── Marquee de palabras ── */
+        @keyframes marquee {
+            0%   { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
         }
-        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 20px 40px -10px rgba(0,0,0,.4); }
+        .marquee {
+            display: flex; gap: 4rem;
+            animation: marquee 40s linear infinite;
+            width: max-content;
+            white-space: nowrap;
+        }
+
+        [x-cloak] { display: none !important; }
     </style>
 </head>
-<body class="bg-[#fafaf9] text-[var(--ink)] relative min-h-screen">
+<body x-data="{
+    playing: false,
+    audio: null,
+    init() {
+        this.audio = new Audio('/audio/maintenance.mp3');
+        this.audio.addEventListener('ended', () => this.playing = false);
+        this.audio.addEventListener('pause', () => this.playing = false);
+        this.audio.addEventListener('play', () => this.playing = true);
+    },
+    toggle() {
+        if (this.playing) { this.audio.pause(); }
+        else { this.audio.play(); }
+    }
+}" class="relative grain">
 
     {{-- Background layers --}}
     <div class="mesh-bg"></div>
     <div class="absolute inset-0 grid-pattern"></div>
 
-    {{-- Floating decorative particles --}}
-    <div class="particle w-32 h-32 top-1/4 left-[10%] blur-2xl" style="animation-delay: 0s"></div>
-    <div class="particle w-24 h-24 top-2/3 right-[15%] blur-2xl" style="animation-delay: -5s"></div>
-    <div class="particle w-40 h-40 bottom-[15%] left-[20%] blur-3xl" style="animation-delay: -10s"></div>
-    <div class="particle w-20 h-20 top-[10%] right-[25%] blur-2xl" style="animation-delay: -8s"></div>
+    <div class="particle w-96 h-96 top-[10%] left-[5%]" style="animation-delay: 0s"></div>
+    <div class="particle w-80 h-80 top-[50%] right-[5%]" style="animation-delay: -7s"></div>
+    <div class="particle w-72 h-72 bottom-[10%] left-[30%]" style="animation-delay: -14s"></div>
 
     {{-- Content --}}
     <div class="relative z-10 min-h-screen flex flex-col">
 
-        {{-- Top nav minimal --}}
-        <header class="flex items-center justify-between px-6 lg:px-12 py-6 fade-in-1">
+        {{-- Top nav --}}
+        <header class="flex items-center justify-between px-6 lg:px-12 py-6 fade-1">
             <div class="flex items-center gap-2.5">
                 @if($logoUrl)
-                    <img src="{{ $logoUrl }}" alt="{{ $brand }}" class="h-9 w-auto">
+                    <img src="{{ $logoUrl }}" alt="{{ $brand }}" class="h-10 w-auto">
                 @else
-                    <div class="h-9 w-9 rounded-xl bg-[var(--ink)] text-white flex items-center justify-center font-black">K</div>
+                    <div class="h-10 w-10 rounded-xl bg-white text-[var(--ink)] flex items-center justify-center font-black">K</div>
                 @endif
-                <span class="text-[17px] font-bold tracking-tight">{{ $brand }}</span>
+                <span class="text-[18px] font-bold tracking-tight text-white">{{ $brand }}</span>
             </div>
 
-            <a href="https://admin.{{ $host }}/login" class="inline-flex items-center gap-1.5 text-[13px] font-medium text-[var(--ink)]/70 hover:text-[var(--ink)] transition">
+            <a href="https://admin.{{ $host }}/login" class="inline-flex items-center gap-1.5 text-[13px] font-medium text-white/70 hover:text-white transition">
                 Iniciar sesión <i class="fa-solid fa-arrow-right text-[10px]"></i>
             </a>
         </header>
 
         {{-- Hero --}}
-        <main class="flex-1 flex items-center justify-center px-6 lg:px-12 py-12">
-            <div class="max-w-4xl text-center">
+        <main class="flex-1 flex items-center justify-center px-6 lg:px-12 py-8">
+            <div class="max-w-5xl w-full text-center">
 
                 {{-- Badge --}}
-                <div class="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-white border border-[var(--ink)]/10 shadow-sm text-[12px] font-semibold text-[var(--ink)]/80 mb-8 fade-in-1">
+                <div class="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-white/5 backdrop-blur border border-white/10 text-[12px] font-semibold text-white/90 mb-10 fade-1">
                     <span class="relative flex h-2 w-2">
                         <span class="absolute inline-flex h-full w-full rounded-full opacity-75 animate-ping" style="background: {{ $primario }};"></span>
                         <span class="relative inline-flex rounded-full h-2 w-2" style="background: {{ $primario }};"></span>
                     </span>
-                    Construyendo algo increíble
+                    Trabajando en algo grande
                 </div>
 
-                {{-- Big icon with shimmer --}}
-                <div class="fade-in-2 mb-8 flex justify-center">
-                    <div class="relative">
-                        <div class="absolute inset-0 shimmer">
-                            <div class="absolute -inset-4 rounded-full opacity-20 blur-2xl" style="background: linear-gradient(135deg, var(--brand), var(--brand-2));"></div>
-                        </div>
-                        <div class="relative h-24 w-24 rounded-3xl bg-white border border-[var(--ink)]/10 shadow-2xl flex items-center justify-center">
-                            <i class="fa-solid fa-screwdriver-wrench text-[var(--brand)] text-4xl"></i>
-                        </div>
-                    </div>
-                </div>
-
-                {{-- Headline --}}
-                <h1 class="display text-[56px] sm:text-[80px] lg:text-[112px] fade-in-3">
-                    Estamos en<br>
-                    <span class="serif text-[var(--brand)]">mantenimiento</span>.
+                {{-- Headline gigante --}}
+                <h1 class="display text-[80px] sm:text-[120px] lg:text-[180px] xl:text-[220px] tracking-[-0.05em] fade-2 glow-text">
+                    <span class="block">Pronto</span>
+                    <span class="block serif text-[var(--brand)]" style="font-size: 0.7em">volvemos</span>
                 </h1>
 
-                <p class="text-[17px] lg:text-[20px] text-[var(--ink)]/60 mt-8 max-w-2xl mx-auto leading-relaxed fade-in-4">
-                    Estamos puliendo cada detalle para darte la mejor experiencia.
-                    Volvemos en muy poco tiempo con sorpresas.
-                </p>
+                {{-- Audio CTA gigante --}}
+                <div class="mt-14 fade-3">
+                    <p class="text-[13px] uppercase tracking-[0.3em] text-white/50 font-semibold mb-6">
+                        <i class="fa-solid fa-headphones"></i> Escucha el mensaje de {{ $brand }}
+                    </p>
 
-                {{-- CTAs --}}
-                <div class="flex flex-wrap items-center justify-center gap-3 mt-12 fade-in-5">
-                    <a href="https://wa.me/573216499744?text=Hola%20Kivox%2C%20quiero%20saber%20cuando%20vuelven" target="_blank"
-                       class="btn-primary inline-flex items-center gap-2 text-[15px] font-semibold px-6 py-3.5 rounded-full">
-                        <i class="fa-brands fa-whatsapp text-[var(--brand)]"></i> Avísame cuando vuelvan
-                    </a>
-                    <a href="https://admin.{{ $host }}/login"
-                       class="inline-flex items-center gap-2 text-[15px] font-semibold px-6 py-3.5 rounded-full bg-white border border-[var(--ink)]/10 hover:border-[var(--ink)] transition">
-                        Acceder al panel <i class="fa-solid fa-arrow-right text-[11px]"></i>
-                    </a>
+                    <button @click="toggle()"
+                            :class="playing ? 'playing scale-105' : ''"
+                            class="group relative inline-flex items-center gap-6 px-8 py-5 rounded-full bg-white/5 backdrop-blur border border-white/10 hover:border-white/30 transition-all">
+
+                        {{-- Play / Pause button --}}
+                        <div class="relative">
+                            <div class="absolute -inset-2 rounded-full opacity-30 blur-xl" style="background: linear-gradient(135deg, var(--brand), var(--brand-2));"></div>
+                            <div class="relative flex h-16 w-16 items-center justify-center rounded-full text-white shadow-2xl pulse-ring"
+                                 style="background: linear-gradient(135deg, var(--brand), var(--brand-2));">
+                                <i x-show="!playing" class="fa-solid fa-play text-xl ml-1"></i>
+                                <i x-show="playing" x-cloak class="fa-solid fa-pause text-xl"></i>
+                            </div>
+                        </div>
+
+                        {{-- Equalizer bars --}}
+                        <div class="flex items-center h-16">
+                            @for($i = 0; $i < 15; $i++)
+                                <span class="bar idle"></span>
+                            @endfor
+                        </div>
+
+                        <div class="text-left">
+                            <div class="text-[15px] font-bold text-white">
+                                <span x-show="!playing">Reproducir mensaje</span>
+                                <span x-show="playing" x-cloak>Reproduciendo…</span>
+                            </div>
+                            <div class="text-[11px] text-white/50">~15 segundos · voz natural IA</div>
+                        </div>
+                    </button>
                 </div>
 
-                {{-- Status --}}
-                <div class="mt-16 fade-in-5">
-                    <div class="inline-flex items-center gap-6 text-[12px] text-[var(--ink)]/60">
-                        <div class="flex items-center gap-2">
-                            <i class="fa-solid fa-circle-check text-[var(--brand)] text-[10px]"></i>
-                            Sistema operativo
-                        </div>
-                        <div class="h-3 w-px bg-[var(--ink)]/15"></div>
-                        <div class="flex items-center gap-2">
-                            <i class="fa-solid fa-circle text-amber-500 text-[8px]"></i>
-                            Landing en mejora
-                        </div>
-                        <div class="h-3 w-px bg-[var(--ink)]/15"></div>
-                        <div class="flex items-center gap-2">
-                            <i class="fa-solid fa-circle-check text-[var(--brand)] text-[10px]"></i>
-                            App de clientes activa
-                        </div>
-                    </div>
+                {{-- CTAs --}}
+                <div class="flex flex-wrap items-center justify-center gap-3 mt-14 fade-4">
+                    <a href="https://wa.me/573216499744?text=Hola%20Kivox%2C%20quiero%20saber%20cuando%20vuelven" target="_blank"
+                       class="inline-flex items-center gap-2 bg-white text-[var(--ink)] font-semibold text-[14px] px-5 py-3 rounded-full hover:scale-105 transition">
+                        <i class="fa-brands fa-whatsapp text-emerald-600"></i> Hablar por WhatsApp
+                    </a>
+                    <a href="https://admin.{{ $host }}/login"
+                       class="inline-flex items-center gap-2 text-white/80 hover:text-white font-medium text-[14px] px-5 py-3 rounded-full border border-white/15 hover:border-white/40 transition">
+                        Acceder al panel <i class="fa-solid fa-arrow-right text-[10px]"></i>
+                    </a>
                 </div>
             </div>
         </main>
 
-        {{-- Footer --}}
-        <footer class="px-6 lg:px-12 py-6 fade-in-5">
-            <div class="flex flex-col md:flex-row items-center justify-between gap-3 text-[12px] text-[var(--ink)]/50">
-                <span>© {{ date('Y') }} {{ $brand }}. Todos los derechos reservados.</span>
-                <div class="flex items-center gap-2">
-                    @foreach(['instagram','linkedin','whatsapp'] as $s)
-                        <a href="#" class="h-8 w-8 flex items-center justify-center rounded-full border border-[var(--ink)]/10 hover:border-[var(--ink)]/40 hover:bg-white transition">
-                            <i class="fa-brands fa-{{ $s }} text-[12px]"></i>
-                        </a>
-                    @endforeach
-                </div>
+        {{-- Marquee bottom --}}
+        <div class="border-t border-white/5 py-5 overflow-hidden fade-5">
+            <div class="marquee text-[14px] uppercase tracking-[0.3em] text-white/30 font-semibold">
+                <span>Volvemos pronto</span>
+                <span style="color: var(--brand)">●</span>
+                <span>Estamos puliendo detalles</span>
+                <span style="color: var(--brand)">●</span>
+                <span>Coming soon</span>
+                <span style="color: var(--brand)">●</span>
+                <span>Stay tuned</span>
+                <span style="color: var(--brand)">●</span>
+                <span>{{ $brand }}</span>
+                <span style="color: var(--brand)">●</span>
+                <span>Volvemos pronto</span>
+                <span style="color: var(--brand)">●</span>
+                <span>Estamos puliendo detalles</span>
+                <span style="color: var(--brand)">●</span>
+                <span>Coming soon</span>
+                <span style="color: var(--brand)">●</span>
+                <span>Stay tuned</span>
+                <span style="color: var(--brand)">●</span>
+                <span>{{ $brand }}</span>
+            </div>
+        </div>
+
+        {{-- Footer mini --}}
+        <footer class="px-6 lg:px-12 py-4 fade-5">
+            <div class="flex items-center justify-between text-[11px] text-white/40">
+                <span>© {{ date('Y') }} {{ $brand }}</span>
+                <span>Hecho en Colombia 🇨🇴</span>
             </div>
         </footer>
     </div>
