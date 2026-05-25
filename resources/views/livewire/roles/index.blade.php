@@ -58,10 +58,13 @@
                                         'cajero'      => ['bg' => 'from-emerald-500 to-emerald-600','badge' => 'bg-emerald-100 text-emerald-700', 'icon' => 'fa-cash-register'],
                                         'super-admin' => ['bg' => 'from-amber-500 to-amber-600',    'badge' => 'bg-amber-100 text-amber-700',     'icon' => 'fa-shield-halved'],
                                         'domiciliario'=> ['bg' => 'from-cyan-500 to-cyan-600',      'badge' => 'bg-cyan-100 text-cyan-700',       'icon' => 'fa-motorcycle'],
-                                        'chatbot'     => ['bg' => 'from-slate-500 to-slate-600',    'badge' => 'bg-slate-100 text-slate-700',     'icon' => 'fa-robot'],
+                                        'chatbot'     => ['bg' => 'from-indigo-500 to-indigo-600',  'badge' => 'bg-indigo-100 text-indigo-700',   'icon' => 'fa-robot'],
                                         'chat-only'   => ['bg' => 'from-pink-500 to-pink-600',      'badge' => 'bg-pink-100 text-pink-700',       'icon' => 'fa-comments'],
                                     ];
-                                    $c = $colores[$rol->name] ?? ['bg' => 'from-slate-500 to-slate-600', 'badge' => 'bg-slate-100 text-slate-700', 'icon' => 'fa-user-shield'];
+                                    // 🔧 Normalizar nombre del rol a minúsculas para que el lookup funcione
+                                    // sin importar si en DB está como "ChatBot", "Chat-Only", etc.
+                                    $rolKey = strtolower(trim($rol->name));
+                                    $c = $colores[$rolKey] ?? ['bg' => 'from-slate-400 to-slate-500', 'badge' => 'bg-slate-100 text-slate-700', 'icon' => 'fa-user-shield'];
                                     $agrupados = $rol->permissions->sortBy('name')->groupBy(function ($p) {
                                         return str_contains($p->name, '.') ? explode('.', $p->name)[0] : 'otros';
                                     });
@@ -94,21 +97,22 @@
                                             </span>
                                         @endif
                                     </td>
-                                    {{-- PERMISOS por módulo (pills) --}}
+                                    {{-- PERMISOS por módulo (pills compactas) --}}
                                     <td class="px-4 py-3.5 hidden md:table-cell">
                                         @if($rol->permissions->count() > 0)
-                                            <div class="flex flex-wrap gap-1 max-w-xl">
+                                            <div class="flex flex-wrap gap-1.5 max-w-2xl">
                                                 @foreach($agrupados as $modulo => $perms)
-                                                    <span class="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full {{ $c['badge'] }} capitalize"
-                                                          title="{{ $perms->pluck('name')->implode(', ') }}">
-                                                        <i class="fa-solid fa-folder text-[9px]"></i>
+                                                    <span class="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-md bg-slate-50 border border-slate-200 text-slate-700 capitalize hover:bg-slate-100 transition"
+                                                          title="{{ $perms->pluck('name')->implode(' · ') }}">
                                                         {{ $modulo }}
-                                                        <span class="text-[9px] opacity-75">({{ $perms->count() }})</span>
+                                                        <span class="inline-flex items-center justify-center min-w-[1.1rem] h-[1.1rem] rounded-full {{ $c['badge'] }} text-[9px] font-extrabold">
+                                                            {{ $perms->count() }}
+                                                        </span>
                                                     </span>
                                                 @endforeach
                                             </div>
                                         @else
-                                            <span class="text-xs text-slate-400">Sin permisos</span>
+                                            <span class="text-xs text-slate-400 italic">Sin permisos</span>
                                         @endif
                                     </td>
                                     {{-- TOTAL count --}}
