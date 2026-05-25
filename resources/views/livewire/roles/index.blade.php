@@ -121,14 +121,27 @@
                                                     class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 hover:bg-brand-soft hover:text-brand-secondary text-slate-600 transition">
                                                 <i class="fa-solid fa-pen-to-square text-xs"></i>
                                             </button>
-                                            @if($rol->name !== 'admin' && !($rol->es_global ?? false))
-                                                <button wire:click="eliminar({{ $rol->id }})"
-                                                        wire:confirm="¿Eliminar el rol '{{ $rol->name }}'?"
-                                                        title="Eliminar"
-                                                        class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 transition">
-                                                    <i class="fa-solid fa-trash text-xs"></i>
-                                                </button>
-                                            @endif
+                                        @endif
+
+                                        {{-- 🗑️ ELIMINAR
+                                             - Super-admin: puede eliminar cualquier rol (incluso los del sistema)
+                                                excepto 'admin' y 'super-admin' que son críticos.
+                                             - Tenant admin: solo elimina roles propios de su tenant. --}}
+                                        @php
+                                            $rolNombre = strtolower($rol->name ?? '');
+                                            $esIntocable = in_array($rolNombre, ['admin', 'super-admin'], true);
+                                            $puedeEliminar = !$esIntocable && (
+                                                $esSuperAdmin
+                                                || (!($rol->es_global ?? false) && ($rol->es_editable ?? false))
+                                            );
+                                        @endphp
+                                        @if($puedeEliminar)
+                                            <button wire:click="eliminar({{ $rol->id }})"
+                                                    wire:confirm="¿Eliminar el rol '{{ $rol->name }}'? {{ $rol->users_count > 0 ? '⚠️ Tiene ' . $rol->users_count . ' usuario(s) — debes reasignarlos primero.' : 'Esta acción no se puede deshacer.' }}"
+                                                    title="Eliminar"
+                                                    class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 transition">
+                                                <i class="fa-solid fa-trash text-xs"></i>
+                                            </button>
                                         @endif
                                     </td>
                                 </tr>

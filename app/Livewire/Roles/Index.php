@@ -128,10 +128,23 @@ class Index extends Component
         $rol = Role::find($id);
         if (!$rol) return;
 
-        if (!$this->puedeEditar($rol)) {
+        // 🚫 Roles intocables incluso para super-admin: la plataforma depende de ellos
+        $intocables = ['admin', 'super-admin'];
+        if (in_array(strtolower($rol->name), $intocables, true)) {
             $this->dispatch('notify', [
                 'type'    => 'error',
-                'message' => 'No puedes eliminar un rol del sistema.',
+                'message' => "El rol '{$rol->name}' es crítico para la plataforma y no puede eliminarse.",
+            ]);
+            return;
+        }
+
+        // Permiso de eliminar:
+        //  - Super-admin: puede eliminar cualquier rol (incluyendo los del sistema)
+        //  - Tenant admin: solo puede eliminar roles propios de su tenant
+        if (!$this->esSuperAdmin() && !$this->puedeEditar($rol)) {
+            $this->dispatch('notify', [
+                'type'    => 'error',
+                'message' => 'No tienes permiso para eliminar este rol.',
             ]);
             return;
         }
@@ -139,13 +152,15 @@ class Index extends Component
         if ($rol->users()->count() > 0) {
             $this->dispatch('notify', [
                 'type'    => 'warning',
-                'message' => "No se puede eliminar — el rol '{$rol->name}' tiene usuarios asignados.",
+                'message' => "No se puede eliminar — el rol '{$rol->name}' tiene {$rol->users()->count()} usuario(s) asignado(s). Reasígnalos primero.",
             ]);
             return;
         }
 
+        $nombre = $rol->name;
         $rol->delete();
-        $this->dispatch('notify', ['type' => 'success', 'message' => 'Rol eliminado.']);
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+        $this->dispatch('notify', ['type' => 'success', 'message' => "🗑️ Rol '{$nombre}' eliminado."]);
     }
 
     /**
