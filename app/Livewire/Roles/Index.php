@@ -103,8 +103,16 @@ class Index extends Component
                 return;
             }
 
-            // Si NO es super-admin, asignar tenant_id automáticamente
-            $tenantIdParaCrear = $this->esSuperAdmin() ? null : $tenantId;
+            // 🏢 Determinar tenant_id del rol nuevo:
+            //   - Si hay un tenant activo (tenant admin O super-admin impersonando)
+            //     → el rol pertenece a ESE tenant (NUNCA global).
+            //   - Solo si NO hay tenant activo (super-admin desde admin.kivox.co)
+            //     → entonces sí se crea como rol global.
+            // Esto garantiza que cada tenant tenga sus propios roles aislados.
+            $tenantIdParaCrear = $tenantId; // si hay tenant en contexto, va al tenant
+            if (!$tenantId && $this->esSuperAdmin()) {
+                $tenantIdParaCrear = null;  // super-admin en dominio principal → rol global
+            }
 
             $rol = Role::create([
                 'name' => $data['name'],
@@ -234,8 +242,23 @@ class Index extends Component
             : null;
         $enSubdominioTenant = $sub && !in_array($sub, $reservados, true);
 
-        // Mostrar: roles globales (tenant_id NULL) + los del tenant actual
-        $rolesQuery = Role::with('permissions')->withCount('users')
+        // Mostrar: roles globales (tenant_id NULL) + los del tenant actual.
+        // 🔧 IMPORTANTE: el count de usuarios SOLO debe contar usuarios del
+        //    tenant actual. Si no filtramos, un rol global mostraría usuarios
+        //    de TODOS los tenants, lo cual es confuso ("Chat-Only · 1 usuario"
+        //    aunque mi tenant no tenga ninguno con ese rol).
+        $rolesQuery = Role::with('permissions')
+            ->withCount([
+                'users as users_count' => function ($q) use ($tenantId) {
+                    if ($tenantId) {
+                        $q->where('users.tenant_id', $tenantId);
+                    } else {
+                        // En el dominio principal (super-admin sin tenant), contar
+                        // los super-admins globales (sin tenant).
+                        $q->whereNull('users.tenant_id');
+                    }
+                },
+            ])
             ->where(function ($q) use ($tenantId) {
                 $q->whereNull('tenant_id');
                 if ($tenantId) {
@@ -303,10 +326,20 @@ class Index extends Component
             }
         }
 
+        // Nombre del tenant activo (si lo hay) para mostrar en el modal
+        $nombreTenantActivo = null;
+        if ($tenantId) {
+            $tenantActivo = app(\App\Services\TenantManager::class)->withoutTenant(
+                fn () => \App\Models\Tenant::find($tenantId)
+            );
+            $nombreTenantActivo = $tenantActivo?->nombre;
+        }
+
         return view('livewire.roles.index', [
-            'roles'           => $roles,
-            'permisosPorMod'  => $permisosPorMod,
-            'esSuperAdmin'    => $esSuper,
+            'roles'              => $roles,
+            'permisosPorMod'     => $permisosPorMod,
+            'esSuperAdmin'       => $esSuper,
+            'nombreTenantActivo' => $nombreTenantActivo,
         ])->layout('layouts.app');
     }
 }

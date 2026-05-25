@@ -234,6 +234,27 @@
                         </div>
                     @endif
 
+                    {{-- 🏢 Indicador del scope del rol: ¿para qué tenant se crea? --}}
+                    @if(!$editandoId && !$soloLectura)
+                        @if($nombreTenantActivo)
+                            <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 flex items-start gap-3">
+                                <i class="fa-solid fa-building text-emerald-600 mt-0.5"></i>
+                                <div class="text-xs">
+                                    <p class="font-bold text-emerald-900">Este rol será solo para: {{ $nombreTenantActivo }}</p>
+                                    <p class="text-emerald-700 mt-0.5">Otros tenants NO verán este rol ni sus permisos.</p>
+                                </div>
+                            </div>
+                        @elseif($esSuperAdmin)
+                            <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 flex items-start gap-3">
+                                <i class="fa-solid fa-globe text-amber-600 mt-0.5"></i>
+                                <div class="text-xs">
+                                    <p class="font-bold text-amber-900">Estás creando un rol GLOBAL del sistema</p>
+                                    <p class="text-amber-700 mt-0.5">Estará disponible como plantilla para TODOS los tenants. Para crear roles específicos de un tenant, impersónalo primero desde /admin/tenants.</p>
+                                </div>
+                            </div>
+                        @endif
+                    @endif
+
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1.5">Nombre del rol *</label>
                         <input type="text" wire:model="name" placeholder="ej. supervisor"
