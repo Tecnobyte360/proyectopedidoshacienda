@@ -5,7 +5,7 @@
         <div class="rounded-2xl border border-[#fbe9d7] bg-gradient-to-r from-brand-soft/40 via-white to-white p-5 shadow-sm">
             <div class="flex flex-wrap items-center justify-between gap-4">
                 <div class="flex items-center gap-4">
-                    <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-lg">
+                    <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-brand to-brand-secondary text-white shadow-lg">
                         <i class="fa-solid fa-bolt text-xl"></i>
                     </div>
                     <div>
@@ -18,7 +18,7 @@
                     </div>
                 </div>
                 <button wire:click="abrirCrear"
-                        class="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold px-5 py-3 transition shadow-lg">
+                        class="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-brand to-brand-secondary hover:from-brand-dark hover:to-brand-dark text-white font-bold px-5 py-3 transition shadow-lg">
                     <i class="fa-solid fa-plus"></i> Nueva respuesta
                 </button>
             </div>
@@ -30,7 +30,7 @@
                 <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
                 <input type="text" wire:model.live.debounce.300ms="busqueda"
                        placeholder="Buscar atajo o texto…"
-                       class="w-full rounded-xl border border-slate-200 bg-slate-50 pl-11 pr-4 py-3 text-sm focus:border-amber-500 focus:bg-white focus:ring-2 focus:ring-amber-200">
+                       class="w-full rounded-xl border border-slate-200 bg-slate-50 pl-11 pr-4 py-3 text-sm focus:border-brand focus:bg-white focus:ring-2 focus:ring-brand/20">
             </div>
         </div>
 
@@ -38,7 +38,7 @@
         <div class="rounded-2xl bg-white border border-slate-200 shadow-sm overflow-hidden">
             @if($items->isEmpty())
                 <div class="p-16 text-center">
-                    <div class="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-100 text-amber-500 mb-4">
+                    <div class="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-soft text-brand mb-4">
                         <i class="fa-solid fa-bolt text-2xl"></i>
                     </div>
                     <p class="text-lg font-semibold text-slate-700">Sin respuestas rápidas</p>
@@ -60,10 +60,10 @@
                         </thead>
                         <tbody class="divide-y divide-slate-100">
                             @foreach($items as $r)
-                                <tr class="transition hover:bg-amber-50/40 {{ !$r->activa ? 'opacity-60' : '' }}">
+                                <tr class="transition hover:bg-brand-soft/30 {{ !$r->activa ? 'opacity-60' : '' }}">
                                     <td class="px-4 py-3.5 text-xs text-slate-400 font-mono">{{ $r->orden }}</td>
                                     <td class="px-4 py-3.5">
-                                        <span class="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full bg-amber-100 text-amber-700">
+                                        <span class="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full bg-brand-soft text-brand-secondary">
                                             <i class="fa-solid fa-bolt text-[10px]"></i>
                                             {{ $r->atajo ?: '—' }}
                                         </span>
@@ -81,7 +81,7 @@
                                     <td class="px-4 py-3.5 text-right whitespace-nowrap">
                                         <button wire:click="abrirEditar({{ $r->id }})"
                                                 title="Editar"
-                                                class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 hover:bg-amber-100 hover:text-amber-700 text-slate-600 transition">
+                                                class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 hover:bg-brand-soft hover:text-brand-secondary text-slate-600 transition">
                                             <i class="fa-solid fa-pen-to-square text-xs"></i>
                                         </button>
                                         <button wire:click="eliminar({{ $r->id }})"
@@ -105,7 +105,7 @@
         <div class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4"
              wire:click.self="cerrarModal">
             <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
-                <div class="px-4 py-3 border-b border-slate-200 bg-gradient-to-br from-amber-500 to-orange-500 text-white flex items-center justify-between">
+                <div class="px-4 py-3 border-b border-slate-200 bg-gradient-to-br from-brand to-brand-secondary text-white flex items-center justify-between">
                     <h3 class="font-bold text-sm flex items-center gap-2">
                         <i class="fa-solid fa-bolt"></i>
                         {{ $editandoId ? 'Editar' : 'Nueva' }} respuesta
@@ -122,7 +122,7 @@
                         </label>
                         <input type="text" wire:model="atajo" maxlength="40"
                                placeholder="Saludo, Horario, Domicilio..."
-                               class="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm focus:border-brand focus:ring-2 focus:ring-amber-100">
+                               class="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm focus:border-brand focus:ring-2 focus:ring-brand/20">
                         @error('atajo') <p class="text-[11px] text-rose-600 mt-1">{{ $message }}</p> @enderror
                     </div>
 
@@ -130,7 +130,7 @@
                         <label class="block text-[11px] font-semibold text-slate-700 mb-1">Texto del mensaje *</label>
                         <textarea wire:model="texto" rows="5" maxlength="2000"
                                   placeholder="Hola, gracias por escribir..."
-                                  class="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm focus:border-brand focus:ring-2 focus:ring-amber-100"></textarea>
+                                  class="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm focus:border-brand focus:ring-2 focus:ring-brand/20"></textarea>
                         @error('texto') <p class="text-[11px] text-rose-600 mt-1">{{ $message }}</p> @enderror
                     </div>
 
