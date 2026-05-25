@@ -98,50 +98,44 @@
                             <span class="text-2xl font-extrabold {{ $c['text'] }}">{{ $rol->permissions->count() }}</span>
                         </div>
 
-                        <div class="rounded-xl bg-slate-50 overflow-hidden">
-                            @if($rol->permissions->count() > 0)
-                                <details class="text-xs">
-                                    <summary class="cursor-pointer {{ $c['text'] }} font-semibold hover:underline px-3 py-2.5">
-                                        Ver permisos asignados
-                                    </summary>
-                                    @php
-                                        // Agrupar permisos por módulo (parte antes del punto)
-                                        $agrupados = $rol->permissions->sortBy('name')->groupBy(function ($p) {
-                                            return str_contains($p->name, '.') ? explode('.', $p->name)[0] : 'otros';
-                                        });
-                                    @endphp
-                                    <div class="max-h-72 overflow-y-auto border-t border-slate-200 bg-white">
-                                        <table class="w-full text-[11px]">
-                                            <thead class="bg-slate-100 sticky top-0 z-10">
-                                                <tr>
-                                                    <th class="text-left px-3 py-1.5 font-bold text-slate-600 uppercase tracking-wider text-[10px]">Módulo</th>
-                                                    <th class="text-left px-3 py-1.5 font-bold text-slate-600 uppercase tracking-wider text-[10px]">Acción</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody class="divide-y divide-slate-100">
-                                                @foreach($agrupados as $modulo => $perms)
-                                                    @foreach($perms as $i => $p)
-                                                        @php
-                                                            $accion = str_contains($p->name, '.') ? substr($p->name, strpos($p->name, '.') + 1) : $p->name;
-                                                        @endphp
-                                                        <tr class="hover:bg-slate-50">
-                                                            <td class="px-3 py-1.5 align-top">
-                                                                @if($i === 0)
-                                                                    <span class="inline-block px-2 py-0.5 rounded font-bold capitalize {{ $c['badge'] }}">{{ $modulo }}</span>
-                                                                @endif
-                                                            </td>
-                                                            <td class="px-3 py-1.5 font-mono text-slate-700">{{ $accion }}</td>
-                                                        </tr>
-                                                    @endforeach
+                        @if($rol->permissions->count() > 0)
+                            @php
+                                $agrupados = $rol->permissions->sortBy('name')->groupBy(function ($p) {
+                                    return str_contains($p->name, '.') ? explode('.', $p->name)[0] : 'otros';
+                                });
+                            @endphp
+                            <div class="rounded-xl border border-slate-200 bg-white overflow-hidden">
+                                <div class="max-h-64 overflow-y-auto">
+                                    <table class="w-full text-[11px]">
+                                        <thead class="bg-slate-100 sticky top-0 z-10">
+                                            <tr>
+                                                <th class="text-left px-3 py-1.5 font-bold text-slate-600 uppercase tracking-wider text-[10px]">Módulo</th>
+                                                <th class="text-left px-3 py-1.5 font-bold text-slate-600 uppercase tracking-wider text-[10px]">Acción</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-slate-100">
+                                            @foreach($agrupados as $modulo => $perms)
+                                                @foreach($perms as $i => $p)
+                                                    @php
+                                                        $accion = str_contains($p->name, '.') ? substr($p->name, strpos($p->name, '.') + 1) : $p->name;
+                                                    @endphp
+                                                    <tr class="hover:bg-slate-50">
+                                                        <td class="px-3 py-1.5 align-top whitespace-nowrap">
+                                                            @if($i === 0)
+                                                                <span class="inline-block px-2 py-0.5 rounded font-bold capitalize {{ $c['badge'] }}">{{ $modulo }}</span>
+                                                            @endif
+                                                        </td>
+                                                        <td class="px-3 py-1.5 font-mono text-slate-700">{{ $accion }}</td>
+                                                    </tr>
                                                 @endforeach
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </details>
-                            @else
-                                <p class="text-xs text-slate-400 px-3 py-2.5">Este rol no tiene permisos asignados.</p>
-                            @endif
-                        </div>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        @else
+                            <p class="text-xs text-slate-400 rounded-xl bg-slate-50 px-3 py-2.5">Este rol no tiene permisos asignados.</p>
+                        @endif
                     </div>
                 </div>
             @endforeach
