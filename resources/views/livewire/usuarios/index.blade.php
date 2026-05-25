@@ -1,4 +1,28 @@
 <div class="min-h-screen bg-slate-50">
+    {{-- 🔐 Helpers Swal para confirmaciones (definidos una sola vez por página) --}}
+    <script>
+        window.usuariosSwal = window.usuariosSwal || {
+            confirmar(opts) {
+                if (typeof Swal === 'undefined') {
+                    if (confirm(opts.text || '¿Confirmar?')) opts.onConfirm && opts.onConfirm();
+                    return;
+                }
+                Swal.fire({
+                    title: opts.title,
+                    html: opts.html,
+                    icon: opts.icon || 'question',
+                    showCancelButton: true,
+                    confirmButtonText: opts.confirmText || 'Sí',
+                    cancelButtonText: 'Cancelar',
+                    confirmButtonColor: opts.color || '#10b981',
+                    cancelButtonColor: '#94a3b8',
+                    reverseButtons: true,
+                    customClass: { popup: 'rounded-2xl' }
+                }).then(r => { if (r.isConfirmed) opts.onConfirm && opts.onConfirm(); });
+            }
+        };
+    </script>
+
     <div class="w-full px-4 py-6 sm:px-6 sm:py-8 lg:px-8 space-y-6">
 
         {{-- HEADER GRANDE --}}
@@ -221,36 +245,36 @@
                                                     $swalTitle = 'Resetear 2FA';
                                                     $swalHtml  = '¿Resetear 2FA de <b>' . e($u->name) . '</b>?<br><span style="color:#64748b;font-size:13px">Tendrá que volver a configurar la app autenticadora.</span>';
                                                     $swalConfirm = 'Sí, resetear';
-                                                    $swalIcon = 'warning';
+                                                    $swalIcon  = 'warning';
                                                     $swalColor = '#f59e0b';
                                                 } elseif ($exigido) {
                                                     $swalTitle = 'Quitar exigencia';
                                                     $swalHtml  = '¿Quitar la exigencia de 2FA a <b>' . e($u->name) . '</b>?';
                                                     $swalConfirm = 'Sí, quitar';
-                                                    $swalIcon = 'question';
+                                                    $swalIcon  = 'question';
                                                     $swalColor = '#64748b';
                                                 } else {
                                                     $swalTitle = 'Forzar 2FA';
                                                     $swalHtml  = '¿Forzar a <b>' . e($u->name) . '</b> a activar 2FA en su próximo login?<br><span style="color:#64748b;font-size:13px">No podrá usar la plataforma hasta que configure su app autenticadora.</span>';
                                                     $swalConfirm = 'Sí, exigir 2FA';
-                                                    $swalIcon = 'info';
+                                                    $swalIcon  = 'info';
                                                     $swalColor = '#10b981';
                                                 }
                                             @endphp
                                             <button type="button"
-                                                    x-data
-                                                    x-on:click='Swal.fire({
-                                                        title: @js($swalTitle),
-                                                        html: @js($swalHtml),
-                                                        icon: @js($swalIcon),
-                                                        showCancelButton: true,
-                                                        confirmButtonText: @js($swalConfirm),
-                                                        cancelButtonText: "Cancelar",
-                                                        confirmButtonColor: @js($swalColor),
-                                                        cancelButtonColor: "#94a3b8",
-                                                        reverseButtons: true,
-                                                        customClass: { popup: "rounded-2xl" }
-                                                    }).then(r => { if (r.isConfirmed) $wire.call("toggleForzar2fa", {{ $u->id }}) })'
+                                                    data-swal-title="{{ $swalTitle }}"
+                                                    data-swal-html="{{ $swalHtml }}"
+                                                    data-swal-confirm="{{ $swalConfirm }}"
+                                                    data-swal-icon="{{ $swalIcon }}"
+                                                    data-swal-color="{{ $swalColor }}"
+                                                    onclick="usuariosSwal.confirmar({
+                                                        title: this.dataset.swalTitle,
+                                                        html: this.dataset.swalHtml,
+                                                        icon: this.dataset.swalIcon,
+                                                        confirmText: this.dataset.swalConfirm,
+                                                        color: this.dataset.swalColor,
+                                                        onConfirm: () => Livewire.find(this.closest('[wire\\:id]').getAttribute('wire:id')).call('toggleForzar2fa', {{ $u->id }})
+                                                    })"
                                                     title="{{ $tt }}"
                                                     class="inline-flex h-8 w-8 items-center justify-center rounded-lg {{ $bg }} transition">
                                                 <i class="fa-solid {{ $ic }} text-xs"></i>
@@ -266,19 +290,15 @@
                                         @can('usuarios.eliminar')
                                             @if(!$esYo)
                                                 <button type="button"
-                                                        x-data
-                                                        x-on:click='Swal.fire({
-                                                            title: "Eliminar usuario",
-                                                            html: @js("¿Eliminar a <b>" . e($u->name) . "</b>?<br><span style=\"color:#ef4444;font-size:13px;font-weight:600\">Esta acción es irreversible.</span>"),
-                                                            icon: "warning",
-                                                            showCancelButton: true,
-                                                            confirmButtonText: "Sí, eliminar",
-                                                            cancelButtonText: "Cancelar",
-                                                            confirmButtonColor: "#ef4444",
-                                                            cancelButtonColor: "#94a3b8",
-                                                            reverseButtons: true,
-                                                            customClass: { popup: "rounded-2xl" }
-                                                        }).then(r => { if (r.isConfirmed) $wire.call("eliminar", {{ $u->id }}) })'
+                                                        data-swal-html="¿Eliminar a <b>{{ e($u->name) }}</b>?<br><span style='color:#ef4444;font-size:13px;font-weight:600'>Esta acción es irreversible.</span>"
+                                                        onclick="usuariosSwal.confirmar({
+                                                            title: 'Eliminar usuario',
+                                                            html: this.dataset.swalHtml,
+                                                            icon: 'warning',
+                                                            confirmText: 'Sí, eliminar',
+                                                            color: '#ef4444',
+                                                            onConfirm: () => Livewire.find(this.closest('[wire\\:id]').getAttribute('wire:id')).call('eliminar', {{ $u->id }})
+                                                        })"
                                                         title="Eliminar"
                                                         class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 transition">
                                                     <i class="fa-solid fa-trash text-xs"></i>
