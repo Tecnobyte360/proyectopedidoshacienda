@@ -267,8 +267,8 @@
                 </div>
 
                 <span class="text-[12px] sm:text-[13px] font-semibold text-white/80 whitespace-nowrap">
-                    <span x-show="!playing && !loading">Escuchar mensaje</span>
-                    <span x-show="playing && !loading" x-cloak>Reproduciendo</span>
+                    <span x-show="!playing && !loading">▸ Escuchar el manifiesto</span>
+                    <span x-show="playing && !loading" x-cloak>Reproduciendo…</span>
                     <span x-show="loading" x-cloak>Cargando…</span>
                 </span>
             </button>
