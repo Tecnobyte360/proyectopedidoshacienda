@@ -280,6 +280,13 @@ class Index extends Component
         $this->admin_email = '';
         $this->admin_password = '';
 
+        // 💡 IMPORTANTE: en modo edición, desactivar crear_suscripcion. Su UI
+        // se oculta con @if(!$editandoId), pero las reglas `required_if` siguen
+        // corriendo y fallaban silenciosamente (suscripcion_plan_id null) → el
+        // botón Actualizar parecía no hacer nada.
+        $this->crear_suscripcion   = false;
+        $this->suscripcion_plan_id = null;
+
         $this->modalAbierto = true;
     }
 
