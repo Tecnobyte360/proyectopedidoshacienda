@@ -216,8 +216,40 @@
                                                     $tt = 'Forzar activación de 2FA en próximo login';
                                                 }
                                             @endphp
-                                            <button wire:click="toggleForzar2fa({{ $u->id }})"
-                                                    wire:confirm="{{ $tiene2fa ? '¿Resetear 2FA de ' . $u->name . '? Tendrá que volver a configurar la app autenticadora.' : ($exigido ? '¿Quitar la exigencia de 2FA a ' . $u->name . '?' : '¿Forzar a ' . $u->name . ' a activar 2FA en su próximo login?') }}"
+                                            @php
+                                                if ($tiene2fa) {
+                                                    $swalTitle = 'Resetear 2FA';
+                                                    $swalHtml  = '¿Resetear 2FA de <b>' . e($u->name) . '</b>?<br><span style="color:#64748b;font-size:13px">Tendrá que volver a configurar la app autenticadora.</span>';
+                                                    $swalConfirm = 'Sí, resetear';
+                                                    $swalIcon = 'warning';
+                                                    $swalColor = '#f59e0b';
+                                                } elseif ($exigido) {
+                                                    $swalTitle = 'Quitar exigencia';
+                                                    $swalHtml  = '¿Quitar la exigencia de 2FA a <b>' . e($u->name) . '</b>?';
+                                                    $swalConfirm = 'Sí, quitar';
+                                                    $swalIcon = 'question';
+                                                    $swalColor = '#64748b';
+                                                } else {
+                                                    $swalTitle = 'Forzar 2FA';
+                                                    $swalHtml  = '¿Forzar a <b>' . e($u->name) . '</b> a activar 2FA en su próximo login?<br><span style="color:#64748b;font-size:13px">No podrá usar la plataforma hasta que configure su app autenticadora.</span>';
+                                                    $swalConfirm = 'Sí, exigir 2FA';
+                                                    $swalIcon = 'info';
+                                                    $swalColor = '#10b981';
+                                                }
+                                            @endphp
+                                            <button type="button"
+                                                    onclick='Swal.fire({
+                                                        title: @json($swalTitle),
+                                                        html: @json($swalHtml),
+                                                        icon: @json($swalIcon),
+                                                        showCancelButton: true,
+                                                        confirmButtonText: @json($swalConfirm),
+                                                        cancelButtonText: "Cancelar",
+                                                        confirmButtonColor: @json($swalColor),
+                                                        cancelButtonColor: "#94a3b8",
+                                                        reverseButtons: true,
+                                                        customClass: { popup: "rounded-2xl" }
+                                                    }).then(r => { if (r.isConfirmed) @this.call("toggleForzar2fa", {{ $u->id }}) })'
                                                     title="{{ $tt }}"
                                                     class="inline-flex h-8 w-8 items-center justify-center rounded-lg {{ $bg }} transition">
                                                 <i class="fa-solid {{ $ic }} text-xs"></i>
@@ -232,8 +264,19 @@
                                         @endcan
                                         @can('usuarios.eliminar')
                                             @if(!$esYo)
-                                                <button wire:click="eliminar({{ $u->id }})"
-                                                        wire:confirm="¿Eliminar a {{ $u->name }}? Esta acción es irreversible."
+                                                <button type="button"
+                                                        onclick='Swal.fire({
+                                                            title: "Eliminar usuario",
+                                                            html: "¿Eliminar a <b>{{ e($u->name) }}</b>?<br><span style=\"color:#ef4444;font-size:13px;font-weight:600\">Esta acción es irreversible.</span>",
+                                                            icon: "warning",
+                                                            showCancelButton: true,
+                                                            confirmButtonText: "Sí, eliminar",
+                                                            cancelButtonText: "Cancelar",
+                                                            confirmButtonColor: "#ef4444",
+                                                            cancelButtonColor: "#94a3b8",
+                                                            reverseButtons: true,
+                                                            customClass: { popup: "rounded-2xl" }
+                                                        }).then(r => { if (r.isConfirmed) @this.call("eliminar", {{ $u->id }}) })'
                                                         title="Eliminar"
                                                         class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 transition">
                                                     <i class="fa-solid fa-trash text-xs"></i>
