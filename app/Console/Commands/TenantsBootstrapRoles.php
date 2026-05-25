@@ -75,11 +75,14 @@ class TenantsBootstrapRoles extends Command
                     $resumenTotal['omitidos']++;
                 } else {
                     if (!$dry) {
-                        $rolTenant = Role::create([
+                        // Bypass Spatie's name-unique-per-guard check inserting directo.
+                        // Spatie no contempla tenant_id en su validación de unicidad.
+                        $rolTenant = new Role();
+                        $rolTenant->forceFill([
                             'name'       => $rolGlobal->name,
                             'guard_name' => 'web',
                             'tenant_id'  => $tenant->id,
-                        ]);
+                        ])->saveQuietly();
                         $rolTenant->syncPermissions($rolGlobal->permissions->pluck('name')->all());
                     }
                     $this->line("  ✅ Clonado '{$rolGlobal->name}' con " . $rolGlobal->permissions->count() . " permisos");
