@@ -1,4 +1,28 @@
 <div class="min-h-screen bg-slate-50">
+    {{-- 🎨 Helper SweetAlert2 para confirmaciones (definido una sola vez) --}}
+    <script>
+        window.rolesSwal = window.rolesSwal || {
+            confirmar(opts) {
+                if (typeof Swal === 'undefined') {
+                    if (confirm(opts.text || '¿Confirmar?')) opts.onConfirm && opts.onConfirm();
+                    return;
+                }
+                Swal.fire({
+                    title: opts.title,
+                    html: opts.html,
+                    icon: opts.icon || 'question',
+                    showCancelButton: true,
+                    confirmButtonText: opts.confirmText || 'Sí',
+                    cancelButtonText: 'Cancelar',
+                    confirmButtonColor: opts.color || '#10b981',
+                    cancelButtonColor: '#94a3b8',
+                    reverseButtons: true,
+                    customClass: { popup: 'rounded-2xl' }
+                }).then(r => { if (r.isConfirmed) opts.onConfirm && opts.onConfirm(); });
+            }
+        };
+    </script>
+
     <div class="w-full px-4 py-6 sm:px-6 sm:py-8 lg:px-8 space-y-6">
 
         {{-- HEADER GRANDE --}}
@@ -136,8 +160,23 @@
                                             );
                                         @endphp
                                         @if($puedeEliminar)
-                                            <button wire:click="eliminar({{ $rol->id }})"
-                                                    wire:confirm="¿Eliminar el rol '{{ $rol->name }}'? {{ $rol->users_count > 0 ? '⚠️ Tiene ' . $rol->users_count . ' usuario(s) — debes reasignarlos primero.' : 'Esta acción no se puede deshacer.' }}"
+                                            @php
+                                                $advUsers = $rol->users_count > 0
+                                                    ? '<div style="background:#fef3c7;border-left:4px solid #f59e0b;border-radius:8px;padding:10px 12px;margin-top:10px;font-size:13px;color:#92400e"><b><i class="fa-solid fa-triangle-exclamation"></i> Atención:</b> Este rol tiene <b>' . $rol->users_count . ' usuario(s) asignado(s)</b>. Debes reasignarlos a otro rol antes de eliminarlo.</div>'
+                                                    : '<div style="color:#64748b;font-size:13px;margin-top:6px">Esta acción no se puede deshacer.</div>';
+                                                $swalHtmlDel = '¿Eliminar el rol <b style="color:#0f172a">' . e($rol->name) . '</b>?' . $advUsers;
+                                            @endphp
+                                            <button type="button"
+                                                    data-swal-html="{{ $swalHtmlDel }}"
+                                                    data-rol-id="{{ $rol->id }}"
+                                                    onclick="rolesSwal.confirmar({
+                                                        title: 'Eliminar rol',
+                                                        html: this.dataset.swalHtml,
+                                                        icon: 'warning',
+                                                        confirmText: 'Sí, eliminar',
+                                                        color: '#ef4444',
+                                                        onConfirm: () => Livewire.find(this.closest('[wire\\:id]').getAttribute('wire:id')).call('eliminar', parseInt(this.dataset.rolId))
+                                                    })"
                                                     title="Eliminar"
                                                     class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 transition">
                                                 <i class="fa-solid fa-trash text-xs"></i>
