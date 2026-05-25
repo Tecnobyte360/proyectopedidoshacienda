@@ -27,7 +27,7 @@
             --ink: #0a0a0a;
         }
         * { -webkit-font-smoothing: antialiased; }
-        body { font-family: 'Inter', sans-serif; letter-spacing: -0.011em; overflow: hidden; background: #0a0a0a; color: white; }
+        body { font-family: 'Inter', sans-serif; letter-spacing: -0.011em; overflow-x: hidden; background: #0a0a0a; color: white; min-height: 100vh; }
         .display { font-family: 'Inter', sans-serif; letter-spacing: -0.04em; line-height: 0.92; font-weight: 800; }
         .serif { font-family: 'Instrument Serif', serif; font-style: italic; letter-spacing: -0.02em; font-weight: 400; }
         .gradient-text {
@@ -196,18 +196,20 @@
     <div class="relative z-10 min-h-screen flex flex-col">
 
         {{-- Top nav --}}
-        <header class="flex items-center justify-between px-6 lg:px-12 py-6 fade-1">
+        <header class="flex items-center justify-between px-4 sm:px-6 lg:px-12 py-4 sm:py-6 fade-1">
             <div class="flex items-center gap-2.5">
                 @if($logoUrl)
-                    <img src="{{ $logoUrl }}" alt="{{ $brand }}" class="h-10 w-auto">
+                    <img src="{{ $logoUrl }}" alt="{{ $brand }}" class="h-8 sm:h-10 w-auto">
                 @else
-                    <div class="h-10 w-10 rounded-xl bg-white text-[var(--ink)] flex items-center justify-center font-black">K</div>
+                    <div class="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-white text-[var(--ink)] flex items-center justify-center font-black">K</div>
                 @endif
-                <span class="text-[18px] font-bold tracking-tight text-white">{{ $brand }}</span>
+                <span class="text-[16px] sm:text-[18px] font-bold tracking-tight text-white">{{ $brand }}</span>
             </div>
 
-            <a href="https://admin.{{ $host }}/login" class="inline-flex items-center gap-1.5 text-[13px] font-medium text-white/70 hover:text-white transition">
-                Iniciar sesión <i class="fa-solid fa-arrow-right text-[10px]"></i>
+            <a href="https://admin.{{ $host }}/login" class="inline-flex items-center gap-1.5 text-[12px] sm:text-[13px] font-medium text-white/70 hover:text-white transition">
+                <span class="hidden sm:inline">Iniciar sesión</span>
+                <span class="sm:hidden">Login</span>
+                <i class="fa-solid fa-arrow-right text-[10px]"></i>
             </a>
         </header>
 
@@ -216,46 +218,57 @@
             <div class="max-w-5xl w-full text-center">
 
                 {{-- LOGO GIGANTE EN EL CENTRO --}}
-                <div class="fade-2 flex flex-col items-center justify-center mb-10 lg:mb-14">
+                <div class="fade-2 flex flex-col items-center justify-center mb-8 sm:mb-10 lg:mb-14">
                     <div class="relative">
                         {{-- Glow detrás del logo --}}
-                        <div class="absolute inset-0 -m-20 rounded-full opacity-50 blur-3xl pointer-events-none" style="background: radial-gradient(circle, {{ $primario }} 0%, transparent 65%);"></div>
+                        <div class="absolute inset-0 -m-12 sm:-m-16 lg:-m-20 rounded-full opacity-50 blur-3xl pointer-events-none" style="background: radial-gradient(circle, {{ $primario }} 0%, transparent 65%);"></div>
 
                         {{-- Anillos orbitando --}}
-                        <div class="absolute inset-0 -m-10 rounded-full border border-white/10 animate-[spin_30s_linear_infinite] pointer-events-none"></div>
-                        <div class="absolute inset-0 -m-20 rounded-full border border-white/5 animate-[spin_45s_linear_infinite_reverse] pointer-events-none"></div>
+                        <div class="absolute inset-0 -m-6 sm:-m-8 lg:-m-10 rounded-full border border-white/10 animate-[spin_30s_linear_infinite] pointer-events-none"></div>
+                        <div class="absolute inset-0 -m-12 sm:-m-16 lg:-m-20 rounded-full border border-white/5 animate-[spin_45s_linear_infinite_reverse] pointer-events-none"></div>
 
                         {{-- LOGO --}}
                         @if($logoUrl)
                             <img src="{{ $logoUrl }}" alt="{{ $brand }}"
-                                 class="relative h-44 lg:h-56 xl:h-64 w-auto object-contain"
+                                 class="relative h-28 sm:h-36 md:h-44 lg:h-52 xl:h-60 w-auto object-contain"
                                  style="filter: drop-shadow(0 0 30px {{ $primario }}99) drop-shadow(0 0 60px {{ $primario }}55);">
                         @else
-                            <div class="relative h-48 lg:h-64 w-48 lg:w-64 rounded-3xl bg-gradient-to-br from-[var(--brand)] to-[var(--brand-2)] text-white flex items-center justify-center font-black text-7xl lg:text-9xl shadow-2xl"
+                            <div class="relative h-32 sm:h-44 lg:h-56 w-32 sm:w-44 lg:w-56 rounded-3xl bg-gradient-to-br from-[var(--brand)] to-[var(--brand-2)] text-white flex items-center justify-center font-black text-6xl sm:text-7xl lg:text-9xl shadow-2xl"
                                  style="box-shadow: 0 0 60px {{ $primario }}80;">K</div>
                         @endif
                     </div>
 
                     {{-- Headline grande, jerarquía clara --}}
-                    <h1 class="display text-[56px] sm:text-[80px] lg:text-[112px] tracking-[-0.04em] mt-12 leading-[0.95]">
+                    <h1 class="display text-[44px] sm:text-[64px] md:text-[80px] lg:text-[96px] xl:text-[112px] tracking-[-0.04em] mt-8 sm:mt-10 lg:mt-12 leading-[0.95]">
                         <span class="block text-white">Pronto</span>
                         <span class="block serif text-[var(--brand)]">volvemos</span>
                     </h1>
 
-                    <p class="text-[16px] lg:text-[18px] text-white/55 mt-6 max-w-lg mx-auto leading-relaxed">
-                        Estamos puliendo cada detalle para darte la mejor experiencia.
-                    </p>
+                    {{-- Mensaje de EXPECTATIVA / teaser --}}
+                    <div class="mt-6 sm:mt-8 max-w-2xl mx-auto px-4">
+                        <div class="inline-block px-4 py-1.5 rounded-full bg-white/5 backdrop-blur border border-white/10 mb-4">
+                            <span class="text-[10px] sm:text-[11px] uppercase tracking-[0.25em] font-bold gradient-text">
+                                <i class="fa-solid fa-wand-magic-sparkles text-[9px]"></i> Algo grande viene
+                            </span>
+                        </div>
+                        <p class="serif text-[20px] sm:text-[26px] lg:text-[32px] text-white/85 leading-[1.3]">
+                            Estamos cocinando una <span class="text-[var(--brand)]">revolución</span> en la forma de vender por WhatsApp.
+                        </p>
+                        <p class="text-[14px] sm:text-[15px] text-white/45 mt-4 leading-relaxed">
+                            Un bot que vende por ti. Cobros automáticos. Despachos en vivo. Y mucho más en camino.
+                        </p>
+                    </div>
                 </div>
 
                 {{-- Audio CTA gigante --}}
                 <div class="mt-8 fade-3">
-                    <p class="text-[13px] uppercase tracking-[0.3em] text-white/50 font-semibold mb-6">
+                    <p class="text-[11px] sm:text-[13px] uppercase tracking-[0.25em] sm:tracking-[0.3em] text-white/50 font-semibold mb-5 sm:mb-6 px-4">
                         <i class="fa-solid fa-headphones"></i> Escucha el mensaje de {{ $brand }}
                     </p>
 
                     <button @click="toggle()"
                             :class="playing ? 'playing scale-105' : ''"
-                            class="group relative inline-flex items-center gap-6 px-8 py-5 rounded-full bg-white/5 backdrop-blur border border-white/10 hover:border-white/30 transition-all">
+                            class="group relative inline-flex flex-col sm:flex-row items-center gap-4 sm:gap-6 px-5 sm:px-8 py-5 rounded-3xl sm:rounded-full bg-white/5 backdrop-blur border border-white/10 hover:border-white/30 transition-all max-w-[90vw]">
 
                         {{-- Play / Pause button --}}
                         <div class="relative">
@@ -268,14 +281,14 @@
                             </div>
                         </div>
 
-                        {{-- Equalizer bars --}}
-                        <div class="flex items-center h-16">
+                        {{-- Equalizer bars (menos en mobile) --}}
+                        <div class="flex items-center h-12 sm:h-16">
                             @for($i = 0; $i < 15; $i++)
-                                <span class="bar idle"></span>
+                                <span class="bar idle {{ $i >= 8 ? 'hidden sm:inline-block' : '' }}"></span>
                             @endfor
                         </div>
 
-                        <div class="text-left">
+                        <div class="text-center sm:text-left">
                             <div class="text-[15px] font-bold text-white">
                                 <span x-show="!playing && !loading && !error">Reproducir mensaje</span>
                                 <span x-show="playing && !loading" x-cloak>Reproduciendo…</span>
@@ -295,13 +308,13 @@
                 </div>
 
                 {{-- CTAs --}}
-                <div class="flex flex-wrap items-center justify-center gap-3 mt-14 fade-4">
+                <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 mt-10 sm:mt-14 fade-4 max-w-md sm:max-w-none mx-auto px-4 sm:px-0">
                     <a href="https://wa.me/573216499744?text=Hola%20Kivox%2C%20quiero%20saber%20cuando%20vuelven" target="_blank"
-                       class="inline-flex items-center gap-2 bg-white text-[var(--ink)] font-semibold text-[14px] px-5 py-3 rounded-full hover:scale-105 transition">
+                       class="inline-flex items-center justify-center gap-2 bg-white text-[var(--ink)] font-semibold text-[14px] px-5 py-3 rounded-full hover:scale-105 transition">
                         <i class="fa-brands fa-whatsapp text-emerald-600"></i> Hablar por WhatsApp
                     </a>
                     <a href="https://admin.{{ $host }}/login"
-                       class="inline-flex items-center gap-2 text-white/80 hover:text-white font-medium text-[14px] px-5 py-3 rounded-full border border-white/15 hover:border-white/40 transition">
+                       class="inline-flex items-center justify-center gap-2 text-white/80 hover:text-white font-medium text-[14px] px-5 py-3 rounded-full border border-white/15 hover:border-white/40 transition">
                         Acceder al panel <i class="fa-solid fa-arrow-right text-[10px]"></i>
                     </a>
                 </div>
@@ -309,8 +322,8 @@
         </main>
 
         {{-- Marquee bottom --}}
-        <div class="border-t border-white/5 py-5 overflow-hidden fade-5">
-            <div class="marquee text-[14px] uppercase tracking-[0.3em] text-white/30 font-semibold">
+        <div class="border-t border-white/5 py-4 sm:py-5 overflow-hidden fade-5">
+            <div class="marquee text-[11px] sm:text-[14px] uppercase tracking-[0.2em] sm:tracking-[0.3em] text-white/30 font-semibold">
                 <span>Volvemos pronto</span>
                 <span style="color: var(--brand)">●</span>
                 <span>Estamos puliendo detalles</span>
@@ -334,8 +347,8 @@
         </div>
 
         {{-- Footer mini --}}
-        <footer class="px-6 lg:px-12 py-4 fade-5">
-            <div class="flex items-center justify-between text-[11px] text-white/40">
+        <footer class="px-4 sm:px-6 lg:px-12 py-3 sm:py-4 fade-5">
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-1 text-[10px] sm:text-[11px] text-white/40">
                 <span>© {{ date('Y') }} {{ $brand }}</span>
                 <span>Hecho en Colombia 🇨🇴</span>
             </div>
