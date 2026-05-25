@@ -223,20 +223,48 @@ class Index extends Component
 
         $roles = $rolesQuery->get();
 
-        // Marcar cada rol con flag editable
-        $roles->each(function ($r) use ($tenantId, $esSuper) {
+        // 🛡️ Si NO es super-admin, ocultar los permisos SaaS-only de cada rol
+        //    para que no vea el conteo inflado ni los pills en la UI.
+        $permisosOcultos = $esSuper ? [] : [
+            'tenants.gestionar',
+            'planes.gestionar', 'suscripciones.gestionar', 'pagos.gestionar',
+            'alertas.ver', 'alertas.gestionar',
+            'bot.configurar',
+        ];
+
+        // Marcar cada rol con flag editable + filtrar permisos visibles
+        $roles->each(function ($r) use ($tenantId, $esSuper, $permisosOcultos) {
             $r->es_global = $r->tenant_id === null;
             $r->es_editable = $esSuper || ($r->tenant_id !== null && (int) $r->tenant_id === (int) $tenantId);
+
+            if (!empty($permisosOcultos)) {
+                $r->setRelation('permissions', $r->permissions->whereNotIn('name', $permisosOcultos)->values());
+            }
         });
 
-        // 🛡️ Permisos SaaS-only (Billing/planes/suscripciones/pagos): solo
-        //    los super-admins (dueños de la plataforma Kivox) pueden ver/asignar
-        //    estos permisos. Un tenant normal NO debe siquiera saber que existen.
+        // 🛡️ Permisos SOLO SUPER-ADMIN (dueño plataforma Kivox desde admin.kivox.co):
+        //   - billing: planes, suscripciones, pagos (Kivox cobra a sus tenants)
+        //   - tenants.gestionar
+        //   - alertas (sistema interno de alertas operativas de Kivox)
+        //   - configuracion_bot (config del bot de IA — solo se toca desde plataforma)
+        //
+        // Un tenant normal NO debe siquiera saber que estos permisos existen.
         $permisosPorMod = RolesPermisosSeeder::PERMISOS;
         if (!$esSuper) {
-            unset($permisosPorMod['billing']);
-            // Por si algún grupo trae permisos saas sueltos, los filtramos también
-            $permisosSaaS = ['tenants.gestionar', 'planes.gestionar', 'suscripciones.gestionar', 'pagos.gestionar'];
+            // 1. Quitar grupos enteros que son exclusivos del dueño
+            unset(
+                $permisosPorMod['billing'],
+                $permisosPorMod['alertas'],
+                $permisosPorMod['configuracion_bot']
+            );
+
+            // 2. Por si algún grupo trae permisos saas sueltos, filtrarlos también
+            $permisosSaaS = [
+                'tenants.gestionar',
+                'planes.gestionar', 'suscripciones.gestionar', 'pagos.gestionar',
+                'alertas.ver', 'alertas.gestionar',
+                'bot.configurar',
+            ];
             foreach ($permisosPorMod as $modulo => $lista) {
                 $permisosPorMod[$modulo] = array_values(array_diff($lista, $permisosSaaS));
                 if (empty($permisosPorMod[$modulo])) {
