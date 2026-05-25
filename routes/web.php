@@ -184,7 +184,7 @@ Route::middleware(['no_super_sin_imp'])->group(function () {
         ->name('integraciones.clientes-erp');
     Route::get('/usuarios-internos', UsuariosInternosIndex::class)->middleware('permission:usuarios_internos.ver|usuarios_internos.gestionar')->name('usuarios-internos.index');
     Route::get('/departamentos',     DepartamentosIndex::class)->middleware('permission:departamentos.gestionar')->name('departamentos.index');
-    Route::get('/chat-widgets',      ChatWidgetsIndex::class)->middleware(['permission:conversaciones.ver', 'role:super-admin'])->name('chat-widgets.index');
+    Route::get('/chat-widgets',      ChatWidgetsIndex::class)->middleware('permission:chat_widgets.gestionar')->name('chat-widgets.index');
     Route::get('/importaciones/plantilla/{tipo}', function (string $tipo) {
         $tipo = in_array($tipo, ['productos', 'categorias'], true) ? $tipo : 'productos';
 
@@ -220,7 +220,7 @@ Route::middleware(['no_super_sin_imp'])->group(function () {
         ->name('configuracion.bot');
 
     Route::get('/configuracion/respuestas-rapidas', \App\Livewire\Configuracion\RespuestasRapidas\Index::class)
-        ->middleware('permission:bot.configurar')
+        ->middleware('permission:respuestas_rapidas.gestionar')
         ->name('configuracion.respuestas-rapidas');
 
     Route::get('/configuracion/bot-lecciones', \App\Livewire\Configuracion\BotLecciones\Index::class)

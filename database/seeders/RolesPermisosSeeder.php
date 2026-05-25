@@ -85,6 +85,12 @@ class RolesPermisosSeeder extends Seeder
         'configuracion_bot' => [
             'bot.configurar',
         ],
+        'respuestas_rapidas' => [
+            'respuestas_rapidas.gestionar',
+        ],
+        'chat_widgets' => [
+            'chat_widgets.gestionar',
+        ],
         'alertas' => [
             'alertas.ver',
             'alertas.gestionar',

@@ -70,7 +70,7 @@
                     ['name' => 'Departamentos',     'icon' => 'fa-building-user',      'route' => 'departamentos.index',    'badge' => null, 'permission' => 'departamentos.gestionar'],
                     ['name' => 'Campañas WhatsApp', 'icon' => 'fa-bullhorn',           'route' => 'campanas.index',         'badge' => null, 'permission' => 'campanas.ver'],
                     ['name' => 'Estados WhatsApp', 'icon' => 'fa-circle-info',         'route' => 'estados-whatsapp.index', 'badge' => 'NUEVO', 'permission' => 'campanas.ver'],
-                    ['name' => 'Widgets de Chat',   'icon' => 'fa-code',               'route' => 'chat-widgets.index',     'badge' => null, 'permission' => 'conversaciones.ver', 'solo_super_admin' => true],
+                    ['name' => 'Widgets de Chat',   'icon' => 'fa-code',               'route' => 'chat-widgets.index',     'badge' => null, 'permission' => 'chat_widgets.gestionar'],
                     ['name' => 'Domiciliarios',     'icon' => 'fa-motorcycle',         'route' => 'domiciliarios.index',    'badge' => null, 'permission' => 'domiciliarios.gestionar'],
                     ['name' => 'Mapa en vivo',      'icon' => 'fa-location-crosshairs','route' => 'despachos.index',        'badge' => null, 'permission' => 'despachos.gestionar'],
                     ['name' => 'Zonas',             'icon' => 'fa-map-location-dot',   'route' => 'zonas.index',            'badge' => null, 'permission' => 'zonas.gestionar'],
@@ -82,7 +82,7 @@
                     // ⚠️ Items de configuración del bot / Meta API son solo para super-admin.
                     // El admin de un tenant NO debe verlos (ni siquiera desde su propio subdominio).
                     ['name' => 'Bot WhatsApp',      'icon' => 'fa-robot',              'route' => 'configuracion.bot',      'badge' => null, 'permission' => 'bot.configurar', 'solo_super_admin' => true],
-                    ['name' => 'Respuestas rápidas','icon' => 'fa-bolt',               'route' => 'configuracion.respuestas-rapidas', 'badge' => null, 'permission' => 'bot.configurar', 'solo_super_admin' => true],
+                    ['name' => 'Respuestas rápidas','icon' => 'fa-bolt',               'route' => 'configuracion.respuestas-rapidas', 'badge' => null, 'permission' => 'respuestas_rapidas.gestionar'],
                     ['name' => 'Lecciones del bot','icon' => 'fa-graduation-cap',    'route' => 'configuracion.bot-lecciones', 'badge' => 'NUEVO', 'permission' => 'bot.configurar', 'solo_super_admin' => true],
                     ['name' => 'Meta WhatsApp',     'icon' => 'fa-brands fa-whatsapp', 'route' => 'meta-whatsapp.index',    'badge' => 'NUEVO', 'permission' => 'bot.configurar', 'solo_super_admin' => true],
                     ['name' => 'Monitor LLM',       'icon' => 'fa-microchip',          'route' => 'monitoreo.llm',          'badge' => null,    'permission' => 'bot.configurar', 'solo_super_admin' => true],
