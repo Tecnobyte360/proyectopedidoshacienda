@@ -132,7 +132,7 @@
                             <div class="flex items-center gap-3">
                                 <span class="flex h-9 w-9 items-center justify-center rounded-xl text-lg"
                                       style="background-color: {{ $cat->color ?? '#fef3c7' }}20;">
-                                    {{ $cat->icono_emoji ?: '📦' }}
+                                    {{ $cat->icono_emoji ?: '<i class="fa-solid fa-box"></i>' }}
                                 </span>
                                 <div>
                                     <div class="font-semibold text-slate-800">{{ $cat->nombre }}</div>

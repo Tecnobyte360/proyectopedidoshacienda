@@ -87,7 +87,7 @@
                 {{-- Jobs pendientes --}}
                 @if($colaJobs->isNotEmpty())
                     <div class="space-y-2 mb-4">
-                        <p class="text-[10px] uppercase tracking-wider font-bold text-slate-400">📋 Esperando ejecución</p>
+                        <p class="text-[10px] uppercase tracking-wider font-bold text-slate-400"><i class="fa-solid fa-clipboard"></i> Esperando ejecución</p>
                         @foreach($colaJobs as $job)
                             @php
                                 $eta = $job->available_at->diffForHumans(['parts' => 2, 'short' => true]);
@@ -112,7 +112,7 @@
                                         </p>
                                         <p class="text-[11px] text-slate-400">
                                             @if($listo)
-                                                <span class="text-emerald-300 font-semibold">⚡ Procesando ahora...</span>
+                                                <span class="text-emerald-300 font-semibold"><i class="fa-solid fa-bolt"></i> Procesando ahora...</span>
                                             @else
                                                 Se ejecutará {{ $eta }}
                                                 <span class="text-slate-500">·</span>
@@ -324,7 +324,7 @@
                                         </span>
                                     @else
                                         <span class="inline-flex items-center rounded-full bg-slate-100 text-slate-600 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider">
-                                            ✓ {{ ucfirst($monitorCampana->estado) }}
+                                            <i class="fa-solid fa-check"></i> {{ ucfirst($monitorCampana->estado) }}
                                         </span>
                                     @endif
                                     <span class="text-xs text-slate-500">
@@ -400,7 +400,7 @@
                         <div class="ml-auto text-xs text-slate-500 max-w-xs hidden md:block">
                             <i class="fa-solid fa-circle-info text-brand"></i>
                             <strong class="text-slate-700">"Llegaron"</strong> = aceptados por WhatsApp.
-                            Si el icono ✓ está verde, el cliente lo recibió.
+                            Si el icono <i class="fa-solid fa-check"></i> está verde, el cliente lo recibió.
                         </div>
                     </div>
 
@@ -687,7 +687,7 @@
                         @error('archivoExcel') <p class="text-rose-500 text-xs mt-1">{{ $message }}</p> @enderror
                         @if($numerosImportados > 0)
                             <p class="text-xs text-emerald-700 mt-2 font-semibold">
-                                ✓ {{ $numerosImportados }} números importados.
+                                <i class="fa-solid fa-check"></i> {{ $numerosImportados }} números importados.
                             </p>
                         @endif
                     </div>

@@ -120,9 +120,9 @@
                     <p class="text-sm mt-1.5">
                         <strong>Cobertura:</strong>
                         @if($estado->cobertura_validada)
-                            <span class="text-emerald-600">✅ Validada</span>
+                            <span class="text-emerald-600"><i class="fa-solid fa-circle-check"></i> Validada</span>
                         @else
-                            <span class="text-rose-600">❌ No validada</span>
+                            <span class="text-rose-600"><i class="fa-solid fa-circle-xmark"></i> No validada</span>
                         @endif
                     </p>
                     @if($estado->distancia_km)
@@ -151,7 +151,7 @@
             <p class="text-sm mt-1.5">
                 <strong>En ERP:</strong>
                 @if($estado->cliente_existe_erp)
-                    <span class="text-emerald-600">✅ Sí</span>
+                    <span class="text-emerald-600"><i class="fa-solid fa-circle-check"></i> Sí</span>
                 @else
                     <span class="text-slate-500">No verificado / no existe</span>
                 @endif
@@ -183,9 +183,9 @@
                     <span class="rounded-full bg-white border border-slate-200 px-3 py-1 text-xs">
                         {{ $clave }}:
                         @if($valor)
-                            <span class="text-emerald-600 font-bold">✓</span>
+                            <span class="text-emerald-600 font-bold"><i class="fa-solid fa-check"></i></span>
                         @else
-                            <span class="text-rose-600 font-bold">✗</span>
+                            <span class="text-rose-600 font-bold"><i class="fa-solid fa-xmark"></i></span>
                         @endif
                     </span>
                 @endforeach
@@ -194,7 +194,7 @@
     @endif
 
     <p class="text-xs text-slate-400 mt-6 text-center">
-        🔄 Auto-refresh cada 5 segundos · Última actualización:
+        <i class="fa-solid fa-arrows-rotate"></i> Auto-refresh cada 5 segundos · Última actualización:
         {{ $estado->updated_at?->format('d/m/Y H:i:s') }}
     </p>
 </div>

@@ -53,11 +53,11 @@
                             </span>
                         @elseif($vencida)
                             <span class="inline-flex items-center rounded-full bg-orange-500 px-3 py-1 text-xs font-medium text-white" title="Está activada pero la fecha de fin ya pasó">
-                                ⚠ Vencida
+                                <i class="fa-solid fa-triangle-exclamation"></i> Vencida
                             </span>
                         @elseif($futura)
                             <span class="inline-flex items-center rounded-full bg-blue-500 px-3 py-1 text-xs font-medium text-white">
-                                ⏳ Programada
+                                <i class="fa-solid fa-hourglass-half"></i> Programada
                             </span>
                         @else
                             <span class="inline-flex items-center rounded-full bg-green-500 px-3 py-1 text-xs font-medium text-white">

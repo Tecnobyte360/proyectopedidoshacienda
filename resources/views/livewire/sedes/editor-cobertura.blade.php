@@ -92,7 +92,7 @@
 
             <label class="mt-2 inline-flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
                 <input type="checkbox" id="gmaps-busqueda-mundial" class="rounded border-slate-300 text-blue-600">
-                <span>🌎 Buscar en todo el mundo (no solo Colombia)</span>
+                <span><i class="fa-solid fa-earth-americas"></i> Buscar en todo el mundo (no solo Colombia)</span>
             </label>
 
             <div id="gmaps-busqueda-resultados" class="mt-2 hidden">

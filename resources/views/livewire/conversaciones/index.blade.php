@@ -222,7 +222,7 @@
                                     @endif
                                     <p class="text-sm text-slate-800 whitespace-pre-wrap">{{ $m->contenido }}</p>
                                     <p class="text-[10px] text-slate-500 mt-1 text-right">
-                                        🤖 {{ $m->created_at->format('H:i') }}
+                                        <i class="fa-solid fa-robot"></i> {{ $m->created_at->format('H:i') }}
                                     </p>
                                 </div>
                             </div>

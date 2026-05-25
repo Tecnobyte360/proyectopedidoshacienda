@@ -426,7 +426,7 @@
                                         </div>
                                     @endif
                                     <p class="text-[11px] text-slate-500 mt-1">
-                                        💡 La prueba se hace desde tu navegador con el referrer correcto (las keys con
+                                        <i class="fa-solid fa-lightbulb"></i> La prueba se hace desde tu navegador con el referrer correcto (las keys con
                                         restricciones de sitio web no aceptan llamadas server-side).
                                     </p>
 
@@ -548,7 +548,7 @@
                                     </div>
                                 </div>
                                 <p class="text-[10px] text-slate-500">
-                                    💡 Tip: si dejas centro/lng vacíos, el botón "Probar" los rellena automáticamente con la ciudad del tenant.
+                                    <i class="fa-solid fa-lightbulb"></i> Tip: si dejas centro/lng vacíos, el botón "Probar" los rellena automáticamente con la ciudad del tenant.
                                 </p>
                             </div>
                         </div>
@@ -974,21 +974,21 @@
                             <label class="flex items-start gap-2 cursor-pointer rounded-lg border border-slate-200 bg-white p-2 hover:border-indigo-300">
                                 <input type="radio" wire:model="whatsapp_provider" value="auto" class="mt-0.5">
                                 <div class="text-xs">
-                                    <span class="font-semibold text-slate-800">⚡ Automático</span>
+                                    <span class="font-semibold text-slate-800"><i class="fa-solid fa-bolt"></i> Automático</span>
                                     <p class="text-slate-500">Usa Meta si hay configuración activa, sino TecnoByteApp.</p>
                                 </div>
                             </label>
                             <label class="flex items-start gap-2 cursor-pointer rounded-lg border border-slate-200 bg-white p-2 hover:border-indigo-300">
                                 <input type="radio" wire:model="whatsapp_provider" value="meta" class="mt-0.5">
                                 <div class="text-xs">
-                                    <span class="font-semibold text-slate-800">🟢 Meta WhatsApp Cloud API (oficial)</span>
+                                    <span class="font-semibold text-slate-800"><i class="fa-solid fa-circle text-emerald-500"></i> Meta WhatsApp Cloud API (oficial)</span>
                                     <p class="text-slate-500">Requiere configurar en /meta-whatsapp con la WABA del tenant.</p>
                                 </div>
                             </label>
                             <label class="flex items-start gap-2 cursor-pointer rounded-lg border border-slate-200 bg-white p-2 hover:border-indigo-300">
                                 <input type="radio" wire:model="whatsapp_provider" value="tecnobyte" class="mt-0.5">
                                 <div class="text-xs">
-                                    <span class="font-semibold text-slate-800">🟡 TecnoByteApp (no oficial)</span>
+                                    <span class="font-semibold text-slate-800"><i class="fa-solid fa-circle text-amber-500"></i> TecnoByteApp (no oficial)</span>
                                     <p class="text-slate-500">whatsapp-web.js. Más libre pero con riesgo de baneo.</p>
                                 </div>
                             </label>
@@ -1098,7 +1098,7 @@
                                                     <span class="font-mono text-xs text-slate-500">#{{ $c['id'] }}</span>
                                                     <span class="font-semibold text-sm text-slate-800 truncate">{{ $c['name'] ?: 'Sin nombre' }}</span>
                                                     @if($c['isDefault'])
-                                                        <span class="text-[10px] text-amber-600 font-bold">★</span>
+                                                        <span class="text-[10px] text-amber-600 font-bold"><i class="fa-solid fa-star"></i></span>
                                                     @endif
                                                 </div>
                                                 <div class="text-[11px] text-slate-500">{{ $c['phoneNumber'] ?: '(sin número)' }}</div>
@@ -1147,7 +1147,7 @@
                                     </button>
                                 </div>
                                 <p class="text-[11px] text-emerald-700 mt-2">
-                                    💡 Pega esta URL en el campo <strong>"URL del Webhook"</strong> de TecnoByteApp para este tenant.
+                                    <i class="fa-solid fa-lightbulb"></i> Pega esta URL en el campo <strong>"URL del Webhook"</strong> de TecnoByteApp para este tenant.
                                     Cada cliente tiene su URL única — los mensajes llegan directamente al tenant correcto.
                                 </p>
                             </div>
@@ -1389,8 +1389,8 @@
                                     <div>
                                         <label class="block text-[11px] font-bold text-emerald-800 mb-1">Estado inicial *</label>
                                         <select wire:model="suscripcion_estado" class="w-full rounded-xl border border-emerald-200 px-3 py-2 text-sm">
-                                            <option value="activa">✓ Activa (paga desde el principio)</option>
-                                            <option value="en_trial">🧪 En trial (período gratis)</option>
+                                            <option value="activa"><i class="fa-solid fa-check"></i> Activa (paga desde el principio)</option>
+                                            <option value="en_trial"><i class="fa-solid fa-flask"></i> En trial (período gratis)</option>
                                         </select>
                                     </div>
                                     <div class="md:col-span-2">
@@ -1406,7 +1406,7 @@
                                     </div>
                                 </div>
                                 <p class="text-[11px] text-emerald-700 bg-emerald-100 rounded-lg px-3 py-2">
-                                    📅 La suscripción vencerá el día <strong>{{ now()->addDays((int) $suscripcion_dias)->format('d/m/Y') }}</strong>.
+                                    <i class="fa-solid fa-calendar-days"></i> La suscripción vencerá el día <strong>{{ now()->addDays((int) $suscripcion_dias)->format('d/m/Y') }}</strong>.
                                     El cron de facturación creará el siguiente Pago automáticamente días antes según tu Política de cobros.
                                 </p>
                             @endif

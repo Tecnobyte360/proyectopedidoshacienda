@@ -83,7 +83,7 @@
                                         class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-brand focus:ring-brand">
                                     <option value="">— Selecciona —</option>
                                     @if($domsZona->isNotEmpty())
-                                        <optgroup label="✓ Cubren esta zona">
+                                        <optgroup label="<i class="fa-solid fa-check"></i> Cubren esta zona">
                                             @foreach($domsZona as $d)
                                                 <option value="{{ $d->id }}">{{ $d->nombre }} ({{ ucfirst($d->estado) }})</option>
                                             @endforeach
@@ -388,8 +388,8 @@
                         <select wire:model.live="tipoEntrega"
                                 class="h-10 w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-9 text-sm font-medium text-slate-700 focus:border-brand focus:bg-white focus:ring-2 focus:ring-brand/20">
                             <option value="todos">Todos ({{ $totalAll }})</option>
-                            <option value="domicilio">🛵 Despacho ({{ $totalDomicilio }})</option>
-                            <option value="recoger">🏪 Recoge en sede ({{ $totalRecoger }})</option>
+                            <option value="domicilio"><i class="fa-solid fa-motorcycle"></i> Despacho ({{ $totalDomicilio }})</option>
+                            <option value="recoger"><i class="fa-solid fa-shop"></i> Recoge en sede ({{ $totalRecoger }})</option>
                         </select>
                         <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none"></i>
                     </div>
@@ -855,7 +855,7 @@
                                                         {{ $totalLineas === 1 ? 'producto' : 'productos' }}
                                                     </span>
                                                     <span class="text-[10px] text-slate-500 leading-tight">
-                                                        Pasa el cursor 👆
+                                                        Pasa el cursor <i class="fa-solid fa-hand-point-up"></i>
                                                     </span>
                                                 </div>
                                                 <i class="fa-solid fa-eye text-[10px] text-slate-400 ml-1"></i>

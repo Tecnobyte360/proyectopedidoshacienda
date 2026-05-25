@@ -138,7 +138,7 @@
         <div class="relative rounded-2xl overflow-hidden shadow-2xl border border-slate-200">
             <div wire:ignore id="mapaDomiciliarios" style="height: 75vh; min-height: 600px; width: 100%;"></div>
             <div id="mapaStatus" class="absolute bottom-3 left-3 bg-white/95 backdrop-blur px-3 py-1.5 rounded-full text-[11px] text-slate-700 shadow font-medium">
-                ⏳ Cargando mapa...
+                <i class="fa-solid fa-hourglass-half"></i> Cargando mapa...
             </div>
             <button onclick="window.mapaDomi && window.mapaDomi.fitAll()"
                     class="absolute bottom-3 right-3 bg-white hover:bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-full text-[11px] text-slate-700 shadow font-semibold flex items-center gap-1.5">

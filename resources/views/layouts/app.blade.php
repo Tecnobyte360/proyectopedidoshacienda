@@ -175,7 +175,7 @@
                             <i class="fa-solid fa-lock text-xl"></i>
                         </div>
                         <div class="flex-1 min-w-[200px]">
-                            <div class="font-extrabold text-base">Tu suscripción está vencida 🔒</div>
+                            <div class="font-extrabold text-base">Tu suscripción está vencida <i class="fa-solid fa-lock"></i></div>
                             <div class="text-xs text-white/90 mt-0.5">
                                 Estás navegando en modo de solo lectura. Para crear, editar o usar el bot, paga la mensualidad.
                             </div>

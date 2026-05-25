@@ -135,7 +135,7 @@ class Pedido extends Model
             </h2>
 
             <p class="text-sm text-slate-600">
-                Al crear un tenant y hacer click en <strong>"🚀 Configurar subdominio"</strong>, el sistema ejecuta 3 pasos
+                Al crear un tenant y hacer click en <strong>"<i class="fa-solid fa-rocket"></i> Configurar subdominio"</strong>, el sistema ejecuta 3 pasos
                 automáticos en menos de 30 segundos:
             </p>
 
@@ -183,7 +183,7 @@ class Pedido extends Model
                 stepper visual sin recargar.
             </p>
 
-            <h3 class="font-bold text-slate-700 mt-4">⚠️ Reglas de slug</h3>
+            <h3 class="font-bold text-slate-700 mt-4"><i class="fa-solid fa-triangle-exclamation"></i> Reglas de slug</h3>
             <p class="text-sm text-slate-600">
                 Let's Encrypt rechaza guion bajo, espacios y mayúsculas en subdominios. El modelo Tenant fuerza
                 <strong>kebab-case</strong> (solo a-z, 0-9, guion medio) vía <code class="bg-slate-100 px-1 rounded text-brand-secondary">Tenant::normalizarSlug()</code>
@@ -265,7 +265,7 @@ CERTBOT_EMAIL=comercial@tecnobyte360.com</code></pre>
             </h2>
             <p class="text-sm text-slate-600">
                 Un usuario es <strong>super-admin</strong> si <code>tenant_id IS NULL</code> + tiene el rol
-                <code>super-admin</code>. Por defecto sólo ve la sección "⭐ Super Admin" del sidebar.
+                <code>super-admin</code>. Por defecto sólo ve la sección "<i class="fa-solid fa-star"></i> Super Admin" del sidebar.
             </p>
 
             <h3 class="font-bold text-slate-700 mt-3">Impersonación ("Ver como")</h3>

@@ -144,7 +144,7 @@
 
                                     @if($a->resuelta)
                                         <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
-                                            ✓ Resuelta
+                                            <i class="fa-solid fa-check"></i> Resuelta
                                         </span>
                                     @endif
                                 </div>

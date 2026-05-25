@@ -144,9 +144,9 @@
                             <strong>Modo LIVE híbrido + fusión.</strong> El bot lee del ERP (cache 30s) y combina con productos locales que no estén en el ERP.
                         </p>
                         <p class="text-[11px] opacity-80">
-                            ✅ Precio + disponibilidad del ERP en tiempo real.<br>
-                            ✅ Match por código → enriquece con cortes, fotos, palabras clave, destacados y sedes.<br>
-                            ✅ Productos solo en <code>/productos</code> también se incluyen.<br>
+                            <i class="fa-solid fa-circle-check"></i> Precio + disponibilidad del ERP en tiempo real.<br>
+                            <i class="fa-solid fa-circle-check"></i> Match por código → enriquece con cortes, fotos, palabras clave, destacados y sedes.<br>
+                            <i class="fa-solid fa-circle-check"></i> Productos solo en <code>/productos</code> también se incluyen.<br>
                         </p>
                     </div>
 
@@ -211,11 +211,11 @@
                         @if ($bot_modo_agente)
                             <div class="mt-3 rounded-xl bg-white border border-brand/30 p-3 text-xs text-slate-700 space-y-1">
                                 <p class="font-semibold text-brand mb-1">Tools disponibles para el agente:</p>
-                                <p>🔍 <code>buscar_productos(query, categoria?)</code> — busca por nombre/código/keywords</p>
-                                <p>📂 <code>listar_categorias()</code> — lista todas las categorías con conteo</p>
-                                <p>🗂️ <code>productos_de_categoria(categoria)</code> — items de una categoría</p>
-                                <p>📦 <code>info_producto(codigo)</code> — detalle + cortes + foto</p>
-                                <p>⭐ <code>productos_destacados()</code> — top destacados + promociones</p>
+                                <p><i class="fa-solid fa-magnifying-glass"></i> <code>buscar_productos(query, categoria?)</code> — busca por nombre/código/keywords</p>
+                                <p><i class="fa-solid fa-folder-open"></i> <code>listar_categorias()</code> — lista todas las categorías con conteo</p>
+                                <p><i class="fa-solid fa-folder-tree"></i> <code>productos_de_categoria(categoria)</code> — items de una categoría</p>
+                                <p><i class="fa-solid fa-box"></i> <code>info_producto(codigo)</code> — detalle + cortes + foto</p>
+                                <p><i class="fa-solid fa-star"></i> <code>productos_destacados()</code> — top destacados + promociones</p>
                             </div>
                         @endif
                     </div>
@@ -366,7 +366,7 @@
                 <label class="inline-flex items-start gap-3 cursor-pointer w-full justify-between rounded-xl border-2 border-purple-200 bg-purple-50/50 p-4 hover:bg-purple-50 transition">
                     <div class="flex-1">
                         <div class="text-sm font-bold text-slate-800 mb-1">
-                            🖼️ Enviar imágenes de productos por WhatsApp
+                            <i class="fa-solid fa-image"></i> Enviar imágenes de productos por WhatsApp
                         </div>
                         <div class="text-xs text-slate-600">
                             Cuando esté activo, la IA podrá enviarle al cliente las fotos de los productos del catálogo.
@@ -441,7 +441,7 @@
             <label class="inline-flex items-start gap-3 cursor-pointer w-full justify-between rounded-xl border-2 border-emerald-200 bg-emerald-50/50 p-4 hover:bg-emerald-50 transition">
                 <div class="flex-1">
                     <div class="text-sm font-bold text-slate-800 mb-1">
-                        🎤 Transcribir notas de voz con Whisper (OpenAI)
+                        <i class="fa-solid fa-microphone"></i> Transcribir notas de voz con Whisper (OpenAI)
                     </div>
                     <div class="text-xs text-slate-600">
                         Cuando el cliente mande un audio en vez de texto, el bot lo transcribe y responde igual que si hubiera escrito.
@@ -479,7 +479,7 @@
                 <label class="inline-flex items-start gap-3 cursor-pointer w-full justify-between rounded-xl border-2 border-cyan-200 bg-cyan-50/40 p-4 hover:bg-cyan-50/70 transition">
                     <div class="flex-1">
                         <div class="text-sm font-bold text-slate-800 mb-1">
-                            🧩 Esperar antes de responder
+                            <i class="fa-solid fa-puzzle-piece"></i> Esperar antes de responder
                         </div>
                         <div class="text-xs text-slate-600 leading-relaxed">
                             Si el cliente manda <strong>"Hola"</strong> + <strong>"Quiero pollo"</strong> + <strong>"Para mañana"</strong>
@@ -825,7 +825,7 @@
                       class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-mono leading-relaxed focus:border-brand focus:ring-brand"></textarea>
             <div class="flex items-start gap-3 mt-2">
                 <p class="text-[11px] text-slate-500 flex-1">
-                    💡 <strong>Cómo funciona:</strong> cuando el bot recibe un mensaje, primero carga el prompt base (o tu prompt personalizado si lo activaste abajo), y al final agrega estas instrucciones bajo el título "🔧 REGLAS ADICIONALES DE ESTE NEGOCIO". La IA las lee igual que el resto del prompt.
+                    <i class="fa-solid fa-lightbulb"></i> <strong>Cómo funciona:</strong> cuando el bot recibe un mensaje, primero carga el prompt base (o tu prompt personalizado si lo activaste abajo), y al final agrega estas instrucciones bajo el título "<i class="fa-solid fa-wrench"></i> REGLAS ADICIONALES DE ESTE NEGOCIO". La IA las lee igual que el resto del prompt.
                 </p>
                 <p class="text-[11px] text-slate-500 flex-shrink-0">
                     Variables: <code class="bg-slate-100 px-1 rounded">{nombre_asesora}</code>,
@@ -852,7 +852,7 @@
             <label class="inline-flex items-start gap-3 cursor-pointer w-full justify-between rounded-xl border-2 border-rose-200 bg-rose-50/30 p-4 hover:bg-rose-50/60 transition mb-4">
                 <div class="flex-1">
                     <div class="text-sm font-bold text-slate-800 mb-1">
-                        ⚡ Usar prompt personalizado
+                        <i class="fa-solid fa-bolt"></i> Usar prompt personalizado
                     </div>
                     <div class="text-xs text-slate-600">
                         Si lo activas, la IA usará TU prompt en lugar del de fábrica.
@@ -877,7 +877,7 @@
                                 <button type="button"
                                         @click.prevent="$dispatch('confirm-show', {
                                             title: 'Cargar plantilla genérica dinámica',
-                                            message: '✨ Plantilla 100% dinámica: usa solo variables del tenant ({tenant_nombre}, {ciudad}, {tipo_negocio}, etc). Funciona out-of-the-box con cualquier negocio. Reemplaza tu prompt actual (NO guarda hasta que pulses Guardar).',
+                                            message: '<i class="fa-solid fa-sparkles"></i> Plantilla 100% dinámica: usa solo variables del tenant ({tenant_nombre}, {ciudad}, {tipo_negocio}, etc). Funciona out-of-the-box con cualquier negocio. Reemplaza tu prompt actual (NO guarda hasta que pulses Guardar).',
                                             confirmText: 'Sí, cargar genérica',
                                             type: 'primary',
                                             onConfirm: () => $wire.cargarPlantillaGenerica(),
@@ -1077,7 +1077,7 @@
                                         x-data
                                         @click="
                                             navigator.clipboard.writeText('{{ '{' . $v['key'] . '}' }}');
-                                            $el.querySelector('.copy-status').textContent = '✓ Copiado';
+                                            $el.querySelector('.copy-status').textContent = '<i class="fa-solid fa-check"></i> Copiado';
                                             setTimeout(() => $el.querySelector('.copy-status').textContent = '', 1200);
                                         "
                                         class="group block w-full text-left rounded-lg border border-slate-200 bg-white hover:bg-purple-50 hover:border-purple-300 transition px-3 py-2">
@@ -1307,7 +1307,7 @@
                                 </p>
                             </div>
                             <div>
-                                <label class="block text-xs font-bold text-slate-700 mb-1">⏱️ Demora antes de enviar (segundos)</label>
+                                <label class="block text-xs font-bold text-slate-700 mb-1"><i class="fa-solid fa-stopwatch"></i> Demora antes de enviar (segundos)</label>
                                 <input type="number" wire:model.lazy="{{ $keyDelay }}" min="0" max="86400"
                                        class="w-32 rounded-lg border border-slate-200 px-3 py-2 text-xs">
                                 <p class="text-[10px] text-slate-500 mt-1">
@@ -1351,11 +1351,11 @@
                        class="mt-1 rounded border-slate-300 text-violet-600 h-5 w-5">
                 <div class="flex-1">
                     <div class="text-sm font-bold text-slate-800 mb-1">
-                        💳 Enviar link de pago al confirmar el pedido
+                        <i class="fa-solid fa-credit-card"></i> Enviar link de pago al confirmar el pedido
                     </div>
                     <div class="text-xs text-slate-600 leading-relaxed">
                         Si está activo, después del resumen del pedido, el bot agrega:
-                        <em>"💳 Paga ahora con tarjeta, Nequi o PSE: {link de Wompi}"</em>.
+                        <em>"<i class="fa-solid fa-credit-card"></i> Paga ahora con tarjeta, Nequi o PSE: {link de Wompi}"</em>.
                         El cliente puede pagar online o seguir con pago contra entrega.
                         Si lo desactivas, el bot solo confirma el pedido sin link.
                     </div>
@@ -1413,12 +1413,12 @@
                            class="mt-1 rounded border-slate-300 text-blue-600 h-5 w-5">
                     <div class="flex-1">
                         <div class="text-sm font-bold text-slate-800 mb-1">
-                            📅 Aceptar pedidos cuando estamos cerrados (programados)
+                            <i class="fa-solid fa-calendar-days"></i> Aceptar pedidos cuando estamos cerrados (programados)
                         </div>
                         <div class="text-xs text-slate-600 leading-relaxed">
                             Si está <strong>activo</strong>: el bot acepta pedidos fuera de horario y los registra
                             como <em>programados</em> para la próxima apertura de la sede. El cliente recibe
-                            un mensaje claro: <em>"📅 Tu pedido quedó programado para mañana a las 8:00 am"</em>.<br>
+                            un mensaje claro: <em>"<i class="fa-solid fa-calendar-days"></i> Tu pedido quedó programado para mañana a las 8:00 am"</em>.<br>
                             Si está <strong>desactivado</strong>: el bot rechaza el pedido cuando la sede está cerrada
                             y le pide al cliente que vuelva en horario.
                         </div>
@@ -1431,7 +1431,7 @@
                         <div>
                             <strong>Activado.</strong> Los pedidos fuera de horario aparecerán en
                             <a href="{{ route('pedidos.index') }}" class="underline font-bold">/pedidos</a>
-                            con etiqueta "📅 Programado" y la fecha de preparación esperada.
+                            con etiqueta "<i class="fa-solid fa-calendar-days"></i> Programado" y la fecha de preparación esperada.
                         </div>
                     </div>
                 @endif
@@ -1458,7 +1458,7 @@
                        class="mt-1 rounded border-slate-300 text-orange-600 h-5 w-5">
                 <div class="flex-1">
                     <div class="text-sm font-bold text-slate-800 mb-1">
-                        🛵 Asignar domiciliario automáticamente
+                        <i class="fa-solid fa-motorcycle"></i> Asignar domiciliario automáticamente
                     </div>
                     <div class="text-xs text-slate-600 leading-relaxed">
                         Si está activo, cuando el pedido entra al estado configurado abajo,
@@ -1475,9 +1475,9 @@
                         <label class="block text-sm font-medium text-slate-700 mb-1">Criterio de asignación</label>
                         <select wire:model="criterio_asignacion"
                                 class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-orange-400 focus:ring-2 focus:ring-orange-100 bg-white">
-                            <option value="balanceado">⚖️ Balanceado por carga (recomendado)</option>
-                            <option value="rotacion">🔄 Rotación (round-robin)</option>
-                            <option value="cercania">📍 Cercanía al cliente</option>
+                            <option value="balanceado"><i class="fa-solid fa-scale-balanced"></i> Balanceado por carga (recomendado)</option>
+                            <option value="rotacion"><i class="fa-solid fa-arrows-rotate"></i> Rotación (round-robin)</option>
+                            <option value="cercania"><i class="fa-solid fa-location-dot"></i> Cercanía al cliente</option>
                         </select>
                         <div class="mt-2 text-[11px] text-slate-500 space-y-1">
                             <p><strong>Balanceado:</strong> al que tenga MENOS pedidos en curso. Reparte la carga equitativamente.</p>
@@ -1515,7 +1515,7 @@
                         {{ $totalDomis }} domiciliario(s) activo(s),
                         <strong>{{ $disponibles }}</strong> disponible(s) para asignación.
                         @if($disponibles === 0)
-                            <span class="text-amber-700 font-bold">⚠️ Sin domiciliarios disponibles los pedidos quedan sin asignar (el operador deberá hacerlo manualmente).</span>
+                            <span class="text-amber-700 font-bold"><i class="fa-solid fa-triangle-exclamation"></i> Sin domiciliarios disponibles los pedidos quedan sin asignar (el operador deberá hacerlo manualmente).</span>
                         @endif
                         Gestiona tu equipo en
                         <a href="{{ route('domiciliarios.index') }}" class="underline font-bold">/domiciliarios</a>.
@@ -1550,10 +1550,10 @@
             </div>
 
             <div class="rounded-xl bg-teal-50 border border-teal-200 px-4 py-3 text-xs text-teal-900 mb-4">
-                <strong>💡 Cómo funciona:</strong>
+                <strong><i class="fa-solid fa-lightbulb"></i> Cómo funciona:</strong>
                 Marca qué datos pides y ordénalos con las flechas.<br>
                 <strong>Activos</strong> = el bot los pedirá. <strong>Desactivos</strong> = el bot los omite.<br>
-                ⚠️ Si un dato es opcional (ej: barrio, email), el cliente puede saltárselo. La cédula sigue siendo
+                <i class="fa-solid fa-triangle-exclamation"></i> Si un dato es opcional (ej: barrio, email), el cliente puede saltárselo. La cédula sigue siendo
                 obligatoria si el lookup ERP está activo.
             </div>
 
@@ -1636,7 +1636,7 @@
                         @endif
                     @endforeach
                     @if($totalActivos === 0)
-                        <div class="text-slate-500 italic">⚠️ No hay campos activos. El bot no podrá armar pedidos.</div>
+                        <div class="text-slate-500 italic"><i class="fa-solid fa-triangle-exclamation"></i> No hay campos activos. El bot no podrá armar pedidos.</div>
                     @endif
                 </div>
             </div>
@@ -1826,7 +1826,7 @@
 
                     @if(count($this->cumpleanerosHoy) === 0)
                         <div class="text-center py-6 text-sm text-slate-500">
-                            🎈 No hay cumpleañeros hoy. Vuelve mañana.
+                            <i class="fa-solid fa-cake-candles"></i> No hay cumpleañeros hoy. Vuelve mañana.
                         </div>
                     @else
                         <div class="space-y-2">
@@ -1842,7 +1842,7 @@
                                     <div class="flex items-center gap-2 shrink-0">
                                         @if($yaEnviado)
                                             <span class="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full bg-emerald-100 text-emerald-700">
-                                                ✅ Ya felicitado hoy
+                                                <i class="fa-solid fa-circle-check"></i> Ya felicitado hoy
                                             </span>
                                         @endif
                                         <button type="button"
@@ -2057,7 +2057,7 @@
             </div>
 
             <div class="mt-4 rounded-xl bg-purple-100/50 border border-purple-200 p-3 text-xs text-slate-700">
-                <strong>📌 Memoria adicional siempre activa:</strong>
+                <strong><i class="fa-solid fa-thumbtack"></i> Memoria adicional siempre activa:</strong>
                 <ul class="list-disc list-inside mt-1 space-y-0.5">
                     <li><strong>Historial del cliente</strong> — pedidos previos, productos favoritos, dirección habitual (siempre).</li>
                     <li><strong>Estado estructurado del pedido</strong> — carrito, dirección, sede, cédula (siempre, no se borra).</li>

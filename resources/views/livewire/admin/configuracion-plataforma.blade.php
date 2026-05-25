@@ -281,8 +281,8 @@
                     <label class="block text-xs font-semibold text-slate-700 mb-1">Modo</label>
                     <select wire:model="saas_wompi_modo"
                             class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-brand focus:ring-2 focus:ring-brand/20">
-                        <option value="sandbox">🧪 Sandbox (pruebas)</option>
-                        <option value="produccion">🚀 Producción (cobros reales)</option>
+                        <option value="sandbox"><i class="fa-solid fa-flask"></i> Sandbox (pruebas)</option>
+                        <option value="produccion"><i class="fa-solid fa-rocket"></i> Producción (cobros reales)</option>
                     </select>
                 </div>
                 <div>
@@ -356,7 +356,7 @@
                     <input type="checkbox" wire:model="saas_billing_activo"
                            class="h-5 w-5 rounded border-slate-300 text-emerald-500 focus:ring-emerald-400">
                     <span class="text-sm font-bold {{ $saas_billing_activo ? 'text-emerald-700' : 'text-rose-600' }}">
-                        {{ $saas_billing_activo ? '✓ Activo' : '⏸ Pausado' }}
+                        {{ $saas_billing_activo ? '<i class="fa-solid fa-check"></i> Activo' : '⏸ Pausado' }}
                     </span>
                 </label>
             </div>
@@ -395,28 +395,28 @@
                     <label class="flex items-start gap-2 p-3 rounded-xl border border-slate-200 hover:border-amber-300 cursor-pointer transition">
                         <input type="checkbox" wire:model="saas_aviso_preaviso" class="mt-0.5 h-4 w-4 rounded border-slate-300 text-amber-500 focus:ring-amber-400">
                         <div>
-                            <div class="text-xs font-bold text-slate-800">📅 Pre-aviso</div>
+                            <div class="text-xs font-bold text-slate-800"><i class="fa-solid fa-calendar-days"></i> Pre-aviso</div>
                             <div class="text-[10px] text-slate-500">3 días antes "vence en 3 días"</div>
                         </div>
                     </label>
                     <label class="flex items-start gap-2 p-3 rounded-xl border border-slate-200 hover:border-amber-300 cursor-pointer transition">
                         <input type="checkbox" wire:model="saas_aviso_vence_hoy" class="mt-0.5 h-4 w-4 rounded border-slate-300 text-amber-500 focus:ring-amber-400">
                         <div>
-                            <div class="text-xs font-bold text-slate-800">⏰ Vence hoy</div>
+                            <div class="text-xs font-bold text-slate-800"><i class="fa-solid fa-clock"></i> Vence hoy</div>
                             <div class="text-[10px] text-slate-500">Día 0 — recordatorio urgente</div>
                         </div>
                     </label>
                     <label class="flex items-start gap-2 p-3 rounded-xl border border-slate-200 hover:border-amber-300 cursor-pointer transition">
                         <input type="checkbox" wire:model="saas_aviso_vencio_ayer" class="mt-0.5 h-4 w-4 rounded border-slate-300 text-amber-500 focus:ring-amber-400">
                         <div>
-                            <div class="text-xs font-bold text-slate-800">⚠️ Venció ayer</div>
+                            <div class="text-xs font-bold text-slate-800"><i class="fa-solid fa-triangle-exclamation"></i> Venció ayer</div>
                             <div class="text-[10px] text-slate-500">Día +1 — primer atraso</div>
                         </div>
                     </label>
                     <label class="flex items-start gap-2 p-3 rounded-xl border border-slate-200 hover:border-rose-300 cursor-pointer transition">
                         <input type="checkbox" wire:model="saas_aviso_urgencia" class="mt-0.5 h-4 w-4 rounded border-slate-300 text-rose-500 focus:ring-rose-400">
                         <div>
-                            <div class="text-xs font-bold text-slate-800">🚨 Urgencia</div>
+                            <div class="text-xs font-bold text-slate-800"><i class="fa-solid fa-bell"></i> Urgencia</div>
                             <div class="text-[10px] text-slate-500">Día +3 "será suspendido pronto"</div>
                         </div>
                     </label>
@@ -543,52 +543,52 @@
                     $diasActivos = count(array_filter($saas_horas_envio, fn($a) => count($a) > 0));
                 @endphp
                 <p class="text-[11px] text-amber-900 bg-amber-200/30 rounded-lg px-3 py-2 mt-3 font-semibold">
-                    📤 <strong>Resumen semanal:</strong> {{ $totalSemana }} envío(s) totales en {{ $diasActivos }} día(s) activo(s).
-                    {{ $totalSemana === 0 ? '⚠️ Actualmente NADIE recibirá recordatorios.' : '' }}
+                    <i class="fa-solid fa-paper-plane"></i> <strong>Resumen semanal:</strong> {{ $totalSemana }} envío(s) totales en {{ $diasActivos }} día(s) activo(s).
+                    {{ $totalSemana === 0 ? '<i class="fa-solid fa-triangle-exclamation"></i> Actualmente NADIE recibirá recordatorios.' : '' }}
                 </p>
             </div>
 
             {{-- Visualización tipo timeline --}}
             <div class="mt-5 rounded-xl bg-slate-50 border border-slate-200 p-4">
-                <p class="text-xs font-bold text-slate-700 mb-3">📍 Línea de tiempo de un cobro</p>
+                <p class="text-xs font-bold text-slate-700 mb-3"><i class="fa-solid fa-location-dot"></i> Línea de tiempo de un cobro</p>
                 <div class="relative">
                     <div class="absolute top-3 left-0 right-0 h-0.5 bg-slate-300"></div>
                     <div class="relative flex justify-between text-center text-[10px]">
                         <div class="flex flex-col items-center">
-                            <div class="h-6 w-6 rounded-full bg-blue-500 text-white flex items-center justify-center text-[10px] font-bold relative z-10">📨</div>
+                            <div class="h-6 w-6 rounded-full bg-blue-500 text-white flex items-center justify-center text-[10px] font-bold relative z-10"><i class="fa-solid fa-envelope-open"></i></div>
                             <div class="mt-1 font-bold text-slate-700">Día -{{ $saas_dias_antes_factura }}</div>
                             <div class="text-slate-500">Factura<br>+ link</div>
                         </div>
                         @if($saas_aviso_preaviso)
                         <div class="flex flex-col items-center">
-                            <div class="h-6 w-6 rounded-full bg-amber-400 text-white flex items-center justify-center text-[10px] font-bold relative z-10">📅</div>
+                            <div class="h-6 w-6 rounded-full bg-amber-400 text-white flex items-center justify-center text-[10px] font-bold relative z-10"><i class="fa-solid fa-calendar-days"></i></div>
                             <div class="mt-1 font-bold text-slate-700">Día -3</div>
                             <div class="text-slate-500">Pre-aviso</div>
                         </div>
                         @endif
                         @if($saas_aviso_vence_hoy)
                         <div class="flex flex-col items-center">
-                            <div class="h-6 w-6 rounded-full bg-orange-500 text-white flex items-center justify-center text-[10px] font-bold relative z-10">⏰</div>
+                            <div class="h-6 w-6 rounded-full bg-orange-500 text-white flex items-center justify-center text-[10px] font-bold relative z-10"><i class="fa-solid fa-clock"></i></div>
                             <div class="mt-1 font-bold text-slate-700">Día 0</div>
                             <div class="text-slate-500">Vence hoy</div>
                         </div>
                         @endif
                         @if($saas_aviso_vencio_ayer)
                         <div class="flex flex-col items-center">
-                            <div class="h-6 w-6 rounded-full bg-orange-600 text-white flex items-center justify-center text-[10px] font-bold relative z-10">⚠️</div>
+                            <div class="h-6 w-6 rounded-full bg-orange-600 text-white flex items-center justify-center text-[10px] font-bold relative z-10"><i class="fa-solid fa-triangle-exclamation"></i></div>
                             <div class="mt-1 font-bold text-slate-700">Día +1</div>
                             <div class="text-slate-500">Venció</div>
                         </div>
                         @endif
                         @if($saas_aviso_urgencia)
                         <div class="flex flex-col items-center">
-                            <div class="h-6 w-6 rounded-full bg-rose-500 text-white flex items-center justify-center text-[10px] font-bold relative z-10">🚨</div>
+                            <div class="h-6 w-6 rounded-full bg-rose-500 text-white flex items-center justify-center text-[10px] font-bold relative z-10"><i class="fa-solid fa-bell"></i></div>
                             <div class="mt-1 font-bold text-slate-700">Día +3</div>
                             <div class="text-slate-500">Urgencia</div>
                         </div>
                         @endif
                         <div class="flex flex-col items-center">
-                            <div class="h-6 w-6 rounded-full bg-rose-700 text-white flex items-center justify-center text-[10px] font-bold relative z-10">🚫</div>
+                            <div class="h-6 w-6 rounded-full bg-rose-700 text-white flex items-center justify-center text-[10px] font-bold relative z-10"><i class="fa-solid fa-ban"></i></div>
                             <div class="mt-1 font-bold text-rose-700">Día +{{ $saas_dias_gracia }}</div>
                             <div class="text-rose-600">SUSPENDIDO</div>
                         </div>
@@ -661,7 +661,7 @@
                                                 <div class="text-[11px] text-slate-500">
                                                     {{ $c['phoneNumber'] ?: '(sin número)' }}
                                                     @if($c['isDefault'] && !($c['esMeta'] ?? false))
-                                                        <span class="ml-1 text-amber-600 font-bold">★ Default</span>
+                                                        <span class="ml-1 text-amber-600 font-bold"><i class="fa-solid fa-star"></i> Default</span>
                                                     @endif
                                                 </div>
                                             </div>
@@ -719,7 +719,7 @@
                                             </select>
                                             @if($c['asignadoA'])
                                                 <div class="text-[10px] text-emerald-600 mt-0.5 truncate">
-                                                    ✓ {{ $c['asignadoA']['nombre'] }}
+                                                    <i class="fa-solid fa-check"></i> {{ $c['asignadoA']['nombre'] }}
                                                 </div>
                                             @endif
                                         @endif

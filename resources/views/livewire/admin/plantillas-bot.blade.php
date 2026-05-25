@@ -126,17 +126,17 @@
                         <td class="px-4 py-2">
                             @if ($t->tipo_negocio)
                                 <span class="inline-flex items-center gap-1 text-xs">
-                                    {{ $tiposMeta[$t->tipo_negocio]['emoji'] ?? '🏢' }}
+                                    {{ $tiposMeta[$t->tipo_negocio]['emoji'] ?? '<i class="fa-solid fa-building"></i>' }}
                                     <span class="capitalize">{{ $t->tipo_negocio }}</span>
                                 </span>
                             @else
-                                <span class="text-xs text-amber-600">⚠️ Sin tipo asignado</span>
+                                <span class="text-xs text-amber-600"><i class="fa-solid fa-triangle-exclamation"></i> Sin tipo asignado</span>
                             @endif
                         </td>
                         <td class="px-4 py-2 text-center">
                             @if ($tieneTipo)
                                 <span class="inline-block rounded-md bg-emerald-100 text-emerald-700 px-2 py-0.5 text-xs font-bold">
-                                    ✓ Bloque {{ $t->tipo_negocio }} aplicado
+                                    <i class="fa-solid fa-check"></i> Bloque {{ $t->tipo_negocio }} aplicado
                                 </span>
                             @else
                                 <span class="inline-block rounded-md bg-slate-100 text-slate-500 px-2 py-0.5 text-xs">

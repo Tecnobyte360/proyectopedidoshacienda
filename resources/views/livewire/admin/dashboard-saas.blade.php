@@ -42,7 +42,7 @@
                 @if($this->kpis['suspendidos'] > 0)
                     <span class="text-rose-500 font-semibold">{{ $this->kpis['suspendidos'] }} suspendidos</span>
                 @else
-                    Todos activos ✓
+                    Todos activos <i class="fa-solid fa-check"></i>
                 @endif
             </div>
         </div>
@@ -167,7 +167,7 @@
     </div>
 
     <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs text-slate-600">
-        <p class="font-bold text-slate-700 mb-2">⚙️ Crons automáticos activos</p>
+        <p class="font-bold text-slate-700 mb-2"><i class="fa-solid fa-gear"></i> Crons automáticos activos</p>
         <ul class="space-y-1 list-disc list-inside">
             <li><code>saas:generar-facturas-mensuales --dias=7 --enviar</code> — diario 09:00 — crea factura + manda link Wompi 7 días antes del vencimiento</li>
             <li><code>tenants:suspender-vencidos --gracia=7 --enviar</code> — diario 10:00 — recordatorios escalonados + suspensión al día 7 de mora</li>

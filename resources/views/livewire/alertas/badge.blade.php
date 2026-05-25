@@ -31,7 +31,7 @@
 
         <div class="px-4 py-3 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white flex items-center justify-between">
             <div>
-                <h3 class="text-sm font-bold text-slate-800">🚨 Alertas del bot</h3>
+                <h3 class="text-sm font-bold text-slate-800"><i class="fa-solid fa-bell"></i> Alertas del bot</h3>
                 <p class="text-xs text-slate-500">
                     @if($noResueltas === 0)
                         Todo en orden
@@ -74,7 +74,7 @@
             @empty
                 <div class="px-4 py-8 text-center text-slate-400 text-sm">
                     <i class="fa-solid fa-circle-check text-2xl mb-2 text-emerald-400"></i>
-                    <p>Sin alertas. Todo funcionando bien 👌</p>
+                    <p>Sin alertas. Todo funcionando bien <i class="fa-solid fa-hand-back-fist"></i></p>
                 </div>
             @endforelse
         </div>

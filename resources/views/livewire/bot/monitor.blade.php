@@ -59,7 +59,7 @@
         <div class="rounded-2xl bg-gradient-to-br {{ $k['requieren_humano'] > 0 ? 'from-rose-50 to-rose-100 border-rose-300 ring-2 ring-rose-300/40' : 'from-slate-50 to-slate-100 border-slate-200' }} border p-4">
             <div class="text-[10px] font-bold {{ $k['requieren_humano'] > 0 ? 'text-rose-700' : 'text-slate-600' }} uppercase tracking-wider"><i class="fa-solid fa-user-tie"></i> Pendientes humano</div>
             <div class="text-3xl font-extrabold {{ $k['requieren_humano'] > 0 ? 'text-rose-700' : 'text-slate-500' }} mt-1">{{ $k['requieren_humano'] }}</div>
-            <div class="text-xs {{ $k['requieren_humano'] > 0 ? 'text-rose-600' : 'text-slate-500' }} mt-1">{{ $k['requieren_humano'] > 0 ? '⚠️ requieren atención' : 'todo bajo control' }}</div>
+            <div class="text-xs {{ $k['requieren_humano'] > 0 ? 'text-rose-600' : 'text-slate-500' }} mt-1">{{ $k['requieren_humano'] > 0 ? '<i class="fa-solid fa-triangle-exclamation"></i> requieren atención' : 'todo bajo control' }}</div>
         </div>
     </div>
 
@@ -72,7 +72,7 @@
         <div class="flex-1 min-w-0">
             <div class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Proveedor IA activo</div>
             <div class="text-base font-bold text-slate-800">
-                {{ $k['proveedor_ia'] === 'anthropic' ? '🪶 Anthropic Claude' : '⚡ OpenAI GPT' }}
+                {{ $k['proveedor_ia'] === 'anthropic' ? '<i class="fa-solid fa-feather"></i> Anthropic Claude' : '<i class="fa-solid fa-bolt"></i> OpenAI GPT' }}
                 <span class="text-xs font-mono text-slate-500 ml-2">{{ $k['modelo_ia'] }}</span>
             </div>
         </div>
@@ -156,7 +156,7 @@
                                 </span>
                                 @if($estado->pedido_id)
                                     <span class="rounded-full bg-emerald-100 text-emerald-700 px-2 py-0.5 text-[10px] font-bold">
-                                        ✅ #{{ $estado->pedido_id }}
+                                        <i class="fa-solid fa-circle-check"></i> #{{ $estado->pedido_id }}
                                     </span>
                                 @endif
                                 @if($completo && !$estado->pedido_id)
@@ -167,8 +167,8 @@
                             </div>
                             <div class="text-xs text-slate-500 mt-0.5">
                                 {{ $estado->conversacion?->telefono_normalizado }}
-                                @if($estado->cedula) · 🪪 {{ $estado->cedula }} @endif
-                                @if($estado->cliente_existe_erp) <span class="text-emerald-600">· ERP ✓</span> @endif
+                                @if($estado->cedula) · <i class="fa-solid fa-id-card"></i> {{ $estado->cedula }} @endif
+                                @if($estado->cliente_existe_erp) <span class="text-emerald-600">· ERP <i class="fa-solid fa-check"></i></span> @endif
                             </div>
                         </div>
                         <div class="text-right flex-shrink-0">
@@ -183,7 +183,7 @@
                     <div class="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
                         {{-- Productos --}}
                         <div class="rounded-lg bg-slate-50 p-2">
-                            <div class="text-[9px] text-slate-500 font-bold uppercase">🛒 Productos</div>
+                            <div class="text-[9px] text-slate-500 font-bold uppercase"><i class="fa-solid fa-cart-shopping"></i> Productos</div>
                             @if(!empty($estado->productos))
                                 @foreach(array_slice($estado->productos, 0, 2) as $p)
                                     <div class="text-slate-700 truncate">{{ $p['quantity'] ?? '?' }} {{ $p['unit'] ?? '' }} {{ $p['name'] ?? '?' }}</div>
@@ -198,7 +198,7 @@
 
                         {{-- Entrega --}}
                         <div class="rounded-lg bg-slate-50 p-2">
-                            <div class="text-[9px] text-slate-500 font-bold uppercase">🚚 Entrega</div>
+                            <div class="text-[9px] text-slate-500 font-bold uppercase"><i class="fa-solid fa-truck"></i> Entrega</div>
                             @if($estado->metodo_entrega === 'recoger')
                                 <div class="text-slate-700">Cliente recoge</div>
                                 <div class="text-[10px] text-slate-500 truncate">{{ $estado->sede?->nombre ?: '—' }}</div>
@@ -206,7 +206,7 @@
                                 <div class="text-slate-700">Despacho</div>
                                 <div class="text-[10px] text-slate-500 truncate">{{ $estado->direccion ?: '—' }}</div>
                                 @if($estado->cobertura_validada)
-                                    <div class="text-[10px] text-emerald-600">✓ {{ $estado->distancia_km }}km</div>
+                                    <div class="text-[10px] text-emerald-600"><i class="fa-solid fa-check"></i> {{ $estado->distancia_km }}km</div>
                                 @endif
                             @else
                                 <div class="text-slate-400 italic">—</div>
@@ -215,7 +215,7 @@
 
                         {{-- Identificación --}}
                         <div class="rounded-lg bg-slate-50 p-2">
-                            <div class="text-[9px] text-slate-500 font-bold uppercase">👤 Identif.</div>
+                            <div class="text-[9px] text-slate-500 font-bold uppercase"><i class="fa-solid fa-user"></i> Identif.</div>
                             <div class="text-slate-700 truncate">{{ $estado->nombre_cliente ?: '—' }}</div>
                             <div class="text-[10px] text-slate-500">{{ $estado->cedula ?: '—' }}</div>
                         </div>
@@ -223,7 +223,7 @@
                         {{-- Pendientes --}}
                         <div class="rounded-lg {{ $completo ? 'bg-emerald-50' : 'bg-amber-50' }} p-2">
                             <div class="text-[9px] {{ $completo ? 'text-emerald-700' : 'text-amber-700' }} font-bold uppercase">
-                                {{ $completo ? '✅ Listo' : '⚠️ Falta' }}
+                                {{ $completo ? '<i class="fa-solid fa-circle-check"></i> Listo' : '<i class="fa-solid fa-triangle-exclamation"></i> Falta' }}
                             </div>
                             @if($completo)
                                 <div class="text-emerald-700 text-[10px]">A confirmar pedido</div>
@@ -277,7 +277,7 @@
                                 </div>
                                 @if(!empty($ev['meta']['from']))
                                     <div class="text-[10px] text-slate-500">
-                                        📞 {{ $ev['meta']['from'] }}
+                                        <i class="fa-solid fa-phone"></i> {{ $ev['meta']['from'] }}
                                     </div>
                                 @endif
                             </div>
@@ -317,7 +317,7 @@
                 <div class="grid md:grid-cols-2 gap-0 divide-x divide-slate-100">
                     {{-- Estado a la izquierda --}}
                     <div class="p-5 space-y-3">
-                        <h4 class="text-sm font-bold text-slate-700 uppercase tracking-wide">📋 Estado del pedido</h4>
+                        <h4 class="text-sm font-bold text-slate-700 uppercase tracking-wide"><i class="fa-solid fa-clipboard"></i> Estado del pedido</h4>
                         @if($ef)
                             <div class="text-xs space-y-1">
                                 <p><strong>Paso:</strong> <span class="rounded bg-violet-100 text-violet-700 px-2 py-0.5 font-bold">{{ $ef->paso_actual }}</span></p>
@@ -330,7 +330,7 @@
                                 <p class="mt-2"><strong>Método:</strong> {{ $ef->metodo_entrega ?: '—' }}</p>
                                 @if($ef->metodo_entrega === 'domicilio')
                                     <p><strong>Dirección:</strong> {{ $ef->direccion ?: '—' }}</p>
-                                    <p><strong>Cobertura:</strong> {{ $ef->cobertura_validada ? '✅' : '❌' }}</p>
+                                    <p><strong>Cobertura:</strong> {{ $ef->cobertura_validada ? '<i class="fa-solid fa-circle-check"></i>' : '<i class="fa-solid fa-circle-xmark"></i>' }}</p>
                                 @elseif($ef->metodo_entrega === 'recoger')
                                     <p><strong>Sede:</strong> {{ $ef->sede?->nombre ?: '—' }}</p>
                                 @endif
@@ -338,7 +338,7 @@
                                 <p><strong>Nombre:</strong> {{ $ef->nombre_cliente ?: '—' }}</p>
                                 @if($ef->pedido_id)
                                     <p class="mt-2 rounded bg-emerald-50 border border-emerald-300 p-2">
-                                        <strong>✅ Pedido #{{ $ef->pedido_id }}</strong>
+                                        <strong><i class="fa-solid fa-circle-check"></i> Pedido #{{ $ef->pedido_id }}</strong>
                                         creado el {{ $ef->confirmado_at?->format('d/m/Y H:i') }}
                                     </p>
                                 @endif
@@ -350,7 +350,7 @@
 
                     {{-- Últimos mensajes a la derecha --}}
                     <div class="p-5">
-                        <h4 class="text-sm font-bold text-slate-700 uppercase tracking-wide mb-3">💬 Últimos 15 mensajes</h4>
+                        <h4 class="text-sm font-bold text-slate-700 uppercase tracking-wide mb-3"><i class="fa-solid fa-comment"></i> Últimos 15 mensajes</h4>
                         <div class="space-y-2 text-xs max-h-96 overflow-y-auto">
                             @foreach($cf->mensajes->reverse() as $m)
                                 <div class="rounded-lg p-2 {{ $m->rol === 'user' ? 'bg-blue-50' : ($m->rol === 'assistant' ? 'bg-emerald-50' : 'bg-slate-50') }}">

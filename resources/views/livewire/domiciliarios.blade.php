@@ -225,7 +225,7 @@
                         </button>
 
                         @if($dom->whatsappUrl())
-                            <a href="{{ $dom->whatsappUrl() }}?text={{ urlencode('Hola ' . explode(' ', $dom->nombre)[0] . ', este es tu portal personal para ver tus pedidos asignados:%0A' . $dom->urlPortal() . '%0AGuárdalo en tu pantalla de inicio 📱') }}"
+                            <a href="{{ $dom->whatsappUrl() }}?text={{ urlencode('Hola ' . explode(' ', $dom->nombre)[0] . ', este es tu portal personal para ver tus pedidos asignados:%0A' . $dom->urlPortal() . '%0AGuárdalo en tu pantalla de inicio <i class="fa-solid fa-mobile-screen"></i>') }}"
                                target="_blank"
                                class="rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-600 px-3 py-2 transition"
                                title="Enviar link por WhatsApp">

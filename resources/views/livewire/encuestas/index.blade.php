@@ -56,11 +56,11 @@
     <div class="rounded-xl bg-white border border-slate-200 p-3 mb-5 flex flex-wrap gap-2 items-center">
         @foreach([
             'todas'       => 'Todas',
-            'sin_enviar'  => '🔴 Sin enviar',
-            'enviadas_no_respondidas' => '📤 Enviadas (sin responder)',
-            'completadas' => '✅ Respondidas',
+            'sin_enviar'  => '<i class="fa-solid fa-circle text-rose-500"></i> Sin enviar',
+            'enviadas_no_respondidas' => '<i class="fa-solid fa-paper-plane"></i> Enviadas (sin responder)',
+            'completadas' => '<i class="fa-solid fa-circle-check"></i> Respondidas',
             'pendientes'  => 'Pendientes',
-            'bajas'       => '⚠ Bajas (≤3)',
+            'bajas'       => '<i class="fa-solid fa-triangle-exclamation"></i> Bajas (≤3)',
         ] as $key => $label)
             <button wire:click="$set('filtro', '{{ $key }}')"
                     class="px-3 py-1.5 rounded-lg text-xs font-semibold {{ $filtro === $key ? 'bg-brand text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' }}">
@@ -134,10 +134,10 @@
                             </td>
                             <td class="px-3 py-2.5 max-w-xs">
                                 @if($e->comentario_proceso)
-                                    <p class="text-[11px] text-slate-700 line-clamp-2">📝 {{ $e->comentario_proceso }}</p>
+                                    <p class="text-[11px] text-slate-700 line-clamp-2"><i class="fa-solid fa-pen-to-square"></i> {{ $e->comentario_proceso }}</p>
                                 @endif
                                 @if($e->comentario_domiciliario)
-                                    <p class="text-[11px] text-slate-500 line-clamp-2 mt-0.5">🛵 {{ $e->comentario_domiciliario }}</p>
+                                    <p class="text-[11px] text-slate-500 line-clamp-2 mt-0.5"><i class="fa-solid fa-motorcycle"></i> {{ $e->comentario_domiciliario }}</p>
                                 @endif
                                 @if(!$e->comentario_proceso && !$e->comentario_domiciliario)
                                     <span class="text-[11px] text-slate-400">—</span>
@@ -169,7 +169,7 @@
                                         {{ $e->enviada_at->diffForHumans() }}
                                     </div>
                                 @else
-                                    <span class="text-rose-600 font-bold">⚠ NO ENVIADA</span>
+                                    <span class="text-rose-600 font-bold"><i class="fa-solid fa-triangle-exclamation"></i> NO ENVIADA</span>
                                     <div class="text-[10px] text-slate-400">creada {{ $e->created_at?->diffForHumans() }}</div>
                                 @endif
                             </td>

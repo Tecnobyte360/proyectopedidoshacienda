@@ -5,7 +5,7 @@
         <div class="flex items-start justify-between gap-4 mb-6 flex-wrap">
             <div>
                 <h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">
-                    🐕 Monitor del Watchdog
+                    <i class="fa-solid fa-dog"></i> Monitor del Watchdog
                 </h1>
                 <p class="text-sm text-slate-500 mt-1">
                     Rescates automáticos de conversaciones donde el bot quedó sin responder.
@@ -64,7 +64,7 @@
         @if($k['total'] === 0)
             <div class="rounded-2xl border border-dashed border-slate-200 bg-white p-10 text-center">
                 <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 text-emerald-500 text-3xl">
-                    🐕
+                    <i class="fa-solid fa-dog"></i>
                 </div>
                 <h3 class="mt-3 text-lg font-semibold text-slate-700">Sin rescates en las últimas {{ $horas }}h</h3>
                 <p class="mt-1 text-sm text-slate-500 max-w-md mx-auto">

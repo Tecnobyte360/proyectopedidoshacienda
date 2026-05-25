@@ -60,7 +60,7 @@
                             <td class="px-2 py-2 align-top">
                                 <div class="font-semibold text-slate-800">{{ $l->titulo }}</div>
                                 @if($l->contexto_error)
-                                    <div class="text-[10px] text-rose-600 mt-0.5">❌ {{ \Illuminate\Support\Str::limit($l->contexto_error, 100) }}</div>
+                                    <div class="text-[10px] text-rose-600 mt-0.5"><i class="fa-solid fa-circle-xmark"></i> {{ \Illuminate\Support\Str::limit($l->contexto_error, 100) }}</div>
                                 @endif
                             </td>
                             <td class="px-2 py-2 align-top hidden md:table-cell">
@@ -68,7 +68,7 @@
                                     <div class="text-[10px] text-slate-500 italic">"{{ \Illuminate\Support\Str::limit($l->frase_disparadora, 50) }}"</div>
                                 @endif
                                 @if($l->regla)
-                                    <div class="text-[10px] text-emerald-700 mt-0.5">✅ {{ \Illuminate\Support\Str::limit($l->regla, 100) }}</div>
+                                    <div class="text-[10px] text-emerald-700 mt-0.5"><i class="fa-solid fa-circle-check"></i> {{ \Illuminate\Support\Str::limit($l->regla, 100) }}</div>
                                 @endif
                             </td>
                             <td class="px-2 py-2 text-center text-[10px] text-slate-500">{{ $l->veces_aplicada }}</td>
@@ -136,14 +136,14 @@
                     </div>
 
                     <div>
-                        <label class="block text-[11px] font-semibold text-rose-700 mb-1">❌ Qué NO debe hacer el bot</label>
+                        <label class="block text-[11px] font-semibold text-rose-700 mb-1"><i class="fa-solid fa-circle-xmark"></i> Qué NO debe hacer el bot</label>
                         <textarea wire:model="contexto_error" rows="3" maxlength="1000"
                                   placeholder='Ej: Interpretar "recojo" como una dirección o ciudad'
                                   class="w-full rounded-lg border border-rose-200 bg-rose-50/30 px-3 py-1.5 text-sm"></textarea>
                     </div>
 
                     <div>
-                        <label class="block text-[11px] font-semibold text-emerald-700 mb-1">✅ Qué SÍ debe hacer</label>
+                        <label class="block text-[11px] font-semibold text-emerald-700 mb-1"><i class="fa-solid fa-circle-check"></i> Qué SÍ debe hacer</label>
                         <textarea wire:model="regla" rows="3" maxlength="1000"
                                   placeholder='Ej: Entender que el cliente quiere RECOGER en sede. Confirmar sede y NO llamar validar_cobertura'
                                   class="w-full rounded-lg border border-emerald-200 bg-emerald-50/30 px-3 py-1.5 text-sm"></textarea>

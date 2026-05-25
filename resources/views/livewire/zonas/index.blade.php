@@ -375,7 +375,7 @@
                                         <h4 class="text-base font-bold text-slate-800">Editor visual con Google Maps</h4>
                                         @if ($poligono && count($poligono) >= 3)
                                             <p class="text-xs text-slate-600 mt-1">
-                                                ✅ Polígono dibujado con <strong>{{ count($poligono) }} puntos</strong>
+                                                <i class="fa-solid fa-circle-check"></i> Polígono dibujado con <strong>{{ count($poligono) }} puntos</strong>
                                                 @if ($area_km2)
                                                     · Área <strong>{{ number_format($area_km2, 2, ',', '.') }} km²</strong>
                                                 @endif
@@ -385,7 +385,7 @@
                                             </p>
                                         @else
                                             <p class="text-xs text-amber-700 mt-1">
-                                                ⚠️ Esta zona aún no tiene polígono dibujado.
+                                                <i class="fa-solid fa-triangle-exclamation"></i> Esta zona aún no tiene polígono dibujado.
                                             </p>
                                             <p class="text-[11px] text-slate-500 mt-1">
                                                 Sin polígono el bot solo valida coberturas por nombre de barrio (menos preciso).

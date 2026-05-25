@@ -180,7 +180,7 @@
                         </div>
                     @else
                         <div class="rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-700 text-white p-4 mb-4">
-                            <div class="text-xs opacity-90 mb-1">✅ Sincronización completada</div>
+                            <div class="text-xs opacity-90 mb-1"><i class="fa-solid fa-circle-check"></i> Sincronización completada</div>
                             <div class="text-3xl font-extrabold">{{ $resultadoSyncFull['tickets_procesados'] ?? 0 }} chats</div>
                         </div>
                         <div class="grid grid-cols-3 gap-2 mb-3">
@@ -257,7 +257,7 @@
                             </table>
                         </div>
                         <div class="text-xs text-slate-500 mt-3">
-                            👉 Pásame los paths que respondieron <strong>200</strong> con JSON y construyo el sync de historial completo.
+                            <i class="fa-solid fa-hand-point-right"></i> Pásame los paths que respondieron <strong>200</strong> con JSON y construyo el sync de historial completo.
                         </div>
                     @endif
                     <div class="mt-4 flex justify-end gap-2">
@@ -782,7 +782,7 @@
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-1">
-                                🎂 Fecha de nacimiento
+                                <i class="fa-solid fa-cake-candles"></i> Fecha de nacimiento
                                 <span class="text-xs text-slate-400 font-normal">(opcional)</span>
                             </label>
                             <input type="date" wire:model="fecha_nacimiento" max="{{ date('Y-m-d') }}"

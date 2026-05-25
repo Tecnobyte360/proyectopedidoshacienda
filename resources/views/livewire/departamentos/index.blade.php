@@ -26,7 +26,7 @@
                         <div class="flex items-center gap-3">
                             <div class="flex h-12 w-12 items-center justify-center rounded-xl text-2xl"
                                  style="background: {{ $d->color }}15; color: {{ $d->color }};">
-                                {{ $d->icono_emoji ?: '🎯' }}
+                                {{ $d->icono_emoji ?: '<i class="fa-solid fa-bullseye"></i>' }}
                             </div>
                             <div>
                                 <h3 class="font-bold text-slate-800">{{ $d->nombre }}</h3>

@@ -148,7 +148,7 @@
 
     {{-- Cheat sheet de precios --}}
     <div class="mt-6 bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs text-slate-600">
-        <p class="font-bold text-slate-700 mb-2">📖 Cómo cobra Meta (Colombia)</p>
+        <p class="font-bold text-slate-700 mb-2"><i class="fa-solid fa-book-open"></i> Cómo cobra Meta (Colombia)</p>
         <ul class="space-y-1 list-disc list-inside">
             <li><strong>Service</strong>: cliente escribe primero → todo dentro de 24h es <span class="text-emerald-600 font-bold">GRATIS</span></li>
             <li><strong>Utility</strong>: tú inicias con plantilla utility (confirmación, recordatorio, OTP) → <span class="font-bold">~$0.0080 USD</span> por conversación 24h</li>

@@ -48,7 +48,7 @@
                     @endif
                     @if($encuesta->recomendaria !== null)
                         <div class="text-slate-600">
-                            ¿Recomendarías?: <strong class="{{ $encuesta->recomendaria ? 'text-emerald-600' : 'text-rose-600' }}">{{ $encuesta->recomendaria ? 'Sí 👍' : 'No 👎' }}</strong>
+                            ¿Recomendarías?: <strong class="{{ $encuesta->recomendaria ? 'text-emerald-600' : 'text-rose-600' }}">{{ $encuesta->recomendaria ? 'Sí <i class="fa-solid fa-thumbs-up"></i>' : 'No <i class="fa-solid fa-thumbs-down"></i>' }}</strong>
                         </div>
                     @endif
                 </div>

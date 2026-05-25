@@ -53,7 +53,7 @@
                     <ul class="text-xs text-slate-600 space-y-1">
                         <li><code class="bg-slate-100 px-1 rounded">nombre</code> <strong>(obligatorio)</strong></li>
                         <li><code class="bg-slate-100 px-1 rounded">descripcion</code></li>
-                        <li><code class="bg-slate-100 px-1 rounded">icono_emoji</code> — ej. 🥩 🍞 🥛</li>
+                        <li><code class="bg-slate-100 px-1 rounded">icono_emoji</code> — ej. <i class="fa-solid fa-drumstick-bite"></i> <i class="fa-solid fa-bread-slice"></i> <i class="fa-solid fa-glass-water"></i></li>
                         <li><code class="bg-slate-100 px-1 rounded">color</code> — hex (#d68643)</li>
                         <li><code class="bg-slate-100 px-1 rounded">orden</code></li>
                         <li><code class="bg-slate-100 px-1 rounded">activo</code></li>

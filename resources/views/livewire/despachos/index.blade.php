@@ -504,7 +504,7 @@
                                     <div class="rounded-xl bg-rose-50 border border-rose-200 p-3 mb-3 flex items-center gap-3">
                                         <i class="fa-solid fa-circle-exclamation text-rose-600 text-lg"></i>
                                         <div class="flex-1 text-xs">
-                                            <div class="font-bold text-rose-800">⚠️ Pedido SIN pagar</div>
+                                            <div class="font-bold text-rose-800"><i class="fa-solid fa-triangle-exclamation"></i> Pedido SIN pagar</div>
                                             <div class="text-rose-700">
                                                 Antes de entregar, marca el pago (efectivo). Sin pago no podrás cerrar el pedido.
                                             </div>
@@ -742,7 +742,7 @@
                     </h3>
                     <p class="text-xs text-slate-500">
                         @if($domisEnVivo === 0 && $domisDesconectados > 0)
-                            ⚠️ Ningún domiciliario tiene su portal abierto. Mostrando últimas ubicaciones conocidas.
+                            <i class="fa-solid fa-triangle-exclamation"></i> Ningún domiciliario tiene su portal abierto. Mostrando últimas ubicaciones conocidas.
                         @elseif($domisActivos->isEmpty())
                             Los repartidores enviarán su ubicación cuando abran el portal en su celular
                         @else
@@ -1951,7 +1951,7 @@
                                             class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-brand focus:ring-brand">
                                         <option value="">— Selecciona un domiciliario —</option>
                                         @if($domsDeZona->isNotEmpty())
-                                            <optgroup label="✓ Cubren esta zona">
+                                            <optgroup label="<i class="fa-solid fa-check"></i> Cubren esta zona">
                                                 @foreach($domsDeZona as $d)
                                                     <option value="{{ $d->id }}">
                                                         {{ $d->nombre }} ({{ ucfirst($d->estado) }}){{ $d->vehiculo ? ' · '.$d->vehiculo : '' }}
@@ -2034,7 +2034,7 @@
                                                 <span class="font-semibold text-slate-800 truncate">{{ $dom->nombre }}</span>
                                                 @if($cubreZona === true)
                                                     <span class="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-bold text-green-700">
-                                                        ✓ Cubre zona
+                                                        <i class="fa-solid fa-check"></i> Cubre zona
                                                     </span>
                                                 @endif
                                             </div>
@@ -2119,9 +2119,9 @@
                         </label>
                         <div class="grid grid-cols-3 gap-2 mb-5">
                             @foreach([
-                                'efectivo' => ['💵', 'Efectivo'],
-                                'transferencia' => ['🏦', 'Transferencia'],
-                                'tarjeta' => ['💳', 'Tarjeta'],
+                                'efectivo' => ['<i class="fa-solid fa-money-bill"></i>', 'Efectivo'],
+                                'transferencia' => ['<i class="fa-solid fa-building-columns"></i>', 'Transferencia'],
+                                'tarjeta' => ['<i class="fa-solid fa-credit-card"></i>', 'Tarjeta'],
                             ] as $val => [$emoji, $label])
                                 <button type="button" wire:click="$set('modalPagoMetodo', '{{ $val }}')"
                                         class="rounded-xl border-2 p-3 text-center transition
@@ -2189,15 +2189,15 @@
                                     </div>
                                     <button type="button" @click="ver = !ver"
                                             class="text-[11px] font-bold text-amber-700 hover:text-amber-900 underline">
-                                        <span x-show="!ver">👁️ Mostrar</span>
-                                        <span x-show="ver" x-cloak>🙈 Ocultar</span>
+                                        <span x-show="!ver"><i class="fa-solid fa-eye"></i> Mostrar</span>
+                                        <span x-show="ver" x-cloak><i class="fa-solid fa-eye-slash"></i> Ocultar</span>
                                     </button>
                                 </div>
                                 <div x-show="ver" x-cloak class="mt-2 text-center">
                                     <div class="font-mono text-3xl font-black tracking-[0.5em] text-amber-900">
                                         {{ $pEnt->token_entrega }}
                                     </div>
-                                    <p class="text-[10px] text-amber-700 mt-1 italic">⚠️ Úsalo solo como referencia, el cliente debe dictarlo</p>
+                                    <p class="text-[10px] text-amber-700 mt-1 italic"><i class="fa-solid fa-triangle-exclamation"></i> Úsalo solo como referencia, el cliente debe dictarlo</p>
                                 </div>
                             </div>
                         @endif
@@ -2223,7 +2223,7 @@
                             </div>
                             <div class="flex items-center justify-between mt-1">
                                 <span>Método de pago:</span>
-                                <strong>{{ ucfirst($pEnt->metodo_pago ?: 'efectivo') }} ✓</strong>
+                                <strong>{{ ucfirst($pEnt->metodo_pago ?: 'efectivo') }} <i class="fa-solid fa-check"></i></strong>
                             </div>
                         </div>
 

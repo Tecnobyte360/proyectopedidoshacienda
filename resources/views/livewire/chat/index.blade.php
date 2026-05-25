@@ -6,7 +6,7 @@
     {{-- Banner de advertencia si el bot está apagado globalmente --}}
     @if(!$cfgBot->activo)
         <div class="absolute top-20 left-0 right-0 z-20 bg-rose-500 text-white px-4 py-2 text-center text-xs font-bold shadow lg:left-64">
-            ⚠️ El bot está APAGADO en {{ \Illuminate\Support\Facades\Route::has('configuracion.bot') ? '' : '' }}
+            <i class="fa-solid fa-triangle-exclamation"></i> El bot está APAGADO en {{ \Illuminate\Support\Facades\Route::has('configuracion.bot') ? '' : '' }}
             <a href="{{ route('configuracion.bot') }}" class="underline">Configuración del bot</a>
             — los clientes escriben pero la IA no responde.
         </div>
@@ -173,7 +173,7 @@
                             <div class="text-[10px] text-slate-400">{{ $c->total_mensajes }} mensajes</div>
                             @if($c->departamento)
                                 <span class="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-700 border border-violet-200" title="Derivada a {{ $c->departamento->nombre }}">
-                                    {!! $c->departamento->icono_emoji ?: '🏢' !!} {{ $c->departamento->nombre }}
+                                    {!! $c->departamento->icono_emoji ?: '<i class="fa-solid fa-building"></i>' !!} {{ $c->departamento->nombre }}
                                 </span>
                             @endif
                         </div>
@@ -231,7 +231,7 @@
                             @if($conversacionActiva->departamento)
                                 <span class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 border border-violet-200"
                                       title="Derivada al departamento {{ $conversacionActiva->departamento->nombre }}">
-                                    {!! $conversacionActiva->departamento->icono_emoji ?: '🏢' !!} {{ $conversacionActiva->departamento->nombre }}
+                                    {!! $conversacionActiva->departamento->icono_emoji ?: '<i class="fa-solid fa-building"></i>' !!} {{ $conversacionActiva->departamento->nombre }}
                                 </span>
                             @endif
                         </div>
@@ -398,7 +398,7 @@
                                     <p class="text-sm text-slate-800 whitespace-pre-wrap">{{ $m->contenido }}</p>
                                 @endif
                                 <p class="text-[10px] text-slate-500 mt-1 text-right flex items-center justify-end gap-1">
-                                    <span>{{ $esHumano ? '👤' : '🤖' }} {{ $m->created_at->format('H:i') }}</span>
+                                    <span>{{ $esHumano ? '<i class="fa-solid fa-user"></i>' : '<i class="fa-solid fa-robot"></i>' }} {{ $m->created_at->format('H:i') }}</span>
                                     @php $ack = (int) ($m->ack ?? 0); @endphp
                                     {{-- Solo mostramos ticks/reloj si podemos rastrear el estado (mensaje del operador).
                                          Los mensajes del bot se envían vía API y asumimos entregados correctamente. --}}
@@ -564,7 +564,7 @@
                              style="bottom: 100%; margin-bottom: 4px;"
                              class="absolute left-0 w-full max-w-md max-h-56 overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-xl z-50">
                             <div class="sticky top-0 px-2.5 py-1 border-b border-slate-100 bg-slate-50 text-[9px] font-bold uppercase tracking-wide text-slate-500">
-                                ⚡ Respuestas <span class="font-normal normal-case text-slate-400 text-[9px]">(↑↓ Enter Esc)</span>
+                                <i class="fa-solid fa-bolt"></i> Respuestas <span class="font-normal normal-case text-slate-400 text-[9px]">(↑↓ Enter Esc)</span>
                             </div>
                             <template x-for="(r, i) in filtradas" :key="r.id">
                                 <button type="button"
@@ -675,7 +675,7 @@
                     <i class="fa-solid fa-comment-dots text-7xl mb-4 text-slate-300"></i>
                     <h3 class="text-2xl font-bold text-slate-700 mb-2">Selecciona una conversación</h3>
                     <p class="text-sm">Elige un chat de la izquierda para empezar a atender al cliente.
-                    Los mensajes nuevos aparecerán en tiempo real 🔥</p>
+                    Los mensajes nuevos aparecerán en tiempo real <i class="fa-solid fa-fire"></i></p>
                 </div>
             </div>
         @endif
@@ -1374,7 +1374,7 @@
                                                 class="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition text-left">
                                             <div>
                                                 <div class="text-sm font-bold text-slate-800">
-                                                    🛠️ Tools disponibles ({{ $promptInspeccion['stats']['tools_total'] ?? count($promptInspeccion['tools']) }})
+                                                    <i class="fa-solid fa-screwdriver-wrench"></i> Tools disponibles ({{ $promptInspeccion['stats']['tools_total'] ?? count($promptInspeccion['tools']) }})
                                                     <span class="text-[10px] font-normal text-slate-500 ml-1">
                                                         — {{ $promptInspeccion['stats']['tools_paso'] ?? 0 }} habilitadas en este paso
                                                     </span>
@@ -1398,12 +1398,12 @@
                                                 <button @click="tipoFiltro = 'habilitadas'"
                                                         :class="tipoFiltro === 'habilitadas' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'"
                                                         class="rounded-full px-2.5 py-0.5 text-[10px] font-bold transition">
-                                                    ✓ Habilitadas ({{ $promptInspeccion['stats']['tools_paso'] ?? 0 }})
+                                                    <i class="fa-solid fa-check"></i> Habilitadas ({{ $promptInspeccion['stats']['tools_paso'] ?? 0 }})
                                                 </button>
                                                 <button @click="tipoFiltro = 'bloqueadas'"
                                                         :class="tipoFiltro === 'bloqueadas' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'"
                                                         class="rounded-full px-2.5 py-0.5 text-[10px] font-bold transition">
-                                                    ✗ Bloqueadas ({{ count($promptInspeccion['tools']) - ($promptInspeccion['stats']['tools_paso'] ?? 0) }})
+                                                    <i class="fa-solid fa-xmark"></i> Bloqueadas ({{ count($promptInspeccion['tools']) - ($promptInspeccion['stats']['tools_paso'] ?? 0) }})
                                                 </button>
                                             </div>
 
@@ -1500,7 +1500,7 @@
                             </div>
 
                             <p class="text-[10px] text-slate-400 text-center pt-1">
-                                ⚙️ Esta es exactamente la información que recibe OpenAI antes de generar la siguiente respuesta.
+                                <i class="fa-solid fa-gear"></i> Esta es exactamente la información que recibe OpenAI antes de generar la siguiente respuesta.
                             </p>
                         </div>
                     @elseif(!empty($promptInspeccion['error']))
@@ -1609,9 +1609,9 @@
                                         <p class="text-xs mt-1">
                                             <strong>Cobertura:</strong>
                                             @if($pedidoEstado->cobertura_validada)
-                                                <span class="text-emerald-600">✅</span>
+                                                <span class="text-emerald-600"><i class="fa-solid fa-circle-check"></i></span>
                                             @else
-                                                <span class="text-rose-600">❌</span>
+                                                <span class="text-rose-600"><i class="fa-solid fa-circle-xmark"></i></span>
                                             @endif
                                             @if($pedidoEstado->distancia_km) · {{ $pedidoEstado->distancia_km }} km @endif
                                         </p>
@@ -1637,7 +1637,7 @@
                                 <p class="text-xs mt-1">
                                     <strong>En ERP:</strong>
                                     @if($pedidoEstado->cliente_existe_erp)
-                                        <span class="text-emerald-600 font-semibold">✅ Sí</span>
+                                        <span class="text-emerald-600 font-semibold"><i class="fa-solid fa-circle-check"></i> Sí</span>
                                     @else
                                         <span class="text-slate-500">No verificado</span>
                                     @endif
@@ -1668,8 +1668,8 @@
                                     @foreach($pedidoEstado->validaciones as $clave => $valor)
                                         <span class="rounded-full bg-white border border-slate-200 px-2.5 py-0.5 text-[10px]">
                                             {{ $clave }}:
-                                            @if($valor)<span class="text-emerald-600 font-bold">✓</span>
-                                            @else<span class="text-rose-600 font-bold">✗</span>@endif
+                                            @if($valor)<span class="text-emerald-600 font-bold"><i class="fa-solid fa-check"></i></span>
+                                            @else<span class="text-rose-600 font-bold"><i class="fa-solid fa-xmark"></i></span>@endif
                                         </span>
                                     @endforeach
                                 </div>

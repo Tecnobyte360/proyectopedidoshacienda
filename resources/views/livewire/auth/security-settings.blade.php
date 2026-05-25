@@ -54,7 +54,7 @@
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-2.5 mb-4">
                     @foreach(session('2fa.recovery_codes') as $code)
                         <div class="group relative font-mono text-sm font-extrabold text-amber-900 text-center py-3 px-2 bg-white rounded-xl border-2 border-amber-200 hover:border-amber-400 hover:shadow-md transition cursor-pointer"
-                             onclick="navigator.clipboard.writeText('{{ $code }}'); this.querySelector('.cp-tooltip').textContent='✓ Copiado';">
+                             onclick="navigator.clipboard.writeText('{{ $code }}'); this.querySelector('.cp-tooltip').textContent='<i class="fa-solid fa-check"></i> Copiado';">
                             {{ $code }}
                             <div class="cp-tooltip absolute -top-7 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[10px] px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition whitespace-nowrap pointer-events-none">
                                 Click para copiar
@@ -72,7 +72,7 @@
                         <i class="fa-solid fa-print"></i> Imprimir
                     </button>
                     <span class="text-[11px] text-amber-800 ml-auto">
-                        💡 Guárdalos en 1Password, Bitwarden o un papel físico seguro
+                        <i class="fa-solid fa-lightbulb"></i> Guárdalos en 1Password, Bitwarden o un papel físico seguro
                     </span>
                 </div>
             </div>
@@ -106,7 +106,7 @@
                             <p>1. Abre tu app autenticadora (Google Authenticator, Authy, 1Password, etc.)</p>
                             <p>2. Toca <strong>"Agregar cuenta"</strong> o el botón <strong>+</strong></p>
                             <p>3. Selecciona <strong>"Escanear código QR"</strong></p>
-                            <p>4. Apunta a este QR ☝️</p>
+                            <p>4. Apunta a este QR <i class="fa-solid fa-hand-point-up"></i></p>
                         </div>
 
                         <details class="rounded-xl bg-slate-50 border border-slate-200 px-3 py-2">
@@ -187,7 +187,7 @@
                     </div>
                     <p class="text-sm text-slate-600 leading-relaxed">
                         @if($user->tieneDosFactor())
-                            🛡️ Tu cuenta está <strong>protegida</strong> con autenticación en 2 pasos desde el
+                            <i class="fa-solid fa-shield-halved"></i> Tu cuenta está <strong>protegida</strong> con autenticación en 2 pasos desde el
                             <strong>{{ $user->two_factor_enabled_at->format('d/m/Y') }}</strong>.
                             Cada vez que inicies sesión, deberás ingresar un código de tu app autenticadora.
                         @else
@@ -210,7 +210,7 @@
                         <form method="POST" action="{{ route('two-factor.disable') }}" class="px-4 pb-4 space-y-3 border-t border-rose-200 pt-4">
                             @csrf
                             <p class="text-xs text-rose-800 leading-relaxed">
-                                ⚠️ Esto reduce la seguridad de tu cuenta. Si decides hacerlo, confirma con tu contraseña.
+                                <i class="fa-solid fa-triangle-exclamation"></i> Esto reduce la seguridad de tu cuenta. Si decides hacerlo, confirma con tu contraseña.
                             </p>
                             <input type="password" name="password" required placeholder="Tu contraseña actual"
                                    class="w-full rounded-xl border border-rose-300 px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-rose-500 focus:ring-4 focus:ring-rose-200">

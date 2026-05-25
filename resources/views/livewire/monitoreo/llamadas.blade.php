@@ -191,7 +191,7 @@
                 </button>
             </form>
             <p class="text-[10px] text-slate-500 mt-2">
-                El cliente recibirá un mensaje con botón "Permitir/Bloquear". Si acepta, podrás llamarlo desde el botón 📞 del chat.
+                El cliente recibirá un mensaje con botón "Permitir/Bloquear". Si acepta, podrás llamarlo desde el botón <i class="fa-solid fa-phone"></i> del chat.
             </p>
         </div>
 

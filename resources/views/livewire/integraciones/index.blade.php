@@ -338,7 +338,7 @@
                                             <tr class="hover:bg-slate-50">
                                                 <td class="px-2 py-1 font-mono font-semibold text-slate-800">{{ $c['nombre'] }}</td>
                                                 <td class="px-2 py-1 font-mono text-slate-600">{{ $c['tipo'] }}</td>
-                                                <td class="px-2 py-1 text-slate-500">{{ strtoupper($c['nullable'] ?? '') === 'YES' ? '✓' : '—' }}</td>
+                                                <td class="px-2 py-1 text-slate-500">{{ strtoupper($c['nullable'] ?? '') === 'YES' ? '<i class="fa-solid fa-check"></i>' : '—' }}</td>
                                             </tr>
                                         @endforeach
                                     </tbody>
@@ -397,7 +397,7 @@
                                    class="mt-1 rounded border-slate-300 text-blue-600 h-5 w-5">
                             <div class="flex-1">
                                 <div class="text-sm font-bold text-slate-800">
-                                    📤 Exportar pedidos confirmados a esta BD
+                                    <i class="fa-solid fa-paper-plane"></i> Exportar pedidos confirmados a esta BD
                                 </div>
                                 <div class="text-[11px] text-slate-500">
                                     Cada pedido nuevo se insertará en la tabla <code>{{ $export_tabla }}</code> del ERP.
@@ -499,7 +499,7 @@
                                             <code class="bg-rose-100 px-1 rounded text-[10px]">DISABLE TRIGGER ALL</code>
                                             antes y <code class="bg-rose-100 px-1 rounded text-[10px]">ENABLE TRIGGER ALL</code>
                                             después del INSERT.<br>
-                                            ⚠️ <strong>Requiere permiso ALTER en la tabla.</strong> Idealmente prefiere
+                                            <i class="fa-solid fa-triangle-exclamation"></i> <strong>Requiere permiso ALTER en la tabla.</strong> Idealmente prefiere
                                             crear el cliente/producto en el ERP antes que desactivar triggers.
                                         </div>
                                     </div>
@@ -507,7 +507,7 @@
                             </div>
 
                             <div class="mt-3 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-[11px] text-amber-800">
-                                💡 <strong>Variables disponibles</strong> en cualquier campo (escríbelas con llaves):<br>
+                                <i class="fa-solid fa-lightbulb"></i> <strong>Variables disponibles</strong> en cualquier campo (escríbelas con llaves):<br>
 
                                 <strong>Cliente:</strong>
                                 <code class="text-[10px] bg-amber-100 px-1 rounded mx-0.5">{cliente.cedula}</code>
@@ -546,7 +546,7 @@
                                     <input type="checkbox" wire:model.live="export_detalle_activo"
                                            class="mt-1 rounded border-slate-300 text-blue-600 h-5 w-5">
                                     <div class="flex-1">
-                                        <div class="text-sm font-bold text-slate-800">📋 Insertar también el detalle</div>
+                                        <div class="text-sm font-bold text-slate-800"><i class="fa-solid fa-clipboard"></i> Insertar también el detalle</div>
                                         <div class="text-[11px] text-slate-500">
                                             Por cada producto del pedido, se hará un <code>INSERT INTO {{ $export_detalle_tabla }}</code>.
                                             Cantidad, código, precio unitario, etc., se llenan automáticamente.
@@ -617,7 +617,7 @@
                                     </div>
 
                                     <div class="mt-3 rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2 text-[11px] text-emerald-800">
-                                        ✓ <strong>Variables del detalle</strong>:<br>
+                                        <i class="fa-solid fa-check"></i> <strong>Variables del detalle</strong>:<br>
                                         <code class="text-[10px] bg-emerald-100 px-1 rounded mr-1">{detalle.codigo}</code>SKU/código
                                         <code class="text-[10px] bg-emerald-100 px-1 rounded mr-1 ml-2">{detalle.nombre}</code>nombre
                                         <code class="text-[10px] bg-emerald-100 px-1 rounded mr-1 ml-2">{detalle.cantidad}</code>cantidad
@@ -654,7 +654,7 @@
                                    class="mt-1 rounded border-slate-300 text-violet-600 h-5 w-5">
                             <div class="flex-1">
                                 <div class="text-sm font-bold text-slate-800">
-                                    🔍 Activar lookup y registro de clientes en el ERP
+                                    <i class="fa-solid fa-magnifying-glass"></i> Activar lookup y registro de clientes en el ERP
                                 </div>
                                 <div class="text-[11px] text-slate-500">
                                     El bot consulta y crea clientes automáticamente antes de registrar pedidos.
@@ -683,7 +683,7 @@
                             </div>
 
                             <div class="mt-3 rounded-lg bg-violet-100/50 border border-violet-200 px-3 py-2 text-[11px] text-violet-900">
-                                💡 El bot busca primero por <strong>{{ $cliente_columna_id }} = cédula</strong>;
+                                <i class="fa-solid fa-lightbulb"></i> El bot busca primero por <strong>{{ $cliente_columna_id }} = cédula</strong>;
                                 @if($cliente_columna_telefono)
                                     si no encuentra, busca por <strong>{{ $cliente_columna_telefono }} = teléfono</strong>.
                                 @endif
@@ -732,43 +732,43 @@
                                     <label class="flex items-center gap-2 rounded-lg border-2 border-slate-200 bg-white p-2 cursor-not-allowed opacity-75">
                                         <input type="checkbox" checked disabled
                                                class="rounded border-slate-300 text-violet-600 h-4 w-4">
-                                        <span class="text-xs font-semibold text-slate-700">📇 Cédula <span class="text-[9px] text-rose-500">(obligatorio)</span></span>
+                                        <span class="text-xs font-semibold text-slate-700"><i class="fa-solid fa-id-card"></i> Cédula <span class="text-[9px] text-rose-500">(obligatorio)</span></span>
                                     </label>
                                     <label class="flex items-center gap-2 rounded-lg border-2 p-2 cursor-pointer
                                                   {{ $cliente_pedir_nombre ? 'border-violet-300 bg-white' : 'border-slate-200 bg-slate-50' }}">
                                         <input type="checkbox" wire:model.live="cliente_pedir_nombre"
                                                class="rounded border-slate-300 text-violet-600 h-4 w-4">
-                                        <span class="text-xs font-semibold text-slate-700">👤 Nombre completo</span>
+                                        <span class="text-xs font-semibold text-slate-700"><i class="fa-solid fa-user"></i> Nombre completo</span>
                                     </label>
                                     <label class="flex items-center gap-2 rounded-lg border-2 p-2 cursor-pointer
                                                   {{ $cliente_pedir_direccion ? 'border-violet-300 bg-white' : 'border-slate-200 bg-slate-50' }}">
                                         <input type="checkbox" wire:model.live="cliente_pedir_direccion"
                                                class="rounded border-slate-300 text-violet-600 h-4 w-4">
-                                        <span class="text-xs font-semibold text-slate-700">📍 Dirección</span>
+                                        <span class="text-xs font-semibold text-slate-700"><i class="fa-solid fa-location-dot"></i> Dirección</span>
                                     </label>
                                     <label class="flex items-center gap-2 rounded-lg border-2 p-2 cursor-pointer
                                                   {{ $cliente_pedir_telefono ? 'border-violet-300 bg-white' : 'border-slate-200 bg-slate-50' }}">
                                         <input type="checkbox" wire:model.live="cliente_pedir_telefono"
                                                class="rounded border-slate-300 text-violet-600 h-4 w-4">
-                                        <span class="text-xs font-semibold text-slate-700">📞 Teléfono <span class="text-[9px] text-slate-400">(de WhatsApp)</span></span>
+                                        <span class="text-xs font-semibold text-slate-700"><i class="fa-solid fa-phone"></i> Teléfono <span class="text-[9px] text-slate-400">(de WhatsApp)</span></span>
                                     </label>
                                     <label class="flex items-center gap-2 rounded-lg border-2 p-2 cursor-pointer
                                                   {{ $cliente_pedir_email ? 'border-violet-300 bg-white' : 'border-slate-200 bg-slate-50' }}">
                                         <input type="checkbox" wire:model.live="cliente_pedir_email"
                                                class="rounded border-slate-300 text-violet-600 h-4 w-4">
-                                        <span class="text-xs font-semibold text-slate-700">📧 Email</span>
+                                        <span class="text-xs font-semibold text-slate-700"><i class="fa-solid fa-envelope"></i> Email</span>
                                     </label>
                                     <label class="flex items-center gap-2 rounded-lg border-2 p-2 cursor-pointer
                                                   {{ $cliente_pedir_ciudad ? 'border-violet-300 bg-white' : 'border-slate-200 bg-slate-50' }}">
                                         <input type="checkbox" wire:model.live="cliente_pedir_ciudad"
                                                class="rounded border-slate-300 text-violet-600 h-4 w-4">
-                                        <span class="text-xs font-semibold text-slate-700">🏙️ Ciudad</span>
+                                        <span class="text-xs font-semibold text-slate-700"><i class="fa-solid fa-city"></i> Ciudad</span>
                                     </label>
                                 </div>
                             </div>
 
                             <div class="mt-3 rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2 text-[11px] text-emerald-800">
-                                ✓ <strong>Flujo del bot:</strong>
+                                <i class="fa-solid fa-check"></i> <strong>Flujo del bot:</strong>
                                 (1) Cliente saluda → bot busca su teléfono en TblTerceros<br>
                                 (2) Si EXISTE → bot ya lo identifica, NO le pide cédula<br>
                                 (3) Si NO existe → bot le pide cédula primero<br>

@@ -198,7 +198,7 @@
                                                 <div class="flex flex-wrap gap-1 mt-0.5">
                                                     @foreach($u->departamentos as $d)
                                                         <span class="inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-200" title="Departamento">
-                                                            {!! $d->icono_emoji ?: '🏢' !!} {{ $d->nombre }}
+                                                            {!! $d->icono_emoji ?: '<i class="fa-solid fa-building"></i>' !!} {{ $d->nombre }}
                                                         </span>
                                                     @endforeach
                                                 </div>
@@ -395,7 +395,7 @@
                             <label class="block text-sm font-medium text-slate-700 mb-1.5">Rol</label>
                             <select wire:model="rol"
                                     class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-2 focus:ring-brand/20">
-                                <option value="">⚠️ Sin rol (sin permisos)</option>
+                                <option value=""><i class="fa-solid fa-triangle-exclamation"></i> Sin rol (sin permisos)</option>
                                 @foreach($roles as $r)
                                     <option value="{{ $r->name }}">{{ ucfirst($r->name) }}</option>
                                 @endforeach
@@ -435,7 +435,7 @@
                                                    value="{{ $d->id }}"
                                                    class="rounded border-slate-300 text-brand focus:ring-brand">
                                             <span class="text-sm text-slate-700 truncate">
-                                                {!! $d->icono_emoji ?: '🏢' !!} {{ $d->nombre }}
+                                                {!! $d->icono_emoji ?: '<i class="fa-solid fa-building"></i>' !!} {{ $d->nombre }}
                                             </span>
                                         </label>
                                     @endforeach

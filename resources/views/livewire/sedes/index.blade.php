@@ -241,7 +241,7 @@
                                                    class="w-full rounded-lg border-slate-200 text-sm">
                                         </div>
                                         <div class="col-span-1 text-right">
-                                            <span class="text-emerald-600">✓</span>
+                                            <span class="text-emerald-600"><i class="fa-solid fa-check"></i></span>
                                         </div>
                                     @else
                                         <div class="col-span-9 text-sm text-rose-500 font-semibold">

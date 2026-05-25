@@ -85,7 +85,7 @@
 
                 <div class="border-t border-slate-200 pt-4">
                     <p class="text-xs text-slate-500 leading-relaxed">
-                        💡 <strong>¿Por qué veo esta pantalla?</strong><br>
+                        <i class="fa-solid fa-lightbulb"></i> <strong>¿Por qué veo esta pantalla?</strong><br>
                         Tu suscripción mensual venció y entraste en período de mora. Una vez paguemos
                         la mensualidad, recuperarás acceso completo a la plataforma de forma automática.
                         Mientras tanto puedes cerrar sesión o pagar para reactivar.

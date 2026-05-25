@@ -167,7 +167,7 @@
             <p class="text-xl font-bold text-slate-800 mt-1">{{ number_format($tokensOutput) }}</p>
         </div>
         <div class="rounded-2xl bg-emerald-50 border border-emerald-200 p-3" title="Cache HIT = no cuenta hacia rate limit, costo 10%">
-            <p class="text-[11px] uppercase font-bold text-emerald-700">Cache hits 💰</p>
+            <p class="text-[11px] uppercase font-bold text-emerald-700">Cache hits <i class="fa-solid fa-money-bill"></i></p>
             <p class="text-xl font-bold text-emerald-700 mt-1">{{ number_format($tokensCacheRead) }}</p>
         </div>
         <div class="rounded-2xl bg-sky-50 border border-sky-200 p-3" title="Tokens guardados en cache (cobran 125%)">
@@ -321,7 +321,7 @@
     {{-- Listado --}}
     @if($wdTotal === 0)
         <div class="rounded-2xl border border-dashed border-slate-200 bg-white p-10 text-center">
-            <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 text-emerald-500 text-3xl">🐕</div>
+            <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 text-emerald-500 text-3xl"><i class="fa-solid fa-dog"></i></div>
             <h3 class="mt-3 text-lg font-semibold text-slate-700">Sin rescates en los últimos {{ $minutos }} minutos</h3>
             <p class="mt-1 text-sm text-slate-500 max-w-md mx-auto">
                 El watchdog está corriendo cada minuto pero no ha tenido que rescatar ninguna conversación.
@@ -739,11 +739,11 @@
 
         <div class="mt-4 pt-4 border-t border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
             <div class="rounded-lg bg-slate-50 p-3">
-                <p class="font-bold text-slate-700 mb-1">⏰ Frecuencia de reintento</p>
+                <p class="font-bold text-slate-700 mb-1"><i class="fa-solid fa-clock"></i> Frecuencia de reintento</p>
                 <p class="text-slate-600">Cada <strong>1 minuto</strong> (scheduler — no parametrizable)</p>
             </div>
             <div class="rounded-lg bg-slate-50 p-3">
-                <p class="font-bold text-slate-700 mb-1">📡 Auto-reconexión WhatsApp</p>
+                <p class="font-bold text-slate-700 mb-1"><i class="fa-solid fa-satellite-dish"></i> Auto-reconexión WhatsApp</p>
                 <p class="text-slate-600">Cada <strong>1 min</strong> · 3 fallos → email del tenant</p>
             </div>
         </div>
@@ -942,7 +942,7 @@
             @if($erpUltimos->isEmpty())
                 <div class="p-8 text-center text-slate-500">
                     <i class="fa-solid fa-check-circle text-4xl text-emerald-400 mb-2"></i>
-                    <p class="text-sm">No hay items en la cola. Todo está sincronizado ✨</p>
+                    <p class="text-sm">No hay items en la cola. Todo está sincronizado <i class="fa-solid fa-sparkles"></i></p>
                 </div>
             @else
                 <div class="overflow-x-auto">
@@ -1015,7 +1015,7 @@
                                         @if($p->proximo_intento_at && $p->estado === 'pendiente')
                                             {{ \Carbon\Carbon::parse($p->proximo_intento_at)->diffForHumans() }}
                                         @elseif($p->completado_at)
-                                            <span class="text-emerald-700">✓ {{ \Carbon\Carbon::parse($p->completado_at)->diffForHumans() }}</span>
+                                            <span class="text-emerald-700"><i class="fa-solid fa-check"></i> {{ \Carbon\Carbon::parse($p->completado_at)->diffForHumans() }}</span>
                                         @else
                                             —
                                         @endif

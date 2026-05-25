@@ -48,7 +48,7 @@
                                 <span class="flex h-8 w-8 items-center justify-center rounded-full bg-sky-100 text-sky-700 font-bold">3</span>
                                 <h4 class="font-bold">Listo</h4>
                             </div>
-                            <p class="text-xs text-slate-600">Refresca tu sitio. Verás el botón flotante 💬 en la esquina. Los visitantes pueden chatear de inmediato.</p>
+                            <p class="text-xs text-slate-600">Refresca tu sitio. Verás el botón flotante <i class="fa-solid fa-comment"></i> en la esquina. Los visitantes pueden chatear de inmediato.</p>
                         </div>
                     </div>
 
@@ -78,7 +78,7 @@
                         <div class="flex items-center gap-3">
                             <div class="flex h-12 w-12 items-center justify-center rounded-xl text-white text-xl"
                                  style="background: linear-gradient(135deg, {{ $w->color_primario }}, {{ $w->color_secundario }});">
-                                💬
+                                <i class="fa-solid fa-comment"></i>
                             </div>
                             <div>
                                 <h3 class="font-bold text-slate-800">{{ $w->nombre }}</h3>

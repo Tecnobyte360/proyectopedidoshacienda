@@ -24,7 +24,7 @@
                     · Monto: <strong>${{ number_format($info['monto'], 0, ',', '.') }} COP</strong>
                 @endif
                 @if($info['sev'] === 'rojo')
-                    · <strong>⚠️ Tu acceso será suspendido pronto</strong>
+                    · <strong><i class="fa-solid fa-triangle-exclamation"></i> Tu acceso será suspendido pronto</strong>
                 @endif
             </div>
         </div>

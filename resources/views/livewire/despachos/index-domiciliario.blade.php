@@ -90,8 +90,8 @@
                                 </div>
                             </div>
                             <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-800 px-2 py-0.5 text-[10px] font-bold">
-                                @if($p->estado === \App\Models\Pedido::ESTADO_REPARTIDOR_EN_CAMINO) 🛵 En camino
-                                @elseif($p->estado === \App\Models\Pedido::ESTADO_EN_PREPARACION) 👨‍🍳 En preparación
+                                @if($p->estado === \App\Models\Pedido::ESTADO_REPARTIDOR_EN_CAMINO) <i class="fa-solid fa-motorcycle"></i> En camino
+                                @elseif($p->estado === \App\Models\Pedido::ESTADO_EN_PREPARACION) <i class="fa-solid fa-user"></i>‍<i class="fa-solid fa-egg"></i> En preparación
                                 @else {{ $p->estado }}
                                 @endif
                             </span>
@@ -121,8 +121,8 @@
                                     </span>
                                     <button type="button" @click="ver = !ver"
                                             class="text-[11px] font-bold text-amber-700 underline">
-                                        <span x-show="!ver">👁️ Ver</span>
-                                        <span x-show="ver" x-cloak>🙈 Ocultar</span>
+                                        <span x-show="!ver"><i class="fa-solid fa-eye"></i> Ver</span>
+                                        <span x-show="ver" x-cloak><i class="fa-solid fa-eye-slash"></i> Ocultar</span>
                                     </button>
                                 </div>
                                 <div x-show="ver" x-cloak class="text-center mt-1">

@@ -153,7 +153,7 @@
                         <textarea wire:model="query_sql" rows="6" placeholder="SELECT id, nombre, telefono, email FROM clientes WHERE cedula = :cedula"
                                   class="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-mono"></textarea>
                         <p class="text-[11px] text-slate-500 mt-1">
-                            💡 Usa <code>:nombre</code> para parámetros nombrados (recomendado) o <code>?</code> para posicionales.
+                            <i class="fa-solid fa-lightbulb"></i> Usa <code>:nombre</code> para parámetros nombrados (recomendado) o <code>?</code> para posicionales.
                         </p>
                     </div>
 
@@ -197,14 +197,14 @@
                         <label class="flex items-start gap-3 cursor-pointer rounded-xl border border-slate-200 p-3 hover:bg-slate-50">
                             <input type="checkbox" wire:model="usar_en_bot" class="mt-1 rounded text-brand">
                             <div>
-                                <div class="text-sm font-bold text-slate-800">🤖 Disponible para el bot</div>
+                                <div class="text-sm font-bold text-slate-800"><i class="fa-solid fa-robot"></i> Disponible para el bot</div>
                                 <div class="text-[11px] text-slate-500">El agente puede llamarla como tool.</div>
                             </div>
                         </label>
                         <label class="flex items-start gap-3 cursor-pointer rounded-xl border border-slate-200 p-3 hover:bg-slate-50">
                             <input type="checkbox" wire:model="activa" class="mt-1 rounded text-emerald-600">
                             <div>
-                                <div class="text-sm font-bold text-slate-800">✓ Consulta activa</div>
+                                <div class="text-sm font-bold text-slate-800"><i class="fa-solid fa-check"></i> Consulta activa</div>
                                 <div class="text-[11px] text-slate-500">Si está inactiva no se puede ejecutar.</div>
                             </div>
                         </label>
@@ -267,7 +267,7 @@
                         @if ($resultadoPrueba['ok'])
                             <div class="rounded-xl bg-emerald-50 border border-emerald-200 p-3">
                                 <p class="text-sm font-bold text-emerald-800">
-                                    ✓ {{ $resultadoPrueba['total'] }} filas
+                                    <i class="fa-solid fa-check"></i> {{ $resultadoPrueba['total'] }} filas
                                 </p>
                             </div>
                             @if (!empty($resultadoPrueba['filas']))

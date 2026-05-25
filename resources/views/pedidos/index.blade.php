@@ -731,7 +731,7 @@
                 <button class="filter-pill">Entrega local</button>
             </div>
             <div class="filters-actions">
-                <button class="icon-button">🔍</button>
+                <button class="icon-button"><i class="fa-solid fa-magnifying-glass"></i></button>
                 <button class="icon-button">⟳</button>
             </div>
         </div>
@@ -871,7 +871,7 @@ $cantidad = rtrim(rtrim(number_format($detalle->cantidad, 2, ',', '.'), '0'), ',
         <div class="toast-title">¡Nuevo pedido confirmado!</div>
         <div class="toast-message" id="toast-message"></div>
     </div>
-    <button class="toast-close" onclick="closeToast()">✕</button>
+    <button class="toast-close" onclick="closeToast()"><i class="fa-solid fa-xmark"></i></button>
 </div>
 
 <script>

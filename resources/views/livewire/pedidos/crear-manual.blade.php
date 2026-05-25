@@ -397,10 +397,10 @@
                             <div class="relative">
                                 <i class="fa-solid fa-wallet absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 z-10"></i>
                                 <select wire:model="metodo_pago" class="{{ $inputClsIcon }} appearance-none cursor-pointer">
-                                    <option value="efectivo">💵 Efectivo contra entrega</option>
-                                    <option value="tarjeta">💳 Tarjeta</option>
-                                    <option value="transferencia">🏦 Transferencia / PSE</option>
-                                    <option value="wompi">⚡ Link Wompi</option>
+                                    <option value="efectivo"><i class="fa-solid fa-money-bill"></i> Efectivo contra entrega</option>
+                                    <option value="tarjeta"><i class="fa-solid fa-credit-card"></i> Tarjeta</option>
+                                    <option value="transferencia"><i class="fa-solid fa-building-columns"></i> Transferencia / PSE</option>
+                                    <option value="wompi"><i class="fa-solid fa-bolt"></i> Link Wompi</option>
                                 </select>
                                 <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
                             </div>

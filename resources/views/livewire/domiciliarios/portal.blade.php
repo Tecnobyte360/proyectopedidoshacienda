@@ -74,7 +74,7 @@
             <div class="rounded-2xl bg-white p-10 text-center text-slate-400 shadow">
                 <i class="fa-regular fa-circle-check text-5xl mb-3 text-emerald-300"></i>
                 <h3 class="font-bold text-slate-700 mb-1">¡Vas al día!</h3>
-                <p class="text-sm">No tienes pedidos asignados ahora mismo. Disfruta el descanso 🙌</p>
+                <p class="text-sm">No tienes pedidos asignados ahora mismo. Disfruta el descanso <i class="fa-solid fa-hands"></i></p>
             </div>
         @else
             <div class="text-xs text-slate-500 font-bold uppercase tracking-wider mt-4 mb-2 flex items-center gap-2">

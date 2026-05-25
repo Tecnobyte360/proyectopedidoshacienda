@@ -32,7 +32,7 @@
 </head>
 <body>
     <div class="card">
-        <h1>📱 WhatsApp · {{ $tenant->nombre }}</h1>
+        <h1><i class="fa-solid fa-mobile-screen"></i> WhatsApp · {{ $tenant->nombre }}</h1>
         <p class="sub">Conexión #{{ $connId }}{{ $phone ? ' · '.$phone : '' }}</p>
 
         @php
@@ -54,12 +54,12 @@
                      alt="QR WhatsApp" width="320" height="320">
             </div>
             <div class="steps">
-                <strong>📲 Pasos para conectar:</strong>
+                <strong><i class="fa-solid fa-mobile-screen"></i> Pasos para conectar:</strong>
                 <ol>
                     <li>Abre <b>WhatsApp</b> en el celular {{ $phone ?: 'que quieres conectar' }}</li>
                     <li>Toca el menú (⋮) → <b>Dispositivos vinculados</b></li>
                     <li>Toca <b>Vincular un dispositivo</b></li>
-                    <li>Apunta la cámara hacia este QR ⬆️</li>
+                    <li>Apunta la cámara hacia este QR <i class="fa-solid fa-arrow-up"></i></li>
                 </ol>
             </div>
         @elseif($status === 'CONNECTED' && $battery !== null && $battery !== 'NONE')
@@ -88,7 +88,7 @@
         </form>
 
         <p style="margin-top:16px; font-size:11px; color:#94a3b8;">
-            🔄 Esta página se refresca sola cada 10 segundos
+            <i class="fa-solid fa-arrows-rotate"></i> Esta página se refresca sola cada 10 segundos
         </p>
     </div>
 </body>

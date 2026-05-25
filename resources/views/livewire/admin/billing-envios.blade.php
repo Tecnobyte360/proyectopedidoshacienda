@@ -168,8 +168,8 @@
                 <select wire:model.live="filtroCanal"
                         class="w-full rounded-xl border border-slate-200 pl-9 pr-3 py-2 text-sm appearance-none focus:border-brand focus:ring-2 focus:ring-brand/20">
                     <option value="">Todos los canales</option>
-                    <option value="whatsapp">📱 Solo WhatsApp</option>
-                    <option value="email">📧 Solo Email</option>
+                    <option value="whatsapp"><i class="fa-solid fa-mobile-screen"></i> Solo WhatsApp</option>
+                    <option value="email"><i class="fa-solid fa-envelope"></i> Solo Email</option>
                 </select>
             </div>
         </div>

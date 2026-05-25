@@ -91,7 +91,7 @@
         <div class="rounded-2xl bg-white border border-slate-200 p-3 shadow-sm flex flex-wrap items-center gap-3">
             <div class="flex items-center gap-2">
                 <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Acción:</span>
-                @foreach (['todos' => 'Todas', 'buscar' => '🔍 Buscar', 'crear' => '➕ Crear'] as $key => $label)
+                @foreach (['todos' => 'Todas', 'buscar' => '<i class="fa-solid fa-magnifying-glass"></i> Buscar', 'crear' => '<i class="fa-solid fa-plus"></i> Crear'] as $key => $label)
                     <button wire:click="$set('filtroAccion', '{{ $key }}')"
                             class="rounded-xl px-3 py-1.5 text-xs font-bold transition
                                    {{ $filtroAccion === $key ? 'bg-gradient-to-r from-brand to-brand-secondary text-white shadow' : 'bg-slate-100 hover:bg-slate-200 text-slate-700' }}">
@@ -160,11 +160,11 @@
                                     <td class="px-4 py-3 text-xs whitespace-nowrap">
                                         @if($log->accion === 'buscar')
                                             <span class="inline-flex items-center gap-1 rounded-full bg-slate-100 border border-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-700">
-                                                🔍 BUSCAR
+                                                <i class="fa-solid fa-magnifying-glass"></i> BUSCAR
                                             </span>
                                         @else
                                             <span class="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-2 py-0.5 text-[10px] font-bold text-blue-700">
-                                                ➕ CREAR
+                                                <i class="fa-solid fa-plus"></i> CREAR
                                             </span>
                                         @endif
                                     </td>

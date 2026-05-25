@@ -61,7 +61,7 @@
         <div class="glass header">
             <div class="header-left">
                 <h1 class="header-title">
-                    Hola, <span>{{ $pedido->cliente_nombre ?? 'Cliente' }}</span> 👋
+                    Hola, <span>{{ $pedido->cliente_nombre ?? 'Cliente' }}</span> <i class="fa-solid fa-hand-wave"></i>
                 </h1>
 
                 <p class="header-desc">
@@ -99,11 +99,11 @@
                     <div style="display:flex; align-items:center; gap:12px; min-width:0; flex: 1;">
                         <div style="width:44px; height:44px; border-radius:12px; background:#7c3aed; color:white; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0;">
                             @if ($estadoPago === 'aprobado')
-                                ✅
+                                <i class="fa-solid fa-circle-check"></i>
                             @elseif (in_array($estadoPago, ['rechazado', 'fallido']))
-                                ❌
+                                <i class="fa-solid fa-circle-xmark"></i>
                             @else
-                                💳
+                                <i class="fa-solid fa-credit-card"></i>
                             @endif
                         </div>
                         <div style="min-width:0;">
@@ -133,7 +133,7 @@
                     @if ($linkPago && !in_array($estadoPago, ['aprobado', 'reembolsado']))
                         <a href="{{ $linkPago }}" target="_blank" rel="noopener"
                            style="display:inline-flex; align-items:center; gap:8px; background:#7c3aed; color:white; font-weight:700; padding:10px 20px; border-radius:12px; text-decoration:none; font-size:14px; box-shadow:0 4px 12px rgba(124,58,237,0.35); flex-shrink:0;">
-                            💳 Pagar ahora
+                            <i class="fa-solid fa-credit-card"></i> Pagar ahora
                         </a>
                     @endif
                 </div>

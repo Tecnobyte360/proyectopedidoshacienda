@@ -32,7 +32,7 @@
                     WebSocket activo
                 </span>
                 <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-violet-50 text-violet-700 text-xs font-semibold">
-                    🤖 IA conectada
+                    <i class="fa-solid fa-robot"></i> IA conectada
                 </span>
             </div>
         </header>

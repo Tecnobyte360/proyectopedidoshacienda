@@ -51,10 +51,10 @@
     const container = document.createElement('div');
     container.className = 'twcw-container';
     container.innerHTML = `
-        <button class="twcw-btn" title="Abrir chat">💬</button>
+        <button class="twcw-btn" title="Abrir chat"><i class="fa-solid fa-comment"></i></button>
         <div class="twcw-panel" role="dialog" aria-label="Chat">
             <div class="twcw-header">
-                ${CFG.avatar ? `<img src="${CFG.avatar}" alt="">` : `<div style="width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;font-size:18px;">🤖</div>`}
+                ${CFG.avatar ? `<img src="${CFG.avatar}" alt="">` : `<div style="width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;font-size:18px;"><i class="fa-solid fa-robot"></i></div>`}
                 <div>
                     <p class="twcw-title">${escapeHtml(CFG.titulo || '¿En qué te ayudamos?')}</p>
                     <p class="twcw-sub">En línea</p>
@@ -64,7 +64,7 @@
             <div class="twcw-messages"></div>
             <div class="twcw-input">
                 <input type="text" placeholder="${escapeHtml(CFG.holder || 'Escribe un mensaje...')}" maxlength="2000">
-                <button aria-label="Enviar">➤</button>
+                <button aria-label="Enviar"><i class="fa-solid fa-caret-right"></i></button>
             </div>
             <div class="twcw-footer">Powered by TecnoByte360</div>
         </div>
@@ -143,7 +143,7 @@
             if (data && data.reply) {
                 appendMsg('bot', data.reply);
             } else if (data && data.modo === 'humano') {
-                const aviso = appendMsg('bot', '🙌 Un asesor está atendiendo esta conversación. Te responderá en un momento.');
+                const aviso = appendMsg('bot', '<i class="fa-solid fa-hands"></i> Un asesor está atendiendo esta conversación. Te responderá en un momento.');
                 aviso.classList.add('typing');
             } else if (data && data.error) {
                 console.error('Widget error:', data);
