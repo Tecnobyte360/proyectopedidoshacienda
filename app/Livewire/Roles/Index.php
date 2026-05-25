@@ -232,9 +232,25 @@ class Index extends Component
             $r->es_editable = $esSuper || ($r->tenant_id !== null && (int) $r->tenant_id === (int) $tenantId);
         });
 
+        // 🛡️ Permisos SaaS-only (Billing/planes/suscripciones/pagos): solo
+        //    los super-admins (dueños de la plataforma Kivox) pueden ver/asignar
+        //    estos permisos. Un tenant normal NO debe siquiera saber que existen.
+        $permisosPorMod = RolesPermisosSeeder::PERMISOS;
+        if (!$esSuper) {
+            unset($permisosPorMod['billing']);
+            // Por si algún grupo trae permisos saas sueltos, los filtramos también
+            $permisosSaaS = ['tenants.gestionar', 'planes.gestionar', 'suscripciones.gestionar', 'pagos.gestionar'];
+            foreach ($permisosPorMod as $modulo => $lista) {
+                $permisosPorMod[$modulo] = array_values(array_diff($lista, $permisosSaaS));
+                if (empty($permisosPorMod[$modulo])) {
+                    unset($permisosPorMod[$modulo]);
+                }
+            }
+        }
+
         return view('livewire.roles.index', [
             'roles'           => $roles,
-            'permisosPorMod'  => RolesPermisosSeeder::PERMISOS,
+            'permisosPorMod'  => $permisosPorMod,
             'esSuperAdmin'    => $esSuper,
         ])->layout('layouts.app');
     }
