@@ -154,6 +154,16 @@ Route::post('/wa-qr/{tenantId}/regenerar', function ($tenantId) {
 Route::middleware(['auth'])->group(function () {
 
 Route::get('/', function () {
+    // 🌐 Si el host es el dominio raíz (kivox.co o www.kivox.co), mostrar la
+    // LANDING comercial pública. La app SaaS vive en los subdominios.
+    $host    = strtolower(request()->getHost());
+    $base    = strtolower(config('app.tenant_base_domain', 'tecnobyte360.com'));
+    $esRoot  = ($host === $base) || ($host === 'www.' . $base);
+
+    if ($esRoot && !auth()->check()) {
+        return view('landing.kivox');
+    }
+
     $u = auth()->user();
     // Super-admin sin impersonar va al panel de tenants
     if ($u && $u->tenant_id === null && $u->hasRole('super-admin') && !session()->has('tenant_imitado_id')) {
