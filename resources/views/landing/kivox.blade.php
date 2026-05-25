@@ -198,6 +198,7 @@
 </head>
 <body x-data="{
     playing: false, loading: false, audio: null,
+    showIntro: true,
     init() {
         this.audio = new Audio('/audio/maintenance.mp3?v={{ time() }}');
         this.audio.preload = 'auto';
@@ -206,6 +207,12 @@
         this.audio.addEventListener('play',  () => { this.playing = true; this.loading = false; });
         this.audio.addEventListener('playing',() => this.loading = false);
         this.audio.addEventListener('waiting',() => this.loading = true);
+    },
+    async enterAndPlay() {
+        this.showIntro = false;
+        this.loading = true;
+        try { await this.audio.play(); }
+        catch (e) { this.loading = false; }
     },
     async toggle() {
         if (this.playing) { this.audio.pause(); return; }
@@ -219,6 +226,43 @@
     <div class="particle w-80 h-80 sm:w-96 sm:h-96 top-[5%] left-[-5%]"  style="animation-delay: 0s"></div>
     <div class="particle w-72 h-72 sm:w-80 sm:h-80 top-[40%] right-[-5%]" style="animation-delay: -8s"></div>
     <div class="particle w-64 h-64 sm:w-72 sm:h-72 bottom-[5%] left-[25%]" style="animation-delay: -14s"></div>
+
+    {{-- ╔═══ INTRO OVERLAY — pide click para activar audio (workaround autoplay) ═══╗ --}}
+    <div x-show="showIntro" x-transition:leave="transition ease-in duration-500" x-transition:leave-end="opacity-0"
+         @click="enterAndPlay()"
+         class="fixed inset-0 z-[100] flex flex-col items-center justify-center cursor-pointer p-6 text-center bg-[#050507]/95 backdrop-blur">
+
+        {{-- Logo grande pulsante --}}
+        <div class="relative mb-10 levitate">
+            <div class="absolute inset-0 -m-16 sm:-m-24 rounded-full blur-3xl glow-pulse pointer-events-none"
+                 style="background: radial-gradient(circle, {{ $primario }} 0%, transparent 65%);"></div>
+            <div class="absolute inset-0 -m-8 rounded-full border border-white/15 animate-[spin_25s_linear_infinite] pointer-events-none"></div>
+            <div class="absolute inset-0 -m-20 rounded-full border border-white/8 animate-[spin_45s_linear_infinite_reverse] pointer-events-none"></div>
+
+            @if($logoUrl)
+                <img src="{{ $logoUrl }}" alt="{{ $brand }}"
+                     class="relative h-32 sm:h-44 lg:h-52 w-auto object-contain"
+                     style="filter: drop-shadow(0 0 30px {{ $primario }}AA) drop-shadow(0 0 60px {{ $primario }}55);"
+                     onerror="this.outerHTML='<div class=\'h-32 w-32 sm:h-44 sm:w-44 rounded-3xl bg-gradient-to-br from-[var(--brand)] to-[var(--brand-2)] text-white flex items-center justify-center font-black text-7xl\' style=\'box-shadow: 0 0 60px {{ $primario }}80;\'>K</div>'">
+            @else
+                <div class="h-32 w-32 sm:h-44 sm:w-44 rounded-3xl bg-gradient-to-br from-[var(--brand)] to-[var(--brand-2)] text-white flex items-center justify-center font-black text-7xl"
+                     style="box-shadow: 0 0 60px {{ $primario }}80;">K</div>
+            @endif
+        </div>
+
+        {{-- Big play button con anillos --}}
+        <button type="button" class="relative flex h-24 w-24 sm:h-28 sm:w-28 items-center justify-center rounded-full text-white shadow-2xl pulse-ring mb-6"
+                style="background: linear-gradient(135deg, var(--brand), var(--brand-2));">
+            <i class="fa-solid fa-volume-high text-2xl sm:text-3xl"></i>
+        </button>
+
+        <p class="display text-[24px] sm:text-[36px] lg:text-[44px] text-white">
+            Toca para <span class="serif text-[var(--brand)]">entrar</span>
+        </p>
+        <p class="text-[12px] sm:text-[13px] text-white/50 mt-3 max-w-md">
+            Activa el sonido para vivir la experiencia completa
+        </p>
+    </div>
 
     {{-- ── Header con logo + acceder ── --}}
     <header class="relative z-20 flex items-center justify-between px-4 sm:px-6 lg:px-10 py-4 sm:py-5 fade-1">
