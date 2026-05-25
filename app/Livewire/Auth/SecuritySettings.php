@@ -19,7 +19,9 @@ class SecuritySettings extends Component
             $this->recoveryCodes = session('2fa.recovery_codes');
         }
         // Si hay enrolamiento en curso (después de redirect), rehidratar el QR
-        $sec = session('2fa.enroll_secret_view');
+        // ⚠️ Usar la MISMA clave que TwoFactorController@confirmEnroll lee
+        // (2fa.enroll_secret) para que al enviar el código no diga "sesión expirada".
+        $sec = session('2fa.enroll_secret');
         if ($sec && !Auth::user()->tieneDosFactor()) {
             $this->secret = $sec;
             $this->regenerarQr();
@@ -30,7 +32,8 @@ class SecuritySettings extends Component
     {
         $svc = app(TwoFactorService::class);
         $this->secret = $svc->generarSecreto();
-        session(['2fa.enroll_secret_view' => $this->secret]);
+        // ⚠️ Persistir con la MISMA clave que confirmEnroll lee
+        session()->put('2fa.enroll_secret', $this->secret);
         $this->regenerarQr();
     }
 
