@@ -154,8 +154,10 @@
                                         @php
                                             $rolNombre = strtolower($rol->name ?? '');
                                             $esIntocable = in_array($rolNombre, ['admin', 'super-admin'], true);
+                                            // Roles del SISTEMA solo se eliminan desde admin.kivox.co (no impersonando).
+                                            // Roles del TENANT se eliminan si el user actual puede editarlos.
                                             $puedeEliminar = !$esIntocable && (
-                                                $esSuperAdmin
+                                                (($rol->es_global ?? false) && ($puedeEliminarSistema ?? false))
                                                 || (!($rol->es_global ?? false) && ($rol->es_editable ?? false))
                                             );
                                         @endphp

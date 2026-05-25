@@ -146,23 +146,50 @@ class Index extends Component
             return;
         }
 
-        // Permiso de eliminar:
-        //  - Super-admin: puede eliminar cualquier rol (incluyendo los del sistema)
-        //  - Tenant admin: solo puede eliminar roles propios de su tenant
-        if (!$this->esSuperAdmin() && !$this->puedeEditar($rol)) {
-            $this->dispatch('notify', [
-                'type'    => 'error',
-                'message' => 'No tienes permiso para eliminar este rol.',
-            ]);
-            return;
-        }
+        $esRolSistema  = $rol->tenant_id === null;
+        $tenantActivo  = $this->tenantActualId();
+        $impersonando  = session()->has('tenant_imitado_id');
 
-        if ($rol->users()->count() > 0) {
-            $this->dispatch('notify', [
-                'type'    => 'warning',
-                'message' => "No se puede eliminar — el rol '{$rol->name}' tiene {$rol->users()->count()} usuario(s) asignado(s). Reasígnalos primero.",
-            ]);
-            return;
+        // 🛡️ Roles del SISTEMA: solo se eliminan desde admin.kivox.co
+        //    (super-admin SIN impersonación ni tenant activo). Si estamos
+        //    impersonando un tenant, el rol global no es nuestro para borrar.
+        if ($esRolSistema) {
+            if (!$this->esSuperAdmin() || $impersonando || $tenantActivo) {
+                $this->dispatch('notify', [
+                    'type'    => 'error',
+                    'message' => "El rol '{$rol->name}' es del SISTEMA. Solo se puede eliminar desde admin.kivox.co (sin impersonar tenants).",
+                ]);
+                return;
+            }
+
+            // En el dominio principal, validar que ningún usuario en TODA la plataforma lo use
+            $totalUsuarios = $rol->users()->count();
+            if ($totalUsuarios > 0) {
+                $this->dispatch('notify', [
+                    'type'    => 'warning',
+                    'message' => "No se puede eliminar — el rol '{$rol->name}' tiene {$totalUsuarios} usuario(s) en toda la plataforma. Reasígnalos primero.",
+                ]);
+                return;
+            }
+        } else {
+            // Roles propios del tenant: validar que el usuario actual puede editarlos
+            if (!$this->puedeEditar($rol)) {
+                $this->dispatch('notify', [
+                    'type'    => 'error',
+                    'message' => 'No tienes permiso para eliminar este rol.',
+                ]);
+                return;
+            }
+
+            // Contar solo usuarios del tenant del rol
+            $totalUsuarios = $rol->users()->where('users.tenant_id', $rol->tenant_id)->count();
+            if ($totalUsuarios > 0) {
+                $this->dispatch('notify', [
+                    'type'    => 'warning',
+                    'message' => "No se puede eliminar — el rol '{$rol->name}' tiene {$totalUsuarios} usuario(s) asignado(s). Reasígnalos primero.",
+                ]);
+                return;
+            }
         }
 
         $nombre = $rol->name;
@@ -340,6 +367,8 @@ class Index extends Component
             'permisosPorMod'     => $permisosPorMod,
             'esSuperAdmin'       => $esSuper,
             'nombreTenantActivo' => $nombreTenantActivo,
+            // Solo permitimos botón eliminar de roles SISTEMA en el dominio principal sin impersonar.
+            'puedeEliminarSistema' => $esSuper && !session()->has('tenant_imitado_id') && !$tenantId,
         ])->layout('layouts.app');
     }
 }
