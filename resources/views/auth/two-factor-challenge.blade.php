@@ -4,6 +4,7 @@
     $brandName = $cfg->nombre ?: 'Kivox';
     $colorPrim = $cfg->color_primario ?: '#10b981';
     $colorSec  = $cfg->color_secundario ?: '#059669';
+    $logoUrl   = $cfg->logo_url ?? null;
 @endphp
 <!DOCTYPE html>
 <html lang="es">
@@ -22,14 +23,17 @@
         <div class="bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden">
 
             <div class="text-center px-8 pt-8 pb-6">
-                <div class="inline-flex h-20 w-20 items-center justify-center rounded-3xl mb-4"
-                     style="background: linear-gradient(135deg, {{ $colorPrim }}22, {{ $colorPrim }}44); color: {{ $colorPrim }};">
-                    <i class="fa-solid fa-shield-halved text-3xl"></i>
-                </div>
+                @if($logoUrl)
+                    <img src="{{ $logoUrl }}" alt="{{ $brandName }}" class="mx-auto h-20 w-auto mb-4 object-contain">
+                @else
+                    <div class="inline-flex h-20 w-20 items-center justify-center rounded-3xl mb-4"
+                         style="background: linear-gradient(135deg, {{ $colorPrim }}22, {{ $colorPrim }}44); color: {{ $colorPrim }};">
+                        <i class="fa-solid fa-shield-halved text-3xl"></i>
+                    </div>
+                @endif
                 <h1 class="text-2xl font-extrabold text-slate-800">Verificación de 2 pasos</h1>
                 <p class="text-sm text-slate-500 mt-1">
                     Ingresa el código de 6 dígitos de tu app autenticadora
-                    <br><span class="text-xs">(Google Authenticator, Authy, 1Password...)</span>
                 </p>
             </div>
 
@@ -58,18 +62,6 @@
                     </button>
                 </form>
 
-                <div class="mt-6 text-center space-y-2">
-                    <p class="text-[11px] text-slate-500">
-                        ¿Perdiste tu dispositivo? Usa uno de tus <strong>códigos de respaldo</strong>
-                        (formato <code class="bg-slate-100 px-1.5 py-0.5 rounded text-[10px]">XXXX-YYYY</code>) en el mismo campo.
-                    </p>
-                    <form method="POST" action="/logout" class="inline">
-                        @csrf
-                        <button type="submit" class="text-xs text-slate-500 hover:text-slate-800 font-semibold">
-                            <i class="fa-solid fa-arrow-left text-[10px]"></i> Cancelar y volver al login
-                        </button>
-                    </form>
-                </div>
             </div>
         </div>
 
