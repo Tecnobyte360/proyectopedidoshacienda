@@ -154,9 +154,11 @@
                         </div>
                         <div>
                             <h3 class="text-lg font-extrabold text-slate-800">
-                                {{ $editandoId ? 'Editar rol' : 'Nuevo rol' }}
+                                {{ $editandoId ? ($soloLectura ? 'Ver rol' : 'Editar rol') : 'Nuevo rol' }}
                             </h3>
-                            <p class="text-xs text-slate-500">Define el nombre y los permisos por módulo</p>
+                            <p class="text-xs text-slate-500">
+                                {{ $soloLectura ? 'Rol del sistema — solo lectura. Clónalo para personalizarlo.' : 'Define el nombre y los permisos por módulo' }}
+                            </p>
                         </div>
                     </div>
                     <button wire:click="cerrarModal"
@@ -166,11 +168,28 @@
                 </div>
 
                 <form wire:submit.prevent="guardar" class="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
+                    @if($soloLectura)
+                        <div class="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 flex items-start gap-3">
+                            <i class="fa-solid fa-circle-info text-sky-600 mt-0.5"></i>
+                            <div class="flex-1">
+                                <p class="text-sm font-bold text-sky-900">Este es un rol del sistema</p>
+                                <p class="text-xs text-sky-700 mt-0.5">No se puede editar ni eliminar directamente. Si necesitas un rol parecido pero con tus propios permisos, usa <b>Clonar</b> y modifica la copia.</p>
+                            </div>
+                            <button type="button" wire:click="clonar({{ $editandoId }})"
+                                    class="inline-flex items-center gap-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold px-3 py-1.5 transition flex-shrink-0">
+                                <i class="fa-solid fa-copy"></i> Clonar
+                            </button>
+                        </div>
+                    @endif
+
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1.5">Nombre del rol *</label>
                         <input type="text" wire:model="name" placeholder="ej. supervisor"
-                               class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-2 focus:ring-brand/20">
-                        <p class="text-xs text-slate-500 mt-1">Usa minúsculas, sin espacios. Ej: <code class="text-brand">supervisor</code>, <code class="text-brand">domiciliario</code></p>
+                               @if($soloLectura) disabled @endif
+                               class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-2 focus:ring-brand/20 {{ $soloLectura ? 'bg-slate-50 cursor-not-allowed' : '' }}">
+                        @if(!$soloLectura)
+                            <p class="text-xs text-slate-500 mt-1">Usa minúsculas, sin espacios. Ej: <code class="text-brand">supervisor</code>, <code class="text-brand">domiciliario</code></p>
+                        @endif
                         @error('name') <p class="text-xs text-rose-600 mt-1">{{ $message }}</p> @enderror
                     </div>
 
@@ -197,18 +216,21 @@
                                         <h4 class="font-bold text-sm text-slate-800 capitalize">
                                             {{ str_replace('_', ' ', $modulo) }}
                                         </h4>
-                                        <button type="button" wire:click="toggleModulo('{{ $modulo }}')"
-                                                class="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-lg transition
-                                                       {{ $todosSel ? 'bg-rose-100 text-rose-700 hover:bg-rose-200' : 'bg-brand-soft text-brand-secondary hover:bg-brand-soft-2' }}">
-                                            <i class="fa-solid {{ $todosSel ? 'fa-square-minus' : 'fa-square-check' }}"></i>
-                                            {{ $todosSel ? 'Quitar todos' : 'Marcar todos' }}
-                                        </button>
+                                        @if(!$soloLectura)
+                                            <button type="button" wire:click="toggleModulo('{{ $modulo }}')"
+                                                    class="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-lg transition
+                                                           {{ $todosSel ? 'bg-rose-100 text-rose-700 hover:bg-rose-200' : 'bg-brand-soft text-brand-secondary hover:bg-brand-soft-2' }}">
+                                                <i class="fa-solid {{ $todosSel ? 'fa-square-minus' : 'fa-square-check' }}"></i>
+                                                {{ $todosSel ? 'Quitar todos' : 'Marcar todos' }}
+                                            </button>
+                                        @endif
                                     </div>
                                     <div class="space-y-1.5">
                                         @foreach($permisos as $perm)
-                                            <label class="flex items-center gap-2 cursor-pointer text-xs hover:bg-white/50 rounded-md px-1 py-0.5 transition">
+                                            <label class="flex items-center gap-2 text-xs rounded-md px-1 py-0.5 {{ $soloLectura ? 'cursor-default' : 'cursor-pointer hover:bg-white/50 transition' }}">
                                                 <input type="checkbox" value="{{ $perm }}" wire:model="permisosSel"
-                                                       class="rounded border-slate-300 text-brand focus:ring-brand/30">
+                                                       @if($soloLectura) disabled @endif
+                                                       class="rounded border-slate-300 text-brand focus:ring-brand/30 {{ $soloLectura ? 'cursor-not-allowed' : '' }}">
                                                 <span class="font-mono text-slate-700">{{ $perm }}</span>
                                             </label>
                                         @endforeach
@@ -221,13 +243,15 @@
                     <div class="flex justify-end gap-3 pt-4 border-t border-slate-100">
                         <button type="button" wire:click="cerrarModal"
                                 class="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition">
-                            Cancelar
+                            {{ $soloLectura ? 'Cerrar' : 'Cancelar' }}
                         </button>
-                        <button type="submit"
-                                class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-brand to-brand-secondary hover:from-brand-dark hover:to-brand-dark px-6 py-2.5 text-sm font-bold text-white shadow-lg transition">
-                            <i class="fa-solid fa-floppy-disk"></i>
-                            Guardar rol
-                        </button>
+                        @if(!$soloLectura)
+                            <button type="submit"
+                                    class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-brand to-brand-secondary hover:from-brand-dark hover:to-brand-dark px-6 py-2.5 text-sm font-bold text-white shadow-lg transition">
+                                <i class="fa-solid fa-floppy-disk"></i>
+                                Guardar rol
+                            </button>
+                        @endif
                     </div>
                 </form>
             </div>

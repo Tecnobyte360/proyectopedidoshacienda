@@ -13,6 +13,7 @@ class Index extends Component
 {
     public bool $modalAbierto = false;
     public ?int $editandoId   = null;
+    public bool $soloLectura  = false; // ← modo "ver" para roles del sistema
 
     public string $name        = '';
     public string $descripcion = '';
@@ -49,15 +50,10 @@ class Index extends Component
     {
         $rol = Role::with('permissions')->findOrFail($id);
 
-        // Verificar que el usuario puede editar este rol
-        if (!$this->puedeEditar($rol)) {
-            $this->dispatch('notify', [
-                'type'    => 'warning',
-                'message' => 'No puedes editar roles del sistema. Crea uno propio para tu empresa.',
-            ]);
-            return;
-        }
-
+        // Si NO puede editar (rol del sistema) → abrir en modo SOLO LECTURA
+        // para que al menos pueda ver los permisos. El botón de guardar se
+        // oculta y los checkboxes se deshabilitan en la vista.
+        $this->soloLectura = !$this->puedeEditar($rol);
         $this->editandoId  = $rol->id;
         $this->name        = $rol->name;
         $this->permisosSel = $rol->permissions->pluck('name')->all();
@@ -202,6 +198,7 @@ class Index extends Component
     private function resetCampos(): void
     {
         $this->editandoId  = null;
+        $this->soloLectura = false;
         $this->name        = '';
         $this->descripcion = '';
         $this->permisosSel = [];
