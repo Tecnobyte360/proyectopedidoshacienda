@@ -198,6 +198,30 @@
                                                     class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 transition">
                                                 <i class="fa-solid fa-key text-xs"></i>
                                             </button>
+                                            {{-- 🔐 Forzar 2FA al usuario --}}
+                                            @php
+                                                $tiene2fa = !empty($u->two_factor_enabled_at);
+                                                $exigido  = (bool) ($u->requiere_2fa ?? false);
+                                                if ($tiene2fa) {
+                                                    $bg = 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700';
+                                                    $ic = 'fa-shield-halved';
+                                                    $tt = '2FA activo · click para resetear (le obliga a re-configurar)';
+                                                } elseif ($exigido) {
+                                                    $bg = 'bg-rose-100 hover:bg-rose-200 text-rose-700 ring-2 ring-rose-300';
+                                                    $ic = 'fa-shield-virus';
+                                                    $tt = '2FA exigido pendiente · click para quitar la exigencia';
+                                                } else {
+                                                    $bg = 'bg-slate-100 hover:bg-emerald-100 hover:text-emerald-700 text-slate-500';
+                                                    $ic = 'fa-shield';
+                                                    $tt = 'Forzar activación de 2FA en próximo login';
+                                                }
+                                            @endphp
+                                            <button wire:click="toggleForzar2fa({{ $u->id }})"
+                                                    wire:confirm="{{ $tiene2fa ? '¿Resetear 2FA de ' . $u->name . '? Tendrá que volver a configurar la app autenticadora.' : ($exigido ? '¿Quitar la exigencia de 2FA a ' . $u->name . '?' : '¿Forzar a ' . $u->name . ' a activar 2FA en su próximo login?') }}"
+                                                    title="{{ $tt }}"
+                                                    class="inline-flex h-8 w-8 items-center justify-center rounded-lg {{ $bg }} transition">
+                                                <i class="fa-solid {{ $ic }} text-xs"></i>
+                                            </button>
                                             @if(!$esYo)
                                                 <button wire:click="toggleActivo({{ $u->id }})"
                                                         title="{{ $u->activo ? 'Desactivar' : 'Activar' }}"

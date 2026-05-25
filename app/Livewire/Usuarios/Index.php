@@ -246,6 +246,50 @@ class Index extends Component
         $u->save();
     }
 
+    /**
+     * 🔐 Forzar a un usuario individual a activar 2FA en su próximo login.
+     * Si ya tiene 2FA activo, en su lugar lo resetea (caso "perdió celular").
+     */
+    public function toggleForzar2fa(int $id): void
+    {
+        $u = $this->aplicarFiltroTenant(User::query())->find($id);
+        if (!$u) {
+            $this->dispatch('notify', ['type' => 'warning', 'message' => 'Usuario no encontrado.']);
+            return;
+        }
+
+        // Si ya tiene 2FA → resetearlo (le quitamos el secret y queda obligado a re-activar)
+        if ($u->tieneDosFactor()) {
+            $u->update([
+                'two_factor_secret'         => null,
+                'two_factor_recovery_codes' => null,
+                'two_factor_enabled_at'     => null,
+                'requiere_2fa'              => true,
+                'requiere_2fa_desde'        => now(),
+            ]);
+            $this->dispatch('notify', [
+                'type' => 'success',
+                'message' => "✓ 2FA de {$u->name} reseteado. Deberá volver a configurarlo en su próximo login.",
+            ]);
+            return;
+        }
+
+        // Toggle del flag de obligación individual
+        if ($u->requiere_2fa) {
+            $u->update(['requiere_2fa' => false, 'requiere_2fa_desde' => null]);
+            $this->dispatch('notify', [
+                'type' => 'info',
+                'message' => "Ya no se le exige 2FA a {$u->name}.",
+            ]);
+        } else {
+            $u->update(['requiere_2fa' => true, 'requiere_2fa_desde' => now()]);
+            $this->dispatch('notify', [
+                'type' => 'success',
+                'message' => "🔐 2FA exigido a {$u->name}. Al ingresar deberá configurarlo antes de usar la plataforma.",
+            ]);
+        }
+    }
+
     public function eliminar(int $id): void
     {
         if ($id === auth()->id()) {

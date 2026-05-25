@@ -16,11 +16,10 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
     <style> body { font-family: 'Plus Jakarta Sans', sans-serif; } </style>
 </head>
-<body class="min-h-screen flex items-center justify-center p-6"
-      style="background: linear-gradient(135deg, {{ $colorPrim }} 0%, {{ $colorSec }} 100%);">
+<body class="min-h-screen flex items-center justify-center p-6 bg-white">
 
     <div class="w-full max-w-md">
-        <div class="bg-white rounded-3xl shadow-2xl overflow-hidden">
+        <div class="bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden">
 
             <div class="text-center px-8 pt-8 pb-6">
                 <div class="inline-flex h-20 w-20 items-center justify-center rounded-3xl mb-4"
@@ -74,7 +73,7 @@
             </div>
         </div>
 
-        <p class="text-center text-xs text-white/80 mt-6">
+        <p class="text-center text-xs text-slate-400 mt-6">
             © {{ date('Y') }} {{ $brandName }}
         </p>
     </div>

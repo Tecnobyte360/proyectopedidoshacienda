@@ -30,14 +30,28 @@ class Forzar2FA
         }
 
         $tenant = app(TenantManager::class)->current();
-        if (!$tenant || !$tenant->requiere_2fa) {
+        $forzadoPorTenant  = $tenant && $tenant->requiere_2fa;
+        $forzadoPorUsuario = (bool) ($user->requiere_2fa ?? false);
+
+        // Si ni el tenant ni el usuario individual lo exigen → pasa de largo
+        if (!$forzadoPorTenant && !$forzadoPorUsuario) {
             return $next($request);
         }
 
+        // Determinar fecha desde la que comenzó la obligación:
+        //  - Si lo forzó el admin del usuario (botón individual) → usar
+        //    requiere_2fa_desde del propio user.
+        //  - Si lo forzó la política del tenant → usar requiere_2fa_desde del tenant.
+        $desde = $forzadoPorUsuario
+            ? ($user->requiere_2fa_desde ?? null)
+            : ($tenant->requiere_2fa_desde ?? null);
+
         // Verificar gracia: si requiere_2fa_desde es muy reciente, dejamos pasar
-        if ($tenant->requiere_2fa_desde) {
-            $diasGracia = $tenant->gracia_2fa_dias ?? 3;
-            $deadline = $tenant->requiere_2fa_desde->copy()->addDays($diasGracia);
+        if ($desde) {
+            $diasGracia = $forzadoPorTenant
+                ? ($tenant->gracia_2fa_dias ?? 3)
+                : 0; // forzado individual = sin gracia
+            $deadline = $desde->copy()->addDays($diasGracia);
             if (now()->lt($deadline)) {
                 // Compartir flag con vistas para mostrar banner de aviso
                 view()->share('aviso_2fa_gracia', [

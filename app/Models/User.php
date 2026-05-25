@@ -33,6 +33,8 @@ class User extends Authenticatable
         'two_factor_secret',
         'two_factor_recovery_codes',
         'two_factor_enabled_at',
+        'requiere_2fa',
+        'requiere_2fa_desde',
     ];
 
     protected $hidden = [
@@ -57,6 +59,8 @@ class User extends Authenticatable
             'two_factor_secret'         => 'encrypted',
             'two_factor_recovery_codes' => 'encrypted',
             'two_factor_enabled_at'     => 'datetime',
+            'requiere_2fa'              => 'boolean',
+            'requiere_2fa_desde'        => 'datetime',
         ];
     }
 
