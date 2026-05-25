@@ -8,20 +8,6 @@
     $faviconUrl = $cfg->favicon_url ?? $logoUrl;
     $host       = request()->getHost();
 
-    // Frases del manifiesto (para animarlas una a una)
-    $manifiesto = [
-        'Imagina un vendedor que nunca duerme.',
-        'Que conoce a tus clientes por su nombre.',
-        'Que toma pedidos a las tres de la mañana.',
-        'Que cobra. Que despacha. Que aprende.',
-        'Que vende mientras tú vives.',
-    ];
-    $features = [
-        'Inteligencia Artificial',
-        'Integrado con Meta y WhatsApp Business',
-        'Pedidos automáticos · Cobros en segundos',
-        'Domiciliarios en tiempo real · Reportes claros',
-    ];
 @endphp
 <!DOCTYPE html>
 <html lang="es">
@@ -307,64 +293,8 @@
             </div>
         </div>
 
-        {{-- Badge --}}
-        <div class="fade-3 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 backdrop-blur border border-white/10 mb-5 sm:mb-6">
-            <span class="relative flex h-1.5 w-1.5">
-                <span class="absolute inline-flex h-full w-full rounded-full opacity-75 animate-ping" style="background: {{ $primario }};"></span>
-                <span class="relative inline-flex rounded-full h-1.5 w-1.5" style="background: {{ $primario }};"></span>
-            </span>
-            <span class="text-[10px] sm:text-[11px] uppercase tracking-[0.25em] font-bold gradient-text">Coming soon</span>
-        </div>
-
-        {{-- Headline --}}
-        <h1 class="fade-3 display text-[40px] xs:text-[48px] sm:text-[64px] md:text-[80px] lg:text-[96px] xl:text-[112px] leading-[0.95] max-w-5xl mx-auto">
-            <span class="block text-white">Algo grande</span>
-            <span class="block serif shimmer-text" style="font-size: 1.05em;">está por venir</span>
-        </h1>
-
-        {{-- ── MANIFIESTO ── --}}
-        <div class="mt-16 sm:mt-24 lg:mt-32 max-w-3xl mx-auto">
-            <div class="fade-4 text-[10px] sm:text-[11px] uppercase tracking-[0.3em] font-bold text-white/40 mb-8">
-                — El manifiesto —
-            </div>
-
-            <div class="serif text-[22px] sm:text-[32px] lg:text-[44px] leading-[1.25] text-white/90 space-y-3 sm:space-y-4">
-                @foreach($manifiesto as $i => $linea)
-                    <p class="cascade" style="animation-delay: {{ 1.5 + $i * 0.35 }}s;">{{ $linea }}</p>
-                @endforeach
-            </div>
-
-            <p class="cascade serif text-[28px] sm:text-[44px] lg:text-[60px] mt-10 sm:mt-14"
-               style="animation-delay: 3.5s">
-                Eso es <span class="text-[var(--brand)] font-semibold not-italic" style="font-family: 'Sora', sans-serif;">Kivox</span>.
-            </p>
-
-            <div class="cascade mt-8 sm:mt-12" style="animation-delay: 4s">
-                <div class="flex flex-wrap items-center justify-center gap-2 sm:gap-3 max-w-2xl mx-auto">
-                    @foreach($features as $f)
-                        <div class="pill rounded-full px-3 sm:px-4 py-1.5 sm:py-2 text-[11px] sm:text-[12px] font-medium text-white/80">
-                            <i class="fa-solid fa-circle-check text-[var(--brand)] text-[9px] mr-1"></i>
-                            {{ $f }}
-                        </div>
-                    @endforeach
-                </div>
-            </div>
-
-            <p class="cascade text-[16px] sm:text-[20px] lg:text-[24px] text-white/70 mt-10 sm:mt-14 leading-relaxed"
-               style="animation-delay: 4.5s">
-                Tu negocio nunca volverá a ser el mismo.<br>
-                <span class="text-white font-semibold">Bienvenido al futuro de las ventas conversacionales.</span>
-            </p>
-
-            <p class="cascade display text-[24px] sm:text-[32px] lg:text-[44px] mt-8 sm:mt-10"
-               style="animation-delay: 5s">
-                <span class="text-white">Kivox.</span>
-                <span class="serif text-[var(--brand)]">Vende más, conversando.</span>
-            </p>
-        </div>
-
         {{-- AUDIO PLAYER --}}
-        <div class="mt-16 sm:mt-20 fade-7">
+        <div class="mt-8 sm:mt-12 fade-3">
             <p class="text-[11px] sm:text-[12px] uppercase tracking-[0.25em] text-white/40 font-semibold mb-5">
                 <i class="fa-solid fa-headphones"></i> Escucha el manifiesto en voz
             </p>
