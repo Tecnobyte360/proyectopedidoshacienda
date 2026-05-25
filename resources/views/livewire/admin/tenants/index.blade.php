@@ -179,7 +179,26 @@
                                 </td>
 
                                 {{-- USUARIOS --}}
-                                <td class="px-4 py-3 text-center font-bold text-slate-700">{{ $t->users_count }}</td>
+                                <td class="px-4 py-3 text-center">
+                                    <div class="font-bold text-slate-700">{{ $t->users_count }}</div>
+                                    @php
+                                        $u2fa = $t->users_2fa_count ?? 0;
+                                        $pct = $t->users_count > 0 ? round(($u2fa / $t->users_count) * 100) : 0;
+                                    @endphp
+                                    @if($t->users_count > 0)
+                                        <div class="inline-flex items-center gap-1 mt-0.5 text-[9px] font-bold
+                                                    {{ $u2fa === $t->users_count ? 'text-emerald-600' : ($u2fa > 0 ? 'text-amber-600' : 'text-slate-400') }}"
+                                             title="{{ $u2fa }} / {{ $t->users_count }} usuarios con 2FA">
+                                            <i class="fa-solid fa-shield-halved"></i>
+                                            {{ $u2fa }}/{{ $t->users_count }}
+                                            @if($t->requiere_2fa)
+                                                <span class="ml-0.5 rounded-full bg-rose-100 text-rose-700 px-1.5 py-0 text-[8px] font-extrabold" title="2FA obligatorio">
+                                                    REQ
+                                                </span>
+                                            @endif
+                                        </div>
+                                    @endif
+                                </td>
 
                                 {{-- PEDIDOS --}}
                                 <td class="px-4 py-3 text-center font-bold text-slate-700">{{ $t->pedidos_count }}</td>
@@ -1274,6 +1293,53 @@
                             <div class="text-xs text-slate-500">Si está inactivo, sus usuarios no pueden iniciar sesión.</div>
                         </div>
                     </label>
+
+                    {{-- 🔐 SEGURIDAD: 2FA obligatorio --}}
+                    <div class="rounded-2xl border-2 border-dashed border-emerald-200 bg-gradient-to-br from-emerald-50/40 to-teal-50/40 p-4 space-y-3">
+                        <div class="flex items-start gap-3">
+                            <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500 text-white flex-shrink-0">
+                                <i class="fa-solid fa-shield-halved"></i>
+                            </div>
+                            <div class="flex-1">
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" wire:model.live="requiere_2fa" class="rounded border-emerald-300 text-emerald-500">
+                                    <span class="text-sm font-bold text-emerald-900">
+                                        Forzar autenticación en 2 pasos (2FA)
+                                    </span>
+                                </label>
+                                <p class="text-[11px] text-emerald-800/80 mt-1">
+                                    Si activas esto, <strong>TODOS los usuarios</strong> de este tenant deberán configurar 2FA en su próximo login.
+                                    Si no lo activan después del período de gracia, serán bloqueados hasta hacerlo.
+                                </p>
+                            </div>
+                        </div>
+
+                        @if($requiere_2fa)
+                            <div class="flex items-center gap-3 ml-13 pl-13">
+                                <label class="text-[11px] font-bold text-emerald-900">Días de gracia:</label>
+                                <input type="number" min="0" max="30" wire:model="gracia_2fa_dias"
+                                       class="w-20 rounded-lg border border-emerald-300 px-3 py-1.5 text-sm text-center font-bold">
+                                <span class="text-[10px] text-emerald-800/70">
+                                    días para que los usuarios activen 2FA antes de quedar bloqueados
+                                </span>
+                            </div>
+                        @endif
+
+                        @if($editandoId)
+                            <div class="rounded-lg bg-white border border-emerald-200 px-3 py-2 text-[11px] text-slate-700 flex items-center justify-between gap-2 flex-wrap">
+                                <span>
+                                    <i class="fa-solid fa-rotate-right text-rose-500"></i>
+                                    <strong>Emergencia:</strong> ¿Algún usuario perdió su celular?
+                                </span>
+                                <button type="button"
+                                        wire:click="resetear2faTenant({{ $editandoId }})"
+                                        wire:confirm="¿Resetear 2FA de TODOS los usuarios de este tenant? Tendrán que volver a configurarlo desde cero."
+                                        class="rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-700 px-3 py-1 text-[11px] font-bold transition">
+                                    <i class="fa-solid fa-eraser"></i> Resetear 2FA de todos
+                                </button>
+                            </div>
+                        @endif
+                    </div>
 
                     {{-- 💳 Crear suscripción inicial (solo en creación) --}}
                     @if(!$editandoId)

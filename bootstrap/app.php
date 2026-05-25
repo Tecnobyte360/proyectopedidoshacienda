@@ -51,6 +51,9 @@ return Application::configure(basePath: dirname(__DIR__))
             // 🚫 Bloqueo soft por mora: si tenant.suspendido_por_mora=true, redirige
             // a /billing/expirado (excepto rutas whitelist: login, logout, billing/*).
             \App\Http\Middleware\BloqueaSiMoroso::class,
+            // 🔐 Si tenant.requiere_2fa y el user no lo tiene, redirige a
+            // /perfil/seguridad tras período de gracia.
+            \App\Http\Middleware\Forzar2FA::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

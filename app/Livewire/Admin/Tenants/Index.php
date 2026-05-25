@@ -69,6 +69,10 @@ class Index extends Component
     public ?string $subscription_ends_at = null;
     public string $notas_internas      = '';
 
+    // 🔐 Política 2FA
+    public bool $requiere_2fa     = false;
+    public int  $gracia_2fa_dias  = 3;
+
     // Wompi (pagos) por tenant
     public string $wompi_modo               = 'sandbox';
     public string $wompi_public_key         = '';
@@ -149,6 +153,8 @@ class Index extends Component
             'trial_ends_at'       => 'nullable|date',
             'subscription_ends_at' => 'nullable|date',
             'notas_internas'      => 'nullable|string|max:2000',
+            'requiere_2fa'        => 'boolean',
+            'gracia_2fa_dias'     => 'integer|min:0|max:30',
 
             'whatsapp_provider'         => 'nullable|in:auto,meta,tecnobyte',
             'whatsapp_fallback_enabled' => 'boolean',
@@ -240,6 +246,8 @@ class Index extends Component
         $this->trial_ends_at        = $t->trial_ends_at?->format('Y-m-d');
         $this->subscription_ends_at = $t->subscription_ends_at?->format('Y-m-d');
         $this->notas_internas       = (string) $t->notas_internas;
+        $this->requiere_2fa         = (bool) $t->requiere_2fa;
+        $this->gracia_2fa_dias      = (int) ($t->gracia_2fa_dias ?: 3);
 
         // Proveedor WhatsApp (auto/meta/tecnobyte)
         $this->whatsapp_provider          = (string) ($t->whatsapp_provider ?: 'auto');
@@ -609,6 +617,18 @@ class Index extends Component
             } else {
                 $data['wompi_config'] = null;
             }
+        }
+
+        // 🔐 Si requiere_2fa cambia de false a true → setear timestamp para iniciar gracia
+        if ($this->editandoId) {
+            $tenantViejo = Tenant::find($this->editandoId);
+            if ($tenantViejo && !$tenantViejo->requiere_2fa && ($data['requiere_2fa'] ?? false)) {
+                $data['requiere_2fa_desde'] = now();
+            } elseif ($tenantViejo && $tenantViejo->requiere_2fa && !($data['requiere_2fa'] ?? false)) {
+                $data['requiere_2fa_desde'] = null;
+            }
+        } elseif ($data['requiere_2fa'] ?? false) {
+            $data['requiere_2fa_desde'] = now();
         }
 
         $tenant = Tenant::updateOrCreate(['id' => $this->editandoId], $data);
@@ -991,6 +1011,8 @@ class Index extends Component
         $this->admin_email          = '';
         $this->admin_password       = '';
         // Suscripción auto
+        $this->requiere_2fa       = false;
+        $this->gracia_2fa_dias    = 3;
         $this->crear_suscripcion   = true;
         $this->suscripcion_plan_id = null;
         $this->suscripcion_ciclo   = 'mensual';
@@ -1000,11 +1022,37 @@ class Index extends Component
         $this->resetValidation();
     }
 
+    /** 🔐 Resetear 2FA de TODOS los usuarios de un tenant (emergencia super-admin) */
+    public function resetear2faTenant(int $tenantId): void
+    {
+        $count = app(TenantManager::class)->withoutTenant(function () use ($tenantId) {
+            return \App\Models\User::where('tenant_id', $tenantId)
+                ->whereNotNull('two_factor_secret')
+                ->update([
+                    'two_factor_secret' => null,
+                    'two_factor_recovery_codes' => null,
+                    'two_factor_enabled_at' => null,
+                ]);
+        });
+
+        $this->dispatch('notify', [
+            'type' => 'success',
+            'message' => "✓ 2FA reseteado para {$count} usuario(s) del tenant. Tendrán que volver a activarlo.",
+        ]);
+    }
+
     public function render()
     {
         // Saltar el global scope (super-admin ve todos los tenants)
         $tenants = app(TenantManager::class)->withoutTenant(function () {
-            return Tenant::withCount(['users', 'pedidos', 'clientes'])
+            return Tenant::withCount([
+                    'users',
+                    'users as users_2fa_count' => function ($q) {
+                        $q->whereNotNull('two_factor_enabled_at');
+                    },
+                    'pedidos',
+                    'clientes',
+                ])
                 ->when($this->busqueda, fn($q) => $q->where(
                     fn($qq) =>
                     $qq->where('nombre', 'like', "%{$this->busqueda}%")
