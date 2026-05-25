@@ -158,16 +158,29 @@
 </head>
 <body x-data="{
     playing: false,
+    loading: false,
     audio: null,
+    error: null,
     init() {
         this.audio = new Audio('/audio/maintenance.mp3');
+        this.audio.preload = 'auto';
         this.audio.addEventListener('ended', () => this.playing = false);
         this.audio.addEventListener('pause', () => this.playing = false);
-        this.audio.addEventListener('play', () => this.playing = true);
+        this.audio.addEventListener('play',  () => { this.playing = true; this.loading = false; });
+        this.audio.addEventListener('playing', () => this.loading = false);
+        this.audio.addEventListener('waiting', () => this.loading = true);
+        this.audio.addEventListener('error', (e) => { this.error = 'No se pudo cargar el audio'; console.error('audio error', e); });
     },
-    toggle() {
-        if (this.playing) { this.audio.pause(); }
-        else { this.audio.play(); }
+    async toggle() {
+        if (this.playing) { this.audio.pause(); return; }
+        this.loading = true;
+        try {
+            await this.audio.play();
+        } catch (err) {
+            console.error('play error', err);
+            this.error = 'Tu navegador bloqueó el audio. Refresca y vuelve a intentar.';
+            this.loading = false;
+        }
     }
 }" class="relative grain">
 
@@ -211,14 +224,41 @@
                     Trabajando en algo grande
                 </div>
 
-                {{-- Headline gigante --}}
-                <h1 class="display text-[80px] sm:text-[120px] lg:text-[180px] xl:text-[220px] tracking-[-0.05em] fade-2 glow-text">
-                    <span class="block">Pronto</span>
-                    <span class="block serif text-[var(--brand)]" style="font-size: 0.7em">volvemos</span>
-                </h1>
+                {{-- LOGO GIGANTE EN EL CENTRO --}}
+                <div class="fade-2 flex flex-col items-center justify-center my-8 lg:my-12">
+                    <div class="relative">
+                        {{-- Glow detrás del logo --}}
+                        <div class="absolute inset-0 -m-16 rounded-full opacity-40 blur-3xl pointer-events-none" style="background: radial-gradient(circle, {{ $primario }} 0%, transparent 60%);"></div>
+
+                        {{-- Anillos orbitando --}}
+                        <div class="absolute inset-0 -m-12 rounded-full border border-white/10 animate-[spin_30s_linear_infinite] pointer-events-none"></div>
+                        <div class="absolute inset-0 -m-20 rounded-full border border-white/5 animate-[spin_45s_linear_infinite_reverse] pointer-events-none"></div>
+
+                        {{-- LOGO --}}
+                        @if($logoUrl)
+                            <img src="{{ $logoUrl }}" alt="{{ $brand }}"
+                                 class="relative h-40 lg:h-56 xl:h-64 w-auto object-contain drop-shadow-[0_0_40px_{{ $primario }}80]"
+                                 style="filter: drop-shadow(0 0 30px {{ $primario }}80) drop-shadow(0 0 60px {{ $primario }}40);">
+                        @else
+                            <div class="relative h-48 lg:h-64 w-48 lg:w-64 rounded-3xl bg-gradient-to-br from-[var(--brand)] to-[var(--brand-2)] text-white flex items-center justify-center font-black text-7xl lg:text-9xl shadow-2xl"
+                                 style="box-shadow: 0 0 60px {{ $primario }}80;">K</div>
+                        @endif
+                    </div>
+
+                    {{-- Brand name + tagline --}}
+                    <div class="mt-8">
+                        <div class="display text-[44px] lg:text-[64px] tracking-tight">
+                            <span class="text-white">Pronto</span>
+                            <span class="serif text-[var(--brand)]">volvemos</span>
+                        </div>
+                        <p class="text-[14px] text-white/50 mt-2 max-w-md mx-auto">
+                            Estamos puliendo cada detalle para darte la mejor experiencia.
+                        </p>
+                    </div>
+                </div>
 
                 {{-- Audio CTA gigante --}}
-                <div class="mt-14 fade-3">
+                <div class="mt-8 fade-3">
                     <p class="text-[13px] uppercase tracking-[0.3em] text-white/50 font-semibold mb-6">
                         <i class="fa-solid fa-headphones"></i> Escucha el mensaje de {{ $brand }}
                     </p>
@@ -232,8 +272,9 @@
                             <div class="absolute -inset-2 rounded-full opacity-30 blur-xl" style="background: linear-gradient(135deg, var(--brand), var(--brand-2));"></div>
                             <div class="relative flex h-16 w-16 items-center justify-center rounded-full text-white shadow-2xl pulse-ring"
                                  style="background: linear-gradient(135deg, var(--brand), var(--brand-2));">
-                                <i x-show="!playing" class="fa-solid fa-play text-xl ml-1"></i>
-                                <i x-show="playing" x-cloak class="fa-solid fa-pause text-xl"></i>
+                                <i x-show="!playing && !loading" class="fa-solid fa-play text-xl ml-1"></i>
+                                <i x-show="playing && !loading" x-cloak class="fa-solid fa-pause text-xl"></i>
+                                <i x-show="loading" x-cloak class="fa-solid fa-spinner fa-spin text-xl"></i>
                             </div>
                         </div>
 
@@ -246,12 +287,21 @@
 
                         <div class="text-left">
                             <div class="text-[15px] font-bold text-white">
-                                <span x-show="!playing">Reproducir mensaje</span>
-                                <span x-show="playing" x-cloak>Reproduciendo…</span>
+                                <span x-show="!playing && !loading && !error">Reproducir mensaje</span>
+                                <span x-show="playing && !loading" x-cloak>Reproduciendo…</span>
+                                <span x-show="loading" x-cloak>Cargando…</span>
+                                <span x-show="error" x-cloak class="text-rose-400" x-text="error"></span>
                             </div>
                             <div class="text-[11px] text-white/50">~15 segundos · voz natural IA</div>
                         </div>
                     </button>
+
+                    {{-- Fallback descarga si autoplay falla --}}
+                    <div class="mt-3">
+                        <a href="/audio/maintenance.mp3" download class="text-[11px] text-white/40 hover:text-white/70 transition underline">
+                            ¿No suena? Descargar mp3
+                        </a>
+                    </div>
                 </div>
 
                 {{-- CTAs --}}
