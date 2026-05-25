@@ -399,7 +399,16 @@ class Index extends Component
             && !$estaImpersonando
             && !$enSubdominioTenant;
 
+        // 🏢 Solo mostrar roles del tenant actual (o globales si super-admin en dominio principal).
+        //    Antes traía Role::all() y como tras el bootstrap cada tenant tiene su propio
+        //    rol 'admin', 'chat-only', etc → el dropdown mostraba 'Admin' 4 veces, etc.
+        $tenantActualId = app(TenantManager::class)->id();
         $rolesQuery = Role::orderBy('name');
+        if ($tenantActualId) {
+            $rolesQuery->where('tenant_id', $tenantActualId);
+        } else {
+            $rolesQuery->whereNull('tenant_id');
+        }
         if (!$puedeVerSuperAdmin) {
             $rolesQuery->where('name', '!=', 'super-admin');
         }
