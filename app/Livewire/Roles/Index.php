@@ -225,6 +225,15 @@ class Index extends Component
         $tenantId = $this->tenantActualId();
         $esSuper  = $this->esSuperAdmin();
 
+        // Detectar si estamos en un subdominio de tenant o en el dominio principal
+        $hostBase = config('app.tenant_base_domain', 'tecnobyte360.com');
+        $host = request()->getHost();
+        $reservados = ['www', 'api', 'admin', 'app', 'mail', 'pedidosonline'];
+        $sub = ($host !== $hostBase && str_ends_with($host, '.' . $hostBase))
+            ? strtolower(substr($host, 0, -strlen('.' . $hostBase)))
+            : null;
+        $enSubdominioTenant = $sub && !in_array($sub, $reservados, true);
+
         // Mostrar: roles globales (tenant_id NULL) + los del tenant actual
         $rolesQuery = Role::with('permissions')->withCount('users')
             ->where(function ($q) use ($tenantId) {
@@ -235,6 +244,12 @@ class Index extends Component
             })
             ->orderByRaw('tenant_id IS NULL DESC') // globales primero
             ->orderBy('name');
+
+        // 🚫 Ocultar rol 'super-admin' en subdominios de tenant. Ese rol es del
+        //    dueño de la plataforma — solo debe verse desde admin.kivox.co.
+        if ($enSubdominioTenant) {
+            $rolesQuery->where('name', '!=', 'super-admin');
+        }
 
         $roles = $rolesQuery->get();
 
