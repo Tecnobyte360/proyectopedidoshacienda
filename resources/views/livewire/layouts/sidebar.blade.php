@@ -430,13 +430,6 @@
 
         {{-- FOOTER --}}
         <div class="border-t px-3 py-3 space-y-1" style="border-color: var(--sb-line);">
-            <a href="{{ route('perfil.seguridad') }}" class="sb-footer-item w-full">
-                <i class="fa-solid fa-shield-halved sb-icon"></i>
-                <span class="sb-collapsible">Seguridad</span>
-                @if(auth()->user()?->tieneDosFactor())
-                    <span class="ml-auto inline-block w-2 h-2 rounded-full bg-emerald-400" title="2FA activo"></span>
-                @endif
-            </a>
             <form method="POST" action="{{ route('logout') }}">
                 @csrf
                 <button type="submit" class="sb-footer-item w-full text-left">
