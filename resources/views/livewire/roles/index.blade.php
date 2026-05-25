@@ -26,126 +26,128 @@
             </div>
         </div>
 
-        {{-- TABLA DE ROLES --}}
-        <div class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm">
-                    <thead class="bg-slate-50 border-b border-slate-200">
-                        <tr>
-                            <th class="text-left px-5 py-3 font-bold text-slate-600 uppercase tracking-wider text-[11px]">Rol</th>
-                            <th class="text-left px-5 py-3 font-bold text-slate-600 uppercase tracking-wider text-[11px]">Tipo</th>
-                            <th class="text-center px-5 py-3 font-bold text-slate-600 uppercase tracking-wider text-[11px]">Usuarios</th>
-                            <th class="text-center px-5 py-3 font-bold text-slate-600 uppercase tracking-wider text-[11px]">Permisos</th>
-                            <th class="text-left px-5 py-3 font-bold text-slate-600 uppercase tracking-wider text-[11px]">Módulos / Acciones</th>
-                            <th class="text-right px-5 py-3 font-bold text-slate-600 uppercase tracking-wider text-[11px]">Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100">
-                        @foreach($roles as $rol)
-                            @php
-                                $colores = [
-                                    'admin'      => ['bg' => 'from-rose-500 to-rose-600',     'text' => 'text-rose-600',    'badge' => 'bg-rose-100 text-rose-700',    'icon' => 'fa-crown'],
-                                    'gerente'    => ['bg' => 'from-violet-500 to-violet-600', 'text' => 'text-violet-600',  'badge' => 'bg-violet-100 text-violet-700','icon' => 'fa-briefcase'],
-                                    'operador'   => ['bg' => 'from-blue-500 to-blue-600',     'text' => 'text-blue-600',    'badge' => 'bg-blue-100 text-blue-700',    'icon' => 'fa-user-tie'],
-                                    'cajero'     => ['bg' => 'from-emerald-500 to-emerald-600','text' => 'text-emerald-600','badge' => 'bg-emerald-100 text-emerald-700','icon' => 'fa-cash-register'],
-                                    'super-admin'=> ['bg' => 'from-amber-500 to-amber-600',   'text' => 'text-amber-600',   'badge' => 'bg-amber-100 text-amber-700',  'icon' => 'fa-shield-halved'],
-                                    'domiciliario'=>['bg' => 'from-cyan-500 to-cyan-600',     'text' => 'text-cyan-600',    'badge' => 'bg-cyan-100 text-cyan-700',    'icon' => 'fa-motorcycle'],
-                                ];
-                                $c = $colores[$rol->name] ?? ['bg' => 'from-slate-500 to-slate-600', 'text' => 'text-slate-600', 'badge' => 'bg-slate-100 text-slate-700', 'icon' => 'fa-user-shield'];
-                                $agrupados = $rol->permissions->sortBy('name')->groupBy(function ($p) {
-                                    return str_contains($p->name, '.') ? explode('.', $p->name)[0] : 'otros';
-                                });
-                            @endphp
-                            <tr class="hover:bg-slate-50/70 transition">
-                                {{-- ROL --}}
-                                <td class="px-5 py-3 whitespace-nowrap">
-                                    <div class="flex items-center gap-3">
-                                        <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br {{ $c['bg'] }} text-white shadow">
-                                            <i class="fa-solid {{ $c['icon'] }} text-sm"></i>
-                                        </div>
-                                        <div class="font-bold capitalize text-slate-800">{{ $rol->name }}</div>
-                                    </div>
-                                </td>
-                                {{-- TIPO --}}
-                                <td class="px-5 py-3 whitespace-nowrap">
-                                    @if(($rol->es_global ?? false))
-                                        <span class="inline-flex items-center gap-1 rounded-full bg-slate-100 text-slate-600 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider">
-                                            <i class="fa-solid fa-lock text-[9px]"></i> Sistema
-                                        </span>
-                                    @else
-                                        <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-700 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider">
-                                            <i class="fa-solid fa-building text-[9px]"></i> Mi empresa
-                                        </span>
-                                    @endif
-                                </td>
-                                {{-- USUARIOS --}}
-                                <td class="px-5 py-3 text-center">
-                                    <span class="inline-flex items-center justify-center min-w-[2rem] rounded-lg bg-slate-100 px-2 py-0.5 text-sm font-bold text-slate-700">
-                                        {{ $rol->users_count }}
-                                    </span>
-                                </td>
-                                {{-- PERMISOS COUNT --}}
-                                <td class="px-5 py-3 text-center">
-                                    <span class="inline-flex items-center justify-center min-w-[2.5rem] rounded-lg {{ $c['badge'] }} px-2.5 py-0.5 text-sm font-extrabold">
-                                        {{ $rol->permissions->count() }}
-                                    </span>
-                                </td>
-                                {{-- MÓDULOS / ACCIONES --}}
-                                <td class="px-5 py-3">
-                                    @if($rol->permissions->count() > 0)
-                                        <div class="space-y-1 max-w-xl">
-                                            @foreach($agrupados as $modulo => $perms)
-                                                <div class="flex items-start gap-2">
-                                                    <span class="inline-block px-2 py-0.5 rounded text-[10px] font-bold capitalize {{ $c['badge'] }} flex-shrink-0 mt-0.5">
-                                                        {{ $modulo }}
-                                                    </span>
-                                                    <div class="flex flex-wrap gap-1">
-                                                        @foreach($perms as $p)
-                                                            @php
-                                                                $accion = str_contains($p->name, '.') ? substr($p->name, strpos($p->name, '.') + 1) : $p->name;
-                                                            @endphp
-                                                            <span class="inline-block text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-100 text-slate-700">
-                                                                {{ $accion }}
-                                                            </span>
-                                                        @endforeach
-                                                    </div>
+        {{-- TABLA DE ROLES (estilo /usuarios) --}}
+        <div class="rounded-2xl bg-white border border-slate-200 shadow-sm overflow-hidden">
+            @if($roles->isEmpty())
+                <div class="p-16 text-center">
+                    <div class="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-slate-400 mb-4">
+                        <i class="fa-solid fa-shield-halved text-2xl"></i>
+                    </div>
+                    <p class="text-lg font-semibold text-slate-700">Sin roles</p>
+                    <p class="text-sm text-slate-500 mt-1">Crea el primer rol con el botón de arriba.</p>
+                </div>
+            @else
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-slate-50 border-b border-slate-200">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-500">Rol</th>
+                                <th class="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-500">Tipo</th>
+                                <th class="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-500 hidden md:table-cell">Permisos</th>
+                                <th class="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-500">Total</th>
+                                <th class="px-4 py-3 text-right text-[10px] font-bold uppercase tracking-wider text-slate-500">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            @foreach($roles as $rol)
+                                @php
+                                    $colores = [
+                                        'admin'       => ['bg' => 'from-rose-500 to-rose-600',      'badge' => 'bg-rose-100 text-rose-700',       'icon' => 'fa-crown'],
+                                        'gerente'     => ['bg' => 'from-violet-500 to-violet-600',  'badge' => 'bg-violet-100 text-violet-700',   'icon' => 'fa-briefcase'],
+                                        'operador'    => ['bg' => 'from-blue-500 to-blue-600',      'badge' => 'bg-blue-100 text-blue-700',       'icon' => 'fa-user-tie'],
+                                        'cajero'      => ['bg' => 'from-emerald-500 to-emerald-600','badge' => 'bg-emerald-100 text-emerald-700', 'icon' => 'fa-cash-register'],
+                                        'super-admin' => ['bg' => 'from-amber-500 to-amber-600',    'badge' => 'bg-amber-100 text-amber-700',     'icon' => 'fa-shield-halved'],
+                                        'domiciliario'=> ['bg' => 'from-cyan-500 to-cyan-600',      'badge' => 'bg-cyan-100 text-cyan-700',       'icon' => 'fa-motorcycle'],
+                                        'chatbot'     => ['bg' => 'from-slate-500 to-slate-600',    'badge' => 'bg-slate-100 text-slate-700',     'icon' => 'fa-robot'],
+                                        'chat-only'   => ['bg' => 'from-pink-500 to-pink-600',      'badge' => 'bg-pink-100 text-pink-700',       'icon' => 'fa-comments'],
+                                    ];
+                                    $c = $colores[$rol->name] ?? ['bg' => 'from-slate-500 to-slate-600', 'badge' => 'bg-slate-100 text-slate-700', 'icon' => 'fa-user-shield'];
+                                    $agrupados = $rol->permissions->sortBy('name')->groupBy(function ($p) {
+                                        return str_contains($p->name, '.') ? explode('.', $p->name)[0] : 'otros';
+                                    });
+                                @endphp
+                                <tr class="transition hover:bg-amber-50/30">
+                                    {{-- ROL: icono + nombre + usuarios --}}
+                                    <td class="px-4 py-3.5">
+                                        <div class="flex items-center gap-3">
+                                            <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br {{ $c['bg'] }} text-white text-sm font-bold shadow-sm">
+                                                <i class="fa-solid {{ $c['icon'] }}"></i>
+                                            </div>
+                                            <div class="min-w-0">
+                                                <div class="font-bold text-slate-800 capitalize truncate">{{ $rol->name }}</div>
+                                                <div class="text-xs text-slate-500">
+                                                    <i class="fa-solid fa-users text-[10px]"></i>
+                                                    {{ $rol->users_count }} usuario(s)
                                                 </div>
-                                            @endforeach
+                                            </div>
                                         </div>
-                                    @else
-                                        <span class="text-xs text-slate-400 italic">Sin permisos</span>
-                                    @endif
-                                </td>
-                                {{-- ACCIONES --}}
-                                <td class="px-5 py-3 text-right whitespace-nowrap">
-                                    @if(($rol->es_global ?? false))
-                                        <button wire:click="clonar({{ $rol->id }})"
-                                                title="Clonar para personalizar"
-                                                class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-600 transition">
-                                            <i class="fa-solid fa-copy text-xs"></i>
-                                        </button>
-                                    @endif
-                                    @if($rol->es_editable ?? false)
-                                        <button wire:click="abrirModalEditar({{ $rol->id }})"
-                                                title="Editar"
-                                                class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 hover:bg-brand-soft hover:text-brand-secondary text-slate-600 transition">
-                                            <i class="fa-solid fa-pen-to-square text-xs"></i>
-                                        </button>
-                                        @if($rol->name !== 'admin' && !($rol->es_global ?? false))
-                                            <button wire:click="eliminar({{ $rol->id }})"
-                                                    wire:confirm="¿Eliminar el rol '{{ $rol->name }}'?"
-                                                    title="Eliminar"
-                                                    class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 transition">
-                                                <i class="fa-solid fa-trash text-xs"></i>
+                                    </td>
+                                    {{-- TIPO --}}
+                                    <td class="px-4 py-3.5">
+                                        @if(($rol->es_global ?? false))
+                                            <span class="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 uppercase tracking-wider">
+                                                <i class="fa-solid fa-lock text-[9px]"></i> Sistema
+                                            </span>
+                                        @else
+                                            <span class="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 uppercase tracking-wider">
+                                                <i class="fa-solid fa-building text-[9px]"></i> Mi empresa
+                                            </span>
+                                        @endif
+                                    </td>
+                                    {{-- PERMISOS por módulo (pills) --}}
+                                    <td class="px-4 py-3.5 hidden md:table-cell">
+                                        @if($rol->permissions->count() > 0)
+                                            <div class="flex flex-wrap gap-1 max-w-xl">
+                                                @foreach($agrupados as $modulo => $perms)
+                                                    <span class="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full {{ $c['badge'] }} capitalize"
+                                                          title="{{ $perms->pluck('name')->implode(', ') }}">
+                                                        <i class="fa-solid fa-folder text-[9px]"></i>
+                                                        {{ $modulo }}
+                                                        <span class="text-[9px] opacity-75">({{ $perms->count() }})</span>
+                                                    </span>
+                                                @endforeach
+                                            </div>
+                                        @else
+                                            <span class="text-xs text-slate-400">Sin permisos</span>
+                                        @endif
+                                    </td>
+                                    {{-- TOTAL count --}}
+                                    <td class="px-4 py-3.5">
+                                        <span class="inline-flex items-center justify-center min-w-[2.5rem] rounded-lg {{ $c['badge'] }} px-2.5 py-1 text-sm font-extrabold">
+                                            {{ $rol->permissions->count() }}
+                                        </span>
+                                    </td>
+                                    {{-- ACCIONES --}}
+                                    <td class="px-4 py-3.5 text-right whitespace-nowrap">
+                                        @if(($rol->es_global ?? false))
+                                            <button wire:click="clonar({{ $rol->id }})"
+                                                    title="Clonar para personalizar"
+                                                    class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-600 transition">
+                                                <i class="fa-solid fa-copy text-xs"></i>
                                             </button>
                                         @endif
-                                    @endif
-                                </td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
+                                        @if($rol->es_editable ?? false)
+                                            <button wire:click="abrirModalEditar({{ $rol->id }})"
+                                                    title="Editar"
+                                                    class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 hover:bg-brand-soft hover:text-brand-secondary text-slate-600 transition">
+                                                <i class="fa-solid fa-pen-to-square text-xs"></i>
+                                            </button>
+                                            @if($rol->name !== 'admin' && !($rol->es_global ?? false))
+                                                <button wire:click="eliminar({{ $rol->id }})"
+                                                        wire:confirm="¿Eliminar el rol '{{ $rol->name }}'?"
+                                                        title="Eliminar"
+                                                        class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 transition">
+                                                    <i class="fa-solid fa-trash text-xs"></i>
+                                                </button>
+                                            @endif
+                                        @endif
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
         </div>
     </div>
 
