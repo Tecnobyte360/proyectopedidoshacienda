@@ -140,6 +140,18 @@ class AuthController extends Controller
             return redirect()->route('two-factor.challenge');
         }
 
+        // 🆕 Si NO tiene 2FA pero su admin lo exigió (o su tenant lo exige y ya
+        // pasó la gracia) → forzar enrollment ANTES de completar el login.
+        //    Guarda credenciales en sesión y manda a /two-factor-enroll
+        //    donde escanea el QR y verifica el primer código.
+        if ($this->debeEnrollar2fa($user)) {
+            $request->session()->put([
+                '2fa.enroll_user_id'  => $user->id,
+                '2fa.enroll_remember' => $remember,
+            ]);
+            return redirect()->route('two-factor.enroll');
+        }
+
         // Login normal sin 2FA
         Auth::login($user, $remember);
         $request->session()->regenerate();
@@ -162,6 +174,34 @@ class AuthController extends Controller
         } catch (\Throwable $e) { /* ignorar */ }
 
         return redirect($this->rutaInicialPara($user));
+    }
+
+    /**
+     * Determina si el usuario debe activar 2FA antes de entrar a la plataforma.
+     *
+     * Reglas:
+     *  - Si el admin marcó individualmente requiere_2fa=true → SÍ (sin gracia)
+     *  - Si el tenant exige 2FA y ya pasó el período de gracia → SÍ
+     *  - En otro caso → NO (puede entrar normal o tiene gracia)
+     */
+    private function debeEnrollar2fa(\App\Models\User $user): bool
+    {
+        // Forzado individual = sin gracia, prioridad máxima
+        if (!empty($user->requiere_2fa)) {
+            return true;
+        }
+
+        // Forzado por política del tenant: respetar gracia
+        $tenant = $user->tenant_id ? \App\Models\Tenant::withoutGlobalScopes()->find($user->tenant_id) : null;
+        if ($tenant && $tenant->requiere_2fa) {
+            $diasGracia = $tenant->gracia_2fa_dias ?? 3;
+            $desde = $tenant->requiere_2fa_desde;
+            if (!$desde) return true;
+            $deadline = $desde->copy()->addDays($diasGracia);
+            return now()->gte($deadline);
+        }
+
+        return false;
     }
 
     public function logout(Request $request)

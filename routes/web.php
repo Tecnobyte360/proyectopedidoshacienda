@@ -69,6 +69,13 @@ Route::get('/two-factor-challenge',  [\App\Http\Controllers\TwoFactorController:
 Route::post('/two-factor-challenge', [\App\Http\Controllers\TwoFactorController::class, 'verifyChallenge'])
     ->name('two-factor.verify');
 
+// 🆕 2FA Enrollment forzado (cuando admin marcó requiere_2fa=true al user)
+//    Va ANTES de completar el login: muestra QR + verifica primer código.
+Route::get('/two-factor-enroll',  [\App\Http\Controllers\TwoFactorController::class, 'showForcedEnroll'])
+    ->name('two-factor.enroll');
+Route::post('/two-factor-enroll', [\App\Http\Controllers\TwoFactorController::class, 'confirmForcedEnroll'])
+    ->name('two-factor.enroll.confirm');
+
 // 🔐 2FA Settings (gestión usuario logueado)
 Route::middleware('auth')->group(function () {
     Route::get('/perfil/seguridad',                \App\Livewire\Auth\SecuritySettings::class)->name('perfil.seguridad');
