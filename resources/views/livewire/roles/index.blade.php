@@ -43,8 +43,7 @@
                             <tr>
                                 <th class="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-500">Rol</th>
                                 <th class="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-500">Tipo</th>
-                                <th class="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-500 hidden md:table-cell">Permisos</th>
-                                <th class="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-500">Total</th>
+                                <th class="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-500">Permisos</th>
                                 <th class="px-4 py-3 text-right text-[10px] font-bold uppercase tracking-wider text-slate-500">Acciones</th>
                             </tr>
                         </thead>
@@ -97,29 +96,15 @@
                                             </span>
                                         @endif
                                     </td>
-                                    {{-- PERMISOS por módulo (pills compactas) --}}
-                                    <td class="px-4 py-3.5 hidden md:table-cell">
-                                        @if($rol->permissions->count() > 0)
-                                            <div class="flex flex-wrap gap-1.5 max-w-2xl">
-                                                @foreach($agrupados as $modulo => $perms)
-                                                    <span class="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-md bg-slate-50 border border-slate-200 text-slate-700 capitalize hover:bg-slate-100 transition"
-                                                          title="{{ $perms->pluck('name')->implode(' · ') }}">
-                                                        {{ $modulo }}
-                                                        <span class="inline-flex items-center justify-center min-w-[1.1rem] h-[1.1rem] rounded-full {{ $c['badge'] }} text-[9px] font-extrabold">
-                                                            {{ $perms->count() }}
-                                                        </span>
-                                                    </span>
-                                                @endforeach
-                                            </div>
-                                        @else
-                                            <span class="text-xs text-slate-400 italic">Sin permisos</span>
-                                        @endif
-                                    </td>
-                                    {{-- TOTAL count --}}
+                                    {{-- PERMISOS: solo contador + botón para verlos en el modal --}}
                                     <td class="px-4 py-3.5">
-                                        <span class="inline-flex items-center justify-center min-w-[2.5rem] rounded-lg {{ $c['badge'] }} px-2.5 py-1 text-sm font-extrabold">
-                                            {{ $rol->permissions->count() }}
-                                        </span>
+                                        <button wire:click="abrirModalEditar({{ $rol->id }})"
+                                                class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg {{ $c['badge'] }} hover:opacity-80 transition text-xs font-bold"
+                                                title="Ver/editar permisos">
+                                            <i class="fa-solid fa-list-check text-[11px]"></i>
+                                            {{ $rol->permissions->count() }} permiso(s)
+                                            <i class="fa-solid fa-arrow-right text-[10px] opacity-70"></i>
+                                        </button>
                                     </td>
                                     {{-- ACCIONES --}}
                                     <td class="px-4 py-3.5 text-right whitespace-nowrap">
@@ -188,69 +173,6 @@
                         <p class="text-xs text-slate-500 mt-1">Usa minúsculas, sin espacios. Ej: <code class="text-brand">supervisor</code>, <code class="text-brand">domiciliario</code></p>
                         @error('name') <p class="text-xs text-rose-600 mt-1">{{ $message }}</p> @enderror
                     </div>
-
-                    {{-- 📋 RESUMEN: Permisos actuales del rol (siempre visibles) --}}
-                    @if(count($permisosSel) > 0)
-                        @php
-                            $resumenAgrupado = collect($permisosSel)->sort()->groupBy(function ($p) {
-                                return str_contains($p, '.') ? explode('.', $p)[0] : 'otros';
-                            });
-                        @endphp
-                        <div class="rounded-2xl border-2 border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50/30 overflow-hidden">
-                            <div class="flex items-center justify-between px-4 py-2.5 bg-emerald-100/60 border-b border-emerald-200">
-                                <div class="flex items-center gap-2">
-                                    <i class="fa-solid fa-circle-check text-emerald-600"></i>
-                                    <span class="text-sm font-bold text-emerald-900">Permisos actualmente asignados</span>
-                                </div>
-                                <span class="inline-flex items-center justify-center min-w-[2rem] rounded-lg bg-emerald-600 text-white px-2.5 py-0.5 text-sm font-extrabold">
-                                    {{ count($permisosSel) }}
-                                </span>
-                            </div>
-                            <div class="max-h-56 overflow-y-auto">
-                                <table class="w-full text-xs">
-                                    <thead class="bg-emerald-50 sticky top-0 z-10">
-                                        <tr>
-                                            <th class="text-left px-4 py-1.5 font-bold text-emerald-800 uppercase tracking-wider text-[10px]">Módulo</th>
-                                            <th class="text-left px-4 py-1.5 font-bold text-emerald-800 uppercase tracking-wider text-[10px]">Acción</th>
-                                            <th class="text-right px-4 py-1.5 font-bold text-emerald-800 uppercase tracking-wider text-[10px]">Quitar</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="divide-y divide-emerald-100 bg-white">
-                                        @foreach($resumenAgrupado as $mod => $perms)
-                                            @foreach($perms as $i => $perm)
-                                                @php
-                                                    $accion = str_contains($perm, '.') ? substr($perm, strpos($perm, '.') + 1) : $perm;
-                                                @endphp
-                                                <tr class="hover:bg-emerald-50/50">
-                                                    <td class="px-4 py-1.5 align-top whitespace-nowrap">
-                                                        @if($i === 0)
-                                                            <span class="inline-block px-2 py-0.5 rounded text-[10px] font-bold capitalize bg-emerald-100 text-emerald-800">
-                                                                {{ $mod }}
-                                                            </span>
-                                                        @endif
-                                                    </td>
-                                                    <td class="px-4 py-1.5 font-mono text-slate-700">{{ $accion }}</td>
-                                                    <td class="px-4 py-1.5 text-right">
-                                                        <button type="button"
-                                                                onclick="this.closest('form').querySelector('input[value=&quot;{{ $perm }}&quot;]').click()"
-                                                                class="inline-flex h-6 w-6 items-center justify-center rounded-md bg-rose-50 hover:bg-rose-100 text-rose-600 transition"
-                                                                title="Quitar este permiso">
-                                                            <i class="fa-solid fa-xmark text-[10px]"></i>
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            @endforeach
-                                        @endforeach
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    @else
-                        <div class="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/50 px-4 py-3 text-center">
-                            <i class="fa-solid fa-circle-exclamation text-slate-400"></i>
-                            <span class="text-xs text-slate-500 ml-1">Este rol aún no tiene permisos. Selecciónalos abajo.</span>
-                        </div>
-                    @endif
 
                     <div>
                         <div class="flex items-center justify-between mb-3">
