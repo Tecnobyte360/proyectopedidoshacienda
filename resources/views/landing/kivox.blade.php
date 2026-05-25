@@ -215,46 +215,36 @@
         <main class="flex-1 flex items-center justify-center px-6 lg:px-12 py-8">
             <div class="max-w-5xl w-full text-center">
 
-                {{-- Badge --}}
-                <div class="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-white/5 backdrop-blur border border-white/10 text-[12px] font-semibold text-white/90 mb-10 fade-1">
-                    <span class="relative flex h-2 w-2">
-                        <span class="absolute inline-flex h-full w-full rounded-full opacity-75 animate-ping" style="background: {{ $primario }};"></span>
-                        <span class="relative inline-flex rounded-full h-2 w-2" style="background: {{ $primario }};"></span>
-                    </span>
-                    Trabajando en algo grande
-                </div>
-
                 {{-- LOGO GIGANTE EN EL CENTRO --}}
-                <div class="fade-2 flex flex-col items-center justify-center my-8 lg:my-12">
+                <div class="fade-2 flex flex-col items-center justify-center mb-10 lg:mb-14">
                     <div class="relative">
                         {{-- Glow detrás del logo --}}
-                        <div class="absolute inset-0 -m-16 rounded-full opacity-40 blur-3xl pointer-events-none" style="background: radial-gradient(circle, {{ $primario }} 0%, transparent 60%);"></div>
+                        <div class="absolute inset-0 -m-20 rounded-full opacity-50 blur-3xl pointer-events-none" style="background: radial-gradient(circle, {{ $primario }} 0%, transparent 65%);"></div>
 
                         {{-- Anillos orbitando --}}
-                        <div class="absolute inset-0 -m-12 rounded-full border border-white/10 animate-[spin_30s_linear_infinite] pointer-events-none"></div>
+                        <div class="absolute inset-0 -m-10 rounded-full border border-white/10 animate-[spin_30s_linear_infinite] pointer-events-none"></div>
                         <div class="absolute inset-0 -m-20 rounded-full border border-white/5 animate-[spin_45s_linear_infinite_reverse] pointer-events-none"></div>
 
                         {{-- LOGO --}}
                         @if($logoUrl)
                             <img src="{{ $logoUrl }}" alt="{{ $brand }}"
-                                 class="relative h-40 lg:h-56 xl:h-64 w-auto object-contain drop-shadow-[0_0_40px_{{ $primario }}80]"
-                                 style="filter: drop-shadow(0 0 30px {{ $primario }}80) drop-shadow(0 0 60px {{ $primario }}40);">
+                                 class="relative h-44 lg:h-56 xl:h-64 w-auto object-contain"
+                                 style="filter: drop-shadow(0 0 30px {{ $primario }}99) drop-shadow(0 0 60px {{ $primario }}55);">
                         @else
                             <div class="relative h-48 lg:h-64 w-48 lg:w-64 rounded-3xl bg-gradient-to-br from-[var(--brand)] to-[var(--brand-2)] text-white flex items-center justify-center font-black text-7xl lg:text-9xl shadow-2xl"
                                  style="box-shadow: 0 0 60px {{ $primario }}80;">K</div>
                         @endif
                     </div>
 
-                    {{-- Brand name + tagline --}}
-                    <div class="mt-8">
-                        <div class="display text-[44px] lg:text-[64px] tracking-tight">
-                            <span class="text-white">Pronto</span>
-                            <span class="serif text-[var(--brand)]">volvemos</span>
-                        </div>
-                        <p class="text-[14px] text-white/50 mt-2 max-w-md mx-auto">
-                            Estamos puliendo cada detalle para darte la mejor experiencia.
-                        </p>
-                    </div>
+                    {{-- Headline grande, jerarquía clara --}}
+                    <h1 class="display text-[56px] sm:text-[80px] lg:text-[112px] tracking-[-0.04em] mt-12 leading-[0.95]">
+                        <span class="block text-white">Pronto</span>
+                        <span class="block serif text-[var(--brand)]">volvemos</span>
+                    </h1>
+
+                    <p class="text-[16px] lg:text-[18px] text-white/55 mt-6 max-w-lg mx-auto leading-relaxed">
+                        Estamos puliendo cada detalle para darte la mejor experiencia.
+                    </p>
                 </div>
 
                 {{-- Audio CTA gigante --}}
