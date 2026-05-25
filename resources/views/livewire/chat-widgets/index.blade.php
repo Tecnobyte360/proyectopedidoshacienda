@@ -19,58 +19,6 @@
             </div>
         </div>
 
-        {{-- GUÍA DE INSTALACIÓN --}}
-        @if($widgets->isNotEmpty())
-            <details class="rounded-2xl bg-gradient-to-r from-sky-50 to-violet-50 border border-sky-200 p-5 shadow-sm">
-                <summary class="cursor-pointer font-bold text-slate-800 flex items-center gap-2">
-                    <i class="fa-solid fa-book-open text-sky-600"></i>
-                    Cómo instalar el widget en tu sitio web
-                    <span class="text-xs font-normal text-slate-500 ml-auto">(clic para expandir)</span>
-                </summary>
-                <div class="mt-4 space-y-4 text-sm text-slate-700">
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div class="bg-white rounded-xl p-4 border border-slate-200">
-                            <div class="flex items-center gap-2 mb-2">
-                                <span class="flex h-8 w-8 items-center justify-center rounded-full bg-sky-100 text-sky-700 font-bold">1</span>
-                                <h4 class="font-bold">Copia el script</h4>
-                            </div>
-                            <p class="text-xs text-slate-600">En la tarjeta de tu widget abajo hay 4 pestañas (HTML, WordPress, Shopify, GTM). Escoge la que uses y dale <strong>"Copiar"</strong>.</p>
-                        </div>
-                        <div class="bg-white rounded-xl p-4 border border-slate-200">
-                            <div class="flex items-center gap-2 mb-2">
-                                <span class="flex h-8 w-8 items-center justify-center rounded-full bg-sky-100 text-sky-700 font-bold">2</span>
-                                <h4 class="font-bold">Pégalo en tu web</h4>
-                            </div>
-                            <p class="text-xs text-slate-600">Lo ideal es antes del <code class="bg-slate-100 px-1 rounded">&lt;/body&gt;</code> para que cargue después del contenido. Guarda y publica.</p>
-                        </div>
-                        <div class="bg-white rounded-xl p-4 border border-slate-200">
-                            <div class="flex items-center gap-2 mb-2">
-                                <span class="flex h-8 w-8 items-center justify-center rounded-full bg-sky-100 text-sky-700 font-bold">3</span>
-                                <h4 class="font-bold">Listo</h4>
-                            </div>
-                            <p class="text-xs text-slate-600">Refresca tu sitio. Verás el botón flotante <i class="fa-solid fa-comment"></i> en la esquina. Los visitantes pueden chatear de inmediato.</p>
-                        </div>
-                    </div>
-
-                    <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 text-xs">
-                        <p class="font-bold text-amber-800 mb-1"><i class="fa-solid fa-shield-halved"></i> Seguridad</p>
-                        <p class="text-amber-700">Si quieres que solo TU dominio pueda usar el widget, edítalo y agrega los dominios permitidos (ej. <code class="bg-amber-100 px-1 rounded">miempresa.com, tienda.miempresa.com</code>). Si dejas vacío, cualquier sitio con el token podría usarlo.</p>
-                    </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                        <div class="bg-white rounded-xl p-3 border border-slate-200">
-                            <p class="font-bold text-slate-800 mb-1"><i class="fa-solid fa-eye text-violet-600"></i> Probarlo sin publicar</p>
-                            <p class="text-slate-600">Clic en <strong>"Ver preview"</strong> en la tarjeta del widget — abre una página de prueba con el widget ya instalado.</p>
-                        </div>
-                        <div class="bg-white rounded-xl p-3 border border-slate-200">
-                            <p class="font-bold text-slate-800 mb-1"><i class="fa-solid fa-palette text-rose-600"></i> Cambiar colores o saludo</p>
-                            <p class="text-slate-600">Edita el widget con el lápiz. Los cambios se aplican inmediato sin volver a copiar el script.</p>
-                        </div>
-                    </div>
-                </div>
-            </details>
-        @endif
-
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             @forelse($widgets as $w)
                 <div class="rounded-2xl bg-white border border-slate-200 p-5 shadow-sm {{ !$w->activo ? 'opacity-60' : '' }}">
