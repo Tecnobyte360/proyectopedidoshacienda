@@ -79,7 +79,7 @@ class Index extends Component
             'telefono'            => 'nullable|string|max:30',
             'sede_id'             => 'nullable|exists:sedes,id',
             'password'            => $this->editandoId ? 'nullable|string|min:6' : 'required|string|min:6',
-            'rol'                 => 'required|exists:roles,name',
+            'rol'                 => 'nullable|string|exists:roles,name',
             'activo'              => 'boolean',
             'departamentos_ids'   => 'array',
             'departamentos_ids.*' => 'integer|exists:departamentos,id',
@@ -89,7 +89,7 @@ class Index extends Component
     public function guardar(): void
     {
         $data = $this->validate();
-        $rol  = $data['rol'];
+        $rol  = $data['rol'] ?? null;
         $deptos = $data['departamentos_ids'] ?? [];
         unset($data['rol'], $data['departamentos_ids']);
 
@@ -131,7 +131,9 @@ class Index extends Component
         }
 
         $user = User::updateOrCreate(['id' => $this->editandoId], $data);
-        $user->syncRoles([$rol]);
+        // Si rol es null/vacío → dejar al usuario sin ningún rol.
+        // syncRoles([]) elimina cualquier rol previo.
+        $user->syncRoles($rol ? [$rol] : []);
 
         // 🛡️ Sincronizar departamentos: solo permitir IDs del tenant actual
         // (defensa adicional contra IPC cross-tenant si alguien manipula el form).
@@ -288,6 +290,31 @@ class Index extends Component
                 'message' => "🔐 2FA exigido a {$u->name}. Al ingresar deberá configurarlo antes de usar la plataforma.",
             ]);
         }
+    }
+
+    /**
+     * ⚡ Quita TODOS los roles a un usuario en un click.
+     * Útil cuando un usuario va a quedar inactivo o necesitas revocarle acceso
+     * sin eliminarlo. Quedará sin permisos pero podrá loguear (si activo=true).
+     */
+    public function quitarRol(int $id): void
+    {
+        if ($id === auth()->id()) {
+            $this->dispatch('notify', ['type' => 'warning', 'message' => 'No puedes quitarte tus propios roles.']);
+            return;
+        }
+
+        $u = $this->aplicarFiltroTenant(User::query())->find($id);
+        if (!$u) {
+            $this->dispatch('notify', ['type' => 'warning', 'message' => 'Usuario no encontrado.']);
+            return;
+        }
+
+        $u->syncRoles([]);
+        $this->dispatch('notify', [
+            'type' => 'success',
+            'message' => "✓ Roles quitados a {$u->name}. Quedó sin permisos.",
+        ]);
     }
 
     public function eliminar(int $id): void

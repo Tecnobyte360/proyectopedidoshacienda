@@ -157,12 +157,33 @@
                                     </td>
                                     <td class="px-4 py-3.5">
                                         @forelse($u->roles as $r)
-                                            <span class="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-violet-100 text-violet-700 capitalize mr-1">
+                                            <span class="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-violet-100 text-violet-700 capitalize mr-1 group">
                                                 <i class="fa-solid fa-shield-halved text-[9px]"></i>
                                                 {{ $r->name }}
+                                                @if(!$esYo)
+                                                    <button type="button"
+                                                            data-user-id="{{ $u->id }}"
+                                                            data-user-name="{{ $u->name }}"
+                                                            data-rol-name="{{ $r->name }}"
+                                                            onclick="usuariosSwal.confirmar({
+                                                                title: 'Quitar rol',
+                                                                html: 'Vas a dejar a <b>' + this.dataset.userName + '</b> sin el rol <b>' + this.dataset.rolName + '</b>.<br><span style=\'color:#64748b;font-size:13px\'>Quedará sin permisos pero podrá iniciar sesión.</span>',
+                                                                icon: 'warning',
+                                                                confirmText: 'Sí, quitar rol',
+                                                                color: '#f59e0b',
+                                                                onConfirm: () => Livewire.find(this.closest('[wire\\:id]').getAttribute('wire:id')).call('quitarRol', parseInt(this.dataset.userId))
+                                                            })"
+                                                            class="ml-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-violet-200/70 hover:bg-rose-500 hover:text-white text-violet-700 opacity-0 group-hover:opacity-100 transition"
+                                                            title="Quitar rol al usuario">
+                                                        <i class="fa-solid fa-xmark text-[8px]"></i>
+                                                    </button>
+                                                @endif
                                             </span>
                                         @empty
-                                            <span class="text-xs text-slate-400">Sin rol</span>
+                                            <span class="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-amber-100 text-amber-700">
+                                                <i class="fa-solid fa-triangle-exclamation text-[9px]"></i>
+                                                Sin rol
+                                            </span>
                                         @endforelse
                                     </td>
                                     <td class="px-4 py-3.5 hidden md:table-cell">
@@ -371,14 +392,15 @@
                             </select>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1.5">Rol *</label>
+                            <label class="block text-sm font-medium text-slate-700 mb-1.5">Rol</label>
                             <select wire:model="rol"
                                     class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-2 focus:ring-brand/20">
-                                <option value="">— Selecciona rol —</option>
+                                <option value="">⚠️ Sin rol (sin permisos)</option>
                                 @foreach($roles as $r)
                                     <option value="{{ $r->name }}">{{ ucfirst($r->name) }}</option>
                                 @endforeach
                             </select>
+                            <p class="text-xs text-slate-500 mt-1">Un usuario sin rol puede iniciar sesión pero no podrá acceder a ningún módulo.</p>
                             @error('rol') <p class="text-xs text-rose-600 mt-1">{{ $message }}</p> @enderror
                         </div>
                         <div class="md:col-span-2">
