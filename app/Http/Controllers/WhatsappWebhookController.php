@@ -6888,6 +6888,45 @@ TXT;
       }
 
       if (!$zona) {
+          // 🏪 Si tenemos info de "recoger_en_sede" del SedeResolverService,
+          //    ofrecemos pickup con datos REALES (nombre, dirección, horario, distancia).
+          //    El bot debe usar estos datos para sugerir al cliente recoger ahí.
+          $sedeRecoger = $resultado['recoger_en_sede'] ?? null;
+
+          if ($sedeRecoger) {
+              $direccionSede = trim(($sedeRecoger->direccion ?? '') . ($sedeRecoger->barrio ? ', ' . $sedeRecoger->barrio : ''));
+              $distancia = $resultado['distancia_km'] ?? null;
+              $tiempoLlegada = $distancia ? max(10, round($distancia * 4)) : null; // ~4 min/km en moto
+
+              $mensajeRecoger = "Verifiqué tu dirección y me queda *fuera de cobertura* 😔. "
+                  . "Pero te queda cerca la sede *{$sedeRecoger->nombre}*"
+                  . ($distancia ? " (a {$distancia} km)" : '') . ". "
+                  . "Si quieres puedo dejarte el pedido listo para que pases a recogerlo "
+                  . ($direccionSede ? "en *{$direccionSede}*. " : '. ')
+                  . "¿O prefieres darme otra dirección que pueda estar dentro de cobertura?";
+
+              return [
+                  'cubierta'         => false,
+                  'zona'             => null,
+                  'costo_envio'      => null,
+                  'tiempo_estimado'  => null,
+                  'coordenadas'      => $coord,
+                  'mensaje_sugerido' => $mensajeRecoger,
+                  'metodo_usado'     => 'sin_cobertura_con_pickup',
+                  // 🎁 Datos para que el bot pueda crear pedido "recoger en sede" si el cliente acepta
+                  'recoger_en_sede'  => [
+                      'sede_id'        => $sedeRecoger->id,
+                      'sede_nombre'    => $sedeRecoger->nombre,
+                      'sede_direccion' => $direccionSede,
+                      'distancia_km'   => $distancia,
+                      'tiempo_llegar'  => $tiempoLlegada,
+                      'horario'        => method_exists($sedeRecoger, 'horarioHoy') ? $sedeRecoger->horarioHoy() : null,
+                      'esta_abierta'   => $sedeRecoger->estaAbierta(),
+                  ],
+              ];
+          }
+
+          // Sin sedeRecoger (no hay sedes activas) → mensaje genérico
           return [
               'cubierta'         => false,
               'zona'             => null,
@@ -6895,8 +6934,7 @@ TXT;
               'tiempo_estimado'  => null,
               'coordenadas'      => $coord,
               'mensaje_sugerido' => "Verifiqué tu dirección en el mapa y me queda fuera de cobertura 😔. "
-                  . "Puedo dejarte el pedido listo para que lo recojas en sede — "
-                  . "o si me pasas otra dirección más cercana, lo valido otra vez.",
+                  . "¿Me pasas otra dirección más cercana para validarla?",
               'metodo_usado'     => null,
           ];
       }
