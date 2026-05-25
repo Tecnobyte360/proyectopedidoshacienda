@@ -103,7 +103,13 @@
                                             @if($producto->urlImagen())
                                                 <img src="{{ $producto->urlImagen() }}" alt="" class="h-full w-full object-cover">
                                             @else
-                                                <span class="text-xl">{{ $producto->categoria?->icono_emoji ?? '<i class="fa-solid fa-box"></i>' }}</span>
+                                                <span class="text-xl">
+                                                    @if($producto->categoria?->icono_emoji)
+                                                        {{ $producto->categoria->icono_emoji }}
+                                                    @else
+                                                        <i class="fa-solid fa-box"></i>
+                                                    @endif
+                                                </span>
                                             @endif
                                         </div>
                                         <div class="min-w-0 max-w-[220px]">
@@ -221,7 +227,13 @@
                         @if($producto->urlImagen())
                             <img src="{{ $producto->urlImagen() }}" alt="{{ $producto->nombre }}" class="h-full w-full object-cover">
                         @else
-                            <span class="text-5xl">{{ $producto->categoria?->icono_emoji ?? '<i class="fa-solid fa-box"></i>' }}</span>
+                            <span class="text-5xl">
+                                @if($producto->categoria?->icono_emoji)
+                                    {{ $producto->categoria->icono_emoji }}
+                                @else
+                                    <i class="fa-solid fa-box"></i>
+                                @endif
+                            </span>
                         @endif
 
                         <button wire:click="toggleDestacado({{ $producto->id }})"

@@ -356,7 +356,7 @@
                     <input type="checkbox" wire:model="saas_billing_activo"
                            class="h-5 w-5 rounded border-slate-300 text-emerald-500 focus:ring-emerald-400">
                     <span class="text-sm font-bold {{ $saas_billing_activo ? 'text-emerald-700' : 'text-rose-600' }}">
-                        {{ $saas_billing_activo ? '<i class="fa-solid fa-check"></i> Activo' : '⏸ Pausado' }}
+                        {!! $saas_billing_activo ? '<i class="fa-solid fa-check"></i> Activo' : '<i class="fa-solid fa-pause"></i> Pausado' !!}
                     </span>
                 </label>
             </div>
@@ -544,7 +544,7 @@
                 @endphp
                 <p class="text-[11px] text-amber-900 bg-amber-200/30 rounded-lg px-3 py-2 mt-3 font-semibold">
                     <i class="fa-solid fa-paper-plane"></i> <strong>Resumen semanal:</strong> {{ $totalSemana }} envío(s) totales en {{ $diasActivos }} día(s) activo(s).
-                    {{ $totalSemana === 0 ? '<i class="fa-solid fa-triangle-exclamation"></i> Actualmente NADIE recibirá recordatorios.' : '' }}
+                    {!! $totalSemana === 0 ? '<i class="fa-solid fa-triangle-exclamation"></i> Actualmente NADIE recibirá recordatorios.' : '' !!}
                 </p>
             </div>
 

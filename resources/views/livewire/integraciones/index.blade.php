@@ -338,7 +338,7 @@
                                             <tr class="hover:bg-slate-50">
                                                 <td class="px-2 py-1 font-mono font-semibold text-slate-800">{{ $c['nombre'] }}</td>
                                                 <td class="px-2 py-1 font-mono text-slate-600">{{ $c['tipo'] }}</td>
-                                                <td class="px-2 py-1 text-slate-500">{{ strtoupper($c['nullable'] ?? '') === 'YES' ? '<i class="fa-solid fa-check"></i>' : '—' }}</td>
+                                                <td class="px-2 py-1 text-slate-500">{!! strtoupper($c['nullable'] ?? '') === 'YES' ? '<i class="fa-solid fa-check"></i>' : '—' !!}</td>
                                             </tr>
                                         @endforeach
                                     </tbody>

@@ -59,7 +59,7 @@
         <div class="rounded-2xl bg-gradient-to-br {{ $k['requieren_humano'] > 0 ? 'from-rose-50 to-rose-100 border-rose-300 ring-2 ring-rose-300/40' : 'from-slate-50 to-slate-100 border-slate-200' }} border p-4">
             <div class="text-[10px] font-bold {{ $k['requieren_humano'] > 0 ? 'text-rose-700' : 'text-slate-600' }} uppercase tracking-wider"><i class="fa-solid fa-user-tie"></i> Pendientes humano</div>
             <div class="text-3xl font-extrabold {{ $k['requieren_humano'] > 0 ? 'text-rose-700' : 'text-slate-500' }} mt-1">{{ $k['requieren_humano'] }}</div>
-            <div class="text-xs {{ $k['requieren_humano'] > 0 ? 'text-rose-600' : 'text-slate-500' }} mt-1">{{ $k['requieren_humano'] > 0 ? '<i class="fa-solid fa-triangle-exclamation"></i> requieren atención' : 'todo bajo control' }}</div>
+            <div class="text-xs {{ $k['requieren_humano'] > 0 ? 'text-rose-600' : 'text-slate-500' }} mt-1">{!! $k['requieren_humano'] > 0 ? '<i class="fa-solid fa-triangle-exclamation"></i> requieren atención' : 'todo bajo control' !!}</div>
         </div>
     </div>
 
@@ -72,7 +72,7 @@
         <div class="flex-1 min-w-0">
             <div class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Proveedor IA activo</div>
             <div class="text-base font-bold text-slate-800">
-                {{ $k['proveedor_ia'] === 'anthropic' ? '<i class="fa-solid fa-feather"></i> Anthropic Claude' : '<i class="fa-solid fa-bolt"></i> OpenAI GPT' }}
+                {!! $k['proveedor_ia'] === 'anthropic' ? '<i class="fa-solid fa-feather"></i> Anthropic Claude' : '<i class="fa-solid fa-bolt"></i> OpenAI GPT' !!}
                 <span class="text-xs font-mono text-slate-500 ml-2">{{ $k['modelo_ia'] }}</span>
             </div>
         </div>
@@ -223,7 +223,7 @@
                         {{-- Pendientes --}}
                         <div class="rounded-lg {{ $completo ? 'bg-emerald-50' : 'bg-amber-50' }} p-2">
                             <div class="text-[9px] {{ $completo ? 'text-emerald-700' : 'text-amber-700' }} font-bold uppercase">
-                                {{ $completo ? '<i class="fa-solid fa-circle-check"></i> Listo' : '<i class="fa-solid fa-triangle-exclamation"></i> Falta' }}
+                                {!! $completo ? '<i class="fa-solid fa-circle-check"></i> Listo' : '<i class="fa-solid fa-triangle-exclamation"></i> Falta' !!}
                             </div>
                             @if($completo)
                                 <div class="text-emerald-700 text-[10px]">A confirmar pedido</div>
@@ -330,7 +330,7 @@
                                 <p class="mt-2"><strong>Método:</strong> {{ $ef->metodo_entrega ?: '—' }}</p>
                                 @if($ef->metodo_entrega === 'domicilio')
                                     <p><strong>Dirección:</strong> {{ $ef->direccion ?: '—' }}</p>
-                                    <p><strong>Cobertura:</strong> {{ $ef->cobertura_validada ? '<i class="fa-solid fa-circle-check"></i>' : '<i class="fa-solid fa-circle-xmark"></i>' }}</p>
+                                    <p><strong>Cobertura:</strong> {!! $ef->cobertura_validada ? '<i class="fa-solid fa-circle-check"></i>' : '<i class="fa-solid fa-circle-xmark"></i>' !!}</p>
                                 @elseif($ef->metodo_entrega === 'recoger')
                                     <p><strong>Sede:</strong> {{ $ef->sede?->nombre ?: '—' }}</p>
                                 @endif

@@ -126,7 +126,7 @@
                         <td class="px-4 py-2">
                             @if ($t->tipo_negocio)
                                 <span class="inline-flex items-center gap-1 text-xs">
-                                    {{ $tiposMeta[$t->tipo_negocio]['emoji'] ?? '<i class="fa-solid fa-building"></i>' }}
+                                    {!! $tiposMeta[$t->tipo_negocio]['emoji'] ?? '<i class="fa-solid fa-building"></i>' !!}
                                     <span class="capitalize">{{ $t->tipo_negocio }}</span>
                                 </span>
                             @else

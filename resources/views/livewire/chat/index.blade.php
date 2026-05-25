@@ -398,7 +398,7 @@
                                     <p class="text-sm text-slate-800 whitespace-pre-wrap">{{ $m->contenido }}</p>
                                 @endif
                                 <p class="text-[10px] text-slate-500 mt-1 text-right flex items-center justify-end gap-1">
-                                    <span>{{ $esHumano ? '<i class="fa-solid fa-user"></i>' : '<i class="fa-solid fa-robot"></i>' }} {{ $m->created_at->format('H:i') }}</span>
+                                    <span>{!! $esHumano ? '<i class="fa-solid fa-user"></i>' : '<i class="fa-solid fa-robot"></i>' !!} {{ $m->created_at->format('H:i') }}</span>
                                     @php $ack = (int) ($m->ack ?? 0); @endphp
                                     {{-- Solo mostramos ticks/reloj si podemos rastrear el estado (mensaje del operador).
                                          Los mensajes del bot se envían vía API y asumimos entregados correctamente. --}}
