@@ -151,26 +151,30 @@ Route::post('/wa-qr/{tenantId}/regenerar', function ($tenantId) {
     }
 });
 
-Route::middleware(['auth'])->group(function () {
-
+// 🌐 Ruta '/' PÚBLICA — landing en el root domain (kivox.co), redirect a app en subdominios.
+//    Va FUERA del grupo auth para que los visitantes anónimos vean la landing.
 Route::get('/', function () {
-    // 🌐 Si el host es el dominio raíz (kivox.co o www.kivox.co), mostrar la
-    // LANDING comercial pública. La app SaaS vive en los subdominios.
     $host    = strtolower(request()->getHost());
     $base    = strtolower(config('app.tenant_base_domain', 'tecnobyte360.com'));
     $esRoot  = ($host === $base) || ($host === 'www.' . $base);
 
-    if ($esRoot && !auth()->check()) {
+    // Root domain (kivox.co / www.kivox.co): landing comercial pública
+    if ($esRoot) {
         return view('landing.kivox');
     }
 
+    // Subdominios de tenant (admin/la-hacienda/etc): redirigir según user
+    if (!auth()->check()) {
+        return redirect('/login');
+    }
     $u = auth()->user();
-    // Super-admin sin impersonar va al panel de tenants
-    if ($u && $u->tenant_id === null && $u->hasRole('super-admin') && !session()->has('tenant_imitado_id')) {
+    if ($u->tenant_id === null && $u->hasRole('super-admin') && !session()->has('tenant_imitado_id')) {
         return redirect()->route('admin.tenants.index');
     }
     return redirect('/pedidos');
 });
+
+Route::middleware(['auth'])->group(function () {
 
 // 🏢 Rutas operativas — bloqueadas para super-admin sin impersonar
 Route::middleware(['no_super_sin_imp'])->group(function () {
