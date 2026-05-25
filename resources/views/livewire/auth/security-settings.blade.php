@@ -236,33 +236,4 @@
         </div>
     @endif
 
-    {{-- APPS RECOMENDADAS --}}
-    <div class="rounded-3xl bg-gradient-to-br from-sky-50 to-blue-50 border border-sky-200 p-5 md:p-6">
-        <div class="flex items-center gap-2 mb-4">
-            <i class="fa-solid fa-lightbulb text-sky-600 text-lg"></i>
-            <h3 class="text-sm font-extrabold text-sky-900">Apps autenticadoras recomendadas</h3>
-        </div>
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div class="rounded-2xl bg-white border border-sky-100 p-4 text-center hover:shadow-md transition">
-                <div class="text-3xl mb-2">🔐</div>
-                <div class="text-xs font-extrabold text-slate-800">Google Authenticator</div>
-                <div class="text-[10px] text-slate-500 mt-1">Gratis · iOS/Android</div>
-            </div>
-            <div class="rounded-2xl bg-white border border-sky-100 p-4 text-center hover:shadow-md transition">
-                <div class="text-3xl mb-2">☁️</div>
-                <div class="text-xs font-extrabold text-slate-800">Authy</div>
-                <div class="text-[10px] text-slate-500 mt-1">Sincroniza dispositivos</div>
-            </div>
-            <div class="rounded-2xl bg-white border border-sky-100 p-4 text-center hover:shadow-md transition">
-                <div class="text-3xl mb-2">🔑</div>
-                <div class="text-xs font-extrabold text-slate-800">1Password</div>
-                <div class="text-[10px] text-slate-500 mt-1">Si ya lo usas</div>
-            </div>
-            <div class="rounded-2xl bg-white border border-sky-100 p-4 text-center hover:shadow-md transition">
-                <div class="text-3xl mb-2">🏢</div>
-                <div class="text-xs font-extrabold text-slate-800">Microsoft</div>
-                <div class="text-[10px] text-slate-500 mt-1">Authenticator</div>
-            </div>
-        </div>
-    </div>
 </div>
