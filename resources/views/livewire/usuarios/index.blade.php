@@ -238,18 +238,19 @@
                                                 }
                                             @endphp
                                             <button type="button"
-                                                    onclick='Swal.fire({
-                                                        title: @json($swalTitle),
-                                                        html: @json($swalHtml),
-                                                        icon: @json($swalIcon),
+                                                    x-data
+                                                    x-on:click='Swal.fire({
+                                                        title: @js($swalTitle),
+                                                        html: @js($swalHtml),
+                                                        icon: @js($swalIcon),
                                                         showCancelButton: true,
-                                                        confirmButtonText: @json($swalConfirm),
+                                                        confirmButtonText: @js($swalConfirm),
                                                         cancelButtonText: "Cancelar",
-                                                        confirmButtonColor: @json($swalColor),
+                                                        confirmButtonColor: @js($swalColor),
                                                         cancelButtonColor: "#94a3b8",
                                                         reverseButtons: true,
                                                         customClass: { popup: "rounded-2xl" }
-                                                    }).then(r => { if (r.isConfirmed) @this.call("toggleForzar2fa", {{ $u->id }}) })'
+                                                    }).then(r => { if (r.isConfirmed) $wire.call("toggleForzar2fa", {{ $u->id }}) })'
                                                     title="{{ $tt }}"
                                                     class="inline-flex h-8 w-8 items-center justify-center rounded-lg {{ $bg }} transition">
                                                 <i class="fa-solid {{ $ic }} text-xs"></i>
@@ -265,9 +266,10 @@
                                         @can('usuarios.eliminar')
                                             @if(!$esYo)
                                                 <button type="button"
-                                                        onclick='Swal.fire({
+                                                        x-data
+                                                        x-on:click='Swal.fire({
                                                             title: "Eliminar usuario",
-                                                            html: "¿Eliminar a <b>{{ e($u->name) }}</b>?<br><span style=\"color:#ef4444;font-size:13px;font-weight:600\">Esta acción es irreversible.</span>",
+                                                            html: @js("¿Eliminar a <b>" . e($u->name) . "</b>?<br><span style=\"color:#ef4444;font-size:13px;font-weight:600\">Esta acción es irreversible.</span>"),
                                                             icon: "warning",
                                                             showCancelButton: true,
                                                             confirmButtonText: "Sí, eliminar",
@@ -276,7 +278,7 @@
                                                             cancelButtonColor: "#94a3b8",
                                                             reverseButtons: true,
                                                             customClass: { popup: "rounded-2xl" }
-                                                        }).then(r => { if (r.isConfirmed) @this.call("eliminar", {{ $u->id }}) })'
+                                                        }).then(r => { if (r.isConfirmed) $wire.call("eliminar", {{ $u->id }}) })'
                                                         title="Eliminar"
                                                         class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 transition">
                                                     <i class="fa-solid fa-trash text-xs"></i>
