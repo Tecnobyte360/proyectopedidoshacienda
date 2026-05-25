@@ -38,19 +38,19 @@ class Forzar2FA
             return $next($request);
         }
 
-        // Determinar fecha desde la que comenzó la obligación:
-        //  - Si lo forzó el admin del usuario (botón individual) → usar
-        //    requiere_2fa_desde del propio user.
-        //  - Si lo forzó la política del tenant → usar requiere_2fa_desde del tenant.
-        $desde = $forzadoPorUsuario
-            ? ($user->requiere_2fa_desde ?? null)
-            : ($tenant->requiere_2fa_desde ?? null);
+        // Determinar fecha+gracia desde la que comenzó la obligación.
+        // ⚠️ El forzado INDIVIDUAL siempre tiene prioridad: si el admin marcó
+        // a un usuario específico, NO hay gracia (debe configurar 2FA ya).
+        if ($forzadoPorUsuario) {
+            $desde      = $user->requiere_2fa_desde ?? null;
+            $diasGracia = 0;
+        } else {
+            $desde      = $tenant->requiere_2fa_desde ?? null;
+            $diasGracia = $tenant->gracia_2fa_dias ?? 3;
+        }
 
         // Verificar gracia: si requiere_2fa_desde es muy reciente, dejamos pasar
         if ($desde) {
-            $diasGracia = $forzadoPorTenant
-                ? ($tenant->gracia_2fa_dias ?? 3)
-                : 0; // forzado individual = sin gracia
             $deadline = $desde->copy()->addDays($diasGracia);
             if (now()->lt($deadline)) {
                 // Compartir flag con vistas para mostrar banner de aviso
