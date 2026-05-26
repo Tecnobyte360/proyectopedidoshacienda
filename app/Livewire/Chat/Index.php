@@ -480,6 +480,87 @@ class Index extends Component
         // Solo dispara render
     }
 
+    /**
+     * 🟢 Auto-rellena las variables de la plantilla con datos del contexto
+     * (nombre cliente, nombre negocio, número de pedido, total, etc.) cuando
+     * el operador selecciona una plantilla. El operador puede editar luego.
+     *
+     * Heurística simple basada en el nombre de la plantilla:
+     *  - bienvenida_*       → var1=nombreCliente, var2=nombreNegocio
+     *  - pedido_*           → var1=nombreCliente, var2=#pedido, var3=total, var4=domiciliario
+     *  - felicitacion_*     → var1=nombreCliente, var2=descuento, var3=fechaVencimiento
+     *  - recordatorio_pago  → var1=nombreCliente, var2=#pedido, var3=monto
+     *  - promocion_general  → var1=nombreCliente, var2=oferta, var3=link
+     *  - encuesta_*         → var1=nombreCliente, var2=#pedido
+     */
+    public function updatedPlantillaChatId(): void
+    {
+        $this->plantillaChatVars = [];
+        if (!$this->plantillaChatId) return;
+
+        try {
+            $tpl = \App\Models\MetaWhatsappPlantilla::find($this->plantillaChatId);
+            if (!$tpl || $tpl->num_variables < 1) return;
+
+            // Contexto: cliente actual + negocio
+            $conv = $this->conversacionActivaId
+                ? \App\Models\ConversacionWhatsapp::with(['cliente', 'pedido'])->find($this->conversacionActivaId)
+                : null;
+
+            $nombreCliente = trim(($conv?->cliente?->nombre ?: '') ?: 'Cliente');
+            // Solo primer nombre (más natural en saludos)
+            $primerNombre = explode(' ', $nombreCliente)[0];
+
+            $tenant = app(\App\Services\TenantManager::class)->current();
+            $nombreNegocio = $tenant?->nombre ?: 'nuestro negocio';
+
+            $pedido = $conv?->pedido;
+            $numPedido = $pedido?->id ?? '';
+            $totalPedido = $pedido ? '$' . number_format($pedido->total, 0, ',', '.') : '';
+
+            $nombre = strtolower($tpl->nombre);
+
+            // 🎯 Heurística por nombre de plantilla
+            if (str_starts_with($nombre, 'bienvenida')) {
+                $this->plantillaChatVars = [1 => $primerNombre, 2 => $nombreNegocio];
+            } elseif (str_starts_with($nombre, 'pedido_confirmado')) {
+                $this->plantillaChatVars = [1 => $primerNombre, 2 => (string) $numPedido, 3 => $totalPedido];
+            } elseif (str_starts_with($nombre, 'pedido_en_proceso')) {
+                $this->plantillaChatVars = [1 => $primerNombre, 2 => (string) $numPedido];
+            } elseif (str_starts_with($nombre, 'pedido_en_camino')) {
+                $domNombre = $pedido?->domiciliario?->nombre ?: '';
+                $tiempoEst = $pedido?->tiempo_estimado_min ? $pedido->tiempo_estimado_min . ' min' : '20 min';
+                $this->plantillaChatVars = [1 => $primerNombre, 2 => (string) $numPedido, 3 => $domNombre, 4 => $tiempoEst];
+            } elseif (str_starts_with($nombre, 'pedido_entregado')) {
+                $this->plantillaChatVars = [1 => $primerNombre, 2 => (string) $numPedido];
+            } elseif (str_starts_with($nombre, 'pedido_cancelado')) {
+                $motivo = $pedido?->motivo_cancelacion ?: 'No se pudo procesar';
+                $this->plantillaChatVars = [1 => $primerNombre, 2 => (string) $numPedido, 3 => $motivo];
+            } elseif (str_starts_with($nombre, 'encuesta')) {
+                $this->plantillaChatVars = [1 => $primerNombre, 2 => (string) $numPedido];
+            } elseif (str_starts_with($nombre, 'felicitacion')) {
+                $vencimiento = now()->addDays(30)->format('d/m/Y');
+                $this->plantillaChatVars = [1 => $primerNombre, 2 => '30%', 3 => $vencimiento];
+            } elseif (str_starts_with($nombre, 'recordatorio_pago')) {
+                $this->plantillaChatVars = [1 => $primerNombre, 2 => (string) $numPedido, 3 => $totalPedido];
+            } elseif (str_starts_with($nombre, 'promocion')) {
+                $this->plantillaChatVars = [1 => $primerNombre, 2 => '20% de descuento', 3 => ''];
+            } else {
+                // Genérico: var1 = nombre cliente, var2 = nombre negocio, resto vacíos
+                $this->plantillaChatVars = [1 => $primerNombre, 2 => $nombreNegocio];
+            }
+
+            // Rellenar las que falten con vacío (para que Livewire las trackee)
+            for ($i = 1; $i <= $tpl->num_variables; $i++) {
+                if (!isset($this->plantillaChatVars[$i])) {
+                    $this->plantillaChatVars[$i] = '';
+                }
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('No se pudo auto-rellenar plantilla: ' . $e->getMessage());
+        }
+    }
+
     public function tomarControl(): void
     {
         if (!$this->conversacionActivaId) return;

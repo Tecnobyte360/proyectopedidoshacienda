@@ -497,19 +497,49 @@
                                         </select>
 
                                         @if($plantillaChatSeleccionada)
-                                            <div class="rounded-lg bg-slate-50 border border-slate-200 px-2.5 py-2 text-[11px] text-slate-600">
-                                                <p class="font-semibold text-slate-700 mb-1 text-[10px] uppercase tracking-wider">Vista previa</p>
-                                                <pre class="whitespace-pre-wrap text-[11px] leading-relaxed">{{ $plantillaChatSeleccionada->body_preview ?: '(sin body)' }}</pre>
+                                            @php
+                                                // 🎯 Etiquetas amigables por variable según nombre de la plantilla
+                                                $nombreTpl = strtolower($plantillaChatSeleccionada->nombre ?? '');
+                                                $etiquetasVars = match(true) {
+                                                    str_starts_with($nombreTpl, 'bienvenida')        => [1 => 'Nombre cliente', 2 => 'Nombre negocio'],
+                                                    str_starts_with($nombreTpl, 'pedido_confirmado') => [1 => 'Nombre cliente', 2 => '# Pedido', 3 => 'Total'],
+                                                    str_starts_with($nombreTpl, 'pedido_en_proceso')=> [1 => 'Nombre cliente', 2 => '# Pedido'],
+                                                    str_starts_with($nombreTpl, 'pedido_en_camino') => [1 => 'Nombre cliente', 2 => '# Pedido', 3 => 'Domiciliario', 4 => 'Tiempo'],
+                                                    str_starts_with($nombreTpl, 'pedido_entregado')=> [1 => 'Nombre cliente', 2 => '# Pedido'],
+                                                    str_starts_with($nombreTpl, 'pedido_cancelado')=> [1 => 'Nombre cliente', 2 => '# Pedido', 3 => 'Motivo'],
+                                                    str_starts_with($nombreTpl, 'encuesta')        => [1 => 'Nombre cliente', 2 => '# Pedido'],
+                                                    str_starts_with($nombreTpl, 'felicitacion')    => [1 => 'Nombre cliente', 2 => 'Descuento %', 3 => 'Vence'],
+                                                    str_starts_with($nombreTpl, 'recordatorio_pago')=> [1 => 'Nombre cliente', 2 => '# Pedido', 3 => 'Monto'],
+                                                    str_starts_with($nombreTpl, 'promocion')       => [1 => 'Nombre cliente', 2 => 'Oferta', 3 => 'Link'],
+                                                    default => [],
+                                                };
+
+                                                // Vista previa con valores sustituidos LIVE
+                                                $previewLive = $plantillaChatSeleccionada->body_preview ?: '';
+                                                for ($i = 1; $i <= $plantillaChatSeleccionada->num_variables; $i++) {
+                                                    $valor = trim($plantillaChatVars[$i] ?? '');
+                                                    $previewLive = preg_replace('/\{\{\s*' . $i . '\s*\}\}/', $valor !== '' ? '<mark class="bg-emerald-100 text-emerald-800 px-1 rounded">' . e($valor) . '</mark>' : '<mark class="bg-rose-100 text-rose-700 px-1 rounded">[falta ' . ($etiquetasVars[$i] ?? 'valor ' . $i) . ']</mark>', $previewLive);
+                                                }
+                                            @endphp
+
+                                            {{-- 📱 Vista previa con sustitución LIVE de valores --}}
+                                            <div class="rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2.5">
+                                                <p class="font-bold text-emerald-700 mb-1.5 text-[9px] uppercase tracking-wider"><i class="fa-solid fa-eye text-[8px]"></i> Cómo lo verá el cliente</p>
+                                                <div class="text-[12px] leading-relaxed text-slate-800 whitespace-pre-wrap">{!! nl2br($previewLive) !!}</div>
                                             </div>
 
                                             @if(($plantillaChatSeleccionada->num_variables ?? 0) > 0)
-                                                <div class="space-y-1">
+                                                <div class="space-y-1.5">
                                                     @for($i = 1; $i <= $plantillaChatSeleccionada->num_variables; $i++)
-                                                        @php $ph = '{{' . $i . '}}'; @endphp
-                                                        <div class="flex items-center gap-2">
-                                                            <span class="inline-flex w-10 h-7 items-center justify-center rounded bg-emerald-100 text-emerald-700 text-[10px] font-bold flex-shrink-0">{{ $ph }}</span>
-                                                            <input type="text" wire:model="plantillaChatVars.{{ $i }}" placeholder="Valor para {{ $ph }}"
-                                                                   class="flex-1 rounded border border-slate-200 px-2 py-1 text-xs">
+                                                        @php $hint = $etiquetasVars[$i] ?? 'Valor ' . $i; @endphp
+                                                        <div>
+                                                            <label class="block text-[10px] font-bold text-slate-600 mb-0.5">
+                                                                <span class="inline-flex items-center justify-center min-w-[18px] h-[14px] rounded bg-emerald-100 text-emerald-700 text-[9px] font-bold mr-1">{{ $i }}</span>
+                                                                {{ $hint }}
+                                                            </label>
+                                                            <input type="text" wire:model.live.debounce.300ms="plantillaChatVars.{{ $i }}"
+                                                                   placeholder="{{ $hint }}"
+                                                                   class="w-full rounded border border-slate-200 px-2 py-1.5 text-xs focus:border-emerald-500 focus:ring-1 focus:ring-emerald-200">
                                                         </div>
                                                     @endfor
                                                 </div>
