@@ -174,6 +174,11 @@ Route::get('/', function () {
     return redirect('/pedidos');
 });
 
+// 📄 Páginas legales públicas (requeridas por App Review de Meta/Instagram)
+Route::view('/privacidad',      'legal.privacidad')->name('legal.privacidad');
+Route::view('/terminos',        'legal.terminos')->name('legal.terminos');
+Route::view('/eliminar-datos',  'legal.eliminar-datos')->name('legal.eliminar-datos');
+
 Route::middleware(['auth'])->group(function () {
 
 // 🏢 Rutas operativas — bloqueadas para super-admin sin impersonar
