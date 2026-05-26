@@ -34,6 +34,11 @@ Route::post('/whatsapp-webhook', [WhatsappWebhookController::class, 'receive'])
 Route::get('/meta/whatsapp/webhook',  [MetaWhatsappWebhookController::class, 'verify']);
 Route::post('/meta/whatsapp/webhook', [MetaWhatsappWebhookController::class, 'receive']);
 
+// 📷 Meta Instagram Direct Messages — webhook único multi-tenant.
+// Identifica el tenant por page_id del payload.
+Route::get('/meta/instagram/webhook',  [\App\Http\Controllers\InstagramWebhookController::class, 'verify']);
+Route::post('/meta/instagram/webhook', [\App\Http\Controllers\InstagramWebhookController::class, 'receive']);
+
 // Webhook ESPECÍFICO POR TENANT — identifica al tenant por slug en la URL.
 // Recomendado en producción: cada tenant tiene su URL única que copia y
 // pega en TecnoByteApp para SU conexión de WhatsApp.

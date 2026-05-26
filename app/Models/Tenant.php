@@ -64,6 +64,10 @@ class Tenant extends Model
         'wompi_config',
         'wompi_modo',
         'notas_internas',
+        // 📷 Instagram DMs
+        'instagram_business_account_id',
+        'instagram_page_id',
+        'instagram_activo',
     ];
 
     public const WA_PROVIDER_AUTO      = 'auto';
@@ -77,6 +81,7 @@ class Tenant extends Model
     ];
 
     protected $casts = [
+        'instagram_activo'     => 'boolean',
         'activo'               => 'boolean',
         'suspendido_por_mora'  => 'boolean',
         'suspendido_at'        => 'datetime',
