@@ -80,6 +80,11 @@ class Index extends Component
     public string $wompi_events_secret      = '';
     public string $wompi_integrity_secret   = '';
 
+    // 📷 Instagram DMs por tenant
+    public string $instagram_business_account_id = '';
+    public string $instagram_page_id             = '';
+    public bool   $instagram_activo              = false;
+
     // WhatsApp por tenant
     public string $whatsapp_provider          = 'auto'; // auto | meta | tecnobyte
     public bool   $whatsapp_fallback_enabled  = true;
@@ -155,6 +160,10 @@ class Index extends Component
             'notas_internas'      => 'nullable|string|max:2000',
             'requiere_2fa'        => 'boolean',
             'gracia_2fa_dias'     => 'integer|min:0|max:30',
+
+            'instagram_business_account_id' => 'nullable|string|max:60',
+            'instagram_page_id'             => 'nullable|string|max:60',
+            'instagram_activo'              => 'boolean',
 
             'whatsapp_provider'         => 'nullable|in:auto,meta,tecnobyte',
             'whatsapp_fallback_enabled' => 'boolean',
@@ -250,6 +259,11 @@ class Index extends Component
         $this->gracia_2fa_dias      = (int) ($t->gracia_2fa_dias ?: 3);
 
         // Proveedor WhatsApp (auto/meta/tecnobyte)
+        // 📷 Instagram config
+        $this->instagram_business_account_id = (string) ($t->instagram_business_account_id ?? '');
+        $this->instagram_page_id             = (string) ($t->instagram_page_id ?? '');
+        $this->instagram_activo              = (bool) ($t->instagram_activo ?? false);
+
         $this->whatsapp_provider          = (string) ($t->whatsapp_provider ?: 'auto');
         $this->whatsapp_fallback_enabled  = (bool) ($t->whatsapp_fallback_enabled ?? true);
 
@@ -575,6 +589,13 @@ class Index extends Component
                     Storage::disk('public')->delete($oldPath);
                 }
             }
+        }
+
+        // 📷 Instagram config (solo si las columnas existen)
+        if (\Illuminate\Support\Facades\Schema::hasColumn('tenants', 'instagram_page_id')) {
+            $data['instagram_business_account_id'] = trim($this->instagram_business_account_id) ?: null;
+            $data['instagram_page_id']             = trim($this->instagram_page_id) ?: null;
+            $data['instagram_activo']              = (bool) $this->instagram_activo;
         }
 
         // Proveedor de WhatsApp (auto/meta/tecnobyte)
@@ -1017,6 +1038,9 @@ class Index extends Component
         $this->subscription_ends_at = null;
         $this->notas_internas       = '';
         $this->whatsapp_provider         = 'auto';
+        $this->instagram_business_account_id = '';
+        $this->instagram_page_id             = '';
+        $this->instagram_activo              = false;
         $this->whatsapp_fallback_enabled = true;
         $this->whatsapp_email           = '';
         $this->whatsapp_password        = '';

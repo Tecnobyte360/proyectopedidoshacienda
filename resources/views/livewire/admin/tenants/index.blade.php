@@ -1159,6 +1159,93 @@
                         @endif
                     </div>
 
+                    {{-- 📷 Instagram Direct Messages --}}
+                    <div class="rounded-xl border-2 border-pink-200 bg-gradient-to-br from-pink-50/40 to-fuchsia-50/30 p-4 space-y-3">
+                        <div class="flex items-center justify-between mb-1">
+                            <div class="flex items-center gap-3">
+                                <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-pink-500 via-fuchsia-500 to-amber-400 text-white shadow">
+                                    <i class="fa-brands fa-instagram text-lg"></i>
+                                </div>
+                                <div>
+                                    <h4 class="font-bold text-slate-800 text-sm">Instagram Direct Messages</h4>
+                                    <p class="text-[11px] text-slate-500">
+                                        Recibe y responde DMs de Instagram en el mismo inbox que WhatsApp.
+                                        <a href="https://business.facebook.com/settings/instagram-accounts" target="_blank" class="text-pink-700 underline">Configura tu cuenta IG Business en Meta</a>.
+                                    </p>
+                                </div>
+                            </div>
+                            @if($instagram_activo && $instagram_page_id)
+                                <span class="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded-full bg-emerald-100 text-emerald-700">
+                                    <i class="fa-solid fa-circle-check"></i> Activo
+                                </span>
+                            @endif
+                        </div>
+
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" wire:model.live="instagram_activo" class="rounded border-pink-300 text-pink-500">
+                            <span class="text-sm font-semibold text-pink-900">Habilitar canal Instagram</span>
+                        </label>
+
+                        @if($instagram_activo)
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-[11px] font-bold text-pink-800 mb-1">
+                                        Instagram Page ID *
+                                    </label>
+                                    <input type="text" wire:model="instagram_page_id"
+                                           placeholder="ej. 178414132...."
+                                           class="w-full rounded-xl border border-pink-200 px-3 py-2 text-sm font-mono">
+                                    <p class="text-[10px] text-slate-500 mt-1">
+                                        ID de la Facebook Page asociada a tu cuenta IG Business.
+                                        Lo encuentras en <code>graph.facebook.com/me/accounts</code> o en tu Business Manager.
+                                    </p>
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-bold text-pink-800 mb-1">
+                                        Instagram Business Account ID
+                                    </label>
+                                    <input type="text" wire:model="instagram_business_account_id"
+                                           placeholder="ej. 178414132...."
+                                           class="w-full rounded-xl border border-pink-200 px-3 py-2 text-sm font-mono">
+                                    <p class="text-[10px] text-slate-500 mt-1">
+                                        ID interno de tu IG Business (a veces igual al Page ID, otras distinto).
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div class="rounded-lg bg-white border border-pink-200 px-3 py-2.5 text-[11px] text-slate-700">
+                                <div class="font-bold text-pink-800 mb-1">
+                                    <i class="fa-solid fa-link"></i> URL del webhook IG (cópiala en Meta)
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <code class="flex-1 font-mono text-[11px] bg-slate-50 px-2 py-1 rounded border border-slate-200 truncate">
+                                        https://admin.{{ config('app.tenant_base_domain', 'kivox.co') }}/api/meta/instagram/webhook
+                                    </code>
+                                    <button type="button"
+                                            onclick="navigator.clipboard.writeText('https://admin.{{ config('app.tenant_base_domain', 'kivox.co') }}/api/meta/instagram/webhook'); this.innerText='Copiado';"
+                                            class="inline-flex items-center gap-1 rounded-lg bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold px-3 py-1.5 transition flex-shrink-0">
+                                        <i class="fa-solid fa-copy text-[10px]"></i> Copiar
+                                    </button>
+                                </div>
+                                <p class="mt-1.5">
+                                    Pega esta URL en <strong>developers.facebook.com → tu app → Instagram → Configuración del webhook</strong>.
+                                    Verify token: usa el mismo <code class="bg-pink-100 px-1 rounded">META_WEBHOOK_VERIFY_TOKEN</code> del .env.
+                                    Suscríbete a eventos: <code>messages</code>, <code>messaging_postbacks</code>, <code>messaging_reactions</code>.
+                                </p>
+                            </div>
+
+                            <div class="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-[11px] text-amber-800">
+                                <p class="font-bold mb-1"><i class="fa-solid fa-triangle-exclamation"></i> Pre-requisitos antes de activar</p>
+                                <ul class="list-disc list-inside space-y-0.5">
+                                    <li>Cuenta Instagram <strong>Business</strong> (no personal)</li>
+                                    <li>Vinculada a la Facebook Page del Business Manager</li>
+                                    <li>App Meta con scopes aprobados: <code>instagram_basic</code>, <code>instagram_manage_messages</code>, <code>pages_messaging</code></li>
+                                    <li>Token Meta del tenant (el mismo que usas para WhatsApp)</li>
+                                </ul>
+                            </div>
+                        @endif
+                    </div>
+
                     {{-- 💳 Wompi por tenant (pagos en línea) --}}
                     <div class="rounded-xl border border-violet-200 bg-violet-50/40 p-4 space-y-3">
                         <div class="flex items-center gap-2 mb-1">
