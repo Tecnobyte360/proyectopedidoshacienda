@@ -3,9 +3,11 @@
 namespace App\Livewire\Ivr;
 
 use App\Models\LlamadaIvr;
+use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Livewire\WithPagination;
 
+#[Layout('layouts.app')]
 class Monitor extends Component
 {
     use WithPagination;
