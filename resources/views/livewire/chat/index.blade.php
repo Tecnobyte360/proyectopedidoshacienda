@@ -457,11 +457,73 @@
                      x-init="init()">
 
                 @if($tenantUsaMeta)
-                    {{-- 🟢 Indicador de ventana 24h Meta --}}
+                    {{-- 🟢 Indicador de ventana 24h Meta + botón plantillas inline --}}
                     @if($ventana24hAbierta)
-                        <div class="px-4 py-1.5 bg-emerald-50 border-b border-emerald-100 flex items-center gap-2 text-[11px] text-emerald-700">
-                            <i class="fa-solid fa-circle text-emerald-500 text-[6px]"></i>
-                            <span><strong>Ventana 24h abierta</strong> — puedes enviar texto libre. Restan ~{{ $ventana24hMinutosRestantes }} min.</span>
+                        <div class="relative px-4 py-1.5 bg-emerald-50 border-b border-emerald-100 flex items-center justify-between gap-2 text-[11px] text-emerald-700"
+                             x-data="{ open: false }">
+                            <div class="flex items-center gap-2 flex-1 min-w-0">
+                                <i class="fa-solid fa-circle text-emerald-500 text-[6px]"></i>
+                                <span class="truncate"><strong>Ventana 24h abierta</strong> — texto libre. Restan ~{{ $ventana24hMinutosRestantes }} min.</span>
+                            </div>
+
+                            @if($plantillasMetaAprobadas->isNotEmpty())
+                                <button type="button" @click="open = !open"
+                                        :class="open ? 'bg-emerald-600 text-white border-emerald-700' : 'bg-white text-emerald-700 border-emerald-300'"
+                                        class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-bold transition flex-shrink-0">
+                                    <i class="fa-brands fa-meta text-[9px]"></i>
+                                    Plantilla
+                                    <span class="inline-flex items-center justify-center min-w-[15px] h-[15px] px-1 rounded-full bg-emerald-200/80 text-emerald-900 text-[9px] font-bold">{{ $plantillasMetaAprobadas->count() }}</span>
+                                </button>
+
+                                {{-- 🪟 Popover flotante (absoluto, NO empuja contenido) --}}
+                                <div x-show="open" x-cloak
+                                     @click.away="open = false"
+                                     x-transition:enter="transition ease-out duration-150"
+                                     x-transition:enter-start="opacity-0 translate-y-1"
+                                     x-transition:enter-end="opacity-100 translate-y-0"
+                                     class="absolute right-2 bottom-full mb-1 z-50 w-[340px] max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-2xl border border-emerald-200 overflow-hidden">
+                                    <div class="px-3 py-2 bg-emerald-50 border-b border-emerald-100 flex items-center justify-between">
+                                        <span class="text-[11px] font-bold text-emerald-800"><i class="fa-brands fa-meta"></i> Plantillas aprobadas</span>
+                                        <button type="button" @click="open = false" class="text-emerald-700 hover:text-emerald-900">
+                                            <i class="fa-solid fa-xmark text-xs"></i>
+                                        </button>
+                                    </div>
+                                    <div class="p-3 space-y-2 max-h-[60vh] overflow-y-auto">
+                                        <select wire:model.live="plantillaChatId" class="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs bg-white">
+                                            <option value="">— Selecciona plantilla —</option>
+                                            @foreach($plantillasMetaAprobadas as $tpl)
+                                                <option value="{{ $tpl->id }}">{{ $tpl->nombre }} ({{ $tpl->num_variables }} vars)</option>
+                                            @endforeach
+                                        </select>
+
+                                        @if($plantillaChatSeleccionada)
+                                            <div class="rounded-lg bg-slate-50 border border-slate-200 px-2.5 py-2 text-[11px] text-slate-600">
+                                                <p class="font-semibold text-slate-700 mb-1 text-[10px] uppercase tracking-wider">Vista previa</p>
+                                                <pre class="whitespace-pre-wrap text-[11px] leading-relaxed">{{ $plantillaChatSeleccionada->body_preview ?: '(sin body)' }}</pre>
+                                            </div>
+
+                                            @if(($plantillaChatSeleccionada->num_variables ?? 0) > 0)
+                                                <div class="space-y-1">
+                                                    @for($i = 1; $i <= $plantillaChatSeleccionada->num_variables; $i++)
+                                                        @php $ph = '{{' . $i . '}}'; @endphp
+                                                        <div class="flex items-center gap-2">
+                                                            <span class="inline-flex w-10 h-7 items-center justify-center rounded bg-emerald-100 text-emerald-700 text-[10px] font-bold flex-shrink-0">{{ $ph }}</span>
+                                                            <input type="text" wire:model="plantillaChatVars.{{ $i }}" placeholder="Valor para {{ $ph }}"
+                                                                   class="flex-1 rounded border border-slate-200 px-2 py-1 text-xs">
+                                                        </div>
+                                                    @endfor
+                                                </div>
+                                            @endif
+
+                                            <button type="button" wire:click="enviarPlantilla" @click="open = false"
+                                                    class="w-full inline-flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-2 transition">
+                                                <i class="fa-solid fa-paper-plane text-[10px]"></i>
+                                                Enviar plantilla
+                                            </button>
+                                        @endif
+                                    </div>
+                                </div>
+                            @endif
                         </div>
                     @else
                         <div class="px-4 py-2 bg-amber-50 border-b border-amber-200">
@@ -509,51 +571,7 @@
                     @endif
                 @endif
 
-                @if($tenantUsaMeta && $plantillasMetaAprobadas->isNotEmpty() && $ventana24hAbierta)
-                    {{-- 🟢 Atajo de plantillas Meta (sin chips de respuestas: usa "/" para esas) --}}
-                    <div class="px-3 pt-2 pb-1 flex items-center gap-1.5 border-b border-slate-100 bg-slate-50/50"
-                         x-data="{ open: false }">
-                        <button type="button"
-                                @click="open = !open"
-                                :class="open ? 'bg-emerald-100' : 'bg-emerald-50'"
-                                class="inline-flex items-center gap-1 rounded-full border border-emerald-200 hover:bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 transition flex-shrink-0">
-                            <i class="fa-brands fa-meta text-[10px]"></i>
-                            <span x-text="open ? 'Cerrar plantillas' : 'Usar plantilla Meta'"></span>
-                            <span class="ml-1 inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-emerald-200 text-emerald-800 text-[9px] font-bold">{{ $plantillasMetaAprobadas->count() }}</span>
-                        </button>
-                        <span class="text-[10px] text-slate-400">o escribe <kbd class="px-1.5 py-0.5 rounded bg-white border border-slate-300 text-slate-600 font-mono text-[10px]">/</kbd> para respuestas rápidas</span>
-
-                    @if($tenantUsaMeta && $plantillasMetaAprobadas->isNotEmpty() && $ventana24hAbierta)
-                        <div x-show="open" x-cloak x-transition class="px-3 py-2 bg-emerald-50/60 border-b border-emerald-100 space-y-2 w-full">
-                            <select wire:model.live="plantillaChatId" class="w-full rounded-lg border border-emerald-300 px-2 py-1.5 text-xs bg-white">
-                                <option value="">— Selecciona plantilla —</option>
-                                @foreach($plantillasMetaAprobadas as $tpl)
-                                    <option value="{{ $tpl->id }}">{{ $tpl->nombre }} ({{ $tpl->num_variables }} vars)</option>
-                                @endforeach
-                            </select>
-                            @if($plantillaChatSeleccionada && ($plantillaChatSeleccionada->num_variables ?? 0) > 0)
-                                <div class="space-y-1">
-                                    @for($i = 1; $i <= $plantillaChatSeleccionada->num_variables; $i++)
-                                        @php $ph = '{{' . $i . '}}'; @endphp
-                                        <div class="flex items-center gap-2">
-                                            <span class="inline-flex w-12 h-7 items-center justify-center rounded bg-emerald-100 text-emerald-700 text-[10px] font-bold">{{ $ph }}</span>
-                                            <input type="text" wire:model="plantillaChatVars.{{ $i }}" placeholder="Valor"
-                                                   class="flex-1 rounded border border-slate-200 px-2 py-1 text-xs">
-                                        </div>
-                                    @endfor
-                                </div>
-                            @endif
-                            @if($plantillaChatSeleccionada)
-                                <button type="button" wire:click="enviarPlantilla"
-                                        class="w-full inline-flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-1.5 transition">
-                                    <i class="fa-solid fa-paper-plane text-[10px]"></i>
-                                    Enviar plantilla
-                                </button>
-                            @endif
-                        </div>
-                    @endif
-                    </div> {{-- cierra x-data del toggle plantilla --}}
-                @endif
+                {{-- El antiguo panel "Usar plantilla Meta" se reemplazó por un popover inline al lado del badge "Ventana 24h abierta" (ver arriba) para no generar scroll en el composer. --}}
 
                 <form wire:submit.prevent="enviar"
                       class="px-3 py-3 flex items-center gap-2"
