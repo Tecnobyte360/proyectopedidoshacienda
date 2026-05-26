@@ -1,4 +1,4 @@
-<div class="p-6 max-w-7xl mx-auto">
+<div class="p-6 max-w-7xl mx-auto" wire:poll.2s>
 
     {{-- Header --}}
     <div class="flex items-center justify-between mb-6">
@@ -7,8 +7,23 @@
                 <i class="fa-solid fa-phone-volume"></i>
             </div>
             <div>
-                <h1 class="text-2xl font-extrabold text-slate-900">Monitor IVR</h1>
-                <p class="text-sm text-slate-500">Llamadas entrantes al sistema telefónico automatizado</p>
+                <h1 class="text-2xl font-extrabold text-slate-900 flex items-center gap-2">
+                    Monitor IVR
+                    @php $enVivo = $llamadas->where('estado','en_curso')->count(); @endphp
+                    @if($enVivo > 0)
+                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold animate-pulse">
+                            <span class="relative flex h-2 w-2">
+                                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                            </span>
+                            {{ $enVivo }} en vivo
+                        </span>
+                    @endif
+                </h1>
+                <p class="text-sm text-slate-500 flex items-center gap-1">
+                    Llamadas entrantes — actualiza automáticamente cada 2s
+                    <span class="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                </p>
             </div>
         </div>
         <div class="flex items-center gap-2">
@@ -96,10 +111,29 @@
             </thead>
             <tbody class="divide-y divide-slate-100">
                 @forelse($llamadas as $l)
-                    <tr class="hover:bg-slate-50/50">
+                    @php $enCurso = $l->estado === 'en_curso'; @endphp
+                    <tr class="hover:bg-slate-50/50 {{ $enCurso ? 'bg-emerald-50/60 animate-pulse-soft' : '' }}">
                         <td class="px-4 py-3">
-                            <div class="font-semibold text-slate-800">{{ $l->cliente?->nombre ?? 'Desconocido' }}</div>
-                            <div class="text-xs text-slate-500 font-mono">{{ $l->caller_id }}</div>
+                            <div class="flex items-center gap-2">
+                                @if($enCurso)
+                                    <span class="relative flex h-2.5 w-2.5">
+                                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                        <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                                    </span>
+                                @endif
+                                <div>
+                                    <div class="font-semibold text-slate-800">
+                                        {{ $l->cliente?->nombre ?? 'Extensión '.$l->caller_id }}
+                                    </div>
+                                    <div class="text-xs text-slate-500 font-mono flex items-center gap-1.5">
+                                        <span>{{ $l->caller_id }}</span>
+                                        @if($l->did_destino)
+                                            <span class="text-slate-300">→</span>
+                                            <span class="text-indigo-600 font-bold">{{ $l->did_destino }}</span>
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
                         </td>
                         <td class="px-4 py-3 text-slate-600 text-xs">
                             {{ $l->iniciada_at->format('d/m H:i:s') }}
@@ -120,7 +154,7 @@
                         <td class="px-4 py-3 text-center">
                             @php
                                 $badge = match($l->estado) {
-                                    'en_curso'           => ['bg-blue-100 text-blue-700', 'En curso'],
+                                    'en_curso'           => ['bg-gradient-to-r from-emerald-500 to-green-500 text-white shadow shadow-emerald-200', '🔴 EN VIVO'],
                                     'terminada_ok'       => ['bg-emerald-100 text-emerald-700', 'OK'],
                                     'voicemail'          => ['bg-rose-100 text-rose-700', 'Voicemail'],
                                     'terminada_timeout'  => ['bg-amber-100 text-amber-700', 'Timeout'],
