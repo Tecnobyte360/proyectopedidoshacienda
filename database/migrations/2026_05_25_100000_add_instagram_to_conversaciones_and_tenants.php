@@ -30,16 +30,16 @@ return new class extends Migration
             }
         });
 
-        // 2. Tenant config para Instagram
+        // 2. Tenant config para Instagram (sin after, agregamos al final)
         Schema::table('tenants', function (Blueprint $t) {
             if (!Schema::hasColumn('tenants', 'instagram_business_account_id')) {
-                $t->string('instagram_business_account_id', 60)->nullable()->after('meta_phone_number_id');
+                $t->string('instagram_business_account_id', 60)->nullable();
             }
             if (!Schema::hasColumn('tenants', 'instagram_page_id')) {
-                $t->string('instagram_page_id', 60)->nullable()->after('instagram_business_account_id');
+                $t->string('instagram_page_id', 60)->nullable();
             }
             if (!Schema::hasColumn('tenants', 'instagram_activo')) {
-                $t->boolean('instagram_activo')->default(false)->after('instagram_page_id');
+                $t->boolean('instagram_activo')->default(false);
             }
         });
     }
