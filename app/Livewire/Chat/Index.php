@@ -20,6 +20,7 @@ class Index extends Component
     public string $nuevoMensaje = '';
     public string $busqueda     = '';
     public string $filtroEstado = 'todas';   // todas | activa | humano | bot | internos
+    public string $filtroCanal  = 'todos';   // todos | whatsapp | instagram | widget
     public bool   $mostrarInternas = false;  // si es false, ocultas conversaciones internas
 
     // Nueva conversación
@@ -1587,6 +1588,10 @@ class Index extends Component
             ->when($this->filtroEstado === 'internos', fn ($q) => $q->where('es_interna', true))
             ->when($this->filtroEstado !== 'internos' && !$this->mostrarInternas,
                    fn ($q) => $q->where(fn ($qq) => $qq->where('es_interna', false)->orWhereNull('es_interna')))
+            // 📡 Filtro por canal (WhatsApp / Instagram / Widget web)
+            ->when($this->filtroCanal === 'whatsapp', fn ($q) => $q->where(fn ($qq) => $qq->where('canal', 'whatsapp')->orWhereNull('canal')))
+            ->when($this->filtroCanal === 'instagram', fn ($q) => $q->where('canal', 'instagram'))
+            ->when($this->filtroCanal === 'widget',    fn ($q) => $q->where('canal', 'widget'))
             ->orderByDesc('ultimo_mensaje_at')
             ->limit(60)
             ->get();

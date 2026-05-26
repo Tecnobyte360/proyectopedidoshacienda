@@ -100,6 +100,25 @@
                     </button>
                 @endforeach
             </div>
+
+            {{-- 📡 Filtros por CANAL (WhatsApp / Instagram / Widget) --}}
+            <div class="flex gap-1 mt-1.5">
+                @foreach([
+                    'todos'     => ['Todos los canales', null, 'bg-slate-700'],
+                    'whatsapp'  => ['WhatsApp',          'fa-brands fa-whatsapp', 'bg-emerald-500'],
+                    'instagram' => ['Instagram',         'fa-brands fa-instagram','bg-pink-500'],
+                    'widget'    => ['Widget web',        'fa-globe',              'bg-sky-500'],
+                ] as $key => [$label, $icon, $color])
+                    <button wire:click="$set('filtroCanal', '{{ $key }}')"
+                            class="flex-1 inline-flex items-center justify-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold transition
+                                  {{ $filtroCanal === $key ? $color . ' text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200' }}">
+                        @if($icon)
+                            <i class="{{ $icon }} text-[10px]"></i>
+                        @endif
+                        {{ $label }}
+                    </button>
+                @endforeach
+            </div>
         </div>
 
         {{-- Lista de conversaciones --}}
@@ -133,6 +152,21 @@
                         <div class="h-12 w-12 rounded-full bg-gradient-to-br from-brand to-brand-secondary text-white font-bold items-center justify-center" style="display:none;">
                             {{ $iniciales ?: 'C' }}
                         </div>
+                        {{-- 📡 Badge del CANAL en esquina superior izquierda --}}
+                        @if($c->canal === 'instagram')
+                            <span class="absolute -top-1 -left-1 flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br from-pink-500 via-fuchsia-500 to-amber-400 text-white text-[10px] border-2 border-white shadow" title="Instagram DM">
+                                <i class="fa-brands fa-instagram text-[9px]"></i>
+                            </span>
+                        @elseif($c->canal === 'widget')
+                            <span class="absolute -top-1 -left-1 flex h-5 w-5 items-center justify-center rounded-full bg-sky-500 text-white text-[10px] border-2 border-white" title="Widget web">
+                                <i class="fa-solid fa-globe text-[9px]"></i>
+                            </span>
+                        @else
+                            <span class="absolute -top-1 -left-1 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white text-[10px] border-2 border-white" title="WhatsApp">
+                                <i class="fa-brands fa-whatsapp text-[9px]"></i>
+                            </span>
+                        @endif
+
                         @if($c->canal === 'widget')
                             <span class="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-sky-500 text-white text-[10px] border-2 border-white" title="Chat desde web (widget)">
                                 <i class="fa-solid fa-globe"></i>
