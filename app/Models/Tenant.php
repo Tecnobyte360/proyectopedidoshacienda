@@ -71,6 +71,9 @@ class Tenant extends Model
         'instagram_access_token',
         'instagram_token_expira_at',
         'instagram_username',
+        // 💬 Messenger
+        'messenger_activo',
+        'messenger_page_access_token',
         // 🔑 Credenciales Meta app (por tenant)
         'meta_app_id',
         'meta_app_secret',
@@ -94,6 +97,8 @@ class Tenant extends Model
         'meta_app_secret'          => 'encrypted',
         'ig_client_secret'         => 'encrypted',
         'instagram_access_token'   => 'encrypted',
+        'messenger_activo'         => 'boolean',
+        'messenger_page_access_token' => 'encrypted',
         'activo'               => 'boolean',
         'suspendido_por_mora'  => 'boolean',
         'suspendido_at'        => 'datetime',

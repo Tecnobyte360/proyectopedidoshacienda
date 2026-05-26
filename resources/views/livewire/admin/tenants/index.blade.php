@@ -1314,6 +1314,77 @@
                         @endif
                     </div>
 
+                    {{-- 💬 Facebook Messenger --}}
+                    <div class="rounded-xl border-2 border-blue-200 bg-gradient-to-br from-blue-50/40 to-sky-50/30 p-4 space-y-3">
+                        <div class="flex items-center justify-between mb-1">
+                            <div class="flex items-center gap-3">
+                                <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-sky-500 text-white shadow">
+                                    <i class="fa-brands fa-facebook-messenger text-lg"></i>
+                                </div>
+                                <div>
+                                    <h4 class="font-bold text-slate-800 text-sm">Facebook Messenger</h4>
+                                    <p class="text-[11px] text-slate-500">
+                                        Recibe DMs de la Página de Facebook en el mismo inbox que WhatsApp e Instagram.
+                                        Usa el mismo Page ID configurado arriba en Instagram.
+                                    </p>
+                                </div>
+                            </div>
+                            @if($messenger_activo && $instagram_page_id)
+                                <span class="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded-full bg-emerald-100 text-emerald-700">
+                                    <i class="fa-solid fa-circle-check"></i> Activo
+                                </span>
+                            @endif
+                        </div>
+
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" wire:model.live="messenger_activo" class="rounded border-blue-300 text-blue-500">
+                            <span class="text-sm font-semibold text-blue-900">Habilitar canal Messenger</span>
+                        </label>
+
+                        @if($messenger_activo)
+                            @if(!$instagram_page_id)
+                                <div class="rounded-lg bg-rose-50 border border-rose-200 px-3 py-2 text-[11px] text-rose-800">
+                                    <i class="fa-solid fa-triangle-exclamation"></i>
+                                    Messenger usa el mismo <strong>Instagram Page ID</strong> que ya configuraste arriba.
+                                    Pero está vacío — primero llena el Page ID en la card de Instagram.
+                                </div>
+                            @endif
+
+                            <div>
+                                <label class="block text-[11px] font-bold text-blue-800 mb-1">Page Access Token (opcional)</label>
+                                <input type="password" wire:model.defer="messenger_page_access_token"
+                                       placeholder="{{ $messenger_page_access_token ? '••••••••• (guardado)' : 'Vacío = usa el token de Instagram' }}"
+                                       class="w-full rounded-xl border border-blue-200 px-3 py-2 text-sm font-mono">
+                                <p class="text-[10px] text-slate-500 mt-1">
+                                    Si lo dejas vacío, se usa el token de Instagram (válido si tu OAuth incluyó scope <code>pages_messaging</code>).
+                                    Lo encuentras en <a href="https://developers.facebook.com/tools/explorer" target="_blank" class="text-blue-700 underline">Graph API Explorer</a>
+                                    o vía OAuth de página.
+                                </p>
+                            </div>
+
+                            <div class="rounded-lg bg-white border border-blue-200 px-3 py-2.5 text-[11px] text-slate-700">
+                                <div class="font-bold text-blue-800 mb-1">
+                                    <i class="fa-solid fa-link"></i> URL del webhook Messenger (cópiala en Meta)
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <code class="flex-1 font-mono text-[11px] bg-slate-50 px-2 py-1 rounded border border-slate-200 truncate">
+                                        https://admin.{{ config('app.tenant_base_domain', 'kivox.co') }}/api/meta/messenger/webhook
+                                    </code>
+                                    <button type="button"
+                                            onclick="navigator.clipboard.writeText('https://admin.{{ config('app.tenant_base_domain', 'kivox.co') }}/api/meta/messenger/webhook'); this.innerText='Copiado';"
+                                            class="inline-flex items-center gap-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-1.5 transition flex-shrink-0">
+                                        <i class="fa-solid fa-copy text-[10px]"></i> Copiar
+                                    </button>
+                                </div>
+                                <p class="mt-1.5">
+                                    Pega en <strong>developers.facebook.com → tu app → Messenger → Configuración → Webhooks</strong>.
+                                    Verify token: el mismo <code class="bg-blue-100 px-1 rounded">META_WEBHOOK_VERIFY_TOKEN</code> del .env.
+                                    Suscríbete a: <code>messages</code>, <code>messaging_postbacks</code>, <code>message_reads</code>.
+                                </p>
+                            </div>
+                        @endif
+                    </div>
+
                     {{-- 💳 Wompi por tenant (pagos en línea) --}}
                     <div class="rounded-xl border border-violet-200 bg-violet-50/40 p-4 space-y-3">
                         <div class="flex items-center gap-2 mb-1">

@@ -215,6 +215,11 @@ class InstagramOAuthController extends Controller
                 'instagram_business_manage_messages',
                 'instagram_business_manage_comments',
                 'instagram_business_content_publish',
+                // 💬 Messenger scopes (mismo OAuth, Meta entrega un solo token con ambos)
+                'pages_messaging',
+                'pages_show_list',
+                'pages_manage_metadata',
+                'pages_read_engagement',
             ]),
             'state'         => $tenant->slug,
         ]);

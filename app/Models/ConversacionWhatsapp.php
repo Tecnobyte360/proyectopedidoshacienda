@@ -19,6 +19,7 @@ class ConversacionWhatsapp extends Model
         'telefono_normalizado',
         'canal',
         'igsid',
+        'psid',
         'sede_id',
         'connection_id',
         'estado',

@@ -107,6 +107,7 @@
                     'todos'     => ['Todos los canales', null, 'bg-slate-700'],
                     'whatsapp'  => ['WhatsApp',          'fa-brands fa-whatsapp', 'bg-emerald-500'],
                     'instagram' => ['Instagram',         'fa-brands fa-instagram','bg-pink-500'],
+                    'messenger' => ['Messenger',         'fa-brands fa-facebook-messenger','bg-blue-500'],
                     'widget'    => ['Widget web',        'fa-globe',              'bg-sky-500'],
                 ] as $key => [$label, $icon, $color])
                     <button wire:click="$set('filtroCanal', '{{ $key }}')"
@@ -156,6 +157,10 @@
                         @if($c->canal === 'instagram')
                             <span class="absolute -top-1 -left-1 flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br from-pink-500 via-fuchsia-500 to-amber-400 text-white text-[10px] border-2 border-white shadow" title="Instagram DM">
                                 <i class="fa-brands fa-instagram text-[9px]"></i>
+                            </span>
+                        @elseif($c->canal === 'messenger')
+                            <span class="absolute -top-1 -left-1 flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-sky-500 text-white text-[10px] border-2 border-white shadow" title="Facebook Messenger">
+                                <i class="fa-brands fa-facebook-messenger text-[9px]"></i>
                             </span>
                         @elseif($c->canal === 'widget')
                             <span class="absolute -top-1 -left-1 flex h-5 w-5 items-center justify-center rounded-full bg-sky-500 text-white text-[10px] border-2 border-white" title="Widget web">

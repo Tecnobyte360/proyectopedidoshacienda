@@ -44,6 +44,10 @@ Route::get('/meta/instagram/oauth/callback', [\App\Http\Controllers\InstagramOAu
 Route::post('/meta/instagram/data-deletion', [\App\Http\Controllers\InstagramOAuthController::class, 'dataDeletion']);
 Route::post('/meta/instagram/deauthorize',   [\App\Http\Controllers\InstagramOAuthController::class, 'deauthorize']);
 
+// 💬 Messenger — webhook único multi-tenant (mismo Page ID que IG)
+Route::get('/meta/messenger/webhook',  [\App\Http\Controllers\MessengerWebhookController::class, 'verify']);
+Route::post('/meta/messenger/webhook', [\App\Http\Controllers\MessengerWebhookController::class, 'receive']);
+
 // Webhook ESPECÍFICO POR TENANT — identifica al tenant por slug en la URL.
 // Recomendado en producción: cada tenant tiene su URL única que copia y
 // pega en TecnoByteApp para SU conexión de WhatsApp.

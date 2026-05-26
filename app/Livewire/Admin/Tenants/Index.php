@@ -85,6 +85,10 @@ class Index extends Component
     public string $instagram_page_id             = '';
     public bool   $instagram_activo              = false;
 
+    // 💬 Messenger
+    public bool   $messenger_activo              = false;
+    public string $messenger_page_access_token   = '';
+
     // 🔑 Credenciales Meta app (por tenant)
     public string $meta_app_id      = '';
     public string $meta_app_secret  = '';
@@ -170,6 +174,8 @@ class Index extends Component
             'instagram_business_account_id' => 'nullable|string|max:60',
             'instagram_page_id'             => 'nullable|string|max:60',
             'instagram_activo'              => 'boolean',
+            'messenger_activo'              => 'boolean',
+            'messenger_page_access_token'   => 'nullable|string|max:500',
             'meta_app_id'                   => 'nullable|string|max:60',
             'meta_app_secret'               => 'nullable|string|max:200',
             'ig_client_id'                  => 'nullable|string|max:60',
@@ -273,6 +279,10 @@ class Index extends Component
         $this->instagram_business_account_id = (string) ($t->instagram_business_account_id ?? '');
         $this->instagram_page_id             = (string) ($t->instagram_page_id ?? '');
         $this->instagram_activo              = (bool) ($t->instagram_activo ?? false);
+
+        // 💬 Messenger
+        $this->messenger_activo              = (bool) ($t->messenger_activo ?? false);
+        $this->messenger_page_access_token   = (string) ($t->messenger_page_access_token ?? '');
 
         // 🔑 Credenciales Meta app
         $this->meta_app_id      = (string) ($t->meta_app_id ?? '');
@@ -612,6 +622,15 @@ class Index extends Component
             $data['instagram_business_account_id'] = trim($this->instagram_business_account_id) ?: null;
             $data['instagram_page_id']             = trim($this->instagram_page_id) ?: null;
             $data['instagram_activo']              = (bool) $this->instagram_activo;
+        }
+
+        // 💬 Messenger
+        if (\Illuminate\Support\Facades\Schema::hasColumn('tenants', 'messenger_activo')) {
+            $data['messenger_activo'] = (bool) $this->messenger_activo;
+            // Solo sobrescribir token si el usuario pegó uno nuevo
+            if (trim($this->messenger_page_access_token) !== '') {
+                $data['messenger_page_access_token'] = trim($this->messenger_page_access_token);
+            }
         }
 
         // 🔑 Credenciales Meta app (solo si la columna existe)
@@ -1065,6 +1084,8 @@ class Index extends Component
         $this->instagram_business_account_id = '';
         $this->instagram_page_id             = '';
         $this->instagram_activo              = false;
+        $this->messenger_activo              = false;
+        $this->messenger_page_access_token   = '';
         $this->meta_app_id      = '';
         $this->meta_app_secret  = '';
         $this->ig_client_id     = '';
