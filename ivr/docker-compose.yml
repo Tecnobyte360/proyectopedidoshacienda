@@ -1,0 +1,27 @@
+# 📞 Kivox IVR — Asterisk en Docker
+#
+# Deploy en VPS Ubuntu con IP pública. Requiere puertos abiertos en firewall:
+#   - 5060/udp (SIP signaling)
+#   - 5060/tcp (SIP signaling sobre TCP)
+#   - 10000-20000/udp (RTP media)
+#
+# Importante: network_mode: host porque SIP/RTP no funciona con NAT de Docker.
+
+services:
+  asterisk:
+    image: andrius/asterisk:20-alpine
+    container_name: kivox_ivr
+    network_mode: host
+    restart: unless-stopped
+    volumes:
+      - ./config/pjsip.conf:/etc/asterisk/pjsip.conf:ro
+      - ./config/extensions.conf:/etc/asterisk/extensions.conf:ro
+      - ./config/rtp.conf:/etc/asterisk/rtp.conf:ro
+      - ./config/logger.conf:/etc/asterisk/logger.conf:ro
+      - ./sounds:/var/lib/asterisk/sounds/custom:ro
+      - ./agi:/var/lib/asterisk/agi-bin
+      - ./logs:/var/log/asterisk
+    environment:
+      - TZ=America/Bogota
+    # Quita el comentario si quieres ver logs en vivo:
+    # command: ["asterisk", "-fvvvv"]

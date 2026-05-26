@@ -141,6 +141,15 @@ Route::prefix('v1')->group(function () {
     Route::get ('zonas',              [ZonaApiController::class, 'index']);
     Route::post('zonas/resolver',     [ZonaApiController::class, 'resolver']);
 
+    // 📞 IVR — endpoints que consume Asterisk (vía AGI scripts en el VPS de telefonía)
+    Route::middleware('api.key')->prefix('ivr')->group(function () {
+        Route::post('llamadas/registrar',      [\App\Http\Controllers\Api\V1\IvrApiController::class, 'registrar']);
+        Route::post('llamadas/evento',         [\App\Http\Controllers\Api\V1\IvrApiController::class, 'evento']);
+        Route::post('llamadas/finalizar',      [\App\Http\Controllers\Api\V1\IvrApiController::class, 'finalizar']);
+        Route::post('voicemail',               [\App\Http\Controllers\Api\V1\IvrApiController::class, 'voicemail']);
+        Route::get ('pedido-por-telefono/{tel}',[\App\Http\Controllers\Api\V1\IvrApiController::class, 'pedidoPorTelefono']);
+    });
+
     // Escritura protegida
     Route::middleware('api.key')->group(function () {
         Route::post  ('categorias',        [CategoriaApiController::class, 'store']);
