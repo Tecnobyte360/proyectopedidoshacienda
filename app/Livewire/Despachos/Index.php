@@ -480,6 +480,9 @@ class Index extends Component
             ->where('estado', Pedido::ESTADO_EN_PREPARACION)
             ->when($this->sedeId, fn ($q) => $q->where('sede_id', $this->sedeId));
 
+        // 🏢 Filtro por sede del operador (admin/gerente ven todo)
+        $query = \App\Support\SedeScopeFilter::aplicar($query);
+
         // 🛵 Si el usuario es DOMICILIARIO, solo ve SUS pedidos asignados.
         // Buscamos el Domiciliario vinculado al user_id del usuario logueado.
         $user = auth()->user();

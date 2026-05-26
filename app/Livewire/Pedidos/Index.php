@@ -274,9 +274,11 @@ class Index extends Component
     public function pedidos()
     {
         try {
-            return Pedido::with(['detalles', 'sede', 'domiciliario', 'zonaCobertura', 'estadoPedidoBot'])
-                ->latest()
-                ->get();
+            // 🏢 Filtrar por sede del operador. Admin/Gerente ven todo.
+            $q = Pedido::with(['detalles', 'sede', 'domiciliario', 'zonaCobertura', 'estadoPedidoBot'])
+                ->latest();
+            $q = \App\Support\SedeScopeFilter::aplicar($q);
+            return $q->get();
         } catch (\Throwable $e) {
             report($e);
             return collect();
@@ -842,17 +844,19 @@ class Index extends Component
     public function render()
     {
         // 🧍 Conversaciones en modo humano (handoff) — alerta al operador de pedidos
-        $handoffPendientes = \App\Models\ConversacionWhatsapp::query()
+        //    Filtradas por sede del user
+        $qHandoff = \App\Models\ConversacionWhatsapp::query()
             ->where('atendida_por_humano', true)
-            ->where('estado', \App\Models\ConversacionWhatsapp::ESTADO_ACTIVA)
+            ->where('estado', \App\Models\ConversacionWhatsapp::ESTADO_ACTIVA);
+        $qHandoff = \App\Support\SedeScopeFilter::aplicar($qHandoff);
+
+        $handoffPendientes = (clone $qHandoff)
             ->with('cliente:id,nombre,telefono_normalizado')
             ->orderByDesc('derivada_at')
             ->limit(10)
-            ->get(['id', 'cliente_id', 'departamento_id', 'derivada_at', 'updated_at', 'telefono_normalizado']);
+            ->get(['id', 'cliente_id', 'departamento_id', 'derivada_at', 'updated_at', 'telefono_normalizado', 'sede_id']);
 
-        $handoffTotal = \App\Models\ConversacionWhatsapp::where('atendida_por_humano', true)
-            ->where('estado', \App\Models\ConversacionWhatsapp::ESTADO_ACTIVA)
-            ->count();
+        $handoffTotal = $qHandoff->count();
 
         // pedidos y pedidosFiltrados son #[Computed] → accesibles directamente en la vista
         return view('livewire.pedidos.index', [

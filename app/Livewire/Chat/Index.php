@@ -1481,13 +1481,19 @@ class Index extends Component
         $deptoIds = $user?->departamentos()->pluck('departamentos.id')->all() ?? [];
         $verTodas = $user?->puedeVerTodasLasConversaciones() ?? true;
 
-        $conversaciones = ConversacionWhatsapp::query()
+        $convQuery = ConversacionWhatsapp::query()
             ->with(['cliente', 'departamento'])
             ->where('estado', '!=', 'archivada')
             ->when(!$verTodas && !empty($deptoIds), function ($q) use ($deptoIds) {
                 // Estricto: solo conversaciones derivadas a algún departamento del agente.
                 $q->whereIn('departamento_id', $deptoIds);
-            })
+            });
+
+        // 🏢 Filtro por sede: si el user tiene sede_id y no es admin/gerente,
+        //    solo ve conversaciones de su sede. Admins ven todo.
+        $convQuery = \App\Support\SedeScopeFilter::aplicar($convQuery);
+
+        $conversaciones = $convQuery
             ->when($this->busqueda, function ($q) {
                 $q->where(function ($qq) {
                     $qq->where('telefono_normalizado', 'like', "%{$this->busqueda}%")
