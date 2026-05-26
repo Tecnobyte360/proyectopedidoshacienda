@@ -101,24 +101,36 @@
                 @endforeach
             </div>
 
-            {{-- 📡 Filtros por CANAL (WhatsApp / Instagram / Widget) --}}
-            <div class="flex gap-1 mt-1.5">
-                @foreach([
-                    'todos'     => ['Todos los canales', null, 'bg-slate-700'],
-                    'whatsapp'  => ['WhatsApp',          'fa-brands fa-whatsapp', 'bg-emerald-500'],
-                    'instagram' => ['Instagram',         'fa-brands fa-instagram','bg-pink-500'],
-                    'messenger' => ['Messenger',         'fa-brands fa-facebook-messenger','bg-blue-500'],
-                    'widget'    => ['Widget web',        'fa-globe',              'bg-sky-500'],
-                ] as $key => [$label, $icon, $color])
-                    <button wire:click="$set('filtroCanal', '{{ $key }}')"
-                            class="flex-1 inline-flex items-center justify-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold transition
-                                  {{ $filtroCanal === $key ? $color . ' text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200' }}">
-                        @if($icon)
-                            <i class="{{ $icon }} text-[10px]"></i>
-                        @endif
-                        {{ $label }}
+            {{-- 📡 Filtros por CANAL --}}
+            <div class="mt-2">
+                <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1 px-0.5">Canal</div>
+                <div class="flex items-center gap-1.5">
+                    {{-- Botón "Todos" más prominente a la izquierda --}}
+                    <button wire:click="$set('filtroCanal', 'todos')"
+                            class="inline-flex items-center justify-center gap-1 rounded-full px-3 py-1.5 text-[11px] font-semibold transition flex-shrink-0
+                                  {{ $filtroCanal === 'todos' ? 'bg-slate-800 text-white shadow' : 'bg-slate-100 text-slate-600 hover:bg-slate-200' }}">
+                        <i class="fa-solid fa-layer-group text-[10px]"></i> Todos
                     </button>
-                @endforeach
+
+                    {{-- Iconos compactos para cada canal con tooltip --}}
+                    @foreach([
+                        'whatsapp'  => ['WhatsApp',          'fa-brands fa-whatsapp',          'bg-emerald-500', 'ring-emerald-300'],
+                        'instagram' => ['Instagram',         'fa-brands fa-instagram',         'bg-gradient-to-br from-pink-500 via-fuchsia-500 to-amber-400', 'ring-pink-300'],
+                        'messenger' => ['Messenger',         'fa-brands fa-facebook-messenger','bg-gradient-to-br from-blue-500 to-sky-500', 'ring-blue-300'],
+                        'widget'    => ['Widget web',        'fa-solid fa-globe',              'bg-sky-500', 'ring-sky-300'],
+                    ] as $key => [$label, $icon, $color, $ring])
+                        <button wire:click="$set('filtroCanal', '{{ $key }}')"
+                                title="{{ $label }}"
+                                class="group relative flex-1 inline-flex items-center justify-center rounded-full h-8 text-sm transition
+                                      {{ $filtroCanal === $key ? $color . ' text-white shadow ring-2 ' . $ring : 'bg-slate-100 text-slate-500 hover:bg-slate-200' }}">
+                            <i class="{{ $icon }}"></i>
+                            {{-- Tooltip al hover --}}
+                            <span class="pointer-events-none absolute -bottom-7 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-white opacity-0 group-hover:opacity-100 transition z-10">
+                                {{ $label }}
+                            </span>
+                        </button>
+                    @endforeach
+                </div>
             </div>
         </div>
 
