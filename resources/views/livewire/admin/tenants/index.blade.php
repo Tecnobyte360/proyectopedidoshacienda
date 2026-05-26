@@ -1187,6 +1187,27 @@
                         </label>
 
                         @if($instagram_activo)
+                            {{-- 🔥 1-click OAuth: el cliente solo da click y conecta su IG --}}
+                            @if($editandoId)
+                                @php $tenantSlugIg = \App\Models\Tenant::find($editandoId)?->slug; @endphp
+                                @if($tenantSlugIg)
+                                <div class="rounded-xl bg-gradient-to-r from-pink-500 via-fuchsia-500 to-amber-400 p-[2px] shadow-lg">
+                                    <div class="rounded-[10px] bg-white px-4 py-3 flex items-center justify-between gap-3">
+                                        <div>
+                                            <p class="text-sm font-bold text-slate-800">Conexión con 1 click</p>
+                                            <p class="text-[11px] text-slate-500">Inicia sesión con tu cuenta IG Business y Kivox guarda el token automáticamente.</p>
+                                        </div>
+                                        <a href="{{ route('admin.tenants.conectar-instagram', $tenantSlugIg) }}"
+                                           target="_blank"
+                                           class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-br from-pink-500 via-fuchsia-500 to-amber-400 text-white font-bold text-sm px-4 py-2 shadow hover:scale-[1.02] transition flex-shrink-0">
+                                            <i class="fa-brands fa-instagram"></i> Conectar Instagram
+                                        </a>
+                                    </div>
+                                </div>
+                                <div class="text-[10px] text-slate-500 -mt-1">O configura manualmente abajo si ya tienes los IDs.</div>
+                                @endif
+                            @endif
+
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                                 <div>
                                     <label class="block text-[11px] font-bold text-pink-800 mb-1">

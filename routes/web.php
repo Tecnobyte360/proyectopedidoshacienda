@@ -328,6 +328,10 @@ Route::middleware(['solo_principal'])->group(function () {
     Route::get('/admin/ventas',        \App\Livewire\Admin\DashboardVentas::class)->middleware('permission:tenants.gestionar')->name('admin.ventas');
     Route::get('/admin/billing-envios',\App\Livewire\Admin\BillingEnvios::class)->middleware('permission:tenants.gestionar')->name('admin.billing-envios');
     Route::get('/admin/tenants',       AdminTenantsIndex::class)->middleware('permission:tenants.gestionar')->name('admin.tenants.index');
+    Route::get('/admin/tenants/{slug}/conectar-instagram',
+        [\App\Http\Controllers\InstagramOAuthController::class, 'iniciar'])
+        ->middleware('permission:tenants.gestionar')
+        ->name('admin.tenants.conectar-instagram');
     Route::get('/admin/plantillas-bot', \App\Livewire\Admin\PlantillasBot::class)
         ->middleware('permission:tenants.gestionar')
         ->name('admin.plantillas-bot');

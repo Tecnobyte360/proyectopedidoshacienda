@@ -68,6 +68,9 @@ class Tenant extends Model
         'instagram_business_account_id',
         'instagram_page_id',
         'instagram_activo',
+        'instagram_access_token',
+        'instagram_token_expira_at',
+        'instagram_username',
     ];
 
     public const WA_PROVIDER_AUTO      = 'auto';
@@ -81,7 +84,8 @@ class Tenant extends Model
     ];
 
     protected $casts = [
-        'instagram_activo'     => 'boolean',
+        'instagram_activo'         => 'boolean',
+        'instagram_token_expira_at'=> 'datetime',
         'activo'               => 'boolean',
         'suspendido_por_mora'  => 'boolean',
         'suspendido_at'        => 'datetime',

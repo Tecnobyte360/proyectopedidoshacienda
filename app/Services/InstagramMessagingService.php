@@ -29,7 +29,7 @@ class InstagramMessagingService
      */
     public function enviarTexto(Tenant $tenant, string $igsid, string $mensaje): array
     {
-        if (empty($tenant->meta_access_token)) {
+        if (empty(($tenant->instagram_access_token ?? $tenant->meta_access_token ?? null))) {
             return ['ok' => false, 'error' => 'Tenant sin token Meta'];
         }
         if (empty($tenant->instagram_page_id)) {
@@ -41,7 +41,7 @@ class InstagramMessagingService
         // Importante: para IG se usa el page_id como prefijo en algunos casos,
         // pero el endpoint /me/messages con el token de la PAGE funciona bien.
         try {
-            $resp = Http::withToken($tenant->meta_access_token)
+            $resp = Http::withToken(($tenant->instagram_access_token ?? $tenant->meta_access_token ?? null))
                 ->timeout(15)
                 ->post($url, [
                     'recipient'      => ['id' => $igsid],
@@ -81,10 +81,10 @@ class InstagramMessagingService
      */
     public function obtenerPerfilUsuario(Tenant $tenant, string $igsid): ?array
     {
-        if (empty($tenant->meta_access_token)) return null;
+        if (empty(($tenant->instagram_access_token ?? $tenant->meta_access_token ?? null))) return null;
 
         try {
-            $resp = Http::withToken($tenant->meta_access_token)
+            $resp = Http::withToken(($tenant->instagram_access_token ?? $tenant->meta_access_token ?? null))
                 ->timeout(10)
                 ->get(self::API_BASE . '/' . self::API_VERSION . '/' . $igsid, [
                     'fields' => 'name,profile_pic,username',

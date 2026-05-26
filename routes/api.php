@@ -39,6 +39,10 @@ Route::post('/meta/whatsapp/webhook', [MetaWhatsappWebhookController::class, 're
 Route::get('/meta/instagram/webhook',  [\App\Http\Controllers\InstagramWebhookController::class, 'verify']);
 Route::post('/meta/instagram/webhook', [\App\Http\Controllers\InstagramWebhookController::class, 'receive']);
 
+// 📷 Instagram Business Login — OAuth flow (cada tenant conecta su cuenta IG)
+Route::get('/meta/instagram/oauth/callback', [\App\Http\Controllers\InstagramOAuthController::class, 'callback']);
+Route::post('/meta/instagram/data-deletion', [\App\Http\Controllers\InstagramOAuthController::class, 'dataDeletion']);
+
 // Webhook ESPECÍFICO POR TENANT — identifica al tenant por slug en la URL.
 // Recomendado en producción: cada tenant tiene su URL única que copia y
 // pega en TecnoByteApp para SU conexión de WhatsApp.
