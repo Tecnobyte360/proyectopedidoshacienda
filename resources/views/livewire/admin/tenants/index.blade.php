@@ -1187,6 +1187,53 @@
                         </label>
 
                         @if($instagram_activo)
+                            {{-- 🔑 Credenciales Meta App (necesarias para el OAuth) --}}
+                            <div class="rounded-xl border border-slate-200 bg-white/80 p-3 space-y-3">
+                                <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
+                                    <i class="fa-solid fa-key text-amber-500"></i>
+                                    Credenciales de la app Meta (encriptadas)
+                                </div>
+                                <p class="text-[11px] text-slate-500 -mt-2">
+                                    Las obtienes en <a href="https://developers.facebook.com/apps/" target="_blank" class="text-pink-600 underline">developers.facebook.com → tu app → Configuración → Básica</a>
+                                    (App ID + App Secret) y en <strong>Instagram → API setup with Instagram login</strong> (Instagram App ID + Secret).
+                                </p>
+
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-[11px] font-bold text-slate-700 mb-1">Meta App ID (Facebook)</label>
+                                        <input type="text" wire:model.defer="meta_app_id"
+                                               placeholder="ej. 4223336821310091"
+                                               class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-mono">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[11px] font-bold text-slate-700 mb-1">Meta App Secret</label>
+                                        <input type="password" wire:model.defer="meta_app_secret"
+                                               placeholder="{{ $meta_app_secret ? '••••••••• (guardado)' : 'pega aquí el secreto' }}"
+                                               class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-mono">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[11px] font-bold text-slate-700 mb-1">Instagram Client ID</label>
+                                        <input type="text" wire:model.defer="ig_client_id"
+                                               placeholder="ej. 3427570777392629"
+                                               class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-mono">
+                                        <p class="text-[10px] text-slate-400 mt-0.5">Si lo dejas vacío, se usa el Meta App ID.</p>
+                                    </div>
+                                    <div>
+                                        <label class="block text-[11px] font-bold text-slate-700 mb-1">Instagram Client Secret</label>
+                                        <input type="password" wire:model.defer="ig_client_secret"
+                                               placeholder="{{ $ig_client_secret ? '••••••••• (guardado)' : 'pega aquí el secreto' }}"
+                                               class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-mono">
+                                        <p class="text-[10px] text-slate-400 mt-0.5">Si lo dejas vacío, se usa el Meta App Secret.</p>
+                                    </div>
+                                </div>
+
+                                <div class="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
+                                    <i class="fa-solid fa-shield-halved"></i>
+                                    Los secretos se guardan <strong>encriptados</strong> en la base de datos con la APP_KEY de Laravel.
+                                    Nunca se muestran en texto plano de vuelta.
+                                </div>
+                            </div>
+
                             {{-- 🔥 1-click OAuth: el cliente solo da click y conecta su IG --}}
                             @if($editandoId)
                                 @php $tenantSlugIg = \App\Models\Tenant::find($editandoId)?->slug; @endphp

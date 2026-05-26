@@ -48,9 +48,15 @@ class InstagramOAuthController extends Controller
             return response('Tenant no encontrado', 404);
         }
 
-        $appId       = env('META_APP_ID');
-        $appSecret   = env('META_APP_SECRET');
+        // Credenciales: primero del tenant, luego del .env como fallback
+        $appId       = $tenant->ig_client_id     ?: $tenant->meta_app_id     ?: env('IG_CLIENT_ID') ?: env('META_APP_ID');
+        $appSecret   = $tenant->ig_client_secret ?: $tenant->meta_app_secret ?: env('IG_CLIENT_SECRET') ?: env('META_APP_SECRET');
         $redirectUri = url('/api/meta/instagram/oauth/callback');
+
+        if (!$appId || !$appSecret) {
+            return redirect('/admin/tenants')
+                ->with('error', 'Falta configurar IG Client ID/Secret en este tenant');
+        }
 
         // 1. Intercambiar code → short-lived token
         $shortRes = Http::asForm()->post('https://api.instagram.com/oauth/access_token', [
@@ -193,8 +199,15 @@ class InstagramOAuthController extends Controller
     {
         $tenant = Tenant::where('slug', $slug)->firstOrFail();
 
+        $clientId = $tenant->ig_client_id ?: $tenant->meta_app_id ?: env('IG_CLIENT_ID') ?: env('META_APP_ID');
+
+        if (!$clientId) {
+            return redirect('/admin/tenants')
+                ->with('error', '⚠️ Falta configurar el IG Client ID del tenant. Editalo y agrega las credenciales Meta.');
+        }
+
         $authUrl = 'https://www.instagram.com/oauth/authorize?' . http_build_query([
-            'client_id'     => env('META_APP_ID'),
+            'client_id'     => $clientId,
             'redirect_uri'  => url('/api/meta/instagram/oauth/callback'),
             'response_type' => 'code',
             'scope'         => implode(',', [

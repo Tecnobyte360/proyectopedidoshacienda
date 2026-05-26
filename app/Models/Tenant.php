@@ -71,6 +71,11 @@ class Tenant extends Model
         'instagram_access_token',
         'instagram_token_expira_at',
         'instagram_username',
+        // 🔑 Credenciales Meta app (por tenant)
+        'meta_app_id',
+        'meta_app_secret',
+        'ig_client_id',
+        'ig_client_secret',
     ];
 
     public const WA_PROVIDER_AUTO      = 'auto';
@@ -86,6 +91,9 @@ class Tenant extends Model
     protected $casts = [
         'instagram_activo'         => 'boolean',
         'instagram_token_expira_at'=> 'datetime',
+        'meta_app_secret'          => 'encrypted',
+        'ig_client_secret'         => 'encrypted',
+        'instagram_access_token'   => 'encrypted',
         'activo'               => 'boolean',
         'suspendido_por_mora'  => 'boolean',
         'suspendido_at'        => 'datetime',
