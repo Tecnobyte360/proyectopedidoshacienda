@@ -1591,6 +1591,7 @@ class Index extends Component
             // 📡 Filtro por canal (WhatsApp / Instagram / Widget web)
             ->when($this->filtroCanal === 'whatsapp', fn ($q) => $q->where(fn ($qq) => $qq->where('canal', 'whatsapp')->orWhereNull('canal')))
             ->when($this->filtroCanal === 'instagram', fn ($q) => $q->where('canal', 'instagram'))
+            ->when($this->filtroCanal === 'messenger', fn ($q) => $q->where('canal', 'messenger'))
             ->when($this->filtroCanal === 'widget',    fn ($q) => $q->where('canal', 'widget'))
             ->orderByDesc('ultimo_mensaje_at')
             ->limit(60)
