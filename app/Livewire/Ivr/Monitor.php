@@ -43,8 +43,9 @@ class Monitor extends Component
             'duracion_promedio'=> (int) (clone $base)->whereNotNull('duracion_segundos')->avg('duracion_segundos'),
         ];
 
-        // Opciones más elegidas
-        $opciones = (clone $base)
+        // Opciones más elegidas (query nueva sin el orderBy de la base)
+        $opciones = LlamadaIvr::query()
+            ->where('iniciada_at', '>=', $desde)
             ->whereNotNull('opcion_elegida')
             ->selectRaw('opcion_elegida, count(*) as total')
             ->groupBy('opcion_elegida')
