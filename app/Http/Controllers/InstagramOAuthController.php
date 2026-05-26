@@ -111,6 +111,40 @@ class InstagramOAuthController extends Controller
     }
 
     /**
+     * POST /api/meta/instagram/deauthorize
+     *
+     * Meta lo llama cuando un usuario revoca el acceso a Kivox desde sus
+     * ajustes de Instagram. Debemos desconectar al tenant (token inválido)
+     * pero NO borrar conversaciones — para eso está data-deletion.
+     */
+    public function deauthorize(Request $request)
+    {
+        $signedRequest = $request->input('signed_request');
+        $payload = $this->parseSignedRequest($signedRequest, env('META_APP_SECRET'));
+        $igUserId = $payload['user_id'] ?? null;
+
+        if ($igUserId) {
+            $tenant = Tenant::where('instagram_business_account_id', $igUserId)
+                ->orWhere('instagram_page_id', $igUserId)
+                ->first();
+
+            if ($tenant) {
+                $tenant->update([
+                    'instagram_activo'         => false,
+                    'instagram_access_token'   => null,
+                    'instagram_token_expira_at'=> null,
+                ]);
+                Log::warning('📷 IG deauthorize: tenant desconectado', [
+                    'tenant_id' => $tenant->id,
+                    'ig_user'   => $igUserId,
+                ]);
+            }
+        }
+
+        return response()->json(['ok' => true]);
+    }
+
+    /**
      * POST /api/meta/instagram/data-deletion
      *
      * Meta lo llama cuando un usuario pide eliminar sus datos desde su cuenta IG.

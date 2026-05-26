@@ -42,6 +42,7 @@ Route::post('/meta/instagram/webhook', [\App\Http\Controllers\InstagramWebhookCo
 // 📷 Instagram Business Login — OAuth flow (cada tenant conecta su cuenta IG)
 Route::get('/meta/instagram/oauth/callback', [\App\Http\Controllers\InstagramOAuthController::class, 'callback']);
 Route::post('/meta/instagram/data-deletion', [\App\Http\Controllers\InstagramOAuthController::class, 'dataDeletion']);
+Route::post('/meta/instagram/deauthorize',   [\App\Http\Controllers\InstagramOAuthController::class, 'deauthorize']);
 
 // Webhook ESPECÍFICO POR TENANT — identifica al tenant por slug en la URL.
 // Recomendado en producción: cada tenant tiene su URL única que copia y
