@@ -511,18 +511,20 @@
 
                 @if($tenantUsaMeta && $plantillasMetaAprobadas->isNotEmpty() && $ventana24hAbierta)
                     {{-- 🟢 Atajo de plantillas Meta (sin chips de respuestas: usa "/" para esas) --}}
-                    <div class="px-3 pt-2 pb-1 flex items-center gap-1.5 border-b border-slate-100 bg-slate-50/50">
+                    <div class="px-3 pt-2 pb-1 flex items-center gap-1.5 border-b border-slate-100 bg-slate-50/50"
+                         x-data="{ open: false }">
                         <button type="button"
-                                onclick="document.getElementById('plantilla-meta-quick').classList.toggle('hidden')"
-                                class="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 transition flex-shrink-0">
+                                @click="open = !open"
+                                :class="open ? 'bg-emerald-100' : 'bg-emerald-50'"
+                                class="inline-flex items-center gap-1 rounded-full border border-emerald-200 hover:bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 transition flex-shrink-0">
                             <i class="fa-brands fa-meta text-[10px]"></i>
-                            Plantilla Meta
+                            <span x-text="open ? 'Cerrar plantillas' : 'Usar plantilla Meta'"></span>
+                            <span class="ml-1 inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-emerald-200 text-emerald-800 text-[9px] font-bold">{{ $plantillasMetaAprobadas->count() }}</span>
                         </button>
                         <span class="text-[10px] text-slate-400">o escribe <kbd class="px-1.5 py-0.5 rounded bg-white border border-slate-300 text-slate-600 font-mono text-[10px]">/</kbd> para respuestas rápidas</span>
-                    </div>
 
                     @if($tenantUsaMeta && $plantillasMetaAprobadas->isNotEmpty() && $ventana24hAbierta)
-                        <div id="plantilla-meta-quick" class="hidden px-3 py-2 bg-emerald-50/60 border-b border-emerald-100 space-y-2">
+                        <div x-show="open" x-cloak x-transition class="px-3 py-2 bg-emerald-50/60 border-b border-emerald-100 space-y-2 w-full">
                             <select wire:model.live="plantillaChatId" class="w-full rounded-lg border border-emerald-300 px-2 py-1.5 text-xs bg-white">
                                 <option value="">— Selecciona plantilla —</option>
                                 @foreach($plantillasMetaAprobadas as $tpl)
@@ -550,6 +552,7 @@
                             @endif
                         </div>
                     @endif
+                    </div> {{-- cierra x-data del toggle plantilla --}}
                 @endif
 
                 <form wire:submit.prevent="enviar"
