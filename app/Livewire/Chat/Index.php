@@ -1542,8 +1542,11 @@ class Index extends Component
         $plantillasMetaAprobadas = collect();
         $plantillaChatSeleccionada = null;
         if ($this->tenantUsaMeta) {
+            // ⚠️ El campo estado puede venir en español ('aprobada') o en formato
+            // Meta API ('APPROVED'), dependiendo de cómo se sincronizaron.
+            // Aceptamos ambos para máxima compatibilidad.
             $plantillasMetaAprobadas = \App\Models\MetaWhatsappPlantilla::where('activa', true)
-                ->where('estado', 'APPROVED')
+                ->whereIn(\Illuminate\Support\Facades\DB::raw('LOWER(estado)'), ['approved', 'aprobada'])
                 ->orderBy('nombre')
                 ->get();
             if ($this->plantillaChatId) {
