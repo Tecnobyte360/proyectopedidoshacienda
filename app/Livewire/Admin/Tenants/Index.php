@@ -80,6 +80,16 @@ class Index extends Component
     public string $wompi_events_secret      = '';
     public string $wompi_integrity_secret   = '';
 
+    // 💳 Bold (pagos) por tenant
+    public bool   $bold_activo              = false;
+    public string $bold_modo                = 'sandbox'; // sandbox | production
+    public string $bold_api_key             = '';
+    public string $bold_secret_key          = '';
+    public string $bold_webhook_secret      = '';
+
+    // 🎯 Pasarela preferida cuando hay 2 activas
+    public string $pasarela_preferida       = 'cliente_elige'; // wompi | bold | cliente_elige
+
     // 📷 Instagram DMs por tenant
     public string $instagram_business_account_id = '';
     public string $instagram_page_id             = '';
@@ -194,6 +204,13 @@ class Index extends Component
             'wompi_events_secret'    => 'nullable|string|max:255',
             'wompi_integrity_secret' => 'nullable|string|max:255',
 
+            'bold_activo'            => 'boolean',
+            'bold_modo'              => 'nullable|in:sandbox,production',
+            'bold_api_key'           => 'nullable|string|max:255',
+            'bold_secret_key'        => 'nullable|string|max:255',
+            'bold_webhook_secret'    => 'nullable|string|max:255',
+            'pasarela_preferida'     => 'nullable|in:wompi,bold,cliente_elige',
+
             'crear_admin_inicial' => 'boolean',
             'admin_nombre'        => 'required_if:crear_admin_inicial,true|nullable|string|max:120',
             'admin_email'         => 'required_if:crear_admin_inicial,true|nullable|email|max:150|unique:users,email',
@@ -307,6 +324,14 @@ class Index extends Component
         $this->wompi_private_key      = (string) ($wompi['private_key'] ?? '');
         $this->wompi_events_secret    = (string) ($wompi['events_secret'] ?? '');
         $this->wompi_integrity_secret = (string) ($wompi['integrity_secret'] ?? '');
+
+        // Bold config
+        $this->bold_activo         = (bool) ($t->bold_activo ?? false);
+        $this->bold_modo           = (string) ($t->bold_modo ?: 'sandbox');
+        $this->bold_api_key        = (string) ($t->bold_api_key ?? '');
+        $this->bold_secret_key     = (string) ($t->bold_secret_key ?? '');
+        $this->bold_webhook_secret = (string) ($t->bold_webhook_secret ?? '');
+        $this->pasarela_preferida  = (string) ($t->pasarela_preferida ?: 'cliente_elige');
 
         // Auto-cargar conexiones disponibles si ya hay credenciales
         $this->whatsapp_conexiones_disponibles = [];
@@ -688,6 +713,28 @@ class Index extends Component
             } else {
                 $data['wompi_config'] = null;
             }
+        }
+
+        // 💳 Bold config — solo si las columnas existen
+        if (\Illuminate\Support\Facades\Schema::hasColumn('tenants', 'bold_api_key')) {
+            $data['bold_activo'] = (bool) $this->bold_activo;
+            $data['bold_modo']   = in_array($this->bold_modo, ['sandbox','production'], true)
+                ? $this->bold_modo
+                : 'sandbox';
+
+            // Solo sobrescribir secretos si el usuario pegó algo nuevo (evita borrar al editar)
+            $bAk  = trim($this->bold_api_key);
+            $bSk  = trim($this->bold_secret_key);
+            $bWh  = trim($this->bold_webhook_secret);
+            if ($bAk !== '') $data['bold_api_key']        = $bAk;
+            if ($bSk !== '') $data['bold_secret_key']     = $bSk;
+            if ($bWh !== '') $data['bold_webhook_secret'] = $bWh;
+        }
+
+        if (\Illuminate\Support\Facades\Schema::hasColumn('tenants', 'pasarela_preferida')) {
+            $data['pasarela_preferida'] = in_array($this->pasarela_preferida, ['wompi','bold','cliente_elige'], true)
+                ? $this->pasarela_preferida
+                : 'cliente_elige';
         }
 
         // 🔐 Si requiere_2fa cambia de false a true → setear timestamp para iniciar gracia
@@ -1103,6 +1150,12 @@ class Index extends Component
         $this->wompi_private_key      = '';
         $this->wompi_events_secret    = '';
         $this->wompi_integrity_secret = '';
+        $this->bold_activo            = false;
+        $this->bold_modo              = 'sandbox';
+        $this->bold_api_key           = '';
+        $this->bold_secret_key        = '';
+        $this->bold_webhook_secret    = '';
+        $this->pasarela_preferida     = 'cliente_elige';
         $this->crear_admin_inicial  = true;
         $this->admin_nombre         = '';
         $this->admin_email          = '';

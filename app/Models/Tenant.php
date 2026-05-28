@@ -79,6 +79,13 @@ class Tenant extends Model
         'meta_app_secret',
         'ig_client_id',
         'ig_client_secret',
+        // 💳 Bold (segunda pasarela de pago)
+        'bold_activo',
+        'bold_modo',
+        'bold_api_key',
+        'bold_secret_key',
+        'bold_webhook_secret',
+        'pasarela_preferida',
     ];
 
     public const WA_PROVIDER_AUTO      = 'auto';
@@ -99,6 +106,10 @@ class Tenant extends Model
         'instagram_access_token'   => 'encrypted',
         'messenger_activo'         => 'boolean',
         'messenger_page_access_token' => 'encrypted',
+        'bold_activo'              => 'boolean',
+        'bold_api_key'             => 'encrypted',
+        'bold_secret_key'          => 'encrypted',
+        'bold_webhook_secret'      => 'encrypted',
         'activo'               => 'boolean',
         'suspendido_por_mora'  => 'boolean',
         'suspendido_at'        => 'datetime',

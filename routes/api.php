@@ -75,6 +75,13 @@ Route::post('/wompi/webhook/{slug}', [\App\Http\Controllers\WompiWebhookControll
 Route::post('/wompi/webhook', [\App\Http\Controllers\WompiWebhookController::class, 'recibir'])
     ->name('wompi.webhook.legacy');
 
+// 💳 Bold — receptor de eventos de pagos POR TENANT (slug en URL).
+// Cada tenant configura en su panel de Bold:
+//   https://admin.kivox.co/api/bold/webhook/{slug}
+Route::post('/bold/webhook/{slug}', [\App\Http\Controllers\BoldWebhookController::class, 'recibir'])
+    ->where('slug', '[a-z0-9-]+')
+    ->name('bold.webhook');
+
 // 💳 SaaS Billing — webhook de Wompi del DUEÑO de Kivox (TecnoByte360).
 // Cobro de mensualidades a los tenants. Diferente de los webhooks tenant→cliente arriba.
 Route::post('/saas-billing/wompi/webhook', \App\Http\Controllers\SaasBillingWompiWebhookController::class)
@@ -148,7 +155,12 @@ Route::prefix('v1')->group(function () {
         Route::post('llamadas/finalizar',      [\App\Http\Controllers\Api\V1\IvrApiController::class, 'finalizar']);
         Route::post('voicemail',               [\App\Http\Controllers\Api\V1\IvrApiController::class, 'voicemail']);
         Route::get ('pedido-por-telefono/{tel}',[\App\Http\Controllers\Api\V1\IvrApiController::class, 'pedidoPorTelefono']);
+        // 🤖 Conversación IA
+        Route::post('conversacion/iniciar', [\App\Http\Controllers\Api\V1\IvrApiController::class, 'iniciarConversacion']);
+        Route::post('conversacion/turno',   [\App\Http\Controllers\Api\V1\IvrApiController::class, 'turnoConversacion']);
     });
+    // Audio público (no requiere API key, sirve los WAV generados al Asterisk)
+    Route::get('ivr/audio/{filename}', [\App\Http\Controllers\Api\V1\IvrApiController::class, 'servirAudio']);
 
     // Escritura protegida
     Route::middleware('api.key')->group(function () {
