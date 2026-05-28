@@ -347,6 +347,11 @@ Route::middleware(['solo_principal'])->group(function () {
     Route::get('/admin/documentacion', AdminDocumentacion::class)->middleware('permission:tenants.gestionar')->name('admin.documentacion');
     Route::get('/admin/configuracion-plataforma', AdminConfiguracionPlataforma::class)->middleware('permission:tenants.gestionar')->name('admin.configuracion-plataforma');
 
+    // 📥 Importar histórico de WhatsApp desde exports .txt del celular
+    Route::get('/admin/importar-historial-whatsapp', \App\Livewire\Admin\ImportarHistorialWa::class)
+        ->middleware('permission:chat.usar')
+        ->name('admin.importar-historial-wa');
+
     // 🎭 Salir del modo impersonación (vuelve al super-admin)
     // Soporta GET y POST por compatibilidad — pero POST es lo recomendado
     // (no cacheable, no interceptado por Livewire, semánticamente correcto).
