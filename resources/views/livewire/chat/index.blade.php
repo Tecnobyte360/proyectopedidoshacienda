@@ -978,6 +978,42 @@
 
                 {{-- El antiguo panel "Usar plantilla Meta" se reemplazó por un popover inline al lado del badge "Ventana 24h abierta" (ver arriba) para no generar scroll en el composer. --}}
 
+                {{-- 💬 Preview "Respondiendo a..." — encima del composer (no flotante) --}}
+                @if($respondiendoAMensajeId)
+                    @php
+                        $esMetaReply = $respondiendoEsMeta === true;
+                        $colorAcento = $esMetaReply ? '#3b82f6' : '#f59e0b';
+                        $colorLabel  = $esMetaReply ? 'text-blue-700' : 'text-amber-700';
+                        $colorBadgeBg = $esMetaReply ? 'bg-blue-100' : 'bg-amber-100';
+                        $colorBadgeText = $esMetaReply ? 'text-blue-700' : 'text-amber-700';
+                    @endphp
+                    <div class="px-3 pt-2">
+                        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex">
+                            <div class="w-1 shrink-0" style="background:{{ $colorAcento }};"></div>
+                            <div class="flex-1 min-w-0 px-3 py-2 flex items-center gap-3">
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="text-xs font-bold {{ $colorLabel }}">{{ $respondiendoAAutor }}</span>
+                                        <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider {{ $colorBadgeBg }} {{ $colorBadgeText }}">
+                                            @if($esMetaReply)
+                                                <i class="fa-solid fa-check text-[8px]"></i> Cliente lo verá
+                                            @else
+                                                <i class="fa-solid fa-bookmark text-[8px]"></i> Solo equipo
+                                            @endif
+                                        </span>
+                                    </div>
+                                    <div class="text-xs text-slate-600 truncate mt-0.5">{{ $respondiendoAPreview }}</div>
+                                </div>
+                                <button type="button" wire:click="cancelarRespuesta"
+                                        class="shrink-0 flex items-center justify-center w-7 h-7 rounded-full text-slate-400 hover:bg-slate-100 hover:text-rose-600 transition"
+                                        title="Cancelar respuesta">
+                                    <i class="fa-solid fa-xmark text-sm"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                @endif
+
                 <form wire:submit.prevent="enviar"
                       class="px-3 py-3 flex items-center gap-2"
                       @if($tenantUsaMeta && !$ventana24hAbierta) style="opacity:0.4; pointer-events:none;" @endif
@@ -1007,41 +1043,6 @@
                             </template>
                         </div>
 
-                        @if($respondiendoAMensajeId)
-                            @php
-                                $esMetaReply = $respondiendoEsMeta === true;
-                                $colorAcento = $esMetaReply ? '#3b82f6' : '#f59e0b'; // azul-500 / ámbar-500
-                                $colorLabel  = $esMetaReply ? 'text-blue-700' : 'text-amber-700';
-                                $colorBadgeBg = $esMetaReply ? 'bg-blue-100' : 'bg-amber-100';
-                                $colorBadgeText = $esMetaReply ? 'text-blue-700' : 'text-amber-700';
-                            @endphp
-                            {{-- 💬 Preview del mensaje al que se está respondiendo (estilo WhatsApp) --}}
-                            <div class="absolute -top-[68px] left-0 right-0 px-3">
-                                <div class="bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden flex">
-                                    <div class="w-1 shrink-0" style="background:{{ $colorAcento }};"></div>
-                                    <div class="flex-1 min-w-0 px-3 py-2 flex items-center gap-3">
-                                        <div class="flex-1 min-w-0">
-                                            <div class="flex items-center gap-1.5">
-                                                <span class="text-xs font-bold {{ $colorLabel }}">{{ $respondiendoAAutor }}</span>
-                                                <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider {{ $colorBadgeBg }} {{ $colorBadgeText }}">
-                                                    @if($esMetaReply)
-                                                        <i class="fa-solid fa-check text-[8px]"></i> Cliente lo verá
-                                                    @else
-                                                        <i class="fa-solid fa-bookmark text-[8px]"></i> Solo equipo
-                                                    @endif
-                                                </span>
-                                            </div>
-                                            <div class="text-xs text-slate-600 truncate mt-0.5">{{ $respondiendoAPreview }}</div>
-                                        </div>
-                                        <button type="button" wire:click="cancelarRespuesta"
-                                                class="shrink-0 flex items-center justify-center w-7 h-7 rounded-full text-slate-400 hover:bg-slate-100 hover:text-rose-600 transition"
-                                                title="Cancelar respuesta (Esc)">
-                                            <i class="fa-solid fa-xmark text-sm"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        @endif
 
                         <textarea wire:model="nuevoMensaje"
                                   x-ref="ta"
