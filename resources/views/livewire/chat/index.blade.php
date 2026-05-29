@@ -82,6 +82,7 @@
         {{-- Filtros --}}
         <div class="p-3 border-b border-slate-200 space-y-2">
             <input type="text" wire:model.live.debounce.400ms="busqueda"
+                   id="chat-search-input"
                    placeholder="Buscar cliente o teléfono..."
                    class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-brand focus:ring-brand">
 
@@ -1186,6 +1187,39 @@
                 if (window.Livewire?.hook) {
                     Livewire.hook('morph.updated', () => setTimeout(scrollToBottom, 50));
                 }
+            });
+
+            // ⎋ ESC global: cierra la conversación activa y enfoca el buscador (estilo WhatsApp Web).
+            // Si ESC se presiona dentro del composer o cualquier input/textarea, salimos del foco primero;
+            // si ya estamos fuera de un campo, cerramos la conversación.
+            document.addEventListener('keydown', (e) => {
+                if (e.key !== 'Escape') return;
+
+                const target = e.target;
+                const tag = (target?.tagName || '').toUpperCase();
+                const enCampo = ['INPUT', 'TEXTAREA', 'SELECT'].includes(tag) || target?.isContentEditable;
+
+                // Si está en el composer, dejamos que primero pierda el foco; el siguiente ESC cerrará el chat.
+                if (enCampo && target.id === 'chat-composer-textarea') {
+                    target.blur();
+                    return;
+                }
+
+                // Si está en un input distinto (ej. buscador), no interceptamos.
+                if (enCampo) return;
+
+                // Hay conversación activa → cerrarla y enfocar buscador.
+                try {
+                    const comp = window.Livewire?.find?.(document.querySelector('[wire\\:id]')?.getAttribute('wire:id'));
+                    if (comp && comp.get('conversacionActivaId')) {
+                        comp.set('conversacionActivaId', null);
+                        e.preventDefault();
+                        setTimeout(() => {
+                            const s = document.getElementById('chat-search-input');
+                            if (s) s.focus();
+                        }, 80);
+                    }
+                } catch (err) { /* noop */ }
             });
 
             scrollToBottom(true);
