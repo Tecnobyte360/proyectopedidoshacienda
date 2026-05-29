@@ -450,6 +450,9 @@ class Index extends Component
         $this->plantillaChatId = null;
         $this->plantillaChatVars = [];
 
+        // 🧹 Limpiar estado de "respondiendo a un mensaje" si veníamos de otro chat
+        $this->cancelarRespuesta();
+
         // 📭 Al abrir la conversación: resetear no_leidos y limpiar el flag
         // manual "marcada_no_leida" si estaba prendido.
         try {
