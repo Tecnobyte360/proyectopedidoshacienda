@@ -1010,28 +1010,36 @@
                         @if($respondiendoAMensajeId)
                             @php
                                 $esMetaReply = $respondiendoEsMeta === true;
-                                $colorBg = $esMetaReply ? 'bg-blue-50' : 'bg-amber-50';
-                                $colorBorder = $esMetaReply ? 'border-blue-500' : 'border-amber-500';
-                                $colorIcon = $esMetaReply ? 'text-blue-500' : 'text-amber-500';
-                                $colorLabel = $esMetaReply ? 'text-blue-700' : 'text-amber-700';
+                                $colorAcento = $esMetaReply ? '#3b82f6' : '#f59e0b'; // azul-500 / ámbar-500
+                                $colorLabel  = $esMetaReply ? 'text-blue-700' : 'text-amber-700';
+                                $colorBadgeBg = $esMetaReply ? 'bg-blue-100' : 'bg-amber-100';
+                                $colorBadgeText = $esMetaReply ? 'text-blue-700' : 'text-amber-700';
                             @endphp
-                            {{-- 💬 Preview del mensaje al que se está respondiendo --}}
-                            <div class="absolute -top-14 left-0 right-12 {{ $colorBg }} border-l-4 {{ $colorBorder }} rounded-tr-lg px-3 py-2 flex items-start gap-2 shadow-sm">
-                                <i class="fa-solid fa-reply {{ $colorIcon }} mt-0.5"></i>
-                                <div class="flex-1 min-w-0">
-                                    <div class="text-[10px] font-bold {{ $colorLabel }} uppercase tracking-wider">
-                                        Respondiendo a {{ $respondiendoAAutor }}
-                                        @if($esMetaReply)
-                                            <span class="ml-1 text-emerald-600">✓ cliente verá la cita</span>
-                                        @else
-                                            <span class="ml-1 text-amber-600">🔖 solo visible para el equipo</span>
-                                        @endif
+                            {{-- 💬 Preview del mensaje al que se está respondiendo (estilo WhatsApp) --}}
+                            <div class="absolute -top-[68px] left-0 right-0 px-3">
+                                <div class="bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden flex">
+                                    <div class="w-1 shrink-0" style="background:{{ $colorAcento }};"></div>
+                                    <div class="flex-1 min-w-0 px-3 py-2 flex items-center gap-3">
+                                        <div class="flex-1 min-w-0">
+                                            <div class="flex items-center gap-1.5">
+                                                <span class="text-xs font-bold {{ $colorLabel }}">{{ $respondiendoAAutor }}</span>
+                                                <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider {{ $colorBadgeBg }} {{ $colorBadgeText }}">
+                                                    @if($esMetaReply)
+                                                        <i class="fa-solid fa-check text-[8px]"></i> Cliente lo verá
+                                                    @else
+                                                        <i class="fa-solid fa-bookmark text-[8px]"></i> Solo equipo
+                                                    @endif
+                                                </span>
+                                            </div>
+                                            <div class="text-xs text-slate-600 truncate mt-0.5">{{ $respondiendoAPreview }}</div>
+                                        </div>
+                                        <button type="button" wire:click="cancelarRespuesta"
+                                                class="shrink-0 flex items-center justify-center w-7 h-7 rounded-full text-slate-400 hover:bg-slate-100 hover:text-rose-600 transition"
+                                                title="Cancelar respuesta (Esc)">
+                                            <i class="fa-solid fa-xmark text-sm"></i>
+                                        </button>
                                     </div>
-                                    <div class="text-xs text-slate-700 truncate">{{ $respondiendoAPreview }}</div>
                                 </div>
-                                <button type="button" wire:click="cancelarRespuesta" class="text-slate-400 hover:text-rose-600" title="Cancelar respuesta">
-                                    <i class="fa-solid fa-xmark"></i>
-                                </button>
                             </div>
                         @endif
 
