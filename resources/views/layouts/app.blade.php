@@ -438,5 +438,106 @@
          /livewire/pedidos/index.blade.php (sin dependencia de archivos mp3). --}}
 
     @stack('scripts')
+
+    @auth
+    {{-- 🔔 Badge dinámico en favicon + título con contador de no leídos --}}
+    @can('chat.usar')
+    <script>
+    (function () {
+        const TITULO_BASE = document.title;
+        const FAVICON_URL_BASE = '{{ $faviconUrl }}';
+        let ultimoCount = -1;
+
+        // Pre-cargar la imagen original del favicon para componerla con el badge
+        const imgBase = new Image();
+        imgBase.crossOrigin = 'anonymous';
+        let imgBaseLista = false;
+        imgBase.onload = () => { imgBaseLista = true; pintar(ultimoCount > 0 ? ultimoCount : 0); };
+        imgBase.onerror = () => { imgBaseLista = false; };
+        imgBase.src = FAVICON_URL_BASE;
+
+        function setFaviconHref(href) {
+            // Quitamos los <link rel="icon"> existentes y agregamos uno nuevo
+            document.querySelectorAll('link[rel="icon"], link[rel="shortcut icon"]').forEach(l => l.remove());
+            const link = document.createElement('link');
+            link.rel = 'icon';
+            link.type = 'image/png';
+            link.href = href;
+            document.head.appendChild(link);
+        }
+
+        function pintar(count) {
+            // Título
+            document.title = count > 0 ? `(${count > 99 ? '99+' : count}) ${TITULO_BASE}` : TITULO_BASE;
+
+            // Favicon — solo si la imagen base cargó OK
+            if (!imgBaseLista) return;
+
+            try {
+                const size = 64;
+                const canvas = document.createElement('canvas');
+                canvas.width = size; canvas.height = size;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(imgBase, 0, 0, size, size);
+
+                if (count > 0) {
+                    // Círculo rojo arriba a la derecha
+                    const r = 22;
+                    const cx = size - r + 4;
+                    const cy = r - 4;
+                    ctx.fillStyle = '#dc2626'; // rojo
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 3;
+                    ctx.stroke();
+
+                    // Número (o "9+" si pasa de 9)
+                    const texto = count > 9 ? '9+' : String(count);
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = 'bold 28px system-ui, -apple-system, "Segoe UI", Arial';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(texto, cx, cy + 1);
+                }
+
+                setFaviconHref(canvas.toDataURL('image/png'));
+            } catch (e) {
+                // CORS u otro error — sin badge, solo título
+            }
+        }
+
+        async function actualizar() {
+            try {
+                const resp = await fetch('/api/chat/unread-count', { credentials: 'same-origin' });
+                if (!resp.ok) return;
+                const data = await resp.json();
+                const count = Math.max(0, parseInt(data.count || 0, 10));
+                if (count !== ultimoCount) {
+                    ultimoCount = count;
+                    pintar(count);
+                }
+            } catch (e) { /* sin red, ignorar */ }
+        }
+
+        // Primera carga + polling cada 25 seg
+        actualizar();
+        setInterval(actualizar, 25_000);
+
+        // Cuando el usuario vuelve a la pestaña, refrescar inmediato
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) actualizar();
+        });
+
+        // Si Livewire dispara un evento (ej. al abrir una conversación) → refrescar
+        document.addEventListener('livewire:initialized', () => {
+            window.Livewire?.on?.('chat-cambiado', () => setTimeout(actualizar, 500));
+            window.Livewire?.on?.('mensaje-enviado', () => setTimeout(actualizar, 500));
+        });
+    })();
+    </script>
+    @endcan
+    @endauth
 </body>
 </html>

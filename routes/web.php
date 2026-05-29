@@ -281,6 +281,26 @@ Route::middleware(['no_super_sin_imp'])->group(function () {
         ->middleware('permission:chat.usar')
         ->name('chat.estado-pedido');
 
+    // 📊 Contador global de mensajes no leídos del tenant actual.
+    // Lo usa el JS del layout para actualizar título de la pestaña y favicon.
+    Route::get('/api/chat/unread-count', function () {
+        $tenantId = app(\App\Services\TenantManager::class)->current()?->id;
+        if (!$tenantId) return response()->json(['count' => 0]);
+
+        $count = app(\App\Services\TenantManager::class)->withoutTenant(function () use ($tenantId) {
+            return \DB::table('conversaciones_whatsapp')
+                ->where('tenant_id', $tenantId)
+                ->whereNull('deleted_at')
+                ->where(function ($q) {
+                    $q->where('no_leidos', '>', 0)
+                      ->orWhere('marcada_no_leida', true);
+                })
+                ->count();
+        });
+
+        return response()->json(['count' => (int) $count]);
+    })->middleware('permission:chat.usar')->name('chat.unread-count');
+
     // 📡 /bot-monitor redirige al tab 'envivo' dentro de Monitor LLM
     Route::get('/bot-monitor', fn () => redirect('/monitoreo/llm?tab=envivo'))
         ->middleware('permission:chat.usar')

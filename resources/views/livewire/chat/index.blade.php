@@ -462,7 +462,8 @@
                                 default         => 'Mensaje reprocesado por el watchdog',
                             };
                         @endphp
-                        <div class="flex justify-start group/msg relative" x-data="{ pickerAbierto: false }">
+                        <div class="flex justify-start group relative" x-data="{ pickerAbierto: false, hovered: false }"
+                             @mouseenter="hovered = true" @mouseleave="hovered = false">
                             <div class="max-w-[85%] md:max-w-[70%] rounded-2xl rounded-tl-sm {{ $rescatadoPor ? 'bg-amber-50 border border-amber-200' : 'bg-white' }} px-3 py-2 shadow-sm">
                                 @if($rescatadoPor)
                                     <div class="flex items-center gap-1 mb-1 text-[10px] font-semibold text-amber-700"
@@ -518,7 +519,9 @@
 
                             {{-- Botón "reaccionar" (visible al hover) --}}
                             <button type="button" @click.stop="pickerAbierto = !pickerAbierto"
-                                    class="opacity-0 group-hover/msg:opacity-100 focus:opacity-100 self-center ml-1 flex items-center justify-center w-7 h-7 rounded-full bg-white shadow border border-slate-200 hover:bg-slate-100 text-slate-500 transition"
+                                    x-show="hovered || pickerAbierto"
+                                    x-transition.opacity.duration.150ms
+                                    class="self-center ml-1 flex items-center justify-center w-7 h-7 rounded-full bg-white shadow border border-slate-200 hover:bg-slate-100 text-slate-500 transition"
                                     title="Reaccionar">
                                 <i class="fa-regular fa-face-smile text-xs"></i>
                             </button>
