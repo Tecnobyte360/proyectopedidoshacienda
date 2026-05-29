@@ -1209,17 +1209,26 @@
                 if (enCampo) return;
 
                 // Hay conversación activa → cerrarla y enfocar buscador.
+                // Buscamos el componente Chat\Index (el que tiene 'conversacionActivaId').
                 try {
-                    const comp = window.Livewire?.find?.(document.querySelector('[wire\\:id]')?.getAttribute('wire:id'));
+                    let comp = null;
+                    if (window.Livewire?.all) {
+                        comp = window.Livewire.all().find(c => {
+                            try {
+                                const v = c.get('conversacionActivaId');
+                                return v !== undefined;
+                            } catch { return false; }
+                        });
+                    }
                     if (comp && comp.get('conversacionActivaId')) {
-                        comp.set('conversacionActivaId', null);
                         e.preventDefault();
+                        comp.call('cerrarConversacionActiva');
                         setTimeout(() => {
                             const s = document.getElementById('chat-search-input');
                             if (s) s.focus();
-                        }, 80);
+                        }, 120);
                     }
-                } catch (err) { /* noop */ }
+                } catch (err) { console.warn('ESC handler error', err); }
             });
 
             scrollToBottom(true);

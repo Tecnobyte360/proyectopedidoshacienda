@@ -670,6 +670,17 @@ class Index extends Component
     }
 
     /**
+     * ⎋ Cierra la conversación activa (ESC en el chat, estilo WhatsApp Web).
+     */
+    public function cerrarConversacionActiva(): void
+    {
+        $this->conversacionActivaId = null;
+        $this->nuevoMensaje         = '';
+        $this->cancelarRespuesta();
+        $this->dispatch('conversacion-cerrada');
+    }
+
+    /**
      * 👍 Reacciona a un mensaje del cliente con un emoji.
      * Si ya hay la misma reacción, la quita (toggle). Si hay otra, la cambia.
      */
