@@ -523,18 +523,26 @@
                     url: '',
                     filename: '',
                     ext: '',
+                    useNativePdf: false,   // toggle: visor nativo del browser para PDFs
                     get viewerSrc() {
                         if (!this.url) return '';
-                        // PDF y TXT: iframe nativo
-                        if (this.ext === 'pdf' || this.ext === 'txt') return this.url;
-                        // Office: visor de Google Docs (requiere URL pública)
+                        // TXT: directo
+                        if (this.ext === 'txt') return this.url;
+                        // PDF: por default usa Google Docs Viewer (evita X-Frame-Options),
+                        //      pero el usuario puede cambiar a visor nativo del browser
+                        if (this.ext === 'pdf') {
+                            return this.useNativePdf
+                                ? this.url + '#toolbar=1&navpanes=0&view=FitH'
+                                : 'https://docs.google.com/viewer?embedded=true&url=' + encodeURIComponent(this.url);
+                        }
+                        // Office: visor de Google Docs
                         if (['doc','docx','xls','xlsx','ppt','pptx','odt','ods','odp','csv'].includes(this.ext)) {
                             return 'https://docs.google.com/viewer?embedded=true&url=' + encodeURIComponent(this.url);
                         }
                         return this.url;
                     }
                  }"
-                 @open-doc-preview.window="open = true; url = $event.detail.url; filename = $event.detail.filename; ext = ($event.detail.ext || '').toLowerCase()"
+                 @open-doc-preview.window="open = true; useNativePdf = false; url = $event.detail.url; filename = $event.detail.filename; ext = ($event.detail.ext || '').toLowerCase()"
                  @keydown.escape.window="open = false"
                  x-show="open"
                  x-cloak
@@ -558,6 +566,14 @@
                             <div class="text-sm font-bold text-slate-800 truncate" x-text="filename"></div>
                             <div class="text-[10px] text-slate-500 uppercase font-bold tracking-wider" x-text="ext || 'archivo'"></div>
                         </div>
+                        <template x-if="ext === 'pdf'">
+                            <button type="button" @click="useNativePdf = !useNativePdf"
+                                    class="inline-flex items-center gap-1.5 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold px-3 py-2 transition"
+                                    :title="useNativePdf ? 'Usar visor de Google' : 'Usar visor nativo del navegador'">
+                                <i class="fa-solid fa-arrows-rotate"></i>
+                                <span x-text="useNativePdf ? 'Nativo' : 'Google'"></span>
+                            </button>
+                        </template>
                         <a :href="url" target="_blank" download
                            class="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-2 transition">
                             <i class="fa-solid fa-download"></i> Descargar
@@ -575,12 +591,18 @@
                     </div>
 
                     {{-- Visor --}}
-                    <div class="flex-1 bg-slate-100 overflow-hidden">
+                    <div class="flex-1 bg-slate-100 overflow-hidden relative">
                         <template x-if="open && viewerSrc">
                             <iframe :src="viewerSrc"
                                     class="w-full h-full border-0"
-                                    sandbox="allow-same-origin allow-scripts allow-popups allow-forms"></iframe>
+                                    referrerpolicy="no-referrer"
+                                    allow="fullscreen"></iframe>
                         </template>
+                        {{-- Mensaje de fallback si Chrome bloquea (raro pero por si acaso) --}}
+                        <noscript class="absolute inset-0 flex flex-col items-center justify-center text-slate-500 gap-3">
+                            <i class="fa-solid fa-triangle-exclamation text-4xl"></i>
+                            <p class="text-sm">El visor no pudo cargar. Usa el botón "Descargar" o "Abrir en pestaña nueva".</p>
+                        </noscript>
                     </div>
                 </div>
             </div>
