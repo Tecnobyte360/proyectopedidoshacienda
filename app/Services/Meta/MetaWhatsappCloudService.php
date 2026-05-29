@@ -23,6 +23,26 @@ class MetaWhatsappCloudService
      * Envía mensaje de texto libre. Requiere sesión abierta (cliente
      * escribió en últimas 24h) según política de Meta.
      */
+    /**
+     * Envía texto pero como REPLY a un mensaje específico del cliente.
+     * El cliente verá el mensaje con la cita arriba (igual que WhatsApp).
+     *
+     * @param string $messageIdReferencia wamid.xxx al que se responde
+     */
+    public function enviarTextoRespuesta(string $telefono, string $mensaje, string $messageIdReferencia, ?int $tenantId = null): bool
+    {
+        $config = $this->resolverConfig($tenantId);
+        if (!$config) return false;
+
+        return $this->ejecutar($config, [
+            'messaging_product' => 'whatsapp',
+            'to'                => $this->normalizar($telefono),
+            'context'           => ['message_id' => $messageIdReferencia],
+            'type'              => 'text',
+            'text'              => ['body' => $mensaje, 'preview_url' => true],
+        ], 'texto-respuesta');
+    }
+
     public function enviarTexto(string $telefono, string $mensaje, ?int $tenantId = null): bool
     {
         $config = $this->resolverConfig($tenantId);

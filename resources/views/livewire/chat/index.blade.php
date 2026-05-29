@@ -495,6 +495,27 @@
                         <div class="flex justify-start group relative" x-data="{ pickerAbierto: false, hovered: false }"
                              @mouseenter="hovered = true" @mouseleave="hovered = false">
                             <div class="max-w-[85%] md:max-w-[70%] rounded-2xl rounded-tl-sm {{ $rescatadoPor ? 'bg-amber-50 border border-amber-200' : 'bg-white' }} px-3 py-2 shadow-sm">
+                                {{-- 💬 Si el cliente responde a un msg nuestro, mostrar la cita --}}
+                                @if($m->respondiendo_a_mensaje_id)
+                                    @php
+                                        $msgCitado = \App\Models\MensajeWhatsapp::find($m->respondiendo_a_mensaje_id);
+                                        $citaPreview = '';
+                                        if ($msgCitado) {
+                                            if ($msgCitado->tipo === 'image')       $citaPreview = '🖼️ Imagen';
+                                            elseif ($msgCitado->tipo === 'video')    $citaPreview = '🎬 Video';
+                                            elseif ($msgCitado->tipo === 'audio')    $citaPreview = '🎤 Audio';
+                                            elseif ($msgCitado->tipo === 'document') $citaPreview = '📄 ' . ($msgCitado->meta['filename'] ?? 'Documento');
+                                            else                                      $citaPreview = mb_substr((string) $msgCitado->contenido, 0, 120);
+                                        }
+                                        $citaAutor = $msgCitado && $msgCitado->rol === 'user' ? 'Cliente' : 'Tú';
+                                    @endphp
+                                    @if($msgCitado)
+                                        <div class="mb-1.5 border-l-4 border-emerald-400 bg-emerald-50/60 rounded-r-md pl-2 py-1">
+                                            <div class="text-[10px] font-bold text-emerald-700">{{ $citaAutor }}</div>
+                                            <div class="text-[11px] text-slate-700 truncate">{{ $citaPreview }}</div>
+                                        </div>
+                                    @endif
+                                @endif
                                 @if($rescatadoPor)
                                     <div class="flex items-center gap-1 mb-1 text-[10px] font-semibold text-amber-700"
                                          title="{{ $motivoLabel }}">
@@ -551,6 +572,17 @@
                                 // Reacción real a Meta solo con wamid. Sin wamid → reacción local visible solo para el equipo.
                                 $reaccionMeta = $m->mensaje_externo_id && str_starts_with($m->mensaje_externo_id, 'wamid.');
                             @endphp
+                            {{-- Botón "responder a este mensaje" (solo si tiene wamid) --}}
+                            @if($reaccionMeta)
+                                <button type="button" wire:click="iniciarRespuesta({{ $m->id }})"
+                                        x-show="hovered || pickerAbierto"
+                                        x-transition.opacity.duration.150ms
+                                        class="self-center ml-1 flex items-center justify-center w-7 h-7 rounded-full bg-blue-50 border border-blue-300 hover:bg-blue-100 text-blue-700 shadow transition"
+                                        title="↩️ Responder a este mensaje">
+                                    <i class="fa-solid fa-reply text-xs"></i>
+                                </button>
+                            @endif
+
                             {{-- Botón "reaccionar" (visible al hover) — color cambia según modo --}}
                             <button type="button" @click.stop="pickerAbierto = !pickerAbierto"
                                     x-show="hovered || pickerAbierto"
@@ -594,6 +626,28 @@
                                     <div class="text-[10px] uppercase font-bold text-blue-700 mb-0.5">
                                         <i class="fa-solid fa-user-tie"></i> Operador
                                     </div>
+                                @endif
+
+                                {{-- 💬 Si este mensaje es respuesta a otro, mostrar la cita arriba --}}
+                                @if($m->respondiendo_a_mensaje_id)
+                                    @php
+                                        $msgCitado = \App\Models\MensajeWhatsapp::find($m->respondiendo_a_mensaje_id);
+                                        $citaPreview = '';
+                                        if ($msgCitado) {
+                                            if ($msgCitado->tipo === 'image')       $citaPreview = '🖼️ Imagen';
+                                            elseif ($msgCitado->tipo === 'video')    $citaPreview = '🎬 Video';
+                                            elseif ($msgCitado->tipo === 'audio')    $citaPreview = '🎤 Audio';
+                                            elseif ($msgCitado->tipo === 'document') $citaPreview = '📄 ' . ($msgCitado->meta['filename'] ?? 'Documento');
+                                            else                                      $citaPreview = mb_substr((string) $msgCitado->contenido, 0, 120);
+                                        }
+                                        $citaAutor = $msgCitado && $msgCitado->rol === 'user' ? 'Cliente' : 'Tú';
+                                    @endphp
+                                    @if($msgCitado)
+                                        <div class="mb-1.5 border-l-4 border-blue-400 bg-white/60 rounded-r-md pl-2 py-1">
+                                            <div class="text-[10px] font-bold text-blue-700">{{ $citaAutor }}</div>
+                                            <div class="text-[11px] text-slate-700 truncate">{{ $citaPreview }}</div>
+                                        </div>
+                                    @endif
                                 @endif
                                 @if($esAudio)
                                     <audio src="{{ $mediaUrl }}" controls class="w-64 max-w-full"></audio>
@@ -951,6 +1005,20 @@
                                 </button>
                             </template>
                         </div>
+
+                        @if($respondiendoAMensajeId)
+                            {{-- 💬 Preview del mensaje al que se está respondiendo --}}
+                            <div class="absolute -top-12 left-0 right-12 bg-blue-50 border-l-4 border-blue-500 rounded-tr-lg px-3 py-2 flex items-start gap-2 shadow-sm">
+                                <i class="fa-solid fa-reply text-blue-500 mt-0.5"></i>
+                                <div class="flex-1 min-w-0">
+                                    <div class="text-[10px] font-bold text-blue-700 uppercase tracking-wider">Respondiendo a {{ $respondiendoAAutor }}</div>
+                                    <div class="text-xs text-slate-700 truncate">{{ $respondiendoAPreview }}</div>
+                                </div>
+                                <button type="button" wire:click="cancelarRespuesta" class="text-slate-400 hover:text-rose-600" title="Cancelar respuesta">
+                                    <i class="fa-solid fa-xmark"></i>
+                                </button>
+                            </div>
+                        @endif
 
                         <textarea wire:model="nuevoMensaje"
                                   x-ref="ta"

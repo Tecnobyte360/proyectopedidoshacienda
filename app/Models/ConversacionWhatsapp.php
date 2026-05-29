@@ -44,6 +44,8 @@ class ConversacionWhatsapp extends Model
         'marcada_no_leida',
     ];
 
+    // (los campos de reacción/respondiendo_a viven en mensajes_whatsapp, no acá)
+
     protected $casts = [
         'atendida_por_humano' => 'boolean',
         'requiere_humano'     => 'boolean',

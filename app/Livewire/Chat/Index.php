@@ -18,6 +18,11 @@ class Index extends Component
     public ?int $conversacionActivaId = null;
 
     public string $nuevoMensaje = '';
+
+    // 💬 Respondiendo a un mensaje específico (estilo WhatsApp reply)
+    public ?int $respondiendoAMensajeId = null;
+    public string $respondiendoAPreview = '';
+    public string $respondiendoAAutor   = '';
     public string $busqueda     = '';
     public string $filtroEstado = 'todas';   // todas | activa | humano | bot | internos
     public string $filtroCanal  = 'todos';   // todos | whatsapp | instagram | widget
@@ -623,6 +628,38 @@ class Index extends Component
             $conv->update(['marcada_no_leida' => true]);
             $this->dispatch('notify', ['type' => 'info', 'message' => '🔵 Marcada como no leída']);
         }
+    }
+
+    /**
+     * 💬 Inicia el modo "responder a un mensaje específico" (estilo WhatsApp).
+     * Setea el state para que el composer muestre la cita y el próximo envío
+     * incluya context.message_id apuntando a este mensaje.
+     */
+    public function iniciarRespuesta(int $mensajeId): void
+    {
+        $m = MensajeWhatsapp::find($mensajeId);
+        if (!$m) return;
+
+        $this->respondiendoAMensajeId = $m->id;
+        $this->respondiendoAAutor     = $m->rol === MensajeWhatsapp::ROL_USER ? 'Cliente' : 'Tú';
+
+        // Preview corto del contenido
+        $preview = trim((string) $m->contenido);
+        if ($m->tipo === 'image')    $preview = '🖼️ Imagen';
+        elseif ($m->tipo === 'video') $preview = '🎬 Video';
+        elseif ($m->tipo === 'audio') $preview = '🎤 Audio';
+        elseif ($m->tipo === 'document') {
+            $nombreDoc = $m->meta['filename'] ?? 'Documento';
+            $preview = "📄 {$nombreDoc}";
+        }
+        $this->respondiendoAPreview = mb_substr($preview, 0, 120);
+    }
+
+    public function cancelarRespuesta(): void
+    {
+        $this->respondiendoAMensajeId = null;
+        $this->respondiendoAPreview   = '';
+        $this->respondiendoAAutor     = '';
     }
 
     /**
@@ -1428,8 +1465,21 @@ class Index extends Component
                     return;
                 }
 
-                $ok = app(\App\Services\Meta\MetaWhatsappCloudService::class)
-                    ->enviarTexto($conv->telefono_normalizado, $texto, $conv->tenant_id);
+                // 💬 ¿Es respuesta a un mensaje específico? Usar context.message_id
+                $mensajeRespondido = null;
+                $wamidReferencia   = null;
+                if ($this->respondiendoAMensajeId) {
+                    $mensajeRespondido = MensajeWhatsapp::find($this->respondiendoAMensajeId);
+                    if ($mensajeRespondido && $mensajeRespondido->mensaje_externo_id
+                        && str_starts_with($mensajeRespondido->mensaje_externo_id, 'wamid.')) {
+                        $wamidReferencia = $mensajeRespondido->mensaje_externo_id;
+                    }
+                }
+
+                $svc = app(\App\Services\Meta\MetaWhatsappCloudService::class);
+                $ok = $wamidReferencia
+                    ? $svc->enviarTextoRespuesta($conv->telefono_normalizado, $texto, $wamidReferencia, $conv->tenant_id)
+                    : $svc->enviarTexto($conv->telefono_normalizado, $texto, $conv->tenant_id);
 
                 if (!$ok) {
                     $this->dispatch('notify', [
@@ -1440,7 +1490,7 @@ class Index extends Component
                 }
 
                 try {
-                    app(ConversacionService::class)->agregarMensaje(
+                    $msg = app(ConversacionService::class)->agregarMensaje(
                         $conv,
                         MensajeWhatsapp::ROL_ASSISTANT,
                         $texto,
@@ -1450,13 +1500,21 @@ class Index extends Component
                             'provider'           => 'meta',
                         ]]
                     );
+                    // Guardar referencia al mensaje respondido para renderizar la cita en UI
+                    if ($mensajeRespondido) {
+                        $msg->update(['respondiendo_a_mensaje_id' => $mensajeRespondido->id]);
+                    }
                 } catch (\Throwable $e) {
                     Log::warning('No persistió mensaje manual Meta: ' . $e->getMessage());
                 }
 
                 $this->nuevoMensaje = '';
+                $this->cancelarRespuesta();
                 $this->dispatch('mensaje-enviado');
-                $this->dispatch('notify', ['type' => 'success', 'message' => '✓ Mensaje enviado por Meta']);
+                $this->dispatch('notify', [
+                    'type'    => 'success',
+                    'message' => $wamidReferencia ? '✓ Respuesta enviada por Meta' : '✓ Mensaje enviado por Meta',
+                ]);
                 return;
             }
         } catch (\Throwable $e) {

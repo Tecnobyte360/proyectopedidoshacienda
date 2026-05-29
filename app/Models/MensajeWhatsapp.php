@@ -17,6 +17,13 @@ class MensajeWhatsapp extends Model
         'contenido',
         'meta',
         'mensaje_externo_id',
+        'respondiendo_a_mensaje_id',
+        'reaccion_operador',
+        'reaccion_operador_at',
+        'reaccion_cliente',
+        'reaccion_cliente_at',
+        'importado_historico',
+        'fuente_importacion',
         'latencia_ms',
         'tokens_input',
         'tokens_output',
@@ -28,6 +35,9 @@ class MensajeWhatsapp extends Model
         'latencia_ms'   => 'integer',
         'tokens_input'  => 'integer',
         'tokens_output' => 'integer',
+        'reaccion_operador_at' => 'datetime',
+        'reaccion_cliente_at'  => 'datetime',
+        'importado_historico'  => 'boolean',
     ];
 
     public const ACK_PENDING   = 0;

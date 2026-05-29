@@ -211,6 +211,20 @@ class MetaWhatsappWebhookController extends Controller
                 $body = "[mensaje tipo: {$tipo}]";
         }
 
+        // 💬 Si el cliente está respondiendo a un mensaje específico, Meta envía
+        // context.id con el wamid del mensaje original. Buscamos ese mensaje
+        // localmente y guardamos el link para renderizar la cita en /chat.
+        $respondiendoAId = null;
+        $contextWamid = $msg['context']['id'] ?? null;
+        if ($contextWamid) {
+            try {
+                $msgCitado = \App\Models\MensajeWhatsapp::withoutGlobalScopes()
+                    ->where('mensaje_externo_id', $contextWamid)
+                    ->first();
+                $respondiendoAId = $msgCitado?->id;
+            } catch (\Throwable $e) { /* no es crítico */ }
+        }
+
         // Connection_id sintético: usamos un namespace meta:{phone_number_id}
         // para que no choque con los IDs numéricos de la API legacy.
         $connectionId = 'meta:' . $config->phone_number_id;
@@ -245,6 +259,9 @@ class MetaWhatsappWebhookController extends Controller
                 'createdAt' => isset($msg['timestamp'])
                     ? date('c', (int) $msg['timestamp'])
                     : now()->toIso8601String(),
+                // 💬 Si es respuesta a otro mensaje, lo pasamos para que el legacy
+                // lo persista en respondiendo_a_mensaje_id
+                'respondiendoAMensajeId' => $respondiendoAId,
             ],
             'provider' => 'meta',
         ];
