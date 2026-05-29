@@ -518,24 +518,21 @@
             </div>
 
             {{-- 👁️ Modal previsualizador de documentos (PDF, Word, Excel, etc.) --}}
+            {{-- Se teletransporta al <body> para escapar de cualquier overflow:hidden / posicionamiento del chat --}}
             <div x-data="{
                     open: false,
                     url: '',
                     filename: '',
                     ext: '',
-                    useNativePdf: false,   // toggle: visor nativo del browser para PDFs
+                    useNativePdf: false,
                     get viewerSrc() {
                         if (!this.url) return '';
-                        // TXT: directo
                         if (this.ext === 'txt') return this.url;
-                        // PDF: por default usa Google Docs Viewer (evita X-Frame-Options),
-                        //      pero el usuario puede cambiar a visor nativo del browser
                         if (this.ext === 'pdf') {
                             return this.useNativePdf
                                 ? this.url + '#toolbar=1&navpanes=0&view=FitH'
                                 : 'https://docs.google.com/viewer?embedded=true&url=' + encodeURIComponent(this.url);
                         }
-                        // Office: visor de Google Docs
                         if (['doc','docx','xls','xlsx','ppt','pptx','odt','ods','odp','csv'].includes(this.ext)) {
                             return 'https://docs.google.com/viewer?embedded=true&url=' + encodeURIComponent(this.url);
                         }
@@ -543,13 +540,17 @@
                     }
                  }"
                  @open-doc-preview.window="open = true; useNativePdf = false; url = $event.detail.url; filename = $event.detail.filename; ext = ($event.detail.ext || '').toLowerCase()"
-                 @keydown.escape.window="open = false"
-                 x-show="open"
+                 @keydown.escape.window="open = false">
+
+            <template x-teleport="body">
+            <div x-show="open"
                  x-cloak
-                 class="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-2 sm:p-6"
+                 style="position: fixed; inset: 0; z-index: 9999;"
+                 class="flex items-center justify-center bg-black/70 backdrop-blur-sm p-2 sm:p-4"
                  @click.self="open = false">
 
-                <div class="bg-white rounded-2xl shadow-2xl flex flex-col w-full max-w-5xl h-[92vh] overflow-hidden"
+                <div class="bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+                     style="width: 96vw; height: 94vh; max-width: 1400px;"
                      x-transition>
                     {{-- Header --}}
                     <div class="flex items-center gap-2 px-4 py-3 border-b border-slate-200 bg-slate-50">
@@ -591,20 +592,17 @@
                     </div>
 
                     {{-- Visor --}}
-                    <div class="flex-1 bg-slate-100 overflow-hidden relative">
+                    <div class="flex-1 bg-slate-100 overflow-hidden relative" style="min-height: 0;">
                         <template x-if="open && viewerSrc">
                             <iframe :src="viewerSrc"
-                                    class="w-full h-full border-0"
+                                    style="width: 100%; height: 100%; border: 0; display: block;"
                                     referrerpolicy="no-referrer"
                                     allow="fullscreen"></iframe>
                         </template>
-                        {{-- Mensaje de fallback si Chrome bloquea (raro pero por si acaso) --}}
-                        <noscript class="absolute inset-0 flex flex-col items-center justify-center text-slate-500 gap-3">
-                            <i class="fa-solid fa-triangle-exclamation text-4xl"></i>
-                            <p class="text-sm">El visor no pudo cargar. Usa el botón "Descargar" o "Abrir en pestaña nueva".</p>
-                        </noscript>
                     </div>
                 </div>
+            </div>
+            </template>
             </div>
 
             {{-- Imagen + Input (todo en un solo x-data para compartir estado) --}}
