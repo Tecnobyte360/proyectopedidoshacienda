@@ -10091,7 +10091,12 @@ PROMPT;
             ]];
         }
 
-        return [];
+        // 📌 Para mensajes reales (Meta wamid o TecnoByteApp id), guardar el
+        // ID externo en la columna mensaje_externo_id. Esto permite:
+        //  - Reaccionar al mensaje vía Meta Cloud API (necesita el wamid)
+        //  - Deduplicar mensajes en re-envíos
+        //  - Trazabilidad end-to-end
+        return ['mensaje_externo_id' => $messageId];
     }
 
     private function enviarRespuestaWhatsapp(string $from, string $reply, $connectionId = null): bool
