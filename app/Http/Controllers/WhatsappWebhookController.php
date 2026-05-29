@@ -217,7 +217,13 @@ class WhatsappWebhookController extends Controller
                 }
                 $extension = strtolower(pathinfo($nombreArchivo, PATHINFO_EXTENSION)) ?: 'pdf';
 
-                $urlLocal = $this->descargarYGuardarDocumento($mediaUrl, $nombreArchivo);
+                // ⚡ Si la URL ya es del propio Kivox (Meta la pre-descargó), reusarla
+                // — evita re-descargas redundantes y problemas de auto-referencia.
+                $appHost = parse_url((string) config('app.url'), PHP_URL_HOST) ?: 'admin.kivox.co';
+                $mediaHost = parse_url($mediaUrl, PHP_URL_HOST);
+                $urlLocal = ($mediaHost === $appHost && str_contains((string) parse_url($mediaUrl, PHP_URL_PATH), '/storage/'))
+                    ? $mediaUrl
+                    : $this->descargarYGuardarDocumento($mediaUrl, $nombreArchivo);
 
                 if ($connectionId) {
                     $t = app(\App\Services\WhatsappResolverService::class)->tenantPorConnectionId((int) $connectionId);
@@ -10343,7 +10349,20 @@ PROMPT;
             $baseSlug = mb_substr(trim($baseSlug, '_') ?: 'doc', 0, 80);
 
             $filename = 'documentos-in/' . now()->format('Ymd_His') . '_' . uniqid() . '_' . $baseSlug . '.' . $ext;
-            \Illuminate\Support\Facades\Storage::disk('public')->put($filename, $bytes);
+            $ok = \Illuminate\Support\Facades\Storage::disk('public')->put($filename, $bytes);
+
+            if (!$ok || !\Illuminate\Support\Facades\Storage::disk('public')->exists($filename)) {
+                Log::warning('📄 Storage::put falló (no escribió el archivo)', [
+                    'filename' => $filename,
+                    'bytes'    => strlen($bytes),
+                ]);
+                return null;
+            }
+
+            Log::info('📄 Documento descargado y guardado', [
+                'filename' => $filename,
+                'bytes'    => strlen($bytes),
+            ]);
 
             return rtrim(config('app.url'), '/') . \Illuminate\Support\Facades\Storage::url($filename);
         } catch (\Throwable $e) {
