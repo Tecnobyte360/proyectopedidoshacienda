@@ -895,9 +895,9 @@
                         </button>
                     </div>
 
-                    {{-- Botón adjuntar imagen --}}
+                    {{-- Botón adjuntar imagen (también se puede pegar con Ctrl+V) --}}
                     <label x-show="!recording && !preview"
-                           title="Adjuntar imagen"
+                           title="Adjuntar imagen (o pegar con Ctrl+V)"
                            class="flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer">
                         <i class="fa-solid fa-image"></i>
                         <input type="file" accept="image/*" class="hidden"
@@ -1004,7 +1004,35 @@
                 imgCaption: '',
                 sendingImg: false,
                 imgError: '',
-                init() {},
+                init() {
+                    // 📋 Listener global de paste: pegar screenshots con Ctrl+V
+                    // mientras el foco esté en algún input/textarea del composer.
+                    document.addEventListener('paste', (e) => {
+                        // Solo si hay conversación activa y NO hay otra imagen ya en preview
+                        if (this.imgDataUrl) return;
+                        const items = e.clipboardData?.items;
+                        if (!items) return;
+                        for (const item of items) {
+                            if (item.kind === 'file' && item.type.startsWith('image/')) {
+                                const blob = item.getAsFile();
+                                if (!blob) continue;
+                                if (blob.size > 15 * 1024 * 1024) {
+                                    this.imgError = 'Imagen pegada demasiado grande (máx 15 MB).';
+                                    return;
+                                }
+                                e.preventDefault();
+                                const reader = new FileReader();
+                                reader.onload = () => {
+                                    this.imgDataUrl = reader.result;
+                                    this.imgError = '';
+                                };
+                                reader.onerror = () => { this.imgError = 'No se pudo leer la imagen pegada.'; };
+                                reader.readAsDataURL(blob);
+                                return;
+                            }
+                        }
+                    });
+                },
                 pickImage(e) {
                     const file = e.target.files && e.target.files[0];
                     if (!file) return;
