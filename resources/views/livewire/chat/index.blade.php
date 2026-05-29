@@ -432,16 +432,17 @@
                                         <p class="text-sm text-slate-800 mt-1 whitespace-pre-wrap">{{ $caption }}</p>
                                     @endif
                                 @elseif($esDocumento)
-                                    <a href="{{ $mediaUrl }}" target="_blank" download
-                                       class="flex items-center gap-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 px-3 py-2.5 transition w-72 max-w-full">
+                                    <button type="button"
+                                            @click="$dispatch('open-doc-preview', { url: '{{ $mediaUrl }}', filename: @js($docNombre ?: 'Documento'), ext: '{{ $docExt }}' })"
+                                            class="flex items-center gap-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 px-3 py-2.5 transition w-72 max-w-full text-left">
                                         <i class="fa-solid {{ $docIcono }} text-2xl shrink-0"></i>
                                         <div class="flex-1 min-w-0">
                                             <div class="text-sm font-semibold text-slate-800 truncate">{{ $docNombre ?: 'Documento' }}</div>
                                             <div class="text-[10px] text-slate-500 uppercase font-bold tracking-wider">
-                                                {{ $docExt ?: 'archivo' }} · <i class="fa-solid fa-download"></i> Descargar
+                                                {{ $docExt ?: 'archivo' }} · <i class="fa-solid fa-eye"></i> Ver
                                             </div>
                                         </div>
-                                    </a>
+                                    </button>
                                     @if($caption)
                                         <p class="text-sm text-slate-800 mt-1 whitespace-pre-wrap">{{ $caption }}</p>
                                     @endif
@@ -473,16 +474,17 @@
                                         <p class="text-sm text-slate-800 mt-1 whitespace-pre-wrap">{{ $caption }}</p>
                                     @endif
                                 @elseif($esDocumento)
-                                    <a href="{{ $mediaUrl }}" target="_blank" download
-                                       class="flex items-center gap-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 px-3 py-2.5 transition w-72 max-w-full">
+                                    <button type="button"
+                                            @click="$dispatch('open-doc-preview', { url: '{{ $mediaUrl }}', filename: @js($docNombre ?: 'Documento'), ext: '{{ $docExt }}' })"
+                                            class="flex items-center gap-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 px-3 py-2.5 transition w-72 max-w-full text-left">
                                         <i class="fa-solid {{ $docIcono }} text-2xl shrink-0"></i>
                                         <div class="flex-1 min-w-0">
                                             <div class="text-sm font-semibold text-slate-800 truncate">{{ $docNombre ?: 'Documento' }}</div>
                                             <div class="text-[10px] text-slate-500 uppercase font-bold tracking-wider">
-                                                {{ $docExt ?: 'archivo' }} · <i class="fa-solid fa-download"></i> Descargar
+                                                {{ $docExt ?: 'archivo' }} · <i class="fa-solid fa-eye"></i> Ver
                                             </div>
                                         </div>
-                                    </a>
+                                    </button>
                                     @if($caption)
                                         <p class="text-sm text-slate-800 mt-1 whitespace-pre-wrap">{{ $caption }}</p>
                                     @endif
@@ -513,6 +515,74 @@
                         </div>
                     @endif
                 @endforeach
+            </div>
+
+            {{-- 👁️ Modal previsualizador de documentos (PDF, Word, Excel, etc.) --}}
+            <div x-data="{
+                    open: false,
+                    url: '',
+                    filename: '',
+                    ext: '',
+                    get viewerSrc() {
+                        if (!this.url) return '';
+                        // PDF y TXT: iframe nativo
+                        if (this.ext === 'pdf' || this.ext === 'txt') return this.url;
+                        // Office: visor de Google Docs (requiere URL pública)
+                        if (['doc','docx','xls','xlsx','ppt','pptx','odt','ods','odp','csv'].includes(this.ext)) {
+                            return 'https://docs.google.com/viewer?embedded=true&url=' + encodeURIComponent(this.url);
+                        }
+                        return this.url;
+                    }
+                 }"
+                 @open-doc-preview.window="open = true; url = $event.detail.url; filename = $event.detail.filename; ext = ($event.detail.ext || '').toLowerCase()"
+                 @keydown.escape.window="open = false"
+                 x-show="open"
+                 x-cloak
+                 class="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-2 sm:p-6"
+                 @click.self="open = false">
+
+                <div class="bg-white rounded-2xl shadow-2xl flex flex-col w-full max-w-5xl h-[92vh] overflow-hidden"
+                     x-transition>
+                    {{-- Header --}}
+                    <div class="flex items-center gap-2 px-4 py-3 border-b border-slate-200 bg-slate-50">
+                        <i class="fa-solid fa-file-pdf text-rose-600 text-lg"
+                           :class="{
+                               'fa-file-pdf text-rose-600': ext === 'pdf',
+                               'fa-file-word text-blue-600': ['doc','docx','odt'].includes(ext),
+                               'fa-file-excel text-emerald-600': ['xls','xlsx','ods','csv'].includes(ext),
+                               'fa-file-powerpoint text-orange-600': ['ppt','pptx','odp'].includes(ext),
+                               'fa-file-lines text-slate-600': ext === 'txt',
+                               'fa-file text-slate-600': !['pdf','doc','docx','odt','xls','xlsx','ods','csv','ppt','pptx','odp','txt'].includes(ext)
+                           }"></i>
+                        <div class="flex-1 min-w-0">
+                            <div class="text-sm font-bold text-slate-800 truncate" x-text="filename"></div>
+                            <div class="text-[10px] text-slate-500 uppercase font-bold tracking-wider" x-text="ext || 'archivo'"></div>
+                        </div>
+                        <a :href="url" target="_blank" download
+                           class="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-2 transition">
+                            <i class="fa-solid fa-download"></i> Descargar
+                        </a>
+                        <a :href="url" target="_blank"
+                           class="inline-flex items-center gap-1.5 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold px-3 py-2 transition"
+                           title="Abrir en pestaña nueva">
+                            <i class="fa-solid fa-up-right-from-square"></i>
+                        </a>
+                        <button type="button" @click="open = false"
+                                class="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-slate-200 hover:bg-rose-100 hover:text-rose-600 text-slate-700 transition"
+                                title="Cerrar (Esc)">
+                            <i class="fa-solid fa-xmark text-lg"></i>
+                        </button>
+                    </div>
+
+                    {{-- Visor --}}
+                    <div class="flex-1 bg-slate-100 overflow-hidden">
+                        <template x-if="open && viewerSrc">
+                            <iframe :src="viewerSrc"
+                                    class="w-full h-full border-0"
+                                    sandbox="allow-same-origin allow-scripts allow-popups allow-forms"></iframe>
+                        </template>
+                    </div>
+                </div>
             </div>
 
             {{-- Imagen + Input (todo en un solo x-data para compartir estado) --}}
