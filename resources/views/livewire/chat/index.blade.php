@@ -225,9 +225,15 @@
                         <div class="flex items-center justify-between gap-2">
                             <div class="text-xs truncate font-mono {{ $tieneNoLeidos ? 'text-slate-700' : 'text-slate-500' }}">{{ $c->telefono_normalizado }}</div>
                             @if($tieneNoLeidos)
-                                <span class="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-emerald-500 text-white text-[11px] font-extrabold flex-shrink-0 shadow-sm">
-                                    {{ $c->no_leidos > 99 ? '99+' : $c->no_leidos }}
-                                </span>
+                                @if(($c->no_leidos ?? 0) > 0)
+                                    {{-- Hay mensajes nuevos reales del cliente: badge con número --}}
+                                    <span class="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-emerald-500 text-white text-[11px] font-extrabold flex-shrink-0 shadow-sm">
+                                        {{ $c->no_leidos > 99 ? '99+' : $c->no_leidos }}
+                                    </span>
+                                @else
+                                    {{-- Sólo marcada manualmente como no leída: puntito verde --}}
+                                    <span class="inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500 flex-shrink-0 shadow-sm" title="Marcada como no leída"></span>
+                                @endif
                             @endif
                         </div>
                         <div class="flex items-center justify-between gap-2 mt-0.5">

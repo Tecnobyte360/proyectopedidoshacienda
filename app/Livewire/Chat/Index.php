@@ -445,6 +445,20 @@ class Index extends Component
         $this->plantillaChatId = null;
         $this->plantillaChatVars = [];
 
+        // 📭 Al abrir la conversación: resetear no_leidos y limpiar el flag
+        // manual "marcada_no_leida" si estaba prendido.
+        try {
+            ConversacionWhatsapp::where('id', $id)
+                ->where(fn ($q) => $q->where('no_leidos', '>', 0)->orWhere('marcada_no_leida', true))
+                ->update([
+                    'no_leidos'        => 0,
+                    'marcada_no_leida' => false,
+                    'ultima_vista_at'  => now(),
+                ]);
+        } catch (\Throwable $e) {
+            Log::warning('No se pudo limpiar no_leidos al abrir conv: ' . $e->getMessage());
+        }
+
         // 🟢 Meta: calcular estado de ventana 24h para esta conversación
         try {
             $tenant = app(\App\Services\TenantManager::class)->current();
