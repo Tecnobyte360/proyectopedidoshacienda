@@ -575,6 +575,42 @@ class Index extends Component
         ]);
     }
 
+    /**
+     * 📌 Fijar / desfijar una conversación en la lista.
+     * Las fijadas aparecen siempre arriba, ordenadas por cuándo se fijaron.
+     */
+    public function toggleFijar(int $conversacionId): void
+    {
+        $conv = ConversacionWhatsapp::find($conversacionId);
+        if (!$conv) return;
+
+        if ($conv->fijada_at) {
+            $conv->update(['fijada_at' => null]);
+            $this->dispatch('notify', ['type' => 'info', 'message' => '📌 Conversación desfijada']);
+        } else {
+            $conv->update(['fijada_at' => now()]);
+            $this->dispatch('notify', ['type' => 'success', 'message' => '📌 Conversación fijada arriba']);
+        }
+    }
+
+    /**
+     * 👁️ Marcar / desmarcar como no leída manualmente.
+     * Override sobre no_leidos: aunque la abras, sigue resaltada hasta desmarcarla.
+     */
+    public function toggleMarcarNoLeida(int $conversacionId): void
+    {
+        $conv = ConversacionWhatsapp::find($conversacionId);
+        if (!$conv) return;
+
+        if ($conv->marcada_no_leida) {
+            $conv->update(['marcada_no_leida' => false]);
+            $this->dispatch('notify', ['type' => 'info', 'message' => '✓ Marcada como leída']);
+        } else {
+            $conv->update(['marcada_no_leida' => true]);
+            $this->dispatch('notify', ['type' => 'info', 'message' => '🔵 Marcada como no leída']);
+        }
+    }
+
     public function devolverAlBot(): void
     {
         if (!$this->conversacionActivaId) return;
@@ -1640,6 +1676,9 @@ class Index extends Component
             ->when($this->filtroCanal === 'instagram', fn ($q) => $q->where('canal', 'instagram'))
             ->when($this->filtroCanal === 'messenger', fn ($q) => $q->where('canal', 'messenger'))
             ->when($this->filtroCanal === 'widget',    fn ($q) => $q->where('canal', 'widget'))
+            // 📌 Fijadas siempre arriba (ordenadas por cuándo se fijaron, más recientes primero)
+            ->orderByRaw('CASE WHEN fijada_at IS NULL THEN 1 ELSE 0 END')
+            ->orderByDesc('fijada_at')
             ->orderByDesc('ultimo_mensaje_at')
             ->limit(60)
             ->get();

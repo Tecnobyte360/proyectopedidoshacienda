@@ -145,10 +145,17 @@
                     $isActiva = $conversacionActiva && $conversacionActiva->id === $c->id;
                 @endphp
 
-                @php $tieneNoLeidos = (int) ($c->no_leidos ?? 0) > 0; @endphp
+                @php
+                    $tieneNoLeidos = ((int) ($c->no_leidos ?? 0) > 0) || ($c->marcada_no_leida ?? false);
+                    $estaFijada    = !empty($c->fijada_at);
+                @endphp
+                <div class="group relative border-b border-slate-100 hover:bg-amber-50/40 transition
+                            {{ $isActiva ? 'bg-amber-50' : ($tieneNoLeidos ? 'bg-emerald-50/40' : '') }}
+                            {{ $estaFijada ? 'border-l-4 border-l-amber-400' : '' }}"
+                     x-data="{ menuAbierto: false }">
+
                 <button wire:click="seleccionar({{ $c->id }})"
-                        class="w-full text-left flex items-center gap-3 px-4 py-3 border-b border-slate-100 hover:bg-amber-50/40 transition
-                              {{ $isActiva ? 'bg-amber-50' : ($tieneNoLeidos ? 'bg-emerald-50/40' : '') }}">
+                        class="w-full text-left flex items-center gap-3 px-4 py-3 pr-10">
 
                     <div class="relative flex-shrink-0">
                         @php
@@ -205,8 +212,11 @@
 
                     <div class="flex-1 min-w-0">
                         <div class="flex items-center justify-between gap-2">
-                            <span class="truncate {{ $tieneNoLeidos ? 'font-extrabold text-slate-900' : 'font-semibold text-slate-800' }}">
-                                {{ $c->cliente?->nombre ?? 'Cliente' }}
+                            <span class="truncate flex items-center gap-1.5 {{ $tieneNoLeidos ? 'font-extrabold text-slate-900' : 'font-semibold text-slate-800' }}">
+                                @if($estaFijada)
+                                    <i class="fa-solid fa-thumbtack text-amber-500 text-[11px] shrink-0" title="Conversación fijada"></i>
+                                @endif
+                                <span class="truncate">{{ $c->cliente?->nombre ?? 'Cliente' }}</span>
                             </span>
                             <span class="text-[10px] flex-shrink-0 {{ $tieneNoLeidos ? 'text-emerald-600 font-bold' : 'text-slate-400' }}">
                                 {{ $c->ultimo_mensaje_at?->diffForHumans(null, true) }}
@@ -230,6 +240,38 @@
                         </div>
                     </div>
                 </button>
+
+                {{-- Kebab menu (acciones por chat) --}}
+                <div class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition"
+                     :class="{ 'opacity-100': menuAbierto }">
+                    <button type="button" @click.stop="menuAbierto = !menuAbierto"
+                            class="flex items-center justify-center w-7 h-7 rounded-full bg-white shadow-sm border border-slate-200 hover:bg-slate-100 text-slate-600"
+                            title="Más opciones">
+                        <i class="fa-solid fa-ellipsis-vertical text-xs"></i>
+                    </button>
+
+                    <div x-show="menuAbierto" x-cloak
+                         @click.outside="menuAbierto = false"
+                         @keydown.escape.window="menuAbierto = false"
+                         x-transition.opacity
+                         class="absolute right-0 mt-1 w-52 bg-white rounded-xl shadow-xl border border-slate-200 py-1 z-30">
+                        <button type="button"
+                                wire:click="toggleFijar({{ $c->id }})"
+                                @click="menuAbierto = false"
+                                class="w-full text-left px-3 py-2 text-sm hover:bg-amber-50 flex items-center gap-2.5">
+                            <i class="fa-solid fa-thumbtack {{ $estaFijada ? 'text-amber-500' : 'text-slate-400' }} w-4"></i>
+                            <span class="text-slate-700">{{ $estaFijada ? 'Desfijar conversación' : 'Fijar arriba' }}</span>
+                        </button>
+                        <button type="button"
+                                wire:click="toggleMarcarNoLeida({{ $c->id }})"
+                                @click="menuAbierto = false"
+                                class="w-full text-left px-3 py-2 text-sm hover:bg-emerald-50 flex items-center gap-2.5">
+                            <i class="fa-solid {{ ($c->marcada_no_leida ?? false) ? 'fa-envelope-open text-slate-400' : 'fa-envelope text-emerald-600' }} w-4"></i>
+                            <span class="text-slate-700">{{ ($c->marcada_no_leida ?? false) ? 'Marcar como leída' : 'Marcar como no leída' }}</span>
+                        </button>
+                    </div>
+                </div>
+                </div>
             @empty
                 <div class="p-8 text-center text-slate-400">
                     <i class="fa-solid fa-inbox text-3xl mb-2 block"></i>

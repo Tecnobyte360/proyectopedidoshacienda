@@ -40,6 +40,8 @@ class ConversacionWhatsapp extends Model
         'humano_motivo',
         'humano_solicitado_at',
         'humano_atendido_at',
+        'fijada_at',
+        'marcada_no_leida',
     ];
 
     protected $casts = [
@@ -54,6 +56,8 @@ class ConversacionWhatsapp extends Model
         'genero_pedido'       => 'boolean',
         'primer_mensaje_at'   => 'datetime',
         'ultimo_mensaje_at'   => 'datetime',
+        'fijada_at'           => 'datetime',
+        'marcada_no_leida'    => 'boolean',
     ];
 
     public const ESTADO_ACTIVA     = 'activa';
