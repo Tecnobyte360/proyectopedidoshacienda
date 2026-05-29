@@ -152,8 +152,21 @@ class WhatsappWebhookController extends Controller
             || preg_match('/\.(jpe?g|png|gif|webp|bmp)(\?|$)/i', $mediaUrl) === 1
         );
 
-        // Si es audio o imagen, el "body" normalmente trae el nombre del archivo — lo ignoramos
-        if ($esAudio || $esImagen) {
+        // 📄 Detectar documento (PDF, Word, Excel, etc.)
+        $esDocumento = !empty($mediaUrl) && !$esAudio && !$esImagen && (
+            $tipoMensaje === 'document'
+            || str_starts_with($tipoMensaje, 'application/')
+            || preg_match('/\.(pdf|docx?|xlsx?|pptx?|txt|csv|zip|rar|odt|ods)(\?|$)/i', $mediaUrl) === 1
+        );
+
+        // Nombre del archivo: lo usan algunos proveedores en `body` / `filename` / `caption`
+        $nombreArchivo = $data['mensaje']['filename']
+            ?? $data['mensaje']['fileName']
+            ?? $data['filename']
+            ?? ($esDocumento && !empty($message) && !str_contains($message, ' ') ? $message : null);
+
+        // Si es audio, imagen o documento, el "body" suele ser el nombre del archivo — lo descartamos del texto
+        if ($esAudio || $esImagen || $esDocumento) {
             $message = '';
         }
 
@@ -191,6 +204,66 @@ class WhatsappWebhookController extends Controller
             } catch (\Throwable $e) {
                 Log::error('🖼️ Error procesando imagen: ' . $e->getMessage());
                 // Seguimos el flujo normal — el cliente al menos verá el aviso
+            }
+        }
+
+        // 📄 DOCUMENTO (PDF/Word/Excel/etc): descargar, guardar y persistir como mensaje del cliente
+        if ($esDocumento) {
+            try {
+                // Adivinar nombre si no vino: del último segmento de la URL
+                if (!$nombreArchivo) {
+                    $parsed = parse_url($mediaUrl);
+                    $nombreArchivo = basename($parsed['path'] ?? '') ?: 'documento';
+                }
+                $extension = strtolower(pathinfo($nombreArchivo, PATHINFO_EXTENSION)) ?: 'pdf';
+
+                $urlLocal = $this->descargarYGuardarDocumento($mediaUrl, $nombreArchivo);
+
+                if ($connectionId) {
+                    $t = app(\App\Services\WhatsappResolverService::class)->tenantPorConnectionId((int) $connectionId);
+                    if ($t) app(\App\Services\TenantManager::class)->set($t);
+                }
+
+                $telefonoNorm = preg_replace('/\D+/', '', $from);
+                $cliente = \App\Models\Cliente::encontrarOCrearPorTelefono($telefonoNorm, $name);
+                $conv = app(\App\Services\ConversacionService::class)
+                    ->obtenerOCrearActiva($telefonoNorm, $cliente->id, null, $connectionId ? (int) $connectionId : null);
+
+                // Icono según extensión (solo cosmético para el contenido textual)
+                $icono = match (true) {
+                    $extension === 'pdf'                                  => '📄',
+                    in_array($extension, ['doc','docx','odt'], true)      => '📝',
+                    in_array($extension, ['xls','xlsx','ods','csv'], true)=> '📊',
+                    in_array($extension, ['ppt','pptx'], true)            => '📈',
+                    in_array($extension, ['zip','rar','7z'], true)        => '🗜️',
+                    default                                                => '📎',
+                };
+
+                app(\App\Services\ConversacionService::class)->agregarMensaje(
+                    $conv,
+                    \App\Models\MensajeWhatsapp::ROL_USER,
+                    "{$icono} {$nombreArchivo}",
+                    [
+                        'tipo' => 'document',
+                        'meta' => [
+                            'media_url'     => $urlLocal ?: $mediaUrl,
+                            'media_url_src' => $mediaUrl,
+                            'filename'      => $nombreArchivo,
+                            'extension'     => $extension,
+                            'mime_type'     => $data['mensaje']['mimeType'] ?? $data['mimeType'] ?? null,
+                        ],
+                    ]
+                );
+
+                Log::info('📄 Documento recibido y persistido', [
+                    'url' => $urlLocal ?: $mediaUrl,
+                    'filename' => $nombreArchivo,
+                    'extension' => $extension,
+                ]);
+                return response()->json(['status' => 'document_received']);
+            } catch (\Throwable $e) {
+                Log::error('📄 Error procesando documento: ' . $e->getMessage());
+                // Seguimos al flujo normal
             }
         }
 
@@ -10231,6 +10304,50 @@ PROMPT;
             return rtrim(config('app.url'), '/') . \Illuminate\Support\Facades\Storage::url($filename);
         } catch (\Throwable $e) {
             Log::error('🖼️ Excepción descargando imagen: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * 📄 Descarga el documento (PDF/Word/Excel/etc) y lo guarda en storage/public.
+     * Devuelve URL absoluta servible al chat panel o null si falló.
+     */
+    private function descargarYGuardarDocumento(string $urlRemota, string $nombreOriginal): ?string
+    {
+        try {
+            $resp = Http::withoutVerifying()->timeout(60)->get($urlRemota);
+            if (!$resp->successful()) {
+                Log::warning('📄 No se pudo descargar el documento', ['url' => $urlRemota, 'status' => $resp->status()]);
+                return null;
+            }
+
+            $bytes = $resp->body();
+            // Permitimos hasta 50 MB para documentos
+            if (strlen($bytes) < 20 || strlen($bytes) > 50 * 1024 * 1024) {
+                Log::warning('📄 Documento fuera de rango de tamaño', ['bytes' => strlen($bytes)]);
+                return null;
+            }
+
+            $ext = strtolower(pathinfo($nombreOriginal, PATHINFO_EXTENSION));
+            if (!$ext) {
+                $ext = strtolower(pathinfo(parse_url($urlRemota, PHP_URL_PATH) ?: '', PATHINFO_EXTENSION)) ?: 'pdf';
+            }
+            // Whitelisting básico para evitar guardar .exe/.sh y demás raros
+            $extsPermitidas = ['pdf','doc','docx','xls','xlsx','ppt','pptx','txt','csv','zip','rar','7z','odt','ods','odp'];
+            if (!in_array($ext, $extsPermitidas, true)) {
+                $ext = 'bin';
+            }
+
+            // Sanear nombre original para incluirlo en el path (evita "../" etc.)
+            $baseSlug = preg_replace('/[^A-Za-z0-9._-]+/', '_', pathinfo($nombreOriginal, PATHINFO_FILENAME));
+            $baseSlug = mb_substr(trim($baseSlug, '_') ?: 'doc', 0, 80);
+
+            $filename = 'documentos-in/' . now()->format('Ymd_His') . '_' . uniqid() . '_' . $baseSlug . '.' . $ext;
+            \Illuminate\Support\Facades\Storage::disk('public')->put($filename, $bytes);
+
+            return rtrim(config('app.url'), '/') . \Illuminate\Support\Facades\Storage::url($filename);
+        } catch (\Throwable $e) {
+            Log::error('📄 Excepción descargando documento: ' . $e->getMessage());
             return null;
         }
     }

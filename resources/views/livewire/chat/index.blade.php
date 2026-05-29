@@ -385,10 +385,23 @@
                  style="word-break: break-word; overflow-wrap: anywhere;">
                 @foreach($conversacionActiva->mensajes as $m)
                     @php
-                        $mediaUrl = $m->meta['media_url'] ?? null;
-                        $esAudio  = ($m->tipo ?? null) === 'audio' && !empty($mediaUrl);
-                        $esImagen = ($m->tipo ?? null) === 'image' && !empty($mediaUrl);
-                        $caption  = $m->meta['caption'] ?? null;
+                        $mediaUrl    = $m->meta['media_url'] ?? null;
+                        $esAudio     = ($m->tipo ?? null) === 'audio' && !empty($mediaUrl);
+                        $esImagen    = ($m->tipo ?? null) === 'image' && !empty($mediaUrl);
+                        $esDocumento = ($m->tipo ?? null) === 'document' && !empty($mediaUrl);
+                        $caption     = $m->meta['caption'] ?? null;
+                        $docNombre   = $m->meta['filename'] ?? null;
+                        $docExt      = strtolower($m->meta['extension'] ?? '');
+                        // Icono FontAwesome por extensión del documento
+                        $docIcono    = match (true) {
+                            $docExt === 'pdf'                                    => 'fa-file-pdf text-rose-600',
+                            in_array($docExt, ['doc','docx','odt'], true)        => 'fa-file-word text-blue-600',
+                            in_array($docExt, ['xls','xlsx','ods','csv'], true)  => 'fa-file-excel text-emerald-600',
+                            in_array($docExt, ['ppt','pptx','odp'], true)        => 'fa-file-powerpoint text-orange-600',
+                            in_array($docExt, ['zip','rar','7z'], true)          => 'fa-file-zipper text-violet-600',
+                            $docExt === 'txt'                                    => 'fa-file-lines text-slate-600',
+                            default                                              => 'fa-file text-slate-600',
+                        };
                     @endphp
                     @if($m->rol === 'user')
                         @php
@@ -418,6 +431,20 @@
                                     @if($caption)
                                         <p class="text-sm text-slate-800 mt-1 whitespace-pre-wrap">{{ $caption }}</p>
                                     @endif
+                                @elseif($esDocumento)
+                                    <a href="{{ $mediaUrl }}" target="_blank" download
+                                       class="flex items-center gap-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 px-3 py-2.5 transition w-72 max-w-full">
+                                        <i class="fa-solid {{ $docIcono }} text-2xl shrink-0"></i>
+                                        <div class="flex-1 min-w-0">
+                                            <div class="text-sm font-semibold text-slate-800 truncate">{{ $docNombre ?: 'Documento' }}</div>
+                                            <div class="text-[10px] text-slate-500 uppercase font-bold tracking-wider">
+                                                {{ $docExt ?: 'archivo' }} · <i class="fa-solid fa-download"></i> Descargar
+                                            </div>
+                                        </div>
+                                    </a>
+                                    @if($caption)
+                                        <p class="text-sm text-slate-800 mt-1 whitespace-pre-wrap">{{ $caption }}</p>
+                                    @endif
                                 @else
                                     <p class="text-sm text-slate-800 whitespace-pre-wrap">{{ $m->contenido }}</p>
                                 @endif
@@ -441,6 +468,20 @@
                                 @elseif($esImagen)
                                     <a href="{{ $mediaUrl }}" target="_blank">
                                         <img src="{{ $mediaUrl }}" class="rounded-lg max-w-full max-h-64 object-contain" alt="imagen">
+                                    </a>
+                                    @if($caption)
+                                        <p class="text-sm text-slate-800 mt-1 whitespace-pre-wrap">{{ $caption }}</p>
+                                    @endif
+                                @elseif($esDocumento)
+                                    <a href="{{ $mediaUrl }}" target="_blank" download
+                                       class="flex items-center gap-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 px-3 py-2.5 transition w-72 max-w-full">
+                                        <i class="fa-solid {{ $docIcono }} text-2xl shrink-0"></i>
+                                        <div class="flex-1 min-w-0">
+                                            <div class="text-sm font-semibold text-slate-800 truncate">{{ $docNombre ?: 'Documento' }}</div>
+                                            <div class="text-[10px] text-slate-500 uppercase font-bold tracking-wider">
+                                                {{ $docExt ?: 'archivo' }} · <i class="fa-solid fa-download"></i> Descargar
+                                            </div>
+                                        </div>
                                     </a>
                                     @if($caption)
                                         <p class="text-sm text-slate-800 mt-1 whitespace-pre-wrap">{{ $caption }}</p>
