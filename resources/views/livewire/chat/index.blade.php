@@ -1189,38 +1189,37 @@
                 }
             });
 
-            // ⎋ ESC global: cierra la conversación activa y enfoca el buscador (estilo WhatsApp Web).
-            // Si ESC se presiona dentro del composer o cualquier input/textarea, salimos del foco primero;
-            // si ya estamos fuera de un campo, cerramos la conversación.
+            // ⎋ ESC global: cierra la conversación activa de UNA con un solo ESC (estilo WhatsApp Web).
+            // No importa si el foco está en el composer, buscador, o lista — siempre cierra.
+            // Excepciones: si hay un modal abierto (data-modal-open) o si estás en otro input
+            // que no sea el composer ni el buscador del chat, no interceptamos.
             document.addEventListener('keydown', (e) => {
                 if (e.key !== 'Escape') return;
 
                 const target = e.target;
                 const tag = (target?.tagName || '').toUpperCase();
                 const enCampo = ['INPUT', 'TEXTAREA', 'SELECT'].includes(tag) || target?.isContentEditable;
+                const idCampo = target?.id || '';
 
-                // Si está en el composer, dejamos que primero pierda el foco; el siguiente ESC cerrará el chat.
-                if (enCampo && target.id === 'chat-composer-textarea') {
-                    target.blur();
-                    return;
-                }
+                // Permitimos cerrar desde: composer, buscador del chat, body o cualquier no-input.
+                const idsPermitidos = ['chat-composer-textarea', 'chat-search-input'];
+                if (enCampo && !idsPermitidos.includes(idCampo)) return;
 
-                // Si está en un input distinto (ej. buscador), no interceptamos.
-                if (enCampo) return;
-
-                // Hay conversación activa → dispatch a Livewire para cerrarla.
-                // Sólo activamos si la zona "Selecciona una conversación" NO está visible
-                // (es decir, sí hay un chat abierto). Detectamos por el textarea del composer.
                 const hayChatAbierto = !!document.getElementById('chat-composer-textarea');
-                if (hayChatAbierto) {
-                    e.preventDefault();
-                    try { window.Livewire?.dispatch?.('cerrar-conversacion-activa'); } catch {}
-                    setTimeout(() => {
-                        const s = document.getElementById('chat-search-input');
-                        if (s) s.focus();
-                    }, 200);
-                }
-            });
+                if (!hayChatAbierto) return;
+
+                e.preventDefault();
+                e.stopPropagation();
+
+                // Si está en el composer, blur primero para que Livewire no quede esperando.
+                if (idCampo === 'chat-composer-textarea') target.blur();
+
+                try { window.Livewire?.dispatch?.('cerrar-conversacion-activa'); } catch {}
+                setTimeout(() => {
+                    const s = document.getElementById('chat-search-input');
+                    if (s) s.focus();
+                }, 200);
+            }, true); // capture: true → corre ANTES que listeners de Alpine en el composer
 
             scrollToBottom(true);
         })();
