@@ -1166,6 +1166,53 @@ class Index extends Component
             return;
         }
 
+        // 🟢 RUTA META: si el tenant usa Meta, no necesitamos connection_id de TecnoByteApp.
+        // Iniciamos directo via Cloud API. Si el cliente nunca te ha escrito y la ventana 24h
+        // está cerrada, Meta exigirá plantilla y avisamos al usuario.
+        $tenant      = app(\App\Services\TenantManager::class)->current();
+        $tenantUsaMeta = $tenant && $tenant->proveedorWhatsappResuelto() === \App\Models\Tenant::WA_PROVIDER_META;
+
+        if ($tenantUsaMeta) {
+            $cliente = \App\Models\Cliente::encontrarOCrearPorTelefono($telefono, trim($this->nuevoChatNombre) ?: 'Cliente');
+            $conv = app(ConversacionService::class)->obtenerOCrearActiva($telefono, $cliente->id, null, null);
+
+            try {
+                $ok = app(\App\Services\Meta\MetaWhatsappCloudService::class)
+                    ->enviarTexto($telefono, $texto, $tenant->id);
+
+                if (!$ok) {
+                    $this->dispatch('notify', [
+                        'type'    => 'error',
+                        'message' => '🔒 Cliente nuevo o ventana 24h cerrada. Por Meta debes enviar una PLANTILLA aprobada para iniciar la conversación. Cierra este modal y usa el panel ámbar "Enviar plantilla" del chat.',
+                    ]);
+                    return;
+                }
+
+                try {
+                    $mensaje = app(ConversacionService::class)->agregarMensaje(
+                        $conv,
+                        MensajeWhatsapp::ROL_ASSISTANT,
+                        $texto,
+                        ['meta' => ['enviado_por_humano' => true, 'usuario_id' => auth()->id(), 'provider' => 'meta']]
+                    );
+                    $mensaje->update(['ack' => MensajeWhatsapp::ACK_SENT]);
+                } catch (\Throwable $e) {
+                    Log::warning('No se persistió mensaje manual Meta (nuevo chat): ' . $e->getMessage());
+                }
+
+                $this->nuevoChatModal       = false;
+                $this->conversacionActivaId = $conv->id;
+                $this->dispatch('notify', ['type' => 'success', 'message' => '✓ Chat iniciado por Meta']);
+                $this->dispatch('chat-cambiado', conversacionId: $conv->id);
+                return;
+            } catch (\Throwable $e) {
+                Log::error('Error iniciando chat Meta: ' . $e->getMessage());
+                $this->dispatch('notify', ['type' => 'error', 'message' => '❌ Error Meta: ' . $e->getMessage()]);
+                return;
+            }
+        }
+
+        // ─── RUTA LEGACY (TecnoByteApp) ─────────────────────────────
         // Resolver connection_id del tenant actual ANTES de crear la conversación
         $connectionId = $this->resolverConnectionId();
         if (!$connectionId) {
