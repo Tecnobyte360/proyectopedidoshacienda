@@ -152,8 +152,14 @@ class WhatsappWebhookController extends Controller
             || preg_match('/\.(jpe?g|png|gif|webp|bmp)(\?|$)/i', $mediaUrl) === 1
         );
 
+        // 🎬 Detectar video
+        $esVideo = !empty($mediaUrl) && !$esAudio && !$esImagen && (
+            str_starts_with($tipoMensaje, 'video')
+            || preg_match('/\.(mp4|mov|3gp|avi|webm|mkv|m4v)(\?|$)/i', $mediaUrl) === 1
+        );
+
         // 📄 Detectar documento (PDF, Word, Excel, etc.)
-        $esDocumento = !empty($mediaUrl) && !$esAudio && !$esImagen && (
+        $esDocumento = !empty($mediaUrl) && !$esAudio && !$esImagen && !$esVideo && (
             $tipoMensaje === 'document'
             || str_starts_with($tipoMensaje, 'application/')
             || preg_match('/\.(pdf|docx?|xlsx?|pptx?|txt|csv|zip|rar|odt|ods)(\?|$)/i', $mediaUrl) === 1
@@ -165,8 +171,8 @@ class WhatsappWebhookController extends Controller
             ?? $data['filename']
             ?? ($esDocumento && !empty($message) && !str_contains($message, ' ') ? $message : null);
 
-        // Si es audio, imagen o documento, el "body" suele ser el nombre del archivo — lo descartamos del texto
-        if ($esAudio || $esImagen || $esDocumento) {
+        // Si es audio, imagen, video o documento, el "body" suele ser el nombre del archivo — lo descartamos del texto
+        if ($esAudio || $esImagen || $esVideo || $esDocumento) {
             $message = '';
         }
 
@@ -204,6 +210,48 @@ class WhatsappWebhookController extends Controller
             } catch (\Throwable $e) {
                 Log::error('🖼️ Error procesando imagen: ' . $e->getMessage());
                 // Seguimos el flujo normal — el cliente al menos verá el aviso
+            }
+        }
+
+        // 🎬 VIDEO: si Meta ya lo descargó local, reusamos la URL; sino lo descargamos.
+        if ($esVideo) {
+            try {
+                $appHost = parse_url((string) config('app.url'), PHP_URL_HOST) ?: 'admin.kivox.co';
+                $mediaHost = parse_url($mediaUrl, PHP_URL_HOST);
+                $esUrlLocal = ($mediaHost === $appHost && str_contains((string) parse_url($mediaUrl, PHP_URL_PATH), '/storage/'));
+
+                $urlLocal = $esUrlLocal
+                    ? $mediaUrl
+                    : $this->descargarYGuardarDocumento($mediaUrl, 'video_' . time() . '.mp4');
+
+                if ($connectionId) {
+                    $t = app(\App\Services\WhatsappResolverService::class)->tenantPorConnectionId((int) $connectionId);
+                    if ($t) app(\App\Services\TenantManager::class)->set($t);
+                }
+
+                $telefonoNorm = preg_replace('/\D+/', '', $from);
+                $cliente = \App\Models\Cliente::encontrarOCrearPorTelefono($telefonoNorm, $name);
+                $conv = app(\App\Services\ConversacionService::class)
+                    ->obtenerOCrearActiva($telefonoNorm, $cliente->id, null, $connectionId ? (int) $connectionId : null);
+
+                app(\App\Services\ConversacionService::class)->agregarMensaje(
+                    $conv,
+                    \App\Models\MensajeWhatsapp::ROL_USER,
+                    '🎬 Video',
+                    [
+                        'tipo' => 'video',
+                        'meta' => [
+                            'media_url'     => $urlLocal ?: $mediaUrl,
+                            'media_url_src' => $mediaUrl,
+                            'mime_type'     => $data['mensaje']['mimeType'] ?? $data['mimeType'] ?? null,
+                        ],
+                    ]
+                );
+
+                Log::info('🎬 Video recibido y persistido', ['url' => $urlLocal ?: $mediaUrl]);
+                return response()->json(['status' => 'video_received']);
+            } catch (\Throwable $e) {
+                Log::error('🎬 Error procesando video: ' . $e->getMessage());
             }
         }
 

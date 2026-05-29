@@ -436,6 +436,7 @@
                         $mediaUrl    = $m->meta['media_url'] ?? null;
                         $esAudio     = ($m->tipo ?? null) === 'audio' && !empty($mediaUrl);
                         $esImagen    = ($m->tipo ?? null) === 'image' && !empty($mediaUrl);
+                        $esVideo     = ($m->tipo ?? null) === 'video' && !empty($mediaUrl);
                         $esDocumento = ($m->tipo ?? null) === 'document' && !empty($mediaUrl);
                         $caption     = $m->meta['caption'] ?? null;
                         $docNombre   = $m->meta['filename'] ?? null;
@@ -479,6 +480,13 @@
                                     @if($caption)
                                         <p class="text-sm text-slate-800 mt-1 whitespace-pre-wrap">{{ $caption }}</p>
                                     @endif
+                                @elseif($esVideo)
+                                    <video src="{{ $mediaUrl }}" controls preload="metadata"
+                                           class="rounded-lg max-w-full max-h-80 bg-black"
+                                           style="max-width: 320px;"></video>
+                                    @if($caption)
+                                        <p class="text-sm text-slate-800 mt-1 whitespace-pre-wrap">{{ $caption }}</p>
+                                    @endif
                                 @elseif($esDocumento)
                                     <button type="button"
                                             @click="$dispatch('open-doc-preview', { url: '{{ $mediaUrl }}', filename: @js($docNombre ?: 'Documento'), ext: '{{ $docExt }}' })"
@@ -518,6 +526,13 @@
                                     <a href="{{ $mediaUrl }}" target="_blank">
                                         <img src="{{ $mediaUrl }}" class="rounded-lg max-w-full max-h-64 object-contain" alt="imagen">
                                     </a>
+                                    @if($caption)
+                                        <p class="text-sm text-slate-800 mt-1 whitespace-pre-wrap">{{ $caption }}</p>
+                                    @endif
+                                @elseif($esVideo)
+                                    <video src="{{ $mediaUrl }}" controls preload="metadata"
+                                           class="rounded-lg max-w-full max-h-80 bg-black"
+                                           style="max-width: 320px;"></video>
                                     @if($caption)
                                         <p class="text-sm text-slate-800 mt-1 whitespace-pre-wrap">{{ $caption }}</p>
                                     @endif
