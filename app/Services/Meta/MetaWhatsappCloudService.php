@@ -114,6 +114,32 @@ class MetaWhatsappCloudService
     }
 
     /**
+     * 👍 Envía una reacción de emoji a un mensaje específico del cliente.
+     *
+     * Meta soporta solo UN emoji por mensaje. Para QUITAR la reacción se manda
+     * el endpoint con emoji vacío "".
+     *
+     * @param string $telefono   Tel del destinatario (E.164 sin +)
+     * @param string $messageId  wamid.xxx del mensaje al que se reacciona
+     * @param string $emoji      Emoji unicode (o "" para remover)
+     */
+    public function enviarReaccion(string $telefono, string $messageId, string $emoji, ?int $tenantId = null): bool
+    {
+        $config = $this->resolverConfig($tenantId);
+        if (!$config) return false;
+
+        return $this->ejecutar($config, [
+            'messaging_product' => 'whatsapp',
+            'to'                => $this->normalizar($telefono),
+            'type'              => 'reaction',
+            'reaction'          => [
+                'message_id' => $messageId,
+                'emoji'      => $emoji,
+            ],
+        ], 'reaccion');
+    }
+
+    /**
      * Sincroniza plantillas desde Meta (`GET /{waba_id}/message_templates`)
      * hacia la tabla `meta_whatsapp_plantillas` (updateOrCreate por nombre+idioma).
      *

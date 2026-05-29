@@ -134,6 +134,40 @@ class MetaWhatsappWebhookController extends Controller
 
         $contactoNombre = $value['contacts'][0]['profile']['name'] ?? 'Cliente';
 
+        // 👍 REACCIÓN: el cliente reaccionó a un mensaje nuestro.
+        // No va al pipeline del bot — solo actualiza la BD.
+        if ($tipo === 'reaction') {
+            $reactedToWamid = $msg['reaction']['message_id'] ?? null;
+            $emoji          = $msg['reaction']['emoji'] ?? '';
+            if (!$reactedToWamid) return;
+
+            try {
+                $mensaje = \App\Models\MensajeWhatsapp::withoutGlobalScopes()
+                    ->where('mensaje_externo_id', $reactedToWamid)
+                    ->first();
+
+                if ($mensaje) {
+                    $mensaje->update([
+                        'reaccion_cliente'    => $emoji ?: null,
+                        'reaccion_cliente_at' => $emoji ? now() : null,
+                    ]);
+                    \Log::info('👍 Reacción de cliente persistida', [
+                        'wamid' => $reactedToWamid,
+                        'emoji' => $emoji ?: '(quitada)',
+                        'mensaje_id' => $mensaje->id,
+                    ]);
+                } else {
+                    \Log::info('👍 Reacción recibida pero mensaje no encontrado', [
+                        'wamid' => $reactedToWamid,
+                        'emoji' => $emoji,
+                    ]);
+                }
+            } catch (\Throwable $e) {
+                \Log::error('Error procesando reacción Meta: ' . $e->getMessage());
+            }
+            return; // no continuar al pipeline normal
+        }
+
         // Extraer cuerpo según tipo
         $body = '';
         $mediaUrl = null;

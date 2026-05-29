@@ -625,6 +625,65 @@ class Index extends Component
         }
     }
 
+    /**
+     * 👍 Reacciona a un mensaje del cliente con un emoji.
+     * Si ya hay la misma reacción, la quita (toggle). Si hay otra, la cambia.
+     */
+    public function reaccionarMensaje(int $mensajeId, string $emoji): void
+    {
+        $emoji = trim($emoji);
+        if (mb_strlen($emoji) > 16) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Emoji inválido.']);
+            return;
+        }
+
+        $mensaje = MensajeWhatsapp::find($mensajeId);
+        if (!$mensaje) return;
+
+        // Toggle: si el operador ya puso ESE mismo emoji, lo quita
+        $emojiActual = $mensaje->reaccion_operador;
+        $nuevoEmoji  = ($emojiActual === $emoji) ? '' : $emoji;
+
+        $conv = ConversacionWhatsapp::find($mensaje->conversacion_id);
+        if (!$conv) return;
+
+        // Sólo via Meta — TecnoByteApp no soporta reactions estándar
+        try {
+            $tenant = app(\App\Services\TenantManager::class)->current();
+            if (!$tenant || $tenant->proveedorWhatsappResuelto() !== \App\Models\Tenant::WA_PROVIDER_META) {
+                $this->dispatch('notify', ['type' => 'warning', 'message' => 'Las reacciones solo funcionan con Meta Cloud API.']);
+                return;
+            }
+
+            $messageId = $mensaje->mensaje_externo_id;
+            if (!$messageId || !str_starts_with($messageId, 'wamid.')) {
+                $this->dispatch('notify', ['type' => 'error', 'message' => 'No se puede reaccionar a este mensaje (sin ID Meta).']);
+                return;
+            }
+
+            $ok = app(\App\Services\Meta\MetaWhatsappCloudService::class)
+                ->enviarReaccion($conv->telefono_normalizado, $messageId, $nuevoEmoji, $tenant->id);
+
+            if (!$ok) {
+                $this->dispatch('notify', ['type' => 'error', 'message' => '❌ Meta rechazó la reacción']);
+                return;
+            }
+
+            $mensaje->update([
+                'reaccion_operador'    => $nuevoEmoji ?: null,
+                'reaccion_operador_at' => $nuevoEmoji ? now() : null,
+            ]);
+
+            $this->dispatch('notify', [
+                'type'    => 'success',
+                'message' => $nuevoEmoji ? "Reaccionaste {$nuevoEmoji}" : '✓ Reacción quitada',
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Error enviando reacción: ' . $e->getMessage());
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Error: ' . $e->getMessage()]);
+        }
+    }
+
     public function devolverAlBot(): void
     {
         if (!$this->conversacionActivaId) return;

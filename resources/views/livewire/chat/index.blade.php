@@ -462,7 +462,7 @@
                                 default         => 'Mensaje reprocesado por el watchdog',
                             };
                         @endphp
-                        <div class="flex justify-start">
+                        <div class="flex justify-start group/msg relative" x-data="{ pickerAbierto: false }">
                             <div class="max-w-[85%] md:max-w-[70%] rounded-2xl rounded-tl-sm {{ $rescatadoPor ? 'bg-amber-50 border border-amber-200' : 'bg-white' }} px-3 py-2 shadow-sm">
                                 @if($rescatadoPor)
                                     <div class="flex items-center gap-1 mb-1 text-[10px] font-semibold text-amber-700"
@@ -508,13 +508,48 @@
                                 <p class="text-[10px] text-slate-400 mt-1 text-right">
                                     {{ $m->created_at->format('H:i') }}
                                 </p>
+                                @if($m->reaccion_operador)
+                                    {{-- Badge de reacción del operador al mensaje del cliente --}}
+                                    <span class="absolute -bottom-3 left-3 bg-white border border-slate-200 rounded-full px-1.5 py-0.5 text-sm shadow-sm" title="Reaccionaste {{ $m->reaccion_operador }}">
+                                        {{ $m->reaccion_operador }}
+                                    </span>
+                                @endif
+                            </div>
+
+                            {{-- Botón "reaccionar" (visible al hover) --}}
+                            <button type="button" @click.stop="pickerAbierto = !pickerAbierto"
+                                    class="opacity-0 group-hover/msg:opacity-100 focus:opacity-100 self-center ml-1 flex items-center justify-center w-7 h-7 rounded-full bg-white shadow border border-slate-200 hover:bg-slate-100 text-slate-500 transition"
+                                    title="Reaccionar">
+                                <i class="fa-regular fa-face-smile text-xs"></i>
+                            </button>
+
+                            {{-- Emoji picker --}}
+                            <div x-show="pickerAbierto" x-cloak
+                                 @click.outside="pickerAbierto = false"
+                                 @keydown.escape.window="pickerAbierto = false"
+                                 x-transition.opacity
+                                 class="absolute left-12 -top-2 z-20 bg-white border border-slate-200 rounded-full shadow-xl px-2 py-1 flex items-center gap-1">
+                                @foreach(['👍','❤️','😂','😮','😢','🙏','🔥','✅'] as $emoji)
+                                    <button type="button"
+                                            wire:click="reaccionarMensaje({{ $m->id }}, '{{ $emoji }}')"
+                                            @click="pickerAbierto = false"
+                                            class="hover:bg-slate-100 rounded-full w-9 h-9 flex items-center justify-center text-xl transition">
+                                        {{ $emoji }}
+                                    </button>
+                                @endforeach
                             </div>
                         </div>
                     @elseif($m->rol === 'assistant')
                         @php $esHumano = ($m->meta['enviado_por_humano'] ?? false); @endphp
-                        <div class="flex justify-end">
-                            <div class="max-w-[85%] md:max-w-[70%] rounded-2xl rounded-tr-sm px-3 py-2 shadow-sm
+                        <div class="flex justify-end relative">
+                            <div class="max-w-[85%] md:max-w-[70%] rounded-2xl rounded-tr-sm px-3 py-2 shadow-sm relative
                                         {{ $esHumano ? 'bg-blue-100' : 'bg-[#dcf8c6]' }}">
+                                @if($m->reaccion_cliente)
+                                    {{-- Badge: el cliente reaccionó a nuestro mensaje --}}
+                                    <span class="absolute -bottom-3 right-3 bg-white border border-slate-200 rounded-full px-1.5 py-0.5 text-sm shadow-sm" title="El cliente reaccionó {{ $m->reaccion_cliente }}">
+                                        {{ $m->reaccion_cliente }}
+                                    </span>
+                                @endif
                                 @if($esHumano)
                                     <div class="text-[10px] uppercase font-bold text-blue-700 mb-0.5">
                                         <i class="fa-solid fa-user-tie"></i> Operador
