@@ -10363,11 +10363,33 @@ PROMPT;
     }
 
     /**
-     * 📄 Descarga el documento (PDF/Word/Excel/etc) y lo guarda en storage/public.
+     * 📄 Descarga el documento (PDF/Word/Excel/Video/etc) y lo guarda en storage/public.
      * Devuelve URL absoluta servible al chat panel o null si falló.
+     *
+     * 🛡️ SEGURIDAD: triple validación contra ejecutables/virus:
+     *   1. Whitelist estricto de extensiones permitidas
+     *   2. Whitelist de MIME types del response header
+     *   3. Blacklist explícito de extensiones peligrosas
      */
     private function descargarYGuardarDocumento(string $urlRemota, string $nombreOriginal): ?string
     {
+        // 🛡️ Blacklist defensivo: si la URL/nombre apunta a ejecutable, rechazar inmediato
+        $extPeligrosas = [
+            'exe','bat','cmd','com','msi','scr','vbs','vbe','js','jse','jar',
+            'ps1','psm1','sh','bash','app','dll','sys','reg','hta','wsf','wsh',
+            'pif','inf','dmg','iso','apk','ipa','deb','rpm',
+        ];
+        $extInputName = strtolower(pathinfo($nombreOriginal, PATHINFO_EXTENSION));
+        $extInputUrl  = strtolower(pathinfo(parse_url($urlRemota, PHP_URL_PATH) ?: '', PATHINFO_EXTENSION));
+        if (in_array($extInputName, $extPeligrosas, true) || in_array($extInputUrl, $extPeligrosas, true)) {
+            Log::warning('🛡️ Documento rechazado: extensión peligrosa', [
+                'nombre' => $nombreOriginal,
+                'url'    => $urlRemota,
+                'ext'    => $extInputName ?: $extInputUrl,
+            ]);
+            return null;
+        }
+
         try {
             $resp = Http::withoutVerifying()->timeout(60)->get($urlRemota);
             if (!$resp->successful()) {
@@ -10376,20 +10398,76 @@ PROMPT;
             }
 
             $bytes = $resp->body();
-            // Permitimos hasta 50 MB para documentos
+            // Permitimos hasta 50 MB
             if (strlen($bytes) < 20 || strlen($bytes) > 50 * 1024 * 1024) {
                 Log::warning('📄 Documento fuera de rango de tamaño', ['bytes' => strlen($bytes)]);
                 return null;
             }
 
-            $ext = strtolower(pathinfo($nombreOriginal, PATHINFO_EXTENSION));
-            if (!$ext) {
-                $ext = strtolower(pathinfo(parse_url($urlRemota, PHP_URL_PATH) ?: '', PATHINFO_EXTENSION)) ?: 'pdf';
+            // 🛡️ Validar MIME del response — Meta/TecnoByteApp deberían enviar correcto
+            $respMime = strtolower(explode(';', (string) $resp->header('Content-Type'))[0] ?? '');
+            $mimesPermitidos = [
+                // Documentos
+                'application/pdf', 'application/msword',
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                'application/vnd.ms-excel',
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'application/vnd.ms-powerpoint',
+                'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+                'application/vnd.oasis.opendocument.text',
+                'application/vnd.oasis.opendocument.spreadsheet',
+                'application/vnd.oasis.opendocument.presentation',
+                'text/plain', 'text/csv',
+                'application/zip', 'application/x-rar-compressed', 'application/x-7z-compressed',
+                // Videos
+                'video/mp4', 'video/quicktime', 'video/3gpp', 'video/x-msvideo',
+                'video/webm', 'video/x-matroska', 'video/x-m4v',
+                // Genérico (Meta a veces manda esto)
+                'application/octet-stream',
+            ];
+            if ($respMime && !in_array($respMime, $mimesPermitidos, true)) {
+                Log::warning('🛡️ Documento rechazado: MIME no permitido', [
+                    'mime' => $respMime,
+                    'url'  => $urlRemota,
+                ]);
+                return null;
             }
-            // Whitelisting básico para evitar guardar .exe/.sh y demás raros
-            $extsPermitidas = ['pdf','doc','docx','xls','xlsx','ppt','pptx','txt','csv','zip','rar','7z','odt','ods','odp'];
+
+            $ext = $extInputName;
+            if (!$ext) {
+                $ext = $extInputUrl ?: 'pdf';
+            }
+            // 🛡️ Whitelist estricto de extensiones permitidas (documentos + videos + media)
+            $extsPermitidas = [
+                // Documentos
+                'pdf','doc','docx','xls','xlsx','ppt','pptx','txt','csv',
+                'odt','ods','odp',
+                // Archivos comprimidos seguros
+                'zip','rar','7z','tar','gz',
+                // Videos
+                'mp4','mov','3gp','avi','webm','mkv','m4v','mpeg','mpg',
+                // Audio
+                'mp3','m4a','ogg','wav','opus','aac',
+                // Imágenes (por si pasa por acá)
+                'jpg','jpeg','png','gif','webp',
+            ];
             if (!in_array($ext, $extsPermitidas, true)) {
-                $ext = 'bin';
+                Log::warning('🛡️ Documento rechazado: extensión no en whitelist', [
+                    'ext'  => $ext,
+                    'url'  => $urlRemota,
+                ]);
+                return null;
+            }
+
+            // 🛡️ Validación final: primeros bytes (magic number) coinciden con el tipo
+            // Detecta ejecutables MZ (Windows PE) o ELF (Linux) aunque la ext mienta
+            $primeros = substr($bytes, 0, 4);
+            if (str_starts_with($primeros, "MZ") || str_starts_with($primeros, "\x7fELF")) {
+                Log::warning('🛡️ Documento rechazado: magic number de ejecutable detectado', [
+                    'ext'  => $ext,
+                    'url'  => $urlRemota,
+                ]);
+                return null;
             }
 
             // Sanear nombre original para incluirlo en el path (evita "../" etc.)
