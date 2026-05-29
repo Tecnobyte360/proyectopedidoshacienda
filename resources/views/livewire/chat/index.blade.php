@@ -1208,27 +1208,18 @@
                 // Si está en un input distinto (ej. buscador), no interceptamos.
                 if (enCampo) return;
 
-                // Hay conversación activa → cerrarla y enfocar buscador.
-                // Buscamos el componente Chat\Index (el que tiene 'conversacionActivaId').
-                try {
-                    let comp = null;
-                    if (window.Livewire?.all) {
-                        comp = window.Livewire.all().find(c => {
-                            try {
-                                const v = c.get('conversacionActivaId');
-                                return v !== undefined;
-                            } catch { return false; }
-                        });
-                    }
-                    if (comp && comp.get('conversacionActivaId')) {
-                        e.preventDefault();
-                        comp.call('cerrarConversacionActiva');
-                        setTimeout(() => {
-                            const s = document.getElementById('chat-search-input');
-                            if (s) s.focus();
-                        }, 120);
-                    }
-                } catch (err) { console.warn('ESC handler error', err); }
+                // Hay conversación activa → dispatch a Livewire para cerrarla.
+                // Sólo activamos si la zona "Selecciona una conversación" NO está visible
+                // (es decir, sí hay un chat abierto). Detectamos por el textarea del composer.
+                const hayChatAbierto = !!document.getElementById('chat-composer-textarea');
+                if (hayChatAbierto) {
+                    e.preventDefault();
+                    try { window.Livewire?.dispatch?.('cerrar-conversacion-activa'); } catch {}
+                    setTimeout(() => {
+                        const s = document.getElementById('chat-search-input');
+                        if (s) s.focus();
+                    }, 200);
+                }
             });
 
             scrollToBottom(true);

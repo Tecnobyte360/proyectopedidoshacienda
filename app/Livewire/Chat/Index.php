@@ -672,6 +672,7 @@ class Index extends Component
     /**
      * ⎋ Cierra la conversación activa (ESC en el chat, estilo WhatsApp Web).
      */
+    #[On('cerrar-conversacion-activa')]
     public function cerrarConversacionActiva(): void
     {
         $this->conversacionActivaId = null;
