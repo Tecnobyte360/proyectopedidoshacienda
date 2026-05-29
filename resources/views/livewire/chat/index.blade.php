@@ -101,6 +101,36 @@
                 @endforeach
             </div>
 
+            {{-- Chips estilo WhatsApp: No leídos + Favoritos --}}
+            <div class="flex flex-wrap gap-1.5 mt-1">
+                <button wire:click="$set('filtroEstado', 'todas')"
+                        class="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold transition
+                              {{ $filtroEstado === 'todas' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' }}">
+                    Todos
+                </button>
+                <button wire:click="$set('filtroEstado', 'no_leidos')"
+                        class="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold transition
+                              {{ $filtroEstado === 'no_leidos' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' }}">
+                    No leídos
+                    @if($totalNoLeidos > 0)
+                        <span class="inline-flex items-center justify-center min-w-[18px] h-4 px-1 rounded-full {{ $filtroEstado === 'no_leidos' ? 'bg-white text-emerald-700' : 'bg-emerald-500 text-white' }} text-[10px] font-bold">
+                            {{ $totalNoLeidos > 99 ? '99+' : $totalNoLeidos }}
+                        </span>
+                    @endif
+                </button>
+                <button wire:click="$set('filtroEstado', 'favoritos')"
+                        class="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold transition
+                              {{ $filtroEstado === 'favoritos' ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' }}">
+                    <i class="fa-solid fa-thumbtack text-[10px]"></i>
+                    Favoritos
+                    @if($totalFavoritos > 0)
+                        <span class="inline-flex items-center justify-center min-w-[18px] h-4 px-1 rounded-full {{ $filtroEstado === 'favoritos' ? 'bg-white text-amber-600' : 'bg-amber-500 text-white' }} text-[10px] font-bold">
+                            {{ $totalFavoritos }}
+                        </span>
+                    @endif
+                </button>
+            </div>
+
             {{-- 📡 Filtros por CANAL --}}
             <div class="mt-2">
                 <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1 px-0.5">Canal</div>

@@ -1755,6 +1755,10 @@ class Index extends Component
             ->when($this->filtroEstado === 'humano',   fn ($q) => $q->where('atendida_por_humano', true))
             ->when($this->filtroEstado === 'bot',      fn ($q) => $q->where('atendida_por_humano', false))
             ->when($this->filtroEstado === 'internos', fn ($q) => $q->where('es_interna', true))
+            ->when($this->filtroEstado === 'no_leidos', fn ($q) => $q->where(fn ($qq) =>
+                $qq->where('no_leidos', '>', 0)->orWhere('marcada_no_leida', true)
+            ))
+            ->when($this->filtroEstado === 'favoritos', fn ($q) => $q->whereNotNull('fijada_at'))
             ->when($this->filtroEstado !== 'internos' && !$this->mostrarInternas,
                    fn ($q) => $q->where(fn ($qq) => $qq->where('es_interna', false)->orWhereNull('es_interna')))
             // 📡 Filtro por canal (WhatsApp / Instagram / Widget web)
@@ -1832,6 +1836,12 @@ class Index extends Component
                 ->get();
         } catch (\Throwable $e) { /* tabla puede no existir aún */ }
 
+        // 📊 Contadores para los chips estilo WhatsApp
+        $totalNoLeidos = ConversacionWhatsapp::query()
+            ->where(fn ($q) => $q->where('no_leidos', '>', 0)->orWhere('marcada_no_leida', true))
+            ->count();
+        $totalFavoritos = ConversacionWhatsapp::query()->whereNotNull('fijada_at')->count();
+
         return view('livewire.chat.index', compact(
             'conversaciones',
             'conversacionActiva',
@@ -1839,7 +1849,9 @@ class Index extends Component
             'promptInspeccion',
             'plantillasMetaAprobadas',
             'plantillaChatSeleccionada',
-            'respuestasRapidas'
+            'respuestasRapidas',
+            'totalNoLeidos',
+            'totalFavoritos'
         ))->layout('layouts.app');
     }
 
