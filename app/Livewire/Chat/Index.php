@@ -1488,6 +1488,9 @@ class Index extends Component
                     ? $svc->enviarTextoRespuesta($conv->telefono_normalizado, $texto, $wamidReferencia, $conv->tenant_id)
                     : $svc->enviarTexto($conv->telefono_normalizado, $texto, $conv->tenant_id);
 
+                // 📌 Capturar wamid del mensaje que acabamos de enviar para futuras citas/reacciones del cliente
+                $wamidNuevo = $svc->ultimoWamid;
+
                 if (!$ok) {
                     $this->dispatch('notify', [
                         'type'    => 'error',
@@ -1508,8 +1511,17 @@ class Index extends Component
                         ]]
                     );
                     // Guardar referencia al mensaje respondido para renderizar la cita en UI
+                    $updates = [];
                     if ($mensajeRespondido) {
-                        $msg->update(['respondiendo_a_mensaje_id' => $mensajeRespondido->id]);
+                        $updates['respondiendo_a_mensaje_id'] = $mensajeRespondido->id;
+                    }
+                    // 📌 Persistir wamid del mensaje recién enviado — permite que cuando el
+                    // cliente lo cite/reaccione, podamos vincularlo correctamente.
+                    if ($wamidNuevo) {
+                        $updates['mensaje_externo_id'] = $wamidNuevo;
+                    }
+                    if (!empty($updates)) {
+                        $msg->update($updates);
                     }
                 } catch (\Throwable $e) {
                     Log::warning('No persistió mensaje manual Meta: ' . $e->getMessage());

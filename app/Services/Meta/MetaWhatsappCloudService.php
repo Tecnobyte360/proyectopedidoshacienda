@@ -247,8 +247,12 @@ class MetaWhatsappCloudService
         return MetaWhatsappConfig::activaActual();
     }
 
+    /** @var string|null Último wamid devuelto por Meta tras un envío exitoso. */
+    public ?string $ultimoWamid = null;
+
     private function ejecutar(MetaWhatsappConfig $config, array $payload, string $tipo): bool
     {
+        $this->ultimoWamid = null;
         try {
             $resp = Http::withToken($config->access_token)
                 ->acceptJson()
@@ -257,6 +261,7 @@ class MetaWhatsappCloudService
 
             if ($resp->successful()) {
                 $messageId = $resp->json('messages.0.id');
+                $this->ultimoWamid = $messageId;
                 Log::info('📤 Meta WA enviado', [
                     'tenant_id' => $config->tenant_id,
                     'tipo'      => $tipo,
