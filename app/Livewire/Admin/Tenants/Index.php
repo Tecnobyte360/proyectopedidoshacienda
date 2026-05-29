@@ -327,7 +327,9 @@ class Index extends Component
 
         // Bold config
         $this->bold_activo         = (bool) ($t->bold_activo ?? false);
-        $this->bold_modo           = (string) ($t->bold_modo ?: 'sandbox');
+        // Normalizar valores legacy ('test' del default antiguo) a 'sandbox'
+        $boldModoRaw               = $t->bold_modo ?: 'sandbox';
+        $this->bold_modo           = in_array($boldModoRaw, ['sandbox','production'], true) ? $boldModoRaw : 'sandbox';
         $this->bold_api_key        = (string) ($t->bold_api_key ?? '');
         $this->bold_secret_key     = (string) ($t->bold_secret_key ?? '');
         $this->bold_webhook_secret = (string) ($t->bold_webhook_secret ?? '');
