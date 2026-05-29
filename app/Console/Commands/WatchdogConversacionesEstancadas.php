@@ -36,7 +36,15 @@ class WatchdogConversacionesEstancadas extends Command
     {
         // 🎛️ Configuración desde BD — editable en /configuracion-bot
         $cfgGlobal = \App\Models\ConfiguracionBot::actual();
-        $activo    = (bool) ($cfgGlobal->watchdog_activo ?? true);
+
+        // 🤖 Si el BOT GLOBAL está apagado (activo=false), no tiene sentido
+        // rescatar mensajes porque el bot tampoco respondería al rescate.
+        if (!((bool) ($cfgGlobal->activo ?? true))) {
+            Log::info('🐕 Watchdog: skip — bot global desactivado (cfg.activo=false)');
+            return self::SUCCESS;
+        }
+
+        $activo = (bool) ($cfgGlobal->watchdog_activo ?? true);
         if (!$activo) {
             Log::info('🐕 Watchdog: desactivado por configuración');
             return self::SUCCESS;
@@ -89,6 +97,21 @@ class WatchdogConversacionesEstancadas extends Command
                     'telefono'        => $conv->telefono_normalizado,
                 ]);
                 continue;
+            }
+
+            // 🤖 NO rescatar si el BOT del tenant está apagado. Sin esto,
+            // watchdog reinyecta mensajes que nadie va a responder.
+            if ($conv->tenant_id) {
+                $cfgTenant = \App\Models\ConfiguracionBot::withoutGlobalScopes()
+                    ->where('tenant_id', $conv->tenant_id)
+                    ->first();
+                if ($cfgTenant && !(bool) $cfgTenant->activo) {
+                    Log::info('🐕 Watchdog: skip — bot del tenant desactivado', [
+                        'conversacion_id' => $conv->id,
+                        'tenant_id'       => $conv->tenant_id,
+                    ]);
+                    continue;
+                }
             }
 
             // 🛡️ NO rescatar si la conv YA generó un pedido reciente (configurable).
