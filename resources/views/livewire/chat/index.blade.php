@@ -3,13 +3,7 @@
 
     @php $cfgBot = \App\Models\ConfiguracionBot::actual(); @endphp
 
-    {{-- Banner de advertencia si el bot está apagado globalmente --}}
-    @if(!$cfgBot->activo)
-        <div class="absolute top-20 left-0 right-0 z-20 bg-rose-500 text-white px-4 py-2 text-center text-xs font-bold shadow lg:left-64">
-            <i class="fa-solid fa-triangle-exclamation"></i> El bot está APAGADO en {{ \Illuminate\Support\Facades\Route::has('configuracion.bot') ? '' : '' }}
-            <a href="{{ route('configuracion.bot') }}" class="underline">Configuración del bot</a>
-            — los clientes escriben pero la IA no responde.
-        </div>
+    {{-- Bot apagado global → la pill bonita ahora vive en el topbar (resources/views/livewire/layouts/topbar.blade.php) --}}
     @endif
 
     {{-- ╔═══ COLUMNA IZQUIERDA: lista de conversaciones ═══╗

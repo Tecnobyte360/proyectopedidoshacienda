@@ -82,6 +82,31 @@
         {{-- DERECHA: switcher de empresa + perfil --}}
         <div class="flex items-center gap-2 md:gap-3">
 
+            {{-- 🤖 Pill de estado del bot (rojo si está apagado globalmente) --}}
+            @php
+                try {
+                    $cfgBotTop = \App\Models\ConfiguracionBot::actual();
+                    $botActivo = (bool) ($cfgBotTop->activo ?? true);
+                } catch (\Throwable $e) {
+                    $botActivo = true;
+                }
+            @endphp
+            @if(!$botActivo)
+                <a href="{{ route('configuracion.bot') }}"
+                   class="hidden sm:inline-flex items-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 hover:bg-rose-100 px-3 py-2 transition shadow-sm group"
+                   title="El bot está apagado — los clientes escriben pero la IA no responde. Click para configurar.">
+                    <span class="relative flex h-2.5 w-2.5">
+                        <span class="absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75 animate-ping"></span>
+                        <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500"></span>
+                    </span>
+                    <div class="hidden md:block text-left leading-tight">
+                        <div class="text-[10px] uppercase tracking-wide text-rose-600 font-bold">Bot apagado</div>
+                        <div class="text-xs font-semibold text-rose-800 group-hover:underline">IA no responde</div>
+                    </div>
+                    <i class="fa-solid fa-gear text-[10px] text-rose-400 ml-1"></i>
+                </a>
+            @endif
+
             {{-- 🎭 Switcher de empresa (solo super-admin impersonando) --}}
             @if($tenantImitado)
                 <div class="relative" x-data="{ open: false }" @click.outside="open = false">
