@@ -615,8 +615,7 @@
                     @elseif($m->rol === 'assistant')
                         @php $esHumano = ($m->meta['enviado_por_humano'] ?? false); @endphp
                         <div class="flex justify-end relative">
-                            <div class="max-w-[85%] md:max-w-[70%] rounded-2xl rounded-tr-sm px-3 py-2 shadow-sm relative
-                                        {{ $esHumano ? 'bg-[#dcf8c6]' : 'bg-[#dcf8c6]' }}">
+                            <div class="max-w-[85%] md:max-w-[70%] rounded-2xl rounded-tr-sm px-3 py-2 shadow-sm relative bg-[#dcf8c6]" style="background-color:#dcf8c6;">
                                 @if($m->reaccion_cliente)
                                     {{-- Badge: el cliente reaccionó a nuestro mensaje --}}
                                     <span class="absolute -bottom-3 right-3 bg-white border border-slate-200 rounded-full px-1.5 py-0.5 text-sm shadow-sm" title="El cliente reaccionó {{ $m->reaccion_cliente }}">
@@ -1166,7 +1165,14 @@
 
             // Al cambiar de chat: SIEMPRE forzar (recién entró)
             document.addEventListener('livewire:initialized', () => {
-                Livewire.on('chat-cambiado', () => setTimeout(() => scrollToBottom(true), 100));
+                Livewire.on('chat-cambiado', () => {
+                    setTimeout(() => scrollToBottom(true), 100);
+                    // 🎯 Auto-focus al campo de escribir cuando se abre una conversación
+                    setTimeout(() => {
+                        const ta = document.querySelector('textarea[wire\\:model="nuevoMensaje"]');
+                        if (ta) ta.focus();
+                    }, 150);
+                });
                 Livewire.on('mensaje-enviado', () => setTimeout(() => scrollToBottom(true), 100));
 
                 if (window.Livewire?.hook) {
