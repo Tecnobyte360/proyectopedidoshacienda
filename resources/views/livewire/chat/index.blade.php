@@ -551,12 +551,15 @@
                                 // Reacción real a Meta solo con wamid. Sin wamid → reacción local visible solo para el equipo.
                                 $reaccionMeta = $m->mensaje_externo_id && str_starts_with($m->mensaje_externo_id, 'wamid.');
                             @endphp
-                            {{-- Botón "reaccionar" (visible al hover) --}}
+                            {{-- Botón "reaccionar" (visible al hover) — color cambia según modo --}}
                             <button type="button" @click.stop="pickerAbierto = !pickerAbierto"
                                     x-show="hovered || pickerAbierto"
                                     x-transition.opacity.duration.150ms
-                                    class="self-center ml-1 flex items-center justify-center w-7 h-7 rounded-full bg-white shadow border border-slate-200 hover:bg-slate-100 text-slate-500 transition"
-                                    title="{{ $reaccionMeta ? 'Reaccionar (cliente lo ve)' : '🔖 Marcar (solo para el equipo)' }}">
+                                    class="self-center ml-1 flex items-center justify-center w-7 h-7 rounded-full shadow border transition
+                                          {{ $reaccionMeta
+                                              ? 'bg-emerald-50 border-emerald-300 hover:bg-emerald-100 text-emerald-700'
+                                              : 'bg-amber-50 border-amber-300 hover:bg-amber-100 text-amber-700' }}"
+                                    title="{{ $reaccionMeta ? '✅ Reaccionar (cliente lo verá)' : '🔖 Solo marca interna (cliente NO la ve)' }}">
                                 <i class="fa-regular fa-face-smile text-xs"></i>
                             </button>
 
