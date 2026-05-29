@@ -656,28 +656,41 @@ class Index extends Component
             }
 
             $messageId = $mensaje->mensaje_externo_id;
-            if (!$messageId || !str_starts_with($messageId, 'wamid.')) {
-                $this->dispatch('notify', ['type' => 'error', 'message' => 'No se puede reaccionar a este mensaje (sin ID Meta).']);
-                return;
+            $puedeEnviarAMeta = $messageId && str_starts_with($messageId, 'wamid.');
+
+            if ($puedeEnviarAMeta) {
+                // Reacción REAL: el cliente la ve en su WhatsApp
+                $ok = app(\App\Services\Meta\MetaWhatsappCloudService::class)
+                    ->enviarReaccion($conv->telefono_normalizado, $messageId, $nuevoEmoji, $tenant->id);
+
+                if (!$ok) {
+                    $this->dispatch('notify', ['type' => 'error', 'message' => '❌ Meta rechazó la reacción']);
+                    return;
+                }
+
+                $mensaje->update([
+                    'reaccion_operador'    => $nuevoEmoji ?: null,
+                    'reaccion_operador_at' => $nuevoEmoji ? now() : null,
+                ]);
+
+                $this->dispatch('notify', [
+                    'type'    => 'success',
+                    'message' => $nuevoEmoji ? "Reaccionaste {$nuevoEmoji} (cliente lo ve)" : '✓ Reacción quitada',
+                ]);
+            } else {
+                // Reacción LOCAL: marca interna del equipo, el cliente NO la ve
+                $mensaje->update([
+                    'reaccion_operador'    => $nuevoEmoji ?: null,
+                    'reaccion_operador_at' => $nuevoEmoji ? now() : null,
+                ]);
+
+                $this->dispatch('notify', [
+                    'type'    => 'info',
+                    'message' => $nuevoEmoji
+                        ? "🔖 Marcada {$nuevoEmoji} (solo visible para el equipo)"
+                        : '✓ Marca quitada',
+                ]);
             }
-
-            $ok = app(\App\Services\Meta\MetaWhatsappCloudService::class)
-                ->enviarReaccion($conv->telefono_normalizado, $messageId, $nuevoEmoji, $tenant->id);
-
-            if (!$ok) {
-                $this->dispatch('notify', ['type' => 'error', 'message' => '❌ Meta rechazó la reacción']);
-                return;
-            }
-
-            $mensaje->update([
-                'reaccion_operador'    => $nuevoEmoji ?: null,
-                'reaccion_operador_at' => $nuevoEmoji ? now() : null,
-            ]);
-
-            $this->dispatch('notify', [
-                'type'    => 'success',
-                'message' => $nuevoEmoji ? "Reaccionaste {$nuevoEmoji}" : '✓ Reacción quitada',
-            ]);
         } catch (\Throwable $e) {
             Log::error('Error enviando reacción: ' . $e->getMessage());
             $this->dispatch('notify', ['type' => 'error', 'message' => 'Error: ' . $e->getMessage()]);
