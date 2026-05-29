@@ -308,9 +308,11 @@ class MetaWhatsappWebhookController extends Controller
         $ack = $mapAck[$estado] ?? null;
         if ($ack !== null) {
             try {
+                // Solo subir el ack, nunca bajarlo (read > delivered > sent)
                 \App\Models\MensajeWhatsapp::query()
                     ->withoutGlobalScopes()
                     ->where('mensaje_externo_id', $waId)
+                    ->where('ack', '<', $ack)
                     ->update(['ack' => $ack]);
             } catch (\Throwable $e) {
                 Log::warning('No se pudo actualizar ack Meta: ' . $e->getMessage());
