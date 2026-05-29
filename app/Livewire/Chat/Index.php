@@ -635,6 +635,8 @@ class Index extends Component
      * Setea el state para que el composer muestre la cita y el próximo envío
      * incluya context.message_id apuntando a este mensaje.
      */
+    public ?bool $respondiendoEsMeta = null; // true=cliente lo verá, false=solo local
+
     public function iniciarRespuesta(int $mensajeId): void
     {
         $m = MensajeWhatsapp::find($mensajeId);
@@ -642,6 +644,7 @@ class Index extends Component
 
         $this->respondiendoAMensajeId = $m->id;
         $this->respondiendoAAutor     = $m->rol === MensajeWhatsapp::ROL_USER ? 'Cliente' : 'Tú';
+        $this->respondiendoEsMeta     = $m->mensaje_externo_id && str_starts_with($m->mensaje_externo_id, 'wamid.');
 
         // Preview corto del contenido
         $preview = trim((string) $m->contenido);
@@ -660,6 +663,7 @@ class Index extends Component
         $this->respondiendoAMensajeId = null;
         $this->respondiendoAPreview   = '';
         $this->respondiendoAAutor     = '';
+        $this->respondiendoEsMeta     = null;
     }
 
     /**

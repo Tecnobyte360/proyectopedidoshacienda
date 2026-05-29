@@ -572,16 +572,17 @@
                                 // Reacción real a Meta solo con wamid. Sin wamid → reacción local visible solo para el equipo.
                                 $reaccionMeta = $m->mensaje_externo_id && str_starts_with($m->mensaje_externo_id, 'wamid.');
                             @endphp
-                            {{-- Botón "responder a este mensaje" (solo si tiene wamid) --}}
-                            @if($reaccionMeta)
-                                <button type="button" wire:click="iniciarRespuesta({{ $m->id }})"
-                                        x-show="hovered || pickerAbierto"
-                                        x-transition.opacity.duration.150ms
-                                        class="self-center ml-1 flex items-center justify-center w-7 h-7 rounded-full bg-blue-50 border border-blue-300 hover:bg-blue-100 text-blue-700 shadow transition"
-                                        title="↩️ Responder a este mensaje">
-                                    <i class="fa-solid fa-reply text-xs"></i>
-                                </button>
-                            @endif
+                            {{-- Botón "responder a este mensaje" — color según modo --}}
+                            <button type="button" wire:click="iniciarRespuesta({{ $m->id }})"
+                                    x-show="hovered || pickerAbierto"
+                                    x-transition.opacity.duration.150ms
+                                    class="self-center ml-1 flex items-center justify-center w-7 h-7 rounded-full shadow border transition
+                                          {{ $reaccionMeta
+                                              ? 'bg-blue-50 border-blue-300 hover:bg-blue-100 text-blue-700'
+                                              : 'bg-amber-50 border-amber-300 hover:bg-amber-100 text-amber-700' }}"
+                                    title="{{ $reaccionMeta ? '↩️ Responder (cliente verá la cita)' : '🔖 Citar (solo visible para el equipo)' }}">
+                                <i class="fa-solid fa-reply text-xs"></i>
+                            </button>
 
                             {{-- Botón "reaccionar" (visible al hover) — color cambia según modo --}}
                             <button type="button" @click.stop="pickerAbierto = !pickerAbierto"
@@ -1007,11 +1008,25 @@
                         </div>
 
                         @if($respondiendoAMensajeId)
+                            @php
+                                $esMetaReply = $respondiendoEsMeta === true;
+                                $colorBg = $esMetaReply ? 'bg-blue-50' : 'bg-amber-50';
+                                $colorBorder = $esMetaReply ? 'border-blue-500' : 'border-amber-500';
+                                $colorIcon = $esMetaReply ? 'text-blue-500' : 'text-amber-500';
+                                $colorLabel = $esMetaReply ? 'text-blue-700' : 'text-amber-700';
+                            @endphp
                             {{-- 💬 Preview del mensaje al que se está respondiendo --}}
-                            <div class="absolute -top-12 left-0 right-12 bg-blue-50 border-l-4 border-blue-500 rounded-tr-lg px-3 py-2 flex items-start gap-2 shadow-sm">
-                                <i class="fa-solid fa-reply text-blue-500 mt-0.5"></i>
+                            <div class="absolute -top-14 left-0 right-12 {{ $colorBg }} border-l-4 {{ $colorBorder }} rounded-tr-lg px-3 py-2 flex items-start gap-2 shadow-sm">
+                                <i class="fa-solid fa-reply {{ $colorIcon }} mt-0.5"></i>
                                 <div class="flex-1 min-w-0">
-                                    <div class="text-[10px] font-bold text-blue-700 uppercase tracking-wider">Respondiendo a {{ $respondiendoAAutor }}</div>
+                                    <div class="text-[10px] font-bold {{ $colorLabel }} uppercase tracking-wider">
+                                        Respondiendo a {{ $respondiendoAAutor }}
+                                        @if($esMetaReply)
+                                            <span class="ml-1 text-emerald-600">✓ cliente verá la cita</span>
+                                        @else
+                                            <span class="ml-1 text-amber-600">🔖 solo visible para el equipo</span>
+                                        @endif
+                                    </div>
                                     <div class="text-xs text-slate-700 truncate">{{ $respondiendoAPreview }}</div>
                                 </div>
                                 <button type="button" wire:click="cancelarRespuesta" class="text-slate-400 hover:text-rose-600" title="Cancelar respuesta">
