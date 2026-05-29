@@ -202,6 +202,7 @@ class WhatsappWebhookController extends Controller
                             'media_url'     => $urlLocal ?: $mediaUrl,
                             'media_url_src' => $mediaUrl,
                         ],
+                        'mensaje_externo_id' => $messageId ?: null,
                     ]
                 );
 
@@ -245,6 +246,7 @@ class WhatsappWebhookController extends Controller
                             'media_url_src' => $mediaUrl,
                             'mime_type'     => $data['mensaje']['mimeType'] ?? $data['mimeType'] ?? null,
                         ],
+                        'mensaje_externo_id' => $messageId ?: null,
                     ]
                 );
 
@@ -306,6 +308,7 @@ class WhatsappWebhookController extends Controller
                             'extension'     => $extension,
                             'mime_type'     => $data['mensaje']['mimeType'] ?? $data['mimeType'] ?? null,
                         ],
+                        'mensaje_externo_id' => $messageId ?: null,
                     ]
                 );
 

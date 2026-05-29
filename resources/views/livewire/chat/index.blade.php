@@ -517,14 +517,20 @@
                                 @endif
                             </div>
 
-                            {{-- Botón "reaccionar" (visible al hover) --}}
-                            <button type="button" @click.stop="pickerAbierto = !pickerAbierto"
-                                    x-show="hovered || pickerAbierto"
-                                    x-transition.opacity.duration.150ms
-                                    class="self-center ml-1 flex items-center justify-center w-7 h-7 rounded-full bg-white shadow border border-slate-200 hover:bg-slate-100 text-slate-500 transition"
-                                    title="Reaccionar">
-                                <i class="fa-regular fa-face-smile text-xs"></i>
-                            </button>
+                            @php
+                                // Solo permitir reaccionar a mensajes Meta (wamid) — TecnoByteApp viejo no soporta
+                                $puedeReaccionar = $m->mensaje_externo_id && str_starts_with($m->mensaje_externo_id, 'wamid.');
+                            @endphp
+                            @if($puedeReaccionar)
+                                {{-- Botón "reaccionar" (visible al hover) --}}
+                                <button type="button" @click.stop="pickerAbierto = !pickerAbierto"
+                                        x-show="hovered || pickerAbierto"
+                                        x-transition.opacity.duration.150ms
+                                        class="self-center ml-1 flex items-center justify-center w-7 h-7 rounded-full bg-white shadow border border-slate-200 hover:bg-slate-100 text-slate-500 transition"
+                                        title="Reaccionar">
+                                    <i class="fa-regular fa-face-smile text-xs"></i>
+                                </button>
+                            @endif
 
                             {{-- Emoji picker --}}
                             <div x-show="pickerAbierto" x-cloak
