@@ -4,11 +4,14 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\Cliente;
+use App\Models\ConversacionIvr;
 use App\Models\LlamadaIvr;
 use App\Models\Pedido;
 use App\Models\Tenant;
+use App\Services\IvrIaService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * 📞 API que consume Asterisk (vía AGI scripts) para registrar llamadas IVR
@@ -183,6 +186,104 @@ class IvrApiController extends Controller
         // TODO: notificar por WhatsApp/email al tenant que hay un voicemail nuevo
 
         return response()->json(['ok' => true]);
+    }
+
+    // ============================================================
+    // 🤖 ENDPOINTS para IVR conversacional con IA
+    // ============================================================
+
+    /**
+     * POST /api/v1/ivr/conversacion/iniciar
+     * Crea una conversación y devuelve el audio del saludo inicial.
+     */
+    public function iniciarConversacion(Request $r, IvrIaService $svc)
+    {
+        $data = $r->validate([
+            'unique_id' => 'required|string',
+            'caller_id' => 'required|string',
+        ]);
+
+        $conv = $svc->iniciarConversacion($data['unique_id'], $data['caller_id']);
+        $saludoTexto = "Hola, soy la asistente virtual. ¿En qué te puedo ayudar?";
+
+        // Reusa la función protected via reflection — más simple: generar TTS aquí
+        $saludoFile = storage_path('app/public/ivr-audio/saludo_'.preg_replace('/[^a-z0-9]/i','_',$data['unique_id']).'.wav');
+        if (!is_dir(dirname($saludoFile))) @mkdir(dirname($saludoFile), 0775, true);
+
+        if (!file_exists($saludoFile)) {
+            $elevenKey = env('ELEVENLABS_API_KEY');
+            $elevenVoice = env('ELEVENLABS_VOICE_ID');
+
+            if ($elevenKey && $elevenVoice) {
+                $resp = \Http::withHeaders([
+                    'xi-api-key' => $elevenKey,
+                    'Accept' => 'audio/mpeg',
+                    'Content-Type' => 'application/json',
+                ])->timeout(30)
+                ->post("https://api.elevenlabs.io/v1/text-to-speech/{$elevenVoice}", [
+                    'text' => $saludoTexto,
+                    'model_id' => 'eleven_flash_v2_5',
+                    'voice_settings' => ['stability' => 0.5, 'similarity_boost' => 0.75, 'style' => 0.3, 'use_speaker_boost' => true],
+                ]);
+            } else {
+                $resp = \Http::withToken(env('OPENAI_API_KEY'))
+                    ->timeout(20)
+                    ->post('https://api.openai.com/v1/audio/speech', [
+                        'model' => 'tts-1', 'voice' => 'nova', 'input' => $saludoTexto, 'response_format' => 'mp3',
+                    ]);
+            }
+
+            $tmp = sys_get_temp_dir().'/saludo.mp3';
+            file_put_contents($tmp, $resp->body());
+            exec("ffmpeg -y -loglevel error -i {$tmp} -ar 8000 -ac 1 -sample_fmt s16 {$saludoFile}");
+            @unlink($tmp);
+        }
+
+        return response()->json([
+            'ok'             => true,
+            'conversacion_id'=> $conv->id,
+            'audio_filename' => basename($saludoFile, '.wav'),
+            'texto'          => $saludoTexto,
+        ]);
+    }
+
+    /**
+     * POST /api/v1/ivr/conversacion/turno
+     * Recibe audio grabado del cliente, lo procesa con IA, devuelve respuesta.
+     */
+    public function turnoConversacion(Request $r, IvrIaService $svc)
+    {
+        $r->validate([
+            'unique_id' => 'required|string',
+            'audio'     => 'required|file|max:20480',  // 20MB
+        ]);
+
+        $tmp = $r->file('audio')->store('ivr-uploads', 'local');
+        $tmpPath = storage_path('app/private/' . $tmp);
+        if (!file_exists($tmpPath)) {
+            $tmpPath = storage_path('app/' . $tmp);
+        }
+
+        $resultado = $svc->procesarTurno($r->input('unique_id'), $tmpPath);
+        @unlink($tmpPath);
+
+        return response()->json($resultado);
+    }
+
+    /**
+     * GET /api/v1/ivr/audio/{filename}
+     * Sirve el audio TTS generado para que Asterisk lo descargue.
+     */
+    public function servirAudio(string $filename)
+    {
+        $filename = basename($filename); // sanitize
+        if (!str_ends_with($filename, '.wav')) $filename .= '.wav';
+
+        $path = storage_path('app/public/ivr-audio/' . $filename);
+        if (!file_exists($path)) {
+            return response('No encontrado', 404);
+        }
+        return response()->file($path, ['Content-Type' => 'audio/wav']);
     }
 
     // ----------- helpers -----------

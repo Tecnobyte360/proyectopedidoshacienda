@@ -1045,6 +1045,7 @@
 
                         <textarea wire:model="nuevoMensaje"
                                   x-ref="ta"
+                                  id="chat-composer-textarea"
                                   placeholder="Escribe / para respuestas rápidas..."
                                   rows="1"
                                   @input="onInput($event)"
@@ -1167,11 +1168,18 @@
             document.addEventListener('livewire:initialized', () => {
                 Livewire.on('chat-cambiado', () => {
                     setTimeout(() => scrollToBottom(true), 100);
-                    // 🎯 Auto-focus al campo de escribir cuando se abre una conversación
-                    setTimeout(() => {
-                        const ta = document.querySelector('textarea[wire\\:model="nuevoMensaje"]');
-                        if (ta) ta.focus();
-                    }, 150);
+                    // 🎯 Auto-focus al campo de escribir cuando se abre una conversación.
+                    // Reintenta varias veces porque Livewire puede tardar en montar el DOM.
+                    const tryFocus = (intentos = 0) => {
+                        const ta = document.getElementById('chat-composer-textarea');
+                        if (ta) {
+                            ta.focus();
+                            ta.setSelectionRange(ta.value.length, ta.value.length);
+                        } else if (intentos < 10) {
+                            setTimeout(() => tryFocus(intentos + 1), 80);
+                        }
+                    };
+                    setTimeout(() => tryFocus(), 200);
                 });
                 Livewire.on('mensaje-enviado', () => setTimeout(() => scrollToBottom(true), 100));
 

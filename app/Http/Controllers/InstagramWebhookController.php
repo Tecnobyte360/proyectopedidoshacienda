@@ -60,14 +60,30 @@ class InstagramWebhookController extends Controller
         foreach ($payload['entry'] ?? [] as $entry) {
             $pageId = $entry['id'] ?? null;
 
-            // Resolver tenant por page_id
+            // Resolver tenant por page_id / IG business account id
             $tenant = $this->ig->tenantPorPageId($pageId);
             if (!$tenant) {
-                Log::warning('📷 IG webhook: tenant no encontrado para page_id', ['page_id' => $pageId]);
+                Log::warning('📷 IG webhook: tenant no encontrado', ['id' => $pageId]);
                 continue;
             }
 
+            // Formato 1: messaging[] (Messenger-like, IG Business Login viejo)
             foreach ($entry['messaging'] ?? [] as $event) {
+                $this->procesarEvento($event, $tenant);
+            }
+
+            // Formato 2: changes[] (Instagram Graph API moderno)
+            foreach ($entry['changes'] ?? [] as $cambio) {
+                if (($cambio['field'] ?? '') !== 'messages') continue;
+                $v = $cambio['value'] ?? [];
+
+                // Re-estructurar al formato messaging
+                $event = [
+                    'sender'    => $v['sender']    ?? [],
+                    'recipient' => $v['recipient'] ?? [],
+                    'timestamp' => $v['timestamp'] ?? (time() * 1000),
+                    'message'   => $v['message']   ?? [],
+                ];
                 $this->procesarEvento($event, $tenant);
             }
         }
