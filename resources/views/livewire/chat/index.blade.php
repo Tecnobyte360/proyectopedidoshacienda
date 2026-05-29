@@ -4,7 +4,6 @@
     @php $cfgBot = \App\Models\ConfiguracionBot::actual(); @endphp
 
     {{-- Bot apagado global → la pill bonita ahora vive en el topbar (resources/views/livewire/layouts/topbar.blade.php) --}}
-    @endif
 
     {{-- ╔═══ COLUMNA IZQUIERDA: lista de conversaciones ═══╗
          En móvil: solo se ve si NO hay chat activo (al seleccionar uno se oculta).
