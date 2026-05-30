@@ -200,3 +200,11 @@ Schedule::command('informes:enviar')
     ->hourly()
     ->withoutOverlapping()
     ->runInBackground();
+
+// 🧠 Auto-entrenamiento del bot: cada noche analiza las conversaciones del
+// día y destila nuevas lecciones que se inyectan al prompt automáticamente.
+// "Cada día el bot se entrena más solito."
+Schedule::command('bot:entrenar --dias=2')
+    ->dailyAt('03:30')
+    ->withoutOverlapping()
+    ->runInBackground();
