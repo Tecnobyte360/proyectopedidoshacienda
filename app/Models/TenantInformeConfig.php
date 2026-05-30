@@ -29,7 +29,8 @@ class TenantInformeConfig extends Model
         'inc_sin_responder' => 'boolean',
         'inc_palabras_top' => 'boolean',
         'ultimo_envio_at' => 'datetime',
-        'hora_envio' => 'datetime:H:i',
+        // hora_envio queda como string ya que el column es TIME (no datetime).
+        // Lo convertimos manualmente cuando lo necesitamos.
     ];
 
     public function tenant(): BelongsTo
