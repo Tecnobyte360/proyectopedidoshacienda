@@ -16,13 +16,33 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class BloquearSuperAdminSinImpersonar
 {
+    /**
+     * Rutas de plataforma que el super-admin SÍ puede ver sin impersonar
+     * (tienen su propio selector de tenant internamente).
+     */
+    private const RUTAS_PLATAFORMA = [
+        'configuracion.bot',
+        'configuracion.bot-lecciones',
+        'meta-whatsapp.index',
+        'monitoreo.llm',
+        'monitoreo.agente',
+        'monitoreo.watchdog',
+        'monitoreo.costos-meta',
+        'monitoreo.llamadas',
+        'alertas.index',
+    ];
+
     public function handle(Request $request, Closure $next): Response
     {
         $u = auth()->user();
 
         if ($u && $u->tenant_id === null && $u->hasRole('super-admin')) {
             $impersonando = session()->has('tenant_imitado_id');
-            if (!$impersonando) {
+
+            // ✅ Bypass: si la ruta es de plataforma (con selector interno de tenant),
+            // dejamos pasar al super-admin sin obligarlo a impersonar.
+            $rutaActual = optional($request->route())->getName();
+            if (!$impersonando && !in_array($rutaActual, self::RUTAS_PLATAFORMA, true)) {
                 return redirect()->route('admin.tenants.index')
                     ->with('warning', 'Como super-admin, debes usar "Ver como" en /admin/tenants para entrar al panel de un cliente específico.');
             }
