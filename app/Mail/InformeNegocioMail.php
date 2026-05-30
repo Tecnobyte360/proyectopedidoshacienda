@@ -24,8 +24,15 @@ class InformeNegocioMail extends Mailable
         $freq = ucfirst($this->data['rango']['frecuencia'] ?? 'semanal');
         $nombre = $this->tenant->nombre;
         $hasta = $this->data['rango']['hasta']->format('d/m/Y');
+
+        // 🧠 Si la IA generó un titular potente, lo usamos como asunto
+        $titularIa = trim($this->data['analisis']['titular'] ?? '');
+        $subject = $titularIa
+            ? "📊 {$nombre}: {$titularIa}"
+            : "📊 Informe {$freq} — {$nombre} ({$hasta})";
+
         return new Envelope(
-            subject: "📊 Informe {$freq} — {$nombre} ({$hasta})",
+            subject: $subject,
             from: new \Illuminate\Mail\Mailables\Address(
                 config('mail.from.address'),
                 'Kivox'

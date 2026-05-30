@@ -19,6 +19,60 @@
         </div>
     </td></tr>
 
+    {{-- 🧠 ANÁLISIS IA (resumen ejecutivo) --}}
+    @php $ia = $data['analisis'] ?? null; @endphp
+    @if($ia && ($ia['titular'] || $ia['resumen']))
+    <tr><td style="padding:24px 32px 8px;">
+        <div style="background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);border-radius:16px;padding:24px;color:#fff;">
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:2px;font-weight:700;color:#94a3b8;margin-bottom:8px;">
+                Análisis ejecutivo
+            </div>
+            @if($ia['titular'])
+                <div style="font-size:20px;font-weight:700;line-height:1.3;margin-bottom:12px;color:#fff;">
+                    {{ $ia['titular'] }}
+                </div>
+            @endif
+            @if($ia['resumen'])
+                <div style="font-size:14px;line-height:1.6;color:#cbd5e1;">
+                    {{ $ia['resumen'] }}
+                </div>
+            @endif
+
+            @if(!empty($ia['insights']))
+                <div style="margin-top:20px;padding-top:20px;border-top:1px solid #334155;">
+                    <div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;font-weight:700;color:#94a3b8;margin-bottom:10px;">
+                        Lo que observamos
+                    </div>
+                    @foreach($ia['insights'] as $insight)
+                        <div style="display:flex;align-items:flex-start;margin:6px 0;font-size:13px;color:#e2e8f0;line-height:1.5;">
+                            <span style="color:#fbbf24;margin-right:8px;font-weight:700;">·</span>
+                            <span>{{ $insight }}</span>
+                        </div>
+                    @endforeach
+                </div>
+            @endif
+
+            @if(!empty($ia['recomendaciones']))
+                <div style="margin-top:16px;padding-top:16px;border-top:1px solid #334155;">
+                    <div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;font-weight:700;color:#fbbf24;margin-bottom:10px;">
+                        Qué hacer esta semana
+                    </div>
+                    @foreach($ia['recomendaciones'] as $i => $reco)
+                        <div style="display:flex;align-items:flex-start;margin:8px 0;font-size:13px;color:#fef3c7;line-height:1.5;">
+                            <span style="background:#fbbf24;color:#0f172a;font-weight:700;font-size:11px;border-radius:50%;width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;margin-right:10px;flex-shrink:0;">{{ $i + 1 }}</span>
+                            <span>{{ $reco }}</span>
+                        </div>
+                    @endforeach
+                </div>
+            @endif
+
+            <div style="margin-top:16px;font-size:10px;color:#64748b;font-style:italic;">
+                Análisis generado por IA con base en los datos del período. Las recomendaciones son sugerencias automáticas.
+            </div>
+        </div>
+    </td></tr>
+    @endif
+
     {{-- VOLUMEN --}}
     @if(($inc['volumen'] ?? true) && !empty($data['volumen']))
     @php $v = $data['volumen']; @endphp

@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Mail\InformeNegocioMail;
 use App\Models\TenantInformeConfig;
+use App\Services\InformeAnalistaService;
 use App\Services\InformeNegocioService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
@@ -15,7 +16,7 @@ class EnviarInformesNegocio extends Command
 
     protected $description = 'Envía los informes periódicos a los admins de los tenants que estén configurados.';
 
-    public function handle(InformeNegocioService $svc): int
+    public function handle(InformeNegocioService $svc, InformeAnalistaService $analista): int
     {
         $ahora = now();
         $tenantForzado = $this->option('tenant');
@@ -42,6 +43,14 @@ class EnviarInformesNegocio extends Command
 
             // Generar informe
             $data = $svc->generar($cfg->tenant, $cfg->frecuencia);
+
+            // 🧠 Análisis IA con insights y recomendaciones (Claude Haiku)
+            try {
+                $data['analisis'] = $analista->analizar($cfg->tenant->nombre, $data);
+            } catch (\Throwable $e) {
+                Log::warning('Análisis IA falló (continúa con métricas crudas)', ['error' => $e->getMessage()]);
+                $data['analisis'] = ['titular' => '', 'resumen' => '', 'insights' => [], 'recomendaciones' => []];
+            }
 
             // Métricas a incluir
             $incluir = [
