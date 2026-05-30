@@ -73,9 +73,10 @@
         <div class="rounded-xl border border-amber-200 bg-amber-50 p-3 mb-4 text-xs text-amber-800 flex items-start gap-2">
             <i class="fa-solid fa-circle-info text-amber-500 mt-0.5"></i>
             <div>
-                <strong>Aún no hay eventos de billing registrados.</strong>
-                Meta solo factura cuando estás en modo Live + usando un número productivo (no Test).
-                Los eventos aparecerán automáticamente apenas migres a la WABA de Hacienda (Tarea #40).
+                <strong>Aún no hay eventos de billing registrados en este rango.</strong>
+                Si ya estás operando con Meta, los eventos aparecerán apenas reciban el próximo webhook de estado.
+                Mientras la app esté en <em>modo desarrollo</em>, la mayoría de conversaciones llegan como
+                <em>service / free_customer_service</em> (gratis) — verás el volumen aunque el costo sea $0.
             </div>
         </div>
     @endif

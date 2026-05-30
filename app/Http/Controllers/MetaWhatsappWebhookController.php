@@ -397,24 +397,41 @@ class MetaWhatsappWebhookController extends Controller
             }
         }
 
-        // 💰 Persistir evento de billing si Meta lo incluyó
+        // 💰 Persistir evento de billing — TODAS las conversaciones (billable o no).
+        // Las gratis (billable=false) también nos sirven para ver volumen por categoría.
         $pricing      = $status['pricing'] ?? null;
         $conversation = $status['conversation'] ?? null;
         $convId       = $conversation['id'] ?? null;
-        if ($pricing && $convId && (($pricing['billable'] ?? true) === true)) {
+
+        // Fallback: Meta a veces no manda conversation.id (sobre todo para free service).
+        // Sintetizamos uno por (recipient_id + día + categoría) para deduplicar
+        // razonablemente bien y aún ver el volumen real.
+        if ($pricing && !$convId) {
+            $recipient = $status['recipient_id'] ?? 'unknown';
+            $cat       = $pricing['category'] ?? 'service';
+            $day       = isset($status['timestamp'])
+                ? date('Ymd', (int) $status['timestamp'])
+                : now()->format('Ymd');
+            $convId    = "synth:{$recipient}:{$day}:{$cat}";
+        }
+
+        if ($pricing && $convId) {
+            $billable  = (bool) ($pricing['billable'] ?? false);
             $categoria = $pricing['category']
                 ?? ($conversation['origin']['type'] ?? null)
                 ?? 'service';
 
-            // Tabla de precios aproximada Colombia (USD por conversación)
+            // Tabla de precios Colombia (USD por conversación). 0 si no es billable.
             $tarifaCo = [
-                'service'        => 0.000,
-                'utility'        => 0.0080,
-                'authentication' => 0.0080,
-                'marketing'      => 0.0265,
-                'referral_conversion' => 0.000,
+                'service'              => 0.000,
+                'utility'              => 0.0080,
+                'authentication'       => 0.0080,
+                'marketing'            => 0.0265,
+                'referral_conversion'  => 0.000,
+                'free_customer_service'=> 0.000,
+                'free_entry_point'     => 0.000,
             ];
-            $cost = $tarifaCo[$categoria] ?? 0;
+            $cost = $billable ? ($tarifaCo[$categoria] ?? 0) : 0;
 
             try {
                 \App\Models\WhatsappBillingEvent::query()
@@ -429,10 +446,10 @@ class MetaWhatsappWebhookController extends Controller
                             'telefono'      => $status['recipient_id'] ?? null,
                             'categoria'     => $categoria,
                             'pricing_model' => $pricing['pricing_model'] ?? null,
-                            'billable'      => (bool) ($pricing['billable'] ?? true),
+                            'billable'      => $billable,
                             'cost_usd'      => $cost,
                             'moneda'        => 'USD',
-                            'origin_type'   => $conversation['origin']['type'] ?? null,
+                            'origin_type'   => $conversation['origin']['type'] ?? ($pricing['type'] ?? null),
                             'raw_payload'   => ['pricing' => $pricing, 'conversation' => $conversation],
                             'ocurrido_at'   => isset($status['timestamp'])
                                 ? \Carbon\Carbon::createFromTimestamp((int) $status['timestamp'])
