@@ -213,10 +213,14 @@ class MetaWhatsappWebhookController extends Controller
                 $mediaUrl = $this->descargarMediaMeta($mediaId, $config, 'bin') ?? $mediaId;
                 break;
             case 'interactive':
-                // Botón / lista
+                // Botón / lista (interactive — NO viene de plantillas, sino de menús creados al vuelo)
                 $body = $msg['interactive']['button_reply']['title']
                      ?? $msg['interactive']['list_reply']['title']
                      ?? '';
+                break;
+            case 'button':
+                // Quick Reply de PLANTILLA. Meta envía el texto del botón en button.text.
+                $body = $msg['button']['text'] ?? $msg['button']['payload'] ?? '';
                 break;
             default:
                 $body = "[mensaje tipo: {$tipo}]";
