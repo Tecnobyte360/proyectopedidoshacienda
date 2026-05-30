@@ -252,12 +252,15 @@ class CampanaSenderService
                         : [];
 
                     $metaSvc = app(\App\Services\Meta\MetaWhatsappCloudService::class);
+                    // 🖼️ Si la campaña tiene media_url, va como HEADER de imagen
+                    $imagenHeader = $c->media_url ?: null;
                     $ok = $metaSvc->enviarPlantilla(
                         $d->telefono,
                         $c->plantilla_meta_nombre,
                         $varsCampana,
                         $c->tenant_id,
-                        $c->plantilla_meta_idioma ?: 'es'
+                        $c->plantilla_meta_idioma ?: 'es',
+                        $imagenHeader
                     );
 
                     if ($ok) {

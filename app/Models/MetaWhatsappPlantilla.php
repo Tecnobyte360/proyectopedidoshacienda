@@ -13,13 +13,21 @@ class MetaWhatsappPlantilla extends Model
 
     protected $fillable = [
         'tenant_id', 'nombre', 'idioma', 'categoria', 'estado',
-        'descripcion', 'body_preview', 'footer', 'num_variables', 'activa',
+        'descripcion', 'body_preview', 'footer',
+        'header_tipo', 'header_texto',
+        'num_variables', 'activa',
     ];
 
     protected $casts = [
         'activa' => 'boolean',
         'num_variables' => 'int',
     ];
+
+    /** ¿La plantilla requiere subir una imagen al crear la campaña? */
+    public function requiereImagenHeader(): bool
+    {
+        return $this->header_tipo === 'image';
+    }
 
     public function disparadores()
     {

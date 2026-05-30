@@ -69,12 +69,25 @@ class MetaWhatsappCloudService
         string $plantilla,
         array  $variables = [],
         ?int   $tenantId = null,
-        string $idioma   = 'es'
+        string $idioma   = 'es',
+        ?string $headerImagenUrl = null
     ): bool {
         $config = $this->resolverConfig($tenantId);
         if (!$config) return false;
 
         $components = [];
+
+        // 🖼️ Si la plantilla tiene HEADER tipo IMAGE, pasarla como link
+        if ($headerImagenUrl) {
+            $components[] = [
+                'type'       => 'header',
+                'parameters' => [[
+                    'type'  => 'image',
+                    'image' => ['link' => $headerImagenUrl],
+                ]],
+            ];
+        }
+
         if (!empty($variables)) {
             $params = [];
             foreach ($variables as $valor) {
@@ -294,6 +307,17 @@ class MetaWhatsappCloudService
                 $footer = collect($tpl['components'] ?? [])
                     ->firstWhere('type', 'FOOTER')['text'] ?? null;
 
+                // 🖼️ Detectar HEADER (none / text / image / video / document)
+                $header = collect($tpl['components'] ?? [])->firstWhere('type', 'HEADER');
+                $headerTipo = null;
+                $headerTexto = null;
+                if ($header) {
+                    $headerTipo = strtolower($header['format'] ?? 'text');
+                    if ($headerTipo === 'text') {
+                        $headerTexto = $header['text'] ?? null;
+                    }
+                }
+
                 MetaWhatsappPlantilla::updateOrCreate(
                     [
                         'tenant_id' => $config->tenant_id,
@@ -305,6 +329,8 @@ class MetaWhatsappCloudService
                         'estado'        => $estadoMap[$tpl['status'] ?? ''] ?? 'pendiente',
                         'body_preview'  => $body,
                         'footer'        => $footer,
+                        'header_tipo'   => $headerTipo,
+                        'header_texto'  => $headerTexto,
                         'num_variables' => MetaWhatsappPlantilla::contarVariables($body),
                         'activa'        => ($tpl['status'] ?? '') === 'APPROVED',
                     ]
