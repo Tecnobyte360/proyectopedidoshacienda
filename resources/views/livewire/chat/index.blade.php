@@ -810,6 +810,11 @@
             </div>
 
             {{-- Imagen + Input (todo en un solo x-data para compartir estado) --}}
+            {{-- 💡 Copiloto (modo shadow): sugerencia del bot, NO se envía al cliente --}}
+            @if($conversacionActivaId)
+                <livewire:chat.bot-copiloto :conversacion-id="$conversacionActivaId" wire:key="copiloto-{{ $conversacionActivaId }}" />
+            @endif
+
             <div>
                 {{-- Preview de imagen seleccionada --}}
                 <div x-show="imgDataUrl" x-cloak class="bg-slate-50 border-t border-slate-200 px-4 py-3">

@@ -682,6 +682,19 @@ class Index extends Component
     }
 
     /**
+     * 💡 Modo shadow: el copiloto pide copiar su sugerencia al composer.
+     * SOLO copia el texto — NO envía nada. El operador decide enviarlo.
+     */
+    #[On('copiloto-usar')]
+    public function copilotoUsar(string $texto = ''): void
+    {
+        if ($texto !== '') {
+            $this->nuevoMensaje = $texto;
+            $this->dispatch('notify', ['type' => 'info', 'message' => 'Sugerencia copiada. Revísala y envíala tú.']);
+        }
+    }
+
+    /**
      * 👍 Reacciona a un mensaje del cliente con un emoji.
      * Si ya hay la misma reacción, la quita (toggle). Si hay otra, la cambia.
      */
