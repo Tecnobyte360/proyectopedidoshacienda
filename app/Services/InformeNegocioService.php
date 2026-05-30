@@ -37,7 +37,7 @@ class InformeNegocioService
             'tiempoResp'    => $this->tiempoRespuesta($tid, $desde),
             'reacciones'    => $this->reacciones($tid, $desde),
             'topClientes'   => $this->topClientes($tid, $desde),
-            'sinResponder'  => $this->sinResponder($tid, $umbralMin: 120),
+            'sinResponder'  => $this->sinResponder($tid, umbralMin: 120),
             'palabrasTop'   => $this->palabrasTop($tid, $desde),
             'campanas'      => $this->campanasResumen($tid, $desde),
             'costoMeta'     => $this->costoMeta($tid, $desde),
