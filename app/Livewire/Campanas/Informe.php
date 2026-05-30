@@ -78,18 +78,32 @@ class Informe extends Component
         ];
     }
 
-    /** Botones más clicados (Top N). */
+    /**
+     * Botones más clicados — agrega TODOS los clicks (no solo el primero por persona).
+     * Lee del historial JSON botones_clicks; cae a boton_click si no hay historial.
+     */
     public function getBotonesProperty(): array
     {
-        return CampanaDestinatario::query()
+        $destinatarios = CampanaDestinatario::query()
             ->withoutGlobalScopes()
             ->where('campana_id', $this->campana->id)
-            ->whereNotNull('boton_click')
-            ->selectRaw('boton_click, COUNT(*) as n')
-            ->groupBy('boton_click')
-            ->orderByDesc('n')
-            ->get()
-            ->toArray();
+            ->where(fn($q) => $q->whereNotNull('boton_click')->orWhereNotNull('botones_clicks'))
+            ->get(['boton_click', 'botones_clicks']);
+
+        $conteo = [];
+        foreach ($destinatarios as $d) {
+            // Preferir historial JSON; si no hay, usar boton_click clásico
+            $clicks = is_array($d->botones_clicks) && !empty($d->botones_clicks)
+                ? array_column($d->botones_clicks, 'boton')
+                : ($d->boton_click ? [$d->boton_click] : []);
+
+            foreach ($clicks as $btn) {
+                $conteo[$btn] = ($conteo[$btn] ?? 0) + 1;
+            }
+        }
+
+        arsort($conteo);
+        return collect($conteo)->map(fn($n, $btn) => ['boton_click' => $btn, 'n' => $n])->values()->toArray();
     }
 
     /** Reacciones agregadas por emoji. */

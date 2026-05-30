@@ -260,9 +260,19 @@ class MetaWhatsappWebhookController extends Controller
                                ?? $msg['interactive']['list_reply']['title']
                                ?? ($tipo === 'button' ? ($msg['button']['text'] ?? null) : null);
 
-                    if ($botonTexto && !$destinatario->boton_click) {
-                        $update['boton_click']    = mb_substr($botonTexto, 0, 60);
-                        $update['boton_click_at'] = now();
+                    if ($botonTexto) {
+                        $botonTexto = mb_substr($botonTexto, 0, 60);
+
+                        // Primer click: marcar boton_click + boton_click_at
+                        if (!$destinatario->boton_click) {
+                            $update['boton_click']    = $botonTexto;
+                            $update['boton_click_at'] = now();
+                        }
+
+                        // Historial: agregar este click al array JSON
+                        $historial = is_array($destinatario->botones_clicks) ? $destinatario->botones_clicks : [];
+                        $historial[] = ['boton' => $botonTexto, 'at' => now()->toDateTimeString()];
+                        $update['botones_clicks'] = $historial;
                     }
 
                     $destinatario->update($update);

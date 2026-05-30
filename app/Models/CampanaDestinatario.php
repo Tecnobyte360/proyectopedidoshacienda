@@ -20,7 +20,7 @@ class CampanaDestinatario extends Model
         // 📊 Tracking marketing
         'mensaje_externo_id',
         'entregado_at', 'leido_at',
-        'boton_click', 'boton_click_at',
+        'boton_click', 'boton_click_at', 'botones_clicks',
         'reaccion', 'reaccion_at',
         'pedido_id', 'pedido_at',
     ];
@@ -31,6 +31,7 @@ class CampanaDestinatario extends Model
         'entregado_at'     => 'datetime',
         'leido_at'         => 'datetime',
         'boton_click_at'   => 'datetime',
+        'botones_clicks'   => 'array',
         'reaccion_at'      => 'datetime',
         'pedido_at'        => 'datetime',
         'intentos'         => 'integer',
