@@ -251,19 +251,20 @@ class CampanaSenderService
                         ? array_values($c->plantilla_meta_variables)
                         : [];
 
-                    $ok = app(\App\Services\Meta\MetaWhatsappCloudService::class)
-                        ->enviarPlantilla(
-                            $d->telefono,
-                            $c->plantilla_meta_nombre,
-                            $varsCampana,
-                            $c->tenant_id,
-                            $c->plantilla_meta_idioma ?: 'es'
-                        );
+                    $metaSvc = app(\App\Services\Meta\MetaWhatsappCloudService::class);
+                    $ok = $metaSvc->enviarPlantilla(
+                        $d->telefono,
+                        $c->plantilla_meta_nombre,
+                        $varsCampana,
+                        $c->tenant_id,
+                        $c->plantilla_meta_idioma ?: 'es'
+                    );
 
                     if ($ok) {
                         $d->update([
                             'estado'              => CampanaDestinatario::ESTADO_ENVIADO,
                             'mensaje_renderizado' => '[plantilla:' . $c->plantilla_meta_nombre . ']',
+                            'mensaje_externo_id'  => $metaSvc->ultimoWamid, // 📊 wamid para tracking
                             'enviado_at'          => now(),
                             'intentos'            => $d->intentos + 1,
                             'error_detalle'       => null,

@@ -189,6 +189,9 @@ Route::middleware(['no_super_sin_imp'])->group(function () {
     Route::get('/categorias',    CategoriasIndex::class)->middleware('permission:categorias.gestionar')->name('categorias.index');
     Route::get('/cortes',        CortesIndex::class)->middleware('permission:productos.ver')->name('cortes.index');
     Route::get('/campanas',           CampanasIndex::class)->middleware('permission:campanas.ver|campanas.gestionar')->name('campanas.index');
+    Route::get('/campanas/{id}/informe', \App\Livewire\Campanas\Informe::class)
+        ->middleware('permission:campanas.ver|campanas.gestionar')
+        ->name('campanas.informe');
     Route::get('/estados-whatsapp',  EstadosWhatsappIndex::class)->middleware('permission:campanas.ver|campanas.gestionar')->name('estados-whatsapp.index');
     Route::get('/importaciones', ImportacionesIndex::class)->middleware('permission:productos.ver')->name('importaciones.index');
     Route::get('/integraciones', IntegracionesIndex::class)->middleware(['permission:productos.ver', 'role:super-admin'])->name('integraciones.index');

@@ -253,6 +253,11 @@
                                             </span>
                                         @endif
                                     </button>
+                                    {{-- 📊 Informe marketing (KPIs, botones, reacciones, conversión) --}}
+                                    <a href="{{ route('campanas.informe', $c->id) }}" title="Informe completo de marketing"
+                                       class="h-8 w-8 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-700 transition inline-flex items-center justify-center">
+                                        <i class="fa-solid fa-chart-pie text-xs"></i>
+                                    </a>
                                     <button wire:click="generarAudiencia({{ $c->id }})" title="Generar/regenerar audiencia"
                                             class="h-8 w-8 rounded-lg bg-violet-100 hover:bg-violet-200 text-violet-700 transition">
                                         <i class="fa-solid fa-users text-xs"></i>

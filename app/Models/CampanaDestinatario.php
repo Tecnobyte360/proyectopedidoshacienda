@@ -17,13 +17,25 @@ class CampanaDestinatario extends Model
         'nombre', 'telefono',
         'estado', 'mensaje_renderizado', 'enviado_at', 'error_detalle', 'intentos',
         'respondio_at', 'respuestas_count',
+        // 📊 Tracking marketing
+        'mensaje_externo_id',
+        'entregado_at', 'leido_at',
+        'boton_click', 'boton_click_at',
+        'reaccion', 'reaccion_at',
+        'pedido_id', 'pedido_at',
     ];
 
     protected $casts = [
         'enviado_at'       => 'datetime',
         'respondio_at'     => 'datetime',
+        'entregado_at'     => 'datetime',
+        'leido_at'         => 'datetime',
+        'boton_click_at'   => 'datetime',
+        'reaccion_at'      => 'datetime',
+        'pedido_at'        => 'datetime',
         'intentos'         => 'integer',
         'respuestas_count' => 'integer',
+        'pedido_id'        => 'integer',
     ];
 
     public const ESTADO_PENDIENTE = 'pendiente';

@@ -156,7 +156,18 @@ class MetaWhatsappWebhookController extends Controller
                         'emoji' => $emoji ?: '(quitada)',
                         'mensaje_id' => $mensaje->id,
                     ]);
-                } else {
+                }
+
+                // 📊 Tracking campaña: si reaccionaron al mensaje de una campaña
+                \App\Models\CampanaDestinatario::query()
+                    ->withoutGlobalScopes()
+                    ->where('mensaje_externo_id', $reactedToWamid)
+                    ->update([
+                        'reaccion'    => $emoji ?: null,
+                        'reaccion_at' => $emoji ? now() : null,
+                    ]);
+
+                if (!$mensaje) {
                     \Log::info('👍 Reacción recibida pero mensaje no encontrado', [
                         'wamid' => $reactedToWamid,
                         'emoji' => $emoji,
@@ -223,6 +234,38 @@ class MetaWhatsappWebhookController extends Controller
                     ->first();
                 $respondiendoAId = $msgCitado?->id;
             } catch (\Throwable $e) { /* no es crítico */ }
+        }
+
+        // 📊 Tracking campaña: si esta respuesta apunta a un mensaje de campaña,
+        // marcamos respondio_at + (si es click de botón) boton_click.
+        if ($contextWamid) {
+            try {
+                $destinatario = \App\Models\CampanaDestinatario::query()
+                    ->withoutGlobalScopes()
+                    ->where('mensaje_externo_id', $contextWamid)
+                    ->first();
+
+                if ($destinatario) {
+                    $update = [
+                        'respondio_at'     => $destinatario->respondio_at ?? now(),
+                        'respuestas_count' => (int) $destinatario->respuestas_count + 1,
+                    ];
+
+                    // Si fue click de Quick Reply / List → guardar texto del botón
+                    $botonTexto = $msg['interactive']['button_reply']['title']
+                               ?? $msg['interactive']['list_reply']['title']
+                               ?? ($tipo === 'button' ? ($msg['button']['text'] ?? null) : null);
+
+                    if ($botonTexto && !$destinatario->boton_click) {
+                        $update['boton_click']    = mb_substr($botonTexto, 0, 60);
+                        $update['boton_click_at'] = now();
+                    }
+
+                    $destinatario->update($update);
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Tracking campaña respuesta falló: ' . $e->getMessage());
+            }
         }
 
         // Connection_id sintético: usamos un namespace meta:{phone_number_id}
@@ -316,6 +359,27 @@ class MetaWhatsappWebhookController extends Controller
                     ->update(['ack' => $ack]);
             } catch (\Throwable $e) {
                 Log::warning('No se pudo actualizar ack Meta: ' . $e->getMessage());
+            }
+
+            // 📊 Tracking de campañas: marcar entregado_at / leido_at en destinatarios
+            try {
+                if ($ack === 2) {
+                    \App\Models\CampanaDestinatario::query()
+                        ->withoutGlobalScopes()
+                        ->where('mensaje_externo_id', $waId)
+                        ->whereNull('entregado_at')
+                        ->update(['entregado_at' => now()]);
+                } elseif ($ack === 3) {
+                    \App\Models\CampanaDestinatario::query()
+                        ->withoutGlobalScopes()
+                        ->where('mensaje_externo_id', $waId)
+                        ->update([
+                            'entregado_at' => \DB::raw('COALESCE(entregado_at, NOW())'),
+                            'leido_at'     => \DB::raw('COALESCE(leido_at, NOW())'),
+                        ]);
+                }
+            } catch (\Throwable $e) {
+                Log::warning('No se pudo actualizar tracking campaña: ' . $e->getMessage());
             }
         }
 
