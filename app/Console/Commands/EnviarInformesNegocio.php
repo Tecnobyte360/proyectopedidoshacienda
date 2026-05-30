@@ -41,6 +41,9 @@ class EnviarInformesNegocio extends Command
                 continue;
             }
 
+            // 🏢 Setear tenant en TenantManager para que resolverAnthropicKey() funcione
+            app(\App\Services\TenantManager::class)->set($cfg->tenant);
+
             // Generar informe
             $data = $svc->generar($cfg->tenant, $cfg->frecuencia);
 
