@@ -192,3 +192,11 @@ Schedule::command('clientes:felicitar-cumpleanos')
     })
     ->withoutOverlapping()
     ->runInBackground();
+
+
+// 📊 Informes de negocio: cada hora revisamos qué tenants tienen toca enviar
+// (el comando filtra por config: frecuencia diario/semanal/mensual + hora_envio + ultimo_envio_at).
+Schedule::command('informes:enviar')
+    ->hourly()
+    ->withoutOverlapping()
+    ->runInBackground();

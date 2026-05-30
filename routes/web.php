@@ -242,6 +242,10 @@ Route::middleware(['no_super_sin_imp'])->group(function () {
         ->middleware(['permission:bot.configurar', 'role:super-admin'])
         ->name('configuracion.bot');
 
+    Route::get('/configuracion/informes-negocio', \App\Livewire\Configuracion\InformesNegocio::class)
+        ->middleware(['permission:bot.configurar', 'role:super-admin'])
+        ->name('configuracion.informes-negocio');
+
     Route::get('/configuracion/respuestas-rapidas', \App\Livewire\Configuracion\RespuestasRapidas\Index::class)
         ->middleware('permission:respuestas_rapidas.gestionar')
         ->name('configuracion.respuestas-rapidas');

@@ -23,6 +23,7 @@ class BloquearSuperAdminSinImpersonar
     private const RUTAS_PLATAFORMA = [
         'configuracion.bot',
         'configuracion.bot-lecciones',
+        'configuracion.informes-negocio',
         'meta-whatsapp.index',
         'monitoreo.llm',
         'monitoreo.agente',
