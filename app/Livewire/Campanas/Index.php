@@ -393,7 +393,7 @@ class Index extends Component
         $providerMeta = $tenant && $tenant->proveedorWhatsappResuelto() === \App\Models\Tenant::WA_PROVIDER_META;
         $plantillasMeta = $providerMeta
             ? \App\Models\MetaWhatsappPlantilla::where('activa', true)
-                ->where('estado', 'APPROVED')
+                ->where('estado', 'aprobada') // BD guarda en es: aprobada/rechazada/pendiente
                 ->orderBy('nombre')
                 ->get()
             : collect();
