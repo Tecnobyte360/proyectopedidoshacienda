@@ -116,6 +116,14 @@
                     ['name' => 'Envíos Billing','icon' => 'fa-paper-plane',        'route' => 'admin.billing-envios',      'badge' => 'NUEVO', 'permission' => 'tenants.gestionar'],
                     ['name' => 'Documentación',         'icon' => 'fa-book-open',  'route' => 'admin.documentacion',          'badge' => null, 'permission' => 'tenants.gestionar'],
                     ['name' => 'Branding plataforma',   'icon' => 'fa-palette',    'route' => 'admin.configuracion-plataforma','badge' => null, 'permission' => 'tenants.gestionar'],
+
+                    // ─── Plataforma: features que controla solo el super-admin (visibles desde el panel admin). ───
+                    ['name' => 'Bot WhatsApp',      'icon' => 'fa-robot',              'route' => 'configuracion.bot',           'badge' => null, 'permission' => 'bot.configurar', 'solo_super_admin' => true],
+                    ['name' => 'Lecciones del bot', 'icon' => 'fa-graduation-cap',     'route' => 'configuracion.bot-lecciones', 'badge' => null, 'permission' => 'bot.configurar', 'solo_super_admin' => true],
+                    ['name' => 'Meta WhatsApp',     'icon' => 'fa-brands fa-whatsapp', 'route' => 'meta-whatsapp.index',         'badge' => null, 'permission' => 'bot.configurar', 'solo_super_admin' => true],
+                    ['name' => 'Monitor LLM',       'icon' => 'fa-microchip',          'route' => 'monitoreo.llm',               'badge' => null, 'permission' => 'bot.configurar', 'solo_super_admin' => true],
+                    ['name' => 'Costos Meta',       'icon' => 'fa-coins',              'route' => 'monitoreo.costos-meta',       'badge' => null, 'permission' => 'bot.configurar', 'solo_super_admin' => true],
+                    ['name' => 'Alertas del bot',   'icon' => 'fa-triangle-exclamation','route' => 'alertas.index',              'badge' => null, 'permission' => 'alertas.ver',    'solo_super_admin' => true],
                 ],
             ],
         ];
