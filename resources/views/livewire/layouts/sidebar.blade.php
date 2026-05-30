@@ -124,6 +124,8 @@
                     ['name' => 'Monitor LLM',       'icon' => 'fa-microchip',          'route' => 'monitoreo.llm',               'badge' => null, 'permission' => 'bot.configurar', 'solo_super_admin' => true],
                     ['name' => 'Costos Meta',       'icon' => 'fa-coins',              'route' => 'monitoreo.costos-meta',       'badge' => null, 'permission' => 'bot.configurar', 'solo_super_admin' => true],
                     ['name' => 'Alertas del bot',   'icon' => 'fa-triangle-exclamation','route' => 'alertas.index',              'badge' => null, 'permission' => 'alertas.ver',    'solo_super_admin' => true],
+                    ['name' => 'Usuarios globales', 'icon' => 'fa-user-shield',        'route' => 'usuarios.index',              'badge' => null, 'permission' => 'usuarios.ver',   'solo_super_admin' => true],
+                    ['name' => 'Roles y permisos',  'icon' => 'fa-shield-halved',      'route' => 'roles.index',                 'badge' => null, 'permission' => 'roles.gestionar','solo_super_admin' => true],
                 ],
             ],
         ];

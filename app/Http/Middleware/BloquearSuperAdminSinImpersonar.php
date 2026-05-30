@@ -30,6 +30,9 @@ class BloquearSuperAdminSinImpersonar
         'monitoreo.costos-meta',
         'monitoreo.llamadas',
         'alertas.index',
+        // 👇 Gestión de usuarios/roles globales del SaaS
+        'usuarios.index',
+        'roles.index',
     ];
 
     public function handle(Request $request, Closure $next): Response
