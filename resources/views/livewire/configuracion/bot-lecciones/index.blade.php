@@ -1,4 +1,4 @@
-<div class="p-4 md:p-6 max-w-6xl mx-auto">
+<div class="p-4 md:p-6 w-full">
 
     <div class="flex items-center justify-between mb-4 gap-3 flex-wrap">
         <div>
@@ -10,11 +10,14 @@
                 Errores reportados al bot. Se inyectan al prompt del LLM como reglas obligatorias.
             </p>
         </div>
-        <button wire:click="abrirCrear"
-                class="inline-flex items-center gap-1.5 bg-brand hover:bg-brand-dark text-white rounded-lg px-3 py-1.5 text-xs font-semibold shadow-sm transition">
-            <i class="fa-solid fa-plus text-[10px]"></i>
-            Nueva lección
-        </button>
+        <div class="flex items-center gap-2 flex-wrap">
+            <x-tenant-view-selector />
+            <button wire:click="abrirCrear"
+                    class="inline-flex items-center gap-1.5 bg-brand hover:bg-brand-dark text-white rounded-lg px-3 py-1.5 text-xs font-semibold shadow-sm transition">
+                <i class="fa-solid fa-plus text-[10px]"></i>
+                Nueva lección
+            </button>
+        </div>
     </div>
 
     <div class="flex items-center gap-2 mb-3 flex-wrap">

@@ -1,4 +1,4 @@
-<div class="p-4 md:p-6 max-w-7xl mx-auto">
+<div class="p-4 md:p-6 w-full">
 
     <div class="flex items-center justify-between mb-4 gap-3 flex-wrap">
         <div>
