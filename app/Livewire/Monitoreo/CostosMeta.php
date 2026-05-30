@@ -14,7 +14,26 @@ class CostosMeta extends Component
     /** Tasa COP/USD aproximada — luego se puede traer de banco/cache */
     public float $cop_por_usd = 4150.0;
 
-    public function mount(): void {}
+    /** 🏢 Tenant filtrado (null = ver todos los tenants agregados). Solo super-admin. */
+    public ?int $tenantViewId = null;
+
+    public function mount(): void
+    {
+        // Si NO es super-admin, fuerza el tenant del usuario actual (no le dejes elegir)
+        $u = auth()->user();
+        if ($u && !$u->hasRole('super-admin')) {
+            $this->tenantViewId = $u->tenant_id;
+        }
+    }
+
+    /** Listado de tenants para el dropdown (solo lo usa la vista cuando es super-admin). */
+    public function getTenantesProperty()
+    {
+        return \App\Models\Tenant::query()
+            ->withoutGlobalScopes()
+            ->orderBy('nombre')
+            ->get(['id', 'nombre']);
+    }
 
     private function ventana(): array
     {
@@ -26,11 +45,21 @@ class CostosMeta extends Component
         };
     }
 
+    /** Aplica el filtro de tenant a una query base (super-admin con selector). */
+    private function scopeTenant($q)
+    {
+        $q->withoutGlobalScopes();
+        if ($this->tenantViewId) {
+            $q->where('tenant_id', $this->tenantViewId);
+        }
+        return $q;
+    }
+
     #[Computed]
     public function kpis(): array
     {
         [$desde, $hasta] = $this->ventana();
-        $base = WhatsappBillingEvent::query()
+        $base = $this->scopeTenant(WhatsappBillingEvent::query())
             ->whereBetween('ocurrido_at', [$desde, $hasta])
             ->where('billable', true);
 
@@ -58,7 +87,7 @@ class CostosMeta extends Component
     public function topPlantillas()
     {
         [$desde, $hasta] = $this->ventana();
-        return WhatsappBillingEvent::query()
+        return $this->scopeTenant(WhatsappBillingEvent::query())
             ->selectRaw('origin_type, COUNT(*) AS cnt, SUM(cost_usd) AS usd')
             ->whereBetween('ocurrido_at', [$desde, $hasta])
             ->where('billable', true)
@@ -72,7 +101,7 @@ class CostosMeta extends Component
     public function topClientes()
     {
         [$desde, $hasta] = $this->ventana();
-        return WhatsappBillingEvent::query()
+        return $this->scopeTenant(WhatsappBillingEvent::query())
             ->selectRaw('telefono, COUNT(*) AS cnt, SUM(cost_usd) AS usd')
             ->whereBetween('ocurrido_at', [$desde, $hasta])
             ->where('billable', true)
@@ -87,7 +116,7 @@ class CostosMeta extends Component
     public function serieDiaria()
     {
         [$desde, $hasta] = $this->ventana();
-        $rows = WhatsappBillingEvent::query()
+        $rows = $this->scopeTenant(WhatsappBillingEvent::query())
             ->selectRaw('DATE(ocurrido_at) AS fecha, categoria, COUNT(*) AS cnt, SUM(cost_usd) AS usd')
             ->whereBetween('ocurrido_at', [$desde, $hasta])
             ->where('billable', true)

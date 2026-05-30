@@ -10,7 +10,8 @@
                 Lo que Meta te está cobrando por usar la API (real-time desde webhooks).
             </p>
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 flex-wrap">
+            <x-tenant-view-selector :tenants="$this->tenantes" :selected="$tenantViewId" model="tenantViewId" />
             <select wire:model.live="rango" class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs">
                 <option value="hoy">Hoy</option>
                 <option value="7d">Últimos 7 días</option>
