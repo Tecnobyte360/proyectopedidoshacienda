@@ -312,8 +312,26 @@
     </aside>
 
     {{-- ╔═══ COLUMNA DERECHA: chat seleccionado ═══╗ --}}
-    <section class="flex-1 flex-col min-w-0 bg-[#efeae2]
+    <section x-data="chatComposer()"
+             x-init="init()"
+             @dragenter.prevent="onDragEnter($event)"
+             @dragover.prevent="onDragOver($event)"
+             @dragleave.prevent="onDragLeave($event)"
+             @drop.prevent="onDrop($event)"
+             class="relative flex-1 flex-col min-w-0 bg-[#efeae2]
                     {{ $conversacionActivaId ? 'flex' : 'hidden lg:flex' }}">
+
+        {{-- 🎯 Overlay drag-and-drop a TODA la conversación --}}
+        <div x-show="dragging && @js((bool) $conversacionActivaId)" x-cloak
+             class="absolute inset-0 z-40 flex items-center justify-center bg-emerald-50/95 backdrop-blur-sm pointer-events-none">
+            <div class="text-center rounded-2xl border-2 border-dashed border-emerald-400 bg-white/80 px-10 py-8 shadow-lg">
+                <div class="inline-flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg mb-3">
+                    <i class="fa-solid fa-cloud-arrow-up text-2xl"></i>
+                </div>
+                <p class="text-base font-semibold text-emerald-700">Suelta la imagen aquí</p>
+                <p class="text-xs text-emerald-600/70 mt-1">JPG, PNG &middot; máx 15 MB</p>
+            </div>
+        </div>
 
         @if($conversacionActiva)
             @php
@@ -792,26 +810,7 @@
             </div>
 
             {{-- Imagen + Input (todo en un solo x-data para compartir estado) --}}
-            <div x-data="chatComposer()"
-                 x-init="init()"
-                 @dragenter.prevent="onDragEnter($event)"
-                 @dragover.prevent="onDragOver($event)"
-                 @dragleave.prevent="onDragLeave($event)"
-                 @drop.prevent="onDrop($event)"
-                 class="relative">
-
-                {{-- 🎯 Overlay drag-and-drop --}}
-                <div x-show="dragging" x-cloak
-                     class="absolute inset-0 z-30 flex items-center justify-center bg-emerald-50/95 backdrop-blur-sm border-2 border-dashed border-emerald-400 rounded-lg pointer-events-none">
-                    <div class="text-center">
-                        <div class="inline-flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg mb-2">
-                            <i class="fa-solid fa-cloud-arrow-up text-xl"></i>
-                        </div>
-                        <p class="text-sm font-semibold text-emerald-700">Suelta la imagen aquí</p>
-                        <p class="text-xs text-emerald-600/70 mt-0.5">JPG, PNG · máx 15 MB</p>
-                    </div>
-                </div>
-
+            <div>
                 {{-- Preview de imagen seleccionada --}}
                 <div x-show="imgDataUrl" x-cloak class="bg-slate-50 border-t border-slate-200 px-4 py-3">
                     <div class="flex items-start gap-3">
@@ -1246,6 +1245,17 @@
                 dragging: false,
                 dragCounter: 0,
                 init() {
+                    // 🛟 Safety nets: si el drag sale de la ventana sin drop,
+                    // apaga el overlay para que no se quede pegado.
+                    const self = this;
+                    window.addEventListener('dragend',  () => self._resetDrag());
+                    window.addEventListener('mouseout', (e) => {
+                        if (!e.relatedTarget && !e.toElement) self._resetDrag();
+                    });
+                    document.addEventListener('keydown', (e) => {
+                        if (e.key === 'Escape' && self.dragging) self._resetDrag();
+                    });
+
                     // 📋 Listener global de paste: pegar screenshots con Ctrl+V
                     // mientras el foco esté en algún input/textarea del composer.
                     document.addEventListener('paste', (e) => {
@@ -1317,6 +1327,10 @@
                 _hasFiles(ev) {
                     return ev.dataTransfer && Array.from(ev.dataTransfer.types || []).includes('Files');
                 },
+                _resetDrag() {
+                    this.dragging = false;
+                    this.dragCounter = 0;
+                },
                 onDragEnter(ev) {
                     if (!this._hasFiles(ev) || this.imgDataUrl) return;
                     this.dragCounter++;
@@ -1328,13 +1342,12 @@
                     this.dragging = true;
                 },
                 onDragLeave(ev) {
-                    // Solo apagar overlay cuando salgo del contenedor real
                     this.dragCounter = Math.max(0, this.dragCounter - 1);
                     if (this.dragCounter === 0) this.dragging = false;
                 },
                 onDrop(ev) {
-                    this.dragging = false;
-                    this.dragCounter = 0;
+                    // Resetear SIEMPRE el estado antes de procesar.
+                    this._resetDrag();
                     if (!ev.dataTransfer) return;
                     if (this.imgDataUrl) {
                         this.imgError = 'Ya tienes una imagen en preview. Envíala o descártala primero.';
