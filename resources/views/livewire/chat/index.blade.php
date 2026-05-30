@@ -793,7 +793,24 @@
 
             {{-- Imagen + Input (todo en un solo x-data para compartir estado) --}}
             <div x-data="chatComposer()"
-                 x-init="init()">
+                 x-init="init()"
+                 @dragenter.prevent="onDragEnter($event)"
+                 @dragover.prevent="onDragOver($event)"
+                 @dragleave.prevent="onDragLeave($event)"
+                 @drop.prevent="onDrop($event)"
+                 class="relative">
+
+                {{-- 🎯 Overlay drag-and-drop --}}
+                <div x-show="dragging" x-cloak
+                     class="absolute inset-0 z-30 flex items-center justify-center bg-emerald-50/95 backdrop-blur-sm border-2 border-dashed border-emerald-400 rounded-lg pointer-events-none">
+                    <div class="text-center">
+                        <div class="inline-flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg mb-2">
+                            <i class="fa-solid fa-cloud-arrow-up text-xl"></i>
+                        </div>
+                        <p class="text-sm font-semibold text-emerald-700">Suelta la imagen aquí</p>
+                        <p class="text-xs text-emerald-600/70 mt-0.5">JPG, PNG · máx 15 MB</p>
+                    </div>
+                </div>
 
                 {{-- Preview de imagen seleccionada --}}
                 <div x-show="imgDataUrl" x-cloak class="bg-slate-50 border-t border-slate-200 px-4 py-3">
@@ -1226,6 +1243,8 @@
                 imgCaption: '',
                 sendingImg: false,
                 imgError: '',
+                dragging: false,
+                dragCounter: 0,
                 init() {
                     // 📋 Listener global de paste: pegar screenshots con Ctrl+V
                     // mientras el foco esté en algún input/textarea del composer.
@@ -1292,6 +1311,50 @@
                     this.imgDataUrl = null;
                     this.imgCaption = '';
                     this.imgError = '';
+                },
+
+                // ─── Drag and drop ──────────────────────────────────────
+                _hasFiles(ev) {
+                    return ev.dataTransfer && Array.from(ev.dataTransfer.types || []).includes('Files');
+                },
+                onDragEnter(ev) {
+                    if (!this._hasFiles(ev) || this.imgDataUrl) return;
+                    this.dragCounter++;
+                    this.dragging = true;
+                },
+                onDragOver(ev) {
+                    if (!this._hasFiles(ev) || this.imgDataUrl) return;
+                    if (ev.dataTransfer) ev.dataTransfer.dropEffect = 'copy';
+                    this.dragging = true;
+                },
+                onDragLeave(ev) {
+                    // Solo apagar overlay cuando salgo del contenedor real
+                    this.dragCounter = Math.max(0, this.dragCounter - 1);
+                    if (this.dragCounter === 0) this.dragging = false;
+                },
+                onDrop(ev) {
+                    this.dragging = false;
+                    this.dragCounter = 0;
+                    if (!ev.dataTransfer) return;
+                    if (this.imgDataUrl) {
+                        this.imgError = 'Ya tienes una imagen en preview. Envíala o descártala primero.';
+                        return;
+                    }
+                    const file = ev.dataTransfer.files && ev.dataTransfer.files[0];
+                    if (!file) return;
+                    this.imgError = '';
+                    if (!file.type.startsWith('image/')) {
+                        this.imgError = 'Solo se aceptan imágenes.';
+                        return;
+                    }
+                    if (file.size > 15 * 1024 * 1024) {
+                        this.imgError = 'Imagen demasiado grande (máx 15 MB).';
+                        return;
+                    }
+                    const reader = new FileReader();
+                    reader.onload = () => { this.imgDataUrl = reader.result; };
+                    reader.onerror = () => { this.imgError = 'No se pudo leer la imagen.'; };
+                    reader.readAsDataURL(file);
                 },
             };
         }
