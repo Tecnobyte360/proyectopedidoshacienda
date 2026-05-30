@@ -13,6 +13,7 @@
         </div>
 
         <div class="flex flex-wrap items-center gap-2">
+            <x-tenant-view-selector />
             @if($totales['no_resueltas'] > 0)
                 <button wire:click="resolverTodas"
                         wire:confirm="¿Marcar TODAS las alertas no resueltas como resueltas?"

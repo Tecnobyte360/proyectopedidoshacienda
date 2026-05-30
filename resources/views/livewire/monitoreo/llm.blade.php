@@ -12,7 +12,8 @@
                 <p class="text-xs text-slate-500">LLM (Anthropic), watchdog y eventos del bot en tiempo real</p>
             </div>
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 flex-wrap">
+            <x-tenant-view-selector />
             <label class="text-xs text-slate-500">Ventana:</label>
             <select wire:model.live="minutos" class="rounded-lg border border-slate-200 px-2 py-1.5 text-xs">
                 <option value="5">5 min</option>

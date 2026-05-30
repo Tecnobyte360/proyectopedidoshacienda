@@ -2,9 +2,12 @@
      x-data="{ tab: window.localStorage.getItem('bot_cfg_tab') || 'general' }"
      x-init="$watch('tab', v => window.localStorage.setItem('bot_cfg_tab', v))">
 
-    <div class="mb-6">
-        <h2 class="text-3xl font-extrabold text-slate-800">Configuración del bot</h2>
-        <p class="text-sm text-slate-500">Ajusta el comportamiento de la asesora IA.</p>
+    <div class="mb-6 flex items-start justify-between gap-3 flex-wrap">
+        <div>
+            <h2 class="text-3xl font-extrabold text-slate-800">Configuración del bot</h2>
+            <p class="text-sm text-slate-500">Ajusta el comportamiento de la asesora IA.</p>
+        </div>
+        <x-tenant-view-selector />
     </div>
 
     <form wire:submit.prevent="guardar" novalidate class="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6 items-start">

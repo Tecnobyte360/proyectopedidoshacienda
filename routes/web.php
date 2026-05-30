@@ -389,6 +389,24 @@ Route::middleware(['solo_principal'])->group(function () {
                 'Pragma'        => 'no-cache',
             ]);
     })->middleware('permission:tenants.gestionar')->name('admin.dejar-impersonar');
+
+    // 🏢 Cambiar tenant que el super-admin está VIENDO en la página actual.
+    // Usado por el componente <x-tenant-view-selector> en paginas de plataforma
+    // (Bot WhatsApp, Meta WhatsApp, Monitor LLM, etc).
+    Route::post('/admin/ver-tenant', function (\Illuminate\Http\Request $r) {
+        $tenantId = $r->input('tenant_id');
+        $redirect = $r->input('redirect_to') ?: url()->previous();
+
+        if ($tenantId === '' || $tenantId === null) {
+            session()->forget('tenant_imitado_id');
+        } else {
+            session(['tenant_imitado_id' => (int) $tenantId]);
+        }
+        session()->save();
+
+        return redirect()->to($redirect)
+            ->withHeaders(['Cache-Control' => 'no-store']);
+    })->middleware('permission:tenants.gestionar')->name('admin.ver-tenant');
 });
 
 }); // fin auth group

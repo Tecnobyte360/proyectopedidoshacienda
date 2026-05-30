@@ -1,14 +1,15 @@
 <div class="p-6 space-y-5">
     {{-- Header --}}
-    <div class="flex items-center gap-3">
+    <div class="flex items-center gap-3 flex-wrap">
         <div class="w-12 h-12 rounded-xl flex items-center justify-center text-white"
              style="background: linear-gradient(135deg, #25D366, #128C7E);">
             <i class="fa-brands fa-whatsapp text-2xl"></i>
         </div>
-        <div>
+        <div class="flex-1 min-w-0">
             <h1 class="text-xl font-bold text-slate-800">WhatsApp · Cloud API (Meta)</h1>
             <p class="text-xs text-slate-500">Configura credenciales, plantillas y disparadores desde aquí.</p>
         </div>
+        <x-tenant-view-selector />
     </div>
 
     {{-- Tabs --}}
