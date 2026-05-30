@@ -43,8 +43,13 @@ class Llm extends Component
             // Super-admin: si puede ver todos los tenants, no filtra
             $user = auth()->user();
             if ($user && method_exists($user, 'esSuperAdmin') && $user->esSuperAdmin()) {
-                // Si está "imitando" un tenant desde el panel super-admin, sí filtramos
+                // 1) Si está "imitando" un tenant desde el panel super-admin, filtramos por ese
                 if ($imit = session('tenant_imitado_id')) return (int) $imit;
+                // 2) Si vino con ?as_tenant=X en la URL (middleware SuperAdminVerComoTenant
+                //    ya seteó TenantManager para esta request), respetamos ese tenant
+                $tmId = app(\App\Services\TenantManager::class)->id();
+                if ($tmId !== null) return (int) $tmId;
+                // 3) Sin filtro → ve todos los tenants agregados
                 return null;
             }
             return app(\App\Services\TenantManager::class)->id();
@@ -244,29 +249,32 @@ class Llm extends Component
     {
         $desde = now()->subMinutes($this->minutos);
 
-        $invocaciones = LlmInvocacion::where('created_at', '>=', $desde)
+        // 🛡️ Helper local: cada query nueva con filtro de tenant aplicado
+        $q = fn() => $this->scoTenant(LlmInvocacion::query());
+
+        $invocaciones = $q()->where('created_at', '>=', $desde)
             ->orderByDesc('id')
             ->limit(50)
             ->get();
 
-        $total = LlmInvocacion::where('created_at', '>=', $desde)->count();
-        $exitosos = LlmInvocacion::where('created_at', '>=', $desde)->where('exitoso', true)->count();
-        $rateLimit = LlmInvocacion::where('created_at', '>=', $desde)->where('http_status', 429)->count();
-        $overloaded = LlmInvocacion::where('created_at', '>=', $desde)->where('http_status', 529)->count();
+        $total = $q()->where('created_at', '>=', $desde)->count();
+        $exitosos = $q()->where('created_at', '>=', $desde)->where('exitoso', true)->count();
+        $rateLimit = $q()->where('created_at', '>=', $desde)->where('http_status', 429)->count();
+        $overloaded = $q()->where('created_at', '>=', $desde)->where('http_status', 529)->count();
         $errores = $total - $exitosos;
-        $fallbacks = LlmInvocacion::where('created_at', '>=', $desde)->where('es_fallback', true)->count();
+        $fallbacks = $q()->where('created_at', '>=', $desde)->where('es_fallback', true)->count();
 
-        $tokensInput = (int) LlmInvocacion::where('created_at', '>=', $desde)->sum('tokens_input');
-        $tokensOutput = (int) LlmInvocacion::where('created_at', '>=', $desde)->sum('tokens_output');
-        $tokensCacheRead = (int) LlmInvocacion::where('created_at', '>=', $desde)->sum('tokens_cache_read');
-        $tokensCacheCreate = (int) LlmInvocacion::where('created_at', '>=', $desde)->sum('tokens_cache_creation');
+        $tokensInput = (int) $q()->where('created_at', '>=', $desde)->sum('tokens_input');
+        $tokensOutput = (int) $q()->where('created_at', '>=', $desde)->sum('tokens_output');
+        $tokensCacheRead = (int) $q()->where('created_at', '>=', $desde)->sum('tokens_cache_read');
+        $tokensCacheCreate = (int) $q()->where('created_at', '>=', $desde)->sum('tokens_cache_creation');
 
-        $latPromedio = (int) LlmInvocacion::where('created_at', '>=', $desde)
+        $latPromedio = (int) $q()->where('created_at', '>=', $desde)
             ->where('exitoso', true)
             ->avg('latencia_ms');
 
         // Tokens del último minuto (para mostrar consumo vs rate limit)
-        $tokensUltimoMin = (int) LlmInvocacion::where('created_at', '>=', now()->subMinute())
+        $tokensUltimoMin = (int) $q()->where('created_at', '>=', now()->subMinute())
             ->selectRaw('SUM(COALESCE(tokens_input,0) + COALESCE(tokens_cache_creation,0)) as t')
             ->value('t');
 
