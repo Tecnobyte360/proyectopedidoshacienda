@@ -49,7 +49,14 @@ class Informe extends Component
         $convirtieron = (clone $q)->whereNotNull('pedido_id')->count();
         $fallaron = (clone $q)->where('estado', CampanaDestinatario::ESTADO_FALLIDO)->count();
 
-        $pct = fn($n, $base) => $base > 0 ? round(($n / $base) * 100, 1) : 0;
+        $pct = fn($n, $base) => $base > 0 ? round(($n / $base) * 100, 1) : null;
+
+        // Detectar campañas anteriores al tracking (no tienen wamids → no podemos cruzar)
+        $sinTracking = $enviados > 0 && CampanaDestinatario::query()
+            ->withoutGlobalScopes()
+            ->where('campana_id', $this->campana->id)
+            ->whereNotNull('mensaje_externo_id')
+            ->doesntExist();
 
         return [
             'total'         => $total,
@@ -67,6 +74,7 @@ class Informe extends Component
             'pct_clicaron'     => $pct($clicaron, $entregados ?: $enviados),
             'pct_convirtieron' => $pct($convirtieron, $entregados ?: $enviados),
             'pct_fallaron'    => $pct($fallaron, $total),
+            'sin_tracking'    => $sinTracking,
         ];
     }
 

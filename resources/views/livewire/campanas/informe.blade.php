@@ -40,15 +40,28 @@
         </div>
     </header>
 
+    {{-- Aviso: campaña enviada antes de tener tracking de Meta --}}
+    @if($kpis['sin_tracking'])
+        <div class="rounded-lg bg-amber-50 ring-1 ring-amber-200 px-4 py-3 flex items-start gap-3">
+            <i class="fa-solid fa-circle-info text-amber-600 text-sm mt-0.5"></i>
+            <div class="text-[13px] text-amber-900 leading-relaxed">
+                <span class="font-semibold">Esta campaña se envió antes del tracking detallado.</span>
+                Solo se muestran <span class="font-medium">enviados</span> y <span class="font-medium">respondieron</span>.
+                Entregados, leídos, clics y reacciones aparecerán automáticamente en campañas nuevas.
+            </div>
+        </div>
+    @endif
+
     {{-- ───────────────────────────────────────── KPI ROW ────────────────────────────────────── --}}
     @php
+        $fmtPct  = fn($p, $suf) => $p === null ? '—' : ($p . '% ' . $suf);
         $kpiCards = [
-            ['key' => 'total',        'label' => 'Destinatarios',  'value' => $kpis['total'],        'sub' => 'audiencia',           'icon' => 'fa-users',          'tone' => 'slate'],
-            ['key' => 'enviados',     'label' => 'Enviados',       'value' => $kpis['enviados'],     'sub' => 'salieron por Meta',    'icon' => 'fa-paper-plane',    'tone' => 'emerald'],
-            ['key' => 'entregados',   'label' => 'Entregados',     'value' => $kpis['entregados'],   'sub' => $kpis['pct_entregados'].'% de enviados', 'icon' => 'fa-check-double',   'tone' => 'sky'],
-            ['key' => 'leidos',       'label' => 'Leídos',         'value' => $kpis['leidos'],       'sub' => $kpis['pct_leidos'].'% open rate',       'icon' => 'fa-eye',            'tone' => 'indigo'],
-            ['key' => 'respondieron', 'label' => 'Respondieron',   'value' => $kpis['respondieron'], 'sub' => $kpis['pct_respondieron'].'% engagement', 'icon' => 'fa-comment',         'tone' => 'amber'],
-            ['key' => 'convirtieron','label' => 'Conversión',     'value' => $kpis['convirtieron'],'sub' => $kpis['pct_convirtieron'].'% → pedido',   'icon' => 'fa-cart-shopping',  'tone' => 'fuchsia'],
+            ['key' => 'total',        'label' => 'Destinatarios',  'value' => $kpis['total'],        'sub' => 'audiencia',                              'icon' => 'fa-users',          'tone' => 'slate'],
+            ['key' => 'enviados',     'label' => 'Enviados',       'value' => $kpis['enviados'],     'sub' => 'salieron por Meta',                       'icon' => 'fa-paper-plane',    'tone' => 'emerald'],
+            ['key' => 'entregados',   'label' => 'Entregados',     'value' => $kpis['entregados'],   'sub' => $fmtPct($kpis['pct_entregados'],   'de enviados'),  'icon' => 'fa-check-double',   'tone' => 'sky'],
+            ['key' => 'leidos',       'label' => 'Leídos',         'value' => $kpis['leidos'],       'sub' => $fmtPct($kpis['pct_leidos'],       'open rate'),    'icon' => 'fa-eye',            'tone' => 'indigo'],
+            ['key' => 'respondieron', 'label' => 'Respondieron',   'value' => $kpis['respondieron'], 'sub' => $fmtPct($kpis['pct_respondieron'], 'engagement'),   'icon' => 'fa-comment',         'tone' => 'amber'],
+            ['key' => 'convirtieron','label' => 'Conversión',     'value' => $kpis['convirtieron'],'sub' => $fmtPct($kpis['pct_convirtieron'], '→ pedido'),     'icon' => 'fa-cart-shopping',  'tone' => 'fuchsia'],
         ];
         $tones = [
             'slate'   => ['ring-slate-200',   'text-slate-500',   'bg-slate-100',   'text-slate-600'],
@@ -104,7 +117,19 @@
                 <span class="text-[11px] font-medium text-slate-400 tabular-nums">{{ $kpis['clicaron'] }} clics</span>
             </div>
             <div class="p-2">
-                <div id="chart-botones" style="min-height: 280px;"></div>
+                @if(empty($botones))
+                    <div class="flex items-center justify-center h-[280px]">
+                        <div class="text-center">
+                            <div class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-slate-50 text-slate-300 mb-2">
+                                <i class="fa-solid fa-hand-pointer"></i>
+                            </div>
+                            <p class="text-[13px] text-slate-400">Sin clics todavía</p>
+                            <p class="text-[11px] text-slate-300 mt-0.5">Aparecerán al usar plantilla con botones</p>
+                        </div>
+                    </div>
+                @else
+                    <div id="chart-botones" style="min-height: 280px;"></div>
+                @endif
             </div>
         </div>
     </div>
@@ -121,7 +146,19 @@
                 </div>
             </div>
             <div class="p-2">
-                <div id="chart-timeline" style="min-height: 280px;"></div>
+                @if(empty($timeline['horas']))
+                    <div class="flex items-center justify-center h-[280px]">
+                        <div class="text-center">
+                            <div class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-slate-50 text-slate-300 mb-2">
+                                <i class="fa-regular fa-clock"></i>
+                            </div>
+                            <p class="text-[13px] text-slate-400">Sin actividad registrada</p>
+                            <p class="text-[11px] text-slate-300 mt-0.5">Se llena al recibir webhooks de Meta</p>
+                        </div>
+                    </div>
+                @else
+                    <div id="chart-timeline" style="min-height: 280px;"></div>
+                @endif
             </div>
         </div>
 
@@ -335,30 +372,43 @@
             const funnelColors = [C.slate, C.emerald, C.sky, C.indigo, C.amber, C.fuchsia];
 
             window._chartsInforme.funnel = new ApexCharts(document.querySelector("#chart-funnel"), {
-                chart: { type: 'bar', height: 280, ...baseChart },
+                chart: { type: 'bar', height: 300, ...baseChart, offsetX: 0 },
                 series: [{ name: 'Clientes', data: funnelVals }],
                 xaxis: {
                     categories: funnelCats,
+                    max: Math.max(funnelVals[0], 1) * 1.08, // espacio para labels externos
                     labels: { style: { fontSize: '11px', colors: '#94a3b8' } },
                     axisBorder: { show: false }, axisTicks: { show: false },
                 },
                 yaxis: {
-                    labels: { style: { colors: '#475569', fontSize: '12px', fontWeight: 500 } },
+                    labels: {
+                        style: { colors: '#475569', fontSize: '12px', fontWeight: 500 },
+                        offsetX: 0,
+                        minWidth: 110,
+                    },
                 },
                 colors: funnelColors,
-                plotOptions: { bar: { horizontal: true, borderRadius: 4, borderRadiusApplication: 'end', barHeight: '60%', distributed: true } },
+                plotOptions: {
+                    bar: {
+                        horizontal: true,
+                        borderRadius: 4,
+                        borderRadiusApplication: 'end',
+                        barHeight: '58%',
+                        distributed: true,
+                        dataLabels: { position: 'top' }, // si la barra es chica, label va afuera
+                    }
+                },
                 dataLabels: {
                     enabled: true,
-                    textAnchor: 'end',
+                    textAnchor: 'start',
                     formatter: function (val) {
-                        if (val === 0) return '';
                         const pct = funnelVals[0] > 0 ? Math.round((val / funnelVals[0]) * 100) : 0;
-                        return val.toLocaleString() + '  ·  ' + pct + '%';
+                        return val.toLocaleString() + ' · ' + pct + '%';
                     },
-                    style: { fontSize: '11.5px', fontWeight: 600, colors: ['#fff'] },
-                    offsetX: -8,
+                    style: { fontSize: '11.5px', fontWeight: 600, colors: ['#334155'] },
+                    offsetX: 6,
                 },
-                grid: { borderColor: '#f1f5f9', strokeDashArray: 4, padding: { left: 0, right: 24 } },
+                grid: { borderColor: '#f1f5f9', strokeDashArray: 4, padding: { left: 0, right: 12, top: 0, bottom: 0 } },
                 legend: { show: false },
                 tooltip: { theme: 'light', y: { formatter: v => v.toLocaleString() + ' destinatarios' } },
                 states: { hover: { filter: { type: 'darken', value: 0.92 } } },
@@ -366,9 +416,11 @@
             });
             window._chartsInforme.funnel.render();
 
-            // === DONUT BOTONES ===
+            // === DONUT BOTONES === (solo si hay container, tiene HTML empty state si no)
+            const botonesEl = document.querySelector("#chart-botones");
+            if (botonesEl && botones.length) {
             const donutColors = [C.violet, C.indigo, C.sky, C.fuchsia, C.amber, C.emerald];
-            window._chartsInforme.botones = new ApexCharts(document.querySelector("#chart-botones"), {
+            window._chartsInforme.botones = new ApexCharts(botonesEl, {
                 chart: { type: 'donut', height: 280, ...baseChart },
                 series: botones.length ? botones.map(b => b.n) : [1],
                 labels: botones.length ? botones.map(b => b.boton_click) : ['Sin clics'],
@@ -401,9 +453,12 @@
                 noData: { text: 'Sin clics todavía', style: { color: '#cbd5e1', fontSize: '13px' } },
             });
             window._chartsInforme.botones.render();
+            }
 
-            // === TIMELINE ÁREA ===
-            window._chartsInforme.timeline = new ApexCharts(document.querySelector("#chart-timeline"), {
+            // === TIMELINE ÁREA === (solo si hay container)
+            const timelineEl = document.querySelector("#chart-timeline");
+            if (timelineEl && timeline.horas && timeline.horas.length) {
+            window._chartsInforme.timeline = new ApexCharts(timelineEl, {
                 chart: { type: 'area', height: 280, ...baseChart, zoom: { enabled: false } },
                 series: [
                     { name: 'Enviados',     data: timeline.enviados },
@@ -427,6 +482,7 @@
                 noData: { text: 'Sin actividad registrada', style: { color: '#cbd5e1', fontSize: '13px' } },
             });
             window._chartsInforme.timeline.render();
+            }
         })();
     </script>
 </div>
