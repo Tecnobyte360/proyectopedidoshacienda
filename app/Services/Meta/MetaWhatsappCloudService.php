@@ -94,7 +94,101 @@ class MetaWhatsappCloudService
             ],
         ];
 
-        return $this->ejecutar($config, $payload, "plantilla:{$plantilla}");
+        $ok = $this->ejecutar($config, $payload, "plantilla:{$plantilla}");
+
+        // 💾 Persistir en mensajes_whatsapp para que aparezca en el chat de la UI.
+        // Reconstruimos el cuerpo desde body_preview de la plantilla + variables.
+        if ($ok && $this->ultimoWamid) {
+            $this->persistirOutbound(
+                config: $config,
+                telefono: $telefono,
+                contenido: $this->renderizarPlantillaPreview($config->tenant_id, $plantilla, $variables, $idioma),
+                wamid: $this->ultimoWamid,
+                meta: [
+                    'enviado_por_humano' => false,
+                    'provider'           => 'meta',
+                    'tipo'               => 'plantilla',
+                    'plantilla_nombre'   => $plantilla,
+                    'plantilla_idioma'   => $idioma ?: ($config->default_lang ?? 'es'),
+                    'plantilla_vars'     => array_values($variables),
+                ],
+            );
+        }
+
+        return $ok;
+    }
+
+    /**
+     * Toma el body_preview de la plantilla (cacheado en BD) y sustituye {{1}}..{{n}}
+     * con los valores reales que se enviaron. Si la plantilla no está en BD,
+     * devuelve un fallback "[plantilla:nombre]".
+     */
+    private function renderizarPlantillaPreview(int $tenantId, string $nombre, array $variables, string $idioma): string
+    {
+        try {
+            $tpl = \App\Models\MetaWhatsappPlantilla::query()
+                ->withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->where('nombre', $nombre)
+                ->when($idioma, fn($q) => $q->where('idioma', $idioma))
+                ->first();
+
+            $body = $tpl?->body_preview;
+            if (!$body) return "[plantilla:{$nombre}]";
+
+            foreach (array_values($variables) as $i => $valor) {
+                $body = str_replace('{{' . ($i + 1) . '}}', (string) $valor, $body);
+            }
+            return $body;
+        } catch (\Throwable $e) {
+            return "[plantilla:{$nombre}]";
+        }
+    }
+
+    /**
+     * Persiste un mensaje OUTBOUND en mensajes_whatsapp ligándolo a la
+     * conversación correcta del tenant (creándola si no existe).
+     */
+    private function persistirOutbound(
+        MetaWhatsappConfig $config,
+        string $telefono,
+        string $contenido,
+        string $wamid,
+        array $meta = []
+    ): void {
+        try {
+            $telNorm = preg_replace('/\D+/', '', $telefono);
+
+            $conv = \App\Models\ConversacionWhatsapp::query()
+                ->withoutGlobalScopes()
+                ->where('tenant_id', $config->tenant_id)
+                ->where('telefono_normalizado', $telNorm)
+                ->first();
+
+            if (!$conv) {
+                // Crear conversación mínima — el webhook la enriquece después.
+                $conv = \App\Models\ConversacionWhatsapp::create([
+                    'tenant_id'            => $config->tenant_id,
+                    'telefono_normalizado' => $telNorm,
+                    'nombre_cliente'       => 'Cliente',
+                    'estado'               => 'activa',
+                    'canal'                => 'whatsapp',
+                    'connection_id'        => 'meta:' . $config->phone_number_id,
+                ]);
+            }
+
+            \App\Models\MensajeWhatsapp::create([
+                'conversacion_id'    => $conv->id,
+                'rol'                => \App\Models\MensajeWhatsapp::ROL_ASSISTANT,
+                'tipo'               => 'text',
+                'contenido'          => $contenido,
+                'meta'               => $meta,
+                'mensaje_externo_id' => $wamid,
+                'ack'                => \App\Models\MensajeWhatsapp::ACK_SENT,
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('Persistir outbound Meta falló: ' . $e->getMessage());
+        }
     }
 
     /**
