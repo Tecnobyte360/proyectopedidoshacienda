@@ -40,19 +40,23 @@
                 @endforeach
             </select>
         @else
-            {{-- Modo as_tenant: query string en URL actual, NO toca sesión ni sidebar --}}
-            <select onchange="(function(sel){
-                        const u = new URL(window.location.href);
-                        if (sel.value) u.searchParams.set('as_tenant', sel.value);
-                        else u.searchParams.delete('as_tenant');
-                        window.location.href = u.toString();
-                    })(this)"
-                    class="border-0 bg-transparent text-sm font-semibold text-slate-800 focus:ring-0 pr-7 pl-1 cursor-pointer">
-                <option value="" @if(!$seleccionadoActual) selected @endif>— Elegí un tenant —</option>
-                @foreach($tenants as $t)
-                    <option value="{{ $t->id }}" @if($seleccionadoActual == $t->id) selected @endif>{{ $t->nombre }}</option>
+            {{-- Modo as_tenant: form GET que recarga la URL actual con ?as_tenant=X --}}
+            {{-- Conservamos los OTROS query params actuales (tab, etc) --}}
+            <form method="GET" action="{{ url()->current() }}" class="inline-flex">
+                @foreach(request()->query() as $k => $v)
+                    @if($k !== 'as_tenant' && is_scalar($v))
+                        <input type="hidden" name="{{ $k }}" value="{{ $v }}">
+                    @endif
                 @endforeach
-            </select>
+                <select name="as_tenant"
+                        onchange="this.form.submit()"
+                        class="border-0 bg-transparent text-sm font-semibold text-slate-800 focus:ring-0 pr-7 pl-1 cursor-pointer">
+                    <option value="" @if(!$seleccionadoActual) selected @endif>— Elegí un tenant —</option>
+                    @foreach($tenants as $t)
+                        <option value="{{ $t->id }}" @if($seleccionadoActual == $t->id) selected @endif>{{ $t->nombre }}</option>
+                    @endforeach
+                </select>
+            </form>
         @endif
     </div>
 @endif

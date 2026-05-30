@@ -33,8 +33,20 @@ class SuperAdminVerComoTenant
 
             if ($tenant) {
                 app(TenantManager::class)->set($tenant);
-                // Marcamos request para que la vista sepa qué tenant está mirando
                 $request->attributes->set('viewing_as_tenant', $tenant);
+
+                // 🔁 Limpiar caches que podrían tener datos del tenant anterior
+                \Cache::forget('config_bot_actual_' . $tenant->id);
+                \Cache::forget('config_bot_actual_global');
+
+                \Log::info('👁️ SuperAdmin viendo como tenant', [
+                    'user_id'  => $u->id,
+                    'as_tenant'=> $asTenant,
+                    'tenant'   => $tenant->slug,
+                    'url'      => $request->fullUrl(),
+                ]);
+            } else {
+                \Log::warning('SuperAdminVerComoTenant: tenant no encontrado', ['as_tenant' => $asTenant]);
             }
         }
 
