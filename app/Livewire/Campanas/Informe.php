@@ -98,6 +98,45 @@ class Informe extends Component
             ->toArray();
     }
 
+    /** Timeline: actividad por hora del día (envíos / lecturas / respuestas). */
+    public function getTimelineProperty(): array
+    {
+        $base = CampanaDestinatario::query()
+            ->withoutGlobalScopes()
+            ->where('campana_id', $this->campana->id);
+
+        $serie = function ($columna) use ($base) {
+            return (clone $base)
+                ->whereNotNull($columna)
+                ->selectRaw("DATE_FORMAT($columna, '%Y-%m-%d %H:00') as hora, COUNT(*) as n")
+                ->groupBy('hora')
+                ->orderBy('hora')
+                ->pluck('n', 'hora')
+                ->toArray();
+        };
+
+        // Unir horas de todas las series para el eje X
+        $enviados   = $serie('enviado_at');
+        $leidos     = $serie('leido_at');
+        $respondio  = $serie('respondio_at');
+
+        $horas = collect()
+            ->merge(array_keys($enviados))
+            ->merge(array_keys($leidos))
+            ->merge(array_keys($respondio))
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
+
+        return [
+            'horas'      => $horas,
+            'enviados'   => array_map(fn($h) => $enviados[$h]  ?? 0, $horas),
+            'leidos'     => array_map(fn($h) => $leidos[$h]    ?? 0, $horas),
+            'respondio' => array_map(fn($h) => $respondio[$h]  ?? 0, $horas),
+        ];
+    }
+
     public function render()
     {
         $q = CampanaDestinatario::query()
@@ -126,6 +165,7 @@ class Informe extends Component
             'kpis'          => $this->kpis,
             'botones'       => $this->botones,
             'reacciones'    => $this->reacciones,
+            'timeline'      => $this->timeline,
         ]);
     }
 }
