@@ -89,18 +89,17 @@ Tu trabajo: responder al cliente como lo haría el mejor operador humano del
 equipo — cálido, breve, colombiano, resolutivo. Mensajes cortos estilo
 WhatsApp.
 
-🛑🛑 REGLA CRÍTICA SOBRE CATÁLOGO Y PRECIOS 🛑🛑
-NO tenés acceso al catálogo ni a los precios en este momento. Por lo tanto:
-- PROHIBIDO listar productos de memoria (ej: "Carnes de res: molida, bistec...").
-- PROHIBIDO inventar precios o decir cifras.
-- PROHIBIDO armar listas de categorías de productos.
-Si el cliente pide el catálogo, la lista de precios o cuánto vale algo,
-respondé como el operador humano real: ofrecé confirmarlo enseguida.
-Ejemplos correctos:
-  "¡Claro! Dame un momentico y te confirmo los precios 😊"
-  "Con gusto, ¿qué producto necesitás? Te confirmo el valor enseguida."
-  "Apenas facturen te paso el valor exacto."
-NUNCA muestres un catálogo armado por vos.
+🛒 CATÁLOGO Y PRECIOS — USÁ LAS HERRAMIENTAS, NUNCA INVENTES:
+Tenés herramientas para CONSULTAR el catálogo REAL del negocio (productos,
+precios, categorías). REGLAS DE ORO:
+- Si el cliente pregunta por un producto, su precio o qué hay, PRIMERO llamá
+  la herramienta correspondiente (buscar_productos / listar_categorias /
+  productos_de_categoria) y respondé SOLO con lo que devuelva.
+- PROHIBIDO listar productos o precios de memoria. PROHIBIDO inventar cifras.
+- Si la herramienta NO encuentra el producto, decí honestamente que no lo
+  manejás o pedí que lo confirme — NUNCA te lo inventes.
+- Usá los precios EXACTOS que devuelva la herramienta (precio_kg, precio_libra,
+  etc. según la unidad). No hagas cuentas raras.
 
 OTRAS REGLAS:
 - Seguí las lecciones de abajo al pie de la letra.
@@ -130,20 +129,197 @@ SYS;
                 }
             }
 
-            $resp = $this->ai->chat(
-                messages: $messages,
-                toolChoice: 'none',   // 🔒 sin tools: no ejecuta acciones, solo texto
-                tools: null,
-                opts: ['provider' => 'anthropic', 'temperature' => 0.4, 'max_tokens' => 600],
-            );
+            // 🛒 Tools de SOLO LECTURA del catálogo real (HGI / catálogo local).
+            // El copiloto puede CONSULTAR productos y precios reales, pero NUNCA
+            // ejecuta acciones de escritura (no crea pedidos, no factura, no envía).
+            $tools  = $this->toolsCatalogoSoloLectura();
+            $sedeId = $this->resolverSedeId($conv);
 
-            return trim((string) ($resp['choices'][0]['message']['content'] ?? ''));
+            // Loop de function-calling acotado (máx 4 vueltas) — solo lectura.
+            $contenido = '';
+            for ($i = 0; $i < 4; $i++) {
+                $resp = $this->ai->chat(
+                    messages: $messages,
+                    toolChoice: 'auto',   // puede pedir consultar catálogo
+                    tools: $tools,
+                    opts: ['provider' => 'anthropic', 'temperature' => 0.4, 'max_tokens' => 600],
+                );
+
+                $msg       = $resp['choices'][0]['message'] ?? [];
+                $toolCalls = $msg['tool_calls'] ?? [];
+                $contenido = trim((string) ($msg['content'] ?? ''));
+
+                // Sin tool_calls → respuesta final de texto, terminamos.
+                if (empty($toolCalls)) {
+                    break;
+                }
+
+                // Reinyectar el mensaje del asistente (con los tool_calls) y luego
+                // los resultados de cada tool, para que el modelo redacte con datos reales.
+                $messages[] = [
+                    'role'       => 'assistant',
+                    'content'    => $msg['content'] ?? null,
+                    'tool_calls' => $toolCalls,
+                ];
+
+                foreach ($toolCalls as $tc) {
+                    $name    = $tc['function']['name'] ?? '';
+                    $rawArgs = $tc['function']['arguments'] ?? '{}';
+                    $args    = json_decode($rawArgs, true) ?: [];
+                    $tcId    = $tc['id'] ?? ('call_' . uniqid());
+
+                    $resultado = $this->ejecutarToolCatalogo($name, $args, $sedeId);
+
+                    $messages[] = [
+                        'role'         => 'tool',
+                        'tool_call_id' => $tcId,
+                        'name'         => $name,
+                        'content'      => json_encode($resultado, JSON_UNESCAPED_UNICODE),
+                    ];
+                }
+            }
+
+            return $contenido;
         } catch (\Throwable $e) {
             Log::warning('Bot shadow: fallo generando sugerencia', [
                 'conv' => $conv->id, 'error' => $e->getMessage(),
             ]);
             return '';
         }
+    }
+
+    /**
+     * 🛒 Definición de las tools de SOLO LECTURA del catálogo (formato OpenAI).
+     * Son EXACTAMENTE las que usa el bot real, pero excluye toda escritura
+     * (crear_pedido, crear_adicion_pedido, etc). Imposible que modifique nada.
+     */
+    private function toolsCatalogoSoloLectura(): array
+    {
+        return [
+            [
+                'type' => 'function',
+                'function' => [
+                    'name'        => 'buscar_productos',
+                    'description' => 'Busca productos REALES del catálogo por nombre/palabra. '
+                        . 'Úsala SIEMPRE antes de hablar de un producto o su precio. '
+                        . 'Pasá el texto literal del cliente. Retorna código, nombre, categoría, precio y unidad.',
+                    'parameters' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'query'     => ['type' => 'string', 'description' => 'Texto a buscar (ej: "costilla", "pollo", "queso").'],
+                            'categoria' => ['type' => 'string', 'description' => 'Categoría opcional para acotar.'],
+                            'limite'    => ['type' => 'integer', 'description' => 'Máx resultados (default 5).'],
+                        ],
+                        'required' => ['query'],
+                    ],
+                ],
+            ],
+            [
+                'type' => 'function',
+                'function' => [
+                    'name'        => 'listar_categorias',
+                    'description' => 'Lista las categorías reales del catálogo con cuántos productos hay en cada una. '
+                        . 'Úsala cuando el cliente pregunte "qué tienen", "qué venden", "el menú" o esté indeciso.',
+                    'parameters' => ['type' => 'object', 'properties' => new \stdClass()],
+                ],
+            ],
+            [
+                'type' => 'function',
+                'function' => [
+                    'name'        => 'productos_de_categoria',
+                    'description' => 'Lista los productos reales de una categoría. Ej: "muéstrame las carnes de res".',
+                    'parameters' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'categoria' => ['type' => 'string', 'description' => 'Nombre de la categoría (exacto o parcial).'],
+                            'limite'    => ['type' => 'integer', 'description' => 'Máx resultados (default 20).'],
+                        ],
+                        'required' => ['categoria'],
+                    ],
+                ],
+            ],
+            [
+                'type' => 'function',
+                'function' => [
+                    'name'        => 'info_producto',
+                    'description' => 'Detalle de un producto por código: descripción, cortes disponibles, precio.',
+                    'parameters' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'codigo' => ['type' => 'string', 'description' => 'Código del producto.'],
+                        ],
+                        'required' => ['codigo'],
+                    ],
+                ],
+            ],
+            [
+                'type' => 'function',
+                'function' => [
+                    'name'        => 'productos_destacados',
+                    'description' => 'Productos destacados / promociones reales. Útil cuando el cliente está perdido.',
+                    'parameters' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'limite' => ['type' => 'integer', 'description' => 'Máx resultados (default 8).'],
+                        ],
+                    ],
+                ],
+            ],
+        ];
+    }
+
+    /**
+     * Ejecuta una tool de catálogo de SOLO LECTURA. Reusa el mismo motor que el
+     * bot real (BotCatalogoToolService). Cualquier nombre no listado se ignora
+     * (devuelve error) — el copiloto NO puede ejecutar acciones de escritura.
+     */
+    private function ejecutarToolCatalogo(string $name, array $args, ?int $sedeId): array
+    {
+        try {
+            $svc = app(\App\Services\BotCatalogoToolService::class);
+
+            return match ($name) {
+                'buscar_productos' => $svc->buscarProductos(
+                    (string) ($args['query'] ?? ''),
+                    $args['categoria'] ?? null,
+                    (int) ($args['limite'] ?? 5),
+                    $sedeId
+                ),
+                'listar_categorias' => $svc->listarCategorias($sedeId),
+                'productos_de_categoria' => $svc->productosDeCategoria(
+                    (string) ($args['categoria'] ?? ''),
+                    (int) ($args['limite'] ?? 20),
+                    $sedeId
+                ),
+                'info_producto' => $svc->infoProducto((string) ($args['codigo'] ?? ''), $sedeId),
+                'productos_destacados' => $svc->productosDestacados((int) ($args['limite'] ?? 8), $sedeId),
+                // 🔒 Cualquier otra tool (escritura) NO está disponible en el copiloto.
+                default => ['error' => "Herramienta '{$name}' no disponible en modo entrenamiento (solo lectura)."],
+            };
+        } catch (\Throwable $e) {
+            Log::warning('Bot shadow: fallo ejecutando tool catálogo', [
+                'tool' => $name, 'error' => $e->getMessage(),
+            ]);
+            return ['error' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Resuelve la sede para consultar precios. Si la conversación tiene sede
+     * asociada la usa; si no, null (el motor hace fallback a precio base).
+     */
+    private function resolverSedeId(ConversacionWhatsapp $conv): ?int
+    {
+        try {
+            foreach (['sede_id', 'sede'] as $attr) {
+                if (isset($conv->{$attr}) && is_numeric($conv->{$attr})) {
+                    return (int) $conv->{$attr};
+                }
+            }
+        } catch (\Throwable $e) {
+            // ignore
+        }
+        return null;
     }
 
     /**
