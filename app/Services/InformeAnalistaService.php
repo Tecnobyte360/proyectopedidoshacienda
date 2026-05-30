@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Services\Ai\AnthropicService;
+use App\Services\Ai\AiClientService;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Log;
  */
 class InformeAnalistaService
 {
-    public function __construct(private AnthropicService $anthropic) {}
+    public function __construct(private AiClientService $ai) {}
 
     /**
      * Devuelve un array con:
@@ -53,18 +53,23 @@ SYS;
         $userPrompt = "Negocio: {$nombreNegocio}\n\nCONTEXTO (métricas del período):\n{$contexto}\n\nGenerá el informe en formato JSON.";
 
         try {
-            $resp = $this->anthropic->chat(
-                messages: [['role' => 'user', 'content' => $userPrompt]],
+            // OpenAI compatible — el mensaje system entra como primer mensaje del array
+            $resp = $this->ai->chat(
+                messages: [
+                    ['role' => 'system', 'content' => $system],
+                    ['role' => 'user', 'content' => $userPrompt],
+                ],
+                toolChoice: 'none',
                 tools: null,
                 opts: [
-                    'system'      => $system,
-                    'model'       => 'claude-haiku-4-5',
+                    'provider'    => 'anthropic',
                     'temperature' => 0.4,
-                    'max_tokens'  => 800,
+                    'max_tokens'  => 900,
                 ],
             );
 
             $texto = $this->extraerTexto($resp);
+            Log::info('🧠 Informe analista IA respuesta', ['texto_inicio' => mb_substr($texto, 0, 200)]);
             $json = $this->extraerJson($texto);
 
             return [
@@ -74,7 +79,10 @@ SYS;
                 'recomendaciones' => array_values((array) ($json['recomendaciones'] ?? [])),
             ];
         } catch (\Throwable $e) {
-            Log::warning('Informe analista IA falló', ['error' => $e->getMessage()]);
+            Log::warning('Informe analista IA falló', [
+                'error' => $e->getMessage(),
+                'trace' => mb_substr($e->getTraceAsString(), 0, 500),
+            ]);
             return [
                 'titular' => '',
                 'resumen' => '',
@@ -145,14 +153,8 @@ SYS;
     private function extraerTexto(?array $resp): string
     {
         if (!$resp) return '';
-        $contenido = $resp['content'] ?? [];
-        $texto = '';
-        foreach ($contenido as $bloque) {
-            if (($bloque['type'] ?? '') === 'text') {
-                $texto .= $bloque['text'] ?? '';
-            }
-        }
-        return trim($texto);
+        // AiClientService devuelve formato OpenAI: choices[0].message.content
+        return trim((string) ($resp['choices'][0]['message']['content'] ?? ''));
     }
 
     private function extraerJson(string $texto): array

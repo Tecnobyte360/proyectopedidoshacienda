@@ -10,11 +10,37 @@
 <tr><td align="center">
 <table width="640" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,0.05);overflow:hidden;">
 
-    {{-- HEADER --}}
-    <tr><td style="padding:32px 32px 24px;background:linear-gradient(135deg,#d68643 0%,#a85f24 100%);color:#fff;">
-        <div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;font-weight:700;opacity:0.85;">Kivox · Informe {{ ucfirst($data['rango']['frecuencia']) }}</div>
-        <h1 style="font-size:24px;font-weight:700;margin:8px 0 4px;line-height:1.2;">{{ $tenant->nombre }}</h1>
-        <div style="font-size:13px;opacity:0.85;">
+    {{-- HEADER con branding Kivox --}}
+    @php
+        $brand = $cfg?->nombre ?: 'Kivox';
+        $brandHex = $cfg?->color_primario ?: '#d68643';
+        $brandHexD = $cfg?->color_secundario ?: '#a85f24';
+        $logo = $cfg?->logo_url;
+    @endphp
+    <tr><td style="padding:28px 32px;background:linear-gradient(135deg,{{ $brandHex }} 0%,{{ $brandHexD }} 100%);">
+        <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+                <td style="vertical-align:middle;">
+                    @if($logo)
+                        <img src="{{ $logo }}" alt="{{ $brand }}" style="max-height:40px;display:block;border:0;">
+                    @else
+                        <div style="display:inline-block;background:rgba(255,255,255,0.18);padding:8px 16px;border-radius:8px;color:#fff;font-size:18px;font-weight:800;letter-spacing:0.5px;">
+                            {{ $brand }}
+                        </div>
+                    @endif
+                </td>
+                <td style="vertical-align:middle;text-align:right;color:rgba(255,255,255,0.85);font-size:11px;text-transform:uppercase;letter-spacing:1.5px;font-weight:700;">
+                    Informe {{ ucfirst($data['rango']['frecuencia']) }}
+                </td>
+            </tr>
+        </table>
+    </td></tr>
+
+    {{-- TÍTULO DEL TENANT --}}
+    <tr><td style="padding:24px 32px 8px;border-bottom:1px solid #e2e8f0;">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;font-weight:700;">Negocio</div>
+        <h1 style="font-size:22px;font-weight:700;margin:4px 0 6px;line-height:1.2;color:#0f172a;">{{ $tenant->nombre }}</h1>
+        <div style="font-size:13px;color:#64748b;">
             {{ $data['rango']['desde']->format('d M') }} → {{ $data['rango']['hasta']->format('d M Y') }} · {{ $data['rango']['dias'] }} día{{ $data['rango']['dias'] == 1 ? '' : 's' }}
         </div>
     </td></tr>
@@ -219,7 +245,7 @@
     {{-- FOOTER --}}
     <tr><td style="padding:24px 32px;background:#f8fafc;border-top:1px solid #e2e8f0;">
         <div style="font-size:12px;color:#64748b;text-align:center;">
-            Generado automáticamente por <b>Kivox</b> · {{ now()->format('d/m/Y H:i') }}
+            Generado automáticamente por <b style="color:{{ $brandHex }};">{{ $brand }}</b> · {{ now()->format('d/m/Y H:i') }}
         </div>
         <div style="font-size:11px;color:#94a3b8;text-align:center;margin-top:4px;">
             Para ajustar la frecuencia o destinatarios, entra a tu panel de administración.

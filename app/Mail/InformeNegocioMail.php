@@ -42,12 +42,19 @@ class InformeNegocioMail extends Mailable
 
     public function content(): Content
     {
+        $cfgPlataforma = null;
+        try {
+            $cfgPlataforma = \App\Models\ConfiguracionPlataforma::actual();
+        } catch (\Throwable $e) {
+            // fallback con valores defaults
+        }
         return new Content(
             view: 'emails.informe-negocio',
             with: [
                 'tenant'  => $this->tenant,
                 'data'    => $this->data,
                 'inc'     => $this->incluir,
+                'cfg'     => $cfgPlataforma,
             ],
         );
     }
