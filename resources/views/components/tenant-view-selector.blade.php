@@ -1,8 +1,8 @@
 @props([
     'tenants'  => null,      // colección {id, nombre}; si es null, se carga de Tenant::all()
-    'selected' => null,      // tenant_id seleccionado (null = todos / actual)
+    'selected' => null,      // tenant_id seleccionado (null = no filtrar)
     'model'    => null,      // si lo pasas → modo filtro Livewire (wire:model)
-    'mode'     => 'auto',    // auto | filter | impersonate
+    'mode'     => 'auto',    // auto | filter | as_tenant
 ])
 
 @php
@@ -16,18 +16,19 @@
             ->get(['id', 'nombre']);
     }
 
-    // Modo: si pasaron $model → filter (Livewire), si no → impersonate (form POST)
-    $modoReal = $mode === 'auto' ? ($model ? 'filter' : 'impersonate') : $mode;
-    $seleccionadoActual = $modoReal === 'impersonate'
-        ? (session('tenant_imitado_id') ?: '')
+    // Modo: si pasaron $model → filter (Livewire), si no → as_tenant (query string)
+    $modoReal = $mode === 'auto' ? ($model ? 'filter' : 'as_tenant') : $mode;
+
+    $seleccionadoActual = $modoReal === 'as_tenant'
+        ? (request()->query('as_tenant') ?: '')
         : ($selected ?: '');
 @endphp
 
 @if($esSuperAdmin && count($tenants) > 0)
     <div class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
         <span class="text-[10px] uppercase tracking-wider font-semibold text-slate-500 whitespace-nowrap">
-            <i class="fa-solid fa-building text-[10px] text-slate-400"></i>
-            Tenant
+            <i class="fa-solid fa-eye text-[10px] text-slate-400"></i>
+            Ver datos de
         </span>
 
         @if($modoReal === 'filter')
@@ -39,19 +40,19 @@
                 @endforeach
             </select>
         @else
-            {{-- Modo impersonate: form POST que cambia tenant_imitado_id y recarga la URL actual --}}
-            <form method="POST" action="{{ route('admin.ver-tenant') }}" class="inline-flex">
-                @csrf
-                <input type="hidden" name="redirect_to" value="{{ url()->current() }}">
-                <select name="tenant_id"
-                        onchange="this.form.submit()"
-                        class="border-0 bg-transparent text-sm font-semibold text-slate-800 focus:ring-0 pr-7 pl-1 cursor-pointer">
-                    <option value="" @if(!$seleccionadoActual) selected @endif>— Elegí un tenant —</option>
-                    @foreach($tenants as $t)
-                        <option value="{{ $t->id }}" @if($seleccionadoActual == $t->id) selected @endif>{{ $t->nombre }}</option>
-                    @endforeach
-                </select>
-            </form>
+            {{-- Modo as_tenant: query string en URL actual, NO toca sesión ni sidebar --}}
+            <select onchange="(function(sel){
+                        const u = new URL(window.location.href);
+                        if (sel.value) u.searchParams.set('as_tenant', sel.value);
+                        else u.searchParams.delete('as_tenant');
+                        window.location.href = u.toString();
+                    })(this)"
+                    class="border-0 bg-transparent text-sm font-semibold text-slate-800 focus:ring-0 pr-7 pl-1 cursor-pointer">
+                <option value="" @if(!$seleccionadoActual) selected @endif>— Elegí un tenant —</option>
+                @foreach($tenants as $t)
+                    <option value="{{ $t->id }}" @if($seleccionadoActual == $t->id) selected @endif>{{ $t->nombre }}</option>
+                @endforeach
+            </select>
         @endif
     </div>
 @endif

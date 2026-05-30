@@ -54,6 +54,10 @@ return Application::configure(basePath: dirname(__DIR__))
             // 🔐 Si tenant.requiere_2fa y el user no lo tiene, redirige a
             // /perfil/seguridad tras período de gracia.
             \App\Http\Middleware\Forzar2FA::class,
+            // 👁️ Super-admin: ?as_tenant=X cambia el TenantManager solo para esa
+            // request (sin tocar session ni sidebar). Datos del tenant elegido
+            // se ven, pero el user sigue en modo Super Admin.
+            \App\Http\Middleware\SuperAdminVerComoTenant::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
