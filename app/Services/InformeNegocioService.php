@@ -58,7 +58,7 @@ class InformeNegocioService
             ->where('tenant_id', $tid)->count();
         $convsActivas = DB::table('conversaciones_whatsapp')
             ->where('tenant_id', $tid)
-            ->where('ultima_actividad_at', '>=', $desde)
+            ->where('ultimo_mensaje_at', '>=', $desde)
             ->count();
         $nuevasConvs = DB::table('conversaciones_whatsapp')
             ->where('tenant_id', $tid)
