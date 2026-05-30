@@ -234,11 +234,12 @@ Route::middleware(['no_super_sin_imp'])->group(function () {
     Route::get('/despachos',     DespachosIndex::class)->middleware('permission:despachos.gestionar|despachos.ver_propios')->name('despachos.index');
     Route::get('/reportes',      ReportesIndex::class)->middleware('permission:reportes.ver')->name('reportes.index');
     Route::get('/ans-tiempos',   AnsIndex::class)->middleware('permission:ans.gestionar')->name('ans.index');
+    // 🛡️ Plataforma: solo super-admin (Kivox global). Los tenants NO ven Meta config / Bot config / Monitor LLM / Costos Meta.
     Route::get('/meta-whatsapp', \App\Livewire\MetaWhatsapp\Index::class)
-        ->middleware('permission:bot.configurar')
+        ->middleware(['permission:bot.configurar', 'role:super-admin'])
         ->name('meta-whatsapp.index');
     Route::get('/configuracion/bot', ConfiguracionBot::class)
-        ->middleware('permission:bot.configurar')
+        ->middleware(['permission:bot.configurar', 'role:super-admin'])
         ->name('configuracion.bot');
 
     Route::get('/configuracion/respuestas-rapidas', \App\Livewire\Configuracion\RespuestasRapidas\Index::class)
@@ -246,21 +247,21 @@ Route::middleware(['no_super_sin_imp'])->group(function () {
         ->name('configuracion.respuestas-rapidas');
 
     Route::get('/configuracion/bot-lecciones', \App\Livewire\Configuracion\BotLecciones\Index::class)
-        ->middleware('permission:bot.configurar')
+        ->middleware(['permission:bot.configurar', 'role:super-admin'])
         ->name('configuracion.bot-lecciones');
 
     // /monitoreo/agente redirige al tab Agente dentro de /monitoreo/llm
     Route::get('/monitoreo/agente', fn () => redirect('/monitoreo/llm?tab=agente'))
-        ->middleware('permission:bot.configurar')
+        ->middleware(['permission:bot.configurar', 'role:super-admin'])
         ->name('monitoreo.agente');
 
     Route::get('/monitoreo/llm', \App\Livewire\Monitoreo\Llm::class)
-        ->middleware('permission:bot.configurar')
+        ->middleware(['permission:bot.configurar', 'role:super-admin'])
         ->name('monitoreo.llm');
 
     // /monitoreo/watchdog redirige al tab Watchdog dentro de /monitoreo/llm
     Route::get('/monitoreo/watchdog', fn () => redirect('/monitoreo/llm?tab=watchdog'))
-        ->middleware('permission:bot.configurar')
+        ->middleware(['permission:bot.configurar', 'role:super-admin'])
         ->name('monitoreo.watchdog');
 
     Route::get('/monitoreo/llamadas', \App\Livewire\Monitoreo\Llamadas::class)
@@ -268,7 +269,7 @@ Route::middleware(['no_super_sin_imp'])->group(function () {
         ->name('monitoreo.llamadas');
 
     Route::get('/monitoreo/costos-meta', \App\Livewire\Monitoreo\CostosMeta::class)
-        ->middleware('permission:bot.configurar')
+        ->middleware(['permission:bot.configurar', 'role:super-admin'])
         ->name('monitoreo.costos-meta');
 
     Route::get('/rutas', \App\Livewire\Rutas\Index::class)

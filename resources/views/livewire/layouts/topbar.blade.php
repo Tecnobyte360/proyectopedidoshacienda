@@ -82,16 +82,22 @@
         {{-- DERECHA: switcher de empresa + perfil --}}
         <div class="flex items-center gap-2 md:gap-3">
 
-            {{-- 🤖 Pill de estado del bot (rojo si está apagado globalmente) --}}
+            {{-- 🤖 Pill de estado del bot (rojo si está apagado globalmente).
+                 SOLO visible para super-admin (administrador global de Kivox).
+                 Los tenants no deben preocuparse por el estado del bot. --}}
             @php
-                try {
-                    $cfgBotTop = \App\Models\ConfiguracionBot::actual();
-                    $botActivo = (bool) ($cfgBotTop->activo ?? true);
-                } catch (\Throwable $e) {
-                    $botActivo = true;
+                $esSuperAdmin = auth()->user()?->hasRole('super-admin') ?? false;
+                $botActivo = true;
+                if ($esSuperAdmin) {
+                    try {
+                        $cfgBotTop = \App\Models\ConfiguracionBot::actual();
+                        $botActivo = (bool) ($cfgBotTop->activo ?? true);
+                    } catch (\Throwable $e) {
+                        $botActivo = true;
+                    }
                 }
             @endphp
-            @if(!$botActivo)
+            @if($esSuperAdmin && !$botActivo)
                 <a href="{{ route('configuracion.bot') }}"
                    class="hidden sm:inline-flex items-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 hover:bg-rose-100 px-3 py-2 transition shadow-sm group"
                    title="El bot está apagado — los clientes escriben pero la IA no responde. Click para configurar.">
