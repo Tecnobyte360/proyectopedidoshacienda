@@ -1,4 +1,4 @@
-<div>
+<div wire:poll.6s="verificar">
     @if($cargando)
         <div class="mx-3 mb-2 rounded-xl border border-violet-200 bg-violet-50/60 px-4 py-3">
             <div class="flex items-center gap-2 text-[13px] text-violet-600">
