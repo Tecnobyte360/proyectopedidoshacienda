@@ -40,29 +40,23 @@
         </div>
     </header>
 
-    {{-- Aviso: campaña enviada antes de tener tracking de Meta --}}
-    @if($kpis['sin_tracking'])
-        <div class="rounded-lg bg-amber-50 ring-1 ring-amber-200 px-4 py-3 flex items-start gap-3">
-            <i class="fa-solid fa-circle-info text-amber-600 text-sm mt-0.5"></i>
-            <div class="text-[13px] text-amber-900 leading-relaxed">
-                <span class="font-semibold">Esta campaña se envió antes del tracking detallado.</span>
-                Solo se muestran <span class="font-medium">enviados</span> y <span class="font-medium">respondieron</span>.
-                Entregados, leídos, clics y reacciones aparecerán automáticamente en campañas nuevas.
-            </div>
-        </div>
-    @endif
-
     {{-- ───────────────────────────────────────── KPI ROW ────────────────────────────────────── --}}
     @php
-        $fmtPct  = fn($p, $suf) => $p === null ? '—' : ($p . '% ' . $suf);
-        $kpiCards = [
-            ['key' => 'total',        'label' => 'Destinatarios',  'value' => $kpis['total'],        'sub' => 'audiencia',                              'icon' => 'fa-users',          'tone' => 'slate'],
-            ['key' => 'enviados',     'label' => 'Enviados',       'value' => $kpis['enviados'],     'sub' => 'salieron por Meta',                       'icon' => 'fa-paper-plane',    'tone' => 'emerald'],
-            ['key' => 'entregados',   'label' => 'Entregados',     'value' => $kpis['entregados'],   'sub' => $fmtPct($kpis['pct_entregados'],   'de enviados'),  'icon' => 'fa-check-double',   'tone' => 'sky'],
-            ['key' => 'leidos',       'label' => 'Leídos',         'value' => $kpis['leidos'],       'sub' => $fmtPct($kpis['pct_leidos'],       'open rate'),    'icon' => 'fa-eye',            'tone' => 'indigo'],
-            ['key' => 'respondieron', 'label' => 'Respondieron',   'value' => $kpis['respondieron'], 'sub' => $fmtPct($kpis['pct_respondieron'], 'engagement'),   'icon' => 'fa-comment',         'tone' => 'amber'],
-            ['key' => 'convirtieron','label' => 'Conversión',     'value' => $kpis['convirtieron'],'sub' => $fmtPct($kpis['pct_convirtieron'], '→ pedido'),     'icon' => 'fa-cart-shopping',  'tone' => 'fuchsia'],
+        // En campañas pre-tracking solo conocemos: destinatarios, enviados, respondieron
+        $kpisVisibles = $kpis['sin_tracking']
+            ? ['total','enviados','respondieron']
+            : ['total','enviados','entregados','leidos','respondieron','convirtieron'];
+
+        $fmtPct = fn($p, $suf) => $p === null ? '—' : ($p . '% ' . $suf);
+        $allCards = [
+            'total'        => ['Destinatarios',  $kpis['total'],        'audiencia',                                          'fa-users',          'slate'],
+            'enviados'     => ['Enviados',       $kpis['enviados'],     'salieron por Meta',                                   'fa-paper-plane',    'emerald'],
+            'entregados'   => ['Entregados',     $kpis['entregados'],   $fmtPct($kpis['pct_entregados'],   'de enviados'),    'fa-check-double',   'sky'],
+            'leidos'       => ['Leídos',         $kpis['leidos'],       $fmtPct($kpis['pct_leidos'],       'open rate'),      'fa-eye',            'indigo'],
+            'respondieron' => ['Respondieron',   $kpis['respondieron'], $fmtPct($kpis['pct_respondieron'], 'engagement'),     'fa-comment',        'amber'],
+            'convirtieron' => ['Conversión',     $kpis['convirtieron'], $fmtPct($kpis['pct_convirtieron'], '→ pedido'),       'fa-cart-shopping',  'fuchsia'],
         ];
+        $kpiCards = collect($kpisVisibles)->map(fn($k) => array_combine(['label','value','sub','icon','tone'], $allCards[$k]))->all();
         $tones = [
             'slate'   => ['ring-slate-200',   'text-slate-500',   'bg-slate-100',   'text-slate-600'],
             'emerald' => ['ring-emerald-200', 'text-emerald-600', 'bg-emerald-100', 'text-emerald-700'],
@@ -72,7 +66,11 @@
             'fuchsia' => ['ring-fuchsia-200', 'text-fuchsia-600', 'bg-fuchsia-100', 'text-fuchsia-700'],
         ];
     @endphp
-    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+    <div @class([
+        'grid gap-3',
+        'grid-cols-1 sm:grid-cols-3' => $kpis['sin_tracking'],
+        'grid-cols-2 md:grid-cols-3 lg:grid-cols-6' => !$kpis['sin_tracking'],
+    ])>
         @foreach($kpiCards as $card)
             @php [$ring, $iconText, $iconBg, $subText] = $tones[$card['tone']]; @endphp
             <div class="rounded-xl bg-white p-4 ring-1 {{ $ring }} hover:shadow-sm transition">
@@ -87,6 +85,54 @@
             </div>
         @endforeach
     </div>
+
+    {{-- ────────────────────────────────────── PANEL CAMPAÑA SIN TRACKING ─────────────────────────────── --}}
+    @if($kpis['sin_tracking'])
+        <div class="rounded-xl bg-white ring-1 ring-slate-200 p-6">
+            <div class="flex items-start gap-4 mb-5">
+                <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-50 text-amber-600 ring-1 ring-amber-200/60 shrink-0">
+                    <i class="fa-solid fa-circle-info text-sm"></i>
+                </div>
+                <div>
+                    <h3 class="text-sm font-semibold text-slate-900">Datos limitados de esta campaña</h3>
+                    <p class="text-[13px] text-slate-500 mt-1 leading-relaxed max-w-2xl">
+                        Esta campaña se envió antes de implementar tracking detallado de Meta. Solo guardamos
+                        el conteo de envíos y respuestas. En tu próxima campaña verás
+                        <span class="text-slate-700 font-medium">entregados, leídos, clics en botones, reacciones y conversión a pedido</span>
+                        en tiempo real.
+                    </p>
+                </div>
+            </div>
+
+            {{-- Mini resumen visual de lo que sí tenemos --}}
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-6">
+                @php
+                    $resumen = [
+                        ['Tasa de entrega API',   $kpis['total'] > 0 ? round(($kpis['enviados'] / $kpis['total']) * 100, 1) : 0, $kpis['enviados'] . ' / ' . $kpis['total'], 'emerald'],
+                        ['Tasa de respuesta',     $kpis['enviados'] > 0 ? round(($kpis['respondieron'] / $kpis['enviados']) * 100, 1) : 0, $kpis['respondieron'] . ' / ' . $kpis['enviados'], 'amber'],
+                    ];
+                @endphp
+                @foreach($resumen as [$titulo, $pct, $ratio, $tone])
+                    <div class="rounded-lg ring-1 ring-slate-200 p-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-[12px] uppercase tracking-wider font-semibold text-slate-500">{{ $titulo }}</span>
+                            <span class="text-[11px] text-slate-400 tabular-nums">{{ $ratio }}</span>
+                        </div>
+                        <div class="flex items-baseline gap-2 mb-2">
+                            <span class="text-3xl font-semibold text-slate-900 tabular-nums leading-none">{{ $pct }}<span class="text-lg text-slate-400 font-normal">%</span></span>
+                        </div>
+                        <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                            <div @class([
+                                'h-full rounded-full',
+                                'bg-emerald-500' => $tone === 'emerald',
+                                'bg-amber-500'   => $tone === 'amber',
+                            ]) style="width: {{ min(100, $pct) }}%"></div>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    @else
 
     {{-- ───────────────────────────────────────── CHARTS ROW 1 ───────────────────────────────── --}}
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -203,6 +249,7 @@
             </div>
         </div>
     </div>
+    @endif {{-- sin_tracking --}}
 
     {{-- ───────────────────────────────────────── TABLA ──────────────────────────────────────── --}}
     <div class="rounded-xl bg-white ring-1 ring-slate-200 overflow-hidden">
@@ -340,6 +387,7 @@
     </div>
 
     {{-- ───────────────────────────────────────── APEXCHARTS ─────────────────────────────────── --}}
+    @unless($kpis['sin_tracking'])
     <script src="https://cdn.jsdelivr.net/npm/apexcharts@3.49.0/dist/apexcharts.min.js"></script>
     <script>
         (function () {
@@ -485,4 +533,5 @@
             }
         })();
     </script>
+    @endunless
 </div>
