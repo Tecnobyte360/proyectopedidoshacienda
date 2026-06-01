@@ -208,7 +208,7 @@
                     <td style="padding:8px 0;border-bottom:1px solid #fed7aa;vertical-align:top;">
                         <div style="font-family:monospace;color:#9a3412;font-weight:600;">{{ $cm['telefono'] }}</div>
                         @if(!empty($cm['frase']))
-                        <div style="color:#7c2d12;font-style:italic;margin-top:3px;">“{{ \Illuminate\Support\Str::limit($cm['frase'], 120) }}”</div>
+                        <div style="color:#7c2d12;font-style:italic;margin-top:3px;line-height:1.5;">“{{ $cm['frase'] }}”</div>
                         @endif
                     </td>
                     <td style="padding:8px 0;border-bottom:1px solid #fed7aa;text-align:right;vertical-align:top;color:#c2410c;font-weight:700;white-space:nowrap;">
