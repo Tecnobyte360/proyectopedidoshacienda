@@ -8,7 +8,9 @@
     {{-- ╔═══ COLUMNA IZQUIERDA: lista de conversaciones ═══╗
          En móvil: solo se ve si NO hay chat activo (al seleccionar uno se oculta).
          En desktop (lg+): siempre visible. --}}
-    <aside class="w-full lg:w-96 flex-shrink-0 bg-white border-r border-slate-200 flex-col
+    <aside x-data="{ pendienteId: @js($conversacionActivaId) }"
+           @chat-cambiado.window="pendienteId = $event.detail.conversacionId ?? $event.detail[0]?.conversacionId ?? pendienteId"
+           class="w-full lg:w-96 flex-shrink-0 bg-white border-r border-slate-200 flex-col
                   {{ $conversacionActivaId ? 'hidden lg:flex' : 'flex' }}">
 
         {{-- Header --}}
@@ -174,11 +176,13 @@
                     $estaFijada    = !empty($c->fijada_at);
                 @endphp
                 <div class="group relative border-b border-slate-100 hover:bg-amber-50/40 transition
-                            {{ $isActiva ? 'bg-amber-50' : ($tieneNoLeidos ? 'bg-emerald-50/40' : '') }}
+                            {{ $tieneNoLeidos ? 'bg-emerald-50/40' : '' }}
                             {{ $estaFijada ? 'border-l-4 border-l-amber-400' : '' }}"
+                     :class="pendienteId === {{ $c->id }} ? 'bg-amber-50' : ''"
                      x-data="{ menuAbierto: false }">
 
                 <button wire:click="seleccionar({{ $c->id }})"
+                        @click="pendienteId = {{ $c->id }}"
                         class="w-full text-left flex items-center gap-3 px-4 py-3 pr-10">
 
                     <div class="relative flex-shrink-0">
@@ -337,6 +341,16 @@
              @drop.prevent="onDrop($event)"
              class="relative flex-1 flex-col min-w-0 bg-[#efeae2]
                     {{ $conversacionActivaId ? 'flex' : 'hidden lg:flex' }}">
+
+        {{-- ⏳ Overlay de carga al cambiar de conversación: feedback inmediato
+             mientras el servidor responde con los mensajes del chat. --}}
+        <div wire:loading.flex wire:target="seleccionar"
+             class="absolute inset-0 z-30 hidden items-center justify-center bg-[#efeae2]/70 backdrop-blur-[1px]">
+            <div class="flex flex-col items-center gap-2 text-slate-500">
+                <i class="fa-solid fa-circle-notch fa-spin text-2xl"></i>
+                <span class="text-xs font-medium">Abriendo conversación…</span>
+            </div>
+        </div>
 
         {{-- 🎯 Overlay drag-and-drop a TODA la conversación --}}
         <div x-show="dragging && @js((bool) $conversacionActivaId)" x-cloak
