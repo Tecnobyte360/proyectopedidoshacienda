@@ -28,6 +28,11 @@ class Index extends Component
     public string $filtroCanal  = 'todos';   // todos | whatsapp | instagram | widget
     public bool   $mostrarInternas = false;  // si es false, ocultas conversaciones internas
 
+    // 📜 Scroll infinito: cuántas conversaciones mostrar. Arranca en 60 y crece
+    //    de a 60 cada vez que el usuario llega al fondo de la lista.
+    public int    $limiteConversaciones = 60;
+    public bool   $hayMasConversaciones  = false;
+
     // Nueva conversación
     public bool   $nuevoChatModal   = false;
     public string $nuevoChatTel     = '';
@@ -404,6 +409,31 @@ class Index extends Component
             Log::error('Excepción publicando estado WhatsApp: ' . $e->getMessage());
             $this->dispatch('notify', ['type' => 'error', 'message' => 'Error: ' . $e->getMessage()]);
         }
+    }
+
+    /** 📜 Scroll infinito: carga el siguiente bloque de conversaciones. */
+    public function cargarMasConversaciones(): void
+    {
+        if (!$this->hayMasConversaciones) return;
+        $this->limiteConversaciones += 60;
+    }
+
+    /** Al buscar, volvemos al primer bloque (la búsqueda recorre toda la BD). */
+    public function updatedBusqueda(): void
+    {
+        $this->limiteConversaciones = 60;
+    }
+
+    /** Al cambiar el filtro de estado, reiniciamos el scroll infinito. */
+    public function updatedFiltroEstado(): void
+    {
+        $this->limiteConversaciones = 60;
+    }
+
+    /** Al cambiar el filtro de canal, reiniciamos el scroll infinito. */
+    public function updatedFiltroCanal(): void
+    {
+        $this->limiteConversaciones = 60;
     }
 
     public function seleccionar(int $id): void
@@ -1872,8 +1902,15 @@ class Index extends Component
             ->orderByRaw('CASE WHEN fijada_at IS NULL THEN 1 ELSE 0 END')
             ->orderByDesc('fijada_at')
             ->orderByDesc('ultimo_mensaje_at')
-            ->limit(60)
+            // 📜 Scroll infinito: pedimos 1 de más para saber si quedan más por cargar.
+            ->limit($this->limiteConversaciones + 1)
             ->get();
+
+        // ¿Hay más allá del límite actual? (trajimos 1 extra a propósito)
+        $this->hayMasConversaciones = $conversaciones->count() > $this->limiteConversaciones;
+        if ($this->hayMasConversaciones) {
+            $conversaciones = $conversaciones->take($this->limiteConversaciones);
+        }
 
         $conversacionActiva = $this->conversacionActivaId
             ? ConversacionWhatsapp::with(['cliente', 'mensajes', 'pedido'])->find($this->conversacionActivaId)

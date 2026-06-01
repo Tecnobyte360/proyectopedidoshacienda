@@ -308,6 +308,23 @@
                     <p class="text-sm">Sin conversaciones</p>
                 </div>
             @endforelse
+
+            {{-- 📜 Scroll infinito: cuando este sentinel entra en pantalla, carga 60 más --}}
+            @if($hayMasConversaciones)
+                <div x-data="{
+                        observar() {
+                            const io = new IntersectionObserver((entries) => {
+                                if (entries[0].isIntersecting) { $wire.cargarMasConversaciones(); }
+                            }, { root: document.getElementById('lista-conversaciones'), rootMargin: '200px' });
+                            io.observe($el);
+                        }
+                     }"
+                     x-init="observar()"
+                     wire:key="cargar-mas-{{ $limiteConversaciones }}"
+                     class="px-4 py-4 text-center text-xs text-slate-400">
+                    <i class="fa-solid fa-circle-notch fa-spin mr-1.5"></i> Cargando más conversaciones…
+                </div>
+            @endif
         </div>
     </aside>
 
