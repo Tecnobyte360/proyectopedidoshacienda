@@ -342,13 +342,35 @@
              class="relative flex-1 flex-col min-w-0 bg-[#efeae2]
                     {{ $conversacionActivaId ? 'flex' : 'hidden lg:flex' }}">
 
-        {{-- ⏳ Overlay de carga al cambiar de conversación: feedback inmediato
-             mientras el servidor responde con los mensajes del chat. --}}
+        {{-- ⏳ Skeleton estilo WhatsApp al cambiar de conversación: burbujas
+             fantasma con shimmer mientras el servidor trae los mensajes. --}}
         <div wire:loading.flex wire:target="seleccionar"
-             class="absolute inset-0 z-30 hidden items-center justify-center bg-[#efeae2]/70 backdrop-blur-[1px]">
-            <div class="flex flex-col items-center gap-2 text-slate-500">
-                <i class="fa-solid fa-circle-notch fa-spin text-2xl"></i>
-                <span class="text-xs font-medium">Abriendo conversación…</span>
+             class="absolute inset-0 z-30 hidden flex-col bg-[#efeae2]">
+            {{-- Header fantasma --}}
+            <div class="bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-3 shadow-sm">
+                <div class="h-10 w-10 rounded-full chat-skeleton"></div>
+                <div class="flex-1 space-y-2">
+                    <div class="h-3.5 w-40 rounded chat-skeleton"></div>
+                    <div class="h-2.5 w-24 rounded chat-skeleton"></div>
+                </div>
+            </div>
+            {{-- Burbujas fantasma alternadas --}}
+            <div class="flex-1 px-4 py-6 space-y-4 overflow-hidden">
+                <div class="flex justify-start">
+                    <div class="h-12 w-48 rounded-2xl rounded-tl-md chat-skeleton"></div>
+                </div>
+                <div class="flex justify-end">
+                    <div class="h-10 w-56 rounded-2xl rounded-tr-md chat-skeleton"></div>
+                </div>
+                <div class="flex justify-start">
+                    <div class="h-16 w-64 rounded-2xl rounded-tl-md chat-skeleton"></div>
+                </div>
+                <div class="flex justify-end">
+                    <div class="h-9 w-40 rounded-2xl rounded-tr-md chat-skeleton"></div>
+                </div>
+                <div class="flex justify-start">
+                    <div class="h-11 w-52 rounded-2xl rounded-tl-md chat-skeleton"></div>
+                </div>
             </div>
         </div>
 
@@ -2345,4 +2367,17 @@
             </div>
         </div>
     @endif
+
+    {{-- ✨ Shimmer del skeleton de carga de conversación --}}
+    <style>
+        .chat-skeleton {
+            background: linear-gradient(100deg, #e2ddd5 30%, #f2eee8 50%, #e2ddd5 70%);
+            background-size: 200% 100%;
+            animation: chat-shimmer 1.3s ease-in-out infinite;
+        }
+        @keyframes chat-shimmer {
+            0%   { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+    </style>
 </div>
