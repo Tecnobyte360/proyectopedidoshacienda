@@ -64,6 +64,7 @@ class EnviarInformesNegocio extends Command
                 'top_clientes'    => $cfg->inc_top_clientes,
                 'sin_responder'   => $cfg->inc_sin_responder,
                 'palabras_top'    => $cfg->inc_palabras_top,
+                'clientes_molestos' => $cfg->inc_clientes_molestos ?? true,
             ];
 
             $emails = collect($cfg->emails ?? [])->filter(fn ($e) => filter_var($e, FILTER_VALIDATE_EMAIL))->values();

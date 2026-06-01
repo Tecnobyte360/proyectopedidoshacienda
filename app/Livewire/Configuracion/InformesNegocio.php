@@ -28,6 +28,7 @@ class InformesNegocio extends Component
     public bool $incTopClientes = true;
     public bool $incSinResponder = true;
     public bool $incPalabrasTop = false;
+    public bool $incClientesMolestos = true;
 
     public function mount(): void
     {
@@ -61,6 +62,7 @@ class InformesNegocio extends Component
         $this->incTopClientes    = (bool) $cfg->inc_top_clientes;
         $this->incSinResponder   = (bool) $cfg->inc_sin_responder;
         $this->incPalabrasTop    = (bool) $cfg->inc_palabras_top;
+        $this->incClientesMolestos = (bool) ($cfg->inc_clientes_molestos ?? true);
     }
 
     public function agregarEmail(): void
@@ -108,6 +110,7 @@ class InformesNegocio extends Component
                 'inc_top_clientes'       => $this->incTopClientes,
                 'inc_sin_responder'      => $this->incSinResponder,
                 'inc_palabras_top'       => $this->incPalabrasTop,
+                'inc_clientes_molestos'  => $this->incClientesMolestos,
             ]
         );
 

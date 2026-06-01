@@ -143,6 +143,7 @@
                     ['incTopClientes',     'Top clientes', 'Los 5 más activos del período'],
                     ['incSinResponder',    'Sin responder', 'Alertas de conversaciones abandonadas >2h'],
                     ['incReacciones',      'Reacciones', 'Emojis con los que respondieron los clientes'],
+                    ['incClientesMolestos','😠 Clientes molestos (IA)', 'La IA detecta quejas, enojo e insatisfacción y recomienda cómo recuperarlos'],
                     ['incPalabrasTop',     'Palabras top', 'Lo más mencionado por los clientes'],
                 ];
             @endphp

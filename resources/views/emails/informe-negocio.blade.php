@@ -194,6 +194,34 @@
     </td></tr>
     @endif
 
+    {{-- 😠 CLIENTES MOLESTOS / INSATISFECHOS (detección + IA) --}}
+    @if(($inc['clientes_molestos'] ?? true) && !empty($data['clientesMolestos']) && count($data['clientesMolestos']))
+    <tr><td style="padding:16px 32px;">
+        <div style="background:#fff7ed;border-radius:12px;padding:16px;border:1px solid #fed7aa;">
+            <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;font-weight:700;color:#c2410c;">😠 Clientes molestos / insatisfechos</div>
+            <div style="font-size:13px;color:#9a3412;margin:6px 0 12px;">
+                Detectamos {{ count($data['clientesMolestos']) }} cliente{{ count($data['clientesMolestos']) === 1 ? '' : 's' }} con señales de queja o enojo en el período. Conviene contactarlos para recuperarlos:
+            </div>
+            <table width="100%" cellpadding="0" cellspacing="0" style="font-size:13px;">
+                @foreach($data['clientesMolestos'] as $cm)
+                <tr>
+                    <td style="padding:8px 0;border-bottom:1px solid #fed7aa;vertical-align:top;">
+                        <div style="font-family:monospace;color:#9a3412;font-weight:600;">{{ $cm['telefono'] }}</div>
+                        @if(!empty($cm['frase']))
+                        <div style="color:#7c2d12;font-style:italic;margin-top:3px;">“{{ \Illuminate\Support\Str::limit($cm['frase'], 120) }}”</div>
+                        @endif
+                    </td>
+                    <td style="padding:8px 0;border-bottom:1px solid #fed7aa;text-align:right;vertical-align:top;color:#c2410c;font-weight:700;white-space:nowrap;">
+                        {{ $cm['senales'] }} señal{{ $cm['senales'] === 1 ? '' : 'es' }}
+                    </td>
+                </tr>
+                @endforeach
+            </table>
+            <div style="font-size:11px;color:#9a3412;margin-top:10px;">El análisis con recomendaciones para recuperarlos está en la sección de la IA, arriba.</div>
+        </div>
+    </td></tr>
+    @endif
+
     {{-- TOP CLIENTES --}}
     @if(($inc['top_clientes'] ?? true) && count($data['topClientes']))
     <tr><td style="padding:16px 32px;">

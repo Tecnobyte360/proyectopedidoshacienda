@@ -14,6 +14,7 @@ class TenantInformeConfig extends Model
         'emails', 'telefonos_whatsapp',
         'inc_volumen', 'inc_horas_pico', 'inc_tiempo_respuesta',
         'inc_reacciones', 'inc_top_clientes', 'inc_sin_responder', 'inc_palabras_top',
+        'inc_clientes_molestos',
         'ultimo_envio_at',
     ];
 
@@ -28,6 +29,7 @@ class TenantInformeConfig extends Model
         'inc_top_clientes' => 'boolean',
         'inc_sin_responder' => 'boolean',
         'inc_palabras_top' => 'boolean',
+        'inc_clientes_molestos' => 'boolean',
         'ultimo_envio_at' => 'datetime',
         // hora_envio queda como string ya que el column es TIME (no datetime).
         // Lo convertimos manualmente cuando lo necesitamos.

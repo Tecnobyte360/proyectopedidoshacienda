@@ -39,6 +39,7 @@ class InformeNegocioService
             'topClientes'   => $this->topClientes($tid, $desde),
             'sinResponder'  => $this->sinResponder($tid, umbralMin: 120),
             'palabrasTop'   => $this->palabrasTop($tid, $desde),
+            'clientesMolestos' => $this->clientesMolestos($tid, $desde),
             'campanas'      => $this->campanasResumen($tid, $desde),
             'costoMeta'     => $this->costoMeta($tid, $desde),
         ];
@@ -206,6 +207,97 @@ class InformeNegocioService
         }
         arsort($freq);
         return array_slice($freq, 0, $limit, true);
+    }
+
+    /**
+     * 😠 Detecta clientes MOLESTOS / insatisfechos en el período.
+     *
+     * Heurística barata (sin IA, por SQL): cuenta mensajes del cliente que
+     * contienen señales de queja/enojo (reclamos, malas palabras suaves,
+     * insatisfacción, demoras). Devuelve los clientes con más señales para
+     * que la IA después lo interprete y el dueño los vea de un vistazo.
+     */
+    private function clientesMolestos(int $tid, Carbon $desde, int $limit = 8): array
+    {
+        // Frases que indican molestia REAL. Se prioriza frases completas (no
+        // palabras sueltas) para evitar falsos positivos (ej: "tarde" en "buenas
+        // tardes", o "falta" suelto). Cada match suma una "señal".
+        $senales = [
+            // insatisfacción explícita
+            'pesimo', 'pésimo', 'malisimo', 'malísimo', 'horrible', 'terrible',
+            'pesima', 'pésima', 'no sirve', 'no funciona', 'mala calidad',
+            // demoras (frases, no palabras sueltas)
+            'no ha llegado', 'no me ha llegado', 'aun no llega', 'aún no llega',
+            'no llego el pedido', 'se demora mucho', 'demasiada demora', 'mucha demora',
+            'demora mucho', 'lleva mucho', 'horas esperando', 'sigo esperando',
+            'cuanto falta', 'cuánto falta', 'ya va a llegar', 'demoraron',
+            // reclamos / quejas
+            'queja', 'reclamo', 'reclamar', 'quiero hablar con', 'mal servicio',
+            'mala atencion', 'mala atención', 'falta de respeto', 'no responden',
+            'nadie responde', 'nadie me responde', 'no me responden',
+            // producto en mal estado
+            'mal estado', 'esta dañado', 'está dañado', 'llego dañado', 'vencido',
+            'podrido', 'llego frio', 'llegó frío', 'esta frio', 'está frío',
+            'incompleto', 'falto', 'faltó', 'me equivocaron', 'esta equivocado',
+            'no es lo que pedi', 'no es lo que pedí', 'no pedi esto', 'no era esto',
+            // enojo fuerte
+            'estafa', 'estafadores', 'robo', 'ladrones', 'me robaron', 'engaño',
+            'me engañaron', 'mentira', 'verguenza', 'vergüenza', 'que asco', 'qué asco',
+            'indignado', 'indignada', 'muy molesto', 'muy molesta', 'estoy molesto',
+            'estoy molesta', 'grosero', 'grosera', 'no vuelvo a', 'ultima vez que',
+            'última vez que', 'voy a cancelar por', 'pesimo servicio', 'pésimo servicio',
+        ];
+
+        // Construir condición OR de LIKE
+        $likeParts = [];
+        $bindings = [$tid, $desde];
+        foreach ($senales as $s) {
+            $likeParts[] = "LOWER(m.contenido) LIKE ?";
+            $bindings[] = '%' . mb_strtolower($s) . '%';
+        }
+        $likeSql = implode(' OR ', $likeParts);
+
+        $rows = DB::select("
+            SELECT c.telefono_normalizado AS telefono,
+                   c.id AS conversacion_id,
+                   COUNT(*) AS senales,
+                   MAX(m.created_at) AS ult_msg
+            FROM mensajes_whatsapp m
+            JOIN conversaciones_whatsapp c ON c.id = m.conversacion_id
+            WHERE c.tenant_id = ?
+              AND m.rol = 'user'
+              AND m.created_at >= ?
+              AND ({$likeSql})
+            GROUP BY c.telefono_normalizado, c.id
+            ORDER BY senales DESC, ult_msg DESC
+            LIMIT {$limit}
+        ", $bindings);
+
+        // Adjuntar 1-2 frases textuales de queja por cliente (para el email y la IA)
+        $resultado = [];
+        foreach ($rows as $r) {
+            $likeParts2 = [];
+            $bind2 = [$r->conversacion_id, $desde];
+            foreach ($senales as $s) {
+                $likeParts2[] = "LOWER(contenido) LIKE ?";
+                $bind2[] = '%' . mb_strtolower($s) . '%';
+            }
+            $frase = DB::select("
+                SELECT contenido FROM mensajes_whatsapp
+                WHERE conversacion_id = ? AND rol='user' AND created_at >= ?
+                  AND (" . implode(' OR ', $likeParts2) . ")
+                ORDER BY created_at DESC LIMIT 1
+            ", $bind2);
+
+            $resultado[] = [
+                'telefono'         => $r->telefono,
+                'conversacion_id'  => (int) $r->conversacion_id,
+                'senales'          => (int) $r->senales,
+                'frase'            => $frase[0]->contenido ?? '',
+            ];
+        }
+
+        return $resultado;
     }
 
     private function campanasResumen(int $tid, Carbon $desde): array

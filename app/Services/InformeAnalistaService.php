@@ -137,6 +137,19 @@ SYS;
             $bloques[] = "Reacciones de los clientes a mensajes del negocio: " . implode(', ', $reacc) . ".";
         }
 
+        if (!empty($m['clientesMolestos'])) {
+            $n = count($m['clientesMolestos']);
+            $detalle = [];
+            foreach (array_slice($m['clientesMolestos'], 0, 6) as $cm) {
+                $frase = trim(mb_substr((string) ($cm['frase'] ?? ''), 0, 140));
+                $detalle[] = "- {$cm['telefono']} ({$cm['senales']} señal(es) de molestia)"
+                    . ($frase !== '' ? ": \"{$frase}\"" : '');
+            }
+            $bloques[] = "CLIENTES MOLESTOS / INSATISFECHOS detectados: {$n} cliente(s) escribieron quejas o mostraron enojo en el período. "
+                . "Analizá los motivos de queja, agrupá los temas que más se repiten (demoras, calidad, atención, etc.) y recomendá acciones para recuperarlos. Detalle:\n"
+                . implode("\n", $detalle);
+        }
+
         if (($m['campanas']['total'] ?? 0) > 0) {
             $c = $m['campanas'];
             $bloques[] = "Campañas: se lanzaron {$c['total']} campañas, con {$c['enviados']} mensajes entregados y {$c['fallidos']} fallidos.";
