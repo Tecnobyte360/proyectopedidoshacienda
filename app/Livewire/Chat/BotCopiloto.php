@@ -58,15 +58,12 @@ class BotCopiloto extends Component
         $conv = ConversacionWhatsapp::find($this->conversacionId);
         if (!$conv) return;
 
-        $ultimo = MensajeWhatsapp::query()
-            ->where('conversacion_id', $conv->id)
-            ->orderByDesc('id')
-            ->first();
+        // 🎯 MODO ENTRENAMIENTO: buscamos el último mensaje del cliente que el
+        // BOT aún no respondió (aunque un operador humano haya escrito después).
+        $pendiente = app(BotShadowService::class)->ultimoClienteSinRespuestaBot($conv);
 
-        if (!$ultimo) return;
-
-        // Si el último mensaje NO es del cliente (operador ya respondió) → ocultar
-        if ($ultimo->rol !== 'user') {
+        // Si el bot ya respondió (no hay pendiente) → ocultar la sugerencia.
+        if (!$pendiente) {
             if ($this->sugerenciaId || $this->texto) {
                 $this->reset(['sugerenciaId', 'texto', 'oculto']);
             }
@@ -74,13 +71,13 @@ class BotCopiloto extends Component
             return;
         }
 
-        // El último es del cliente. ¿Es un mensaje NUEVO que aún no procesé?
-        if ($this->ultimoClienteId === $ultimo->id) {
+        // ¿Es un mensaje del cliente NUEVO que aún no procesé?
+        if ($this->ultimoClienteId === $pendiente->id) {
             return; // mismo mensaje, ya tengo (o ya decidí) su sugerencia
         }
 
-        // Mensaje nuevo del cliente → generar sugerencia
-        $this->ultimoClienteId = $ultimo->id;
+        // Mensaje nuevo del cliente sin responder → generar sugerencia
+        $this->ultimoClienteId = $pendiente->id;
         $this->generar();
     }
 

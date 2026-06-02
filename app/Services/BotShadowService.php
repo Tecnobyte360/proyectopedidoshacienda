@@ -30,23 +30,12 @@ class BotShadowService
      */
     public function sugerirParaConversacion(ConversacionWhatsapp $conv): ?BotSugerencia
     {
-        // Último mensaje del cliente
-        $ultimoCliente = MensajeWhatsapp::query()
-            ->where('conversacion_id', $conv->id)
-            ->where('rol', 'user')
-            ->orderByDesc('id')
-            ->first();
+        // Último mensaje del cliente que el BOT aún no respondió. Sugerimos
+        // aunque un operador humano haya escrito después (modo entrenamiento):
+        // así el copiloto siempre propone para cada pregunta del cliente.
+        $ultimoCliente = $this->ultimoClienteSinRespuestaBot($conv);
 
         if (!$ultimoCliente) return null;
-
-        // ¿El cliente es el último que habló? Si el operador ya respondió, no sugerimos.
-        $ultimoMsg = MensajeWhatsapp::query()
-            ->where('conversacion_id', $conv->id)
-            ->orderByDesc('id')
-            ->first();
-        if (!$ultimoMsg || $ultimoMsg->rol !== 'user') {
-            return null; // ya respondió un humano/bot, no hay nada que sugerir
-        }
 
         // ¿Ya existe sugerencia pendiente para este mensaje? reutilizar
         $existente = BotSugerencia::query()
@@ -66,6 +55,44 @@ class BotShadowService
             'sugerencia'         => $texto,
             'estado'             => BotSugerencia::ESTADO_PENDIENTE,
         ]);
+    }
+
+    /**
+     * Devuelve el último mensaje del CLIENTE que el BOT (rol=assistant generado
+     * por IA, no operador humano) aún no respondió. Devuelve null si el bot ya
+     * contestó después del último mensaje del cliente.
+     *
+     * 🎯 MODO ENTRENAMIENTO: ignoramos los mensajes de operadores HUMANOS. Es
+     * decir, si un humano escribió pero el bot no, igual sugerimos — para que el
+     * copiloto practique con cada pregunta real del cliente.
+     */
+    public function ultimoClienteSinRespuestaBot(ConversacionWhatsapp $conv): ?MensajeWhatsapp
+    {
+        $ultimoCliente = MensajeWhatsapp::query()
+            ->where('conversacion_id', $conv->id)
+            ->where('rol', 'user')
+            ->orderByDesc('id')
+            ->first();
+
+        if (!$ultimoCliente) return null;
+
+        // ¿Hay una respuesta del BOT (IA, no humano) DESPUÉS de ese mensaje?
+        // meta->enviado_por_humano = true marca los mensajes del operador.
+        $respuestaBotPosterior = MensajeWhatsapp::query()
+            ->where('conversacion_id', $conv->id)
+            ->where('rol', 'assistant')
+            ->where('id', '>', $ultimoCliente->id)
+            ->get()
+            ->first(function ($m) {
+                $meta = is_array($m->meta) ? $m->meta : (json_decode((string) $m->meta, true) ?: []);
+                // Es respuesta del BOT si NO fue enviada por un humano.
+                return empty($meta['enviado_por_humano']);
+            });
+
+        // Si el bot ya respondió → no sugerimos (ya está atendido por IA).
+        if ($respuestaBotPosterior) return null;
+
+        return $ultimoCliente;
     }
 
     /** Llama al LLM con el cerebro del bot — SOLO texto, sin tools, sin envío. */
