@@ -128,6 +128,16 @@ precios, categorías). REGLAS DE ORO:
 - Usá los precios EXACTOS que devuelva la herramienta (precio_kg, precio_libra,
   etc. según la unidad). No hagas cuentas raras.
 
+🕒 HORARIOS, COBERTURA Y PROMOCIONES — TAMBIÉN CON HERRAMIENTAS:
+- Si preguntan por HORARIOS de atención (a qué hora abren/cierran, si están
+  abiertos), llamá SIEMPRE 'consultar_horarios' y respondé con esos horarios
+  REALES. PROHIBIDO inventar horas.
+- Si preguntan por domicilio/cobertura (si llegan a un barrio, costo de envío,
+  pedido mínimo), llamá 'consultar_zonas_cobertura'.
+- Si preguntan por ofertas/descuentos, llamá 'consultar_promociones'.
+- NUNCA inventes horarios, costos de envío ni promociones: si la herramienta no
+  los trae, decí que lo confirmás enseguida.
+
 OTRAS REGLAS:
 - Seguí las lecciones de abajo al pie de la letra.
 - Respondé SOLO el mensaje que le mandarías al cliente, sin explicaciones.
@@ -292,6 +302,35 @@ SYS;
                     ],
                 ],
             ],
+            [
+                'type' => 'function',
+                'function' => [
+                    'name'        => 'consultar_horarios',
+                    'description' => 'Devuelve los HORARIOS DE ATENCIÓN REALES de las sedes (de la base de datos). '
+                        . 'Úsala SIEMPRE que el cliente pregunte a qué hora abren/cierran, si están abiertos, '
+                        . 'horario de atención o de domicilios. NUNCA inventes horarios: usá solo lo que devuelve esta tool.',
+                    'parameters' => ['type' => 'object', 'properties' => new \stdClass()],
+                ],
+            ],
+            [
+                'type' => 'function',
+                'function' => [
+                    'name'        => 'consultar_zonas_cobertura',
+                    'description' => 'Devuelve las ZONAS DE COBERTURA REALES de domicilio con su costo de envío, '
+                        . 'pedido mínimo y tiempo estimado. Úsala cuando el cliente pregunte si llegan a su barrio, '
+                        . 'cuánto cuesta el domicilio o el pedido mínimo.',
+                    'parameters' => ['type' => 'object', 'properties' => new \stdClass()],
+                ],
+            ],
+            [
+                'type' => 'function',
+                'function' => [
+                    'name'        => 'consultar_promociones',
+                    'description' => 'Devuelve las PROMOCIONES vigentes reales. Úsala cuando el cliente pregunte por '
+                        . 'ofertas, descuentos o promociones.',
+                    'parameters' => ['type' => 'object', 'properties' => new \stdClass()],
+                ],
+            ],
         ];
     }
 
@@ -320,6 +359,9 @@ SYS;
                 ),
                 'info_producto' => $svc->infoProducto((string) ($args['codigo'] ?? ''), $sedeId),
                 'productos_destacados' => $svc->productosDestacados((int) ($args['limite'] ?? 8), $sedeId),
+                'consultar_horarios'        => $this->resultadoHorarios(),
+                'consultar_zonas_cobertura' => $this->resultadoZonas(),
+                'consultar_promociones'     => $this->resultadoPromociones(),
                 // 🔒 Cualquier otra tool (escritura) NO está disponible en el copiloto.
                 default => ['error' => "Herramienta '{$name}' no disponible en modo entrenamiento (solo lectura)."],
             };
@@ -329,6 +371,54 @@ SYS;
             ]);
             return ['error' => $e->getMessage()];
         }
+    }
+
+    /** 🕒 Horarios REALES de las sedes (mismo motor que el bot real). */
+    private function resultadoHorarios(): array
+    {
+        $sedes = \App\Models\Sede::where('activa', true)->get();
+        return [
+            'sedes' => $sedes->map(fn ($s) => [
+                'nombre'   => $s->nombre,
+                'abierta'  => method_exists($s, 'estaAbierta') ? $s->estaAbierta() : null,
+                'proxima'  => method_exists($s, 'proximaApertura') ? $s->proximaApertura() : null,
+                'horarios' => $s->horarios ?? null,
+            ])->all(),
+        ];
+    }
+
+    /** 🗺️ Zonas de cobertura REALES con costo/mínimo/tiempo. */
+    private function resultadoZonas(): array
+    {
+        $zonas = \App\Models\ZonaCobertura::where('activa', true)->get();
+        return [
+            'zonas' => $zonas->map(fn ($z) => [
+                'nombre'        => $z->nombre,
+                'descripcion'   => $z->descripcion ?? null,
+                'costo_envio'   => (float) $z->costo_envio,
+                'pedido_minimo' => (float) $z->pedido_minimo,
+                'tiempo'        => $z->tiempo_entrega_estimado ?? null,
+            ])->all(),
+        ];
+    }
+
+    /** 🎁 Promociones vigentes reales. */
+    private function resultadoPromociones(): array
+    {
+        $promos = \App\Models\Promocion::where('activa', true)
+            ->where('fecha_inicio', '<=', now())
+            ->where('fecha_fin', '>=', now())
+            ->get();
+        return [
+            'total' => $promos->count(),
+            'promociones' => $promos->map(fn ($p) => [
+                'nombre'      => $p->nombre,
+                'descripcion' => $p->descripcion,
+                'tipo'        => $p->tipo,
+                'valor'       => (float) $p->valor,
+                'codigo'      => $p->codigo_cupon,
+            ])->all(),
+        ];
     }
 
     /**
