@@ -161,12 +161,75 @@ class CrearManual extends Component
     public function buscarPorCedula(): void
     {
         if (mb_strlen($this->cedula) < 5) return;
+
+        // 1️⃣ Primero buscar en la base local (rápido). Si el cliente ya pidió
+        //    alguna vez por la plataforma, está acá.
         $cliente = Cliente::where('cedula', $this->cedula)->first();
         if ($cliente) {
             $this->nombre_cliente = $cliente->nombre;
             $this->telefono = $this->telefono ?: $cliente->telefono_normalizado;
             $this->email = $this->email ?: ($cliente->email ?? '');
             $this->dispatch('notify', ['type' => 'success', 'message' => '✅ Cliente encontrado: ' . $cliente->nombre]);
+            return;
+        }
+
+        // 2️⃣ Si NO está local, y el tenant tiene HGI/ERP con búsqueda de cliente
+        //    activada, consultarlo en el ERP. Esto respeta la config de cada
+        //    tenant: si no tiene lookup ERP, simplemente no encuentra nada.
+        if ($this->buscarClienteEnErp()) {
+            return;
+        }
+
+        $this->dispatch('notify', ['type' => 'info', 'message' => 'No se encontró un cliente con esa cédula.']);
+    }
+
+    /**
+     * Busca el cliente en el ERP (HGI u otro) SOLO si el tenant tiene una
+     * integración activa con cliente_lookup habilitado. Devuelve true si lo
+     * encontró y autocompletó los campos.
+     */
+    private function buscarClienteEnErp(): bool
+    {
+        try {
+            $tenantId = app(\App\Services\TenantManager::class)->id();
+
+            $integ = \App\Models\Integracion::where('tenant_id', $tenantId)
+                ->where('activo', true)
+                ->where('exporta_pedidos', true)
+                ->get()
+                ->first(fn ($i) => $i->config['cliente_lookup']['activo'] ?? false);
+
+            // El tenant no usa ERP para buscar clientes → no hay nada que hacer.
+            if (!$integ) {
+                return false;
+            }
+
+            $clienteErp = app(\App\Services\ClienteErpService::class)
+                ->buscar($integ, $this->cedula, $this->telefono ?: null);
+
+            if (!$clienteErp) {
+                return false;
+            }
+
+            // Autocompletar con los datos REALES del ERP.
+            $this->nombre_cliente = $clienteErp['StrNombre'] ?? $this->nombre_cliente;
+            if (empty($this->telefono) && !empty($clienteErp['StrCelular'])) {
+                $this->telefono = $clienteErp['StrCelular'];
+            }
+            if (empty($this->direccion) && !empty($clienteErp['StrDireccion'])) {
+                $this->direccion = $clienteErp['StrDireccion'];
+            }
+
+            $this->dispatch('notify', [
+                'type'    => 'success',
+                'message' => '✅ Cliente encontrado en el ERP: ' . ($clienteErp['StrNombre'] ?? $this->cedula),
+            ]);
+            return true;
+        } catch (\Throwable $e) {
+            Log::warning('Pedido manual: fallo buscando cliente en ERP', [
+                'cedula' => $this->cedula, 'error' => $e->getMessage(),
+            ]);
+            return false;
         }
     }
 
