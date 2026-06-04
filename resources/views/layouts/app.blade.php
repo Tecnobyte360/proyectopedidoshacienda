@@ -76,6 +76,7 @@
         body.is-fullscreen header.app-topbar { display: none !important; }
         body.is-fullscreen main             { padding-top: 0 !important; padding-left: 0 !important; }
         body.is-fullscreen #btn-exit-fullscreen { display: flex !important; }
+        body.is-fullscreen footer.app-credit { display: none !important; }
 
         /* 🔒 Modo tenant moroso — solo lectura. Bloqueamos visualmente todas las
            acciones interactivas (botones submit, inputs, selects) excepto los
@@ -211,6 +212,17 @@
         @else
             {{ $slot }}
         @endif
+
+        {{-- 🏷️ Crédito del desarrollador --}}
+        <footer class="app-credit px-4 pb-5 pt-1 lg:px-6 text-center">
+            <p class="text-[11px] text-slate-400">
+                Desarrollado por
+                <a href="https://tecnobyte360.com" target="_blank" rel="noopener"
+                   class="font-semibold text-slate-500 hover:text-slate-700 transition-colors">
+                    TecnoByte360
+                </a>
+            </p>
+        </footer>
     </main>
 
     {{-- BOTÓN FLOTANTE PARA SALIR DE FULLSCREEN (controlado por body class) --}}

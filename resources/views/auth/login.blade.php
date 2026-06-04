@@ -260,6 +260,11 @@
                 <p class="text-center text-xs text-slate-400 mt-8 lg:hidden">
                     © {{ date('Y') }} {{ $brandName }} · Todos los derechos reservados
                 </p>
+                <p class="text-center text-[11px] text-slate-400 mt-2">
+                    Desarrollado por
+                    <a href="https://tecnobyte360.com" target="_blank" rel="noopener"
+                       class="font-semibold text-slate-500 hover:text-slate-700 transition-colors">TecnoByte360</a>
+                </p>
             </div>
         </div>
     </div>
