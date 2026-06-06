@@ -88,10 +88,14 @@
                             <i class="fa-solid fa-phone text-slate-400 mr-1"></i>
                             Teléfono <span class="text-rose-500">*</span>
                         </label>
-                        <div class="relative">
-                            <i class="fa-brands fa-whatsapp absolute left-3 top-1/2 -translate-y-1/2 text-emerald-500"></i>
-                            <input type="text" wire:model.live.debounce.400ms="telefono" placeholder="573XXXXXXXXX"
-                                   class="{{ $inputClsIcon }}">
+                        {{-- 🌍 Selector de país con bandera (intl-tel-input). Detecta
+                             el país y antepone el indicativo automáticamente. --}}
+                        <div wire:ignore
+                             x-data="telefonoIntl(@js($telefono))"
+                             x-init="init()">
+                            <input type="tel" x-ref="tel"
+                                   placeholder="Número del cliente"
+                                   class="w-full rounded-xl border border-slate-300 bg-white text-sm py-3 shadow-sm transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none">
                         </div>
                         @error('telefono') <p class="mt-1 text-xs text-rose-600"><i class="fa-solid fa-circle-exclamation"></i> {{ $message }}</p> @enderror
 
@@ -550,4 +554,48 @@
                 async defer
                 onload="(function(){ const el = document.getElementById('pedido-direccion-input'); if (el && window.initPedidoDireccionAutocomplete) window.initPedidoDireccionAutocomplete(el); })()"></script>
     @endif
+
+    {{-- 🌍 intl-tel-input: selector de país con bandera para el teléfono --}}
+    @once
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/intl-tel-input@23.8.0/build/css/intlTelInput.css">
+        <style>
+            .iti { width: 100%; }
+            .iti__tel-input, .iti input[type=tel] { padding-left: 52px !important; }
+        </style>
+        <script src="https://cdn.jsdelivr.net/npm/intl-tel-input@23.8.0/build/js/intlTelInput.min.js"></script>
+        <script>
+            function telefonoIntl(valorInicial) {
+                return {
+                    iti: null,
+                    init() {
+                        const input = this.$refs.tel;
+                        // Valor inicial: si trae 10 dígitos lo tomamos como CO local.
+                        if (valorInicial) input.value = valorInicial;
+
+                        this.iti = window.intlTelInput(input, {
+                            initialCountry: 'co',
+                            preferredCountries: ['co', 'us', 've', 'ec', 'pe', 'mx', 'es'],
+                            separateDialCode: true,
+                            nationalMode: true,
+                            utilsScript: 'https://cdn.jsdelivr.net/npm/intl-tel-input@23.8.0/build/js/utils.js',
+                        });
+
+                        const sync = () => {
+                            // getNumber() devuelve E.164 completo: +573215942660
+                            let full = '';
+                            try { full = this.iti.getNumber() || ''; } catch (e) {}
+                            const limpio = full.replace(/\D+/g, ''); // 573215942660
+                            this.$wire.set('telefono', limpio);
+                        };
+
+                        input.addEventListener('input', sync);
+                        input.addEventListener('blur', sync);
+                        input.addEventListener('countrychange', sync);
+                        // Sincronizar el valor inicial ya formateado.
+                        setTimeout(sync, 300);
+                    },
+                };
+            }
+        </script>
+    @endonce
 </div>
