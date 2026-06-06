@@ -213,7 +213,7 @@ class CrearManual extends Component
 
     public function getTotalProperty(): float
     {
-        return collect($this->productos)->sum(fn ($p) => $p['cantidad'] * $p['precio']);
+        return collect($this->productos)->sum(fn ($p) => (float) ($p['cantidad'] ?? 0) * (float) ($p['precio'] ?? 0));
     }
 
     /**

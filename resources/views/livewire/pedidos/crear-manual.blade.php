@@ -249,7 +249,7 @@
                                                        class="w-full rounded-lg border border-slate-200 bg-white text-sm text-right px-2 py-1.5 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 focus:outline-none">
                                             </td>
                                             <td class="px-3 py-2.5 text-right font-semibold text-slate-800">
-                                                ${{ number_format(($p['cantidad'] ?? 0) * ($p['precio'] ?? 0), 0, ',', '.') }}
+                                                ${{ number_format(((float) ($p['cantidad'] ?? 0)) * ((float) ($p['precio'] ?? 0)), 0, ',', '.') }}
                                             </td>
                                             <td class="px-2 py-2.5 text-center">
                                                 <button type="button" wire:click="eliminarProducto({{ $idx }})"
