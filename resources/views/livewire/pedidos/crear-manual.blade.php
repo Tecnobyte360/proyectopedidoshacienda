@@ -170,7 +170,7 @@
                             <div class="absolute left-0 right-0 top-full mt-2 z-20 rounded-xl border border-slate-200 bg-white shadow-2xl max-h-72 overflow-y-auto">
                                 @foreach($productosCatalogo as $p)
                                     <button type="button"
-                                            wire:click="agregarProducto({{ $p->id }})"
+                                            wire:click="agregarProducto(@js($p->codigo))"
                                             class="w-full text-left px-4 py-3 hover:bg-emerald-50 active:bg-emerald-100 flex items-center justify-between gap-3 border-b border-slate-100 last:border-b-0 transition">
                                         <div class="flex items-center gap-3 min-w-0">
                                             <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500">

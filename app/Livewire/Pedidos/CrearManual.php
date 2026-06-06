@@ -115,13 +115,44 @@ class CrearManual extends Component
         if (mb_strlen($this->busquedaProducto) < 2) {
             return collect();
         }
-        return Producto::where('activo', true)
-            ->where(function ($q) {
-                $q->where('nombre', 'LIKE', '%' . $this->busquedaProducto . '%')
-                  ->orWhere('codigo', 'LIKE', '%' . $this->busquedaProducto . '%');
-            })
-            ->limit(10)
-            ->get(['id', 'codigo', 'nombre', 'precio_base', 'unidad']);
+
+        // 🎯 Usar el MISMO motor del bot (BotCatalogoService): si el tenant está
+        //    en modo integración (HGI), trae productos y precios REALES del ERP
+        //    en vivo; si está en modo tabla, lee la tabla local. Respeta la
+        //    config de cada tenant automáticamente.
+        try {
+            $q = mb_strtolower(trim($this->busquedaProducto));
+            $catalogo = app(\App\Services\BotCatalogoService::class)
+                ->productosActivos($this->sede_id ?: null);
+
+            return $catalogo
+                ->filter(function ($p) use ($q) {
+                    $nombre = mb_strtolower((string) ($p->nombre ?? ''));
+                    $codigo = mb_strtolower((string) ($p->codigo ?? ''));
+                    return str_contains($nombre, $q) || str_contains($codigo, $q);
+                })
+                ->take(15)
+                ->map(fn ($p) => (object) [
+                    'id'          => $p->id ?? null,
+                    'codigo'      => (string) ($p->codigo ?? ''),
+                    'nombre'      => (string) ($p->nombre ?? ''),
+                    'precio_base' => (float) ($p->precio_base ?? 0),
+                    'unidad'      => (string) ($p->unidad ?? 'unidad'),
+                ])
+                ->values();
+        } catch (\Throwable $e) {
+            Log::warning('Pedido manual: catálogo HGI falló, fallback a local', [
+                'error' => $e->getMessage(),
+            ]);
+            // Fallback: tabla local si el ERP está caído
+            return Producto::where('activo', true)
+                ->where(function ($q) {
+                    $q->where('nombre', 'LIKE', '%' . $this->busquedaProducto . '%')
+                      ->orWhere('codigo', 'LIKE', '%' . $this->busquedaProducto . '%');
+                })
+                ->limit(10)
+                ->get(['id', 'codigo', 'nombre', 'precio_base', 'unidad']);
+        }
     }
 
     public function getSedesProperty()
@@ -129,13 +160,35 @@ class CrearManual extends Component
         return Sede::where('activa', true)->orderBy('nombre')->get(['id', 'nombre']);
     }
 
-    public function agregarProducto(int $productoId): void
+    /**
+     * Agrega un producto al pedido por su CÓDIGO. Usamos código (no id) porque
+     * los productos que vienen SOLO de HGI no tienen id local. Busca en el
+     * mismo catálogo (BotCatalogoService) para traer nombre/precio/unidad reales.
+     */
+    public function agregarProducto(string $codigo): void
     {
-        $prod = Producto::find($productoId);
+        $codigo = trim($codigo);
+        if ($codigo === '') return;
+
+        // Buscar el producto en el catálogo activo (HGI o local según el tenant).
+        $prod = null;
+        try {
+            $prod = app(\App\Services\BotCatalogoService::class)
+                ->productosActivos($this->sede_id ?: null)
+                ->first(fn ($p) => (string) ($p->codigo ?? '') === $codigo);
+        } catch (\Throwable $e) {
+            Log::warning('Pedido manual: agregar producto, catálogo falló', ['error' => $e->getMessage()]);
+        }
+
+        // Fallback: tabla local por código.
+        if (!$prod) {
+            $prod = Producto::where('codigo', $codigo)->first();
+        }
         if (!$prod) return;
 
         $this->productos[] = [
-            'producto_id' => $prod->id,
+            'producto_id' => $prod->id ?? null,
+            'codigo'      => (string) ($prod->codigo ?? ''),
             'nombre'      => $prod->nombre,
             'cantidad'    => 1,
             'unidad'      => $prod->unidad ?: 'unidad',
