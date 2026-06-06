@@ -165,26 +165,34 @@ class CrearManual extends Component
      * los productos que vienen SOLO de HGI no tienen id local. Busca en el
      * mismo catálogo (BotCatalogoService) para traer nombre/precio/unidad reales.
      */
-    public function agregarProducto($codigo): void
+    public function agregarProducto($ref): void
     {
-        $codigo = trim((string) $codigo);
-        if ($codigo === '') return;
+        $ref = trim((string) $ref);
+        if ($ref === '') return;
 
-        // Buscar el producto en el catálogo activo (HGI o local según el tenant).
+        // $ref puede ser el CÓDIGO del producto o su ID local. Buscamos por
+        // ambos para que funcione siempre (los productos de HGI vienen con id
+        // local cuando hay match, o solo código cuando no).
         $prod = null;
         try {
             $prod = app(\App\Services\BotCatalogoService::class)
                 ->productosActivos($this->sede_id ?: null)
-                ->first(fn ($p) => (string) ($p->codigo ?? '') === $codigo);
+                ->first(fn ($p) =>
+                    (string) ($p->codigo ?? '') === $ref
+                    || (string) ($p->id ?? '') === $ref
+                );
         } catch (\Throwable $e) {
             Log::warning('Pedido manual: agregar producto, catálogo falló', ['error' => $e->getMessage()]);
         }
 
-        // Fallback: tabla local por código.
+        // Fallback: tabla local por código o por id.
         if (!$prod) {
-            $prod = Producto::where('codigo', $codigo)->first();
+            $prod = Producto::where('codigo', $ref)->orWhere('id', $ref)->first();
         }
-        if (!$prod) return;
+        if (!$prod) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'No se pudo agregar el producto.']);
+            return;
+        }
 
         $this->productos[] = [
             'producto_id' => $prod->id ?? null,
