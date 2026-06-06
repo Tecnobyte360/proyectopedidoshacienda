@@ -88,14 +88,32 @@
                             <i class="fa-solid fa-phone text-slate-400 mr-1"></i>
                             Teléfono <span class="text-rose-500">*</span>
                         </label>
-                        {{-- 🌍 Selector de país con bandera (intl-tel-input). Detecta
-                             el país y antepone el indicativo automáticamente. --}}
-                        <div wire:ignore
-                             x-data="telefonoIntl(@js($telefono))"
-                             x-init="init()">
-                            <input type="tel" x-ref="tel"
-                                   placeholder="Número del cliente"
-                                   class="w-full rounded-xl border border-slate-300 bg-white text-sm py-3 shadow-sm transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none">
+                        {{-- 🌍 Selector de país (propio, sin CDN) + número --}}
+                        <div x-data="telefonoPais(@js($telefono))" x-init="init()" class="flex gap-2">
+                            {{-- Selector de país con bandera --}}
+                            <div class="relative shrink-0">
+                                <select x-model="indicativo" @change="sync()"
+                                        class="appearance-none rounded-xl border border-slate-300 bg-white text-sm py-3 pl-3 pr-8 shadow-sm focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none cursor-pointer">
+                                    <option value="57">🇨🇴 +57</option>
+                                    <option value="1">🇺🇸 +1</option>
+                                    <option value="58">🇻🇪 +58</option>
+                                    <option value="593">🇪🇨 +593</option>
+                                    <option value="51">🇵🇪 +51</option>
+                                    <option value="52">🇲🇽 +52</option>
+                                    <option value="34">🇪🇸 +34</option>
+                                    <option value="56">🇨🇱 +56</option>
+                                    <option value="54">🇦🇷 +54</option>
+                                    <option value="507">🇵🇦 +507</option>
+                                </select>
+                                <i class="fa-solid fa-chevron-down absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none"></i>
+                            </div>
+                            {{-- Número sin indicativo --}}
+                            <div class="relative flex-1">
+                                <i class="fa-brands fa-whatsapp absolute left-3 top-1/2 -translate-y-1/2 text-emerald-500"></i>
+                                <input type="tel" x-model="numero" @input="sync()"
+                                       placeholder="300 123 4567"
+                                       class="w-full rounded-xl border border-slate-300 bg-white text-sm pl-10 pr-4 py-3 shadow-sm transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none">
+                            </div>
                         </div>
                         @error('telefono') <p class="mt-1 text-xs text-rose-600"><i class="fa-solid fa-circle-exclamation"></i> {{ $message }}</p> @enderror
 
@@ -555,53 +573,38 @@
                 onload="(function(){ const el = document.getElementById('pedido-direccion-input'); if (el && window.initPedidoDireccionAutocomplete) window.initPedidoDireccionAutocomplete(el); })()"></script>
     @endif
 
-    {{-- 🌍 intl-tel-input: selector de país con bandera para el teléfono --}}
+    {{-- 🌍 Selector de país propio (sin CDN) para el teléfono --}}
     @once
-        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/intl-tel-input@23.8.0/build/css/intlTelInput.css">
-        <style>
-            .iti { width: 100%; }
-            .iti__tel-input, .iti input[type=tel] { padding-left: 52px !important; }
-        </style>
-        <script src="https://cdn.jsdelivr.net/npm/intl-tel-input@23.8.0/build/js/intlTelInput.min.js"></script>
         <script>
-            function telefonoIntl(valorInicial) {
+            function telefonoPais(valorInicial) {
+                // Indicativos conocidos, del más largo al más corto para detectar bien.
+                const INDICATIVOS = ['593','591','507','506','502','598','51','58','57','56','55','54','52','34','1'];
                 return {
-                    iti: null,
+                    indicativo: '57',
+                    numero: '',
                     init() {
-                        const input = this.$refs.tel;
-                        if (valorInicial) input.value = valorInicial;
-
-                        // Esperar a que la librería esté disponible (puede cargar
-                        // después de Alpine). Reintenta hasta 10s.
-                        const arrancar = () => {
-                            if (typeof window.intlTelInput !== 'function') return false;
-
-                            this.iti = window.intlTelInput(input, {
-                                initialCountry: 'co',
-                                preferredCountries: ['co', 'us', 've', 'ec', 'pe', 'mx', 'es'],
-                                separateDialCode: true,
-                                nationalMode: true,
-                                utilsScript: 'https://cdn.jsdelivr.net/npm/intl-tel-input@23.8.0/build/js/utils.js',
-                            });
-
-                            const sync = () => {
-                                let full = '';
-                                try { full = this.iti.getNumber() || ''; } catch (e) {}
-                                const limpio = full.replace(/\D+/g, '');
-                                this.$wire.set('telefono', limpio);
-                            };
-
-                            input.addEventListener('input', sync);
-                            input.addEventListener('blur', sync);
-                            input.addEventListener('countrychange', sync);
-                            setTimeout(sync, 400);
-                            return true;
-                        };
-
-                        if (!arrancar()) {
-                            const iv = setInterval(() => { if (arrancar()) clearInterval(iv); }, 250);
-                            setTimeout(() => clearInterval(iv), 10000);
+                        let v = (valorInicial || '').replace(/\D+/g, '');
+                        if (v) {
+                            // Detectar indicativo si el número ya viene con código país.
+                            const hit = INDICATIVOS.find(c => v.startsWith(c) && v.length > 10);
+                            if (hit) { this.indicativo = hit; this.numero = v.slice(hit.length); }
+                            else { this.numero = v; } // 10 dígitos → local, default CO
                         }
+                        this.sync();
+                        // Si Livewire cambia el teléfono (ej. buscar por cédula), re-sincronizar.
+                        this.$wire.$watch('telefono', (val) => {
+                            const limpio = (val || '').replace(/\D+/g, '');
+                            const actual = this.indicativo + this.numero;
+                            if (limpio && limpio !== actual) {
+                                const hit = INDICATIVOS.find(c => limpio.startsWith(c) && limpio.length > 10);
+                                if (hit) { this.indicativo = hit; this.numero = limpio.slice(hit.length); }
+                                else { this.numero = limpio; }
+                            }
+                        });
+                    },
+                    sync() {
+                        const limpio = (this.numero || '').replace(/\D+/g, '');
+                        this.$wire.set('telefono', limpio ? (this.indicativo + limpio) : '');
                     },
                 };
             }
