@@ -90,10 +90,27 @@
                         </label>
                         <div class="relative">
                             <i class="fa-brands fa-whatsapp absolute left-3 top-1/2 -translate-y-1/2 text-emerald-500"></i>
-                            <input type="text" wire:model="telefono" placeholder="573XXXXXXXXX"
+                            <input type="text" wire:model.live.debounce.400ms="telefono" placeholder="573XXXXXXXXX"
                                    class="{{ $inputClsIcon }}">
                         </div>
                         @error('telefono') <p class="mt-1 text-xs text-rose-600"><i class="fa-solid fa-circle-exclamation"></i> {{ $message }}</p> @enderror
+
+                        {{-- 🏷️ Marca: el teléfono vino del ERP, verificar --}}
+                        @if($telefonoDesdeErp)
+                            <p class="mt-1 text-[11px] text-amber-600 flex items-center gap-1">
+                                <i class="fa-solid fa-database text-[10px]"></i>
+                                Traído del ERP — <strong>verifícalo</strong> antes de guardar.
+                            </p>
+                        @endif
+
+                        {{-- ⚠️ Alerta: el teléfono parece inválido --}}
+                        @php $telMotivo = $this->telefonoSospechoso(); @endphp
+                        @if($telMotivo !== '')
+                            <p class="mt-1 text-[11px] text-rose-600 flex items-center gap-1">
+                                <i class="fa-solid fa-triangle-exclamation text-[10px]"></i>
+                                {{ $telMotivo }} El cliente no recibirá notificaciones.
+                            </p>
+                        @endif
                     </div>
 
                     <div>

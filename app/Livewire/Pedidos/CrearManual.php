@@ -57,6 +57,13 @@ class CrearManual extends Component
     // Productos disponibles para autocomplete
     public string $busquedaProducto = '';
 
+    // 🏷️ Marca que el teléfono fue traído del ERP (HGI) al buscar por cédula,
+    //    para que el operador lo verifique.
+    public bool $telefonoDesdeErp = false;
+
+    // Cuando el teléfono parece inválido, exigimos una segunda confirmación.
+    public bool $confirmoTelefonoSospechoso = false;
+
     public function mount(?int $conv = null): void
     {
         $this->conversacionId = $conv;
@@ -216,6 +223,40 @@ class CrearManual extends Component
         return collect($this->productos)->sum(fn ($p) => (float) ($p['cantidad'] ?? 0) * (float) ($p['precio'] ?? 0));
     }
 
+    /** Si el operador edita el teléfono a mano, ya no es "el del ERP". */
+    public function updatedTelefono(): void
+    {
+        $this->telefonoDesdeErp = false;
+    }
+
+    /**
+     * Heurística: ¿el teléfono parece inválido / de relleno?
+     * Reglas (Colombia): celular = 10 dígitos empezando por 3. También
+     * detecta números repetidos como 3111111111, 0000000000, etc.
+     * Devuelve string con el motivo, o '' si parece válido.
+     */
+    public function telefonoSospechoso(): string
+    {
+        $tel = preg_replace('/\D+/', '', (string) $this->telefono);
+        // Quitar prefijo país 57 si viene
+        if (str_starts_with($tel, '57') && strlen($tel) === 12) {
+            $tel = substr($tel, 2);
+        }
+
+        if ($tel === '') return '';
+        if (strlen($tel) !== 10) {
+            return 'Debe tener 10 dígitos (celular colombiano).';
+        }
+        if ($tel[0] !== '3') {
+            return 'Un celular colombiano empieza por 3.';
+        }
+        // Todos los dígitos (después del 3) iguales → relleno tipo 3111111111
+        if (preg_match('/^3(\d)\1{8}$/', $tel)) {
+            return 'Parece un número de relleno (dígitos repetidos).';
+        }
+        return '';
+    }
+
     /**
      * Buscar cliente por cédula en BD local (luego se podría extender a ERP).
      */
@@ -275,7 +316,8 @@ class CrearManual extends Component
             // Autocompletar con los datos REALES del ERP.
             $this->nombre_cliente = $clienteErp['StrNombre'] ?? $this->nombre_cliente;
             if (empty($this->telefono) && !empty($clienteErp['StrCelular'])) {
-                $this->telefono = $clienteErp['StrCelular'];
+                $this->telefono = preg_replace('/\D+/', '', (string) $clienteErp['StrCelular']);
+                $this->telefonoDesdeErp = true; // 🏷️ marcar que vino del ERP
             }
             if (empty($this->direccion) && !empty($clienteErp['StrDireccion'])) {
                 $this->direccion = $clienteErp['StrDireccion'];
@@ -314,6 +356,16 @@ class CrearManual extends Component
         }
         if (empty($this->telefono)) {
             $this->dispatch('notify', ['type' => 'error', 'message' => 'Falta el teléfono del cliente.']);
+            return;
+        }
+        // ⚠️ Teléfono sospechoso → frenar y pedir confirmación una vez.
+        $motivoTel = $this->telefonoSospechoso();
+        if ($motivoTel !== '' && !$this->confirmoTelefonoSospechoso) {
+            $this->confirmoTelefonoSospechoso = true; // próximo clic ya pasa
+            $this->dispatch('notify', [
+                'type'    => 'warning',
+                'message' => "⚠️ Revisa el teléfono: {$motivoTel} El cliente NO recibirá notificaciones. Si está bien, dale 'Crear pedido' otra vez.",
+            ]);
             return;
         }
         if (empty($this->nombre_cliente)) {
