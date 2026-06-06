@@ -7278,7 +7278,12 @@ TXT;
         //
         // El estado persistente es prueba de que en algún momento el
         // captador detectó al cliente pidiendo ese producto. Es seguro.
-        if ($conversacion) {
+        //
+        // ⚠️ EXCEPCIÓN: los pedidos MANUALES (creados por un operador humano
+        // desde la plataforma) saltan el cortafuego — el operador agrega los
+        // productos a mano, el cliente no los "menciona" por WhatsApp.
+        $esPedidoManual = !empty($orderData['manual']);
+        if ($conversacion && !$esPedidoManual) {
             $productos = $orderData['products'] ?? [];
             if (!empty($productos)) {
                 // PASO 1: ¿Los productos coinciden con el estado persistente?

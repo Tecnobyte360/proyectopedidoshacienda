@@ -343,6 +343,9 @@ class CrearManual extends Component
             'payment_method' => $this->metodo_pago,
             'coupon_code'    => $this->cupon,
             'notes'          => trim(($this->notas ? $this->notas . "\n" : '') . '[CREADO MANUALMENTE]'),
+            // 🚩 Marca que es un pedido manual → salta el cortafuego anti-fantasma
+            //    del bot (el operador agrega productos a mano).
+            'manual'         => true,
         ];
 
         if ($this->metodo_entrega === 'domicilio') {
