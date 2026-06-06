@@ -308,6 +308,24 @@ class CrearManual extends Component
     }
 
     /**
+     * Devuelve el teléfono en formato INTERNACIONAL para Meta/WhatsApp:
+     * 57 + 10 dígitos (Colombia). Si ya viene con 57, lo respeta.
+     */
+    private function telefonoInternacional($tel): string
+    {
+        $tel = preg_replace('/\D+/', '', (string) $tel);
+        // Ya en internacional (57XXXXXXXXXX)
+        if (strlen($tel) === 12 && str_starts_with($tel, '57')) {
+            return $tel;
+        }
+        // Celular local de 10 dígitos → anteponer 57
+        if (strlen($tel) === 10 && $tel[0] === '3') {
+            return '57' . $tel;
+        }
+        return $tel; // cualquier otro caso, devolver tal cual (no forzar)
+    }
+
+    /**
      * Busca el cliente en el ERP (HGI u otro) SOLO si el tenant tiene una
      * integración activa con cliente_lookup habilitado. Devuelve true si lo
      * encontró y autocompletó los campos.
@@ -408,6 +426,10 @@ class CrearManual extends Component
             return;
         }
 
+        // 📞 Teléfono en formato INTERNACIONAL (57 + 10 dígitos) para que Meta
+        //    pueda entregar el mensaje. Sin el 57, WhatsApp no lo entrega.
+        $telInternacional = $this->telefonoInternacional($this->telefono);
+
         // Construir orderData con el formato que entiende guardarPedidoDesdeToolCall
         $orderData = [
             'products' => array_values(array_map(fn ($p) => [
@@ -417,7 +439,7 @@ class CrearManual extends Component
             ], $this->productos)),
             'customer_name'  => $this->nombre_cliente,
             'cedula'         => $this->cedula,
-            'phone'          => $this->telefono,
+            'phone'          => $telInternacional,
             'email'          => $this->email,
             'payment_method' => $this->metodo_pago,
             'coupon_code'    => $this->cupon,
@@ -443,7 +465,7 @@ class CrearManual extends Component
             $conv = $this->conversacionId
                 ? ConversacionWhatsapp::find($this->conversacionId)
                 : ConversacionWhatsapp::firstOrCreate(
-                    ['telefono_normalizado' => $this->telefono],
+                    ['telefono_normalizado' => $telInternacional],
                     [
                         'tenant_id' => app(\App\Services\TenantManager::class)->id(),
                         'estado'    => 'activa',
@@ -457,7 +479,7 @@ class CrearManual extends Component
             $controller = app(WhatsappWebhookController::class);
             $resultado = $controller->guardarPedidoDesdeToolCall(
                 $orderData,
-                $this->telefono,
+                $telInternacional,
                 $this->nombre_cliente,
                 [], // historial vacío
                 $cacheKey,
