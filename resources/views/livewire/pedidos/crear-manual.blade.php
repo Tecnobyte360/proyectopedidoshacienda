@@ -569,30 +569,39 @@
                     iti: null,
                     init() {
                         const input = this.$refs.tel;
-                        // Valor inicial: si trae 10 dígitos lo tomamos como CO local.
                         if (valorInicial) input.value = valorInicial;
 
-                        this.iti = window.intlTelInput(input, {
-                            initialCountry: 'co',
-                            preferredCountries: ['co', 'us', 've', 'ec', 'pe', 'mx', 'es'],
-                            separateDialCode: true,
-                            nationalMode: true,
-                            utilsScript: 'https://cdn.jsdelivr.net/npm/intl-tel-input@23.8.0/build/js/utils.js',
-                        });
+                        // Esperar a que la librería esté disponible (puede cargar
+                        // después de Alpine). Reintenta hasta 10s.
+                        const arrancar = () => {
+                            if (typeof window.intlTelInput !== 'function') return false;
 
-                        const sync = () => {
-                            // getNumber() devuelve E.164 completo: +573215942660
-                            let full = '';
-                            try { full = this.iti.getNumber() || ''; } catch (e) {}
-                            const limpio = full.replace(/\D+/g, ''); // 573215942660
-                            this.$wire.set('telefono', limpio);
+                            this.iti = window.intlTelInput(input, {
+                                initialCountry: 'co',
+                                preferredCountries: ['co', 'us', 've', 'ec', 'pe', 'mx', 'es'],
+                                separateDialCode: true,
+                                nationalMode: true,
+                                utilsScript: 'https://cdn.jsdelivr.net/npm/intl-tel-input@23.8.0/build/js/utils.js',
+                            });
+
+                            const sync = () => {
+                                let full = '';
+                                try { full = this.iti.getNumber() || ''; } catch (e) {}
+                                const limpio = full.replace(/\D+/g, '');
+                                this.$wire.set('telefono', limpio);
+                            };
+
+                            input.addEventListener('input', sync);
+                            input.addEventListener('blur', sync);
+                            input.addEventListener('countrychange', sync);
+                            setTimeout(sync, 400);
+                            return true;
                         };
 
-                        input.addEventListener('input', sync);
-                        input.addEventListener('blur', sync);
-                        input.addEventListener('countrychange', sync);
-                        // Sincronizar el valor inicial ya formateado.
-                        setTimeout(sync, 300);
+                        if (!arrancar()) {
+                            const iv = setInterval(() => { if (arrancar()) clearInterval(iv); }, 250);
+                            setTimeout(() => clearInterval(iv), 10000);
+                        }
                     },
                 };
             }
