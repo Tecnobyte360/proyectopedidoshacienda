@@ -219,6 +219,17 @@ class CrearManual extends Component
             if (empty($this->direccion) && !empty($clienteErp['StrDireccion'])) {
                 $this->direccion = $clienteErp['StrDireccion'];
             }
+            // 📧 Email: HGI lo guarda en StrMail (correo) o StrMailFE (facturación
+            //    electrónica). Tomamos el primero que tenga un valor con @.
+            if (empty($this->email)) {
+                foreach (['StrMail', 'StrMailFE'] as $colMail) {
+                    $mail = trim((string) ($clienteErp[$colMail] ?? ''));
+                    if ($mail !== '' && str_contains($mail, '@')) {
+                        $this->email = $mail;
+                        break;
+                    }
+                }
+            }
 
             $this->dispatch('notify', [
                 'type'    => 'success',
