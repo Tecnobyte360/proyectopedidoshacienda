@@ -7825,7 +7825,9 @@ TXT;
         // aunque la sede tuviera Colombia entera como zona.
         $coberturaValida = !empty($zonaCobertura) || !empty($validacion['cubierta']);
 
-        if ($indicoDomicilio && !$coberturaValida) {
+        // ⚠️ EXCEPCIÓN: en pedidos MANUALES el operador decide; no rechazamos
+        // por cobertura aunque la dirección no caiga en una zona registrada.
+        if ($indicoDomicilio && !$coberturaValida && !$esPedidoManual) {
             Cache::forget($confirmKey);   // liberar el lock de deduplicación
             DB::rollBack();
 
