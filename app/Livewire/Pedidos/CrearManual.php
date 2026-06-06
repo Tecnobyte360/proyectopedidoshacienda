@@ -408,9 +408,16 @@ class CrearManual extends Component
     #[Layout('layouts.app')]
     public function render()
     {
+        // 🗺️ API key de Google Maps del tenant (para autocompletar dirección).
+        $tenant = app(\App\Services\TenantManager::class)->current();
+        $gmapsKey = ($tenant && $tenant->google_maps_activo && !empty($tenant->google_maps_api_key))
+            ? $tenant->google_maps_api_key
+            : null;
+
         return view('livewire.pedidos.crear-manual', [
             'productosCatalogo' => $this->productosCatalogo,
             'sedes'             => $this->sedes,
+            'gmapsKey'          => $gmapsKey,
         ]);
     }
 }

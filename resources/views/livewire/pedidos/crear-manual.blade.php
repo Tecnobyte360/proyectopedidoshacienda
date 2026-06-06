@@ -351,11 +351,18 @@
                                     Dirección <span class="text-rose-500">*</span>
                                 </label>
                                 <div class="relative">
-                                    <i class="fa-solid fa-house absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                    <i class="fa-solid fa-house absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 z-10"></i>
                                     <input type="text" wire:model="direccion"
-                                           placeholder="Cra 50 #63B-48"
+                                           id="pedido-direccion-input"
+                                           @if($gmapsKey) x-data x-init="window.initPedidoDireccionAutocomplete && window.initPedidoDireccionAutocomplete($el)" autocomplete="off" @endif
+                                           placeholder="Empieza a escribir la dirección…"
                                            class="{{ $inputClsIcon }}">
                                 </div>
+                                @if($gmapsKey)
+                                    <p class="mt-1 text-[11px] text-slate-400">
+                                        <i class="fa-brands fa-google text-[10px]"></i> Escribe y elige una sugerencia de Google Maps
+                                    </p>
+                                @endif
                                 @error('direccion') <p class="mt-1 text-xs text-rose-600"><i class="fa-solid fa-circle-exclamation"></i> {{ $message }}</p> @enderror
                             </div>
                             <div>
@@ -463,4 +470,66 @@
             </button>
         </div>
     </div>
+
+    {{-- 🗺️ Autocompletado de dirección con Google Maps Places --}}
+    @if($gmapsKey)
+        <script>
+            // Define la función global que el input llama vía x-init.
+            window.initPedidoDireccionAutocomplete = function (input) {
+                if (!input || input.dataset.acInit === '1') return;
+
+                const arrancar = () => {
+                    if (!(window.google && google.maps && google.maps.places)) return false;
+                    input.dataset.acInit = '1';
+
+                    const ac = new google.maps.places.Autocomplete(input, {
+                        componentRestrictions: { country: 'co' },
+                        fields: ['formatted_address', 'address_components', 'name'],
+                        types: ['address'],
+                    });
+
+                    ac.addListener('place_changed', () => {
+                        const place = ac.getPlace();
+                        const direccion = place.formatted_address || place.name || input.value;
+
+                        // Extraer el barrio (sublocality / neighborhood) si viene.
+                        let barrio = '';
+                        (place.address_components || []).forEach(c => {
+                            if (c.types.includes('sublocality') ||
+                                c.types.includes('sublocality_level_1') ||
+                                c.types.includes('neighborhood')) {
+                                barrio = c.long_name;
+                            }
+                        });
+
+                        // Empujar a Livewire.
+                        const cmp = window.Livewire && Livewire.find(
+                            input.closest('[wire\\:id]')?.getAttribute('wire:id')
+                        );
+                        if (cmp) {
+                            cmp.set('direccion', direccion);
+                            if (barrio) cmp.set('barrio', barrio);
+                        } else {
+                            input.value = direccion;
+                            input.dispatchEvent(new Event('input'));
+                        }
+                    });
+
+                    // Evitar que Enter envíe el formulario al elegir sugerencia.
+                    input.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter') e.preventDefault();
+                    });
+                    return true;
+                };
+
+                if (!arrancar()) {
+                    const iv = setInterval(() => { if (arrancar()) clearInterval(iv); }, 300);
+                    setTimeout(() => clearInterval(iv), 10000);
+                }
+            };
+        </script>
+        <script src="https://maps.googleapis.com/maps/api/js?key={{ $gmapsKey }}&libraries=places&language=es&region=CO"
+                async defer
+                onload="(function(){ const el = document.getElementById('pedido-direccion-input'); if (el && window.initPedidoDireccionAutocomplete) window.initPedidoDireccionAutocomplete(el); })()"></script>
+    @endif
 </div>
