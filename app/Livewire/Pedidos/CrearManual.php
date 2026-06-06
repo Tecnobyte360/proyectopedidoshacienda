@@ -237,12 +237,7 @@ class CrearManual extends Component
      */
     public function telefonoSospechoso(): string
     {
-        $tel = preg_replace('/\D+/', '', (string) $this->telefono);
-        // Quitar prefijo país 57 si viene
-        if (str_starts_with($tel, '57') && strlen($tel) === 12) {
-            $tel = substr($tel, 2);
-        }
-
+        $tel = $this->normalizarTel($this->telefono);
         if ($tel === '') return '';
         if (strlen($tel) !== 10) {
             return 'Debe tener 10 dígitos (celular colombiano).';
@@ -250,7 +245,6 @@ class CrearManual extends Component
         if ($tel[0] !== '3') {
             return 'Un celular colombiano empieza por 3.';
         }
-        // Todos los dígitos (después del 3) iguales → relleno tipo 3111111111
         if (preg_match('/^3(\d)\1{8}$/', $tel)) {
             return 'Parece un número de relleno (dígitos repetidos).';
         }
@@ -264,25 +258,53 @@ class CrearManual extends Component
     {
         if (mb_strlen($this->cedula) < 5) return;
 
-        // 1️⃣ Primero buscar en la base local (rápido). Si el cliente ya pidió
-        //    alguna vez por la plataforma, está acá.
+        // 1️⃣ Buscar en la base local (rápido). Llena nombre/email/dirección,
+        //    y el teléfono SOLO si el local tiene uno VÁLIDO.
         $cliente = Cliente::where('cedula', $this->cedula)->first();
+        $encontradoLocal = false;
         if ($cliente) {
+            $encontradoLocal = true;
             $this->nombre_cliente = $cliente->nombre;
-            $this->telefono = $this->telefono ?: $cliente->telefono_normalizado;
             $this->email = $this->email ?: ($cliente->email ?? '');
-            $this->dispatch('notify', ['type' => 'success', 'message' => '✅ Cliente encontrado: ' . $cliente->nombre]);
-            return;
+            $telLocal = $this->normalizarTel($cliente->telefono_normalizado ?? $cliente->telefono ?? '');
+            if (empty($this->telefono) && $this->esTelefonoValido($telLocal)) {
+                $this->telefono = $telLocal;
+            }
         }
 
-        // 2️⃣ Si NO está local, y el tenant tiene HGI/ERP con búsqueda de cliente
-        //    activada, consultarlo en el ERP. Esto respeta la config de cada
-        //    tenant: si no tiene lookup ERP, simplemente no encuentra nada.
-        if ($this->buscarClienteEnErp()) {
-            return;
+        // 2️⃣ Consultar SIEMPRE el ERP (HGI) si está activo. El ERP suele tener
+        //    el dato más actualizado; lo usamos para completar lo que falte y
+        //    para CORREGIR el teléfono si el local quedó inválido (ej. relleno
+        //    3111111111 mientras HGI tiene el celular real).
+        $hitErp = $this->buscarClienteEnErp();
+
+        if ($encontradoLocal && !$hitErp) {
+            // Estaba local pero el ERP no respondió (o no aplica). Avisar igual.
+            $this->dispatch('notify', ['type' => 'success', 'message' => '✅ Cliente encontrado: ' . $this->nombre_cliente]);
         }
 
-        $this->dispatch('notify', ['type' => 'info', 'message' => 'No se encontró un cliente con esa cédula.']);
+        if (!$encontradoLocal && !$hitErp) {
+            $this->dispatch('notify', ['type' => 'info', 'message' => 'No se encontró un cliente con esa cédula.']);
+        }
+    }
+
+    /** Normaliza un teléfono: solo dígitos, sin prefijo país 57. */
+    private function normalizarTel($valor): string
+    {
+        $tel = preg_replace('/\D+/', '', (string) $valor);
+        if (str_starts_with($tel, '57') && strlen($tel) === 12) {
+            $tel = substr($tel, 2);
+        }
+        return $tel;
+    }
+
+    /** ¿Es un celular colombiano válido? (10 dígitos, empieza por 3, no relleno) */
+    private function esTelefonoValido($tel): bool
+    {
+        $tel = $this->normalizarTel($tel);
+        return strlen($tel) === 10
+            && $tel[0] === '3'
+            && !preg_match('/^3(\d)\1{8}$/', $tel);
     }
 
     /**
@@ -315,8 +337,13 @@ class CrearManual extends Component
 
             // Autocompletar con los datos REALES del ERP.
             $this->nombre_cliente = $clienteErp['StrNombre'] ?? $this->nombre_cliente;
-            if (empty($this->telefono) && !empty($clienteErp['StrCelular'])) {
-                $this->telefono = preg_replace('/\D+/', '', (string) $clienteErp['StrCelular']);
+
+            // 📞 Teléfono: si el actual está VACÍO o es INVÁLIDO (ej. el local
+            //    quedó en 3111111111), y el ERP tiene uno VÁLIDO, usar el del
+            //    ERP. Así el celular real de HGI corrige el basura local.
+            $telErp = $this->normalizarTel($clienteErp['StrCelular'] ?? '');
+            if (!$this->esTelefonoValido($this->telefono) && $this->esTelefonoValido($telErp)) {
+                $this->telefono = $telErp;
                 $this->telefonoDesdeErp = true; // 🏷️ marcar que vino del ERP
             }
             if (empty($this->direccion) && !empty($clienteErp['StrDireccion'])) {
