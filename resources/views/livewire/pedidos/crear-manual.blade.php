@@ -390,18 +390,40 @@
                                     <i class="fa-solid fa-location-dot text-slate-400 mr-1"></i>
                                     Dirección <span class="text-rose-500">*</span>
                                 </label>
-                                <div class="relative">
-                                    <i class="fa-solid fa-house absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 z-10"></i>
-                                    <input type="text" wire:model="direccion"
-                                           id="pedido-direccion-input"
-                                           @if($gmapsKey) x-data x-init="window.initPedidoDireccionAutocomplete && window.initPedidoDireccionAutocomplete($el)" autocomplete="off" @endif
-                                           placeholder="Empieza a escribir la dirección…"
-                                           class="{{ $inputClsIcon }}">
-                                </div>
                                 @if($gmapsKey)
+                                    <div x-data="direccionAutocomplete(@js($gmapsKey))" class="relative">
+                                        <i class="fa-solid fa-house absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 z-10"></i>
+                                        <input type="text"
+                                               x-model="texto"
+                                               @input.debounce.350ms="buscar()"
+                                               @focus="if(sugerencias.length) abierto=true"
+                                               @keydown.escape="abierto=false"
+                                               autocomplete="off"
+                                               placeholder="Empieza a escribir la dirección…"
+                                               class="{{ $inputClsIcon }}">
+                                        {{-- Dropdown de sugerencias --}}
+                                        <div x-show="abierto && sugerencias.length" x-cloak
+                                             @click.outside="abierto=false"
+                                             class="absolute left-0 right-0 top-full mt-1 z-30 rounded-xl border border-slate-200 bg-white shadow-2xl max-h-64 overflow-y-auto">
+                                            <template x-for="(s, i) in sugerencias" :key="i">
+                                                <button type="button" @click="elegir(s)"
+                                                        class="w-full text-left px-4 py-2.5 hover:bg-emerald-50 border-b border-slate-100 last:border-0 text-sm text-slate-700 flex items-start gap-2">
+                                                    <i class="fa-solid fa-location-dot text-slate-400 mt-0.5 text-[11px]"></i>
+                                                    <span x-text="s.texto"></span>
+                                                </button>
+                                            </template>
+                                        </div>
+                                    </div>
                                     <p class="mt-1 text-[11px] text-slate-400">
                                         <i class="fa-brands fa-google text-[10px]"></i> Escribe y elige una sugerencia de Google Maps
                                     </p>
+                                @else
+                                    <div class="relative">
+                                        <i class="fa-solid fa-house absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 z-10"></i>
+                                        <input type="text" wire:model="direccion"
+                                               placeholder="Cra 50 #63B-48"
+                                               class="{{ $inputClsIcon }}">
+                                    </div>
                                 @endif
                                 @error('direccion') <p class="mt-1 text-xs text-rose-600"><i class="fa-solid fa-circle-exclamation"></i> {{ $message }}</p> @enderror
                             </div>
@@ -511,67 +533,100 @@
         </div>
     </div>
 
-    {{-- 🗺️ Autocompletado de dirección con Google Maps Places --}}
-    @if($gmapsKey)
+    {{-- 🗺️ Autocompletado de dirección con Places API (New) vía REST.
+         No usa el SDK google.maps.places.Autocomplete (bloqueado para
+         cuentas nuevas desde marzo 2025). Llama directo al endpoint REST. --}}
+    @once
         <script>
-            // Define la función global que el input llama vía x-init.
-            window.initPedidoDireccionAutocomplete = function (input) {
-                if (!input || input.dataset.acInit === '1') return;
-
-                const arrancar = () => {
-                    if (!(window.google && google.maps && google.maps.places)) return false;
-                    input.dataset.acInit = '1';
-
-                    const ac = new google.maps.places.Autocomplete(input, {
-                        componentRestrictions: { country: 'co' },
-                        fields: ['formatted_address', 'address_components', 'name'],
-                        types: ['address'],
-                    });
-
-                    ac.addListener('place_changed', () => {
-                        const place = ac.getPlace();
-                        const direccion = place.formatted_address || place.name || input.value;
-
-                        // Extraer el barrio (sublocality / neighborhood) si viene.
-                        let barrio = '';
-                        (place.address_components || []).forEach(c => {
-                            if (c.types.includes('sublocality') ||
-                                c.types.includes('sublocality_level_1') ||
-                                c.types.includes('neighborhood')) {
-                                barrio = c.long_name;
-                            }
+            function direccionAutocomplete(apiKey) {
+                return {
+                    apiKey: apiKey,
+                    texto: '',
+                    sugerencias: [],
+                    abierto: false,
+                    sessionToken: null,
+                    init() {
+                        // Sincronizar con el valor inicial de Livewire (si lo hay).
+                        this.texto = this.$wire.get('direccion') || '';
+                        this.$wire.$watch('direccion', (val) => {
+                            if ((val || '') !== this.texto) this.texto = val || '';
                         });
+                    },
+                    nuevoToken() {
+                        // Un token UUID por sesión de búsqueda (lo pide Places New).
+                        this.sessionToken = (crypto.randomUUID
+                            ? crypto.randomUUID()
+                            : ('t' + Date.now() + Math.random().toString(16).slice(2)));
+                    },
+                    async buscar() {
+                        // Mantener el campo direccion en Livewire mientras escribe.
+                        this.$wire.set('direccion', this.texto, false);
 
-                        // Empujar a Livewire.
-                        const cmp = window.Livewire && Livewire.find(
-                            input.closest('[wire\\:id]')?.getAttribute('wire:id')
-                        );
-                        if (cmp) {
-                            cmp.set('direccion', direccion);
-                            if (barrio) cmp.set('barrio', barrio);
-                        } else {
-                            input.value = direccion;
-                            input.dispatchEvent(new Event('input'));
+                        const q = (this.texto || '').trim();
+                        if (q.length < 3) { this.sugerencias = []; this.abierto = false; return; }
+                        if (!this.sessionToken) this.nuevoToken();
+
+                        try {
+                            const resp = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-Goog-Api-Key': this.apiKey,
+                                },
+                                body: JSON.stringify({
+                                    input: q,
+                                    languageCode: 'es',
+                                    regionCode: 'CO',
+                                    sessionToken: this.sessionToken,
+                                }),
+                            });
+                            const data = await resp.json();
+                            if (data.error) { console.warn('Places New error:', data.error.message); this.sugerencias = []; return; }
+                            this.sugerencias = (data.suggestions || [])
+                                .filter(s => s.placePrediction)
+                                .map(s => ({
+                                    texto: s.placePrediction.text?.text || '',
+                                    placeId: s.placePrediction.placeId,
+                                }));
+                            this.abierto = this.sugerencias.length > 0;
+                        } catch (e) {
+                            console.warn('Places New fetch falló:', e);
+                            this.sugerencias = [];
                         }
-                    });
+                    },
+                    async elegir(s) {
+                        this.texto = s.texto;
+                        this.$wire.set('direccion', s.texto);
+                        this.abierto = false;
+                        this.sugerencias = [];
 
-                    // Evitar que Enter envíe el formulario al elegir sugerencia.
-                    input.addEventListener('keydown', (e) => {
-                        if (e.key === 'Enter') e.preventDefault();
-                    });
-                    return true;
+                        // Pedir detalles para extraer el barrio.
+                        try {
+                            const resp = await fetch(
+                                'https://places.googleapis.com/v1/places/' + s.placeId +
+                                '?languageCode=es&sessionToken=' + this.sessionToken,
+                                { headers: {
+                                    'X-Goog-Api-Key': this.apiKey,
+                                    'X-Goog-FieldMask': 'addressComponents,formattedAddress',
+                                } }
+                            );
+                            const d = await resp.json();
+                            let barrio = '';
+                            (d.addressComponents || []).forEach(c => {
+                                const t = c.types || [];
+                                if (t.includes('sublocality') || t.includes('sublocality_level_1') || t.includes('neighborhood')) {
+                                    barrio = c.longText || c.shortText || '';
+                                }
+                            });
+                            if (barrio) this.$wire.set('barrio', barrio);
+                        } catch (e) { /* sin barrio, no pasa nada */ }
+
+                        this.sessionToken = null; // cerrar sesión de búsqueda
+                    },
                 };
-
-                if (!arrancar()) {
-                    const iv = setInterval(() => { if (arrancar()) clearInterval(iv); }, 300);
-                    setTimeout(() => clearInterval(iv), 10000);
-                }
-            };
+            }
         </script>
-        <script src="https://maps.googleapis.com/maps/api/js?key={{ $gmapsKey }}&libraries=places&language=es&region=CO"
-                async defer
-                onload="(function(){ const el = document.getElementById('pedido-direccion-input'); if (el && window.initPedidoDireccionAutocomplete) window.initPedidoDireccionAutocomplete(el); })()"></script>
-    @endif
+    @endonce
 
     {{-- 🌍 Selector de país propio (sin CDN) para el teléfono --}}
     @once
