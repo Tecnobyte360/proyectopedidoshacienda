@@ -165,9 +165,9 @@ class CrearManual extends Component
      * los productos que vienen SOLO de HGI no tienen id local. Busca en el
      * mismo catálogo (BotCatalogoService) para traer nombre/precio/unidad reales.
      */
-    public function agregarProducto(string $codigo): void
+    public function agregarProducto($codigo): void
     {
-        $codigo = trim($codigo);
+        $codigo = trim((string) $codigo);
         if ($codigo === '') return;
 
         // Buscar el producto en el catálogo activo (HGI o local según el tenant).
