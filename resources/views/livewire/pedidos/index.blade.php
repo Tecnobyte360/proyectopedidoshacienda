@@ -357,6 +357,7 @@
                         @endphp
 
                         @foreach($tabs as $tab)
+                            @continue(!$this->tabPermitida($tab['key']))
                             <button type="button" wire:click="cambiarTab('{{ $tab['key'] }}')"
                                     class="inline-flex h-10 shrink-0 items-center gap-2 rounded-xl px-3 sm:px-4 text-xs sm:text-sm font-semibold transition
                                            {{ $estado === $tab['key']

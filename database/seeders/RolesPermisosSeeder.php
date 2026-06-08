@@ -22,6 +22,13 @@ class RolesPermisosSeeder extends Seeder
             'pedidos.editar',
             'pedidos.despachar',
             'pedidos.cancelar',
+            // 🗂️ Visibilidad por estado/pestaña (cada usuario ve solo las suyas)
+            'pedidos.ver-nuevos',
+            'pedidos.ver-programados',
+            'pedidos.ver-en-proceso',
+            'pedidos.ver-despachados',
+            'pedidos.ver-entregados',
+            'pedidos.ver-cancelados',
         ],
         'productos' => [
             'productos.ver',
@@ -153,6 +160,8 @@ class RolesPermisosSeeder extends Seeder
         $gerente = Role::firstOrCreate(['name' => 'gerente', 'guard_name' => 'web']);
         $gerente->syncPermissions([
             'pedidos.ver', 'pedidos.editar', 'pedidos.despachar', 'pedidos.cancelar',
+            'pedidos.ver-nuevos', 'pedidos.ver-programados', 'pedidos.ver-en-proceso',
+            'pedidos.ver-despachados', 'pedidos.ver-entregados', 'pedidos.ver-cancelados',
             'productos.ver', 'productos.crear', 'productos.editar',
             'categorias.gestionar', 'promociones.gestionar',
             'clientes.ver', 'clientes.editar',
@@ -169,6 +178,8 @@ class RolesPermisosSeeder extends Seeder
         $operador = Role::firstOrCreate(['name' => 'operador', 'guard_name' => 'web']);
         $operador->syncPermissions([
             'pedidos.ver', 'pedidos.editar', 'pedidos.despachar',
+            'pedidos.ver-nuevos', 'pedidos.ver-programados', 'pedidos.ver-en-proceso',
+            'pedidos.ver-despachados', 'pedidos.ver-entregados', 'pedidos.ver-cancelados',
             'clientes.ver',
             'chat.usar', 'conversaciones.ver',
             'despachos.gestionar',
@@ -177,6 +188,8 @@ class RolesPermisosSeeder extends Seeder
         $cajero = Role::firstOrCreate(['name' => 'cajero', 'guard_name' => 'web']);
         $cajero->syncPermissions([
             'pedidos.ver', 'pedidos.editar',
+            'pedidos.ver-nuevos', 'pedidos.ver-programados', 'pedidos.ver-en-proceso',
+            'pedidos.ver-despachados', 'pedidos.ver-entregados', 'pedidos.ver-cancelados',
             'clientes.ver',
         ]);
 

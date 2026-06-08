@@ -284,11 +284,91 @@ class Index extends Component
             $q = Pedido::with(['detalles', 'sede', 'domiciliario', 'zonaCobertura', 'estadoPedidoBot'])
                 ->latest();
             $q = \App\Support\SedeScopeFilter::aplicar($q);
+
+            // 🗂️ PERMISOS POR ESTADO: si el usuario tiene permisos granulares,
+            //    solo trae los pedidos de los estados que puede ver (seguridad
+            //    real, no solo ocultar pestañas).
+            $estadosPerm = $this->estadosPermitidos();
+            if ($estadosPerm !== null) {
+                $verProgramados = $this->puedeVerProgramados();
+                $q->where(function ($qq) use ($estadosPerm, $verProgramados) {
+                    if (!empty($estadosPerm)) {
+                        $qq->whereIn('estado', $estadosPerm);
+                    } else {
+                        $qq->whereRaw('1 = 0'); // sin estados permitidos
+                    }
+                    if ($verProgramados) {
+                        $qq->orWhereNotNull('programado_para');
+                    }
+                });
+            }
+
             return $q->get();
         } catch (\Throwable $e) {
             report($e);
             return collect();
         }
+    }
+
+    /** Mapa permiso → estados reales que habilita. */
+    private function mapaPermisoEstado(): array
+    {
+        return [
+            'pedidos.ver-nuevos'      => [Pedido::ESTADO_NUEVO, 'confirmado'],
+            'pedidos.ver-en-proceso'  => [Pedido::ESTADO_EN_PREPARACION],
+            'pedidos.ver-despachados' => [Pedido::ESTADO_REPARTIDOR_EN_CAMINO, Pedido::ESTADO_RECOGIDO],
+            'pedidos.ver-entregados'  => [Pedido::ESTADO_ENTREGADO],
+            'pedidos.ver-cancelados'  => [Pedido::ESTADO_CANCELADO],
+        ];
+    }
+
+    /** ¿El usuario tiene CONFIGURADO algún permiso granular de estado? */
+    #[Computed]
+    public function permisosGranulares(): bool
+    {
+        $u = auth()->user();
+        if (!$u) return false;
+        foreach (array_merge(array_keys($this->mapaPermisoEstado()), ['pedidos.ver-programados']) as $p) {
+            if ($u->can($p)) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Estados que el usuario puede ver. null = sin restricción (ve todo).
+     */
+    private function estadosPermitidos(): ?array
+    {
+        if (!$this->permisosGranulares()) return null; // compat: ve todo
+        $u = auth()->user();
+        $estados = [];
+        foreach ($this->mapaPermisoEstado() as $perm => $sts) {
+            if ($u->can($perm)) $estados = array_merge($estados, $sts);
+        }
+        return array_values(array_unique($estados));
+    }
+
+    public function puedeVerProgramados(): bool
+    {
+        if (!$this->permisosGranulares()) return true;
+        return auth()->user()?->can('pedidos.ver-programados') ?? false;
+    }
+
+    /** ¿Se debe mostrar la pestaña con esta key? */
+    public function tabPermitida(string $key): bool
+    {
+        if (!$this->permisosGranulares()) return true; // ve todas
+        $u = auth()->user();
+        return match ($key) {
+            'todos'                              => true,
+            Pedido::ESTADO_NUEVO                 => (bool) $u?->can('pedidos.ver-nuevos'),
+            'programados'                        => (bool) $u?->can('pedidos.ver-programados'),
+            Pedido::ESTADO_EN_PREPARACION        => (bool) $u?->can('pedidos.ver-en-proceso'),
+            Pedido::ESTADO_REPARTIDOR_EN_CAMINO  => (bool) $u?->can('pedidos.ver-despachados'),
+            Pedido::ESTADO_ENTREGADO             => (bool) $u?->can('pedidos.ver-entregados'),
+            Pedido::ESTADO_CANCELADO             => (bool) $u?->can('pedidos.ver-cancelados'),
+            default                              => true,
+        };
     }
 
     /**
