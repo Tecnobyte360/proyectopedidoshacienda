@@ -219,12 +219,20 @@ class WhatsappResolverService
 
         $cacheKey   = $this->tokenCacheKey($tenant);
         $refreshKey = $cacheKey . '_refresh';
+        $backoffKey = $cacheKey . '_backoff'; // 🛑 marca de credenciales inválidas
         $base       = rtrim($cred['api_base_url'], '/');
 
         // 1) Token cacheado válido
         if (!$forzarFresh) {
             $cached = Cache::get($cacheKey);
             if (is_string($cached) && $cached !== '') return $cached;
+        }
+
+        // 🛑 BACKOFF: si el último login falló por credenciales inválidas, NO
+        //    reintentar cada minuto (no se arregla solas y solo ensucia el log).
+        //    Esperamos 1h antes de volver a intentar para esta conexión.
+        if (!$forzarFresh && Cache::get($backoffKey)) {
+            return null;
         }
 
         // Mutex: solo un proceso a la vez puede hacer login/refresh para esta key
@@ -277,16 +285,30 @@ class WhatsappResolverService
                 $token = $resp->successful() ? $resp->json('token') : null;
                 if (is_string($token) && $token !== '') {
                     Cache::put($cacheKey, $token, now()->addMinutes(13));
+                    Cache::forget($backoffKey); // credenciales OK → limpiar backoff
                     $this->guardarRefreshDeCookies($resp, $refreshKey);
                     Log::info('✅ login OK', ['cache_key' => $cacheKey]);
                     return $token;
                 }
 
-                Log::error('🔴 login falló', [
-                    'cache_key' => $cacheKey,
-                    'status'    => $resp->status(),
-                    'body'      => mb_strimwidth((string) $resp->body(), 0, 300),
-                ]);
+                // 🛑 Credenciales inválidas → activar backoff de 1h para no
+                //    reintentar cada minuto (no se arregla con reintentos).
+                $body = (string) $resp->body();
+                $credInvalidas = $resp->status() === 401
+                    || str_contains($body, 'ERR_INVALID_CREDENTIALS');
+                if ($credInvalidas) {
+                    Cache::put($backoffKey, true, now()->addHour());
+                    Log::warning('🔕 login con credenciales inválidas — backoff 1h', [
+                        'cache_key' => $cacheKey,
+                        'status'    => $resp->status(),
+                    ]);
+                } else {
+                    Log::error('🔴 login falló', [
+                        'cache_key' => $cacheKey,
+                        'status'    => $resp->status(),
+                        'body'      => mb_strimwidth($body, 0, 300),
+                    ]);
+                }
                 return null;
             } catch (\Throwable $e) {
                 Log::error('🔴 login excepción: ' . $e->getMessage());
