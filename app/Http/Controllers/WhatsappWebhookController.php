@@ -7220,7 +7220,11 @@ TXT;
         // creado en los últimos 30 minutos, NO crear duplicado. Devolver info del
         // pedido existente. Esto cubre los casos donde el watchdog (o el LLM) intenta
         // confirmar dos veces el mismo pedido.
-        $pedidoRecienteCliente = \App\Models\Pedido::where('telefono_whatsapp', $telNorm)
+        // 🟢 PEDIDO MANUAL: el operador SÍ puede crear varios pedidos para el
+        //    mismo cliente (no es el bot duplicando). Saltar la deduplicación.
+        $esPedidoManual = !empty($orderData['manual']);
+
+        $pedidoRecienteCliente = $esPedidoManual ? null : \App\Models\Pedido::where('telefono_whatsapp', $telNorm)
             ->where('created_at', '>=', now()->subMinutes(30))
             ->whereNotIn('estado', [\App\Models\Pedido::ESTADO_CANCELADO])
             ->orderByDesc('id')
@@ -7318,7 +7322,7 @@ TXT;
         // ⚠️ EXCEPCIÓN: los pedidos MANUALES (creados por un operador humano
         // desde la plataforma) saltan el cortafuego — el operador agrega los
         // productos a mano, el cliente no los "menciona" por WhatsApp.
-        $esPedidoManual = !empty($orderData['manual']);
+        // ($esPedidoManual ya definido arriba)
         if ($conversacion && !$esPedidoManual) {
             $productos = $orderData['products'] ?? [];
             if (!empty($productos)) {
