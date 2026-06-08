@@ -488,15 +488,30 @@ class CrearManual extends Component
                 $convService
             );
 
-            // Marcar el estado como confirmado
+            // Marcar el estado como confirmado + notificar al cliente
             try {
                 // Buscar el último pedido del teléfono creado en los últimos 30s
-                $pedido = \App\Models\Pedido::where('telefono', $this->telefono)
+                $pedido = \App\Models\Pedido::where('telefono', $telInternacional)
                     ->where('created_at', '>=', now()->subSeconds(30))
                     ->orderByDesc('id')
                     ->first();
                 if ($pedido) {
                     app(EstadoPedidoService::class)->marcarConfirmado($conv, $pedido->id);
+
+                    // 📲 Avisar al cliente que su pedido fue recibido/confirmado.
+                    //    Usa el disparador Meta 'pedido_confirmado' (plantilla),
+                    //    que funciona aunque la ventana de 24h esté cerrada.
+                    try {
+                        $tenant = app(\App\Services\TenantManager::class)->current();
+                        if ($tenant && $tenant->proveedorWhatsappResuelto() === \App\Models\Tenant::WA_PROVIDER_META) {
+                            app(\App\Services\Whatsapp\DispararEventoMetaService::class)
+                                ->dispararParaPedido('pedido_confirmado', $pedido);
+                        }
+                    } catch (\Throwable $eNotif) {
+                        Log::warning('Pedido manual: no se pudo notificar al cliente', [
+                            'pedido_id' => $pedido->id, 'error' => $eNotif->getMessage(),
+                        ]);
+                    }
                 }
             } catch (\Throwable $e) {
                 Log::warning('No se pudo marcar estado confirmado: ' . $e->getMessage());
@@ -504,7 +519,7 @@ class CrearManual extends Component
 
             $this->dispatch('notify', [
                 'type'    => 'success',
-                'message' => '✅ Pedido creado correctamente.',
+                'message' => '✅ Pedido creado y cliente notificado.',
             ]);
 
             return redirect()->route('pedidos.index');

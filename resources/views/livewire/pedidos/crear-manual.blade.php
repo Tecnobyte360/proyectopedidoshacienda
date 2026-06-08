@@ -404,12 +404,15 @@
                                         {{-- Dropdown de sugerencias --}}
                                         <div x-show="abierto && sugerencias.length" x-cloak
                                              @click.outside="abierto=false"
-                                             class="absolute left-0 right-0 top-full mt-1 z-30 rounded-xl border border-slate-200 bg-white shadow-2xl max-h-64 overflow-y-auto">
+                                             class="absolute left-0 right-0 top-full mt-1 z-30 rounded-xl border border-slate-200 bg-white shadow-2xl max-h-80 overflow-y-auto">
                                             <template x-for="(s, i) in sugerencias" :key="i">
                                                 <button type="button" @click="elegir(s)"
-                                                        class="w-full text-left px-4 py-2.5 hover:bg-emerald-50 border-b border-slate-100 last:border-0 text-sm text-slate-700 flex items-start gap-2">
-                                                    <i class="fa-solid fa-location-dot text-slate-400 mt-0.5 text-[11px]"></i>
-                                                    <span x-text="s.texto"></span>
+                                                        class="w-full text-left px-4 py-2.5 hover:bg-emerald-50 border-b border-slate-100 last:border-0 flex items-start gap-2.5">
+                                                    <i class="fa-solid fa-location-dot text-emerald-500 mt-1 text-[12px] shrink-0"></i>
+                                                    <span class="min-w-0">
+                                                        <span class="block text-sm font-semibold text-slate-800 truncate" x-text="s.principal"></span>
+                                                        <span class="block text-[11px] text-slate-500 truncate" x-text="s.secundario"></span>
+                                                    </span>
                                                 </button>
                                             </template>
                                         </div>
@@ -584,10 +587,16 @@
                             if (data.error) { console.warn('Places New error:', data.error.message); this.sugerencias = []; return; }
                             this.sugerencias = (data.suggestions || [])
                                 .filter(s => s.placePrediction)
-                                .map(s => ({
-                                    texto: s.placePrediction.text?.text || '',
-                                    placeId: s.placePrediction.placeId,
-                                }));
+                                .map(s => {
+                                    const p = s.placePrediction;
+                                    const sf = p.structuredFormat || {};
+                                    return {
+                                        texto:      p.text?.text || '',                 // completo (lo que se guarda)
+                                        principal:  sf.mainText?.text || p.text?.text || '', // calle
+                                        secundario: sf.secondaryText?.text || '',        // ciudad/barrio
+                                        placeId:    p.placeId,
+                                    };
+                                });
                             this.abierto = this.sugerencias.length > 0;
                         } catch (e) {
                             console.warn('Places New fetch falló:', e);
