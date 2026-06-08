@@ -320,7 +320,9 @@
             {{-- ═══════════════════════════════════════════════════════════
                  🚚 ENTREGA
                  ═══════════════════════════════════════════════════════════ --}}
-            <div class="{{ $cardCls }}">
+            {{-- Sin overflow-hidden para que el dropdown de direcciones (Google)
+                 no quede recortado por la tarjeta. --}}
+            <div class="rounded-2xl border border-slate-200 bg-white shadow-sm relative z-20">
                 <div class="flex items-center justify-between gap-3 px-5 py-4 border-b border-slate-100 bg-gradient-to-r from-cyan-50/50 to-transparent">
                     <h3 class="flex items-center gap-2.5 text-sm font-bold text-slate-700">
                         <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-cyan-100 text-cyan-600">
@@ -404,7 +406,7 @@
                                         {{-- Dropdown de sugerencias --}}
                                         <div x-show="abierto && sugerencias.length" x-cloak
                                              @click.outside="abierto=false"
-                                             class="absolute left-0 right-0 top-full mt-1 z-30 rounded-xl border border-slate-200 bg-white shadow-2xl max-h-80 overflow-y-auto">
+                                             class="absolute left-0 right-0 top-full mt-1 z-50 rounded-xl border border-slate-200 bg-white shadow-2xl max-h-80 overflow-y-auto">
                                             <template x-for="(s, i) in sugerencias" :key="i">
                                                 <button type="button" @click="elegir(s)"
                                                         class="w-full text-left px-4 py-2.5 hover:bg-emerald-50 border-b border-slate-100 last:border-0 flex items-start gap-2.5">
