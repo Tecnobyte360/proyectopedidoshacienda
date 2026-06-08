@@ -845,21 +845,22 @@
                                              @mouseenter="show($event)"
                                              @mouseleave="hover = false">
 
-                                            {{-- Chip resumen visible siempre --}}
-                                            <div class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/50 px-2.5 py-1.5 cursor-help hover:bg-brand-soft hover:border-brand/30 transition">
+                                            {{-- Chip resumen visible siempre (CLICK = editar kilos/cantidad) --}}
+                                            <button type="button" wire:click="abrirEditorProductos({{ $pedido->id }})"
+                                                    class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/50 px-2.5 py-1.5 cursor-pointer hover:bg-brand-soft hover:border-brand/40 transition">
                                                 <span class="inline-flex items-center justify-center min-w-[22px] h-[22px] rounded-lg bg-brand text-white text-[10px] font-bold">
                                                     {{ $totalLineas }}
                                                 </span>
-                                                <div class="flex flex-col">
+                                                <div class="flex flex-col text-left">
                                                     <span class="text-[11px] font-semibold text-slate-700 leading-tight">
                                                         {{ $totalLineas === 1 ? 'producto' : 'productos' }}
                                                     </span>
-                                                    <span class="text-[10px] text-slate-500 leading-tight">
-                                                        Pasa el cursor <i class="fa-solid fa-hand-point-up"></i>
+                                                    <span class="text-[10px] text-brand-secondary leading-tight font-medium">
+                                                        Click para editar <i class="fa-solid fa-pen-to-square"></i>
                                                     </span>
                                                 </div>
-                                                <i class="fa-solid fa-eye text-[10px] text-slate-400 ml-1"></i>
-                                            </div>
+                                                <i class="fa-solid fa-scale-balanced text-[11px] text-brand ml-1"></i>
+                                            </button>
 
                                             {{-- 📋 Tooltip rico via x-teleport (sale al body para escapar overflow) --}}
                                             <template x-teleport="body">
@@ -1066,6 +1067,88 @@
         </div>
 
         {{-- MODAL DESPACHO --}}
+        {{-- ⚖️ EDITOR DE PRODUCTOS: modificar kilos/cantidad y recalcular --}}
+        @if($modalProductosAbierto)
+            <div class="fixed inset-0 z-[60] flex items-end sm:items-center justify-center sm:p-4"
+                 style="background: rgba(15,23,42,0.55); backdrop-filter: blur(4px);"
+                 wire:click="cerrarEditorProductos">
+                <div class="w-full sm:max-w-2xl rounded-t-2xl sm:rounded-2xl border border-slate-200 bg-white shadow-2xl max-h-[90vh] flex flex-col" @click.stop>
+                    {{-- Header --}}
+                    <div class="flex items-center gap-3 border-b border-slate-100 px-5 py-4 shrink-0">
+                        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-soft text-brand">
+                            <i class="fa-solid fa-scale-balanced"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-sm font-bold text-slate-800">Editar cantidades / kilos</h3>
+                            <p class="text-xs text-slate-500">Pedido #{{ str_pad($pedidoIdProductos, 3, '0', STR_PAD_LEFT) }} — el total se recalcula solo</p>
+                        </div>
+                        <button type="button" wire:click="cerrarEditorProductos" class="text-slate-400 hover:text-slate-600">
+                            <i class="fa-solid fa-xmark text-lg"></i>
+                        </button>
+                    </div>
+
+                    {{-- Líneas editables --}}
+                    <div class="flex-1 overflow-y-auto px-5 py-4 space-y-3">
+                        @forelse($itemsEditar as $i => $item)
+                            <div class="rounded-xl border border-slate-200 p-3">
+                                <div class="flex items-center justify-between gap-3 mb-2">
+                                    <span class="text-sm font-semibold text-slate-800 leading-tight">{{ $item['producto'] }}</span>
+                                    <span class="text-xs text-slate-500 whitespace-nowrap">
+                                        ${{ number_format((float) $item['precio_unitario'], 0, ',', '.') }} / {{ $item['unidad'] }}
+                                    </span>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <div class="flex-1">
+                                        <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                                            Cantidad ({{ $item['unidad'] }})
+                                        </label>
+                                        <input type="number" step="0.001" min="0"
+                                               wire:model.live.debounce.400ms="itemsEditar.{{ $i }}.cantidad"
+                                               class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-800 focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none">
+                                    </div>
+                                    <div class="text-right shrink-0">
+                                        <span class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Subtotal</span>
+                                        <span class="text-base font-bold text-emerald-700 font-mono">
+                                            ${{ number_format((float) ($item['subtotal'] ?? 0), 0, ',', '.') }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        @empty
+                            <p class="text-sm text-slate-400 italic text-center py-4">Este pedido no tiene productos en detalle.</p>
+                        @endforelse
+                    </div>
+
+                    {{-- Footer: total + acciones --}}
+                    <div class="border-t border-slate-100 px-5 py-4 shrink-0">
+                        @if($costoEnvioEditar > 0)
+                            <div class="flex items-center justify-between text-xs text-slate-500 mb-1">
+                                <span>Envío</span>
+                                <span class="font-mono">${{ number_format((float) $costoEnvioEditar, 0, ',', '.') }}</span>
+                            </div>
+                        @endif
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-sm font-bold text-slate-700">TOTAL A PAGAR</span>
+                            <span class="text-xl font-bold text-brand font-mono">
+                                ${{ number_format($this->totalEditar, 0, ',', '.') }}
+                            </span>
+                        </div>
+                        <div class="flex gap-2">
+                            <button type="button" wire:click="cerrarEditorProductos"
+                                    class="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition">
+                                Cancelar
+                            </button>
+                            <button type="button" wire:click="guardarProductos"
+                                    wire:loading.attr="disabled" wire:target="guardarProductos"
+                                    class="flex-1 rounded-xl bg-brand hover:bg-brand-dark px-4 py-2.5 text-sm font-bold text-white shadow-sm transition">
+                                <i class="fa-solid fa-floppy-disk mr-1"></i> Guardar cambios
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @endif
+
         @if($modalDespachoAbierto)
             <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4"
                  style="background: rgba(15,23,42,0.55); backdrop-filter: blur(4px);">

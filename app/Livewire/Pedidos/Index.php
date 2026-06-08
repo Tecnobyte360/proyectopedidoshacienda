@@ -40,6 +40,12 @@ class Index extends Component
     public bool  $modalMasivoAbierto = false;
     public array $domiciliariosPorZonaMasivo = [];   // [zona_id => domiciliario_id]
 
+    // ⚖️ EDITOR DE PRODUCTOS (modificar kilos/cantidad y recalcular)
+    public bool  $modalProductosAbierto = false;
+    public int   $pedidoIdProductos      = 0;
+    public array $itemsEditar            = []; // [{id,producto,cantidad,unidad,precio_unitario,subtotal}]
+    public float $costoEnvioEditar       = 0.0;
+
     /**
      * Livewire 3 — formato `echo:CANAL,NOMBRE_EVENTO`.
      * Cuando el event class usa `broadcastAs('pedido.confirmado')`,
@@ -838,6 +844,97 @@ class Index extends Component
                 'type' => 'error',
                 'message' => 'Ocurrió un error al cancelar el pedido.',
             ]);
+        }
+    }
+
+    /**
+     * ⚖️ Abre el editor de productos de un pedido: carga sus líneas para
+     * poder modificar la cantidad/kilos y recalcular el valor.
+     */
+    public function abrirEditorProductos(int $pedidoId): void
+    {
+        $pedido = Pedido::with('detalles')->find($pedidoId);
+        if (!$pedido) return;
+
+        // No permitir editar pedidos ya cerrados.
+        if (in_array(trim((string) $pedido->estado), [Pedido::ESTADO_ENTREGADO, Pedido::ESTADO_CANCELADO], true)) {
+            $this->dispatch('notify', ['type' => 'warning', 'message' => 'Este pedido ya está cerrado, no se puede editar.']);
+            return;
+        }
+
+        $this->pedidoIdProductos = $pedido->id;
+        $this->costoEnvioEditar  = (float) ($pedido->costo_envio ?? 0);
+        $this->itemsEditar = $pedido->detalles->map(fn ($d) => [
+            'id'              => $d->id,
+            'producto'        => $d->producto,
+            'unidad'          => $d->unidad ?: 'und',
+            'precio_unitario' => (float) ($d->precio_unitario ?? 0),
+            'cantidad'        => (float) ($d->cantidad ?? 1),
+            'subtotal'        => (float) ($d->subtotal ?? 0),
+        ])->values()->all();
+
+        $this->modalProductosAbierto = true;
+    }
+
+    public function cerrarEditorProductos(): void
+    {
+        $this->modalProductosAbierto = false;
+        $this->reset(['pedidoIdProductos', 'itemsEditar', 'costoEnvioEditar']);
+    }
+
+    /** Recalcula el subtotal de una línea cuando cambia la cantidad. */
+    public function updatedItemsEditar($value, $key): void
+    {
+        // $key viene como "0.cantidad" → recalcular esa línea.
+        [$idx] = explode('.', $key);
+        if (isset($this->itemsEditar[$idx])) {
+            $cant   = (float) ($this->itemsEditar[$idx]['cantidad'] ?? 0);
+            $precio = (float) ($this->itemsEditar[$idx]['precio_unitario'] ?? 0);
+            $this->itemsEditar[$idx]['subtotal'] = round($cant * $precio, 2);
+        }
+    }
+
+    /** Total recalculado en vivo (suma de líneas + envío). */
+    public function getTotalEditarProperty(): float
+    {
+        $sub = collect($this->itemsEditar)->sum(fn ($i) => (float) ($i['subtotal'] ?? 0));
+        return round($sub + (float) $this->costoEnvioEditar, 2);
+    }
+
+    /** Guarda los cambios: persiste cada línea y recalcula subtotal/total del pedido. */
+    public function guardarProductos(): void
+    {
+        $pedido = Pedido::with('detalles')->find($this->pedidoIdProductos);
+        if (!$pedido) return;
+
+        try {
+            $detallesPorId = $pedido->detalles->keyBy('id');
+            $subtotal = 0.0;
+
+            foreach ($this->itemsEditar as $item) {
+                $cant   = max(0, (float) ($item['cantidad'] ?? 0));
+                $precio = (float) ($item['precio_unitario'] ?? 0);
+                $sub    = round($cant * $precio, 2);
+                $subtotal += $sub;
+
+                $d = $detallesPorId->get($item['id']);
+                if ($d) {
+                    $d->cantidad = $cant;
+                    $d->subtotal = $sub;
+                    $d->save();
+                }
+            }
+
+            // Recalcular subtotal y total del pedido (subtotal + envío).
+            $pedido->subtotal = round($subtotal, 2);
+            $pedido->total    = round($subtotal + (float) ($pedido->costo_envio ?? 0), 2);
+            $pedido->save();
+
+            $this->dispatch('notify', ['type' => 'success', 'message' => "Pedido #{$pedido->id} actualizado. Nuevo total: $" . number_format($pedido->total, 0, ',', '.')]);
+            $this->cerrarEditorProductos();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Editor productos: guardar falló', ['error' => $e->getMessage()]);
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'No se pudo guardar: ' . $e->getMessage()]);
         }
     }
 
