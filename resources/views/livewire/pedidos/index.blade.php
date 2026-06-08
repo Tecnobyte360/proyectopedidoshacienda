@@ -345,14 +345,17 @@
                 <div class="flex-1 min-w-0 -mx-3 sm:-mx-4 lg:mx-0 px-3 sm:px-4 lg:px-0 overflow-x-auto pb-1 scrollbar-hide">
                     <div class="flex gap-2 min-w-max">
                         @php
+                            // 🎨 Pestañas con el color de la MARCA (Kivox). La activa usa
+                            //    el brand; el ícono distingue el estado. Coherencia total.
+                            $tabActiva = 'bg-brand text-white shadow';
                             $tabs = [
                                 ['key' => 'todos',                                              'label' => 'Todos',           'count' => $todos,       'icon' => 'fa-table-cells-large', 'active' => 'bg-slate-900 text-white'],
-                                ['key' => \App\Models\Pedido::ESTADO_NUEVO,                    'label' => 'Nuevos',          'count' => $nuevos,      'icon' => 'fa-bell',              'active' => 'bg-blue-600 text-white'],
-                                ['key' => 'programados',                                        'label' => 'Programados',     'count' => $programados, 'icon' => 'fa-calendar-check',    'active' => 'bg-cyan-600 text-white'],
-                                ['key' => \App\Models\Pedido::ESTADO_EN_PREPARACION,           'label' => $lblEnProceso,     'count' => $enProceso,   'icon' => 'fa-gears',             'active' => 'bg-amber-500 text-white'],
-                                ['key' => \App\Models\Pedido::ESTADO_REPARTIDOR_EN_CAMINO,     'label' => $lblDespachado,    'count' => $despachados, 'icon' => $iconDespachado,        'active' => $modoPickup ? 'bg-orange-600 text-white' : 'bg-violet-600 text-white'],
-                                ['key' => \App\Models\Pedido::ESTADO_ENTREGADO,                'label' => 'Entregados',      'count' => $entregados,  'icon' => 'fa-circle-check',      'active' => 'bg-emerald-600 text-white'],
-                                ['key' => \App\Models\Pedido::ESTADO_CANCELADO,                'label' => 'Cancelados',      'count' => $cancelados,  'icon' => 'fa-ban',               'active' => 'bg-rose-600 text-white'],
+                                ['key' => \App\Models\Pedido::ESTADO_NUEVO,                    'label' => 'Nuevos',          'count' => $nuevos,      'icon' => 'fa-bell',              'active' => $tabActiva],
+                                ['key' => 'programados',                                        'label' => 'Programados',     'count' => $programados, 'icon' => 'fa-calendar-check',    'active' => $tabActiva],
+                                ['key' => \App\Models\Pedido::ESTADO_EN_PREPARACION,           'label' => $lblEnProceso,     'count' => $enProceso,   'icon' => 'fa-gears',             'active' => $tabActiva],
+                                ['key' => \App\Models\Pedido::ESTADO_REPARTIDOR_EN_CAMINO,     'label' => $lblDespachado,    'count' => $despachados, 'icon' => $iconDespachado,        'active' => $tabActiva],
+                                ['key' => \App\Models\Pedido::ESTADO_ENTREGADO,                'label' => 'Entregados',      'count' => $entregados,  'icon' => 'fa-circle-check',      'active' => $tabActiva],
+                                ['key' => \App\Models\Pedido::ESTADO_CANCELADO,                'label' => 'Cancelados',      'count' => $cancelados,  'icon' => 'fa-ban',               'active' => $tabActiva],
                             ];
                         @endphp
 
@@ -362,7 +365,7 @@
                                     class="inline-flex h-10 shrink-0 items-center gap-2 rounded-xl px-3 sm:px-4 text-xs sm:text-sm font-semibold transition
                                            {{ $estado === $tab['key']
                                                ? $tab['active'] . ' shadow-sm'
-                                               : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50' }}">
+                                               : 'border border-slate-200 bg-white text-slate-600 hover:bg-brand-soft hover:text-brand hover:border-brand/30' }}">
                                 <i class="fa-solid {{ $tab['icon'] }} text-[10px] sm:text-xs"></i>
                                 <span>{{ $tab['label'] }}</span>
                                 <span class="rounded-full px-1.5 py-0.5 text-[10px]
