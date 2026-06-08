@@ -285,23 +285,22 @@ class Index extends Component
                 ->latest();
             $q = \App\Support\SedeScopeFilter::aplicar($q);
 
-            // 🗂️ PERMISOS POR ESTADO: si el usuario tiene permisos granulares,
-            //    solo trae los pedidos de los estados que puede ver (seguridad
-            //    real, no solo ocultar pestañas).
-            $estadosPerm = $this->estadosPermitidos();
-            if ($estadosPerm !== null) {
-                $verProgramados = $this->puedeVerProgramados();
-                $q->where(function ($qq) use ($estadosPerm, $verProgramados) {
-                    if (!empty($estadosPerm)) {
-                        $qq->whereIn('estado', $estadosPerm);
-                    } else {
-                        $qq->whereRaw('1 = 0'); // sin estados permitidos
-                    }
-                    if ($verProgramados) {
-                        $qq->orWhereNotNull('programado_para');
-                    }
-                });
-            }
+            // 🗂️ PERMISOS POR ESTADO (estricto): solo trae los pedidos de los
+            //    estados que el usuario puede ver. El super-admin pasa todos los
+            //    can() (Gate::before) → ve todo. Un usuario sin permisos de
+            //    estado no ve ningún pedido.
+            $estadosPerm    = $this->estadosPermitidos();
+            $verProgramados = $this->puedeVerProgramados();
+            $q->where(function ($qq) use ($estadosPerm, $verProgramados) {
+                if (!empty($estadosPerm)) {
+                    $qq->whereIn('estado', $estadosPerm);
+                } else {
+                    $qq->whereRaw('1 = 0'); // sin estados permitidos → nada
+                }
+                if ($verProgramados) {
+                    $qq->orWhereNotNull('programado_para');
+                }
+            });
 
             return $q->get();
         } catch (\Throwable $e) {
@@ -322,25 +321,15 @@ class Index extends Component
         ];
     }
 
-    /** ¿El usuario tiene CONFIGURADO algún permiso granular de estado? */
-    #[Computed]
-    public function permisosGranulares(): bool
-    {
-        $u = auth()->user();
-        if (!$u) return false;
-        foreach (array_merge(array_keys($this->mapaPermisoEstado()), ['pedidos.ver-programados']) as $p) {
-            if ($u->can($p)) return true;
-        }
-        return false;
-    }
-
     /**
-     * Estados que el usuario puede ver. null = sin restricción (ve todo).
+     * Estados que el usuario puede ver, según SUS permisos (estricto).
+     * Solo incluye los estados cuyo permiso `pedidos.ver-X` tiene asignado.
+     * El super-admin pasa todos los can() por Gate::before → ve todo.
      */
-    private function estadosPermitidos(): ?array
+    private function estadosPermitidos(): array
     {
-        if (!$this->permisosGranulares()) return null; // compat: ve todo
         $u = auth()->user();
+        if (!$u) return [];
         $estados = [];
         foreach ($this->mapaPermisoEstado() as $perm => $sts) {
             if ($u->can($perm)) $estados = array_merge($estados, $sts);
@@ -350,23 +339,23 @@ class Index extends Component
 
     public function puedeVerProgramados(): bool
     {
-        if (!$this->permisosGranulares()) return true;
-        return auth()->user()?->can('pedidos.ver-programados') ?? false;
+        return (bool) (auth()->user()?->can('pedidos.ver-programados') ?? false);
     }
 
-    /** ¿Se debe mostrar la pestaña con esta key? */
+    /** ¿Se debe mostrar la pestaña con esta key? (estricto por permiso) */
     public function tabPermitida(string $key): bool
     {
-        if (!$this->permisosGranulares()) return true; // ve todas
         $u = auth()->user();
+        if (!$u) return false;
         return match ($key) {
-            'todos'                              => true,
-            Pedido::ESTADO_NUEVO                 => (bool) $u?->can('pedidos.ver-nuevos'),
-            'programados'                        => (bool) $u?->can('pedidos.ver-programados'),
-            Pedido::ESTADO_EN_PREPARACION        => (bool) $u?->can('pedidos.ver-en-proceso'),
-            Pedido::ESTADO_REPARTIDOR_EN_CAMINO  => (bool) $u?->can('pedidos.ver-despachados'),
-            Pedido::ESTADO_ENTREGADO             => (bool) $u?->can('pedidos.ver-entregados'),
-            Pedido::ESTADO_CANCELADO             => (bool) $u?->can('pedidos.ver-cancelados'),
+            // 'todos' visible solo si el usuario puede ver AL MENOS un estado.
+            'todos'                              => count($this->estadosPermitidos()) > 0 || $this->puedeVerProgramados(),
+            Pedido::ESTADO_NUEVO                 => (bool) $u->can('pedidos.ver-nuevos'),
+            'programados'                        => (bool) $u->can('pedidos.ver-programados'),
+            Pedido::ESTADO_EN_PREPARACION        => (bool) $u->can('pedidos.ver-en-proceso'),
+            Pedido::ESTADO_REPARTIDOR_EN_CAMINO  => (bool) $u->can('pedidos.ver-despachados'),
+            Pedido::ESTADO_ENTREGADO             => (bool) $u->can('pedidos.ver-entregados'),
+            Pedido::ESTADO_CANCELADO             => (bool) $u->can('pedidos.ver-cancelados'),
             default                              => true,
         };
     }
