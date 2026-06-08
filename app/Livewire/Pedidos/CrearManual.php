@@ -297,7 +297,7 @@ class CrearManual extends Component
 
         if ($encontradoLocal && !$hitErp) {
             // Estaba local pero el ERP no respondió (o no aplica). Avisar igual.
-            $this->dispatch('notify', ['type' => 'success', 'message' => '✅ Cliente encontrado: ' . $this->nombre_cliente]);
+            $this->dispatch('notify', ['type' => 'success', 'message' => 'Cliente encontrado: ' . $this->nombre_cliente]);
         }
 
         if (!$encontradoLocal && !$hitErp) {
@@ -402,7 +402,7 @@ class CrearManual extends Component
 
             $this->dispatch('notify', [
                 'type'    => 'success',
-                'message' => '✅ Cliente encontrado en el ERP: ' . ($clienteErp['StrNombre'] ?? $this->cedula),
+                'message' => 'Cliente encontrado en el ERP: ' . ($clienteErp['StrNombre'] ?? $this->cedula),
             ]);
             return true;
         } catch (\Throwable $e) {
