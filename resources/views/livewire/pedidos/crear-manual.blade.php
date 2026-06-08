@@ -762,7 +762,10 @@
                     },
                     sync() {
                         const limpio = (this.numero || '').replace(/\D+/g, '');
-                        this.$wire.set('telefono', limpio ? (this.indicativo + limpio) : '');
+                        // 3er arg = false → DIFERIDO: no hace roundtrip al servidor en
+                        // cada tecla (eso causaba que el número "saltara" mientras se
+                        // escribía). El valor viaja al crear el pedido.
+                        this.$wire.set('telefono', limpio ? (this.indicativo + limpio) : '', false);
                     },
                 };
             }
