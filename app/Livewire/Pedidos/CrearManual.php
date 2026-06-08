@@ -592,43 +592,35 @@ class CrearManual extends Component
                         }
                     }
 
-                    // 📲 Avisar al cliente que su pedido fue recibido/confirmado.
-                    //    Usa el disparador Meta 'pedido_confirmado' (plantilla),
-                    //    que funciona aunque la ventana de 24h esté cerrada.
-                    try {
-                        $tenant = app(\App\Services\TenantManager::class)->current();
-                        if ($tenant && $tenant->proveedorWhatsappResuelto() === \App\Models\Tenant::WA_PROVIDER_META) {
-                            app(\App\Services\Whatsapp\DispararEventoMetaService::class)
-                                ->dispararParaPedido('pedido_confirmado', $pedido);
+                    // 💳 Generar link de pago (si el método es por pasarela), para
+                    //    INCLUIRLO en el mensaje al cliente y mostrarlo en pantalla.
+                    $linkPago = null;
+                    if (in_array($this->metodo_pago, ['wompi', 'bold', 'link', 'tarjeta'], true)) {
+                        try {
+                            $linkPago = app(\App\Services\PasarelaPagoService::class)->urlPagoPrincipal($pedido);
+                            if ($linkPago) {
+                                $this->linkPagoGenerado = $linkPago;
+                                $this->pedidoCreadoId   = $pedido->id;
+                            }
+                        } catch (\Throwable $e) {
+                            Log::warning('Pedido manual: no se pudo generar link de pago', ['error' => $e->getMessage()]);
                         }
-                    } catch (\Throwable $eNotif) {
-                        Log::warning('Pedido manual: no se pudo notificar al cliente', [
-                            'pedido_id' => $pedido->id, 'error' => $eNotif->getMessage(),
-                        ]);
                     }
+
+                    // 📲 Notificar al cliente Y dejar TRAZABILIDAD en el chat.
+                    $this->notificarClienteConTraza($conv, $pedido, $linkPago);
                 }
             } catch (\Throwable $e) {
                 Log::warning('No se pudo marcar estado confirmado: ' . $e->getMessage());
             }
 
-            // 💳 Si el método de pago es por pasarela (link), generar el link y
-            //    mostrarlo en pantalla en vez de redirigir. Así el operador lo
-            //    copia o lo envía al cliente.
-            if (in_array($this->metodo_pago, ['wompi', 'bold', 'link', 'tarjeta'], true) && $pedido ?? false) {
-                try {
-                    $link = app(\App\Services\PasarelaPagoService::class)->urlPagoPrincipal($pedido);
-                    if ($link) {
-                        $this->linkPagoGenerado = $link;
-                        $this->pedidoCreadoId   = $pedido->id;
-                        $this->dispatch('notify', [
-                            'type'    => 'success',
-                            'message' => '✅ Pedido creado. Link de pago generado abajo.',
-                        ]);
-                        return; // no redirigir: mostrar el link
-                    }
-                } catch (\Throwable $e) {
-                    Log::warning('Pedido manual: no se pudo generar link de pago', ['error' => $e->getMessage()]);
-                }
+            // 💳 Si se generó link de pago, mostrarlo en pantalla en vez de redirigir.
+            if ($this->linkPagoGenerado) {
+                $this->dispatch('notify', [
+                    'type'    => 'success',
+                    'message' => 'Pedido creado. Link de pago generado abajo y enviado al cliente.',
+                ]);
+                return; // no redirigir: mostrar el link
             }
 
             $this->dispatch('notify', [
@@ -642,6 +634,77 @@ class CrearManual extends Component
             $this->dispatch('notify', [
                 'type'    => 'error',
                 'message' => '❌ Error: ' . $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * 📲 Notifica al cliente que su pedido fue creado y DEJA TRAZABILIDAD en el
+     * chat (registra el mensaje en la conversación). Estrategia:
+     *   - Si la ventana de 24h está ABIERTA → envía texto libre (con link de
+     *     pago si lo hay) y lo registra como mensaje del asistente en el chat.
+     *   - Si está CERRADA → dispara la plantilla Meta 'pedido_confirmado' (que
+     *     funciona fuera de la ventana) y registra una nota en el chat con el
+     *     resumen + link, para que quede el historial.
+     */
+    private function notificarClienteConTraza($conv, $pedido, ?string $linkPago): void
+    {
+        try {
+            $tenant = app(\App\Services\TenantManager::class)->current();
+            $esMeta = $tenant && $tenant->proveedorWhatsappResuelto() === \App\Models\Tenant::WA_PROVIDER_META;
+
+            // Texto de confirmación legible (con link de pago si existe).
+            $total = number_format((float) ($pedido->total ?? 0), 0, ',', '.');
+            $texto = "✅ *¡Pedido recibido!*\n"
+                . "Hola {$this->nombre_cliente}, registramos tu pedido *#{$pedido->id}* por *\${$total}*.\n";
+            if ($linkPago) {
+                $texto .= "\n💳 *Paga aquí con tarjeta, Nequi o PSE:*\n{$linkPago}\n";
+            }
+            $texto .= "\n¡Gracias por tu compra! 🙌";
+
+            $convService = app(ConversacionService::class);
+            $enviadoComoTexto = false;
+
+            if ($esMeta) {
+                // ¿Ventana de 24h abierta? Solo entonces se puede mandar texto libre.
+                $ventanaAbierta = false;
+                try {
+                    $ventanaAbierta = app(\App\Services\Whatsapp\Ventana24hChecker::class)->abierta($conv);
+                } catch (\Throwable $e) { /* asumir cerrada */ }
+
+                if ($ventanaAbierta) {
+                    $ok = app(\App\Services\Meta\MetaWhatsappCloudService::class)
+                        ->enviarTexto($conv->telefono_normalizado, $texto, $conv->tenant_id);
+                    $enviadoComoTexto = (bool) $ok;
+                }
+
+                // Si NO se pudo enviar texto (ventana cerrada) → plantilla.
+                if (!$enviadoComoTexto) {
+                    app(\App\Services\Whatsapp\DispararEventoMetaService::class)
+                        ->dispararParaPedido('pedido_confirmado', $pedido);
+                }
+            }
+
+            // 🧾 TRAZABILIDAD: registrar el mensaje en la conversación (chat).
+            $contenidoTraza = $enviadoComoTexto
+                ? $texto
+                : ($texto . ($esMeta ? "\n\n_(enviado al cliente como plantilla — ventana de 24h cerrada)_" : ''));
+
+            $convService->agregarMensaje(
+                $conv,
+                \App\Models\MensajeWhatsapp::ROL_ASSISTANT,
+                $contenidoTraza,
+                ['meta' => [
+                    'enviado_por_humano' => true,
+                    'usuario_id'         => auth()->id(),
+                    'pedido_manual'      => true,
+                    'pedido_id'          => $pedido->id,
+                    'link_pago'          => $linkPago,
+                ]]
+            );
+        } catch (\Throwable $e) {
+            Log::warning('Pedido manual: notificar+traza falló', [
+                'pedido_id' => $pedido->id ?? null, 'error' => $e->getMessage(),
             ]);
         }
     }
