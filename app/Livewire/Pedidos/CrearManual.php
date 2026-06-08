@@ -288,8 +288,13 @@ class CrearManual extends Component
     {
         $tel = $this->normalizarTel($this->telefono);
         if ($tel === '') return '';
-        if (strlen($tel) !== 10) {
-            return 'Debe tener 10 dígitos (celular colombiano).';
+        // ✍️ Mientras todavía escribe (menos de 10 dígitos) NO molestar con error.
+        //    Solo validamos cuando el número ya está "completo" (10+ dígitos).
+        if (strlen($tel) < 10) {
+            return '';
+        }
+        if (strlen($tel) > 10) {
+            return 'Tiene más de 10 dígitos. Un celular colombiano son 10.';
         }
         if ($tel[0] !== '3') {
             return 'Un celular colombiano empieza por 3.';
