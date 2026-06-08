@@ -64,6 +64,10 @@ class CrearManual extends Component
     // Cuando el teléfono parece inválido, exigimos una segunda confirmación.
     public bool $confirmoTelefonoSospechoso = false;
 
+    // 💳 Link de pago generado tras crear el pedido (para mostrar/copiar).
+    public ?string $linkPagoGenerado = null;
+    public ?int    $pedidoCreadoId   = null;
+
     public function mount(?int $conv = null): void
     {
         $this->conversacionId = $conv;
@@ -517,6 +521,26 @@ class CrearManual extends Component
                 Log::warning('No se pudo marcar estado confirmado: ' . $e->getMessage());
             }
 
+            // 💳 Si el método de pago es por pasarela (link), generar el link y
+            //    mostrarlo en pantalla en vez de redirigir. Así el operador lo
+            //    copia o lo envía al cliente.
+            if (in_array($this->metodo_pago, ['wompi', 'bold', 'link', 'tarjeta'], true) && $pedido ?? false) {
+                try {
+                    $link = app(\App\Services\PasarelaPagoService::class)->urlPagoPrincipal($pedido);
+                    if ($link) {
+                        $this->linkPagoGenerado = $link;
+                        $this->pedidoCreadoId   = $pedido->id;
+                        $this->dispatch('notify', [
+                            'type'    => 'success',
+                            'message' => '✅ Pedido creado. Link de pago generado abajo.',
+                        ]);
+                        return; // no redirigir: mostrar el link
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning('Pedido manual: no se pudo generar link de pago', ['error' => $e->getMessage()]);
+                }
+            }
+
             $this->dispatch('notify', [
                 'type'    => 'success',
                 'message' => '✅ Pedido creado y cliente notificado.',
@@ -541,10 +565,16 @@ class CrearManual extends Component
             ? $tenant->google_maps_api_key
             : null;
 
+        // 💳 Pasarelas de pago activas del tenant.
+        $tieneWompi = $tenant ? $tenant->tieneWompi() : false;
+        $tieneBold  = $tenant ? ($tenant->bold_activo && !empty($tenant->bold_api_key)) : false;
+
         return view('livewire.pedidos.crear-manual', [
             'productosCatalogo' => $this->productosCatalogo,
             'sedes'             => $this->sedes,
             'gmapsKey'          => $gmapsKey,
+            'tieneWompi'        => $tieneWompi,
+            'tieneBold'         => $tieneBold,
         ]);
     }
 }

@@ -471,10 +471,17 @@
                             <div class="relative">
                                 <i class="fa-solid fa-wallet absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 z-10"></i>
                                 <select wire:model="metodo_pago" class="{{ $inputClsIcon }} appearance-none cursor-pointer">
-                                    <option value="efectivo"><i class="fa-solid fa-money-bill"></i> Efectivo contra entrega</option>
-                                    <option value="tarjeta"><i class="fa-solid fa-credit-card"></i> Tarjeta</option>
-                                    <option value="transferencia"><i class="fa-solid fa-building-columns"></i> Transferencia / PSE</option>
-                                    <option value="wompi"><i class="fa-solid fa-bolt"></i> Link Wompi</option>
+                                    <option value="efectivo">Efectivo contra entrega</option>
+                                    <option value="transferencia">Transferencia / PSE</option>
+                                    @if($tieneWompi)
+                                        <option value="wompi">💳 Link de pago — Wompi</option>
+                                    @endif
+                                    @if($tieneBold)
+                                        <option value="bold">💳 Link de pago — Bold</option>
+                                    @endif
+                                    @if(!$tieneWompi && !$tieneBold)
+                                        <option value="tarjeta">Tarjeta (manual)</option>
+                                    @endif
                                 </select>
                                 <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
                             </div>
@@ -504,6 +511,41 @@
                 </div>
             </div>
         </form>
+
+        {{-- 💳 Link de pago generado tras crear el pedido --}}
+        @if($linkPagoGenerado)
+            <div class="mt-5 rounded-2xl border-2 border-emerald-300 bg-emerald-50/60 p-5 shadow-sm">
+                <div class="flex items-center gap-2 mb-3">
+                    <span class="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500 text-white">
+                        <i class="fa-solid fa-link"></i>
+                    </span>
+                    <div>
+                        <h3 class="text-sm font-bold text-emerald-800">Link de pago generado</h3>
+                        <p class="text-[12px] text-emerald-600">Pedido #{{ $pedidoCreadoId }} — compártelo con el cliente</p>
+                    </div>
+                </div>
+                <div x-data="{ link: @js($linkPagoGenerado), copiado: false }" class="flex flex-col sm:flex-row gap-2">
+                    <input type="text" readonly :value="link"
+                           class="flex-1 rounded-xl border border-emerald-300 bg-white text-sm px-3.5 py-2.5 text-slate-700 font-mono">
+                    <button type="button"
+                            @click="navigator.clipboard.writeText(link); copiado=true; setTimeout(()=>copiado=false,2000)"
+                            class="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-4 py-2.5 transition shrink-0">
+                        <i class="fa-solid" :class="copiado ? 'fa-check' : 'fa-copy'"></i>
+                        <span x-text="copiado ? '¡Copiado!' : 'Copiar'"></span>
+                    </button>
+                    <a :href="link" target="_blank"
+                       class="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-300 bg-white hover:bg-emerald-50 text-emerald-700 text-sm font-semibold px-4 py-2.5 transition shrink-0">
+                        <i class="fa-solid fa-arrow-up-right-from-square"></i> Abrir
+                    </a>
+                </div>
+                <div class="mt-3 flex items-center justify-end">
+                    <a href="{{ route('pedidos.index') }}"
+                       class="text-sm font-semibold text-slate-600 hover:text-slate-800">
+                        <i class="fa-solid fa-arrow-left mr-1"></i> Ir a Gestión de pedidos
+                    </a>
+                </div>
+            </div>
+        @endif
 
     </div>
 
