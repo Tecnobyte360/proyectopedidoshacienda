@@ -265,6 +265,16 @@ class CrearManual extends Component
     {
         if (mb_strlen($this->cedula) < 5) return;
 
+        // 🧹 Limpiar datos del cliente ANTERIOR para no arrastrar (ej. el email
+        //    de otro cliente cuando se busca una cédula distinta sin recargar).
+        $this->nombre_cliente      = '';
+        $this->email               = '';
+        $this->telefono            = '';
+        $this->direccion           = '';
+        $this->barrio              = '';
+        $this->telefonoDesdeErp    = false;
+        $this->listaPrecioCliente  = null;
+
         // 1️⃣ Buscar en la base local (rápido). Llena nombre/email/dirección,
         //    y el teléfono SOLO si el local tiene uno VÁLIDO.
         $cliente = Cliente::where('cedula', $this->cedula)->first();
@@ -272,9 +282,9 @@ class CrearManual extends Component
         if ($cliente) {
             $encontradoLocal = true;
             $this->nombre_cliente = $cliente->nombre;
-            $this->email = $this->email ?: ($cliente->email ?? '');
+            $this->email = $cliente->email ?? '';
             $telLocal = $this->normalizarTel($cliente->telefono_normalizado ?? $cliente->telefono ?? '');
-            if (empty($this->telefono) && $this->esTelefonoValido($telLocal)) {
+            if ($this->esTelefonoValido($telLocal)) {
                 $this->telefono = $telLocal;
             }
         }
