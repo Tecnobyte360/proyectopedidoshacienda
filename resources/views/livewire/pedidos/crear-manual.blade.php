@@ -147,9 +147,21 @@
                                        class="{{ $inputClsIcon }}">
                             </div>
                             <button type="button" wire:click="buscarPorCedula"
-                                    class="inline-flex items-center gap-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white px-4 text-sm font-bold shadow-sm transition shrink-0">
-                                <i class="fa-solid fa-magnifying-glass"></i>
-                                <span class="hidden sm:inline">Buscar</span>
+                                    wire:loading.attr="disabled" wire:target="buscarPorCedula"
+                                    class="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white px-4 text-sm font-bold shadow-sm transition shrink-0 disabled:opacity-80 disabled:cursor-wait min-w-[110px]">
+                                {{-- Estado normal --}}
+                                <span wire:loading.remove wire:target="buscarPorCedula" class="inline-flex items-center gap-2">
+                                    <i class="fa-solid fa-magnifying-glass"></i>
+                                    <span class="hidden sm:inline">Buscar</span>
+                                </span>
+                                {{-- Spinner mientras busca --}}
+                                <span wire:loading.flex wire:target="buscarPorCedula" class="items-center gap-2">
+                                    <svg class="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24" fill="none">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                                    </svg>
+                                    <span class="hidden sm:inline">Buscando…</span>
+                                </span>
                             </button>
                         </div>
                     </div>
