@@ -82,6 +82,23 @@ class AsignacionDomiciliarioService
     }
 
     /**
+     * 💡 Sugiere el mejor domiciliario SIN guardar nada (modo híbrido).
+     * Usa el mismo criterio configurado. El operador decide si lo confirma.
+     * Devuelve el Domiciliario sugerido o null.
+     */
+    public function sugerirSinGuardar(Pedido $pedido): ?Domiciliario
+    {
+        $cfg = ConfiguracionBot::actual();
+        $criterio = (string) ($cfg->criterio_asignacion ?: 'balanceado');
+
+        return match ($criterio) {
+            'cercania' => $this->porCercania($pedido) ?: $this->porBalanceo(),
+            'rotacion' => $this->porRotacion()        ?: $this->porBalanceo(),
+            default    => $this->porBalanceo(),
+        };
+    }
+
+    /**
      * Domiciliario activo con la MENOR cantidad de pedidos en curso.
      * "En curso" = pedidos no entregados ni cancelados.
      */

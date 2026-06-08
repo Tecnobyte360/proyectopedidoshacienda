@@ -457,6 +457,44 @@
                                 </div>
                             </div>
                         </div>
+
+                        {{-- 🛵 Domiciliario (híbrido: sistema sugiere, operador confirma) --}}
+                        <div class="mt-4">
+                            <label class="{{ $labelCls }}">
+                                <i class="fa-solid fa-motorcycle text-slate-400 mr-1"></i>
+                                Domiciliario <span class="text-slate-400 normal-case font-normal">(opcional)</span>
+                            </label>
+                            <div class="flex flex-col sm:flex-row gap-2">
+                                <div class="relative flex-1">
+                                    <i class="fa-solid fa-user absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 z-10"></i>
+                                    <select wire:model.live="domiciliario_id" class="{{ $inputClsIcon }} appearance-none cursor-pointer">
+                                        <option value="">— Sin asignar (el sistema lo asigna) —</option>
+                                        @foreach($domiciliarios as $d)
+                                            <option value="{{ $d->id }}">
+                                                {{ $d->nombre }} ({{ $d->estado === 'disponible' ? 'disponible' : 'en ruta' }})
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                    <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
+                                </div>
+                                <button type="button" wire:click="sugerirDomiciliario"
+                                        wire:loading.attr="disabled" wire:target="sugerirDomiciliario"
+                                        class="inline-flex items-center justify-center gap-2 rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2.5 text-sm font-semibold transition shrink-0">
+                                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                                    Sugerir mejor
+                                </button>
+                            </div>
+                            @if($domiciliarioSugerido)
+                                <p class="mt-1 text-[11px] text-cyan-600 flex items-center gap-1">
+                                    <i class="fa-solid fa-wand-magic-sparkles text-[10px]"></i>
+                                    Sugerido por el sistema — podés cambiarlo.
+                                </p>
+                            @else
+                                <p class="mt-1 text-[11px] text-slate-400">
+                                    Si lo dejás sin asignar, el sistema elige el mejor al crear el pedido.
+                                </p>
+                            @endif
+                        </div>
                     @endif
                 </div>
             </div>

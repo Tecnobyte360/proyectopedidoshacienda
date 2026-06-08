@@ -49,6 +49,10 @@ class CrearManual extends Component
     public string $barrio         = '';
     public string $ciudad         = '';
 
+    // 🛵 Domiciliario (modo híbrido: el sistema sugiere, el operador confirma).
+    public ?int  $domiciliario_id        = null;
+    public bool  $domiciliarioSugerido   = false; // true si lo puso el sistema
+
     // Pago / extras
     public string $metodo_pago = 'efectivo';
     public string $cupon       = '';
@@ -172,6 +176,44 @@ class CrearManual extends Component
     public function getSedesProperty()
     {
         return Sede::where('activa', true)->orderBy('nombre')->get(['id', 'nombre']);
+    }
+
+    /** 🛵 Domiciliarios activos para el selector. */
+    public function getDomiciliariosProperty()
+    {
+        return \App\Models\Domiciliario::where('activo', true)
+            ->orderBy('nombre')
+            ->get(['id', 'nombre', 'estado']);
+    }
+
+    /**
+     * 💡 Sugiere el mejor domiciliario (sistema) según la zona/carga.
+     * No guarda nada: solo pre-selecciona para que el operador confirme/cambie.
+     */
+    public function sugerirDomiciliario(): void
+    {
+        try {
+            // Pedido temporal con los datos actuales para que el servicio razone.
+            $tmp = new \App\Models\Pedido();
+            $tmp->barrio = $this->barrio ?: null;
+
+            $dom = app(\App\Services\AsignacionDomiciliarioService::class)->sugerirSinGuardar($tmp);
+            if ($dom) {
+                $this->domiciliario_id      = $dom->id;
+                $this->domiciliarioSugerido = true;
+                $this->dispatch('notify', ['type' => 'success', 'message' => 'Domiciliario sugerido: ' . $dom->nombre]);
+            } else {
+                $this->dispatch('notify', ['type' => 'info', 'message' => 'No hay domiciliarios disponibles para sugerir.']);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Sugerir domiciliario falló: ' . $e->getMessage());
+        }
+    }
+
+    /** Si el operador cambia el domiciliario a mano, ya no es "sugerido". */
+    public function updatedDomiciliarioId(): void
+    {
+        $this->domiciliarioSugerido = false;
     }
 
     /**
@@ -519,6 +561,32 @@ class CrearManual extends Component
                 if ($pedido) {
                     app(EstadoPedidoService::class)->marcarConfirmado($conv, $pedido->id);
 
+                    // 🛵 Asignar domiciliario (solo a domicilio). Si el operador
+                    //    eligió uno, ese; si no, el sistema sugiere el mejor.
+                    if ($this->metodo_entrega === 'domicilio') {
+                        try {
+                            $domId = $this->domiciliario_id;
+                            if (!$domId) {
+                                $sug = app(\App\Services\AsignacionDomiciliarioService::class)
+                                    ->sugerirSinGuardar($pedido);
+                                $domId = $sug?->id;
+                            }
+                            if ($domId) {
+                                $pedido->domiciliario_id = $domId;
+                                $pedido->fecha_asignacion_domiciliario = now();
+                                $pedido->saveQuietly();
+                                $dom = \App\Models\Domiciliario::find($domId);
+                                if ($dom && $dom->estado === \App\Models\Domiciliario::ESTADO_DISPONIBLE) {
+                                    $dom->update(['estado' => \App\Models\Domiciliario::ESTADO_EN_RUTA]);
+                                }
+                            }
+                        } catch (\Throwable $eDom) {
+                            Log::warning('Pedido manual: no se pudo asignar domiciliario', [
+                                'pedido_id' => $pedido->id, 'error' => $eDom->getMessage(),
+                            ]);
+                        }
+                    }
+
                     // 📲 Avisar al cliente que su pedido fue recibido/confirmado.
                     //    Usa el disparador Meta 'pedido_confirmado' (plantilla),
                     //    que funciona aunque la ventana de 24h esté cerrada.
@@ -589,6 +657,7 @@ class CrearManual extends Component
         return view('livewire.pedidos.crear-manual', [
             'productosCatalogo' => $this->productosCatalogo,
             'sedes'             => $this->sedes,
+            'domiciliarios'     => $this->domiciliarios,
             'gmapsKey'          => $gmapsKey,
             'tieneWompi'        => $tieneWompi,
             'tieneBold'         => $tieneBold,
