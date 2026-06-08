@@ -16,9 +16,19 @@ use Illuminate\Support\Str;
  */
 class BotCatalogoToolService
 {
+    /** 💰 Lista de precios HGI (1..8) del cliente actual. null = precio base. */
+    private ?int $listaPrecio = null;
+
     public function __construct(
         private BotCatalogoService $catalogo,
     ) {}
+
+    /** Setea la lista de precios del cliente para esta conversación. */
+    public function conLista(?int $listaPrecio): self
+    {
+        $this->listaPrecio = $listaPrecio;
+        return $this;
+    }
 
     /**
      * Busca productos por nombre, código o palabras clave.
@@ -175,7 +185,7 @@ class BotCatalogoToolService
 
     private function buscarInternoConSede(string $query, ?string $categoria, int $limite, ?int $sedeId): array
     {
-        $productos = $this->catalogo->productosActivos($sedeId);
+        $productos = $this->catalogo->productosActivos($sedeId, $this->listaPrecio);
         // 🇨🇴 Expandir con sinónimos colombianos antes de normalizar
         $queryExpandida = $this->expandirConSinonimos($query);
         $q  = $queryExpandida; // ya está normalizado
@@ -303,7 +313,7 @@ class BotCatalogoToolService
      */
     public function listarCategorias(?int $sedeId = null): array
     {
-        $productos = $this->catalogo->productosActivos($sedeId);
+        $productos = $this->catalogo->productosActivos($sedeId, $this->listaPrecio);
 
         $cats = $productos->groupBy(fn ($p) => $this->getCategoriaNombre($p))
             ->map(fn ($g, $cat) => [
@@ -322,7 +332,7 @@ class BotCatalogoToolService
      */
     public function productosDeCategoria(string $categoria, int $limite = 20, ?int $sedeId = null): array
     {
-        $productos = $this->catalogo->productosActivos($sedeId);
+        $productos = $this->catalogo->productosActivos($sedeId, $this->listaPrecio);
         $catN = $this->normalizar($categoria);
 
         $delaCat = $productos
@@ -342,7 +352,7 @@ class BotCatalogoToolService
      */
     public function infoProducto(string $codigo, ?int $sedeId = null): array
     {
-        $productos = $this->catalogo->productosActivos($sedeId);
+        $productos = $this->catalogo->productosActivos($sedeId, $this->listaPrecio);
         $p = $productos->first(function ($x) use ($codigo) {
             return !empty($x->codigo) && strcasecmp(trim((string) $x->codigo), trim($codigo)) === 0;
         });
@@ -369,7 +379,7 @@ class BotCatalogoToolService
      */
     public function productosDestacados(int $limite = 8, ?int $sedeId = null): array
     {
-        $productos = $this->catalogo->productosActivos($sedeId);
+        $productos = $this->catalogo->productosActivos($sedeId, $this->listaPrecio);
 
         $destacados = $productos->filter(fn ($p) => !empty($p->destacado))
             ->take($limite)

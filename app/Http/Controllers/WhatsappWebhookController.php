@@ -6154,13 +6154,49 @@ TXT;
    * Ejecuta una tool por nombre y devuelve el resultado.
    * Conoce todas las tools del bot principal.
    */
+  /**
+   * 💰 Resuelve la lista de precios HGI (1..8) del cliente de la conversación.
+   * Solo si el cliente ya dio su cédula y el tenant tiene lookup ERP activo.
+   * Devuelve null si no se puede (→ el catálogo usa precio base).
+   */
+  private function resolverListaPrecioCliente($conversacion): ?int
+  {
+      try {
+          $cedula = $conversacion?->cliente?->cedula;
+          if (empty($cedula)) return null;
+
+          $tenantId = app(\App\Services\TenantManager::class)->id();
+          $integ = \App\Models\Integracion::where('tenant_id', $tenantId)
+              ->where('activo', true)
+              ->where('exporta_pedidos', true)
+              ->get()
+              ->first(fn ($i) => $i->config['cliente_lookup']['activo'] ?? false);
+          if (!$integ) return null;
+
+          // Cache 5 min por cédula para no consultar HGI en cada tool call.
+          $key = "lista_precio_t{$tenantId}_" . md5((string) $cedula);
+          return \Illuminate\Support\Facades\Cache::remember($key, 300, function () use ($integ, $cedula) {
+              return app(\App\Services\ClienteErpService::class)
+                  ->obtenerListaPrecioCliente($integ, (string) $cedula);
+          });
+      } catch (\Throwable $e) {
+          Log::warning('resolverListaPrecioCliente falló: ' . $e->getMessage());
+          return null;
+      }
+  }
+
   private function ejecutarToolPorNombre(string $name, array $args, $conversacion, $connectionId, string $from): array
   {
       try {
           $sedeId = $this->obtenerSedeIdDesdeConexion($connectionId);
 
+          // 💰 Lista de precios HGI (1..8) del cliente, si ya dio su cédula.
+          //    Permite que el bot muestre precios según la lista del cliente.
+          $listaPrecio = $this->resolverListaPrecioCliente($conversacion);
+          $catalogoTool = fn () => app(\App\Services\BotCatalogoToolService::class)->conLista($listaPrecio);
+
           return match ($name) {
-              'buscar_productos' => app(\App\Services\BotCatalogoToolService::class)
+              'buscar_productos' => $catalogoTool()
                   ->buscarProductos(
                       (string) ($args['query'] ?? ''),
                       $args['categoria'] ?? null,
@@ -6168,20 +6204,20 @@ TXT;
                       $sedeId
                   ),
 
-              'productos_de_categoria' => app(\App\Services\BotCatalogoToolService::class)
+              'productos_de_categoria' => $catalogoTool()
                   ->productosDeCategoria(
                       (string) ($args['categoria'] ?? ''),
                       (int) ($args['limite'] ?? 20),
                       $sedeId
                   ),
 
-              'listar_categorias' => app(\App\Services\BotCatalogoToolService::class)
+              'listar_categorias' => $catalogoTool()
                   ->listarCategorias(),
 
-              'info_producto' => app(\App\Services\BotCatalogoToolService::class)
+              'info_producto' => $catalogoTool()
                   ->infoProducto((string) ($args['producto'] ?? ''), $sedeId),
 
-              'productos_destacados' => app(\App\Services\BotCatalogoToolService::class)
+              'productos_destacados' => $catalogoTool()
                   ->productosDestacados((int) ($args['limite'] ?? 5), $sedeId),
 
               'consultar_horarios' => $this->resultadoHorarios(),

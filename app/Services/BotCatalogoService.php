@@ -19,7 +19,12 @@ class BotCatalogoService
     /**
      * Catálogo activo cacheado 2 minutos.
      */
-    public function productosActivos(?int $sedeId = null): Collection
+    /**
+     * @param int|null $sedeId
+     * @param int|null $listaPrecio Lista de precios HGI (1..8) del cliente. Si
+     *   viene, los productos usan ese precio en vez del precio_base. null = base.
+     */
+    public function productosActivos(?int $sedeId = null, ?int $listaPrecio = null): Collection
     {
         $tenantId = app(\App\Services\TenantManager::class)->id() ?? 'none';
 
@@ -31,9 +36,11 @@ class BotCatalogoService
         if ($config && $config->fuente_productos === \App\Models\ConfiguracionBot::FUENTE_INTEGRACION
             && $config->integracion_productos_id) {
 
-            $cacheKey = "bot_catalogo_live_t{$tenantId}_i{$config->integracion_productos_id}";
+            // 💰 La lista de precios entra en la cache key: cada lista cachea aparte.
+            $lp = $listaPrecio ? "_lp{$listaPrecio}" : '';
+            $cacheKey = "bot_catalogo_live_t{$tenantId}_i{$config->integracion_productos_id}{$lp}";
             // Cache 30s para no martillar el ERP en una misma conversacion
-            return Cache::remember($cacheKey, 30, function () use ($config) {
+            return Cache::remember($cacheKey, 30, function () use ($config, $listaPrecio) {
                 try {
                     $integracion = \App\Models\Integracion::find($config->integracion_productos_id);
                     if (!$integracion || !$integracion->activo) return collect();
@@ -68,12 +75,22 @@ class BotCatalogoService
 
                     // 1) Por cada fila del ERP: si hay match local → usar Producto
                     //    Eloquent con precio sobreescrito; si no → stdClass virtual.
-                    $resultadoErp = $liveRows->map(function ($row) use ($localesPorCodigo) {
+                    $resultadoErp = $liveRows->map(function ($row) use ($localesPorCodigo, $listaPrecio) {
                         $codigo = (string) ($row->codigo ?? '');
                         $local  = $codigo !== '' ? $localesPorCodigo->get($codigo) : null;
 
+                        // 💰 Precio según la lista del cliente (HGI IntPrecio1..8).
+                        //    Si el cliente tiene lista y el producto tiene ese
+                        //    precio (>0), usarlo; si no, caer al precio_base.
+                        $precio = (float) ($row->precio_base ?? 0);
+                        if ($listaPrecio
+                            && isset($row->listas_precio[$listaPrecio])
+                            && (float) $row->listas_precio[$listaPrecio] > 0) {
+                            $precio = (float) $row->listas_precio[$listaPrecio];
+                        }
+
                         if ($local) {
-                            $local->precio_base = (float) ($row->precio_base ?? $local->precio_base);
+                            $local->precio_base = $precio ?: (float) $local->precio_base;
                             if (!empty($row->unidad)) {
                                 $local->unidad = $row->unidad;
                             }
@@ -81,6 +98,7 @@ class BotCatalogoService
                             return $local;
                         }
 
+                        $row->precio_base = $precio;
                         $row->_fuente = 'solo_erp';
                         return $row;
                     });

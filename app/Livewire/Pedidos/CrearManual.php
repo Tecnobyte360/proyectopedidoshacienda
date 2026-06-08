@@ -61,6 +61,9 @@ class CrearManual extends Component
     //    para que el operador lo verifique.
     public bool $telefonoDesdeErp = false;
 
+    // 💰 Lista de precios HGI (1..8) del cliente identificado. null = precio base.
+    public ?int $listaPrecioCliente = null;
+
     // Cuando el teléfono parece inválido, exigimos una segunda confirmación.
     public bool $confirmoTelefonoSospechoso = false;
 
@@ -134,7 +137,7 @@ class CrearManual extends Component
         try {
             $q = mb_strtolower(trim($this->busquedaProducto));
             $catalogo = app(\App\Services\BotCatalogoService::class)
-                ->productosActivos($this->sede_id ?: null);
+                ->productosActivos($this->sede_id ?: null, $this->listaPrecioCliente);
 
             return $catalogo
                 ->filter(function ($p) use ($q) {
@@ -187,7 +190,7 @@ class CrearManual extends Component
         $prod = null;
         try {
             $prod = app(\App\Services\BotCatalogoService::class)
-                ->productosActivos($this->sede_id ?: null)
+                ->productosActivos($this->sede_id ?: null, $this->listaPrecioCliente)
                 ->first(fn ($p) =>
                     (string) ($p->codigo ?? '') === $ref
                     || (string) ($p->id ?? '') === $ref
@@ -356,6 +359,10 @@ class CrearManual extends Component
             if (!$clienteErp) {
                 return false;
             }
+
+            // 💰 Resolver la lista de precios del cliente (HGI IntPrecio 1..8).
+            $this->listaPrecioCliente = app(\App\Services\ClienteErpService::class)
+                ->obtenerListaPrecioCliente($integ, $this->cedula);
 
             // Autocompletar con los datos REALES del ERP.
             $this->nombre_cliente = $clienteErp['StrNombre'] ?? $this->nombre_cliente;

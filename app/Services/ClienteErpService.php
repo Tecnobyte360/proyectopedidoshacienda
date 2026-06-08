@@ -36,6 +36,37 @@ class ClienteErpService
      * ¿Existe un cliente con esta cédula o teléfono en el ERP?
      * Retorna los datos si existe, null si no.
      */
+    /**
+     * 💰 Devuelve el número de LISTA DE PRECIOS (1..8) del cliente según HGI.
+     * El cliente tiene un IntTipoTercero → ese tipo define un IntPrecio (lista).
+     * Devuelve null si no se puede resolver (usar precio base).
+     */
+    public function obtenerListaPrecioCliente(Integracion $integracion, string $cedula): ?int
+    {
+        if (trim($cedula) === '') return null;
+        $cfg = $integracion->config['cliente_lookup'] ?? [];
+        if (!($cfg['activo'] ?? false)) return null;
+
+        try {
+            $pdo = $this->sync->conectar($integracion);
+            // Ter.IntTipoTercero → Tip.IntPrecio (número de lista 1..8)
+            $sql = "SELECT TOP 1 Tip.IntPrecio AS lista
+                    FROM TblTerceros Ter
+                    LEFT JOIN TblTiposTercero Tip ON Tip.IntIdTipoTercero = Ter.IntTipoTercero
+                    WHERE Ter.StrIdTercero = :id";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([':id' => trim($cedula)]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            $lista = $row ? (int) ($row['lista'] ?? 0) : 0;
+            return ($lista >= 1 && $lista <= 8) ? $lista : null;
+        } catch (\Throwable $e) {
+            Log::warning('ClienteErpService::obtenerListaPrecioCliente falló — ' . $e->getMessage(), [
+                'integracion_id' => $integracion->id, 'cedula' => $cedula,
+            ]);
+            return null;
+        }
+    }
+
     public function buscar(Integracion $integracion, ?string $cedula = null, ?string $telefono = null): ?array
     {
         $cfg = $integracion->config['cliente_lookup'] ?? [];

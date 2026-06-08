@@ -137,7 +137,7 @@ class IntegracionSyncService
         $mapeo = $integracion->config['mapeo'] ?? [];
 
         return collect($rows)->map(function (array $r) use ($mapeo) {
-            return (object) [
+            $obj = (object) [
                 'codigo'      => $this->valor($r, $mapeo, 'codigo'),
                 'nombre'      => $this->valor($r, $mapeo, 'nombre'),
                 'categoria'   => $this->valor($r, $mapeo, 'categoria'),
@@ -145,6 +145,20 @@ class IntegracionSyncService
                 'unidad'      => $this->valor($r, $mapeo, 'unidad') ?: 'unidad',
                 'descripcion' => $this->valor($r, $mapeo, 'descripcion'),
             ];
+
+            // 💰 Listas de precios (1..8) si el query las trae (columnas lista1..lista8).
+            //    Permite cobrar según la lista del cliente (HGI: IntPrecio1..8).
+            $listas = [];
+            for ($i = 1; $i <= 8; $i++) {
+                if (array_key_exists("lista{$i}", $r) && $r["lista{$i}"] !== null) {
+                    $listas[$i] = (float) $r["lista{$i}"];
+                }
+            }
+            if (!empty($listas)) {
+                $obj->listas_precio = $listas;
+            }
+
+            return $obj;
         })->filter(fn ($p) => !empty($p->nombre))->values();
     }
 
