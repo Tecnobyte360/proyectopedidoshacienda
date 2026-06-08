@@ -7,7 +7,7 @@
         $cardCls = 'rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden';
     @endphp
 
-    <div class="px-4 lg:px-8 py-6 max-w-5xl mx-auto pb-32">
+    <div class="px-4 lg:px-8 py-6 w-full max-w-[1600px] mx-auto pb-32">
 
         {{-- ═══════════════════════════════════════════════════════════════
              HEADER profesional
@@ -565,7 +565,7 @@
          FOOTER STICKY con total + botón crear
          ═══════════════════════════════════════════════════════════════════ --}}
     <div class="fixed bottom-0 left-0 right-0 z-30 bg-white border-t border-slate-200 shadow-2xl">
-        <div class="max-w-5xl mx-auto px-4 lg:px-8 py-4 flex items-center justify-between gap-4">
+        <div class="w-full max-w-[1600px] mx-auto px-4 lg:px-8 py-4 flex items-center justify-between gap-4">
             <div class="flex items-center gap-3 min-w-0">
                 <div class="hidden sm:flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-md shrink-0">
                     <i class="fa-solid fa-coins text-lg"></i>
