@@ -599,6 +599,15 @@
                                     <div class="flex items-center gap-2">
                                         <i class="fa-solid fa-motorcycle w-4 text-center text-violet-500"></i>
                                         <span class="font-medium text-violet-700">{{ $pedido->domiciliario->nombre }}</span>
+                                        @if($pedido->estado === \App\Models\Pedido::ESTADO_REPARTIDOR_EN_CAMINO)
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-violet-700">
+                                                <span class="relative flex h-1.5 w-1.5">
+                                                    <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-violet-500 opacity-75"></span>
+                                                    <span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-violet-600"></span>
+                                                </span>
+                                                De viaje
+                                            </span>
+                                        @endif
                                     </div>
                                 @endif
                                 @if($pedido->token_entrega && $pedido->estado === \App\Models\Pedido::ESTADO_REPARTIDOR_EN_CAMINO)
@@ -1029,9 +1038,19 @@
                                     @elseif($pedido->domiciliario)
                                         <div class="min-w-0 max-w-[120px]">
                                             <div class="truncate text-xs font-semibold text-slate-800">{{ $pedido->domiciliario->nombre }}</div>
-                                            <div class="truncate text-[10px] text-slate-500">
-                                                {{ $pedido->domiciliario->vehiculo ?? '' }}
-                                            </div>
+                                            @if($pedido->estado === \App\Models\Pedido::ESTADO_REPARTIDOR_EN_CAMINO)
+                                                <span class="mt-0.5 inline-flex items-center gap-1 rounded-full bg-violet-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-violet-700">
+                                                    <span class="relative flex h-1.5 w-1.5">
+                                                        <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-violet-500 opacity-75"></span>
+                                                        <span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-violet-600"></span>
+                                                    </span>
+                                                    De viaje
+                                                </span>
+                                            @else
+                                                <div class="truncate text-[10px] text-slate-500">
+                                                    {{ $pedido->domiciliario->vehiculo ?? '' }}
+                                                </div>
+                                            @endif
                                         </div>
                                     @else
                                         <span class="text-xs text-slate-400 italic">—</span>

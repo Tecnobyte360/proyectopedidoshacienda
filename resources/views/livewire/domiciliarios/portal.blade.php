@@ -153,8 +153,9 @@
 
                             @if($p->estado === 'en_preparacion' || $p->estado === 'nuevo')
                                 <button wire:click="marcarEnCamino({{ $p->id }})"
+                                        wire:confirm="¿Iniciar ruta del pedido #{{ $p->id }}? Se le avisará al cliente que su pedido va en camino."
                                         class="inline-flex items-center justify-center gap-1.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold text-sm py-2.5 transition">
-                                    <i class="fa-solid fa-motorcycle"></i> Salir
+                                    <i class="fa-solid fa-motorcycle"></i> Iniciar ruta
                                 </button>
                             @elseif($p->estado === 'repartidor_en_camino')
                                 <button wire:click="marcarEntregado({{ $p->id }})"
