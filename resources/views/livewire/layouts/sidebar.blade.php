@@ -45,7 +45,7 @@
                 'title' => 'Principal',
                 'items' => [
                     ['name' => 'Pedidos',      'icon' => 'fa-bag-shopping', 'route' => 'pedidos.index',      'badge' => null,  'permission' => 'pedidos.ver'],
-                    ['name' => 'Crear pedido', 'icon' => 'fa-cart-plus',    'route' => 'pedidos.crear-manual','badge' => null, 'permission' => 'pedidos.ver'],
+                    ['name' => 'Crear pedido', 'icon' => 'fa-cart-plus',    'route' => 'pedidos.crear-manual','badge' => null, 'permission' => 'pedidos.crear'],
                     ['name' => 'Chat en vivo', 'icon' => 'fa-headset',      'route' => 'chat.index',         'badge' => null,  'permission' => 'chat.usar'],
                     ['name' => 'Enrutar pedidos', 'icon' => 'fa-route',  'route' => 'despachos.index',    'badge' => null,  'permission' => 'despachos.gestionar'],
                 ],

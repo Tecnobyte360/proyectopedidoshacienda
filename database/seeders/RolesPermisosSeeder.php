@@ -19,6 +19,7 @@ class RolesPermisosSeeder extends Seeder
     public const PERMISOS = [
         'pedidos' => [
             'pedidos.ver',
+            'pedidos.crear',
             'pedidos.editar',
             'pedidos.despachar',
             'pedidos.cancelar',

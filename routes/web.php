@@ -317,7 +317,7 @@ Route::middleware(['no_super_sin_imp'])->group(function () {
 
     // 🛒 Crear pedido manual (admin/operador)
     Route::get('/pedidos/crear', \App\Livewire\Pedidos\CrearManual::class)
-        ->middleware('permission:pedidos.ver')
+        ->middleware('permission:pedidos.crear')
         ->name('pedidos.crear-manual');
     // Proxy autenticado para servir las medias de los estados de WhatsApp
     Route::get('/whatsapp-status/media/{filename}', \App\Http\Controllers\WhatsappStatusMediaController::class)
