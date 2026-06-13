@@ -982,6 +982,92 @@ class Index extends Component
         $this->dispatch('notify', ['type' => $enviados > 0 ? 'success' : 'warning', 'message' => $msg]);
     }
 
+    /** 🖼️ Broadcast de imagen a todos los miembros del grupo (ventana 24h). */
+    private function broadcastImagenAGrupo(string $dataUrl, string $caption): void
+    {
+        $grupo = $this->grupoActivo;
+        if (!$grupo) return;
+        if (!preg_match('/^data:(image\/[a-z0-9.+-]+);base64,(.+)$/i', $dataUrl, $m)) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Formato de imagen no reconocido.']);
+            return;
+        }
+        $bytes = base64_decode($m[2], true);
+        if ($bytes === false || strlen($bytes) < 100) return;
+        $ext = str_contains($m[1], 'png') ? 'png' : (str_contains($m[1], 'webp') ? 'webp' : (str_contains($m[1], 'gif') ? 'gif' : 'jpg'));
+
+        // Subir UNA vez → URL pública.
+        $filename = 'imagenes-out/grp_' . now()->format('Ymd_His') . '_' . uniqid() . '.' . $ext;
+        Storage::disk('public')->put($filename, $bytes);
+        $mediaUrl = rtrim(config('app.url'), '/') . Storage::url($filename);
+        $caption  = trim($caption);
+
+        $this->broadcastMediaAGrupo($grupo, 'image', $mediaUrl, $caption,
+            fn ($svc, $tel, $tid) => $svc->enviarImagen($tel, $mediaUrl, $caption ?: null, $tid),
+            $caption !== '' ? $caption : '🖼️ Imagen');
+    }
+
+    /** 🎤 Broadcast de audio a todos los miembros del grupo (ventana 24h). */
+    private function broadcastAudioAGrupo(string $dataUrl): void
+    {
+        $grupo = $this->grupoActivo;
+        if (!$grupo) return;
+        if (!preg_match('/^data:(audio\/[^;,]+(?:;[^,]*)?);base64,(.+)$/i', $dataUrl, $m)) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Formato de audio no reconocido.']);
+            return;
+        }
+        $mime  = strtolower(explode(';', $m[1])[0]);
+        $bytes = base64_decode($m[2], true);
+        if ($bytes === false || strlen($bytes) < 100) return;
+        $ext = str_contains($mime, 'ogg') ? 'ogg' : (str_contains($mime, 'mpeg') ? 'mp3' : (str_contains($mime, 'mp4') ? 'm4a' : 'webm'));
+
+        [$bytesEnvio, $extEnvio] = $this->convertirAOggOpus($bytes, $ext);
+        $filename = 'audios-out/grp_' . now()->format('Ymd_His') . '_' . uniqid() . '.' . $extEnvio;
+        Storage::disk('public')->put($filename, $bytesEnvio);
+        $mediaUrl = rtrim(config('app.url'), '/') . Storage::url($filename);
+
+        $this->broadcastMediaAGrupo($grupo, 'audio', $mediaUrl, '',
+            fn ($svc, $tel, $tid) => $svc->enviarAudio($tel, $mediaUrl, $tid),
+            '🎤 Nota de voz');
+    }
+
+    /** Núcleo del broadcast de media: envía a cada miembro con ventana abierta. */
+    private function broadcastMediaAGrupo($grupo, string $tipo, string $mediaUrl, string $caption, callable $enviar, string $textoRegistro): void
+    {
+        $tenant  = app(\App\Services\TenantManager::class)->current();
+        $esMeta  = $tenant && $tenant->proveedorWhatsappResuelto() === \App\Models\Tenant::WA_PROVIDER_META;
+        $svc     = app(\App\Services\Meta\MetaWhatsappCloudService::class);
+        $checker = app(\App\Services\Whatsapp\Ventana24hChecker::class);
+        $convSvc = app(ConversacionService::class);
+        $batch   = (string) \Illuminate\Support\Str::uuid();
+
+        $enviados = 0; $omitidos = 0;
+        foreach ($grupo->clientes as $cli) {
+            $tel = $cli->telefono_normalizado;
+            if (!$tel) { $omitidos++; continue; }
+            $conv = ConversacionWhatsapp::firstOrCreate(
+                ['telefono_normalizado' => $tel],
+                ['tenant_id' => $tenant?->id, 'cliente_id' => $cli->id, 'estado' => 'activa', 'canal' => 'whatsapp']
+            );
+            $ok = false;
+            if ($esMeta) {
+                try { $abierta = $checker->abierta($conv); } catch (\Throwable $e) { $abierta = false; }
+                if ($abierta) $ok = (bool) $enviar($svc, $tel, $tenant->id);
+            }
+            if ($ok) {
+                $convSvc->agregarMensaje($conv, MensajeWhatsapp::ROL_ASSISTANT, $textoRegistro, [
+                    'tipo' => $tipo,
+                    'meta' => ['enviado_por_humano' => true, 'usuario_id' => auth()->id(), 'media_url' => $mediaUrl, 'caption' => $caption, 'grupo_id' => $grupo->id, 'grupo_batch' => $batch, 'provider' => 'meta'],
+                ]);
+                $enviados++;
+            } else { $omitidos++; }
+        }
+
+        $this->dispatch('mensaje-enviado');
+        $msg = ucfirst($tipo === 'audio' ? 'audio' : 'imagen') . " enviada a {$enviados} miembro(s).";
+        if ($omitidos > 0) $msg .= " {$omitidos} sin ventana de 24h.";
+        $this->dispatch('notify', ['type' => $enviados > 0 ? 'success' : 'warning', 'message' => $msg]);
+    }
+
     /** Clientes para el modal: chats recientes o resultado de búsqueda. */
     public function getClientesParaListaProperty()
     {
@@ -1241,6 +1327,12 @@ class Index extends Component
      */
     public function enviarAudio(string $dataUrl): void
     {
+        // 👥 Si hay un grupo abierto, enviar el audio a TODOS los miembros.
+        if ($this->grupoAbiertoId) {
+            $this->broadcastAudioAGrupo($dataUrl);
+            return;
+        }
+
         if (!$this->conversacionActivaId) return;
 
         $conv = ConversacionWhatsapp::find($this->conversacionActivaId);
@@ -1530,6 +1622,12 @@ class Index extends Component
      */
     public function enviarImagen(string $dataUrl = '', string $caption = ''): void
     {
+        // 👥 Si hay un grupo abierto, enviar la imagen a TODOS los miembros.
+        if ($this->grupoAbiertoId) {
+            $this->broadcastImagenAGrupo($dataUrl, $caption);
+            return;
+        }
+
         if (!$this->conversacionActivaId) return;
         if ($dataUrl === '') {
             $this->dispatch('notify', ['type' => 'error', 'message' => 'Selecciona una imagen primero.']);

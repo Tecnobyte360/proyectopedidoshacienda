@@ -521,9 +521,47 @@
                         </div>
                     @endif
 
-                    {{-- Texto libre (solo a quienes tienen ventana 24h) --}}
+                    {{-- Texto libre + media (imagen/audio), reusa funciones Alpine del composer --}}
                     <div class="px-3 py-2.5">
+                        {{-- Preview de imagen a enviar al grupo --}}
+                        <div x-show="imgDataUrl" x-cloak class="mb-2 flex items-center gap-2 p-2 rounded-xl bg-slate-50 border border-slate-200">
+                            <img :src="imgDataUrl" class="h-12 w-12 rounded-lg object-cover">
+                            <input type="text" x-model="imgCaption" placeholder="Pie de foto (opcional)…" class="flex-1 rounded-lg border border-slate-200 px-2 py-1 text-xs">
+                            <button type="button" @click="$wire.enviarImagen(imgDataUrl, imgCaption); imgDataUrl=null; imgCaption='';" class="rounded-lg bg-emerald-500 text-white px-3 py-1.5 text-xs font-bold"><i class="fa-solid fa-paper-plane"></i></button>
+                            <button type="button" @click="imgDataUrl=null; imgCaption='';" class="text-slate-400 hover:text-rose-600"><i class="fa-solid fa-xmark"></i></button>
+                        </div>
+
                         <form wire:submit.prevent="enviarAGrupo" class="flex items-center gap-2">
+                            {{-- 😊 Emoji --}}
+                            <button type="button" @click="$dispatch('toggle-emoji-grupo')" title="Emojis"
+                                    class="h-10 w-10 shrink-0 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition">
+                                <i class="fa-regular fa-face-smile"></i>
+                            </button>
+                            {{-- 🖼️ Imagen --}}
+                            <label title="Adjuntar imagen" class="h-10 w-10 shrink-0 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition cursor-pointer">
+                                <i class="fa-solid fa-image"></i>
+                                <input type="file" accept="image/*" class="hidden" @change="pickImage($event)">
+                            </label>
+                            {{-- 🎤 Audio (grabar → detener → enviar) --}}
+                            <template x-if="!recording && !preview">
+                                <button type="button" @click="start()" title="Grabar nota de voz"
+                                        class="h-10 w-10 shrink-0 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition">
+                                    <i class="fa-solid fa-microphone"></i>
+                                </button>
+                            </template>
+                            <template x-if="recording">
+                                <button type="button" @click="stop()" title="Detener"
+                                        class="h-10 w-10 shrink-0 rounded-full bg-rose-500 text-white flex items-center justify-center animate-pulse">
+                                    <i class="fa-solid fa-stop"></i>
+                                </button>
+                            </template>
+                            <template x-if="preview">
+                                <button type="button" @click="send()" :disabled="sending" title="Enviar nota de voz"
+                                        class="h-10 w-10 shrink-0 rounded-full bg-emerald-500 text-white flex items-center justify-center disabled:opacity-50">
+                                    <i class="fa-solid" :class="sending ? 'fa-circle-notch fa-spin' : 'fa-paper-plane'"></i>
+                                </button>
+                            </template>
+
                             <input type="text" wire:model="mensajeGrupo" placeholder="Escribe un mensaje para todo el grupo…"
                                    class="flex-1 rounded-full border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none">
                             <button type="submit" wire:loading.attr="disabled" wire:target="enviarAGrupo"
@@ -531,7 +569,13 @@
                                 <i class="fa-solid fa-paper-plane"></i>
                             </button>
                         </form>
-                        <p class="text-[10px] text-slate-400 mt-1 px-1">💬 El texto libre solo llega a quienes te escribieron en las últimas 24h.</p>
+                        {{-- Emoji picker simple --}}
+                        <div x-data="{ openE: false }" @toggle-emoji-grupo.window="openE = !openE" x-show="openE" x-cloak @click.outside="openE=false" class="mt-1 flex flex-wrap gap-1 p-2 rounded-xl bg-slate-50 border border-slate-100">
+                            @foreach(['😀','😁','😂','🤣','😊','😍','😘','👍','🙏','🔥','✅','❤️','🎉','😢','😮','🤝','💪','👏','🛒','📦'] as $em)
+                                <button type="button" @click="$wire.set('mensajeGrupo', ($wire.mensajeGrupo||'') + '{{ $em }}')" class="text-lg hover:scale-125 transition">{{ $em }}</button>
+                            @endforeach
+                        </div>
+                        <p class="text-[10px] text-slate-400 mt-1 px-1">💬 Texto, imagen y audio llegan a quienes te escribieron en las últimas 24h. Para todos siempre → usá plantilla.</p>
                     </div>
                 </div>
             </div>
