@@ -11,6 +11,7 @@ class Sede extends Model
 
     protected $fillable = [
         'tenant_id',
+        'meta_phone_number_id',
         'nombre',
         'direccion',
         'latitud',

@@ -320,6 +320,15 @@
                                            placeholder="+57 305 399 9848"
                                            class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand">
                                 </div>
+                                <div class="sm:col-span-2">
+                                    <label class="block text-xs font-medium text-slate-600 mb-1">
+                                        Número Meta de esta sede <span class="text-slate-400 font-normal">(phone_number_id)</span>
+                                    </label>
+                                    <input type="text" wire:model="meta_phone_number_id"
+                                           placeholder="Ej: 1166731586517266"
+                                           class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-mono focus:border-brand focus:ring-brand">
+                                    <p class="text-[10px] text-slate-500 mt-1">Los pedidos que entren por este número de WhatsApp (Meta) se asignarán a esta sede.</p>
+                                </div>
                             </div>
                         @endif
                         @endif {{-- /tenantEsMeta --}}

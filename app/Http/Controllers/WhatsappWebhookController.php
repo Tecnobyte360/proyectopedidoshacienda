@@ -4663,9 +4663,20 @@ TXT;
     private function obtenerSedeIdDesdeConexion(?string $connectionId): ?int
     {
         if ($connectionId) {
-            $sede = Sede::porConnectionId((int) $connectionId);
-            if ($sede) {
-                return $sede->id;
+            // 🟢 META: el connection_id viene como 'meta:{phone_number_id}'.
+            //    Buscamos la sede cuyo meta_phone_number_id coincida con ese número,
+            //    para que los pedidos del bot caigan en la sede correcta (ej. Selva).
+            if (str_starts_with($connectionId, 'meta:')) {
+                $pid = substr($connectionId, 5);
+                $sedeMeta = Sede::where('meta_phone_number_id', $pid)->first();
+                if ($sedeMeta) {
+                    return $sedeMeta->id;
+                }
+            } else {
+                $sede = Sede::porConnectionId((int) $connectionId);
+                if ($sede) {
+                    return $sede->id;
+                }
             }
         }
 

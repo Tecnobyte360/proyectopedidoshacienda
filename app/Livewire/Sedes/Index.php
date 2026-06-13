@@ -20,6 +20,8 @@ class Index extends Component
     public ?int    $whatsapp_connection_id = null;
     public ?int    $whatsapp_id            = null;
     public string  $whatsapp_telefono      = '';
+    /** Número Meta (phone_number_id) que atiende esta sede → enruta pedidos del bot. */
+    public ?string $meta_phone_number_id   = null;
 
     // Cobertura de la sede (refactor: cada sede maneja su zona)
     public ?array  $cobertura_poligono       = null;
@@ -51,6 +53,7 @@ class Index extends Component
             'whatsapp_connection_id' => 'nullable|integer',
             'whatsapp_id'            => 'nullable|integer',
             'whatsapp_telefono'      => 'nullable|string|max:32',
+            'meta_phone_number_id'   => 'nullable|string|max:40',
             'cobertura_costo_envio'   => 'numeric|min:0',
             'cobertura_tiempo_min'    => 'integer|min:1|max:480',
             'cobertura_pedido_minimo' => 'numeric|min:0',
@@ -85,6 +88,7 @@ class Index extends Component
         $this->activa          = (bool) $sede->activa;
         $this->mensaje_cerrado = (string) $sede->mensaje_cerrado;
         $this->whatsapp_connection_id = $sede->whatsapp_connection_id;
+        $this->meta_phone_number_id   = $sede->meta_phone_number_id;
         $this->whatsapp_id            = $sede->whatsapp_id;
         $this->whatsapp_telefono      = (string) $sede->whatsapp_telefono;
 
@@ -185,6 +189,7 @@ class Index extends Component
         $this->activa          = true;
         $this->mensaje_cerrado = '';
         $this->whatsapp_connection_id = null;
+        $this->meta_phone_number_id   = null;
         $this->whatsapp_id            = null;
         $this->whatsapp_telefono      = '';
 
