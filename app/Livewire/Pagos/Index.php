@@ -114,7 +114,11 @@ class Index extends Component
 
     private function baseQuery()
     {
-        $q = Pedido::query()->whereNotNull('wompi_reference');
+        // Incluir pedidos con pasarela: Wompi (wompi_reference) o Bold (bold_payment_id).
+        $q = Pedido::query()->where(function ($w) {
+            $w->whereNotNull('wompi_reference')
+              ->orWhereNotNull('bold_payment_id');
+        });
 
         $r = $this->rangoFechas();
         if ($r) {
@@ -131,6 +135,8 @@ class Index extends Component
             $q->where(function ($qq) use ($b) {
                 $qq->where('wompi_reference', 'like', $b)
                    ->orWhere('wompi_transaction_id', 'like', $b)
+                   ->orWhere('bold_payment_id', 'like', $b)
+                   ->orWhere('bold_transaction_id', 'like', $b)
                    ->orWhere('cliente_nombre', 'like', $b)
                    ->orWhere('telefono_whatsapp', 'like', $b)
                    ->orWhere('id', is_numeric(trim($this->busqueda)) ? (int) trim($this->busqueda) : 0);

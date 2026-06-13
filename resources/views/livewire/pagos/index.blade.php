@@ -4,7 +4,7 @@
     <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
             <h2 class="text-3xl font-extrabold text-slate-800">Pagos</h2>
-            <p class="text-sm text-slate-500">Transacciones de Wompi de tus pedidos.</p>
+            <p class="text-sm text-slate-500">Transacciones de pagos (Wompi y Bold) de tus pedidos.</p>
         </div>
 
         <div class="inline-flex items-center rounded-xl bg-white shadow p-1">
@@ -151,9 +151,13 @@
                                 <div class="text-[10px] text-slate-400 font-mono">{{ $p->telefono_whatsapp }}</div>
                             </td>
                             <td class="px-4 py-3">
-                                <code class="text-[11px] text-slate-600">{{ $p->wompi_reference }}</code>
-                                @if($p->wompi_transaction_id)
-                                    <div class="text-[10px] text-slate-400 font-mono mt-0.5">tx: {{ $p->wompi_transaction_id }}</div>
+                                @php $esBold = $p->pasarela_usada === 'bold' || (!$p->wompi_reference && $p->bold_payment_id); @endphp
+                                <span class="inline-block mb-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider {{ $esBold ? 'bg-orange-100 text-orange-700' : 'bg-violet-100 text-violet-700' }}">
+                                    {{ $esBold ? 'Bold' : 'Wompi' }}
+                                </span>
+                                <code class="block text-[11px] text-slate-600">{{ $p->wompi_reference ?: $p->bold_payment_id }}</code>
+                                @if($p->wompi_transaction_id || $p->bold_transaction_id)
+                                    <div class="text-[10px] text-slate-400 font-mono mt-0.5">tx: {{ $p->wompi_transaction_id ?: $p->bold_transaction_id }}</div>
                                 @endif
                             </td>
                             <td class="px-4 py-3 text-right font-bold text-slate-800">
@@ -195,18 +199,21 @@
                                 @endif
 
                                 @if(in_array($p->estado_pago, ['pendiente', 'rechazado', 'fallido']))
-                                    <a href="{{ $p->urlPagoWompi() }}" target="_blank"
+                                    @php $urlPagoFila = $esBold ? ($p->bold_payment_link ?: '#') : $p->urlPagoWompi(); @endphp
+                                    <a href="{{ $urlPagoFila }}" target="_blank"
                                        class="inline-flex items-center justify-center h-8 px-3 rounded-lg bg-brand hover:bg-brand-dark text-white text-[11px] font-bold ml-1 transition shadow-sm"
                                        title="Abrir link de pago">
                                         <i class="fa-solid fa-credit-card mr-1"></i> Pagar
                                     </a>
-                                    <button type="button"
-                                            wire:click="regenerarLink({{ $p->id }})"
-                                            wire:confirm="Generar una nueva referencia de pago? Esto invalida el link anterior."
-                                            class="inline-flex items-center justify-center h-8 w-8 rounded-lg bg-brand/10 hover:bg-brand/20 text-brand-dark ml-1 transition"
-                                            title="Generar nuevo link (rotar referencia)">
-                                        <i class="fa-solid fa-rotate text-xs"></i>
-                                    </button>
+                                    @unless($esBold)
+                                        <button type="button"
+                                                wire:click="regenerarLink({{ $p->id }})"
+                                                wire:confirm="Generar una nueva referencia de pago? Esto invalida el link anterior."
+                                                class="inline-flex items-center justify-center h-8 w-8 rounded-lg bg-brand/10 hover:bg-brand/20 text-brand-dark ml-1 transition"
+                                                title="Generar nuevo link (rotar referencia)">
+                                            <i class="fa-solid fa-rotate text-xs"></i>
+                                        </button>
+                                    @endunless
                                 @endif
                             </td>
                         </tr>
@@ -215,7 +222,7 @@
                             <td colspan="8" class="text-center py-12 text-slate-400">
                                 <i class="fa-solid fa-circle-dollar-to-slot text-4xl mb-2 block opacity-50"></i>
                                 <p class="text-sm">No hay pagos en este periodo.</p>
-                                <p class="text-[11px] mt-1">Los pagos aparecen cuando un cliente paga via Wompi.</p>
+                                <p class="text-[11px] mt-1">Los pagos aparecen cuando un cliente paga via Wompi o Bold.</p>
                             </td>
                         </tr>
                     @endforelse
