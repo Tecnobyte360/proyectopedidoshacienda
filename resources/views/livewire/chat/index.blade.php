@@ -2452,11 +2452,11 @@
     {{-- ───────── 👥 Modal "Crear lista" estilo WhatsApp ───────── --}}
     @if($modalCrearGrupo)
         <div class="fixed inset-0 z-[60] flex items-center justify-center p-4" style="background: rgba(15,23,42,0.55); backdrop-filter: blur(4px);" wire:click="cerrarModalCrearGrupo">
-            <div class="w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-2xl max-h-[88vh] flex flex-col" @click.stop>
+            <div class="relative w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-2xl max-h-[88vh] flex flex-col" @click.stop>
                 {{-- Header --}}
                 <div class="px-5 py-4 border-b border-slate-100 flex items-center gap-3 shrink-0">
                     <button wire:click="cerrarModalCrearGrupo" class="text-slate-500 hover:text-slate-700"><i class="fa-solid fa-arrow-left"></i></button>
-                    <h3 class="text-sm font-bold text-slate-800">Crear una nueva lista</h3>
+                    <h3 class="text-sm font-bold text-slate-800">Crea una nueva lista</h3>
                 </div>
 
                 {{-- Nombre de la lista --}}
@@ -2510,14 +2510,24 @@
                     @endforelse
                 </div>
 
-                {{-- Footer --}}
-                <div class="px-5 py-4 border-t border-slate-100 shrink-0">
-                    <button wire:click="crearListaConMiembros"
-                            class="w-full rounded-xl bg-brand hover:bg-brand-dark px-4 py-2.5 text-sm font-bold text-white transition disabled:opacity-50">
-                        <i class="fa-solid fa-check mr-1"></i>
-                        Crear lista{{ count(array_filter($clientesSeleccionados)) > 0 ? ' (' . count(array_filter($clientesSeleccionados)) . ')' : '' }}
-                    </button>
+                {{-- Footer con chips de seleccionados --}}
+                <div class="px-5 py-3 border-t border-slate-100 shrink-0">
+                    @if(count(array_filter($clientesSeleccionados)) > 0)
+                        <p class="text-xs text-slate-500">
+                            <i class="fa-solid fa-users text-brand mr-1"></i>
+                            {{ count(array_filter($clientesSeleccionados)) }} persona(s) en la lista
+                        </p>
+                    @else
+                        <p class="text-xs text-slate-400">Seleccioná personas y tocá el botón verde para crear.</p>
+                    @endif
                 </div>
+
+                {{-- ✅ Botón verde flotante (FAB) estilo WhatsApp --}}
+                <button wire:click="crearListaConMiembros"
+                        class="absolute -bottom-5 right-6 h-14 w-14 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/40 flex items-center justify-center transition active:scale-95"
+                        title="Crear lista">
+                    <i class="fa-solid fa-check text-xl"></i>
+                </button>
             </div>
         </div>
     @endif
