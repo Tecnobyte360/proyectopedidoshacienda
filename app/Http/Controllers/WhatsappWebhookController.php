@@ -8250,8 +8250,15 @@ TXT;
         //   - Si NO hay zona y es DOMICILIO → fallback al costo default de la sede
         //   - Si es pickup → siempre $0
         $costoEnvio = 0;
+        // 🚚 Pedido MANUAL: si el operador fijó el costo de envío en el formulario,
+        //    ese valor MANDA sobre la zona o el default de la sede (aunque sea $0).
+        //    Así el cobro coincide exacto con el total que vio el operador.
+        $envioManualSet = !empty($orderData['manual']) && !empty($orderData['costo_envio_manual']);
+        $envioManualVal = (float) ($orderData['costo_envio'] ?? $orderData['shipping_cost'] ?? 0);
         if ($esPickup) {
             $costoEnvio = 0;
+        } elseif ($envioManualSet) {
+            $costoEnvio = $envioManualVal;
         } elseif ($zonaCobertura) {
             $costoEnvio = (float) ($zonaCobertura->costo_envio ?? 0);
         } elseif ($sede && (float) ($sede->cobertura_costo_envio ?? 0) > 0) {

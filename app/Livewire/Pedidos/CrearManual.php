@@ -690,12 +690,16 @@ class CrearManual extends Component
             $orderData['address']      = $this->direccion;
             $orderData['neighborhood'] = $this->barrio;
             $orderData['location']     = $this->ciudad;
-            // 🚚 Costo de envío definido por el operador (manda sobre el de zona).
-            if ($this->costo_envio !== null && $this->costo_envio !== '') {
-                $orderData['shipping_cost']        = (float) $this->costo_envio;
-                $orderData['costo_envio']          = (float) $this->costo_envio;
-                $orderData['costo_envio_manual']   = true;
-            }
+            // 🚚 Costo de envío definido por el operador. SIEMPRE mandamos el
+            //    valor del formulario (vacío = $0) y lo marcamos como manual, para
+            //    que MANDE sobre cualquier default del backend ($15.000) y el cobro
+            //    coincida exactamente con el total que ve el operador en pantalla.
+            $envioManual = ($this->costo_envio !== null && $this->costo_envio !== '')
+                ? (float) $this->costo_envio
+                : 0.0;
+            $orderData['shipping_cost']      = $envioManual;
+            $orderData['costo_envio']        = $envioManual;
+            $orderData['costo_envio_manual'] = true;
         } else {
             $orderData['address']  = '';
             $orderData['location'] = Sede::find($this->sede_id)?->nombre ?? '';
