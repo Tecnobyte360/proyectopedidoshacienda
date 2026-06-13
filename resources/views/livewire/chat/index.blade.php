@@ -145,34 +145,6 @@
                 </div>
             </div>
 
-            {{-- 👥 Fila de grupos (se despliega al tocar el chip Grupos) --}}
-            @if($mostrarGrupos)
-                <div class="flex flex-wrap items-center gap-1.5 mt-2 p-2 rounded-xl bg-slate-50 border border-slate-100">
-                    @forelse($gruposChat as $g)
-                        <button wire:click="filtrarPorGrupo({{ $g->id }})"
-                                class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition border
-                                       {{ $grupoFiltroId === $g->id ? 'text-white border-transparent' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50' }}"
-                                @if($grupoFiltroId === $g->id) style="background-color: {{ $g->color ?: '#d68643' }}" @endif>
-                            <span class="h-2 w-2 rounded-full" style="background-color: {{ $g->color ?: '#d68643' }}"></span>
-                            {{ $g->nombre }}
-                            <span class="opacity-70">{{ $g->clientes_count }}</span>
-                        </button>
-                    @empty
-                        <span class="text-xs text-slate-400 px-1">Aún no tenés grupos. Creá uno →</span>
-                    @endforelse
-
-                    {{-- Crear lista nueva (modal estilo WhatsApp) --}}
-                    <button wire:click="abrirModalCrearGrupo"
-                            class="inline-flex items-center gap-1 rounded-full border border-dashed border-brand/40 bg-white text-brand px-3 py-1 text-xs font-semibold hover:bg-brand-soft transition">
-                        <i class="fa-solid fa-plus text-[10px]"></i> Nueva lista
-                    </button>
-                    @if($grupoFiltroId)
-                        <button wire:click="filtrarPorGrupo(null)" class="text-xs text-slate-500 hover:text-rose-600 ml-1">
-                            <i class="fa-solid fa-xmark"></i> Ver todos
-                        </button>
-                    @endif
-                </div>
-            @endif
 
             {{-- 📡 Filtros por CANAL --}}
             <div class="mt-2">
@@ -209,6 +181,52 @@
 
         {{-- Lista de conversaciones --}}
         <div class="flex-1 overflow-y-auto" id="lista-conversaciones">
+
+            {{-- 👥 MODO GRUPOS: muestra los grupos como items (estilo WhatsApp) --}}
+            @if($mostrarGrupos && !$grupoFiltroId)
+                {{-- Botón crear nueva lista (arriba de todo) --}}
+                <button wire:click="abrirModalCrearGrupo"
+                        class="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition border-b border-slate-100">
+                    <span class="h-12 w-12 shrink-0 rounded-full bg-brand-soft text-brand flex items-center justify-center">
+                        <i class="fa-solid fa-plus text-lg"></i>
+                    </span>
+                    <span class="font-semibold text-brand">Nueva lista</span>
+                </button>
+
+                @forelse($gruposChat as $g)
+                    <button wire:click="filtrarPorGrupo({{ $g->id }})"
+                            class="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition border-b border-slate-50 text-left">
+                        <span class="h-12 w-12 shrink-0 rounded-full flex items-center justify-center text-white shadow-sm"
+                              style="background-color: {{ $g->color ?: '#d68643' }}">
+                            <i class="fa-solid fa-users"></i>
+                        </span>
+                        <div class="min-w-0 flex-1">
+                            <p class="font-semibold text-slate-800 truncate">{{ $g->nombre }}</p>
+                            <p class="text-xs text-slate-500 truncate">{{ $g->clientes_count }} {{ $g->clientes_count === 1 ? 'miembro' : 'miembros' }}</p>
+                        </div>
+                        <i class="fa-solid fa-chevron-right text-slate-300 text-xs"></i>
+                    </button>
+                @empty
+                    <div class="p-8 text-center text-slate-400">
+                        <i class="fa-solid fa-users-rectangle text-3xl mb-2 block"></i>
+                        <p class="text-sm">Aún no tenés listas.</p>
+                        <p class="text-xs mt-1">Tocá "Nueva lista" para crear la primera.</p>
+                    </div>
+                @endforelse
+
+            {{-- Lista normal de conversaciones (o conversaciones de un grupo) --}}
+            @else
+                @if($grupoFiltroId)
+                    @php $grupoActivoChip = $gruposChat->firstWhere('id', $grupoFiltroId); @endphp
+                    <button wire:click="filtrarPorGrupo(null)"
+                            class="w-full flex items-center gap-2 px-4 py-2.5 bg-brand-soft/50 border-b border-slate-100 text-sm font-semibold text-brand hover:bg-brand-soft transition">
+                        <i class="fa-solid fa-arrow-left text-xs"></i>
+                        <span class="h-2.5 w-2.5 rounded-full" style="background-color: {{ $grupoActivoChip->color ?? '#d68643' }}"></span>
+                        {{ $grupoActivoChip->nombre ?? 'Grupo' }}
+                        <span class="ml-auto text-xs text-slate-400">volver a listas</span>
+                    </button>
+                @endif
+
             @forelse($conversaciones as $c)
                 @php
                     $iniciales = collect(explode(' ', trim($c->cliente?->nombre ?? 'C')))
@@ -359,9 +377,10 @@
                     <p class="text-sm">Sin conversaciones</p>
                 </div>
             @endforelse
+            @endif {{-- fin modo grupos / conversaciones --}}
 
             {{-- 📜 Scroll infinito: cuando este sentinel entra en pantalla, carga 60 más --}}
-            @if($hayMasConversaciones)
+            @if($hayMasConversaciones && !($mostrarGrupos && !$grupoFiltroId))
                 <div x-data="{
                         observar() {
                             const io = new IntersectionObserver((entries) => {
