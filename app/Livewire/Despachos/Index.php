@@ -936,9 +936,16 @@ class Index extends Component
                 Pedido::ESTADO_ENTREGADO,
                 Pedido::ESTADO_CANCELADO,
             ])
-            ->when($this->sedeId, fn ($q) => $q->where('sede_id', $this->sedeId))
-            ->orderBy('domiciliario_id')
-            ->orderBy('fecha_pedido');
+            ->when($this->sedeId, fn ($q) => $q->where('sede_id', $this->sedeId));
+
+        // 🛵 Si es DOMICILIARIO, solo SUS pedidos en ruta (no los de otros).
+        $uEnRuta = auth()->user();
+        if ($uEnRuta && $uEnRuta->hasRole('domiciliario') && !$uEnRuta->hasRole('admin') && !$uEnRuta->hasRole('gerente')) {
+            $domEnRuta = \App\Models\Domiciliario::where('user_id', $uEnRuta->id)->first();
+            $enRutaQuery->where('domiciliario_id', $domEnRuta?->id ?? 0);
+        }
+
+        $enRutaQuery->orderBy('domiciliario_id')->orderBy('fecha_pedido');
 
         // Paginar por domiciliario (5 por página). Cada domiciliario muestra todos sus pedidos.
         // reorder() limpia los orderBy heredados del clone — necesario para
