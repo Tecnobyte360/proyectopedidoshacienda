@@ -18,8 +18,8 @@ use Illuminate\Support\Str;
  */
 class BoldService
 {
-    private const API_BASE_PROD = 'https://payments.api.bold.co';
-    private const API_BASE_TEST = 'https://payments.api.bold.co'; // Bold no separa hosts; el modo se distingue por la api_key
+    private const API_BASE_PROD = 'https://integrations.api.bold.co';
+    private const API_BASE_TEST = 'https://integrations.api.bold.co'; // Bold no separa hosts; el modo se distingue por la api_key
 
     public function __construct(private ?Tenant $tenant = null) {}
 
@@ -76,7 +76,7 @@ class BoldService
             'Accept'        => 'application/json',
         ])
             ->timeout(15)
-            ->post($this->apiBase() . '/v2/payment-link', [
+            ->post($this->apiBase() . '/online/link/v1', [
                 'amount_type'  => 'CLOSE',  // monto cerrado (el cliente NO puede modificarlo)
                 'amount' => [
                     'currency'     => 'COP',
@@ -86,8 +86,9 @@ class BoldService
                 ],
                 'description'  => 'Pedido #' . $pedido->id . ' - ' . ($tenant->nombre ?? 'Comercio'),
                 'callback_url' => url('/pedidos/' . $pedido->id . '/gracias'),
-                'expiration_date' => now()->addDays(7)->getTimestampMs(),
-                'payment_methods' => ['CREDIT_CARD','PSE','NEQUI','BANCOLOMBIA','BTN_BANCOLOMBIA'],
+                // Bold espera la expiración en NANOSEGUNDOS (epoch * 1e9).
+                'expiration_date' => (int) (now()->addDays(7)->getTimestamp() * 1000000000),
+                'payment_methods' => ['CREDIT_CARD','PSE','NEQUI'],
             ]);
 
         if ($resp->failed()) {
@@ -101,8 +102,10 @@ class BoldService
         }
 
         $data = $resp->json();
-        $url   = $data['url']        ?? $data['payment_link'] ?? null;
-        $payId = $data['payment_link'] ?? $data['id']           ?? null;
+        // Bold responde: { "payload": { "payment_link": "LNK_...", "url": "https://checkout.bold.co/payment/LNK_..." }, "errors": [] }
+        $payload = $data['payload'] ?? $data;
+        $url   = $payload['url']          ?? $payload['payment_link_url'] ?? null;
+        $payId = $payload['payment_link'] ?? $payload['id']               ?? null;
 
         if (!$url) return null;
 
