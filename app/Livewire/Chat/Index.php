@@ -748,7 +748,11 @@ class Index extends Component
             ->find($this->grupoAbiertoId);
     }
 
-    /** Mensajes UNIFICADOS de todos los miembros del grupo, ordenados por fecha. */
+    /**
+     * Mensajes del HILO DEL GRUPO únicamente (no el historial de las convs
+     * normales). Incluye: lo que el operador envió AL grupo (meta.grupo_id)
+     * + las respuestas de cada miembro a partir de su primer mensaje de grupo.
+     */
     public function getMensajesGrupoProperty()
     {
         $grupo = $this->grupoActivo;
@@ -757,7 +761,6 @@ class Index extends Component
         $clienteIds = $grupo->clientes->pluck('id')->all();
         if (empty($clienteIds)) return collect();
 
-        // Conversaciones de esos clientes (1-a-1 con el negocio).
         $convs = ConversacionWhatsapp::whereIn('cliente_id', $clienteIds)
             ->with('cliente:id,nombre,telefono_normalizado,foto_url')
             ->get();
@@ -766,14 +769,32 @@ class Index extends Component
 
         $convCliente = $convs->keyBy('id');
 
-        // Últimos 200 mensajes de todas esas conversaciones, mergeados.
+        // 1) Primer mensaje de ESTE grupo por conversación (cuándo arrancó el hilo).
+        $primerGrupoPorConv = MensajeWhatsapp::whereIn('conversacion_id', $convIds)
+            ->where('meta->grupo_id', $this->grupoAbiertoId)
+            ->selectRaw('conversacion_id, MIN(id) as min_id')
+            ->groupBy('conversacion_id')
+            ->pluck('min_id', 'conversacion_id');
+
+        if ($primerGrupoPorConv->isEmpty()) return collect(); // aún no se habló por el grupo
+
+        // 2) Traer: salientes del grupo (meta.grupo_id) + entrantes del cliente
+        //    posteriores a su primer mensaje de grupo (sus respuestas al grupo).
         return MensajeWhatsapp::whereIn('conversacion_id', $convIds)
             ->whereIn('rol', [MensajeWhatsapp::ROL_USER, MensajeWhatsapp::ROL_ASSISTANT])
-            ->orderByDesc('id')
-            ->limit(200)
+            ->where(function ($q) use ($primerGrupoPorConv) {
+                $q->where('meta->grupo_id', $this->grupoAbiertoId);
+                foreach ($primerGrupoPorConv as $convId => $minId) {
+                    $q->orWhere(function ($qq) use ($convId, $minId) {
+                        $qq->where('conversacion_id', $convId)
+                           ->where('id', '>=', $minId)
+                           ->where('rol', MensajeWhatsapp::ROL_USER);
+                    });
+                }
+            })
+            ->orderBy('id')
+            ->limit(300)
             ->get()
-            ->sortBy('id')
-            ->values()
             ->map(function ($m) use ($convCliente) {
                 $cli = $convCliente->get($m->conversacion_id)?->cliente;
                 $m->_remitente = $cli?->nombre ?: ($cli?->telefono_normalizado ?? 'Cliente');
