@@ -10688,6 +10688,15 @@ PROMPT;
 
     private function loginWhatsapp(bool $force = false): ?string
     {
+        // 🟢 Si el tenant usa Meta (Cloud API), NO hay TecnoByteApp que loguear.
+        //    Evita timeouts y alertas falsas de "EXCEPCIÓN LOGIN WHATSAPP".
+        try {
+            $tenant = app(\App\Services\TenantManager::class)->current();
+            if ($tenant && $tenant->proveedorWhatsappResuelto() === \App\Models\Tenant::WA_PROVIDER_META) {
+                return null;
+            }
+        } catch (\Throwable $e) { /* seguir con flujo legacy */ }
+
         $resolver = app(\App\Services\WhatsappResolverService::class);
         $cred = $resolver->credenciales();
         $cacheKey = $resolver->tokenCacheKey();
