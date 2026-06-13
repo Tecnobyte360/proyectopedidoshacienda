@@ -27,6 +27,8 @@ class Index extends Component
     public string $password  = '';
     public string $rol       = '';
     public bool   $activo    = true;
+    /** Si está activo, el usuario ve datos de TODAS las sedes (no solo la suya). */
+    public bool   $veTodasSedes = false;
     /** @var int[] IDs de departamentos seleccionados para el usuario */
     public array  $departamentos_ids = [];
 
@@ -61,6 +63,7 @@ class Index extends Component
         $this->rol        = $u->roles->first()?->name ?? '';
         $this->password   = ''; // no precargar
         $this->departamentos_ids = $u->departamentos()->pluck('departamentos.id')->all();
+        try { $this->veTodasSedes = $u->hasPermissionTo('sedes.ver-todas'); } catch (\Throwable $e) { $this->veTodasSedes = false; }
 
         $this->modalAbierto = true;
     }
@@ -142,6 +145,16 @@ class Index extends Component
             ? Departamento::where('tenant_id', $tenantId)->whereIn('id', $deptos)->pluck('id')->all()
             : [];
         $user->departamentos()->sync($deptosValidos);
+
+        // 🏢 Permiso "ver todas las sedes" por usuario (directo, no por rol).
+        try {
+            \Spatie\Permission\Models\Permission::firstOrCreate(['name' => 'sedes.ver-todas', 'guard_name' => 'web']);
+            if ($this->veTodasSedes) {
+                $user->givePermissionTo('sedes.ver-todas');
+            } elseif ($user->hasPermissionTo('sedes.ver-todas')) {
+                $user->revokePermissionTo('sedes.ver-todas');
+            }
+        } catch (\Throwable $e) { /* permiso no disponible */ }
 
         $this->cerrarModal();
         $this->dispatch('notify', [
@@ -345,6 +358,7 @@ class Index extends Component
         $this->password  = '';
         $this->rol       = '';
         $this->activo    = true;
+        $this->veTodasSedes = false;
         $this->departamentos_ids = [];
         $this->resetValidation();
     }

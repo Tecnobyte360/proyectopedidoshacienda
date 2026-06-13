@@ -89,6 +89,7 @@ class RolesPermisosSeeder extends Seeder
         ],
         'sedes' => [
             'sedes.gestionar',
+            'sedes.ver-todas',   // ve datos (pedidos, chats, etc.) de TODAS las sedes, no solo la suya
         ],
         'configuracion_bot' => [
             'bot.configurar',

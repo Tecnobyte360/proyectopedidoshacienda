@@ -36,8 +36,8 @@ class SedeScopeFilter
         // Sin usuario logueado → no devolver nada (defensa)
         if (!$user) return $query->whereRaw('1 = 0');
 
-        // Roles globales: no filtran, ven todo
-        if (self::esRolGlobal($user)) {
+        // Roles globales o usuarios con permiso 'sedes.ver-todas': no filtran, ven todo
+        if (self::veTodasLasSedes($user)) {
             return $query;
         }
 
@@ -65,7 +65,7 @@ class SedeScopeFilter
     {
         $user = auth()->user();
         if (!$user) return $query->whereRaw('1 = 0');
-        if (self::esRolGlobal($user)) return $query;
+        if (self::veTodasLasSedes($user)) return $query;
 
         if ($user->sede_id) {
             $tabla = $query->getModel()->getTable();
@@ -78,6 +78,21 @@ class SedeScopeFilter
     /**
      * ¿El user tiene rol global (admin/gerente/super-admin)?
      */
+    /**
+     * ¿El user ve TODAS las sedes? (rol global O permiso 'sedes.ver-todas').
+     * Permite dar a un usuario operativo acceso a todas las sedes sin hacerlo admin.
+     */
+    public static function veTodasLasSedes($user): bool
+    {
+        if (!$user) return false;
+        if (self::esRolGlobal($user)) return true;
+        try {
+            return (bool) $user->can('sedes.ver-todas');
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
     public static function esRolGlobal($user): bool
     {
         if (!$user) return false;

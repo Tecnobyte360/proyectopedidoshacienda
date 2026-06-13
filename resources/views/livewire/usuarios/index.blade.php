@@ -390,6 +390,12 @@
                                     <option value="{{ $s->id }}">{{ $s->nombre }}</option>
                                 @endforeach
                             </select>
+                            <label class="mt-2 flex items-start gap-2 cursor-pointer">
+                                <input type="checkbox" wire:model="veTodasSedes" class="mt-0.5 rounded border-slate-300 text-brand focus:ring-brand/30">
+                                <span class="text-xs text-slate-600">
+                                    <b>Ver todas las sedes</b> — el usuario ve pedidos, chats y datos de <b>todas</b> las sedes (no solo la suya).
+                                </span>
+                            </label>
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-1.5">Rol</label>
