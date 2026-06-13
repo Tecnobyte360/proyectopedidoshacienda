@@ -268,6 +268,51 @@ class CrearManual extends Component
         $this->productos = array_values($this->productos);
     }
 
+    // 🚚 Info del cálculo de envío por distancia (para mostrar al operador).
+    public ?float $envioDistanciaKm = null;
+
+    /**
+     * 🚚 Calcula el costo de envío por LEJANÍA: distancia desde la sede de
+     * referencia hasta la dirección elegida en Google Maps (lat/lng).
+     * Costo = tarifa_base + (km * tarifa_km). El operador puede modificarlo.
+     */
+    public function calcularEnvio(float $lat, float $lng): void
+    {
+        if ($this->metodo_entrega !== 'domicilio') return;
+
+        // Sede de referencia: la seleccionada, o la primera activa con coords.
+        $sede = ($this->sede_id ? Sede::find($this->sede_id) : null)
+            ?: Sede::where('activa', true)->whereNotNull('latitud')->whereNotNull('longitud')->first();
+
+        if (!$sede || !$sede->latitud || !$sede->longitud) {
+            $this->dispatch('notify', ['type' => 'warning', 'message' => 'La sede no tiene ubicación configurada — no puedo calcular el envío por distancia.']);
+            return;
+        }
+
+        // Distancia en km (haversine) × 1.3 para aproximar recorrido por calles.
+        $km = $this->distanciaKm((float) $sede->latitud, (float) $sede->longitud, $lat, $lng) * 1.3;
+        $this->envioDistanciaKm = round($km, 1);
+
+        $base  = (float) ($sede->tarifa_envio_base ?? 3000);
+        $porKm = (float) ($sede->tarifa_envio_km ?? 1500);
+        $costo = $base + ($km * $porKm);
+        // Redondear a la centena más cercana.
+        $costo = round($costo / 100) * 100;
+
+        $this->costo_envio = (string) $costo;
+        $this->dispatch('notify', ['type' => 'success', 'message' => "Envío calculado: " . round($km, 1) . " km → $" . number_format($costo, 0, ',', '.') . " (podés modificarlo)"]);
+    }
+
+    /** Haversine: distancia en km entre dos coordenadas. */
+    private function distanciaKm(float $lat1, float $lon1, float $lat2, float $lon2): float
+    {
+        $r = 6371;
+        $dLat = deg2rad($lat2 - $lat1);
+        $dLon = deg2rad($lon2 - $lon1);
+        $a = sin($dLat / 2) ** 2 + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLon / 2) ** 2;
+        return $r * 2 * atan2(sqrt($a), sqrt(1 - $a));
+    }
+
     /** Subtotal de productos (sin envío). */
     public function getSubtotalProductosProperty(): float
     {

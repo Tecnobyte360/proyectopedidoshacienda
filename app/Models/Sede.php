@@ -26,6 +26,8 @@ class Sede extends Model
         // Cobertura propia de la sede (refactor: cada sede su area)
         'cobertura_poligono',
         'cobertura_costo_envio',
+        'tarifa_envio_base',
+        'tarifa_envio_km',
         'cobertura_tiempo_min',
         'cobertura_pedido_minimo',
         'cobertura_color',

@@ -470,7 +470,13 @@
                                        placeholder="0"
                                        class="w-full rounded-xl border border-slate-300 bg-white text-sm pl-7 pr-3.5 py-2.5 shadow-sm focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none">
                             </div>
-                            <p class="text-[11px] text-slate-400 mt-1">El costo de envío de esta entrega. Se suma al total.</p>
+                            <p class="text-[11px] text-slate-400 mt-1">
+                                @if($envioDistanciaKm)
+                                    <span class="text-emerald-600 font-medium"><i class="fa-solid fa-route"></i> Calculado por distancia: ~{{ $envioDistanciaKm }} km</span> · podés modificarlo.
+                                @else
+                                    Se calcula solo al elegir la dirección de Google Maps. Podés modificarlo.
+                                @endif
+                            </p>
                         </div>
 
                         {{-- 🛵 Domiciliario (híbrido: sistema sugiere, operador confirma) --}}
@@ -730,7 +736,7 @@
                                 '?languageCode=es&sessionToken=' + this.sessionToken,
                                 { headers: {
                                     'X-Goog-Api-Key': this.apiKey,
-                                    'X-Goog-FieldMask': 'addressComponents,formattedAddress',
+                                    'X-Goog-FieldMask': 'addressComponents,formattedAddress,location',
                                 } }
                             );
                             const d = await resp.json();
@@ -742,7 +748,12 @@
                                 }
                             });
                             if (barrio) this.$wire.set('barrio', barrio);
-                        } catch (e) { /* sin barrio, no pasa nada */ }
+
+                            // 🚚 Coordenadas → calcular costo de envío por lejanía.
+                            if (d.location && d.location.latitude && d.location.longitude) {
+                                this.$wire.calcularEnvio(d.location.latitude, d.location.longitude);
+                            }
+                        } catch (e) { /* sin barrio/coords, no pasa nada */ }
 
                         this.sessionToken = null; // cerrar sesión de búsqueda
                     },
