@@ -317,6 +317,62 @@ class CrearManual extends Component
 
     // 🚚 Info del cálculo de envío por distancia (para mostrar al operador).
     public ?float $envioDistanciaKm = null;
+    // 🗺️ Nombre de la zona de cobertura resuelta por barrio (para mostrar).
+    public ?string $envioZonaNombre = null;
+
+    /**
+     * 🗺️ Calcula el costo de envío según la ZONA DE COBERTURA del barrio.
+     *
+     * Esta es la forma OFICIAL de cobrar el domicilio: cada zona tiene su
+     * `costo_envio` y `pedido_minimo` definidos por la empresa (no por
+     * distancia). Resuelve la zona a partir del barrio escrito y aplica su
+     * tarifa. El operador siempre puede modificar el valor a mano.
+     */
+    public function calcularEnvioPorZona(): void
+    {
+        if ($this->metodo_entrega !== 'domicilio') return;
+
+        $barrio = trim((string) $this->barrio);
+        if ($barrio === '') {
+            $this->dispatch('notify', ['type' => 'warning', 'message' => 'Escribe el barrio para calcular el envío por zona.']);
+            return;
+        }
+
+        $zona = \App\Models\ZonaCobertura::resolverPorBarrio($barrio, $this->sede_id ?: null);
+
+        if (!$zona) {
+            $this->envioZonaNombre = null;
+            $this->dispatch('notify', [
+                'type'    => 'warning',
+                'message' => "El barrio \"{$barrio}\" no está en ninguna zona de cobertura. Pon el costo a mano, o agrega el barrio a una zona en Cobertura.",
+            ]);
+            return;
+        }
+
+        $this->costo_envio      = (string) (int) round((float) $zona->costo_envio);
+        $this->envioZonaNombre  = $zona->nombre;
+        $this->envioDistanciaKm = null; // ya no es por distancia
+
+        $aviso = "🗺️ Zona \"{$zona->nombre}\": envío $" . number_format((float) $zona->costo_envio, 0, ',', '.');
+        $min = (float) $zona->pedido_minimo;
+        if ($min > 0 && $this->subtotalProductos < $min) {
+            $aviso .= " · ⚠️ pedido mínimo de la zona $" . number_format($min, 0, ',', '.');
+        }
+        $this->dispatch('notify', ['type' => 'success', 'message' => $aviso]);
+    }
+
+    /** Al cambiar el barrio, intenta resolver la zona automáticamente. */
+    public function updatedBarrio(): void
+    {
+        if ($this->metodo_entrega === 'domicilio' && trim((string) $this->barrio) !== '') {
+            $zona = \App\Models\ZonaCobertura::resolverPorBarrio($this->barrio, $this->sede_id ?: null);
+            if ($zona) {
+                $this->costo_envio     = (string) (int) round((float) $zona->costo_envio);
+                $this->envioZonaNombre = $zona->nombre;
+                $this->envioDistanciaKm = null;
+            }
+        }
+    }
 
     /**
      * 🚚 Calcula el costo de envío por LEJANÍA: distancia desde la sede de
