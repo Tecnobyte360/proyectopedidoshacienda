@@ -937,7 +937,7 @@ class CrearManual extends Component
                 })))
             ->with('zona:id,nombre,costo_envio')
             ->orderBy('nombre')
-            ->get(['id', 'nombre', 'zona_id'])
+            ->get(['id', 'nombre', 'zona_cobertura_id'])
             ->map(fn ($b) => [
                 'nombre' => $b->nombre,
                 'zona'   => $b->zona?->nombre,
