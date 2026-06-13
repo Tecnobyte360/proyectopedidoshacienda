@@ -235,12 +235,49 @@ class Index extends Component
         $this->resetValidation();
     }
 
+    /* ── ⏱️ ANS de entrega POR ZONA ───────────────────────── */
+    public array $tiemposZona = []; // [zona_id => ['min'=>x,'max'=>y]]
+
+    /** Guarda el tiempo de entrega (min/max) de una zona. */
+    public function guardarEntregaZona(int $zonaId): void
+    {
+        $min = (int) ($this->tiemposZona[$zonaId]['min'] ?? 0);
+        $max = (int) ($this->tiemposZona[$zonaId]['max'] ?? 0);
+        if ($max <= 0) {
+            $this->dispatch('notify', ['type' => 'warning', 'message' => 'Definí el tiempo máximo (rojo) para la zona.']);
+            return;
+        }
+        \App\Models\AnsEntregaZona::updateOrCreate(
+            ['zona_cobertura_id' => $zonaId],
+            [
+                'tenant_id'   => app(\App\Services\TenantManager::class)->id(),
+                'minutos_min' => max(0, $min),
+                'minutos_max' => $max,
+                'activo'      => true,
+            ]
+        );
+        $this->dispatch('notify', ['type' => 'success', 'message' => 'Tiempo de entrega de la zona guardado.']);
+    }
+
     public function render()
     {
         $ans       = AnsTiempoPedido::orderBy('orden')->orderBy('estado')->get();
         $reglasBot = AnsPedido::orderBy('id')->get();
 
-        return view('livewire.ans.index', compact('ans', 'reglasBot'))
+        // Zonas con su ANS de entrega (para la sección "Entrega por zona").
+        $zonas = \App\Models\ZonaCobertura::orderBy('nombre')->get();
+        $ansZona = \App\Models\AnsEntregaZona::get()->keyBy('zona_cobertura_id');
+        foreach ($zonas as $z) {
+            if (!isset($this->tiemposZona[$z->id])) {
+                $a = $ansZona->get($z->id);
+                $this->tiemposZona[$z->id] = [
+                    'min' => $a->minutos_min ?? 0,
+                    'max' => $a->minutos_max ?? '',
+                ];
+            }
+        }
+
+        return view('livewire.ans.index', compact('ans', 'reglasBot', 'zonas'))
             ->layout('layouts.app');
     }
 }

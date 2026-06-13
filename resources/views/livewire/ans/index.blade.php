@@ -171,6 +171,51 @@
         @endforelse
     </div>
 
+    {{-- ╔═══ ⏱️ ANS DE ENTREGA POR ZONA ═══╗ --}}
+    <div class="mt-8">
+        <div class="flex items-center gap-2 mb-3">
+            <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-100 text-violet-600"><i class="fa-solid fa-route"></i></span>
+            <h3 class="text-sm font-bold text-slate-800">Tiempo de entrega por zona</h3>
+        </div>
+        <p class="text-xs text-slate-500 mb-3">Cuánto debería tardar la entrega en ruta según la zona del cliente (mín = verde, máx = rojo).</p>
+
+        <div class="grid sm:grid-cols-2 gap-3">
+            @forelse($zonas as $z)
+                <div class="rounded-2xl border border-slate-200 bg-white shadow-sm p-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="font-semibold text-slate-800"><i class="fa-solid fa-location-dot text-violet-500 mr-1"></i>{{ $z->nombre }}</span>
+                    </div>
+                    <div class="flex items-end gap-2">
+                        <div class="flex-1">
+                            <label class="block text-[10px] font-bold uppercase tracking-wider text-emerald-600 mb-1">Mín (verde)</label>
+                            <div class="relative">
+                                <input type="number" min="0" wire:model="tiemposZona.{{ $z->id }}.min"
+                                       class="w-full rounded-lg border border-slate-200 px-3 py-2 pr-10 text-sm focus:border-brand focus:outline-none">
+                                <span class="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400">min</span>
+                            </div>
+                        </div>
+                        <div class="flex-1">
+                            <label class="block text-[10px] font-bold uppercase tracking-wider text-rose-600 mb-1">Máx (rojo)</label>
+                            <div class="relative">
+                                <input type="number" min="1" wire:model="tiemposZona.{{ $z->id }}.max"
+                                       class="w-full rounded-lg border border-slate-200 px-3 py-2 pr-10 text-sm focus:border-brand focus:outline-none">
+                                <span class="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400">min</span>
+                            </div>
+                        </div>
+                        <button wire:click="guardarEntregaZona({{ $z->id }})"
+                                class="shrink-0 rounded-lg bg-brand hover:bg-brand-dark text-white px-3 py-2 text-sm font-bold transition">
+                            <i class="fa-solid fa-floppy-disk"></i>
+                        </button>
+                    </div>
+                </div>
+            @empty
+                <div class="col-span-full text-center text-slate-400 text-sm py-6 rounded-xl border border-dashed border-slate-200">
+                    No hay zonas de cobertura. Creá zonas primero para configurar sus tiempos de entrega.
+                </div>
+            @endforelse
+        </div>
+    </div>
+
     @endif {{-- /tab sla --}}
 
     @if($tab === 'bot')
