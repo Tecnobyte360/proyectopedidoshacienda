@@ -7707,6 +7707,13 @@ TXT;
         $whatsappId = $conexionData['whatsapp_id'];
 
         $sede = Sede::find($this->obtenerSedeIdDesdeConexion($connectionId)) ?? Sede::first();
+        // 🏢 Pedido MANUAL: si el operador eligió una sede en el formulario, esa MANDA.
+        //    Permite que desde una sede (ej. Principal) se monte un pedido para otra
+        //    sede (ej. Selva), y que el equipo de esa sede lo vea.
+        if (!empty($orderData['manual']) && !empty($orderData['sede_id'])) {
+            $sedeManual = Sede::find((int) $orderData['sede_id']);
+            if ($sedeManual) $sede = $sedeManual;
+        }
 
         $partes = array_filter([
             $orderData['notes'] ?? null,

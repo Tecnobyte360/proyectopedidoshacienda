@@ -379,6 +379,26 @@
                         </label>
                     </div>
 
+                    @if($metodo_entrega === 'domicilio')
+                        <div class="mb-4">
+                            <label class="{{ $labelCls }}">
+                                <i class="fa-solid fa-shop text-slate-400 mr-1"></i>
+                                Sede que atiende este pedido
+                            </label>
+                            <div class="relative">
+                                <i class="fa-solid fa-map-pin absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 z-10"></i>
+                                <select wire:model.live="sede_id" class="{{ $inputClsIcon }} appearance-none cursor-pointer">
+                                    <option value="">— Sede por defecto —</option>
+                                    @foreach($sedes as $s)
+                                        <option value="{{ $s->id }}">{{ $s->nombre }}</option>
+                                    @endforeach
+                                </select>
+                                <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
+                            </div>
+                            <p class="mt-1 text-[11px] text-slate-400">El equipo de <b>esa sede</b> verá y preparará este pedido (puedes montar desde una sede un pedido para otra).</p>
+                        </div>
+                    @endif
+
                     @if($metodo_entrega === 'recoger')
                         <div>
                             <label class="{{ $labelCls }}">
