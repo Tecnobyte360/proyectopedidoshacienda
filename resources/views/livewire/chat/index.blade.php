@@ -156,15 +156,11 @@
                         <span class="text-xs text-slate-400 px-1">Aún no tenés grupos. Creá uno →</span>
                     @endforelse
 
-                    {{-- Crear grupo rápido --}}
-                    <div class="inline-flex items-center gap-1">
-                        <input type="text" wire:model="nuevoGrupoNombre" wire:keydown.enter="crearGrupoRapido"
-                               placeholder="Nuevo grupo…"
-                               class="w-28 rounded-full border border-slate-200 px-3 py-1 text-xs focus:border-brand focus:ring-1 focus:ring-brand/20 focus:outline-none">
-                        <button wire:click="crearGrupoRapido" class="h-6 w-6 rounded-full bg-brand text-white flex items-center justify-center hover:bg-brand-dark" title="Crear grupo">
-                            <i class="fa-solid fa-plus text-[10px]"></i>
-                        </button>
-                    </div>
+                    {{-- Crear lista nueva (modal estilo WhatsApp) --}}
+                    <button wire:click="abrirModalCrearGrupo"
+                            class="inline-flex items-center gap-1 rounded-full border border-dashed border-brand/40 bg-white text-brand px-3 py-1 text-xs font-semibold hover:bg-brand-soft transition">
+                        <i class="fa-solid fa-plus text-[10px]"></i> Nueva lista
+                    </button>
                     @if($grupoFiltroId)
                         <button wire:click="filtrarPorGrupo(null)" class="text-xs text-slate-500 hover:text-rose-600 ml-1">
                             <i class="fa-solid fa-xmark"></i> Ver todos
@@ -2452,4 +2448,77 @@
             100% { background-position: -200% 0; }
         }
     </style>
+
+    {{-- ───────── 👥 Modal "Crear lista" estilo WhatsApp ───────── --}}
+    @if($modalCrearGrupo)
+        <div class="fixed inset-0 z-[60] flex items-center justify-center p-4" style="background: rgba(15,23,42,0.55); backdrop-filter: blur(4px);" wire:click="cerrarModalCrearGrupo">
+            <div class="w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-2xl max-h-[88vh] flex flex-col" @click.stop>
+                {{-- Header --}}
+                <div class="px-5 py-4 border-b border-slate-100 flex items-center gap-3 shrink-0">
+                    <button wire:click="cerrarModalCrearGrupo" class="text-slate-500 hover:text-slate-700"><i class="fa-solid fa-arrow-left"></i></button>
+                    <h3 class="text-sm font-bold text-slate-800">Crear una nueva lista</h3>
+                </div>
+
+                {{-- Nombre de la lista --}}
+                <div class="px-5 pt-4 shrink-0">
+                    <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Nombre de la lista</label>
+                    <input type="text" wire:model="nombreListaNueva" placeholder="Nueva etiqueta" autofocus
+                           class="w-full border-0 border-b-2 border-slate-200 px-1 py-2 text-sm focus:border-brand focus:ring-0 focus:outline-none">
+                </div>
+
+                {{-- Buscador --}}
+                <div class="px-5 pt-4 shrink-0">
+                    <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                        Incluidos
+                        @if(count(array_filter($clientesSeleccionados)) > 0)
+                            <span class="ml-1 text-brand">({{ count(array_filter($clientesSeleccionados)) }} seleccionados)</span>
+                        @endif
+                    </label>
+                    <div class="relative">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                        <input type="text" wire:model.live.debounce.300ms="buscarParaLista" placeholder="Buscar un nombre o número"
+                               class="w-full rounded-xl border border-slate-200 pl-9 pr-3 py-2.5 text-sm focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none">
+                    </div>
+                </div>
+
+                {{-- Lista de clientes con checkboxes --}}
+                <div class="flex-1 overflow-y-auto px-3 py-3 mt-1">
+                    <p class="px-2 text-[11px] font-semibold text-slate-400 mb-1">
+                        {{ trim($buscarParaLista) !== '' ? 'Resultados' : 'Chats recientes' }}
+                    </p>
+                    @forelse($clientesParaLista as $c)
+                        @php $sel = isset($clientesSeleccionados[$c->id]); @endphp
+                        <button wire:click="toggleClienteLista({{ $c->id }})"
+                                class="w-full flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-slate-50 transition text-left">
+                            <span class="h-9 w-9 shrink-0 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 text-sm font-bold overflow-hidden">
+                                @if($c->foto_url)
+                                    <img src="{{ $c->foto_url }}" class="h-full w-full object-cover" alt="">
+                                @else
+                                    {{ mb_substr($c->nombre ?: 'C', 0, 1) }}
+                                @endif
+                            </span>
+                            <div class="min-w-0 flex-1">
+                                <p class="text-sm font-medium text-slate-800 truncate">{{ $c->nombre ?: 'Cliente' }}</p>
+                                <p class="text-xs text-slate-400 truncate">{{ $c->telefono_normalizado }}</p>
+                            </div>
+                            <span class="h-5 w-5 shrink-0 rounded-md border flex items-center justify-center {{ $sel ? 'bg-brand border-brand text-white' : 'border-slate-300' }}">
+                                @if($sel) <i class="fa-solid fa-check text-[10px]"></i> @endif
+                            </span>
+                        </button>
+                    @empty
+                        <p class="px-2 py-6 text-sm text-slate-400 text-center">No hay clientes para mostrar.</p>
+                    @endforelse
+                </div>
+
+                {{-- Footer --}}
+                <div class="px-5 py-4 border-t border-slate-100 shrink-0">
+                    <button wire:click="crearListaConMiembros"
+                            class="w-full rounded-xl bg-brand hover:bg-brand-dark px-4 py-2.5 text-sm font-bold text-white transition disabled:opacity-50">
+                        <i class="fa-solid fa-check mr-1"></i>
+                        Crear lista{{ count(array_filter($clientesSeleccionados)) > 0 ? ' (' . count(array_filter($clientesSeleccionados)) . ')' : '' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
 </div>

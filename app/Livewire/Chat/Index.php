@@ -31,6 +31,12 @@ class Index extends Component
     public bool   $mostrarGrupos    = false;  // despliega la fila de grupos
     public ?int   $grupoFiltroId    = null;   // grupo seleccionado (filtra chats)
     public string $nuevoGrupoNombre = '';     // crear grupo rápido
+
+    // 👥 Modal "Crear lista" estilo WhatsApp (nombre + selección múltiple)
+    public bool   $modalCrearGrupo     = false;
+    public string $nombreListaNueva    = '';
+    public string $buscarParaLista     = '';
+    public array  $clientesSeleccionados = []; // [cliente_id => true]
     public bool   $mostrarInternas = false;  // si es false, ocultas conversaciones internas
 
     // 📜 Scroll infinito: cuántas conversaciones mostrar. Arranca en 60 y crece
@@ -651,7 +657,7 @@ class Index extends Component
         $this->grupoFiltroId = ($this->grupoFiltroId === $grupoId) ? null : $grupoId;
     }
 
-    /** Crea un grupo nuevo desde el chat. */
+    /** Crea un grupo nuevo desde el chat (rápido, solo nombre). */
     public function crearGrupoRapido(): void
     {
         $nombre = trim($this->nuevoGrupoNombre);
@@ -664,6 +670,84 @@ class Index extends Component
         $this->nuevoGrupoNombre = '';
         $this->grupoFiltroId = $g->id;
         $this->dispatch('notify', ['type' => 'success', 'message' => "Grupo '{$nombre}' creado."]);
+    }
+
+    /* ─── Modal "Crear lista" estilo WhatsApp (nombre + multi-selección) ─── */
+
+    public function abrirModalCrearGrupo(): void
+    {
+        $this->reset(['nombreListaNueva', 'buscarParaLista', 'clientesSeleccionados']);
+        $this->modalCrearGrupo = true;
+    }
+
+    public function cerrarModalCrearGrupo(): void
+    {
+        $this->modalCrearGrupo = false;
+    }
+
+    /** Marca/desmarca un cliente en la selección múltiple. */
+    public function toggleClienteLista(int $clienteId): void
+    {
+        if (isset($this->clientesSeleccionados[$clienteId])) {
+            unset($this->clientesSeleccionados[$clienteId]);
+        } else {
+            $this->clientesSeleccionados[$clienteId] = true;
+        }
+    }
+
+    /** Crea la lista/grupo con TODOS los clientes seleccionados de una. */
+    public function crearListaConMiembros(): void
+    {
+        $nombre = trim($this->nombreListaNueva);
+        if ($nombre === '') {
+            $this->dispatch('notify', ['type' => 'warning', 'message' => 'Ponle un nombre a la lista.']);
+            return;
+        }
+        $g = \App\Models\GrupoCliente::create([
+            'tenant_id' => app(\App\Services\TenantManager::class)->id(),
+            'nombre'    => $nombre,
+            'color'     => '#d68643',
+        ]);
+
+        $ids = array_keys(array_filter($this->clientesSeleccionados));
+        if (!empty($ids)) {
+            $g->clientes()->syncWithoutDetaching($ids);
+        }
+
+        $this->modalCrearGrupo = false;
+        $this->mostrarGrupos = true;
+        $this->grupoFiltroId = $g->id;
+        $this->reset(['nombreListaNueva', 'buscarParaLista', 'clientesSeleccionados']);
+        $this->dispatch('notify', ['type' => 'success', 'message' => "Lista '{$nombre}' creada con " . count($ids) . " miembro(s)."]);
+    }
+
+    /** Clientes para el modal: chats recientes o resultado de búsqueda. */
+    public function getClientesParaListaProperty()
+    {
+        $q = trim($this->buscarParaLista);
+        $base = \App\Models\Cliente::whereNotNull('telefono_normalizado');
+
+        if (mb_strlen($q) >= 2) {
+            $base->where(function ($w) use ($q) {
+                $w->where('nombre', 'like', "%{$q}%")
+                  ->orWhere('telefono_normalizado', 'like', "%{$q}%")
+                  ->orWhere('cedula', 'like', "%{$q}%");
+            });
+            return $base->limit(30)->get();
+        }
+
+        // Sin búsqueda: chats recientes (clientes con conversación reciente).
+        $idsRecientes = ConversacionWhatsapp::query()
+            ->whereNotNull('cliente_id')
+            ->orderByDesc('ultimo_mensaje_at')
+            ->limit(30)
+            ->pluck('cliente_id')->unique()->values()->all();
+
+        if (empty($idsRecientes)) return $base->limit(20)->get();
+
+        return \App\Models\Cliente::whereIn('id', $idsRecientes)
+            ->orderByRaw('FIELD(id, ' . implode(',', $idsRecientes) . ')')
+            ->get();
     }
 
     /** Agrega el cliente de una conversación al grupo seleccionado. */
@@ -2048,6 +2132,9 @@ class Index extends Component
         // 👥 Grupos de clientes (para los chips del chat)
         $gruposChat = \App\Models\GrupoCliente::withCount('clientes')->orderBy('nombre')->get();
 
+        // 👥 Clientes para el modal "Crear lista" (chats recientes o búsqueda)
+        $clientesParaLista = $this->modalCrearGrupo ? $this->clientesParaLista : collect();
+
         return view('livewire.chat.index', compact(
             'conversaciones',
             'conversacionActiva',
@@ -2058,7 +2145,8 @@ class Index extends Component
             'respuestasRapidas',
             'totalNoLeidos',
             'totalFavoritos',
-            'gruposChat'
+            'gruposChat',
+            'clientesParaLista'
         ))->layout('layouts.app');
     }
 
