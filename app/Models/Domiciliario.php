@@ -21,6 +21,7 @@ class Domiciliario extends Model
         'telefono',
         'placa',
         'vehiculo',
+        'capacidad_kg',
         'estado',
         'activo',
         'token_acceso',

@@ -15,6 +15,7 @@ class Domiciliarios extends Component
     public string $telefono     = '';
     public string $vehiculo     = '';
     public string $placa        = '';
+    public ?string $capacidad_kg = null; // ⚖️ capacidad de carga en kilos
     public string $estado       = 'disponible';
     public bool   $activo       = true;
     public array  $zonasIds     = [];
@@ -43,6 +44,7 @@ class Domiciliarios extends Component
             'telefono'    => ['nullable', 'string', 'max:30'],
             'vehiculo'    => ['nullable', 'string', 'max:100'],
             'placa'       => ['nullable', 'string', 'max:20'],
+            'capacidad_kg' => ['nullable', 'numeric', 'min:0', 'max:99999'],
             'estado'      => ['required', 'in:disponible,ocupado,inactivo'],
             'activo'      => ['boolean'],
             'zonasIds'    => ['array'],
@@ -126,6 +128,7 @@ class Domiciliarios extends Component
             $this->telefono       = $domiciliario->telefono ?? '';
             $this->vehiculo       = $domiciliario->vehiculo ?? '';
             $this->placa          = $domiciliario->placa ?? '';
+            $this->capacidad_kg   = $domiciliario->capacidad_kg !== null ? (string) $domiciliario->capacidad_kg : null;
             $this->estado         = $domiciliario->estado ?? 'disponible';
             $this->activo         = (bool) $domiciliario->activo;
             $this->zonasIds       = $domiciliario->zonas->pluck('id')->toArray();
@@ -168,6 +171,7 @@ class Domiciliarios extends Component
                 'telefono'    => $this->telefono,
                 'vehiculo'    => $this->vehiculo,
                 'placa'       => $this->placa,
+                'capacidad_kg' => $this->capacidad_kg !== '' ? $this->capacidad_kg : null,
                 'estado'      => $this->estado,
                 'activo'      => $this->activo,
             ];
@@ -324,6 +328,7 @@ class Domiciliarios extends Component
         $this->telefono       = '';
         $this->vehiculo       = '';
         $this->placa          = '';
+        $this->capacidad_kg   = null;
         $this->estado         = 'disponible';
         $this->activo         = true;
         $this->zonasIds       = [];

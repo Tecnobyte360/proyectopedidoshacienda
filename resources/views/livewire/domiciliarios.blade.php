@@ -309,6 +309,21 @@
                         </div>
                     </div>
 
+                    {{-- ⚖️ Capacidad de carga --}}
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">
+                            <i class="fa-solid fa-weight-hanging text-slate-400 mr-1"></i>
+                            Capacidad de carga (kg)
+                        </label>
+                        <div class="relative">
+                            <input type="number" step="0.5" min="0" wire:model="capacidad_kg" placeholder="Ej. 50"
+                                   class="w-full rounded-xl border border-slate-200 px-4 py-2.5 pr-12 text-sm focus:border-brand focus:ring-brand">
+                            <span class="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-slate-400 font-semibold">kg</span>
+                        </div>
+                        @error('capacidad_kg') <p class="text-xs text-rose-600 mt-1">{{ $message }}</p> @enderror
+                        <p class="text-xs text-slate-400 mt-1">Cuántos kilos puede transportar este domiciliario.</p>
+                    </div>
+
                     {{-- 🔐 Credenciales de acceso al sistema (rol domiciliario) --}}
                     <div class="rounded-xl border-2 border-indigo-200 bg-indigo-50/30 p-4">
                         <label class="block text-sm font-bold text-indigo-700 mb-2">
