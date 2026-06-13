@@ -77,6 +77,7 @@ class Index extends Component
     public string $audienciaTipo = 'todos';
     public ?int   $zonaId = null;
     public ?int   $sedeId = null;
+    public ?int   $grupoClienteId = null; // 👥 audiencia por grupo
     public int    $minPedidos = 1;
     public string $telefonosManual = '';
 
@@ -188,6 +189,15 @@ class Index extends Component
     public function mount(): void
     {
         $this->refreshEstadoWa();
+
+        // 👥 Si vino desde "Difundir" de un grupo, preseleccionar audiencia=grupo
+        //    y abrir el formulario de nueva campaña.
+        $grupoId = request()->integer('grupo_id');
+        if ($grupoId) {
+            $this->audienciaTipo  = 'grupo';
+            $this->grupoClienteId = $grupoId;
+            $this->modal = true;
+        }
     }
 
     /** Consulta el estado de la sesión WA del tenant. Llamado en mount + wire:poll.30s */
@@ -404,8 +414,10 @@ class Index extends Component
             ? \App\Models\MetaWhatsappPlantilla::find($this->plantillaMetaId)
             : null;
 
+        $grupos = \App\Models\GrupoCliente::withCount('clientes')->orderBy('nombre')->get();
+
         return view('livewire.campanas.index', compact(
-            'campanas', 'zonas', 'sedes',
+            'campanas', 'zonas', 'sedes', 'grupos',
             'monitorCampana', 'monitorDestinatarios', 'monitorEstadisticas',
             'colaJobs', 'failedJobs',
             'providerMeta', 'plantillasMeta', 'plantillaSeleccionada'
@@ -462,6 +474,7 @@ class Index extends Component
         $f = $c->audiencia_filtros ?? [];
         $this->zonaId           = $f['zona_id']      ?? null;
         $this->sedeId           = $f['sede_id']      ?? null;
+        $this->grupoClienteId   = $f['grupo_id']     ?? null;
         $this->minPedidos       = $f['min_pedidos']  ?? 1;
         $this->telefonosManual  = isset($f['telefonos']) ? implode("\n", $f['telefonos']) : '';
         $this->intervaloMinSeg  = $c->intervalo_min_seg;
@@ -500,6 +513,7 @@ class Index extends Component
         $filtros = [];
         if ($this->audienciaTipo === 'zona' && $this->zonaId)         $filtros['zona_id'] = $this->zonaId;
         if ($this->audienciaTipo === 'sede' && $this->sedeId)         $filtros['sede_id'] = $this->sedeId;
+        if ($this->audienciaTipo === 'grupo' && $this->grupoClienteId) $filtros['grupo_id'] = $this->grupoClienteId;
         if ($this->audienciaTipo === 'con_pedidos')                   $filtros['min_pedidos'] = $this->minPedidos;
         if ($this->audienciaTipo === 'manual')                        $filtros['telefonos'] = array_values(array_filter(array_map('trim', preg_split('/[\s,]+/', $this->telefonosManual))));
 

@@ -76,6 +76,16 @@ class CampanaSenderService
                     ->get();
                 break;
 
+            case 'grupo':
+                $grupoId = $filtros['grupo_id'] ?? null;
+                if ($grupoId) {
+                    $grupo = \App\Models\GrupoCliente::with(['clientes' => function ($q) {
+                        $q->whereNotNull('telefono_normalizado');
+                    }])->find($grupoId);
+                    $clientes = $grupo ? $grupo->clientes : collect();
+                }
+                break;
+
             case 'manual':
                 $lista = collect($filtros['telefonos'] ?? []);
                 foreach ($lista as $tel) {

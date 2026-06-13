@@ -71,6 +71,12 @@ class Cliente extends Model
         return $this->hasMany(Pedido::class)->latest('fecha_pedido');
     }
 
+    public function grupos(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(GrupoCliente::class, 'cliente_grupo', 'cliente_id', 'grupo_id')
+            ->withTimestamps();
+    }
+
     public function zonaCobertura(): BelongsTo
     {
         return $this->belongsTo(ZonaCobertura::class);

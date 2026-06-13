@@ -643,6 +643,7 @@
                         <h4 class="font-bold text-slate-800 text-sm"><i class="fa-solid fa-users text-brand"></i> Audiencia</h4>
                         <select wire:model.live="audienciaTipo" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm">
                             <option value="todos">Todos los clientes activos</option>
+                            <option value="grupo">👥 Por grupo de clientes</option>
                             <option value="zona">Por zona de cobertura</option>
                             <option value="sede">Por sede (clientes con pedidos en esa sede)</option>
                             <option value="con_pedidos">Con N o más pedidos</option>
@@ -650,7 +651,17 @@
                             <option value="manual">Lista manual de teléfonos</option>
                         </select>
 
-                        @if($audienciaTipo === 'zona')
+                        @if($audienciaTipo === 'grupo')
+                            <select wire:model="grupoClienteId" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm">
+                                <option value="">— Selecciona grupo —</option>
+                                @foreach($grupos as $g)
+                                    <option value="{{ $g->id }}">{{ $g->nombre }} ({{ $g->clientes_count }} clientes)</option>
+                                @endforeach
+                            </select>
+                            <a href="{{ route('grupos.index') }}" class="text-xs text-brand hover:underline mt-1 inline-block">
+                                <i class="fa-solid fa-gear text-[10px]"></i> Gestionar grupos
+                            </a>
+                        @elseif($audienciaTipo === 'zona')
                             <select wire:model="zonaId" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm">
                                 <option value="">— Selecciona zona —</option>
                                 @foreach($zonas as $z)

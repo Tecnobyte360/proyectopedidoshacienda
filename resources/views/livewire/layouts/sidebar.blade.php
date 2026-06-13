@@ -69,6 +69,7 @@
                     ['name' => 'Usuarios internos', 'icon' => 'fa-user-shield',        'route' => 'usuarios-internos.index','badge' => null, 'permission' => 'usuarios_internos.ver'],
                     ['name' => 'Departamentos',     'icon' => 'fa-building-user',      'route' => 'departamentos.index',    'badge' => null, 'permission' => 'departamentos.gestionar'],
                     ['name' => 'Campañas WhatsApp', 'icon' => 'fa-bullhorn',           'route' => 'campanas.index',         'badge' => null, 'permission' => 'campanas.ver'],
+                    ['name' => 'Grupos de clientes', 'icon' => 'fa-users-rectangle',  'route' => 'grupos.index',           'badge' => null, 'permission' => 'campanas.ver'],
                     ['name' => 'Estados WhatsApp', 'icon' => 'fa-circle-info',         'route' => 'estados-whatsapp.index', 'badge' => null, 'permission' => 'campanas.ver'],
                     ['name' => 'Widgets de Chat',   'icon' => 'fa-code',               'route' => 'chat-widgets.index',     'badge' => null, 'permission' => 'chat_widgets.gestionar'],
                     ['name' => 'Domiciliarios',     'icon' => 'fa-motorcycle',         'route' => 'domiciliarios.index',    'badge' => null, 'permission' => 'domiciliarios.gestionar'],

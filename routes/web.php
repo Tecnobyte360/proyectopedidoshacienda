@@ -193,6 +193,7 @@ Route::middleware(['no_super_sin_imp'])->group(function () {
         ->middleware('permission:campanas.ver|campanas.gestionar')
         ->name('campanas.informe');
     Route::get('/estados-whatsapp',  EstadosWhatsappIndex::class)->middleware('permission:campanas.ver|campanas.gestionar')->name('estados-whatsapp.index');
+    Route::get('/grupos', \App\Livewire\Grupos\Index::class)->middleware('permission:campanas.ver|campanas.gestionar')->name('grupos.index');
     Route::get('/importaciones', ImportacionesIndex::class)->middleware('permission:productos.ver')->name('importaciones.index');
     Route::get('/integraciones', IntegracionesIndex::class)->middleware(['permission:productos.ver', 'role:super-admin'])->name('integraciones.index');
     Route::get('/integraciones/{integracion}/consultas', \App\Livewire\Integraciones\Consultas::class)
