@@ -829,7 +829,7 @@ class Index extends Component
 
         // 2) Traer: salientes del grupo (meta.grupo_id) + entrantes del cliente
         //    posteriores a su primer mensaje de grupo (sus respuestas al grupo).
-        return MensajeWhatsapp::whereIn('conversacion_id', $convIds)
+        $mensajes = MensajeWhatsapp::whereIn('conversacion_id', $convIds)
             ->whereIn('rol', [MensajeWhatsapp::ROL_USER, MensajeWhatsapp::ROL_ASSISTANT])
             ->where(function ($q) use ($primerGrupoPorConv) {
                 $q->where('meta->grupo_id', $this->grupoAbiertoId);
@@ -842,14 +842,32 @@ class Index extends Component
                 }
             })
             ->orderBy('id')
-            ->limit(300)
-            ->get()
-            ->map(function ($m) use ($convCliente) {
-                $cli = $convCliente->get($m->conversacion_id)?->cliente;
-                $m->_remitente = $cli?->nombre ?: ($cli?->telefono_normalizado ?? 'Cliente');
-                $m->_foto      = $cli?->foto_url;
-                return $m;
-            });
+            ->limit(400)
+            ->get();
+
+        // 3) Consolidar: los salientes del MISMO lote (grupo_batch) = 1 burbuja.
+        //    Mostramos solo el primero de cada lote + cuántos lo recibieron.
+        $vistos = [];
+        return $mensajes->filter(function ($m) use (&$vistos) {
+            if ($m->rol === MensajeWhatsapp::ROL_ASSISTANT) {
+                $batch = $m->meta['grupo_batch'] ?? null;
+                if ($batch) {
+                    if (isset($vistos[$batch])) return false; // ya mostramos este lote
+                    $vistos[$batch] = true;
+                }
+            }
+            return true;
+        })->map(function ($m) use ($convCliente, $mensajes) {
+            $cli = $convCliente->get($m->conversacion_id)?->cliente;
+            $m->_remitente = $cli?->nombre ?: ($cli?->telefono_normalizado ?? 'Cliente');
+            $m->_foto      = $cli?->foto_url;
+            // Cuántos miembros recibieron este lote (para el badge).
+            $batch = $m->meta['grupo_batch'] ?? null;
+            $m->_destinatarios = $batch
+                ? $mensajes->where('meta.grupo_batch', $batch)->count()
+                : 1;
+            return $m;
+        })->values();
     }
 
     /** Envía el mensaje a TODOS los miembros del grupo (cada uno en su privado). */
@@ -864,6 +882,7 @@ class Index extends Component
         $svc      = app(\App\Services\Meta\MetaWhatsappCloudService::class);
         $checker  = app(\App\Services\Whatsapp\Ventana24hChecker::class);
         $convSvc  = app(ConversacionService::class);
+        $batch    = (string) \Illuminate\Support\Str::uuid(); // 🔗 mismo lote = 1 burbuja
 
         $enviados = 0; $omitidos = 0;
         foreach ($grupo->clientes as $cli) {
@@ -888,7 +907,7 @@ class Index extends Component
             // Registrar en la conversación del cliente (trazabilidad) si se envió.
             if ($ok) {
                 $convSvc->agregarMensaje($conv, MensajeWhatsapp::ROL_ASSISTANT, $texto, [
-                    'meta' => ['enviado_por_humano' => true, 'usuario_id' => auth()->id(), 'grupo_id' => $grupo->id],
+                    'meta' => ['enviado_por_humano' => true, 'usuario_id' => auth()->id(), 'grupo_id' => $grupo->id, 'grupo_batch' => $batch],
                 ]);
                 $enviados++;
             } else {
@@ -923,6 +942,7 @@ class Index extends Component
         $convSvc = app(ConversacionService::class);
         $numVars = (int) ($tpl->num_variables ?? 0);
         $nombreNegocio = $tenant?->nombre ?: 'nosotros';
+        $batch   = (string) \Illuminate\Support\Str::uuid(); // 🔗 mismo lote = 1 burbuja
 
         $enviados = 0; $fallidos = 0;
         foreach ($grupo->clientes as $cli) {
@@ -948,7 +968,7 @@ class Index extends Component
                     $body = str_replace(['{{' . ($i + 1) . '}}', '{{ ' . ($i + 1) . ' }}'], (string) $v, $body);
                 }
                 $convSvc->agregarMensaje($conv, MensajeWhatsapp::ROL_ASSISTANT, $body, [
-                    'meta' => ['enviado_por_humano' => true, 'usuario_id' => auth()->id(), 'grupo_id' => $grupo->id, 'plantilla' => $tpl->nombre],
+                    'meta' => ['enviado_por_humano' => true, 'usuario_id' => auth()->id(), 'grupo_id' => $grupo->id, 'grupo_batch' => $batch, 'plantilla' => $tpl->nombre],
                 ]);
                 $enviados++;
             } else {

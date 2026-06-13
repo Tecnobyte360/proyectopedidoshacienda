@@ -481,7 +481,12 @@
                                     <p class="text-[11px] font-bold text-brand mb-0.5">{{ $m->_remitente }}</p>
                                 @endif
                                 <p class="text-sm text-slate-800 whitespace-pre-wrap break-words">{{ $m->contenido }}</p>
-                                <p class="text-[10px] text-slate-400 text-right mt-0.5">{{ $m->created_at?->format('h:i a') }}</p>
+                                <p class="text-[10px] text-slate-400 text-right mt-0.5">
+                                    @if(!$esCliente && ($m->_destinatarios ?? 1) > 1)
+                                        <span class="text-emerald-600 font-semibold">✓ enviado a {{ $m->_destinatarios }} miembros</span> ·
+                                    @endif
+                                    {{ $m->created_at?->format('h:i a') }}
+                                </p>
                             </div>
                         </div>
                     @empty
