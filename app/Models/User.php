@@ -69,6 +69,12 @@ class User extends Authenticatable
         return $this->belongsTo(Sede::class);
     }
 
+    /** Sedes que el usuario puede VER (multi-sede). Vacío = solo su sede_id. */
+    public function sedesVisibles(): BelongsToMany
+    {
+        return $this->belongsToMany(Sede::class, 'sede_user');
+    }
+
     public function iniciales(): string
     {
         return collect(explode(' ', trim($this->name ?? '')))

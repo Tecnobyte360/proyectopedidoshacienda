@@ -391,11 +391,30 @@
                                 @endforeach
                             </select>
                             <label class="mt-2 flex items-start gap-2 cursor-pointer">
-                                <input type="checkbox" wire:model="veTodasSedes" class="mt-0.5 rounded border-slate-300 text-brand focus:ring-brand/30">
+                                <input type="checkbox" wire:model.live="veTodasSedes" class="mt-0.5 rounded border-slate-300 text-brand focus:ring-brand/30">
                                 <span class="text-xs text-slate-600">
                                     <b>Ver todas las sedes</b> — el usuario ve pedidos, chats y datos de <b>todas</b> las sedes (no solo la suya).
                                 </span>
                             </label>
+
+                            {{-- 🏢 Selección de sedes específicas (si NO ve todas) --}}
+                            @unless($veTodasSedes)
+                                <div class="mt-3 rounded-xl border border-slate-200 p-3">
+                                    <p class="text-xs font-semibold text-slate-700 mb-2">
+                                        <i class="fa-solid fa-list-check text-slate-400"></i> Sedes que puede ver
+                                        <span class="font-normal text-slate-400">(además de la asignada). Vacío = solo la suya.</span>
+                                    </p>
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-40 overflow-y-auto">
+                                        @foreach($sedes as $s)
+                                            <label class="flex items-center gap-2 text-sm text-slate-700 cursor-pointer rounded-lg px-2 py-1 hover:bg-slate-50">
+                                                <input type="checkbox" value="{{ $s->id }}" wire:model="sedes_visibles_ids"
+                                                       class="rounded border-slate-300 text-brand focus:ring-brand/30">
+                                                {{ $s->nombre }}
+                                            </label>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            @endunless
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-1.5">Rol</label>

@@ -41,20 +41,31 @@ class SedeScopeFilter
             return $query;
         }
 
-        // User con sede asignada → solo SU sede
-        // Permitimos también los registros sin sede asignada (NULL) para evitar pérdida de datos
-        // (ej: pedidos antiguos sin sede o conversaciones del bot antes de asignar)
-        if ($user->sede_id) {
-            $tabla = $query->getModel()->getTable();
-            $col = "{$tabla}.{$columnaSede}";
-            return $query->where(function ($q) use ($col, $user) {
-                $q->where($col, $user->sede_id)
-                  ->orWhereNull($col);
-            });
+        // Conjunto de sedes que el usuario puede ver (multi-sede + su sede_id).
+        // Permitimos también los registros sin sede (NULL) para no perder datos.
+        $ids = self::sedeIdsPermitidos($user);
+        if (empty($ids)) {
+            return $query->whereRaw('1 = 0'); // sin sedes → no ve nada
         }
+        $tabla = $query->getModel()->getTable();
+        $col = "{$tabla}.{$columnaSede}";
+        return $query->where(function ($q) use ($col, $ids) {
+            $q->whereIn($col, $ids)
+              ->orWhereNull($col);
+        });
+    }
 
-        // User sin sede y sin rol global → no ve nada
-        return $query->whereRaw('1 = 0');
+    /**
+     * IDs de sedes que el usuario puede ver: las de la relación sedesVisibles
+     * (multi-sede) y, si no tiene ninguna, su sede_id "principal".
+     */
+    public static function sedeIdsPermitidos($user): array
+    {
+        if (!$user) return [];
+        $ids = [];
+        try { $ids = $user->sedesVisibles()->pluck('sedes.id')->all(); } catch (\Throwable $e) { $ids = []; }
+        if (empty($ids) && $user->sede_id) $ids = [(int) $user->sede_id];
+        return array_values(array_unique(array_map('intval', $ids)));
     }
 
     /**
@@ -67,12 +78,10 @@ class SedeScopeFilter
         if (!$user) return $query->whereRaw('1 = 0');
         if (self::veTodasLasSedes($user)) return $query;
 
-        if ($user->sede_id) {
-            $tabla = $query->getModel()->getTable();
-            return $query->where("{$tabla}.{$columnaSede}", $user->sede_id);
-        }
-
-        return $query->whereRaw('1 = 0');
+        $ids = self::sedeIdsPermitidos($user);
+        if (empty($ids)) return $query->whereRaw('1 = 0');
+        $tabla = $query->getModel()->getTable();
+        return $query->whereIn("{$tabla}.{$columnaSede}", $ids);
     }
 
     /**

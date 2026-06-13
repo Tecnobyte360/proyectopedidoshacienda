@@ -29,6 +29,8 @@ class Index extends Component
     public bool   $activo    = true;
     /** Si está activo, el usuario ve datos de TODAS las sedes (no solo la suya). */
     public bool   $veTodasSedes = false;
+    /** @var int[] Sedes específicas que el usuario puede ver (multi-sede). */
+    public array  $sedes_visibles_ids = [];
     /** @var int[] IDs de departamentos seleccionados para el usuario */
     public array  $departamentos_ids = [];
 
@@ -64,6 +66,7 @@ class Index extends Component
         $this->password   = ''; // no precargar
         $this->departamentos_ids = $u->departamentos()->pluck('departamentos.id')->all();
         try { $this->veTodasSedes = $u->hasPermissionTo('sedes.ver-todas'); } catch (\Throwable $e) { $this->veTodasSedes = false; }
+        $this->sedes_visibles_ids = $u->sedesVisibles()->pluck('sedes.id')->all();
 
         $this->modalAbierto = true;
     }
@@ -155,6 +158,13 @@ class Index extends Component
                 $user->revokePermissionTo('sedes.ver-todas');
             }
         } catch (\Throwable $e) { /* permiso no disponible */ }
+
+        // 🏢 Sedes específicas que puede ver (solo del tenant actual por seguridad).
+        $tenantId2 = app(TenantManager::class)->id();
+        $sedesValidas = $tenantId2
+            ? Sede::where('tenant_id', $tenantId2)->whereIn('id', $this->sedes_visibles_ids)->pluck('id')->all()
+            : Sede::whereIn('id', $this->sedes_visibles_ids)->pluck('id')->all();
+        $user->sedesVisibles()->sync($sedesValidas);
 
         $this->cerrarModal();
         $this->dispatch('notify', [
@@ -359,6 +369,7 @@ class Index extends Component
         $this->rol       = '';
         $this->activo    = true;
         $this->veTodasSedes = false;
+        $this->sedes_visibles_ids = [];
         $this->departamentos_ids = [];
         $this->resetValidation();
     }
