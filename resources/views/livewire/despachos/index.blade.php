@@ -230,8 +230,9 @@
 
         <div class="mb-6">
 
-            {{-- 🗺️ MAPA con la ruta del domiciliario --}}
-            @if(!empty($rutaDomi['paradas']))
+            {{-- 🗺️ MAPA de ruta OCULTO para el domiciliario (usa Google Maps/Waze
+                 directo desde cada pedido). Se mantiene el script de navegación. --}}
+            @if(false && !empty($rutaDomi['paradas']))
                 <div class="mt-4 rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
                     <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between bg-slate-50">
                         <div class="flex items-center gap-2">
@@ -247,7 +248,9 @@
                          data-ruta="{{ json_encode($rutaDomi) }}"
                          style="height: 380px; background:#e5e7eb;"></div>
                 </div>
+            @endif
 
+            @if(!empty($rutaDomi['paradas']))
                 @script
                 <script>
                     (function () {
