@@ -2129,7 +2129,7 @@
                                 <button type="button" wire:click="$set('modalPagoMetodo', '{{ $val }}')"
                                         class="rounded-xl border-2 p-3 text-center transition
                                             {{ $modalPagoMetodo === $val ? 'border-amber-500 bg-amber-50 text-amber-900' : 'border-slate-200 hover:border-slate-300 text-slate-700' }}">
-                                    <div class="text-2xl mb-1">{{ $emoji }}</div>
+                                    <div class="text-2xl mb-1">{!! $emoji !!}</div>
                                     <div class="text-xs font-bold">{{ $label }}</div>
                                 </button>
                             @endforeach
