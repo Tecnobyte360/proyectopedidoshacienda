@@ -803,8 +803,35 @@ class CrearManual extends Component
 
                 // Si NO se pudo enviar texto (ventana cerrada) → plantilla.
                 if (!$enviadoComoTexto) {
-                    app(\App\Services\Whatsapp\DispararEventoMetaService::class)
-                        ->dispararParaPedido('pedido_confirmado', $pedido);
+                    // 💳 Si el pago es por Bold y ya tenemos el ID del link
+                    //    (LNK_...), enviamos la plantilla 'pedido_pago_bold' con
+                    //    BOTÓN URL para que el cliente pueda pagar aunque la
+                    //    ventana de 24h esté cerrada. Si no hay link Bold, cae a
+                    //    la confirmación normal.
+                    $lnkId = ($pedido->pasarela_usada === 'bold') ? ($pedido->bold_payment_id ?: null) : null;
+                    $enviadoPlantillaPago = false;
+                    if ($lnkId) {
+                        try {
+                            $primerNombre = trim(explode(' ', (string) $this->nombre_cliente)[0] ?: 'Cliente');
+                            $enviadoPlantillaPago = app(\App\Services\Meta\MetaWhatsappCloudService::class)
+                                ->enviarPlantilla(
+                                    $conv->telefono_normalizado,
+                                    'pedido_pago_bold',
+                                    [$primerNombre, (string) $pedido->id, number_format((float) $pedido->total, 0, ',', '.')],
+                                    $conv->tenant_id,
+                                    'es',
+                                    null,
+                                    $lnkId // 🔘 parámetro del botón URL (sufijo del link Bold)
+                                );
+                        } catch (\Throwable $e) {
+                            Log::warning('Pedido manual: plantilla pago Bold falló', ['error' => $e->getMessage()]);
+                        }
+                    }
+
+                    if (!$enviadoPlantillaPago) {
+                        app(\App\Services\Whatsapp\DispararEventoMetaService::class)
+                            ->dispararParaPedido('pedido_confirmado', $pedido);
+                    }
                 }
             }
 

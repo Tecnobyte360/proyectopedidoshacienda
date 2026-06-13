@@ -70,7 +70,8 @@ class MetaWhatsappCloudService
         array  $variables = [],
         ?int   $tenantId = null,
         string $idioma   = 'es',
-        ?string $headerImagenUrl = null
+        ?string $headerImagenUrl = null,
+        ?string $botonUrlParam = null
     ): bool {
         $config = $this->resolverConfig($tenantId);
         if (!$config) return false;
@@ -94,6 +95,18 @@ class MetaWhatsappCloudService
                 $params[] = ['type' => 'text', 'text' => (string) $valor];
             }
             $components[] = ['type' => 'body', 'parameters' => $params];
+        }
+
+        // 🔘 Botón URL dinámico: el parámetro es el SUFIJO que se concatena a la
+        //    URL base de la plantilla (ej. base 'https://checkout.bold.co/payment/{{1}}'
+        //    + param 'LNK_ABC' → 'https://checkout.bold.co/payment/LNK_ABC').
+        if ($botonUrlParam !== null && $botonUrlParam !== '') {
+            $components[] = [
+                'type'       => 'button',
+                'sub_type'   => 'url',
+                'index'      => '0',
+                'parameters' => [['type' => 'text', 'text' => (string) $botonUrlParam]],
+            ];
         }
 
         $payload = [
