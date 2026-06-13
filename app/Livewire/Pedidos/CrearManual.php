@@ -319,6 +319,10 @@ class CrearManual extends Component
     public ?float $envioDistanciaKm = null;
     // 🗺️ Nombre de la zona de cobertura resuelta por barrio (para mostrar).
     public ?string $envioZonaNombre = null;
+    // 📍 Coordenadas de la dirección elegida en Google Maps (para que el pedido
+    //    entre en la ruta optimizada / mapa de despachos).
+    public ?float $direccionLat = null;
+    public ?float $direccionLng = null;
 
     /**
      * 🗺️ Calcula el costo de envío según la ZONA DE COBERTURA del barrio.
@@ -483,6 +487,8 @@ class CrearManual extends Component
         $this->barrio              = '';
         $this->telefonoDesdeErp    = false;
         $this->listaPrecioCliente  = null;
+        $this->direccionLat        = null;
+        $this->direccionLng        = null;
 
         // 1️⃣ Buscar en la base local (rápido). Llena nombre/email/dirección,
         //    y el teléfono SOLO si el local tiene uno VÁLIDO.
@@ -700,6 +706,12 @@ class CrearManual extends Component
             $orderData['shipping_cost']      = $envioManual;
             $orderData['costo_envio']        = $envioManual;
             $orderData['costo_envio_manual'] = true;
+            // 📍 Coordenadas de la dirección (si se eligió de Google Maps) para
+            //    que el pedido entre en la ruta optimizada y el mapa de despachos.
+            if ($this->direccionLat && $this->direccionLng) {
+                $orderData['location_lat'] = (float) $this->direccionLat;
+                $orderData['location_lng'] = (float) $this->direccionLng;
+            }
         } else {
             $orderData['address']  = '';
             $orderData['location'] = Sede::find($this->sede_id)?->nombre ?? '';

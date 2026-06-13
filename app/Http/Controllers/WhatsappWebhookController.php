@@ -8420,6 +8420,18 @@ TXT;
         // Coordenadas del cliente (si la validación las encontró vía geocoding)
         $pedidoLat = $validacion['coordenadas']['lat'] ?? null;
         $pedidoLng = $validacion['coordenadas']['lng'] ?? null;
+        // 📍 Respaldo: en pedidos MANUALES, si la geocodificación no dio coords
+        //    pero el operador eligió la dirección en Google (capturamos lat/lng
+        //    en el formulario), usamos esas para que el pedido SÍ entre en la
+        //    ruta optimizada / mapa de despachos.
+        if ((!$pedidoLat || !$pedidoLng) && !empty($orderData['manual'])) {
+            $latForm = (float) ($orderData['location_lat'] ?? 0);
+            $lngForm = (float) ($orderData['location_lng'] ?? 0);
+            if ($latForm != 0.0 && $lngForm != 0.0) {
+                $pedidoLat = $latForm;
+                $pedidoLng = $lngForm;
+            }
+        }
 
         // 🚚 Si es pickup en sede, NO guardamos dirección de cliente
         // (la dirección es la de la sede misma — no debemos despachar).

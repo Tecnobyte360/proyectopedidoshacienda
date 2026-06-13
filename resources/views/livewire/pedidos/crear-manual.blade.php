@@ -766,6 +766,13 @@
                                     barrio = c.longText || c.shortText || '';
                                 }
                             });
+                            // 📍 Coordenadas → para que el pedido entre en la ruta
+                            //    optimizada y el mapa de despachos.
+                            if (d.location && d.location.latitude && d.location.longitude) {
+                                this.$wire.set('direccionLat', d.location.latitude, false);
+                                this.$wire.set('direccionLng', d.location.longitude, false);
+                            }
+
                             // 🗺️ Al setear el barrio, el backend (updatedBarrio)
                             //    resuelve la ZONA de cobertura y pone el costo.
                             if (barrio) this.$wire.set('barrio', barrio);
