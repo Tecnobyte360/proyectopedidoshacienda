@@ -450,11 +450,21 @@
                                     Barrio
                                 </label>
                                 <div class="relative">
-                                    <i class="fa-solid fa-tree-city absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
-                                    <input type="text" wire:model="barrio"
-                                           placeholder="Prado"
+                                    <i class="fa-solid fa-tree-city absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 z-10"></i>
+                                    <input type="text" wire:model.live.debounce.500ms="barrio"
+                                           list="barriosCoberturaList"
+                                           autocomplete="off"
+                                           placeholder="Escribe o elige el barrio…"
                                            class="{{ $inputClsIcon }}">
+                                    <datalist id="barriosCoberturaList">
+                                        @foreach($barriosCobertura as $b)
+                                            <option value="{{ $b['nombre'] }}">{{ $b['zona'] }}@if($b['costo'] > 0) · ${{ number_format($b['costo'], 0, ',', '.') }}@endif</option>
+                                        @endforeach
+                                    </datalist>
                                 </div>
+                                @if($barriosCobertura->isEmpty())
+                                    <p class="mt-1 text-[11px] text-amber-600"><i class="fa-solid fa-triangle-exclamation"></i> No hay barrios cargados en zonas de cobertura.</p>
+                                @endif
                             </div>
                         </div>
 

@@ -928,6 +928,24 @@ class CrearManual extends Component
         $tieneWompi = $tenant ? $tenant->tieneWompi() : false;
         $tieneBold  = $tenant ? ($tenant->bold_activo && !empty($tenant->bold_api_key)) : false;
 
+        // 🗺️ Barrios de las zonas de cobertura (para la lista del campo Barrio).
+        //    Cada barrio se muestra con su zona y costo de envío como pista.
+        $barriosCobertura = \App\Models\ZonaBarrio::query()
+            ->whereHas('zona', fn ($q) => $q->where('activa', true)
+                ->when($this->sede_id, fn ($qq) => $qq->where(function ($w) {
+                    $w->where('sede_id', $this->sede_id)->orWhereNull('sede_id');
+                })))
+            ->with('zona:id,nombre,costo_envio')
+            ->orderBy('nombre')
+            ->get(['id', 'nombre', 'zona_id'])
+            ->map(fn ($b) => [
+                'nombre' => $b->nombre,
+                'zona'   => $b->zona?->nombre,
+                'costo'  => (float) ($b->zona?->costo_envio ?? 0),
+            ])
+            ->unique('nombre')
+            ->values();
+
         return view('livewire.pedidos.crear-manual', [
             'productosCatalogo' => $this->productosCatalogo,
             'sedes'             => $this->sedes,
@@ -935,6 +953,7 @@ class CrearManual extends Component
             'gmapsKey'          => $gmapsKey,
             'tieneWompi'        => $tieneWompi,
             'tieneBold'         => $tieneBold,
+            'barriosCobertura'  => $barriosCobertura,
         ]);
     }
 }
