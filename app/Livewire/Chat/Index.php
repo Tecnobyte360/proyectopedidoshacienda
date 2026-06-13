@@ -737,6 +737,11 @@ class Index extends Component
     {
         $this->grupoAbiertoId = $grupoId;
         $this->conversacionActivaId = null; // salir de cualquier conversación 1-a-1
+
+        // 🟢 Asegurar que se carguen las plantillas Meta (para el panel del grupo).
+        $tenant = app(\App\Services\TenantManager::class)->current();
+        $this->tenantUsaMeta = $tenant
+            && $tenant->proveedorWhatsappResuelto() === \App\Models\Tenant::WA_PROVIDER_META;
     }
 
     public function cerrarGrupoUnificado(): void
