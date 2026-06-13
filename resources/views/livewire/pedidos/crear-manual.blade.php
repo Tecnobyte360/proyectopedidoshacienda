@@ -457,7 +457,7 @@
                                         </p>
                                     @else
                                         <p class="mt-1 text-[11px] text-amber-600 font-medium">
-                                            <i class="fa-solid fa-triangle-exclamation text-[10px]"></i> Elige la dirección del desplegable de Google para fijar la ubicación (obligatorio para domicilio).
+                                            <i class="fa-solid fa-triangle-exclamation text-[10px]"></i> Elige la dirección del desplegable de Google para fijar la ubicación exacta (recomendado para la ruta). Si no, igual puedes crear el pedido.
                                         </p>
                                     @endif
                                 @else
