@@ -464,17 +464,27 @@
                                 <i class="fa-solid fa-truck text-slate-400 mr-1"></i>
                                 Costo de envío
                             </label>
-                            <div class="relative max-w-xs">
-                                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-semibold">$</span>
-                                <input type="number" step="500" min="0" wire:model.live="costo_envio"
-                                       placeholder="0"
-                                       class="w-full rounded-xl border border-slate-300 bg-white text-sm pl-7 pr-3.5 py-2.5 shadow-sm focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none">
+                            <div class="flex items-center gap-2 max-w-md" @if($gmapsKey) x-data="envioCalculador(@js($gmapsKey))" @endif>
+                                <div class="relative flex-1 max-w-xs">
+                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-semibold">$</span>
+                                    <input type="number" step="500" min="0" wire:model.live="costo_envio"
+                                           placeholder="0"
+                                           class="w-full rounded-xl border border-slate-300 bg-white text-sm pl-7 pr-3.5 py-2.5 shadow-sm focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none">
+                                </div>
+                                @if($gmapsKey)
+                                    <button type="button" @click="calcular()" x-bind:disabled="cargando"
+                                            class="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 text-sm font-semibold transition shrink-0 disabled:opacity-70 disabled:cursor-wait">
+                                        <i class="fa-solid fa-route" x-show="!cargando"></i>
+                                        <i class="fa-solid fa-spinner fa-spin" x-show="cargando" x-cloak></i>
+                                        <span x-text="cargando ? 'Calculando…' : 'Calcular'"></span>
+                                    </button>
+                                @endif
                             </div>
                             <p class="text-[11px] text-slate-400 mt-1">
                                 @if($envioDistanciaKm)
                                     <span class="text-emerald-600 font-medium"><i class="fa-solid fa-route"></i> Calculado por distancia: ~{{ $envioDistanciaKm }} km</span> · podés modificarlo.
                                 @else
-                                    Se calcula solo al elegir la dirección de Google Maps. Podés modificarlo.
+                                    Se calcula solo al elegir la dirección de Google Maps, o con el botón <b>Calcular</b>. Podés modificarlo.
                                 @endif
                             </p>
                         </div>
@@ -756,6 +766,47 @@
                         } catch (e) { /* sin barrio/coords, no pasa nada */ }
 
                         this.sessionToken = null; // cerrar sesión de búsqueda
+                    },
+                };
+            }
+
+            // 🚚 Calcula el costo de envío geolocalizando la dirección ESCRITA
+            //    (venga del ERP, de Google o tecleada). Usa Text Search (New)
+            //    para obtener coordenadas y luego pide el cálculo al servidor.
+            function envioCalculador(apiKey) {
+                return {
+                    apiKey: apiKey,
+                    cargando: false,
+                    async calcular() {
+                        const dir = (this.$wire.get('direccion') || '').trim();
+                        if (dir.length < 5) {
+                            this.$wire.dispatch('notify', { type: 'warning', message: 'Escribe primero la dirección del cliente.' });
+                            return;
+                        }
+                        this.cargando = true;
+                        try {
+                            const resp = await fetch('https://places.googleapis.com/v1/places:searchText', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-Goog-Api-Key': this.apiKey,
+                                    'X-Goog-FieldMask': 'places.location,places.formattedAddress',
+                                },
+                                body: JSON.stringify({ textQuery: dir, languageCode: 'es', regionCode: 'CO' }),
+                            });
+                            const d = await resp.json();
+                            if (d.error) { console.warn('Text Search error:', d.error.message); }
+                            const loc = d.places && d.places[0] && d.places[0].location;
+                            if (loc && loc.latitude && loc.longitude) {
+                                await this.$wire.calcularEnvio(loc.latitude, loc.longitude);
+                            } else {
+                                this.$wire.dispatch('notify', { type: 'warning', message: 'No pude ubicar esa dirección en el mapa. Ajústala y reintenta, o escribe el costo a mano.' });
+                            }
+                        } catch (e) {
+                            console.warn('envioCalculador falló:', e);
+                            this.$wire.dispatch('notify', { type: 'error', message: 'No se pudo calcular el envío. Escribe el costo a mano.' });
+                        }
+                        this.cargando = false;
                     },
                 };
             }
