@@ -431,9 +431,15 @@
                                             </template>
                                         </div>
                                     </div>
-                                    <p class="mt-1 text-[11px] text-slate-400">
-                                        <i class="fa-brands fa-google text-[10px]"></i> Escribe y elige una sugerencia de Google Maps
-                                    </p>
+                                    @if($direccionLat && $direccionLng)
+                                        <p class="mt-1 text-[11px] text-emerald-600 font-medium">
+                                            <i class="fa-solid fa-location-crosshairs text-[10px]"></i> Ubicación fijada ✓ (entra en la ruta)
+                                        </p>
+                                    @else
+                                        <p class="mt-1 text-[11px] text-amber-600 font-medium">
+                                            <i class="fa-solid fa-triangle-exclamation text-[10px]"></i> Elige la dirección del desplegable de Google para fijar la ubicación (obligatorio para domicilio).
+                                        </p>
+                                    @endif
                                 @else
                                     <div class="relative">
                                         <i class="fa-solid fa-house absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 z-10"></i>

@@ -660,6 +660,16 @@ class CrearManual extends Component
             $this->dispatch('notify', ['type' => 'error', 'message' => 'Falta la dirección para domicilio.']);
             return;
         }
+        // 📍 DESPACHO SÍ O SÍ con ubicación: sin coordenadas el pedido no entra en
+        //    la ruta ni se puede trazar el mapa al cliente. Obligamos a elegir la
+        //    dirección del desplegable de Google Maps (eso captura las coords).
+        if ($this->metodo_entrega === 'domicilio' && (!$this->direccionLat || !$this->direccionLng)) {
+            $this->dispatch('notify', [
+                'type'    => 'error',
+                'message' => '📍 Elige la dirección del desplegable de Google Maps para fijar la ubicación. Sin ubicación no se puede despachar ni trazar la ruta al cliente.',
+            ]);
+            return;
+        }
         if ($this->metodo_entrega === 'recoger' && empty($this->sede_id)) {
             $this->dispatch('notify', ['type' => 'error', 'message' => 'Falta la sede de recogida.']);
             return;
