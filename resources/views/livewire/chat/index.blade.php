@@ -81,27 +81,11 @@
                    placeholder="Buscar cliente o teléfono..."
                    class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-brand focus:ring-brand">
 
-            <div class="flex gap-1">
-                @foreach([
-                    'todas'     => ['Todas', 'fa-list'],
-                    'activa'    => ['Activas', 'fa-circle-dot'],
-                    'humano'    => ['Humano', 'fa-user'],
-                    'bot'       => ['Bot', 'fa-robot'],
-                    'internos'  => ['Internos', 'fa-user-shield'],
-                ] as $key => [$label, $icon])
-                    <button wire:click="$set('filtroEstado', '{{ $key }}')"
-                            class="flex-1 rounded-lg px-2 py-1.5 text-xs font-semibold transition
-                                  {{ $filtroEstado === $key ? 'bg-brand text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200' }}">
-                        <i class="fa-solid {{ $icon }} mr-0.5"></i> {{ $label }}
-                    </button>
-                @endforeach
-            </div>
-
-            {{-- Chips estilo WhatsApp: No leídos + Favoritos --}}
-            <div class="flex flex-wrap gap-1.5 mt-1">
+            {{-- 🔖 Filtros rápidos (estilo WhatsApp): No leídos · Favoritos · Grupos --}}
+            <div class="flex flex-wrap gap-1.5">
                 <button wire:click="$set('filtroEstado', 'todas')"
                         class="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold transition
-                              {{ $filtroEstado === 'todas' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' }}">
+                              {{ in_array($filtroEstado, ['todas','activa','humano','bot','internos']) && !$mostrarGrupos ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' }}">
                     Todos
                 </button>
                 <button wire:click="$set('filtroEstado', 'no_leidos')"
@@ -125,8 +109,6 @@
                         </span>
                     @endif
                 </button>
-
-                {{-- 👥 Chip GRUPOS (estilo WhatsApp) --}}
                 <button wire:click="toggleMostrarGrupos"
                         class="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold transition
                               {{ $mostrarGrupos ? 'bg-brand text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' }}">
@@ -138,6 +120,29 @@
                         </span>
                     @endif
                 </button>
+            </div>
+
+            {{-- ⚙️ Filtros por estado de atención (colapsable para no saturar) --}}
+            <div x-data="{ abierto: false }" class="border-t border-slate-100 pt-2">
+                <button @click="abierto = !abierto" class="flex items-center justify-between w-full text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1 px-0.5 hover:text-slate-600 transition">
+                    <span><i class="fa-solid fa-sliders text-[9px] mr-1"></i> Estado de atención</span>
+                    <i class="fa-solid fa-chevron-down text-[9px] transition" :class="abierto ? 'rotate-180' : ''"></i>
+                </button>
+                <div x-show="abierto" x-transition x-cloak class="grid grid-cols-5 gap-1">
+                    @foreach([
+                        'todas'     => ['Todas', 'fa-list'],
+                        'activa'    => ['Activas', 'fa-circle-dot'],
+                        'humano'    => ['Humano', 'fa-user'],
+                        'bot'       => ['Bot', 'fa-robot'],
+                        'internos'  => ['Internos', 'fa-user-shield'],
+                    ] as $key => [$label, $icon])
+                        <button wire:click="$set('filtroEstado', '{{ $key }}')"
+                                class="rounded-lg px-1 py-1.5 text-[10px] font-semibold transition flex flex-col items-center gap-0.5
+                                      {{ $filtroEstado === $key ? 'bg-brand text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200' }}">
+                            <i class="fa-solid {{ $icon }}"></i> {{ $label }}
+                        </button>
+                    @endforeach
+                </div>
             </div>
 
             {{-- 👥 Fila de grupos (se despliega al tocar el chip Grupos) --}}
