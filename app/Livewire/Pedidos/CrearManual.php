@@ -44,6 +44,7 @@ class CrearManual extends Component
 
     // Entrega
     public string $metodo_entrega = 'recoger'; // recoger | domicilio
+    public ?string $costo_envio   = null;       // 🚚 costo de envío editable (domicilio)
     public ?int   $sede_id        = null;
     public string $direccion      = '';
     public string $barrio         = '';
@@ -267,9 +268,22 @@ class CrearManual extends Component
         $this->productos = array_values($this->productos);
     }
 
-    public function getTotalProperty(): float
+    /** Subtotal de productos (sin envío). */
+    public function getSubtotalProductosProperty(): float
     {
         return collect($this->productos)->sum(fn ($p) => (float) ($p['cantidad'] ?? 0) * (float) ($p['precio'] ?? 0));
+    }
+
+    /** Costo de envío efectivo (solo si es domicilio). */
+    public function getEnvioProperty(): float
+    {
+        if ($this->metodo_entrega !== 'domicilio') return 0.0;
+        return (float) ($this->costo_envio ?? 0);
+    }
+
+    public function getTotalProperty(): float
+    {
+        return $this->subtotalProductos + $this->envio;
     }
 
     /** Si el operador edita el teléfono a mano, ya no es "el del ERP". */
@@ -521,6 +535,12 @@ class CrearManual extends Component
             $orderData['address']      = $this->direccion;
             $orderData['neighborhood'] = $this->barrio;
             $orderData['location']     = $this->ciudad;
+            // 🚚 Costo de envío definido por el operador (manda sobre el de zona).
+            if ($this->costo_envio !== null && $this->costo_envio !== '') {
+                $orderData['shipping_cost']        = (float) $this->costo_envio;
+                $orderData['costo_envio']          = (float) $this->costo_envio;
+                $orderData['costo_envio_manual']   = true;
+            }
         } else {
             $orderData['address']  = '';
             $orderData['location'] = Sede::find($this->sede_id)?->nombre ?? '';
@@ -564,6 +584,14 @@ class CrearManual extends Component
                     ->orderByDesc('id')
                     ->first();
                 if ($pedido) {
+                    // 🚚 Si el operador definió costo de envío, forzarlo y recalcular total.
+                    if ($this->metodo_entrega === 'domicilio' && $this->costo_envio !== null && $this->costo_envio !== '') {
+                        $envio = (float) $this->costo_envio;
+                        $pedido->costo_envio = $envio;
+                        $pedido->total = (float) ($pedido->subtotal ?? 0) + $envio;
+                        $pedido->saveQuietly();
+                    }
+
                     app(EstadoPedidoService::class)->marcarConfirmado($conv, $pedido->id);
 
                     // 🛵 Asignar domiciliario (solo a domicilio). Si el operador

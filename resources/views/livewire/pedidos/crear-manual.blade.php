@@ -458,6 +458,21 @@
                             </div>
                         </div>
 
+                        {{-- 🚚 Costo de envío (lo define el operador) --}}
+                        <div class="mt-4">
+                            <label class="{{ $labelCls }}">
+                                <i class="fa-solid fa-truck text-slate-400 mr-1"></i>
+                                Costo de envío
+                            </label>
+                            <div class="relative max-w-xs">
+                                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-semibold">$</span>
+                                <input type="number" step="500" min="0" wire:model.live="costo_envio"
+                                       placeholder="0"
+                                       class="w-full rounded-xl border border-slate-300 bg-white text-sm pl-7 pr-3.5 py-2.5 shadow-sm focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none">
+                            </div>
+                            <p class="text-[11px] text-slate-400 mt-1">El costo de envío de esta entrega. Se suma al total.</p>
+                        </div>
+
                         {{-- 🛵 Domiciliario (híbrido: sistema sugiere, operador confirma) --}}
                         <div class="mt-4">
                             <label class="{{ $labelCls }}">
@@ -613,6 +628,11 @@
                     <div class="text-2xl sm:text-3xl font-extrabold text-emerald-600 truncate">
                         ${{ number_format($this->total, 0, ',', '.') }}
                     </div>
+                    @if($metodo_entrega === 'domicilio' && $this->envio > 0)
+                        <div class="text-[10px] text-slate-400">
+                            Productos ${{ number_format($this->subtotalProductos, 0, ',', '.') }} + Envío ${{ number_format($this->envio, 0, ',', '.') }}
+                        </div>
+                    @endif
                 </div>
             </div>
             <button type="submit" form="" wire:click="crearPedido"
