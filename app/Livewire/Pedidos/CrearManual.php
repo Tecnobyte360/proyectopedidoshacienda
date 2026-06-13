@@ -268,6 +268,53 @@ class CrearManual extends Component
         $this->productos = array_values($this->productos);
     }
 
+    /**
+     * 💰 Repreciar el carrito según la lista de precios del cliente actual.
+     *
+     * Cuando se busca/cambia de cliente, su lista de precios (HGI IntPrecio
+     * 1..8) puede ser distinta. Los productos que ya estaban en el carrito
+     * deben tomar AUTOMÁTICAMENTE el precio que corresponde al nuevo cliente.
+     * Hace match por producto_id (preferido) o por código contra el catálogo
+     * resuelto con $this->listaPrecioCliente.
+     */
+    public function repreciarCarrito(): void
+    {
+        if (empty($this->productos)) return;
+
+        try {
+            $catalogo = app(\App\Services\BotCatalogoService::class)
+                ->productosActivos($this->sede_id ?: null, $this->listaPrecioCliente);
+        } catch (\Throwable $e) {
+            Log::warning('Pedido manual: repreciar carrito, catálogo falló', ['error' => $e->getMessage()]);
+            return;
+        }
+
+        $cambios = 0;
+        foreach ($this->productos as $i => $item) {
+            $pid = $item['producto_id'] ?? null;
+            $cod = (string) ($item['codigo'] ?? '');
+
+            $prod = $catalogo->first(fn ($p) =>
+                ($pid !== null && (string) ($p->id ?? '') === (string) $pid)
+                || ($cod !== '' && (string) ($p->codigo ?? '') === $cod)
+            );
+            if (!$prod) continue;
+
+            $nuevoPrecio = (float) ($prod->precio_base ?? 0);
+            if ($nuevoPrecio > 0 && abs($nuevoPrecio - (float) ($item['precio'] ?? 0)) > 0.001) {
+                $this->productos[$i]['precio'] = $nuevoPrecio;
+                $cambios++;
+            }
+        }
+
+        if ($cambios > 0) {
+            $this->dispatch('notify', [
+                'type'    => 'info',
+                'message' => "💰 Se actualizó el precio de {$cambios} producto(s) a la lista del cliente.",
+            ]);
+        }
+    }
+
     // 🚚 Info del cálculo de envío por distancia (para mostrar al operador).
     public ?float $envioDistanciaKm = null;
 
@@ -400,6 +447,9 @@ class CrearManual extends Component
         //    para CORREGIR el teléfono si el local quedó inválido (ej. relleno
         //    3111111111 mientras HGI tiene el celular real).
         $hitErp = $this->buscarClienteEnErp();
+
+        // 💰 Repreciar lo que ya estaba en el carrito a la lista del NUEVO cliente.
+        $this->repreciarCarrito();
 
         if ($encontradoLocal && !$hitErp) {
             // Estaba local pero el ERP no respondió (o no aplica). Avisar igual.
