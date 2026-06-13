@@ -125,7 +125,53 @@
                         </span>
                     @endif
                 </button>
+
+                {{-- 👥 Chip GRUPOS (estilo WhatsApp) --}}
+                <button wire:click="toggleMostrarGrupos"
+                        class="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold transition
+                              {{ $mostrarGrupos ? 'bg-brand text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' }}">
+                    <i class="fa-solid fa-users text-[10px]"></i>
+                    Grupos
+                    @if($gruposChat->count() > 0)
+                        <span class="inline-flex items-center justify-center min-w-[18px] h-4 px-1 rounded-full {{ $mostrarGrupos ? 'bg-white text-brand' : 'bg-brand text-white' }} text-[10px] font-bold">
+                            {{ $gruposChat->count() }}
+                        </span>
+                    @endif
+                </button>
             </div>
+
+            {{-- 👥 Fila de grupos (se despliega al tocar el chip Grupos) --}}
+            @if($mostrarGrupos)
+                <div class="flex flex-wrap items-center gap-1.5 mt-2 p-2 rounded-xl bg-slate-50 border border-slate-100">
+                    @forelse($gruposChat as $g)
+                        <button wire:click="filtrarPorGrupo({{ $g->id }})"
+                                class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition border
+                                       {{ $grupoFiltroId === $g->id ? 'text-white border-transparent' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50' }}"
+                                @if($grupoFiltroId === $g->id) style="background-color: {{ $g->color ?: '#d68643' }}" @endif>
+                            <span class="h-2 w-2 rounded-full" style="background-color: {{ $g->color ?: '#d68643' }}"></span>
+                            {{ $g->nombre }}
+                            <span class="opacity-70">{{ $g->clientes_count }}</span>
+                        </button>
+                    @empty
+                        <span class="text-xs text-slate-400 px-1">Aún no tenés grupos. Creá uno →</span>
+                    @endforelse
+
+                    {{-- Crear grupo rápido --}}
+                    <div class="inline-flex items-center gap-1">
+                        <input type="text" wire:model="nuevoGrupoNombre" wire:keydown.enter="crearGrupoRapido"
+                               placeholder="Nuevo grupo…"
+                               class="w-28 rounded-full border border-slate-200 px-3 py-1 text-xs focus:border-brand focus:ring-1 focus:ring-brand/20 focus:outline-none">
+                        <button wire:click="crearGrupoRapido" class="h-6 w-6 rounded-full bg-brand text-white flex items-center justify-center hover:bg-brand-dark" title="Crear grupo">
+                            <i class="fa-solid fa-plus text-[10px]"></i>
+                        </button>
+                    </div>
+                    @if($grupoFiltroId)
+                        <button wire:click="filtrarPorGrupo(null)" class="text-xs text-slate-500 hover:text-rose-600 ml-1">
+                            <i class="fa-solid fa-xmark"></i> Ver todos
+                        </button>
+                    @endif
+                </div>
+            @endif
 
             {{-- 📡 Filtros por CANAL --}}
             <div class="mt-2">
@@ -449,6 +495,32 @@
                     @php
                         $telLlamar = preg_replace('/[^0-9]/', '', $conversacionActiva->telefono_normalizado ?? '');
                     @endphp
+                    {{-- 👥 Agregar este cliente a un grupo --}}
+                    <div x-data="{ openG: false }" class="relative">
+                        <button type="button" @click="openG = !openG" @click.outside="openG = false"
+                                title="Agregar a un grupo"
+                                class="rounded-lg bg-brand px-2.5 py-1.5 text-xs font-bold text-white hover:bg-brand-dark transition inline-flex items-center gap-1">
+                            <i class="fa-solid fa-users"></i>
+                            <span class="hidden md:inline">Grupo</span>
+                        </button>
+                        <div x-show="openG" x-transition x-cloak
+                             class="absolute right-0 mt-1 w-56 rounded-lg border border-slate-200 bg-white shadow-xl z-50 overflow-hidden">
+                            <div class="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100">Agregar a grupo</div>
+                            <div class="max-h-52 overflow-y-auto">
+                                @forelse($gruposChat as $g)
+                                    <button wire:click="agregarConversacionAGrupo({{ $conversacionActiva->id }}, {{ $g->id }})" @click="openG = false"
+                                            class="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-brand-soft text-left transition">
+                                        <span class="h-2.5 w-2.5 rounded-full" style="background-color: {{ $g->color ?: '#d68643' }}"></span>
+                                        <span class="truncate">{{ $g->nombre }}</span>
+                                        <span class="ml-auto text-slate-400">{{ $g->clientes_count }}</span>
+                                    </button>
+                                @empty
+                                    <p class="px-3 py-2 text-xs text-slate-400">No tenés grupos. Creá uno desde el chip "Grupos".</p>
+                                @endforelse
+                            </div>
+                        </div>
+                    </div>
+
                     <div x-data="{ open: false }" class="relative">
                         <button type="button" @click="open = !open" @click.outside="open = false"
                                 title="Llamar al cliente"

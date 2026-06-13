@@ -26,6 +26,11 @@ class Index extends Component
     public string $busqueda     = '';
     public string $filtroEstado = 'todas';   // todas | activa | humano | bot | internos
     public string $filtroCanal  = 'todos';   // todos | whatsapp | instagram | widget
+
+    // 👥 Grupos de clientes (estilo WhatsApp: filtrar chats por grupo)
+    public bool   $mostrarGrupos    = false;  // despliega la fila de grupos
+    public ?int   $grupoFiltroId    = null;   // grupo seleccionado (filtra chats)
+    public string $nuevoGrupoNombre = '';     // crear grupo rápido
     public bool   $mostrarInternas = false;  // si es false, ocultas conversaciones internas
 
     // 📜 Scroll infinito: cuántas conversaciones mostrar. Arranca en 60 y crece
@@ -631,6 +636,60 @@ class Index extends Component
      * 📌 Fijar / desfijar una conversación en la lista.
      * Las fijadas aparecen siempre arriba, ordenadas por cuándo se fijaron.
      */
+    /* ───────── 👥 GRUPOS de clientes (estilo WhatsApp) ───────── */
+
+    /** Muestra/oculta la fila de grupos. */
+    public function toggleMostrarGrupos(): void
+    {
+        $this->mostrarGrupos = !$this->mostrarGrupos;
+        if (!$this->mostrarGrupos) $this->grupoFiltroId = null;
+    }
+
+    /** Selecciona/deselecciona un grupo para filtrar las conversaciones. */
+    public function filtrarPorGrupo(?int $grupoId): void
+    {
+        $this->grupoFiltroId = ($this->grupoFiltroId === $grupoId) ? null : $grupoId;
+    }
+
+    /** Crea un grupo nuevo desde el chat. */
+    public function crearGrupoRapido(): void
+    {
+        $nombre = trim($this->nuevoGrupoNombre);
+        if ($nombre === '') return;
+        $g = \App\Models\GrupoCliente::create([
+            'tenant_id' => app(\App\Services\TenantManager::class)->id(),
+            'nombre'    => $nombre,
+            'color'     => '#d68643',
+        ]);
+        $this->nuevoGrupoNombre = '';
+        $this->grupoFiltroId = $g->id;
+        $this->dispatch('notify', ['type' => 'success', 'message' => "Grupo '{$nombre}' creado."]);
+    }
+
+    /** Agrega el cliente de una conversación al grupo seleccionado. */
+    public function agregarConversacionAGrupo(int $conversacionId, int $grupoId): void
+    {
+        $conv = ConversacionWhatsapp::find($conversacionId);
+        $grupo = \App\Models\GrupoCliente::find($grupoId);
+        if (!$conv || !$conv->cliente_id || !$grupo) {
+            $this->dispatch('notify', ['type' => 'warning', 'message' => 'La conversación no tiene cliente asociado.']);
+            return;
+        }
+        $grupo->clientes()->syncWithoutDetaching([$conv->cliente_id]);
+        $this->dispatch('notify', ['type' => 'success', 'message' => "Agregado a '{$grupo->nombre}'."]);
+    }
+
+    /** Quita el cliente de la conversación del grupo actualmente filtrado. */
+    public function quitarConversacionDeGrupo(int $conversacionId): void
+    {
+        $conv = ConversacionWhatsapp::find($conversacionId);
+        $grupo = $this->grupoFiltroId ? \App\Models\GrupoCliente::find($this->grupoFiltroId) : null;
+        if ($conv && $conv->cliente_id && $grupo) {
+            $grupo->clientes()->detach($conv->cliente_id);
+            $this->dispatch('notify', ['type' => 'info', 'message' => "Quitado de '{$grupo->nombre}'."]);
+        }
+    }
+
     public function toggleFijar(int $conversacionId): void
     {
         $conv = ConversacionWhatsapp::find($conversacionId);
@@ -1891,6 +1950,11 @@ class Index extends Component
                 $qq->where('no_leidos', '>', 0)->orWhere('marcada_no_leida', true)
             ))
             ->when($this->filtroEstado === 'favoritos', fn ($q) => $q->whereNotNull('fijada_at'))
+            // 👥 Filtro por grupo de clientes: solo conversaciones de clientes en el grupo
+            ->when($this->grupoFiltroId, fn ($q) => $q->whereIn('cliente_id',
+                \Illuminate\Support\Facades\DB::table('cliente_grupo')
+                    ->where('grupo_id', $this->grupoFiltroId)->pluck('cliente_id')
+            ))
             ->when($this->filtroEstado !== 'internos' && !$this->mostrarInternas,
                    fn ($q) => $q->where(fn ($qq) => $qq->where('es_interna', false)->orWhereNull('es_interna')))
             // 📡 Filtro por canal (WhatsApp / Instagram / Widget web)
@@ -1981,6 +2045,9 @@ class Index extends Component
             ->count();
         $totalFavoritos = ConversacionWhatsapp::query()->whereNotNull('fijada_at')->count();
 
+        // 👥 Grupos de clientes (para los chips del chat)
+        $gruposChat = \App\Models\GrupoCliente::withCount('clientes')->orderBy('nombre')->get();
+
         return view('livewire.chat.index', compact(
             'conversaciones',
             'conversacionActiva',
@@ -1990,7 +2057,8 @@ class Index extends Component
             'plantillaChatSeleccionada',
             'respuestasRapidas',
             'totalNoLeidos',
-            'totalFavoritos'
+            'totalFavoritos',
+            'gruposChat'
         ))->layout('layouts.app');
     }
 
