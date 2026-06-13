@@ -8113,9 +8113,17 @@ TXT;
             }
 
             if ($producto) {
-                $precio = method_exists($producto, 'precioParaSede')
-                    ? $producto->precioParaSede($sede?->id)
-                    : (float) ($producto->precio_base ?? $producto->precio ?? 0);
+                // 💰 En pedidos MANUALES respetamos el precio que el operador vio
+                //    y ajustó en el formulario (resuelto con la lista de precios
+                //    del cliente). Solo si no viene precio, re-preciamos del catálogo.
+                $precioManual = (float) ($product['precio_unitario'] ?? $product['precio'] ?? 0);
+                if (!empty($orderData['manual']) && $precioManual > 0) {
+                    $precio = $precioManual;
+                } else {
+                    $precio = method_exists($producto, 'precioParaSede')
+                        ? $producto->precioParaSede($sede?->id)
+                        : (float) ($producto->precio_base ?? $producto->precio ?? 0);
+                }
 
                 $sub = $precio * $cantidad;
                 $subtotalProductos += $sub;

@@ -669,6 +669,10 @@ class CrearManual extends Component
                 'name'     => $p['nombre'],
                 'quantity' => (float) $p['cantidad'],
                 'unit'     => $p['unidad'],
+                // 💰 Precio que vio/ajustó el operador (lista del cliente). El
+                //    controlador lo respeta en pedidos manuales en vez de
+                //    re-preciar al precio base del catálogo.
+                'precio_unitario' => (float) ($p['precio'] ?? 0),
             ], $this->productos)),
             'customer_name'  => $this->nombre_cliente,
             'cedula'         => $this->cedula,
