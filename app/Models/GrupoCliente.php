@@ -17,7 +17,11 @@ class GrupoCliente extends Model
     protected $table = 'grupos_clientes';
 
     protected $fillable = [
-        'tenant_id', 'nombre', 'descripcion', 'color',
+        'tenant_id', 'nombre', 'descripcion', 'color', 'fijado_at',
+    ];
+
+    protected $casts = [
+        'fijado_at' => 'datetime',
     ];
 
     public function clientes(): BelongsToMany

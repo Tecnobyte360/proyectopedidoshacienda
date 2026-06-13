@@ -741,6 +741,45 @@ class Index extends Component
         $this->mensajeGrupo = '';
     }
 
+    /** 📌 Fijar / desfijar el grupo (aparece primero en la lista). */
+    public function toggleFijarGrupo(int $grupoId): void
+    {
+        $g = \App\Models\GrupoCliente::find($grupoId);
+        if (!$g) return;
+        $g->update(['fijado_at' => $g->fijado_at ? null : now()]);
+        $this->dispatch('notify', ['type' => 'info', 'message' => $g->fijado_at ? "📌 '{$g->nombre}' fijado" : "Grupo desfijado"]);
+    }
+
+    /** ✏️ Renombrar el grupo. */
+    public string $renombrarGrupoNombre = '';
+    public ?int   $renombrandoGrupoId   = null;
+
+    public function abrirRenombrarGrupo(int $grupoId): void
+    {
+        $g = \App\Models\GrupoCliente::find($grupoId);
+        if (!$g) return;
+        $this->renombrandoGrupoId   = $g->id;
+        $this->renombrarGrupoNombre = $g->nombre;
+    }
+
+    public function guardarNombreGrupo(): void
+    {
+        $nombre = trim($this->renombrarGrupoNombre);
+        if ($nombre === '' || !$this->renombrandoGrupoId) return;
+        \App\Models\GrupoCliente::where('id', $this->renombrandoGrupoId)->update(['nombre' => $nombre]);
+        $this->renombrandoGrupoId = null;
+        $this->renombrarGrupoNombre = '';
+        $this->dispatch('notify', ['type' => 'success', 'message' => 'Nombre actualizado.']);
+    }
+
+    /** 🗑️ Eliminar el grupo. */
+    public function eliminarGrupoChat(int $grupoId): void
+    {
+        \App\Models\GrupoCliente::where('id', $grupoId)->delete();
+        if ($this->grupoAbiertoId === $grupoId) $this->grupoAbiertoId = null;
+        $this->dispatch('notify', ['type' => 'info', 'message' => 'Grupo eliminado.']);
+    }
+
     /** Grupo abierto (con clientes). */
     public function getGrupoActivoProperty()
     {
@@ -2322,8 +2361,11 @@ class Index extends Component
             ->count();
         $totalFavoritos = ConversacionWhatsapp::query()->whereNotNull('fijada_at')->count();
 
-        // 👥 Grupos de clientes (para los chips del chat)
-        $gruposChat = \App\Models\GrupoCliente::withCount('clientes')->orderBy('nombre')->get();
+        // 👥 Grupos de clientes (para los chips del chat) — fijados primero
+        $gruposChat = \App\Models\GrupoCliente::withCount('clientes')
+            ->orderByRaw('fijado_at IS NULL, fijado_at DESC')
+            ->orderBy('nombre')
+            ->get();
 
         // 👥 Clientes para el modal "Crear lista" (chats recientes o búsqueda)
         $clientesParaLista = $this->modalCrearGrupo ? $this->clientesParaLista : collect();

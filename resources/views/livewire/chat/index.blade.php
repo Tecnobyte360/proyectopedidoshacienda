@@ -419,11 +419,52 @@
                         <i class="fa-solid fa-users"></i>
                     </span>
                     <div class="min-w-0 flex-1">
-                        <p class="font-semibold text-slate-800 truncate">{{ $gActivo->nombre }}</p>
+                        <p class="font-semibold text-slate-800 truncate flex items-center gap-1.5">
+                            {{ $gActivo->nombre }}
+                            @if($gActivo->fijado_at)<i class="fa-solid fa-thumbtack text-amber-500 text-[10px]" title="Fijado"></i>@endif
+                        </p>
                         <p class="text-xs text-slate-500 truncate">{{ $gActivo->clientes->count() }} miembros · {{ $gActivo->clientes->take(4)->pluck('nombre')->filter()->implode(', ') }}{{ $gActivo->clientes->count() > 4 ? '…' : '' }}</p>
                     </div>
+
+                    {{-- ⚙️ Menú de opciones del grupo --}}
+                    <div x-data="{ open: false }" class="relative">
+                        <button @click="open = !open" @click.outside="open = false" class="text-slate-400 hover:text-slate-600 px-2 py-1" title="Opciones del grupo">
+                            <i class="fa-solid fa-ellipsis-vertical"></i>
+                        </button>
+                        <div x-show="open" x-transition x-cloak class="absolute right-0 mt-1 w-52 rounded-xl border border-slate-200 bg-white shadow-xl z-50 overflow-hidden">
+                            <button wire:click="toggleFijarGrupo({{ $gActivo->id }})" @click="open=false" class="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50 text-left">
+                                <i class="fa-solid fa-thumbtack text-amber-500 w-4"></i> {{ $gActivo->fijado_at ? 'Desfijar' : 'Fijar grupo' }}
+                            </button>
+                            <button wire:click="abrirRenombrarGrupo({{ $gActivo->id }})" @click="open=false" class="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50 text-left">
+                                <i class="fa-solid fa-pen text-slate-500 w-4"></i> Cambiar nombre
+                            </button>
+                            <a href="{{ route('grupos.index') }}" class="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50 text-left">
+                                <i class="fa-solid fa-user-gear text-slate-500 w-4"></i> Gestionar miembros
+                            </a>
+                            <button wire:click="eliminarGrupoChat({{ $gActivo->id }})" wire:confirm="¿Eliminar el grupo '{{ $gActivo->nombre }}'?" @click="open=false"
+                                    class="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-rose-50 text-rose-600 text-left border-t border-slate-100">
+                                <i class="fa-solid fa-trash w-4"></i> Eliminar grupo
+                            </button>
+                        </div>
+                    </div>
+
                     <button wire:click="cerrarGrupoUnificado" class="text-slate-400 hover:text-slate-600 hidden lg:block"><i class="fa-solid fa-xmark text-lg"></i></button>
                 </div>
+
+                {{-- ✏️ Modal renombrar grupo --}}
+                @if($renombrandoGrupoId)
+                    <div class="absolute inset-0 z-50 flex items-center justify-center p-4" style="background: rgba(15,23,42,0.5);" wire:click="$set('renombrandoGrupoId', null)">
+                        <div class="w-full max-w-sm rounded-2xl bg-white shadow-2xl p-5" @click.stop>
+                            <h3 class="text-sm font-bold text-slate-800 mb-3">Cambiar nombre del grupo</h3>
+                            <input type="text" wire:model="renombrarGrupoNombre" wire:keydown.enter="guardarNombreGrupo" autofocus
+                                   class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none">
+                            <div class="flex gap-2 mt-4">
+                                <button wire:click="$set('renombrandoGrupoId', null)" class="flex-1 rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">Cancelar</button>
+                                <button wire:click="guardarNombreGrupo" class="flex-1 rounded-xl bg-brand hover:bg-brand-dark px-4 py-2 text-sm font-bold text-white">Guardar</button>
+                            </div>
+                        </div>
+                    </div>
+                @endif
 
                 {{-- Aviso: grupo del lado del negocio --}}
                 <div class="bg-amber-50 border-b border-amber-100 px-4 py-1.5 text-[11px] text-amber-700 shrink-0">
