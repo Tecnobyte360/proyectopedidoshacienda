@@ -444,6 +444,10 @@ class Index extends Component
     public function updatedFiltroEstado(): void
     {
         $this->limiteConversaciones = 60;
+        // Salir del modo grupos al cambiar de filtro (cambio rápido).
+        $this->mostrarGrupos  = false;
+        $this->grupoAbiertoId = null;
+        $this->grupoFiltroId  = null;
     }
 
     /** Al cambiar el filtro de canal, reiniciamos el scroll infinito. */

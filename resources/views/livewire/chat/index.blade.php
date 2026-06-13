@@ -82,14 +82,14 @@
                    class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-brand focus:ring-brand">
 
             {{-- 🔖 Filtros rápidos (estilo WhatsApp): No leídos · Favoritos · Grupos --}}
-            <div class="flex flex-wrap gap-1.5">
+            <div class="flex gap-1.5 overflow-x-auto pb-0.5" style="scrollbar-width:none;">
                 <button wire:click="$set('filtroEstado', 'todas')"
-                        class="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold transition
+                        class="shrink-0 inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold transition
                               {{ in_array($filtroEstado, ['todas','activa','humano','bot','internos']) && !$mostrarGrupos ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' }}">
                     Todos
                 </button>
                 <button wire:click="$set('filtroEstado', 'no_leidos')"
-                        class="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold transition
+                        class="shrink-0 inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold transition
                               {{ $filtroEstado === 'no_leidos' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' }}">
                     No leídos
                     @if($totalNoLeidos > 0)
@@ -99,7 +99,7 @@
                     @endif
                 </button>
                 <button wire:click="$set('filtroEstado', 'favoritos')"
-                        class="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold transition
+                        class="shrink-0 inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold transition
                               {{ $filtroEstado === 'favoritos' ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' }}">
                     <i class="fa-solid fa-thumbtack text-[10px]"></i>
                     Favoritos
@@ -110,7 +110,7 @@
                     @endif
                 </button>
                 <button wire:click="toggleMostrarGrupos"
-                        class="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold transition
+                        class="shrink-0 inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold transition
                               {{ $mostrarGrupos ? 'bg-brand text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' }}">
                     <i class="fa-solid fa-users text-[10px]"></i>
                     Grupos
@@ -494,36 +494,40 @@
                 </div>
 
                 {{-- Composer del grupo --}}
-                <div class="bg-white border-t border-slate-200 px-3 py-2.5 shrink-0 space-y-2">
-                    {{-- 📋 Enviar PLANTILLA a todo el grupo (funciona fuera de 24h) --}}
+                <div class="bg-white border-t border-slate-200 shrink-0">
+                    {{-- 📋 Panel de PLANTILLA (igual que el chat normal) --}}
                     @if(!empty($plantillasMetaAprobadas) && count($plantillasMetaAprobadas) > 0)
-                        <div class="flex items-center gap-2">
-                            <select wire:model="plantillaGrupoId" class="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-xs focus:border-brand focus:outline-none">
-                                <option value="">📋 Enviar plantilla a todos (llega siempre)…</option>
-                                @foreach($plantillasMetaAprobadas as $tpl)
-                                    <option value="{{ $tpl->id }}">{{ $tpl->nombre }}</option>
-                                @endforeach
-                            </select>
-                            <button wire:click="enviarPlantillaAGrupo" wire:loading.attr="disabled" wire:target="enviarPlantillaAGrupo"
-                                    class="shrink-0 rounded-lg bg-brand hover:bg-brand-dark text-white px-3 py-2 text-xs font-bold transition disabled:opacity-50">
-                                <i class="fa-solid fa-bullhorn mr-1"></i> Enviar
-                            </button>
+                        <div class="bg-amber-50 border-b border-amber-100 px-3 py-2">
+                            <p class="text-[11px] font-semibold text-amber-700 mb-1.5">
+                                <i class="fa-solid fa-bullhorn"></i> Para llegarle a <strong>todos</strong> los miembros, enviá una plantilla aprobada (funciona aunque no haya ventana de 24h).
+                            </p>
+                            <div class="flex items-center gap-2">
+                                <select wire:model="plantillaGrupoId" class="flex-1 rounded-lg border border-amber-200 bg-white px-3 py-2 text-xs focus:border-brand focus:outline-none">
+                                    <option value="">— Selecciona plantilla para enviar —</option>
+                                    @foreach($plantillasMetaAprobadas as $tpl)
+                                        <option value="{{ $tpl->id }}">{{ $tpl->nombre }}</option>
+                                    @endforeach
+                                </select>
+                                <button wire:click="enviarPlantillaAGrupo" wire:loading.attr="disabled" wire:target="enviarPlantillaAGrupo"
+                                        class="shrink-0 rounded-lg bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 text-xs font-bold transition disabled:opacity-50">
+                                    <i class="fa-solid fa-paper-plane mr-1"></i> Enviar a todos
+                                </button>
+                            </div>
                         </div>
                     @endif
 
                     {{-- Texto libre (solo a quienes tienen ventana 24h) --}}
-                    <form wire:submit.prevent="enviarAGrupo" class="flex items-center gap-2">
-                        <input type="text" wire:model="mensajeGrupo" placeholder="Escribe un mensaje para todo el grupo…"
-                               class="flex-1 rounded-full border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none">
-                        <button type="submit" wire:loading.attr="disabled" wire:target="enviarAGrupo"
-                                class="h-10 w-10 shrink-0 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white flex items-center justify-center transition">
-                            <i class="fa-solid fa-paper-plane"></i>
-                        </button>
-                    </form>
-                    <p class="text-[10px] text-slate-400 px-1">
-                        💬 Texto libre: solo a quienes te escribieron en 24h.
-                        📋 Plantilla: le llega a <strong>todos</strong> (regla de Meta).
-                    </p>
+                    <div class="px-3 py-2.5">
+                        <form wire:submit.prevent="enviarAGrupo" class="flex items-center gap-2">
+                            <input type="text" wire:model="mensajeGrupo" placeholder="Escribe un mensaje para todo el grupo…"
+                                   class="flex-1 rounded-full border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none">
+                            <button type="submit" wire:loading.attr="disabled" wire:target="enviarAGrupo"
+                                    class="h-10 w-10 shrink-0 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white flex items-center justify-center transition">
+                                <i class="fa-solid fa-paper-plane"></i>
+                            </button>
+                        </form>
+                        <p class="text-[10px] text-slate-400 mt-1 px-1">💬 El texto libre solo llega a quienes te escribieron en las últimas 24h.</p>
+                    </div>
                 </div>
             </div>
         @endif
