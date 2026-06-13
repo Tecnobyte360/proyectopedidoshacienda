@@ -194,8 +194,8 @@
                 </button>
 
                 @forelse($gruposChat as $g)
-                    <button wire:click="filtrarPorGrupo({{ $g->id }})"
-                            class="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition border-b border-slate-50 text-left">
+                    <button wire:click="abrirGrupoUnificado({{ $g->id }})"
+                            class="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition border-b border-slate-50 text-left {{ $grupoAbiertoId === $g->id ? 'bg-brand-soft/40' : '' }}">
                         <span class="h-12 w-12 shrink-0 rounded-full flex items-center justify-center text-white shadow-sm"
                               style="background-color: {{ $g->color ?: '#d68643' }}">
                             <i class="fa-solid fa-users"></i>
@@ -406,7 +406,66 @@
              @dragleave.prevent="onDragLeave($event)"
              @drop.prevent="onDrop($event)"
              class="relative flex-1 flex-col min-w-0 bg-[#efeae2]
-                    {{ $conversacionActivaId ? 'flex' : 'hidden lg:flex' }}">
+                    {{ ($conversacionActivaId || $grupoAbiertoId) ? 'flex' : 'hidden lg:flex' }}">
+
+        {{-- ───────── 👥 HILO UNIFICADO DEL GRUPO (overlay) ───────── --}}
+        @if($grupoAbiertoId && $this->grupoActivo)
+            @php $gActivo = $this->grupoActivo; @endphp
+            <div class="absolute inset-0 z-40 flex flex-col bg-[#efeae2]">
+                {{-- Header del grupo --}}
+                <div class="bg-white border-b border-slate-200 px-4 py-2.5 flex items-center gap-3 shadow-sm shrink-0">
+                    <button wire:click="cerrarGrupoUnificado" class="text-slate-500 hover:text-slate-700 lg:hidden"><i class="fa-solid fa-arrow-left"></i></button>
+                    <span class="h-10 w-10 shrink-0 rounded-full flex items-center justify-center text-white" style="background-color: {{ $gActivo->color ?: '#d68643' }}">
+                        <i class="fa-solid fa-users"></i>
+                    </span>
+                    <div class="min-w-0 flex-1">
+                        <p class="font-semibold text-slate-800 truncate">{{ $gActivo->nombre }}</p>
+                        <p class="text-xs text-slate-500 truncate">{{ $gActivo->clientes->count() }} miembros · {{ $gActivo->clientes->take(4)->pluck('nombre')->filter()->implode(', ') }}{{ $gActivo->clientes->count() > 4 ? '…' : '' }}</p>
+                    </div>
+                    <button wire:click="cerrarGrupoUnificado" class="text-slate-400 hover:text-slate-600 hidden lg:block"><i class="fa-solid fa-xmark text-lg"></i></button>
+                </div>
+
+                {{-- Aviso: grupo del lado del negocio --}}
+                <div class="bg-amber-50 border-b border-amber-100 px-4 py-1.5 text-[11px] text-amber-700 shrink-0">
+                    <i class="fa-solid fa-circle-info"></i> Hilo unificado: ves a todos los miembros. Al responder le llega a cada uno en privado (no se ven entre sí).
+                </div>
+
+                {{-- Mensajes unificados --}}
+                <div class="flex-1 overflow-y-auto px-4 py-3 space-y-2" id="hilo-grupo">
+                    @forelse($this->mensajesGrupo as $m)
+                        @php $esCliente = $m->rol === \App\Models\MensajeWhatsapp::ROL_USER; @endphp
+                        <div class="flex {{ $esCliente ? 'justify-start' : 'justify-end' }}">
+                            <div class="max-w-[75%] rounded-2xl px-3 py-2 shadow-sm {{ $esCliente ? 'bg-white rounded-tl-md' : 'bg-[#d9fdd3] rounded-tr-md' }}">
+                                @if($esCliente)
+                                    <p class="text-[11px] font-bold text-brand mb-0.5">{{ $m->_remitente }}</p>
+                                @endif
+                                <p class="text-sm text-slate-800 whitespace-pre-wrap break-words">{{ $m->contenido }}</p>
+                                <p class="text-[10px] text-slate-400 text-right mt-0.5">{{ $m->created_at?->format('h:i a') }}</p>
+                            </div>
+                        </div>
+                    @empty
+                        <div class="text-center text-slate-400 py-10">
+                            <i class="fa-solid fa-comments text-3xl mb-2 block"></i>
+                            <p class="text-sm">Aún no hay mensajes de los miembros.</p>
+                            <p class="text-xs mt-1">Escribí abajo para mandarle a todos.</p>
+                        </div>
+                    @endforelse
+                </div>
+
+                {{-- Composer del grupo --}}
+                <div class="bg-white border-t border-slate-200 px-3 py-2.5 shrink-0">
+                    <form wire:submit.prevent="enviarAGrupo" class="flex items-center gap-2">
+                        <input type="text" wire:model="mensajeGrupo" placeholder="Escribe un mensaje para todo el grupo…"
+                               class="flex-1 rounded-full border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none">
+                        <button type="submit" wire:loading.attr="disabled" wire:target="enviarAGrupo"
+                                class="h-10 w-10 shrink-0 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white flex items-center justify-center transition">
+                            <i class="fa-solid fa-paper-plane"></i>
+                        </button>
+                    </form>
+                    <p class="text-[10px] text-slate-400 mt-1 px-1">Solo llega a quienes te escribieron en las últimas 24h (regla de Meta para texto libre).</p>
+                </div>
+            </div>
+        @endif
 
         {{-- ⏳ Skeleton estilo WhatsApp al cambiar de conversación: burbujas
              fantasma con shimmer mientras el servidor trae los mensajes. --}}

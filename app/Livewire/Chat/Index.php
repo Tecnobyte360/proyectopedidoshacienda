@@ -37,6 +37,10 @@ class Index extends Component
     public string $nombreListaNueva    = '';
     public string $buscarParaLista     = '';
     public array  $clientesSeleccionados = []; // [cliente_id => true]
+
+    // 👥 Hilo UNIFICADO del grupo (el operador ve a todos en un solo chat)
+    public ?int   $grupoAbiertoId = null;
+    public string $mensajeGrupo   = '';
     public bool   $mostrarInternas = false;  // si es false, ocultas conversaciones internas
 
     // 📜 Scroll infinito: cuántas conversaciones mostrar. Arranca en 60 y crece
@@ -719,6 +723,113 @@ class Index extends Component
         $this->grupoFiltroId = $g->id;
         $this->reset(['nombreListaNueva', 'buscarParaLista', 'clientesSeleccionados']);
         $this->dispatch('notify', ['type' => 'success', 'message' => "Lista '{$nombre}' creada con " . count($ids) . " miembro(s)."]);
+    }
+
+    /* ─── 👥 Hilo UNIFICADO del grupo ─── */
+
+    /** Abre el hilo unificado del grupo (todos los miembros en un chat). */
+    public function abrirGrupoUnificado(int $grupoId): void
+    {
+        $this->grupoAbiertoId = $grupoId;
+        $this->conversacionActivaId = null; // salir de cualquier conversación 1-a-1
+    }
+
+    public function cerrarGrupoUnificado(): void
+    {
+        $this->grupoAbiertoId = null;
+        $this->mensajeGrupo = '';
+    }
+
+    /** Grupo abierto (con clientes). */
+    public function getGrupoActivoProperty()
+    {
+        if (!$this->grupoAbiertoId) return null;
+        return \App\Models\GrupoCliente::with(['clientes' => fn ($q) => $q->whereNotNull('telefono_normalizado')])
+            ->find($this->grupoAbiertoId);
+    }
+
+    /** Mensajes UNIFICADOS de todos los miembros del grupo, ordenados por fecha. */
+    public function getMensajesGrupoProperty()
+    {
+        $grupo = $this->grupoActivo;
+        if (!$grupo) return collect();
+
+        $clienteIds = $grupo->clientes->pluck('id')->all();
+        if (empty($clienteIds)) return collect();
+
+        // Conversaciones de esos clientes (1-a-1 con el negocio).
+        $convs = ConversacionWhatsapp::whereIn('cliente_id', $clienteIds)
+            ->with('cliente:id,nombre,telefono_normalizado,foto_url')
+            ->get();
+        $convIds = $convs->pluck('id')->all();
+        if (empty($convIds)) return collect();
+
+        $convCliente = $convs->keyBy('id');
+
+        // Últimos 200 mensajes de todas esas conversaciones, mergeados.
+        return MensajeWhatsapp::whereIn('conversacion_id', $convIds)
+            ->whereIn('rol', [MensajeWhatsapp::ROL_USER, MensajeWhatsapp::ROL_ASSISTANT])
+            ->orderByDesc('id')
+            ->limit(200)
+            ->get()
+            ->sortBy('id')
+            ->values()
+            ->map(function ($m) use ($convCliente) {
+                $cli = $convCliente->get($m->conversacion_id)?->cliente;
+                $m->_remitente = $cli?->nombre ?: ($cli?->telefono_normalizado ?? 'Cliente');
+                $m->_foto      = $cli?->foto_url;
+                return $m;
+            });
+    }
+
+    /** Envía el mensaje a TODOS los miembros del grupo (cada uno en su privado). */
+    public function enviarAGrupo(): void
+    {
+        $texto = trim($this->mensajeGrupo);
+        $grupo = $this->grupoActivo;
+        if ($texto === '' || !$grupo) return;
+
+        $tenant = app(\App\Services\TenantManager::class)->current();
+        $esMeta = $tenant && $tenant->proveedorWhatsappResuelto() === \App\Models\Tenant::WA_PROVIDER_META;
+        $svc      = app(\App\Services\Meta\MetaWhatsappCloudService::class);
+        $checker  = app(\App\Services\Whatsapp\Ventana24hChecker::class);
+        $convSvc  = app(ConversacionService::class);
+
+        $enviados = 0; $omitidos = 0;
+        foreach ($grupo->clientes as $cli) {
+            $tel = $cli->telefono_normalizado;
+            if (!$tel) { $omitidos++; continue; }
+
+            // Conversación del cliente (crear si no existe).
+            $conv = ConversacionWhatsapp::firstOrCreate(
+                ['telefono_normalizado' => $tel],
+                ['tenant_id' => $tenant?->id, 'cliente_id' => $cli->id, 'estado' => 'activa', 'canal' => 'whatsapp']
+            );
+
+            $ok = false;
+            if ($esMeta) {
+                // Solo texto libre si la ventana 24h está abierta.
+                try { $abierta = $checker->abierta($conv); } catch (\Throwable $e) { $abierta = false; }
+                if ($abierta) {
+                    $ok = $svc->enviarTexto($tel, $texto, $tenant->id);
+                }
+            }
+
+            // Registrar en la conversación del cliente (trazabilidad) si se envió.
+            if ($ok) {
+                $convSvc->agregarMensaje($conv, MensajeWhatsapp::ROL_ASSISTANT, $texto, [
+                    'meta' => ['enviado_por_humano' => true, 'usuario_id' => auth()->id(), 'grupo_id' => $grupo->id],
+                ]);
+                $enviados++;
+            } else {
+                $omitidos++;
+            }
+        }
+
+        $this->mensajeGrupo = '';
+        $msg = "Enviado a {$enviados} miembro(s).";
+        if ($omitidos > 0) $msg .= " {$omitidos} sin ventana de 24h abierta (no recibieron texto libre).";
+        $this->dispatch('notify', ['type' => $enviados > 0 ? 'success' : 'warning', 'message' => $msg]);
     }
 
     /** Clientes para el modal: chats recientes o resultado de búsqueda. */
