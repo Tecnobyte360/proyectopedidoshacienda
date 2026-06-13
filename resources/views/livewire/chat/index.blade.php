@@ -453,7 +453,24 @@
                 </div>
 
                 {{-- Composer del grupo --}}
-                <div class="bg-white border-t border-slate-200 px-3 py-2.5 shrink-0">
+                <div class="bg-white border-t border-slate-200 px-3 py-2.5 shrink-0 space-y-2">
+                    {{-- 📋 Enviar PLANTILLA a todo el grupo (funciona fuera de 24h) --}}
+                    @if(!empty($plantillasMetaAprobadas) && count($plantillasMetaAprobadas) > 0)
+                        <div class="flex items-center gap-2">
+                            <select wire:model="plantillaGrupoId" class="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-xs focus:border-brand focus:outline-none">
+                                <option value="">📋 Enviar plantilla a todos (llega siempre)…</option>
+                                @foreach($plantillasMetaAprobadas as $tpl)
+                                    <option value="{{ $tpl->id }}">{{ $tpl->nombre }}</option>
+                                @endforeach
+                            </select>
+                            <button wire:click="enviarPlantillaAGrupo" wire:loading.attr="disabled" wire:target="enviarPlantillaAGrupo"
+                                    class="shrink-0 rounded-lg bg-brand hover:bg-brand-dark text-white px-3 py-2 text-xs font-bold transition disabled:opacity-50">
+                                <i class="fa-solid fa-bullhorn mr-1"></i> Enviar
+                            </button>
+                        </div>
+                    @endif
+
+                    {{-- Texto libre (solo a quienes tienen ventana 24h) --}}
                     <form wire:submit.prevent="enviarAGrupo" class="flex items-center gap-2">
                         <input type="text" wire:model="mensajeGrupo" placeholder="Escribe un mensaje para todo el grupo…"
                                class="flex-1 rounded-full border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none">
@@ -462,7 +479,10 @@
                             <i class="fa-solid fa-paper-plane"></i>
                         </button>
                     </form>
-                    <p class="text-[10px] text-slate-400 mt-1 px-1">Solo llega a quienes te escribieron en las últimas 24h (regla de Meta para texto libre).</p>
+                    <p class="text-[10px] text-slate-400 px-1">
+                        💬 Texto libre: solo a quienes te escribieron en 24h.
+                        📋 Plantilla: le llega a <strong>todos</strong> (regla de Meta).
+                    </p>
                 </div>
             </div>
         @endif

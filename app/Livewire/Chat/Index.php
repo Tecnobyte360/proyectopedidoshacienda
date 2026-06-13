@@ -39,8 +39,9 @@ class Index extends Component
     public array  $clientesSeleccionados = []; // [cliente_id => true]
 
     // 👥 Hilo UNIFICADO del grupo (el operador ve a todos en un solo chat)
-    public ?int   $grupoAbiertoId = null;
-    public string $mensajeGrupo   = '';
+    public ?int   $grupoAbiertoId  = null;
+    public string $mensajeGrupo    = '';
+    public ?int   $plantillaGrupoId = null; // enviar plantilla a todo el grupo
     public bool   $mostrarInternas = false;  // si es false, ocultas conversaciones internas
 
     // 📜 Scroll infinito: cuántas conversaciones mostrar. Arranca en 60 y crece
@@ -849,7 +850,67 @@ class Index extends Component
 
         $this->mensajeGrupo = '';
         $msg = "Enviado a {$enviados} miembro(s).";
-        if ($omitidos > 0) $msg .= " {$omitidos} sin ventana de 24h abierta (no recibieron texto libre).";
+        if ($omitidos > 0) $msg .= " {$omitidos} sin ventana de 24h abierta — usá una plantilla para llegarles.";
+        $this->dispatch('notify', ['type' => $enviados > 0 ? 'success' : 'warning', 'message' => $msg]);
+    }
+
+    /**
+     * 📋 Envía una PLANTILLA Meta a TODOS los miembros del grupo.
+     * Funciona AUNQUE no tengan la ventana de 24h abierta (lo que permite
+     * llegarle a todos siempre). Cada uno la recibe en su privado.
+     */
+    public function enviarPlantillaAGrupo(): void
+    {
+        $grupo = $this->grupoActivo;
+        if (!$grupo || !$this->plantillaGrupoId) return;
+
+        $tpl = \App\Models\MetaWhatsappPlantilla::find($this->plantillaGrupoId);
+        if (!$tpl) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Plantilla no encontrada.']);
+            return;
+        }
+
+        $tenant  = app(\App\Services\TenantManager::class)->current();
+        $svc     = app(\App\Services\Meta\MetaWhatsappCloudService::class);
+        $convSvc = app(ConversacionService::class);
+        $numVars = (int) ($tpl->num_variables ?? 0);
+        $nombreNegocio = $tenant?->nombre ?: 'nosotros';
+
+        $enviados = 0; $fallidos = 0;
+        foreach ($grupo->clientes as $cli) {
+            $tel = $cli->telefono_normalizado;
+            if (!$tel) { $fallidos++; continue; }
+
+            // Variables comunes: 1=primer nombre del cliente, 2=negocio.
+            $primerNombre = trim(explode(' ', (string) ($cli->nombre ?: 'Cliente'))[0]);
+            $vars = [];
+            for ($i = 1; $i <= $numVars; $i++) {
+                $vars[] = $i === 1 ? $primerNombre : ($i === 2 ? $nombreNegocio : '');
+            }
+
+            $ok = $svc->enviarPlantilla($tel, $tpl->nombre, $vars, $tenant?->id, $tpl->idioma ?: 'es');
+
+            if ($ok) {
+                $conv = ConversacionWhatsapp::firstOrCreate(
+                    ['telefono_normalizado' => $tel],
+                    ['tenant_id' => $tenant?->id, 'cliente_id' => $cli->id, 'estado' => 'activa', 'canal' => 'whatsapp']
+                );
+                $body = $tpl->body_preview ?: ('[plantilla:' . $tpl->nombre . ']');
+                foreach ($vars as $i => $v) {
+                    $body = str_replace(['{{' . ($i + 1) . '}}', '{{ ' . ($i + 1) . ' }}'], (string) $v, $body);
+                }
+                $convSvc->agregarMensaje($conv, MensajeWhatsapp::ROL_ASSISTANT, $body, [
+                    'meta' => ['enviado_por_humano' => true, 'usuario_id' => auth()->id(), 'grupo_id' => $grupo->id, 'plantilla' => $tpl->nombre],
+                ]);
+                $enviados++;
+            } else {
+                $fallidos++;
+            }
+        }
+
+        $this->plantillaGrupoId = null;
+        $msg = "Plantilla enviada a {$enviados} miembro(s).";
+        if ($fallidos > 0) $msg .= " {$fallidos} fallaron.";
         $this->dispatch('notify', ['type' => $enviados > 0 ? 'success' : 'warning', 'message' => $msg]);
     }
 
