@@ -660,16 +660,15 @@ class CrearManual extends Component
             $this->dispatch('notify', ['type' => 'error', 'message' => 'Falta la dirección para domicilio.']);
             return;
         }
-        // 📍 Ideal: tener coordenadas (elegir la dirección de Google) para que el
-        //    pedido entre en la ruta. Pero NO bloqueamos la creación si no las hay
-        //    (a veces Google falla); solo avisamos. El pedido se crea igual y se
-        //    puede ubicar/rutear después.
+        // 📍 DESPACHO SÍ O SÍ con ubicación: sin coordenadas no se sabe a dónde
+        //    despachar ni se traza la ruta. Obligamos a elegir la dirección del
+        //    desplegable de Google (captura coords vía detalles o Text Search).
         if ($this->metodo_entrega === 'domicilio' && (!$this->direccionLat || !$this->direccionLng)) {
             $this->dispatch('notify', [
-                'type'    => 'warning',
-                'message' => '⚠️ El pedido se creó sin ubicación exacta (Google no la fijó). Se podrá rutear por barrio; si quieres el pin exacto, vuelve a elegir la dirección del desplegable de Google.',
+                'type'    => 'error',
+                'message' => '📍 Elige la dirección del desplegable de Google Maps para fijar la ubicación. Sin ubicación no se puede despachar.',
             ]);
-            // sin return: se crea de todos modos
+            return;
         }
         if ($this->metodo_entrega === 'recoger' && empty($this->sede_id)) {
             $this->dispatch('notify', ['type' => 'error', 'message' => 'Falta la sede de recogida.']);

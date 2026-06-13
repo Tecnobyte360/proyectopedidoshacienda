@@ -457,7 +457,7 @@
                                         </p>
                                     @else
                                         <p class="mt-1 text-[11px] text-amber-600 font-medium">
-                                            <i class="fa-solid fa-triangle-exclamation text-[10px]"></i> Elige la dirección del desplegable de Google para fijar la ubicación exacta (recomendado para la ruta). Si no, igual puedes crear el pedido.
+                                            <i class="fa-solid fa-triangle-exclamation text-[10px]"></i> Elige la dirección del desplegable de Google para fijar la ubicación (obligatorio para domicilio).
                                         </p>
                                     @endif
                                 @else
@@ -713,6 +713,7 @@
                     sugerencias: [],
                     abierto: false,
                     sessionToken: null,
+                    coordsOk: false,
                     init() {
                         // Sincronizar con el valor inicial de Livewire (si lo hay).
                         this.texto = this.$wire.get('direccion') || '';
@@ -773,6 +774,7 @@
                         this.$wire.set('direccion', s.texto);
                         this.abierto = false;
                         this.sugerencias = [];
+                        this.coordsOk = false;
 
                         // Pedir detalles para extraer el barrio.
                         try {
@@ -792,17 +794,37 @@
                                     barrio = c.longText || c.shortText || '';
                                 }
                             });
-                            // 📍 Coordenadas → para que el pedido entre en la ruta
-                            //    optimizada y el mapa de despachos.
+                            // 📍 Coordenadas → para que el pedido entre en la ruta.
                             if (d.location && d.location.latitude && d.location.longitude) {
                                 this.$wire.set('direccionLat', d.location.latitude, false);
                                 this.$wire.set('direccionLng', d.location.longitude, false);
+                                this.coordsOk = true;
                             }
-
-                            // 🗺️ Al setear el barrio, el backend (updatedBarrio)
-                            //    resuelve la ZONA de cobertura y pone el costo.
                             if (barrio) this.$wire.set('barrio', barrio);
-                        } catch (e) { /* sin barrio, no pasa nada */ }
+                        } catch (e) { /* place details no disponible — usamos fallback */ }
+
+                        // 📍 RESPALDO de coordenadas vía Text Search (más confiable
+                        //    que Place Details, que a veces la key no habilita).
+                        if (!this.coordsOk) {
+                            try {
+                                const r2 = await fetch('https://places.googleapis.com/v1/places:searchText', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'X-Goog-Api-Key': this.apiKey,
+                                        'X-Goog-FieldMask': 'places.location',
+                                    },
+                                    body: JSON.stringify({ textQuery: s.texto, languageCode: 'es', regionCode: 'CO' }),
+                                });
+                                const d2 = await r2.json();
+                                const loc = d2.places && d2.places[0] && d2.places[0].location;
+                                if (loc && loc.latitude && loc.longitude) {
+                                    this.$wire.set('direccionLat', loc.latitude, false);
+                                    this.$wire.set('direccionLng', loc.longitude, false);
+                                    this.coordsOk = true;
+                                }
+                            } catch (e) { console.warn('Text Search coords falló:', e); }
+                        }
 
                         this.sessionToken = null; // cerrar sesión de búsqueda
                     },
