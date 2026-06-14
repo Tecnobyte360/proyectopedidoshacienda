@@ -209,6 +209,44 @@ class CrearManual extends Component
         } catch (\Throwable $e) {
             Log::warning('geocodificarDireccion falló: ' . $e->getMessage());
         }
+
+        // 🗂️ Guardar la dirección en el ERP (HGI), SOLO si el cliente ya existe.
+        $this->guardarDireccionEnErp($dir);
+    }
+
+    /**
+     * 🗂️ Actualiza la dirección del cliente en el ERP (HGI) si ya existe.
+     * No crea clientes. Best-effort: no rompe el formulario si el ERP falla.
+     */
+    private function guardarDireccionEnErp(string $direccion): void
+    {
+        $direccion = trim($direccion);
+        if ($direccion === '') return;
+
+        $cedula = trim((string) $this->cedula) ?: null;
+        $tel    = trim((string) $this->telefono) ?: null;
+        if (!$cedula && !$tel) return; // sin clave, no se puede ubicar al cliente
+
+        try {
+            $tenantId = app(\App\Services\TenantManager::class)->id();
+            if (!$tenantId) return;
+
+            $integ = \App\Models\Integracion::where('tenant_id', $tenantId)
+                ->where('activo', true)
+                ->where('exporta_pedidos', true)
+                ->get()
+                ->first(fn ($i) => $i->config['cliente_lookup']['activo'] ?? false);
+            if (!$integ) return;
+
+            $ok = app(\App\Services\ClienteErpService::class)
+                ->actualizarDireccion($integ, $cedula, $tel, $direccion);
+
+            if ($ok) {
+                $this->dispatch('notify', ['type' => 'success', 'message' => '📍 Dirección actualizada en el ERP (HGI).']);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('guardarDireccionEnErp falló: ' . $e->getMessage());
+        }
     }
 
     /**

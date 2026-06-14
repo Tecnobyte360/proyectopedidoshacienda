@@ -301,6 +301,70 @@ class ClienteErpService
         return $this->crear($integracion, $datos);
     }
 
+    /**
+     * Actualiza SOLO la dirección de un cliente que YA EXISTE en el ERP (HGI).
+     * No crea clientes. Devuelve true si actualizó alguna fila (el cliente existía).
+     *
+     * @param  string|null $cedula    Cédula (columna_id)
+     * @param  string|null $telefono  Teléfono (columna_telefono)
+     * @param  string      $direccion Nueva dirección
+     */
+    public function actualizarDireccion(Integracion $integracion, ?string $cedula, ?string $telefono, string $direccion): bool
+    {
+        $cfg = $integracion->config['cliente_lookup'] ?? [];
+        if (!($cfg['activo'] ?? false)) return false;
+
+        $direccion = trim($direccion);
+        if ($direccion === '' || (empty($cedula) && empty($telefono))) return false;
+
+        $tabla  = trim((string) ($cfg['tabla'] ?? 'TblTerceros'));
+        $colId  = trim((string) ($cfg['columna_id'] ?? 'StrTercero'));
+        $colTel = trim((string) ($cfg['columna_telefono'] ?? ''));
+
+        // Columna de dirección = la que en mapeo_insert apunta a {cliente.direccion}.
+        $colDir = null;
+        foreach (($cfg['mapeo_insert'] ?? []) as $col => $val) {
+            if (is_string($val) && str_contains($val, 'cliente.direccion')) { $colDir = $col; break; }
+        }
+        if (!$colDir || $tabla === '') return false;
+
+        $actualizado = false;
+        $error = null;
+        try {
+            $pdo = $this->sync->conectar($integracion);
+
+            if (!empty($cedula)) {
+                $stmt = $pdo->prepare("UPDATE {$tabla} SET {$colDir} = :dir WHERE {$colId} = :id");
+                $stmt->execute([':dir' => $direccion, ':id' => $cedula]);
+                $actualizado = $stmt->rowCount() > 0;
+            }
+            if (!$actualizado && !empty($telefono) && $colTel !== '') {
+                $stmt = $pdo->prepare("UPDATE {$tabla} SET {$colDir} = :dir WHERE {$colTel} = :tel");
+                $stmt->execute([':dir' => $direccion, ':tel' => $telefono]);
+                $actualizado = $stmt->rowCount() > 0;
+            }
+        } catch (\Throwable $e) {
+            $error = $e->getMessage();
+            Log::warning('ClienteErpService::actualizarDireccion falló — ' . $e->getMessage(), [
+                'integracion_id' => $integracion->id,
+                'cedula'         => $cedula,
+                'telefono'       => $telefono,
+            ]);
+        }
+
+        $this->registrarLog($integracion, [
+            'accion'        => 'actualizar_direccion',
+            'cedula'        => $cedula,
+            'telefono'      => $telefono,
+            'direccion'     => $direccion,
+            'encontrado'    => $actualizado,
+            'exitoso'       => $error === null,
+            'error_mensaje' => $error,
+        ]);
+
+        return $actualizado;
+    }
+
     private function construirContextoCliente(array $datos): array
     {
         return [
