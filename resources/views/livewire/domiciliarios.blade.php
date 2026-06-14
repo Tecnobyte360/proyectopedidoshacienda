@@ -287,6 +287,7 @@
                                 class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-brand focus:ring-brand">
                             <option value="disponible">Disponible</option>
                             <option value="ocupado">Ocupado</option>
+                            <option value="en_ruta">En ruta</option>
                             <option value="inactivo">Inactivo</option>
                         </select>
                     </div>

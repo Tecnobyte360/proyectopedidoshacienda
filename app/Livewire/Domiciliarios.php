@@ -45,7 +45,7 @@ class Domiciliarios extends Component
             'vehiculo'    => ['nullable', 'string', 'max:100'],
             'placa'       => ['nullable', 'string', 'max:20'],
             'capacidad_kg' => ['nullable', 'numeric', 'min:0', 'max:99999'],
-            'estado'      => ['required', 'in:disponible,ocupado,inactivo'],
+            'estado'      => ['required', 'in:disponible,ocupado,en_ruta,inactivo'],
             'activo'      => ['boolean'],
             'zonasIds'    => ['array'],
             'zonasIds.*'  => ['integer', 'exists:zonas_cobertura,id'],
