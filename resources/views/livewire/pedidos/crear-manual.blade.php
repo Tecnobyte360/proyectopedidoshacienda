@@ -543,7 +543,7 @@
                                         @foreach($domiciliarios as $d)
                                             @php $noAlcanza = $this->pesoTotalKg > 0 && $d->capacidad_kg && $d->capacidad_kg < $this->pesoTotalKg; @endphp
                                             <option value="{{ $d->id }}">
-                                                {{ $d->nombre }} ({{ $d->estado === 'disponible' ? 'disponible' : 'en ruta' }}@if($d->capacidad_kg) · {{ $d->capacidad_kg }} kg@endif){{ $noAlcanza ? ' ⚠️ no alcanza' : '' }}
+                                                {{ $d->nombre }} ({{ $d->estado === 'disponible' ? 'disponible' : 'en ruta' }}{{ $d->capacidad_kg ? ' · ' . $d->capacidad_kg . ' kg' : '' }}){{ $noAlcanza ? ' ⚠️ no alcanza' : '' }}
                                             </option>
                                         @endforeach
                                     </select>
