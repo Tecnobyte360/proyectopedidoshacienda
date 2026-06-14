@@ -578,6 +578,18 @@
                                     Si lo dejás sin asignar, el sistema elige el mejor al crear el pedido.
                                 </p>
                             @endif
+
+                            {{-- ⚖️ Aviso de viajes si el domiciliario no tiene capacidad para todo --}}
+                            @if($this->viajesDomiciliario)
+                                <div class="mt-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-[11px] text-amber-800 flex items-start gap-2">
+                                    <i class="fa-solid fa-truck-ramp-box mt-0.5"></i>
+                                    <div>
+                                        <b>{{ $this->viajesDomiciliario['nombre'] }}</b> no puede llevar todo de una
+                                        (pedido {{ $this->viajesDomiciliario['peso'] }} kg · capacidad {{ $this->viajesDomiciliario['capacidad'] }} kg).
+                                        Deberá hacer <b>al menos {{ $this->viajesDomiciliario['viajes'] }} viajes</b> para entregar el pedido completo.
+                                    </div>
+                                </div>
+                            @endif
                         </div>
                     @endif
                 </div>

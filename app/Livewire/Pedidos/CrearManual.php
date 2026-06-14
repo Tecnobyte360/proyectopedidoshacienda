@@ -211,6 +211,29 @@ class CrearManual extends Component
         }
     }
 
+    /**
+     * ⚖️ Si el domiciliario seleccionado NO tiene capacidad para todo el peso,
+     * devuelve cuántos viajes necesita. null si alcanza o no aplica.
+     */
+    public function getViajesDomiciliarioProperty(): ?array
+    {
+        if (!$this->domiciliario_id) return null;
+        $peso = $this->pesoTotalKg;
+        if ($peso <= 0) return null;
+
+        $dom = collect($this->domiciliarios)->firstWhere('id', (int) $this->domiciliario_id);
+        $cap = $dom ? (float) ($dom->capacidad_kg ?? 0) : 0;
+        // Capacidad 0/null = sin límite definido → no aplica. Si alcanza, tampoco.
+        if ($cap <= 0 || $cap >= $peso) return null;
+
+        return [
+            'nombre'    => $dom->nombre,
+            'peso'      => $peso,
+            'capacidad' => $cap,
+            'viajes'    => (int) ceil($peso / $cap),
+        ];
+    }
+
     /** ⚖️ Peso total del pedido en kg (productos vendidos por peso). */
     public function getPesoTotalKgProperty(): float
     {
