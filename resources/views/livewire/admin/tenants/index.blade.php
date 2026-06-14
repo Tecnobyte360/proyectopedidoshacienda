@@ -1399,6 +1399,14 @@
                             </div>
                         </div>
 
+                        <label class="flex items-start gap-3 rounded-xl bg-white border border-violet-200 p-3 cursor-pointer mb-3">
+                            <input type="checkbox" wire:model.live="wompi_activo" class="mt-0.5 rounded border-violet-300 text-violet-600">
+                            <div>
+                                <div class="text-sm font-semibold text-slate-800">Activar Wompi para este tenant</div>
+                                <div class="text-xs text-slate-500">Si está apagado, no se genera ni se ofrece pago por Wompi y se ignoran sus webhooks.</div>
+                            </div>
+                        </label>
+
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div>
                                 <label class="block text-xs font-semibold text-slate-700 mb-1">Modo</label>

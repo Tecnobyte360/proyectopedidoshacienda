@@ -79,6 +79,8 @@ class Tenant extends Model
         'meta_app_secret',
         'ig_client_id',
         'ig_client_secret',
+        // 💳 Wompi
+        'wompi_activo',
         // 💳 Bold (segunda pasarela de pago)
         'bold_activo',
         'bold_modo',
@@ -106,6 +108,7 @@ class Tenant extends Model
         'instagram_access_token'   => 'encrypted',
         'messenger_activo'         => 'boolean',
         'messenger_page_access_token' => 'encrypted',
+        'wompi_activo'             => 'boolean',
         'bold_activo'              => 'boolean',
         'bold_api_key'             => 'encrypted',
         'bold_secret_key'          => 'encrypted',
@@ -439,6 +442,10 @@ class Tenant extends Model
     /** ¿El tenant tiene Wompi configurado y listo para cobrar? */
     public function tieneWompi(): bool
     {
+        // Respeta el switch wompi_activo (default true para no romper tenants existentes).
+        if (($this->wompi_activo ?? true) === false) {
+            return false;
+        }
         $c = $this->wompiCredenciales();
         return $c !== null && $c['public_key'] !== '' && $c['integrity_secret'] !== '';
     }

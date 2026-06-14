@@ -75,6 +75,7 @@ class Index extends Component
 
     // Wompi (pagos) por tenant
     public string $wompi_modo               = 'sandbox';
+    public bool   $wompi_activo             = true;
     public string $wompi_public_key         = '';
     public string $wompi_private_key        = '';
     public string $wompi_events_secret      = '';
@@ -199,6 +200,7 @@ class Index extends Component
             'whatsapp_connection_ids' => 'nullable|string|max:500',
 
             'wompi_modo'             => 'nullable|in:sandbox,produccion',
+            'wompi_activo'           => 'boolean',
             'wompi_public_key'       => 'nullable|string|max:255',
             'wompi_private_key'      => 'nullable|string|max:255',
             'wompi_events_secret'    => 'nullable|string|max:255',
@@ -320,6 +322,7 @@ class Index extends Component
         // Wompi config
         $wompi = $t->wompi_config ?? [];
         $this->wompi_modo             = (string) ($t->wompi_modo ?: 'sandbox');
+        $this->wompi_activo           = (bool) ($t->wompi_activo ?? true);
         $this->wompi_public_key       = (string) ($wompi['public_key'] ?? '');
         $this->wompi_private_key      = (string) ($wompi['private_key'] ?? '');
         $this->wompi_events_secret    = (string) ($wompi['events_secret'] ?? '');
@@ -693,6 +696,9 @@ class Index extends Component
         }
 
         // Wompi config — solo si las columnas existen (la migración se debe haber corrido)
+        if (\Illuminate\Support\Facades\Schema::hasColumn('tenants', 'wompi_activo')) {
+            $data['wompi_activo'] = (bool) $this->wompi_activo;
+        }
         if (\Illuminate\Support\Facades\Schema::hasColumn('tenants', 'wompi_config')) {
             $wPub   = trim($this->wompi_public_key);
             $wPriv  = trim($this->wompi_private_key);
@@ -1148,6 +1154,7 @@ class Index extends Component
         $this->error_conexiones = null;
         $this->cargando_conexiones = false;
         $this->wompi_modo             = 'sandbox';
+        $this->wompi_activo           = true;
         $this->wompi_public_key       = '';
         $this->wompi_private_key      = '';
         $this->wompi_events_secret    = '';
