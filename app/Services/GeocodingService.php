@@ -248,10 +248,21 @@ class GeocodingService
                 }
                 $loc = $primero['geometry']['location'];
 
+                // 🏘️ Extraer el BARRIO de los componentes (sublocality/neighborhood).
+                $barrioGeo = null;
+                foreach (($primero['address_components'] ?? []) as $comp) {
+                    $types = $comp['types'] ?? [];
+                    if (array_intersect($types, ['sublocality', 'sublocality_level_1', 'neighborhood'])) {
+                        $barrioGeo = $comp['long_name'] ?? $comp['short_name'] ?? null;
+                        break;
+                    }
+                }
+
                 Log::info('✅ Google Geocoding resuelto', [
                     'address' => $address,
                     'lat'     => $loc['lat'],
                     'lng'     => $loc['lng'],
+                    'barrio'  => $barrioGeo,
                     'display' => $primero['formatted_address'] ?? null,
                     'tipo'    => $primero['geometry']['location_type'] ?? null,
                 ]);
@@ -259,6 +270,7 @@ class GeocodingService
                 return [
                     'lat'     => (float) $loc['lat'],
                     'lng'     => (float) $loc['lng'],
+                    'barrio'  => $barrioGeo,
                     'display' => $primero['formatted_address'] ?? $address,
                     'fuente'  => 'google',
                 ];

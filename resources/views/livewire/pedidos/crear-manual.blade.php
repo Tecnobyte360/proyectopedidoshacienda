@@ -845,11 +845,11 @@
                             } catch (e) { console.warn('Text Search falló:', e); }
                         }
 
-                        // 🏘️ Último recurso para el barrio: el texto secundario de la
-                        //    sugerencia (ej. "Calimío Norte, Cali") → primer segmento.
-                        if (!this.barrioOk && s.secundario) {
-                            const b = (s.secundario.split(',')[0] || '').trim();
-                            if (b) this.$wire.set('barrio', b);
+                        // 🌐 Respaldo final: si el navegador no logró coords o barrio,
+                        //    el SERVIDOR geocodifica la dirección (Google con Referer)
+                        //    y llena ambos de forma confiable.
+                        if (!this.coordsOk || !this.barrioOk) {
+                            try { this.$wire.geocodificarDireccion(s.texto); } catch (e) {}
                         }
 
                         this.sessionToken = null; // cerrar sesión de búsqueda

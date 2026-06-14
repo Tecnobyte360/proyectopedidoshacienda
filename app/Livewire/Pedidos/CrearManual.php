@@ -179,6 +179,38 @@ class CrearManual extends Component
         return Sede::where('activa', true)->orderBy('nombre')->get(['id', 'nombre']);
     }
 
+    /**
+     * 🌐 Geocodifica la dirección EN EL SERVIDOR (Google con Referer) y llena
+     * las coordenadas y el barrio. Se llama al elegir la dirección de Google,
+     * para que el barrio y la ubicación se completen aunque el navegador falle.
+     */
+    public function geocodificarDireccion(?string $direccion = null): void
+    {
+        $dir = trim((string) ($direccion ?: $this->direccion));
+        if ($this->metodo_entrega !== 'domicilio' || $dir === '') {
+            return;
+        }
+        $this->direccion = $dir;
+        try {
+            $geo = app(\App\Services\GeocodingService::class)->geocodificar(
+                $dir,
+                $this->barrio ?: null,
+                $this->ciudad ?: 'Bello'
+            );
+            if ($geo) {
+                if (!empty($geo['lat']) && !empty($geo['lng'])) {
+                    $this->direccionLat = (float) $geo['lat'];
+                    $this->direccionLng = (float) $geo['lng'];
+                }
+                if (empty($this->barrio) && !empty($geo['barrio'])) {
+                    $this->barrio = $geo['barrio']; // dispara updatedBarrio → zona/envío
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('geocodificarDireccion falló: ' . $e->getMessage());
+        }
+    }
+
     /** ⚖️ Peso total del pedido en kg (productos vendidos por peso). */
     public function getPesoTotalKgProperty(): float
     {
