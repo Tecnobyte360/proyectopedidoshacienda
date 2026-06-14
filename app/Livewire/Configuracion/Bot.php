@@ -36,6 +36,8 @@ class Bot extends Component
     public string $frase_bienvenida          = '';
     public string $info_empresa              = '';
     public bool   $activo                    = true;
+    /** 🧪 Números (coma-separados) que el bot atiende AUNQUE esté apagado (modo prueba). */
+    public string $numeros_prueba            = '';
 
     // Prompt personalizado
     public bool   $usar_prompt_personalizado = false;
@@ -192,6 +194,7 @@ class Bot extends Component
         $this->frase_bienvenida          = (string) ($cfg->frase_bienvenida ?? '');
         $this->info_empresa              = (string) ($cfg->info_empresa ?? '');
         $this->activo                    = (bool) $cfg->activo;
+        $this->numeros_prueba            = (string) ($cfg->numeros_prueba ?? '');
 
         $this->usar_prompt_personalizado = (bool) ($cfg->usar_prompt_personalizado ?? false);
         $this->system_prompt             = (string) ($cfg->system_prompt ?? '');
@@ -723,6 +726,7 @@ class Bot extends Component
             'frase_bienvenida'          => 'nullable|string|max:500',
             'info_empresa'              => 'nullable|string|max:2000',
             'activo'                    => 'boolean',
+            'numeros_prueba'            => 'nullable|string|max:500',
             'usar_prompt_personalizado' => 'boolean',
             'system_prompt'             => 'nullable|string|max:20000',
             'instrucciones_extra'       => 'nullable|string|max:20000',

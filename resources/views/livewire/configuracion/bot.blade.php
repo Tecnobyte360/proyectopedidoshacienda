@@ -82,6 +82,22 @@
                     </label>
                 </div>
             </div>
+
+            {{-- 🧪 Modo prueba: números que el bot atiende AUNQUE esté apagado --}}
+            @unless($activo)
+                <div class="mt-4 rounded-xl border border-amber-200 bg-amber-50/60 p-4">
+                    <label class="block text-sm font-semibold text-amber-800 mb-1">
+                        <i class="fa-solid fa-flask"></i> Modo prueba — números que SÍ atiende (bot apagado)
+                    </label>
+                    <input type="text" wire:model.blur="numeros_prueba"
+                           placeholder="Ej: 573216499744, 573001234567"
+                           class="w-full rounded-xl border border-amber-300 px-4 py-2.5 text-sm focus:border-amber-500 focus:ring-2 focus:ring-amber-100">
+                    <p class="text-[11px] text-amber-700 mt-1">
+                        Con el bot <b>apagado</b>, la IA responderá <b>solo</b> a estos números (separados por coma).
+                        Ideal para probar sin encenderlo a todos los clientes. Déjalo vacío para que no responda a nadie.
+                    </p>
+                </div>
+            @endunless
         </section>
 
         {{-- FUENTE DE PRODUCTOS --}}

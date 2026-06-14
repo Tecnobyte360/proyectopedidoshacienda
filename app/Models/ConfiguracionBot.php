@@ -17,6 +17,7 @@ class ConfiguracionBot extends Model
 
     protected $fillable = [
         'tenant_id',
+        'numeros_prueba',
         'enviar_imagenes_productos',
         'enviar_ficha_tecnica',
         'transcribir_audios',

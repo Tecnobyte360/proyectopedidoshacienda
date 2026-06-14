@@ -840,7 +840,10 @@ class WhatsappWebhookController extends Controller
         // Aún persistimos los mensajes del cliente en BD para que aparezcan en /chat
         // y el operador pueda atenderlos manualmente.
         $configBot = \App\Models\ConfiguracionBot::actual();
-        if (!$configBot->activo) {
+        // 🧪 MODO PRUEBA: si el bot está apagado pero el número está en la lista de
+        //    prueba, igual respondemos (para probar sin encenderlo a todos).
+        $esPrueba = $this->esNumeroPrueba($from, $configBot);
+        if (!$configBot->activo && !$esPrueba) {
             try {
                 $telefonoNorm = $this->normalizarTelefono($from);
                 $cliente      = \App\Models\Cliente::encontrarOCrearPorTelefono($telefonoNorm, $name);
@@ -853,6 +856,9 @@ class WhatsappWebhookController extends Controller
 
             Log::info('🔌 Bot DESACTIVADO globalmente — sin respuesta', ['phone' => $from]);
             return '';   // sin respuesta
+        }
+        if (!$configBot->activo && $esPrueba) {
+            Log::info('🧪 Bot apagado pero número en MODO PRUEBA — respondiendo', ['phone' => $from]);
         }
 
         // ── CAPA -1: Modo intervención humana ─────────────────────────────────
@@ -4660,6 +4666,29 @@ TXT;
      *   1. Buscar una sede que tenga whatsapp_connection_id == connectionId.
      *   2. Si no hay match, usar la primera sede activa del tenant (fallback legacy).
      */
+    /**
+     * 🧪 ¿El número remitente está en la lista de números de prueba del bot?
+     * Compara solo dígitos y tolera el código de país (compara por sufijo).
+     */
+    private function esNumeroPrueba(string $from, $cfg): bool
+    {
+        $lista = trim((string) ($cfg->numeros_prueba ?? ''));
+        if ($lista === '') return false;
+
+        $norm = preg_replace('/\D+/', '', (string) $from);
+        if ($norm === '') return false;
+
+        foreach (preg_split('/[,\s;]+/', $lista) as $n) {
+            $n = preg_replace('/\D+/', '', (string) $n);
+            if ($n === '') continue;
+            // Match tolerante: 573216499744 vs 3216499744 (con/sin indicativo).
+            if ($norm === $n || str_ends_with($norm, $n) || str_ends_with($n, $norm)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private function obtenerSedeIdDesdeConexion(?string $connectionId): ?int
     {
         if ($connectionId) {
