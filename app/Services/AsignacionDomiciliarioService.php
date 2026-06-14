@@ -49,16 +49,20 @@ class AsignacionDomiciliarioService
 
         $criterio = (string) ($cfg->criterio_asignacion ?: 'balanceado');
 
+        // ⚖️ Peso del pedido (kg): solo se sugieren domiciliarios que puedan cargarlo.
+        $pesoKg = $this->pesoKgDePedido($pedido);
+
         $domiciliario = match ($criterio) {
-            'cercania' => $this->porCercania($pedido) ?: $this->porBalanceo(),
-            'rotacion' => $this->porRotacion()        ?: $this->porBalanceo(),
-            default    => $this->porBalanceo(),
+            'cercania' => $this->porCercania($pedido) ?: $this->porBalanceo($pesoKg),
+            'rotacion' => $this->porRotacion($pesoKg)  ?: $this->porBalanceo($pesoKg),
+            default    => $this->porBalanceo($pesoKg),
         };
 
         if (!$domiciliario) {
-            Log::info('Auto-asignación: no hay domiciliarios disponibles', [
+            Log::info('Auto-asignación: no hay domiciliarios disponibles (o ninguno con capacidad para el peso)', [
                 'pedido_id' => $pedido->id,
                 'criterio'  => $criterio,
+                'peso_kg'   => $pesoKg,
             ]);
             return null;
         }
@@ -76,6 +80,8 @@ class AsignacionDomiciliarioService
             'pedido_id'     => $pedido->id,
             'domiciliario'  => $domiciliario->nombre,
             'criterio'      => $criterio,
+            'peso_kg'       => $pesoKg,
+            'capacidad_kg'  => $domiciliario->capacidad_kg,
         ]);
 
         return $domiciliario;
@@ -86,15 +92,18 @@ class AsignacionDomiciliarioService
      * Usa el mismo criterio configurado. El operador decide si lo confirma.
      * Devuelve el Domiciliario sugerido o null.
      */
-    public function sugerirSinGuardar(Pedido $pedido): ?Domiciliario
+    public function sugerirSinGuardar(Pedido $pedido, ?float $pesoKg = null): ?Domiciliario
     {
         $cfg = ConfiguracionBot::actual();
         $criterio = (string) ($cfg->criterio_asignacion ?: 'balanceado');
 
+        // ⚖️ Si no nos pasan el peso, lo calculamos del pedido (sus detalles).
+        $pesoKg = $pesoKg ?? $this->pesoKgDePedido($pedido);
+
         return match ($criterio) {
-            'cercania' => $this->porCercania($pedido) ?: $this->porBalanceo(),
-            'rotacion' => $this->porRotacion()        ?: $this->porBalanceo(),
-            default    => $this->porBalanceo(),
+            'cercania' => $this->porCercania($pedido) ?: $this->porBalanceo($pesoKg),
+            'rotacion' => $this->porRotacion($pesoKg)  ?: $this->porBalanceo($pesoKg),
+            default    => $this->porBalanceo($pesoKg),
         };
     }
 
@@ -102,13 +111,14 @@ class AsignacionDomiciliarioService
      * Domiciliario activo con la MENOR cantidad de pedidos en curso.
      * "En curso" = pedidos no entregados ni cancelados.
      */
-    private function porBalanceo(): ?Domiciliario
+    private function porBalanceo(?float $pesoKg = null): ?Domiciliario
     {
         // Cualquier domiciliario activo es candidato — no importa su estado.
         // El balanceo se basa en CARGA REAL (pedidos en curso), no en el flag
         // de estado que puede quedar pegado. Así el con menos pedidos siempre gana.
         return Domiciliario::query()
             ->where('activo', true)
+            ->tap(fn ($q) => $this->filtrarPorCapacidad($q, $pesoKg))
             ->withCount(['pedidos as carga_actual' => function ($q) {
                 $q->whereNotIn('estado', [
                     Pedido::ESTADO_ENTREGADO,
@@ -137,13 +147,14 @@ class AsignacionDomiciliarioService
     /**
      * Round-robin: el activo que LLEVA MÁS TIEMPO sin recibir un pedido.
      */
-    private function porRotacion(): ?Domiciliario
+    private function porRotacion(?float $pesoKg = null): ?Domiciliario
     {
         // Domiciliarios activos ordenados por la última vez que recibieron pedido
         // (los que NUNCA recibieron salen primero, luego los que más tiempo llevan
         // sin recibir). Sin filtrar por estado — la carga manda.
         $domis = Domiciliario::query()
             ->where('activo', true)
+            ->tap(fn ($q) => $this->filtrarPorCapacidad($q, $pesoKg))
             ->get();
 
         if ($domis->isEmpty()) return null;
@@ -156,5 +167,58 @@ class AsignacionDomiciliarioService
             ->pluck('ult', 'domiciliario_id');
 
         return $domis->sortBy(fn ($d) => $ultimas->get($d->id) ?? '0000-00-00 00:00:00')->first();
+    }
+
+    /**
+     * ⚖️ Filtra el query de domiciliarios a los que PUEDEN cargar $pesoKg.
+     * Domiciliarios con capacidad_kg NULL o 0 = sin límite definido → siempre elegibles.
+     */
+    private function filtrarPorCapacidad($query, ?float $pesoKg): void
+    {
+        if ($pesoKg === null || $pesoKg <= 0) {
+            return;
+        }
+        $query->where(function ($q) use ($pesoKg) {
+            $q->whereNull('capacidad_kg')
+              ->orWhere('capacidad_kg', 0)
+              ->orWhere('capacidad_kg', '>=', $pesoKg);
+        });
+    }
+
+    /**
+     * ⚖️ Peso del pedido en KG = suma de cantidades de productos vendidos por peso,
+     * convertidas a kg (kg/Kl ×1, libra ×0.5, gramos ÷1000). Las unidades "und/unidad"
+     * no suman peso (no se venden por peso).
+     */
+    public function pesoKgDePedido(Pedido $pedido): float
+    {
+        try {
+            $detalles = $pedido->relationLoaded('detalles')
+                ? $pedido->detalles
+                : ($pedido->exists ? $pedido->detalles()->get() : collect());
+        } catch (\Throwable $e) {
+            return 0.0;
+        }
+
+        $peso = 0.0;
+        foreach ($detalles as $d) {
+            $peso += $this->cantidadAKg((float) ($d->cantidad ?? 0), (string) ($d->unidad ?? ''));
+        }
+        return round($peso, 3);
+    }
+
+    /**
+     * Convierte una cantidad+unidad a kilogramos. Reutilizable desde otros lados
+     * (ej. el formulario de pedido manual) para calcular el peso del pedido.
+     */
+    public function cantidadAKg(float $cantidad, string $unidad): float
+    {
+        $u = strtolower(trim($unidad));
+        return match (true) {
+            in_array($u, ['kg', 'kl', 'kilo', 'kilos', 'kilogramo', 'kilogramos'], true) => $cantidad,
+            in_array($u, ['lb', 'libra', 'libras', 'librita', 'libritas'], true)         => $cantidad * 0.5,
+            in_array($u, ['g', 'gr', 'gramo', 'gramos'], true)                           => $cantidad / 1000.0,
+            default                                                                       => 0.0, // unidad/und → no pesa
+        };
     }
 }

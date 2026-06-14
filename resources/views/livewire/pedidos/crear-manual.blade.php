@@ -529,6 +529,11 @@
                             <label class="{{ $labelCls }}">
                                 <i class="fa-solid fa-motorcycle text-slate-400 mr-1"></i>
                                 Domiciliario <span class="text-slate-400 normal-case font-normal">(opcional)</span>
+                                @if($this->pesoTotalKg > 0)
+                                    <span class="ml-1 inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-700">
+                                        <i class="fa-solid fa-weight-hanging text-[9px]"></i> Pedido ≈ {{ $this->pesoTotalKg }} kg
+                                    </span>
+                                @endif
                             </label>
                             <div class="flex flex-col sm:flex-row gap-2">
                                 <div class="relative flex-1">
@@ -536,8 +541,9 @@
                                     <select wire:model.live="domiciliario_id" class="{{ $inputClsIcon }} appearance-none cursor-pointer">
                                         <option value="">— Sin asignar (el sistema lo asigna) —</option>
                                         @foreach($domiciliarios as $d)
+                                            @php $noAlcanza = $this->pesoTotalKg > 0 && $d->capacidad_kg && $d->capacidad_kg < $this->pesoTotalKg; @endphp
                                             <option value="{{ $d->id }}">
-                                                {{ $d->nombre }} ({{ $d->estado === 'disponible' ? 'disponible' : 'en ruta' }})
+                                                {{ $d->nombre }} ({{ $d->estado === 'disponible' ? 'disponible' : 'en ruta' }}@if($d->capacidad_kg) · {{ $d->capacidad_kg }} kg@endif){{ $noAlcanza ? ' ⚠️ no alcanza' : '' }}
                                             </option>
                                         @endforeach
                                     </select>

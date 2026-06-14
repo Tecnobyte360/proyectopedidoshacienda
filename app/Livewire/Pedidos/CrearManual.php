@@ -179,12 +179,23 @@ class CrearManual extends Component
         return Sede::where('activa', true)->orderBy('nombre')->get(['id', 'nombre']);
     }
 
+    /** ⚖️ Peso total del pedido en kg (productos vendidos por peso). */
+    public function getPesoTotalKgProperty(): float
+    {
+        $svc  = app(\App\Services\AsignacionDomiciliarioService::class);
+        $peso = 0.0;
+        foreach ($this->productos as $p) {
+            $peso += $svc->cantidadAKg((float) ($p['cantidad'] ?? 0), (string) ($p['unidad'] ?? ''));
+        }
+        return round($peso, 2);
+    }
+
     /** 🛵 Domiciliarios activos para el selector. */
     public function getDomiciliariosProperty()
     {
         return \App\Models\Domiciliario::where('activo', true)
             ->orderBy('nombre')
-            ->get(['id', 'nombre', 'estado']);
+            ->get(['id', 'nombre', 'estado', 'capacidad_kg']);
     }
 
     /**
@@ -197,12 +208,20 @@ class CrearManual extends Component
             // Pedido temporal con los datos actuales para que el servicio razone.
             $tmp = new \App\Models\Pedido();
             $tmp->barrio = $this->barrio ?: null;
+            $tmp->lat    = $this->direccionLat;
+            $tmp->lng    = $this->direccionLng;
 
-            $dom = app(\App\Services\AsignacionDomiciliarioService::class)->sugerirSinGuardar($tmp);
+            // ⚖️ Peso del pedido (kg) → el servicio sugiere solo domiciliarios que lo carguen.
+            $peso = $this->pesoTotalKg;
+
+            $dom = app(\App\Services\AsignacionDomiciliarioService::class)->sugerirSinGuardar($tmp, $peso);
             if ($dom) {
                 $this->domiciliario_id      = $dom->id;
                 $this->domiciliarioSugerido = true;
-                $this->dispatch('notify', ['type' => 'success', 'message' => 'Domiciliario sugerido: ' . $dom->nombre]);
+                $cap = $dom->capacidad_kg ? " · capacidad {$dom->capacidad_kg} kg" : '';
+                $this->dispatch('notify', ['type' => 'success', 'message' => "Domiciliario sugerido: {$dom->nombre}{$cap} (pedido ≈ {$peso} kg)"]);
+            } elseif ($peso > 0) {
+                $this->dispatch('notify', ['type' => 'warning', 'message' => "Ningún domiciliario disponible puede cargar ≈ {$peso} kg. Asigna manual o divide el pedido."]);
             } else {
                 $this->dispatch('notify', ['type' => 'info', 'message' => 'No hay domiciliarios disponibles para sugerir.']);
             }
