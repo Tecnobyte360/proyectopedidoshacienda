@@ -456,8 +456,8 @@
                                             <i class="fa-solid fa-location-crosshairs text-[10px]"></i> Ubicación fijada ✓ (entra en la ruta)
                                         </p>
                                     @else
-                                        <p class="mt-1 text-[11px] text-amber-600 font-medium">
-                                            <i class="fa-solid fa-triangle-exclamation text-[10px]"></i> Elige la dirección del desplegable de Google para fijar la ubicación (obligatorio para domicilio).
+                                        <p class="mt-1 text-[11px] text-slate-500 font-medium">
+                                            <i class="fa-solid fa-circle-info text-[10px]"></i> Elige la dirección del desplegable de Google para fijar la ubicación exacta. Si no aparece, igual se calculará automáticamente al crear el pedido.
                                         </p>
                                     @endif
                                 @else
