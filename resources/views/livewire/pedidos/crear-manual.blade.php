@@ -475,18 +475,30 @@
                                     <i class="fa-solid fa-map text-slate-400 mr-1"></i>
                                     Barrio
                                 </label>
-                                <div class="relative">
+                                {{-- 🔎 Select2-like buscable de barrios de cobertura --}}
+                                <div class="relative" x-data="barrioSelect({{ \Illuminate\Support\Js::from($barriosCobertura->values()) }})" @click.away="open=false">
                                     <i class="fa-solid fa-tree-city absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 z-10"></i>
-                                    <input type="text" wire:model.live.debounce.500ms="barrio"
-                                           list="barriosCoberturaList"
+                                    <input type="text" x-model="barrio"
+                                           @focus="open=true" @click="open=true" @input="open=true"
                                            autocomplete="off"
                                            placeholder="Escribe o elige el barrio…"
-                                           class="{{ $inputClsIcon }}">
-                                    <datalist id="barriosCoberturaList">
-                                        @foreach($barriosCobertura as $b)
-                                            <option value="{{ $b['nombre'] }}">{{ $b['zona'] }}@if($b['costo'] > 0) · ${{ number_format($b['costo'], 0, ',', '.') }}@endif</option>
-                                        @endforeach
-                                    </datalist>
+                                           class="{{ $inputClsIcon }} pr-9">
+                                    <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
+
+                                    <div x-show="open" x-transition.opacity x-cloak
+                                         class="absolute z-50 mt-1 w-full max-h-60 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg">
+                                        <template x-for="b in filtrados()" :key="b.nombre">
+                                            <button type="button" @click="elegir(b)"
+                                                    class="w-full text-left px-4 py-2 hover:bg-emerald-50 flex items-center justify-between gap-2">
+                                                <span class="text-sm text-slate-700" x-text="b.nombre"></span>
+                                                <span class="text-[11px] text-slate-400 shrink-0"
+                                                      x-text="b.zona + (b.costo > 0 ? ' · $' + fmt(b.costo) : '')"></span>
+                                            </button>
+                                        </template>
+                                        <div x-show="filtrados().length === 0" class="px-4 py-2 text-[12px] text-slate-500">
+                                            Sin coincidencias. Se usará: «<span x-text="barrio"></span>»
+                                        </div>
+                                    </div>
                                 </div>
                                 @if($barriosCobertura->isEmpty())
                                     <p class="mt-1 text-[11px] text-amber-600"><i class="fa-solid fa-triangle-exclamation"></i> No hay barrios cargados en zonas de cobertura.</p>
@@ -894,6 +906,30 @@
                             this.$wire.dispatch('notify', { type: 'error', message: 'No se pudo calcular el envío. Escribe el costo a mano.' });
                         }
                         this.cargando = false;
+                    },
+                };
+            }
+
+            // 🔎 Select2-like buscable para el campo Barrio.
+            function barrioSelect(barrios) {
+                return {
+                    open: false,
+                    barrios: barrios || [],
+                    barrio: @entangle('barrio').live,
+                    filtrados() {
+                        const q = (this.barrio || '').toString().toLowerCase().trim();
+                        if (!q) return this.barrios;
+                        return this.barrios.filter(b =>
+                            (b.nombre || '').toLowerCase().includes(q) ||
+                            (b.zona || '').toLowerCase().includes(q)
+                        );
+                    },
+                    elegir(b) {
+                        this.barrio = b.nombre;
+                        this.open = false;
+                    },
+                    fmt(n) {
+                        try { return new Intl.NumberFormat('es-CO').format(n); } catch (e) { return n; }
                     },
                 };
             }
