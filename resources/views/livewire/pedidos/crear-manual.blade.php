@@ -720,6 +720,7 @@
                     abierto: false,
                     sessionToken: null,
                     coordsOk: false,
+                    barrioOk: false,
                     init() {
                         // Sincronizar con el valor inicial de Livewire (si lo hay).
                         this.texto = this.$wire.get('direccion') || '';
@@ -781,6 +782,7 @@
                         this.abierto = false;
                         this.sugerencias = [];
                         this.coordsOk = false;
+                        this.barrioOk = false;
 
                         // Pedir detalles para extraer el barrio.
                         try {
@@ -806,30 +808,48 @@
                                 this.$wire.set('direccionLng', d.location.longitude, false);
                                 this.coordsOk = true;
                             }
-                            if (barrio) this.$wire.set('barrio', barrio);
+                            if (barrio) { this.$wire.set('barrio', barrio); this.barrioOk = true; }
                         } catch (e) { /* place details no disponible — usamos fallback */ }
 
-                        // 📍 RESPALDO de coordenadas vía Text Search (más confiable
-                        //    que Place Details, que a veces la key no habilita).
-                        if (!this.coordsOk) {
+                        // 📍 RESPALDO vía Text Search (más confiable que Place Details):
+                        //    trae coordenadas Y componentes para autocompletar el BARRIO.
+                        if (!this.coordsOk || !this.barrioOk) {
                             try {
                                 const r2 = await fetch('https://places.googleapis.com/v1/places:searchText', {
                                     method: 'POST',
                                     headers: {
                                         'Content-Type': 'application/json',
                                         'X-Goog-Api-Key': this.apiKey,
-                                        'X-Goog-FieldMask': 'places.location',
+                                        'X-Goog-FieldMask': 'places.location,places.addressComponents',
                                     },
                                     body: JSON.stringify({ textQuery: s.texto, languageCode: 'es', regionCode: 'CO' }),
                                 });
                                 const d2 = await r2.json();
-                                const loc = d2.places && d2.places[0] && d2.places[0].location;
-                                if (loc && loc.latitude && loc.longitude) {
+                                const place = d2.places && d2.places[0];
+                                const loc = place && place.location;
+                                if (!this.coordsOk && loc && loc.latitude && loc.longitude) {
                                     this.$wire.set('direccionLat', loc.latitude, false);
                                     this.$wire.set('direccionLng', loc.longitude, false);
                                     this.coordsOk = true;
                                 }
-                            } catch (e) { console.warn('Text Search coords falló:', e); }
+                                if (!this.barrioOk && place) {
+                                    let b = '';
+                                    (place.addressComponents || []).forEach(c => {
+                                        const t = c.types || [];
+                                        if (t.includes('sublocality') || t.includes('sublocality_level_1') || t.includes('neighborhood')) {
+                                            b = c.longText || c.shortText || '';
+                                        }
+                                    });
+                                    if (b) { this.$wire.set('barrio', b); this.barrioOk = true; }
+                                }
+                            } catch (e) { console.warn('Text Search falló:', e); }
+                        }
+
+                        // 🏘️ Último recurso para el barrio: el texto secundario de la
+                        //    sugerencia (ej. "Calimío Norte, Cali") → primer segmento.
+                        if (!this.barrioOk && s.secundario) {
+                            const b = (s.secundario.split(',')[0] || '').trim();
+                            if (b) this.$wire.set('barrio', b);
                         }
 
                         this.sessionToken = null; // cerrar sesión de búsqueda
