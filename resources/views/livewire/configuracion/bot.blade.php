@@ -1341,8 +1341,8 @@
                 <div>
                     <h3 class="font-bold text-slate-800">Pagos en línea por WhatsApp</h3>
                     <p class="text-xs text-slate-500">
-                        Controla si el bot incluye un link de pago Wompi cuando el pedido se confirma.
-                        Las llaves de Wompi se configuran por tenant en
+                        Controla si el bot incluye un link de pago (Wompi y/o Bold) cuando el pedido se confirma.
+                        Las pasarelas se activan y configuran por tenant en
                         <a href="{{ route('admin.tenants.index') }}" class="text-violet-700 underline">admin → tenants</a>.
                     </p>
                 </div>
@@ -1358,9 +1358,10 @@
                     </div>
                     <div class="text-xs text-slate-600 leading-relaxed">
                         Si está activo, después del resumen del pedido, el bot agrega:
-                        <em>"<i class="fa-solid fa-credit-card"></i> Paga ahora con tarjeta, Nequi o PSE: {link de Wompi}"</em>.
+                        <em>"<i class="fa-solid fa-credit-card"></i> Paga ahora con tarjeta, Nequi o PSE: {link de pago}"</em>.
+                        Usa las pasarelas activas del tenant (Wompi y/o Bold). Si ambas están activas y la
+                        preferencia es "cliente elige", muestra las dos opciones.
                         El cliente puede pagar online o seguir con pago contra entrega.
-                        Si lo desactivas, el bot solo confirma el pedido sin link.
                     </div>
                 </div>
             </label>
@@ -1368,23 +1369,29 @@
             @php
                 $tenantActual = app(\App\Services\TenantManager::class)->current();
                 $tieneWompi = $tenantActual?->tieneWompi() ?? false;
+                $tieneBold  = ($tenantActual?->bold_activo && !empty($tenantActual?->bold_api_key)) ?? false;
+                $tienePasarela = $tieneWompi || $tieneBold;
             @endphp
 
-            @if(!$tieneWompi)
+            @if(!$tienePasarela)
                 <div class="mt-4 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-xs text-amber-800 flex items-start gap-2">
                     <i class="fa-solid fa-triangle-exclamation mt-0.5"></i>
                     <div>
-                        <strong>Wompi no está configurado para este tenant.</strong>
+                        <strong>No hay ninguna pasarela de pago activa para este tenant.</strong>
                         Aunque marques este check, el link no se enviará hasta que el super-admin
-                        registre las llaves de Wompi. Pídele que las configure en
-                        <em>Admin → Tenants → editar tenant → bloque "Pasarela de pagos · Wompi"</em>.
+                        active y configure al menos una pasarela en
+                        <em>Admin → Tenants → editar tenant → bloque "Pasarela de pagos" (Wompi o Bold)</em>.
                     </div>
                 </div>
             @else
                 <div class="mt-4 rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3 text-xs text-emerald-800 flex items-start gap-2">
                     <i class="fa-solid fa-circle-check mt-0.5"></i>
                     <div>
-                        Wompi configurado en modo <strong>{{ ucfirst($tenantActual->wompi_modo ?: 'sandbox') }}</strong>.
+                        Pasarela activa:
+                        <strong>@if($tieneWompi)Wompi @endif@if($tieneWompi && $tieneBold)+ @endif@if($tieneBold)Bold @endif</strong>.
+                        @if($tieneWompi && $tieneBold)
+                            Preferencia: <strong>{{ ucfirst(str_replace('_',' ', $tenantActual->pasarela_preferida ?: 'cliente_elige')) }}</strong>.
+                        @endif
                         Los pagos aprobados se ven en
                         <a href="{{ route('pagos.index') }}" class="underline font-bold">/pagos</a>
                         y al cliente le llega un WhatsApp de confirmación automáticamente.

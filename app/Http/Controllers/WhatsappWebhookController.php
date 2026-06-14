@@ -8759,13 +8759,23 @@ TXT;
             };
         }
 
-        // Bloque de pago (opcional, solo si Wompi está activo)
+        // Bloque de pago (opcional). Usa TODAS las pasarelas activas del tenant
+        // (Wompi y/o Bold, según su config y preferencia), no solo Wompi.
         $bloquePago = '';
         if ($cfgBot->enviar_link_pago ?? true) {
             try {
-                $linkPago = $pedido->urlPagoWompi();
-                if ($linkPago) {
-                    $bloquePago = "\n💳 *Paga ahora con tarjeta, Nequi o PSE:*\n{$linkPago}\n(También puedes pagar contra entrega)\n";
+                $urlsPago = app(\App\Services\PasarelaPagoService::class)->urlsPago($pedido);
+                if (!empty($urlsPago)) {
+                    if (count($urlsPago) > 1) {
+                        // Cliente elige: mostrar ambas opciones.
+                        $lineas = [];
+                        if (!empty($urlsPago['wompi'])) $lineas[] = "• Tarjeta/Nequi/PSE (Wompi): {$urlsPago['wompi']}";
+                        if (!empty($urlsPago['bold']))  $lineas[] = "• Tarjeta/Nequi/PSE (Bold): {$urlsPago['bold']}";
+                        $bloquePago = "\n💳 *Paga ahora en línea:*\n" . implode("\n", $lineas) . "\n(También puedes pagar contra entrega)\n";
+                    } else {
+                        $linkPago = array_values($urlsPago)[0];
+                        $bloquePago = "\n💳 *Paga ahora con tarjeta, Nequi o PSE:*\n{$linkPago}\n(También puedes pagar contra entrega)\n";
+                    }
                 }
             } catch (\Throwable $e) { /* ignorar */ }
         }
