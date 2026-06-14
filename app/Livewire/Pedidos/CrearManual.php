@@ -679,6 +679,24 @@ class CrearManual extends Component
             $this->dispatch('notify', ['type' => 'error', 'message' => 'Falta la dirección para domicilio.']);
             return;
         }
+        // 🌐 RESPALDO server-side: si el navegador no fijó las coordenadas (Google
+        //    a veces no las captura), las geocodificamos en el servidor a partir
+        //    de la dirección. Así no bloqueamos al operador por una falla de Google.
+        if ($this->metodo_entrega === 'domicilio' && !empty($this->direccion) && (!$this->direccionLat || !$this->direccionLng)) {
+            try {
+                $geo = app(\App\Services\GeocodingService::class)->geocodificar(
+                    (string) $this->direccion,
+                    $this->barrio ?: null,
+                    $this->ciudad ?: 'Bello'
+                );
+                if ($geo && !empty($geo['lat']) && !empty($geo['lng'])) {
+                    $this->direccionLat = (float) $geo['lat'];
+                    $this->direccionLng = (float) $geo['lng'];
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Geocode manual falló: ' . $e->getMessage());
+            }
+        }
         // 📍 DESPACHO SÍ O SÍ con ubicación: sin coordenadas no se sabe a dónde
         //    despachar ni se traza la ruta. Obligamos a elegir la dirección del
         //    desplegable de Google (captura coords vía detalles o Text Search).

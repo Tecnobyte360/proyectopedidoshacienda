@@ -200,12 +200,16 @@ class GeocodingService
 
         return Cache::remember($cacheKey, 86400, function () use ($address, $apiKey) {
             try {
-                $resp = Http::timeout(8)->get('https://maps.googleapis.com/maps/api/geocode/json', [
-                    'address' => $address,
-                    'key'     => $apiKey,
-                    'region'  => 'co',
-                    'language' => 'es',
-                ]);
+                // 🌐 Referer de un dominio whitelisteado para que la API key
+                //    (restringida por referente HTTP) acepte la llamada server-side.
+                $resp = Http::timeout(8)
+                    ->withHeaders(['Referer' => 'https://admin.kivox.co/'])
+                    ->get('https://maps.googleapis.com/maps/api/geocode/json', [
+                        'address' => $address,
+                        'key'     => $apiKey,
+                        'region'  => 'co',
+                        'language' => 'es',
+                    ]);
 
                 if (!$resp->successful()) {
                     Log::warning('🗺️ Google Geocoding HTTP error', ['status' => $resp->status()]);
