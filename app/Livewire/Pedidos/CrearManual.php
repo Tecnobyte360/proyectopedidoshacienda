@@ -236,6 +236,15 @@ class CrearManual extends Component
      */
     public function sugerirDomiciliario(): void
     {
+        // 🛒 Sin productos no se puede sugerir por peso — pedir agregarlos primero.
+        if (empty($this->productos) || collect($this->productos)->sum(fn ($p) => (float) ($p['cantidad'] ?? 0)) <= 0) {
+            $this->dispatch('notify', [
+                'type'    => 'warning',
+                'message' => '🛒 Agrega primero los productos para sugerir el domiciliario según el peso del pedido.',
+            ]);
+            return;
+        }
+
         try {
             // Pedido temporal con los datos actuales para que el servicio razone.
             $tmp = new \App\Models\Pedido();
