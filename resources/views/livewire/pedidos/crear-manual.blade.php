@@ -618,7 +618,6 @@
                                 <i class="fa-solid fa-wallet absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 z-10"></i>
                                 <select wire:model="metodo_pago" class="{{ $inputClsIcon }} appearance-none cursor-pointer">
                                     <option value="efectivo">Efectivo contra entrega</option>
-                                    <option value="transferencia">Transferencia / PSE</option>
                                     @if($tieneWompi)
                                         <option value="wompi">💳 Link de pago — Wompi</option>
                                     @endif
@@ -634,15 +633,30 @@
                         </div>
                         <div>
                             <label class="{{ $labelCls }}">
-                                <i class="fa-solid fa-ticket text-slate-400 mr-1"></i>
-                                Cupón de descuento <span class="text-slate-400 normal-case font-normal">(opcional)</span>
+                                <i class="fa-solid fa-gift text-slate-400 mr-1"></i>
+                                Beneficios del cliente
                             </label>
-                            <div class="relative">
-                                <i class="fa-solid fa-percent absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
-                                <input type="text" wire:model="cupon"
-                                       placeholder="EJ: BIENVENIDA10"
-                                       class="{{ $inputClsIcon }} uppercase">
-                            </div>
+                            @php $bc = $this->beneficiosCliente; @endphp
+                            @if($bc['cumple'])
+                                <div class="rounded-xl bg-pink-50 border border-pink-200 px-3 py-2 text-[12px] text-pink-700 font-semibold mb-2">
+                                    🎂 ¡Hoy está de cumpleaños{{ $bc['nombre'] ? ', ' . \Illuminate\Support\Str::title(strtok($bc['nombre'], ' ')) : '' }}! 🎉
+                                </div>
+                            @endif
+                            @if(!empty($bc['beneficios']))
+                                <div class="space-y-1">
+                                    @foreach($bc['beneficios'] as $b)
+                                        <div class="flex items-center justify-between rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-1.5 text-[12px]">
+                                            <span class="font-semibold text-emerald-700">{{ $b['etiqueta'] }}</span>
+                                            <span class="text-[10px] text-emerald-600">@if($b['origen'] === 'cumpleanos')🎂 · @endif vence {{ $b['vence'] }}</span>
+                                        </div>
+                                    @endforeach
+                                </div>
+                                <p class="mt-1 text-[10px] text-slate-400">Se aplican automáticamente al crear el pedido.</p>
+                            @else
+                                <p class="text-[11px] text-slate-400 mt-1">
+                                    <i class="fa-solid fa-circle-info"></i> Sin cupones/beneficios vigentes para este cliente.
+                                </p>
+                            @endif
                         </div>
                     </div>
                     <div>

@@ -272,6 +272,41 @@ class CrearManual extends Component
         ];
     }
 
+    /** 🎁 Beneficios vigentes del cliente cargado + aviso de cumpleaños (auto). */
+    public function getBeneficiosClienteProperty(): array
+    {
+        $vacio = ['beneficios' => [], 'cumple' => false, 'nombre' => null];
+        $ced = trim((string) $this->cedula);
+        $tel = trim((string) $this->telefono);
+        if ($ced === '' && $tel === '') return $vacio;
+
+        try {
+            $cliente = \App\Models\Cliente::query()
+                ->when($ced !== '', fn ($q) => $q->where('cedula', $ced))
+                ->when($ced === '' && $tel !== '', fn ($q) => $q->where(function ($w) use ($tel) {
+                    $w->where('telefono', $tel)->orWhere('telefono_normalizado', 'like', '%' . $tel);
+                }))
+                ->first();
+            if (!$cliente) return $vacio;
+
+            $beneficios = $cliente->beneficios()->vigentes()->orderBy('vigente_hasta')->get()
+                ->map(fn ($b) => [
+                    'etiqueta' => $b->etiquetaTipo(),
+                    'origen'   => $b->origen,
+                    'vence'    => optional($b->vigente_hasta)->format('d/m/Y'),
+                ])->values()->toArray();
+
+            $cumple = false;
+            if ($cliente->fecha_nacimiento) {
+                $cumple = $cliente->fecha_nacimiento->format('m-d') === now()->format('m-d');
+            }
+
+            return ['beneficios' => $beneficios, 'cumple' => $cumple, 'nombre' => $cliente->nombre];
+        } catch (\Throwable $e) {
+            return $vacio;
+        }
+    }
+
     /** ⚖️ Peso total del pedido en kg (productos vendidos por peso). */
     public function getPesoTotalKgProperty(): float
     {
