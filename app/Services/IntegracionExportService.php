@@ -283,6 +283,13 @@ class IntegracionExportService
             'updated_at'     => now(),
         ]);
 
+        // 📄 Guardar el # de documento del ERP (HGI) en el pedido para mostrarlo en la lista.
+        try {
+            if (\Illuminate\Support\Facades\Schema::hasColumn('pedidos', 'erp_documento_id')) {
+                $pedido->forceFill(['erp_documento_id' => (string) $documentoId])->saveQuietly();
+            }
+        } catch (\Throwable $e) { /* no romper el export por esto */ }
+
         Log::info('✅ Pedido exportado al ERP', [
             'pedido_id'         => $pedido->id,
             'integracion_id'    => $integracion->id,

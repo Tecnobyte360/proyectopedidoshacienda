@@ -762,6 +762,12 @@
                                         <i class="fa-solid fa-hashtag text-[9px] text-slate-400"></i>
                                         {{ str_pad($pedido->id, 3, '0', STR_PAD_LEFT) }}
                                     </div>
+                                    @if(!empty($pedido->erp_documento_id))
+                                        <div class="mt-1 inline-flex items-center gap-1 rounded-lg bg-indigo-50 border border-indigo-200 px-2 py-0.5 text-[10px] font-bold text-indigo-700 whitespace-nowrap"
+                                             title="Número de documento en HGI">
+                                            <i class="fa-solid fa-building text-[9px]"></i> HGI: {{ $pedido->erp_documento_id }}
+                                        </div>
+                                    @endif
                                 </td>
 
                                 {{-- Cliente --}}
