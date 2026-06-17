@@ -378,10 +378,12 @@ class IntegracionExportService
             'IntTotal'          => $this->resolver($cfg['total']       ?? '{pedido.total}', $ctx),
             'IntNeto'           => $this->resolver($cfg['neto']        ?? '{pedido.total}', $ctx),
             'StrUsuarioGra'     => $this->resolver($cfg['usuario_grabador'] ?? 'admin', $ctx),
-            'IntAno'            => $this->resolver($cfg['ano']         ?? '{ano}', $ctx),
-            'IntPeriodo'        => $this->resolver($cfg['periodo']     ?? '{mes}', $ctx),
-            'IntAnoCartera'     => $this->resolver($cfg['ano_cartera'] ?? '{ano}', $ctx),
-            'IntPeriodoCartera' => $this->resolver($cfg['periodo_cartera'] ?? '{mes}', $ctx),
+            // 📅 Año y periodo (mes) SIEMPRE automáticos = periodo ACTUAL.
+            //    Se ignora cualquier valor fijo del config para no postear a un mes equivocado.
+            'IntAno'            => (int) $ctx['ano'],
+            'IntPeriodo'        => (int) $ctx['mes'],
+            'IntAnoCartera'     => (int) $ctx['ano'],
+            'IntPeriodoCartera' => (int) $ctx['mes'],
             'IntBodega'         => $this->resolver($cfg['bodega']      ?? '1', $ctx),
             // 🏢 La sucursal de la SEDE manda; si la sede no tiene, cae al config.
             'StrSucursal'       => ($ctx['pedido.sucursal'] ?? '') !== ''
