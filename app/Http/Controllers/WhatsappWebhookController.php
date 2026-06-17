@@ -8327,10 +8327,21 @@ TXT;
 
         // ── CLIENTE: lo resolvemos acá arriba para poder consultar beneficios ──
         // (antes se hacía más abajo, pero necesitamos el $cliente antes)
-        $cliente = Cliente::encontrarOCrearPorTelefono(
-            $telefonoWhatsapp,
-            $orderData['customer_name'] ?? $name
-        );
+        // 🧾 PEDIDO MANUAL: si el operador escribió una cédula, ESE cliente manda
+        //    (identidad por cédula). Así, cambiar el teléfono NO salta a otro cliente.
+        //    En el bot (no manual) se mantiene la identidad por teléfono de WhatsApp.
+        $cedulaManual = trim((string) ($orderData['cedula'] ?? ''));
+        $cliente = null;
+        if (!empty($orderData['manual']) && $cedulaManual !== ''
+            && !\App\Services\EstadoPedidoService::esCedulaTrivial($cedulaManual)) {
+            $cliente = Cliente::where('cedula', $cedulaManual)->first();
+        }
+        if (!$cliente) {
+            $cliente = Cliente::encontrarOCrearPorTelefono(
+                $telefonoWhatsapp,
+                $orderData['customer_name'] ?? $name
+            );
+        }
 
         // 🎁 ¿Tiene beneficio de envío gratis vigente? (ej. por cumpleaños)
         // Aplica si es DOMICILIO (sin importar si la zona se resolvió o no — usamos
