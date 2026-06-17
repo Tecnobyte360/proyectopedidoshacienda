@@ -12,6 +12,7 @@ class Sede extends Model
     protected $fillable = [
         'tenant_id',
         'meta_phone_number_id',
+        'hgi_sucursal',
         'nombre',
         'direccion',
         'latitud',

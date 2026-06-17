@@ -318,6 +318,8 @@ class IntegracionExportService
             'pedido.fecha_hora' => $hoyHora,
             'pedido.barrio'     => (string) ($pedido->barrio ?? ''),
             'pedido.direccion'  => (string) ($pedido->direccion ?? ''),
+            // 🏢 StrSucursal de HGI según la SEDE del pedido (cada sede tiene el suyo).
+            'pedido.sucursal'   => (string) (optional($pedido->sede)->hgi_sucursal ?? ''),
             'cliente.cedula'    => $this->resolverTercero($pedido),
             'cliente.nombre'    => (string) ($pedido->cliente_nombre ?? ''),
             'cliente.telefono'  => (string) ($pedido->telefono_whatsapp ?? $pedido->telefono ?? ''),
@@ -374,7 +376,10 @@ class IntegracionExportService
             'IntAnoCartera'     => $this->resolver($cfg['ano_cartera'] ?? '{ano}', $ctx),
             'IntPeriodoCartera' => $this->resolver($cfg['periodo_cartera'] ?? '{mes}', $ctx),
             'IntBodega'         => $this->resolver($cfg['bodega']      ?? '1', $ctx),
-            'StrSucursal'       => $this->resolver($cfg['sucursal']    ?? '0', $ctx),
+            // 🏢 La sucursal de la SEDE manda; si la sede no tiene, cae al config.
+            'StrSucursal'       => ($ctx['pedido.sucursal'] ?? '') !== ''
+                                    ? $ctx['pedido.sucursal']
+                                    : $this->resolver($cfg['sucursal'] ?? '0', $ctx),
             'StrCcosto'         => $this->resolver($cfg['ccosto']      ?? '0', $ctx),
             'StrSubCcosto'      => $this->resolver($cfg['subccosto']   ?? '0', $ctx),
             'IntCartera'        => $this->resolver($cfg['cartera']     ?? 1, $ctx),
@@ -403,7 +408,9 @@ class IntegracionExportService
             'IntValorTotal'      => $this->resolver($det['valor_total']  ?? '{detalle.subtotal}', $ctx),
             'IntValorIva'        => $this->resolver($det['valor_iva']    ?? 0, $ctx),
             'IntVrImpuesto1'     => $this->resolver($det['impuesto1']    ?? 0, $ctx),
-            'StrSucursal'        => $this->resolver($det['sucursal']     ?? $cfg['sucursal']    ?? '0', $ctx),
+            'StrSucursal'        => ($ctx['pedido.sucursal'] ?? '') !== ''
+                                    ? $ctx['pedido.sucursal']
+                                    : $this->resolver($det['sucursal'] ?? $cfg['sucursal'] ?? '0', $ctx),
             'StrCCosto'          => $this->resolver($det['ccosto']       ?? $cfg['ccosto']      ?? '0', $ctx),
             'StrSubCCosto'       => $this->resolver($det['subccosto']    ?? $cfg['subccosto']   ?? '0', $ctx),
             // StrSerie: ID creciente por línea (1, 2, 3...) — patrón estándar HGI
