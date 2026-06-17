@@ -8327,14 +8327,29 @@ TXT;
 
         // ── CLIENTE: lo resolvemos acá arriba para poder consultar beneficios ──
         // (antes se hacía más abajo, pero necesitamos el $cliente antes)
-        // 🧾 PEDIDO MANUAL: si el operador escribió una cédula, ESE cliente manda
-        //    (identidad por cédula). Así, cambiar el teléfono NO salta a otro cliente.
+        // 🧾 PEDIDO MANUAL: el operador manda. Si escribió una cédula (la que sea,
+        //    incluida la de "consumidor" 222…), ESE cliente se usa. Si no existe,
+        //    se crea con el nombre escrito — NUNCA saltamos al dueño del teléfono.
         //    En el bot (no manual) se mantiene la identidad por teléfono de WhatsApp.
         $cedulaManual = trim((string) ($orderData['cedula'] ?? ''));
         $cliente = null;
-        if (!empty($orderData['manual']) && $cedulaManual !== ''
-            && !\App\Services\EstadoPedidoService::esCedulaTrivial($cedulaManual)) {
+        if (!empty($orderData['manual']) && $cedulaManual !== '') {
             $cliente = Cliente::where('cedula', $cedulaManual)->first();
+            if (!$cliente) {
+                $nombreForm = trim((string) ($orderData['customer_name'] ?? $name)) ?: 'Cliente';
+                $telCorto   = preg_replace('/\D+/', '', (string) $telefonoWhatsapp);
+                if (str_starts_with($telCorto, '57') && strlen($telCorto) === 12) {
+                    $telCorto = substr($telCorto, 2);
+                }
+                $cliente = Cliente::create([
+                    'cedula'               => $cedulaManual,
+                    'nombre'               => $nombreForm,
+                    'telefono'             => $telCorto,
+                    'telefono_normalizado' => $telefonoWhatsapp,
+                    'canal_origen'         => 'manual',
+                    'activo'               => true,
+                ]);
+            }
         }
         if (!$cliente) {
             $cliente = Cliente::encontrarOCrearPorTelefono(
