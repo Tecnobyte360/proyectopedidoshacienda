@@ -209,6 +209,17 @@
                         </div>
                     </div>
 
+                    {{-- 🏢 Código de sucursal en HGI (StrSucursal) --}}
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">
+                            <i class="fa-solid fa-building text-brand"></i> Código de sucursal en HGI <span class="text-slate-400 font-normal">(StrSucursal)</span>
+                        </label>
+                        <input type="text" wire:model="hgi_sucursal"
+                               placeholder="Ej: 01"
+                               class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-mono focus:border-brand focus:ring-brand">
+                        <p class="text-[11px] text-slate-500 mt-1">Al exportar pedidos de esta sede a HGI se enviará este código en <b>StrSucursal</b>.</p>
+                    </div>
+
                     {{-- HORARIOS --}}
                     <div class="rounded-xl border-2 border-slate-200 overflow-hidden">
                         <div class="px-4 py-3 bg-slate-50 border-b border-slate-200">
@@ -328,15 +339,6 @@
                                            placeholder="Ej: 1166731586517266"
                                            class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-mono focus:border-brand focus:ring-brand">
                                     <p class="text-[10px] text-slate-500 mt-1">Los pedidos que entren por este número de WhatsApp (Meta) se asignarán a esta sede.</p>
-                                </div>
-                                <div class="sm:col-span-2">
-                                    <label class="block text-xs font-medium text-slate-600 mb-1">
-                                        Código de sucursal en HGI <span class="text-slate-400 font-normal">(StrSucursal)</span>
-                                    </label>
-                                    <input type="text" wire:model="hgi_sucursal"
-                                           placeholder="Ej: 001"
-                                           class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-mono focus:border-brand focus:ring-brand">
-                                    <p class="text-[10px] text-slate-500 mt-1">Al exportar pedidos de esta sede a HGI, se enviará este código en <b>StrSucursal</b> (cabecera y detalle).</p>
                                 </div>
                             </div>
                         @endif
