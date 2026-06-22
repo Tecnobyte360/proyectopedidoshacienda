@@ -18,8 +18,14 @@
     const css = `
         .twcw-container * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
         .twcw-container { position: fixed; z-index: 2147483647; ${CFG.pos === 'bottom-left' ? 'left: 20px;' : 'right: 20px;'} bottom: 20px; }
-        .twcw-btn { width: 60px; height: 60px; border-radius: 50%; background: linear-gradient(135deg, ${CFG.color1}, ${CFG.color2}); color: #fff; cursor: pointer; border: none; box-shadow: 0 8px 24px rgba(0,0,0,0.25); display: flex; align-items: center; justify-content: center; font-size: 28px; transition: transform 0.2s; }
+        .twcw-btn { width: 60px; height: 60px; border-radius: 50%; background: linear-gradient(135deg, ${CFG.color1}, ${CFG.color2}); color: #fff; cursor: pointer; border: none; box-shadow: 0 8px 24px rgba(0,0,0,0.25); display: flex; align-items: center; justify-content: center; font-size: 28px; transition: transform 0.2s; flex: 0 0 auto; }
         .twcw-btn:hover { transform: scale(1.08); }
+        .twcw-launcher { display: flex; align-items: center; gap: 10px; ${CFG.pos === 'bottom-left' ? 'flex-direction: row-reverse;' : ''} }
+        .twcw-cta { background: #fff; color: #1e293b; font-size: 13.5px; font-weight: 600; padding: 10px 14px; border-radius: 24px; box-shadow: 0 6px 20px rgba(0,0,0,0.18); white-space: nowrap; cursor: pointer; display: flex; align-items: center; gap: 8px; animation: twcw-bounce 2.6s ease-in-out infinite; }
+        .twcw-cta:hover { background: #f8fafc; }
+        .twcw-cta-x { color: #94a3b8; font-weight: 700; font-size: 15px; line-height: 1; cursor: pointer; }
+        @keyframes twcw-bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+        .twcw-launcher.hide-cta .twcw-cta { display: none; }
         .twcw-panel { position: fixed; ${CFG.pos === 'bottom-left' ? 'left: 20px;' : 'right: 20px;'} bottom: 95px; width: 360px; max-width: calc(100vw - 40px); height: 520px; max-height: calc(100vh - 120px); background: #fff; border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.25); display: none; flex-direction: column; overflow: hidden; }
         .twcw-panel.open { display: flex; animation: twcw-slide 0.25s ease-out; }
         @keyframes twcw-slide { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
@@ -51,7 +57,10 @@
     const container = document.createElement('div');
     container.className = 'twcw-container';
     container.innerHTML = `
-        <button class="twcw-btn" title="Abrir chat"><i class="fa-solid fa-comment"></i></button>
+        <div class="twcw-launcher">
+            <div class="twcw-cta"><span class="twcw-cta-text">💬 ${escapeHtml(CFG.cta || '¿Tienes una pregunta?')}</span><span class="twcw-cta-x" title="Cerrar">×</span></div>
+            <button class="twcw-btn" title="Abrir chat">💬</button>
+        </div>
         <div class="twcw-panel" role="dialog" aria-label="Chat">
             <div class="twcw-header">
                 ${CFG.avatar ? `<img src="${CFG.avatar}" alt="">` : `<div style="width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;font-size:18px;"><i class="fa-solid fa-robot"></i></div>`}
@@ -77,6 +86,25 @@
     const messagesEl = container.querySelector('.twcw-messages');
     const inputEl = container.querySelector('.twcw-input input');
     const sendBtn = container.querySelector('.twcw-input button');
+    const launcher = container.querySelector('.twcw-launcher');
+    const cta = container.querySelector('.twcw-cta');
+    const ctaX = container.querySelector('.twcw-cta-x');
+    const ctaDismissKey = storageKey + '_cta_dismissed';
+
+    // Si el visitante ya cerró la etiqueta antes, no se la mostramos otra vez
+    if (localStorage.getItem(ctaDismissKey) === '1') launcher.classList.add('hide-cta');
+
+    // Clic en la etiqueta = abrir el chat
+    cta.addEventListener('click', (e) => {
+        if (e.target === ctaX) return;   // la × se maneja aparte
+        btn.click();
+    });
+    // Clic en la × = cerrar solo la etiqueta (recordar la decisión)
+    ctaX.addEventListener('click', (e) => {
+        e.stopPropagation();
+        launcher.classList.add('hide-cta');
+        try { localStorage.setItem(ctaDismissKey, '1'); } catch (err) {}
+    });
 
     let sending = false;
     let greeted = false;
@@ -87,6 +115,7 @@
 
     btn.addEventListener('click', () => {
         panel.classList.add('open');
+        launcher.classList.add('hide-cta');   // al abrir el chat, ocultar la etiqueta
         if (!greeted && CFG.saludo) {
             appendMsg('bot', CFG.saludo);
             greeted = true;
