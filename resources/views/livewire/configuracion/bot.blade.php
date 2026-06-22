@@ -81,6 +81,16 @@
                         <input type="checkbox" wire:model="activo" class="rounded border-slate-300 text-brand h-5 w-5">
                     </label>
                 </div>
+
+                <div class="flex items-end">
+                    <label class="inline-flex items-center gap-3 cursor-pointer w-full justify-between rounded-xl border border-slate-200 px-4 py-2.5">
+                        <div>
+                            <div class="text-sm font-medium text-slate-700"><i class="fa-solid fa-globe text-blue-500"></i> IA en el chat web (widget)</div>
+                            <div class="text-[11px] text-slate-500">Si lo apagas, el widget de la web no responde con IA — queda para que conteste un operador</div>
+                        </div>
+                        <input type="checkbox" wire:model="widget_ia_activa" class="rounded border-slate-300 text-brand h-5 w-5">
+                    </label>
+                </div>
             </div>
 
             {{-- 🧪 Modo prueba: números que el bot atiende AUNQUE esté apagado --}}

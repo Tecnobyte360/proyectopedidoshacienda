@@ -120,8 +120,12 @@ class ChatWidgetController extends Controller
             ['meta' => ['canal_widget' => true, 'widget_session_id' => $sesion->session_id]]
         );
 
-        // Si el operador ya tomó control → NO invocar IA, solo persistir y esperar respuesta humana
-        if ($conv->atendida_por_humano) {
+        // 🤖 ¿La IA está habilitada para el chat web? (Configuración → Bot)
+        $iaWidgetActiva = (bool) (\App\Models\ConfiguracionBot::actual()->widget_ia_activa ?? true);
+
+        // Si el operador ya tomó control, o la IA del widget está apagada →
+        // NO invocar IA, solo persistir y esperar respuesta humana del operador.
+        if ($conv->atendida_por_humano || !$iaWidgetActiva) {
             return $this->cors(response()->json([
                 'ok'     => true,
                 'reply'  => null,   // sin respuesta inmediata del bot; operador responderá manualmente

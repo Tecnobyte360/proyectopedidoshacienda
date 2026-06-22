@@ -36,6 +36,8 @@ class Bot extends Component
     public string $frase_bienvenida          = '';
     public string $info_empresa              = '';
     public bool   $activo                    = true;
+    /** IA responde en el chat web (widget). Si está apagado, el widget queda para operadores. */
+    public bool   $widget_ia_activa          = true;
     /** 🧪 Números (coma-separados) que el bot atiende AUNQUE esté apagado (modo prueba). */
     public string $numeros_prueba            = '';
 
@@ -194,6 +196,7 @@ class Bot extends Component
         $this->frase_bienvenida          = (string) ($cfg->frase_bienvenida ?? '');
         $this->info_empresa              = (string) ($cfg->info_empresa ?? '');
         $this->activo                    = (bool) $cfg->activo;
+        $this->widget_ia_activa          = (bool) ($cfg->widget_ia_activa ?? true);
         $this->numeros_prueba            = (string) ($cfg->numeros_prueba ?? '');
 
         $this->usar_prompt_personalizado = (bool) ($cfg->usar_prompt_personalizado ?? false);
@@ -726,6 +729,7 @@ class Bot extends Component
             'frase_bienvenida'          => 'nullable|string|max:500',
             'info_empresa'              => 'nullable|string|max:2000',
             'activo'                    => 'boolean',
+            'widget_ia_activa'          => 'boolean',
             'numeros_prueba'            => 'nullable|string|max:500',
             'usar_prompt_personalizado' => 'boolean',
             'system_prompt'             => 'nullable|string|max:20000',
