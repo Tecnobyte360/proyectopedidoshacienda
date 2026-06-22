@@ -236,7 +236,7 @@
             if (data && data.reply) {
                 appendMsg('bot', data.reply);
             } else if (data && data.modo === 'humano') {
-                const aviso = appendMsg('bot', '<i class="fa-solid fa-hands"></i> Un asesor está atendiendo esta conversación. Te responderá en un momento.');
+                const aviso = appendMsg('bot', '🙋 Un asesor está atendiendo esta conversación. Te responderá en un momento.');
                 aviso.classList.add('typing');
             } else if (data && data.error) {
                 console.error('Widget error:', data);
