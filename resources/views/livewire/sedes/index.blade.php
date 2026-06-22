@@ -220,6 +220,17 @@
                         <p class="text-[11px] text-slate-500 mt-1">Al exportar pedidos de esta sede a HGI se enviará este código en <b>StrSucursal</b>.</p>
                     </div>
 
+                    {{-- 🏢 Código de transacción en HGI (IntTransaccion) --}}
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">
+                            <i class="fa-solid fa-receipt text-brand"></i> Transacción de pedidos en HGI <span class="text-slate-400 font-normal">(IntTransaccion)</span>
+                        </label>
+                        <input type="text" wire:model="hgi_transaccion"
+                               placeholder="Ej: 145"
+                               class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-mono focus:border-brand focus:ring-brand">
+                        <p class="text-[11px] text-slate-500 mt-1">Código de transacción de pedidos de esta sede en HGI (se usa para el consecutivo y el documento).</p>
+                    </div>
+
                     {{-- HORARIOS --}}
                     <div class="rounded-xl border-2 border-slate-200 overflow-hidden">
                         <div class="px-4 py-3 bg-slate-50 border-b border-slate-200">

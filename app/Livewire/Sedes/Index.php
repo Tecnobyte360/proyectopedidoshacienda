@@ -24,6 +24,8 @@ class Index extends Component
     public ?string $meta_phone_number_id   = null;
     /** Código StrSucursal de HGI para esta sede (se envía al exportar el pedido). */
     public ?string $hgi_sucursal           = null;
+    /** Código IntTransaccion de HGI para pedidos de esta sede. */
+    public ?string $hgi_transaccion        = null;
 
     // Cobertura de la sede (refactor: cada sede maneja su zona)
     public ?array  $cobertura_poligono       = null;
@@ -57,6 +59,7 @@ class Index extends Component
             'whatsapp_telefono'      => 'nullable|string|max:32',
             'meta_phone_number_id'   => 'nullable|string|max:40',
             'hgi_sucursal'           => 'nullable|string|max:40',
+            'hgi_transaccion'        => 'nullable|string|max:40',
             'cobertura_costo_envio'   => 'numeric|min:0',
             'cobertura_tiempo_min'    => 'integer|min:1|max:480',
             'cobertura_pedido_minimo' => 'numeric|min:0',
@@ -93,6 +96,7 @@ class Index extends Component
         $this->whatsapp_connection_id = $sede->whatsapp_connection_id;
         $this->meta_phone_number_id   = $sede->meta_phone_number_id;
         $this->hgi_sucursal           = $sede->hgi_sucursal;
+        $this->hgi_transaccion        = $sede->hgi_transaccion;
         $this->whatsapp_id            = $sede->whatsapp_id;
         $this->whatsapp_telefono      = (string) $sede->whatsapp_telefono;
 
@@ -195,6 +199,7 @@ class Index extends Component
         $this->whatsapp_connection_id = null;
         $this->meta_phone_number_id   = null;
         $this->hgi_sucursal           = null;
+        $this->hgi_transaccion        = null;
         $this->whatsapp_id            = null;
         $this->whatsapp_telefono      = '';
 

@@ -13,6 +13,7 @@ class Sede extends Model
         'tenant_id',
         'meta_phone_number_id',
         'hgi_sucursal',
+        'hgi_transaccion',
         'nombre',
         'direccion',
         'latitud',

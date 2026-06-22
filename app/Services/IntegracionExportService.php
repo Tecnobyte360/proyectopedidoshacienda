@@ -241,10 +241,16 @@ class IntegracionExportService
      */
     private function ejecutarInserts(PDO $pdo, Integracion $integracion, Pedido $pedido, array $cfg, string $tablaHeader, string $tablaDetalle): array
     {
-        $documentoId = $this->siguienteConsecutivo($pdo, $tablaHeader, $cfg);
+        // 🏢 Transacción por SEDE: cada sucursal tiene su código de pedidos en HGI
+        //    (ej. Principal=145, Selva=009). Si la sede no tiene, cae al config.
+        $transaccion = (string) (optional($pedido->sede)->hgi_transaccion ?: ($cfg['transaccion'] ?? '009'));
+
+        // El consecutivo (IntDocumento) se calcula POR esa transacción.
+        $documentoId = $this->siguienteConsecutivo($pdo, $tablaHeader, $cfg, $transaccion);
 
         // Contexto base de variables (header + cada línea de detalle)
         $ctxBase = $this->construirContexto($pedido, $documentoId);
+        $ctxBase['pedido.transaccion'] = $transaccion;
 
         // ── 1. INSERT en tabla de ENCABEZADOS ─────────────────────────────
         $headerFields = $this->camposHeader($cfg, $ctxBase);
@@ -365,7 +371,8 @@ class IntegracionExportService
     {
         return [
             'IntEmpresa'        => $this->resolver($cfg['empresa']     ?? 1, $ctx),
-            'IntTransaccion'    => $this->resolver($cfg['transaccion'] ?? '009', $ctx),
+            // 🏢 Transacción de la SEDE (puesta en ejecutarInserts); fallback al config.
+            'IntTransaccion'    => $ctx['pedido.transaccion'] ?? $this->resolver($cfg['transaccion'] ?? '009', $ctx),
             'IntDocumento'      => $ctx['consecutivo'],
             'DatFecha'          => $this->resolver($cfg['fecha']       ?? '{pedido.fecha}', $ctx),
             'DatVencimiento'    => $this->resolver($cfg['vencimiento'] ?? '{pedido.fecha}', $ctx),
@@ -406,7 +413,7 @@ class IntegracionExportService
         $det = $cfg['detalle'] ?? [];
         return [
             'IntEmpresa'         => $this->resolver($det['empresa']      ?? $cfg['empresa']     ?? 1, $ctx),
-            'IntTransaccion'     => $this->resolver($det['transaccion']  ?? $cfg['transaccion'] ?? '009', $ctx),
+            'IntTransaccion'     => $ctx['pedido.transaccion'] ?? $this->resolver($det['transaccion'] ?? $cfg['transaccion'] ?? '009', $ctx),
             'IntDocumento'       => $ctx['consecutivo'],
             'StrProducto'        => $this->resolver($det['producto']     ?? '{detalle.codigo}', $ctx),
             'IntBodega'          => $this->resolver($det['bodega']       ?? $cfg['bodega']      ?? '1', $ctx),
@@ -474,10 +481,10 @@ class IntegracionExportService
      * Si la BD tiene constraint UNIQUE en (Empresa, Transaccion, Documento)
      * filtramos también por esos.
      */
-    private function siguienteConsecutivo(PDO $pdo, string $tabla, array $cfg): int
+    private function siguienteConsecutivo(PDO $pdo, string $tabla, array $cfg, ?string $transaccion = null): int
     {
         $empresa     = (int) ($cfg['empresa']     ?? 1);
-        $transaccion = (string) ($cfg['transaccion'] ?? '009');
+        $transaccion = (string) ($transaccion ?: ($cfg['transaccion'] ?? '009'));
         $minimo      = (int) ($cfg['consecutivo_inicial'] ?? 1);
 
         try {
