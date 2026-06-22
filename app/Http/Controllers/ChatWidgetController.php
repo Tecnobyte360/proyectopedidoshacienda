@@ -211,6 +211,8 @@ class ChatWidgetController extends Controller
             'holder'  => $widget->placeholder,
             'avatar'  => $widget->avatar_url,
             'nombre'  => $widget->nombre,
+            'pedir_nombre'   => (bool) $widget->pedir_nombre,
+            'pedir_telefono' => (bool) $widget->pedir_telefono,
         ], JSON_UNESCAPED_UNICODE);
 
         $js = view('widget.script', [

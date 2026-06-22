@@ -70,6 +70,12 @@
                 </div>
                 <button class="twcw-close" aria-label="Cerrar">×</button>
             </div>
+            <form class="twcw-name-form" style="display:none;">
+                <p style="font-size:13px;color:#475569;margin:0 0 14px;">Para atenderte mejor, déjanos tus datos 👇</p>
+                ${CFG.pedir_nombre ? '<label>Tu nombre</label><input type="text" name="nombre" autocomplete="name" placeholder="Nombre y apellido" required>' : ''}
+                ${CFG.pedir_telefono ? '<label>Tu celular</label><input type="tel" name="telefono" autocomplete="tel" inputmode="tel" placeholder="Ej: 3001234567" required>' : ''}
+                <button type="submit">Iniciar chat</button>
+            </form>
             <div class="twcw-messages"></div>
             <div class="twcw-input">
                 <input type="text" placeholder="${escapeHtml(CFG.holder || 'Escribe un mensaje...')}" maxlength="2000">
@@ -89,7 +95,18 @@
     const launcher = container.querySelector('.twcw-launcher');
     const cta = container.querySelector('.twcw-cta');
     const ctaX = container.querySelector('.twcw-cta-x');
+    const nameForm = container.querySelector('.twcw-name-form');
+    const messagesBox = container.querySelector('.twcw-messages');
+    const inputBox = container.querySelector('.twcw-input');
     const ctaDismissKey = storageKey + '_cta_dismissed';
+
+    // ── Datos del visitante (nombre / celular) ──
+    const visitKeyN = storageKey + '_nombre';
+    const visitKeyT = storageKey + '_tel';
+    let visitName  = localStorage.getItem(visitKeyN) || '';
+    let visitPhone = localStorage.getItem(visitKeyT) || '';
+    // ¿Ya tenemos lo requerido? Si falta algo pedido, mostramos el formulario.
+    let gateOk = (!CFG.pedir_nombre || !!visitName) && (!CFG.pedir_telefono || !!visitPhone);
 
     // Si el visitante ya cerró la etiqueta antes, no se la mostramos otra vez
     if (localStorage.getItem(ctaDismissKey) === '1') launcher.classList.add('hide-cta');
@@ -113,9 +130,10 @@
     let lastId = parseInt(localStorage.getItem(lastIdKey) || '0', 10) || 0;
     let pollInterval = null;
 
-    btn.addEventListener('click', () => {
-        panel.classList.add('open');
-        launcher.classList.add('hide-cta');   // al abrir el chat, ocultar la etiqueta
+    function iniciarChat() {
+        nameForm.style.display = 'none';
+        messagesBox.style.display = '';
+        inputBox.style.display = '';
         if (!greeted && CFG.saludo) {
             appendMsg('bot', CFG.saludo);
             greeted = true;
@@ -125,6 +143,41 @@
         if (!pollInterval) {
             pollInterval = setInterval(pollOperador, 3000);
         }
+    }
+
+    btn.addEventListener('click', () => {
+        panel.classList.add('open');
+        launcher.classList.add('hide-cta');   // al abrir el chat, ocultar la etiqueta
+        if (!gateOk) {
+            // Pedir nombre/celular antes de chatear
+            nameForm.style.display = 'block';
+            messagesBox.style.display = 'none';
+            inputBox.style.display = 'none';
+            const first = nameForm.querySelector('input');
+            if (first) setTimeout(() => first.focus(), 100);
+        } else {
+            iniciarChat();
+        }
+    });
+
+    nameForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const n = nameForm.querySelector('input[name="nombre"]');
+        const t = nameForm.querySelector('input[name="telefono"]');
+        if (n) {
+            visitName = n.value.trim();
+            if (CFG.pedir_nombre && !visitName) { n.focus(); return; }
+        }
+        if (t) {
+            visitPhone = t.value.trim();
+            if (CFG.pedir_telefono && visitPhone.replace(/\D/g, '').length < 7) { t.focus(); return; }
+        }
+        try {
+            if (visitName)  localStorage.setItem(visitKeyN, visitName);
+            if (visitPhone) localStorage.setItem(visitKeyT, visitPhone);
+        } catch (err) {}
+        gateOk = true;
+        iniciarChat();
     });
     closeBtn.addEventListener('click', () => {
         panel.classList.remove('open');
@@ -172,6 +225,8 @@
             body: JSON.stringify({
                 session_id: sessionId,
                 mensaje: texto,
+                visitante_nombre: visitName || undefined,
+                visitante_telefono: visitPhone || undefined,
                 url_origen: location.href,
             }),
         })
