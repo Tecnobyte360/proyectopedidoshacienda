@@ -80,7 +80,9 @@
 
     let sending = false;
     let greeted = false;
-    let lastCheck = new Date().toISOString();
+    // Cursor por ID del último mensaje de operador visto (robusto ante zonas horarias)
+    const lastIdKey = storageKey + '_lastid';
+    let lastId = parseInt(localStorage.getItem(lastIdKey) || '0', 10) || 0;
     let pollInterval = null;
 
     btn.addEventListener('click', () => {
@@ -101,7 +103,7 @@
     });
 
     function pollOperador() {
-        fetch(CFG.apiBase + '/mensajes?session_id=' + encodeURIComponent(sessionId) + '&since=' + encodeURIComponent(lastCheck), {
+        fetch(CFG.apiBase + '/mensajes?session_id=' + encodeURIComponent(sessionId) + '&since_id=' + encodeURIComponent(lastId), {
             method: 'GET',
             headers: { 'Accept': 'application/json' },
         })
@@ -110,8 +112,15 @@
             if (!data || !Array.isArray(data.mensajes)) return;
             data.mensajes.forEach(m => {
                 appendMsg('bot', m.texto);
-                if (m.created_at > lastCheck) lastCheck = m.created_at;
+                if (m.id && m.id > lastId) {
+                    lastId = m.id;
+                    try { localStorage.setItem(lastIdKey, String(lastId)); } catch (e) {}
+                }
             });
+            if (data.last_id && data.last_id > lastId) {
+                lastId = data.last_id;
+                try { localStorage.setItem(lastIdKey, String(lastId)); } catch (e) {}
+            }
         })
         .catch(() => {});
     }

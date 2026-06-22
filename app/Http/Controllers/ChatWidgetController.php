@@ -213,7 +213,10 @@ class ChatWidgetController extends Controller
             'config' => $cfgJson,
         ])->render();
 
-        return response($js, 200, ['Content-Type' => 'application/javascript; charset=UTF-8']);
+        return response($js, 200, [
+            'Content-Type'  => 'application/javascript; charset=UTF-8',
+            'Cache-Control' => 'no-cache, must-revalidate',
+        ]);
     }
 
     /**
@@ -265,7 +268,9 @@ class ChatWidgetController extends Controller
         app(\App\Services\TenantManager::class)->set($widget->tenant);
 
         $sessionId = $request->query('session_id');
-        $since     = $request->query('since');
+        // Cursor por ID (robusto ante zonas horarias). Compatibilidad: si llega
+        // 'since_id' lo usamos; si no, arrancamos en 0 (trae los del operador).
+        $sinceId   = (int) $request->query('since_id', 0);
 
         if (!$sessionId) return $this->cors(response()->json(['error' => 'session_id requerido'], 400), $request);
 
@@ -274,32 +279,31 @@ class ChatWidgetController extends Controller
         $conv = ConversacionWhatsapp::where('telefono_normalizado', $telFake)->first();
 
         if (!$conv) {
-            return $this->cors(response()->json(['mensajes' => []]), $request);
+            return $this->cors(response()->json(['mensajes' => [], 'last_id' => $sinceId]), $request);
         }
 
-        $q = $conv->mensajes()
+        $mensajesModel = $conv->mensajes()
             ->where('rol', MensajeWhatsapp::ROL_ASSISTANT)
-            ->whereJsonContains('meta->enviado_por_humano', true);
+            ->whereJsonContains('meta->enviado_por_humano', true)
+            ->where('id', '>', $sinceId)
+            ->orderBy('id')
+            ->get(['id', 'contenido', 'tipo', 'meta', 'created_at']);
 
-        if ($since) {
-            try {
-                $q->where('created_at', '>', \Carbon\Carbon::parse($since));
-            } catch (\Throwable $e) { /* ignore */ }
-        }
+        $mensajes = $mensajesModel->map(fn ($m) => [
+            'id'          => $m->id,
+            'texto'       => $m->contenido,
+            'tipo'        => $m->tipo ?: 'text',
+            'operador'    => ($m->meta['usuario_id'] ?? null) ? 'Operador' : 'Agente',
+            'media_url'   => $m->meta['media_url'] ?? null,
+            'created_at'  => $m->created_at->toIso8601String(),
+        ]);
 
-        $mensajes = $q->orderBy('id')
-            ->get(['contenido', 'tipo', 'meta', 'created_at'])
-            ->map(fn ($m) => [
-                'texto'       => $m->contenido,
-                'tipo'        => $m->tipo ?: 'text',
-                'operador'    => ($m->meta['usuario_id'] ?? null) ? 'Operador' : 'Agente',
-                'media_url'   => $m->meta['media_url'] ?? null,
-                'created_at'  => $m->created_at->toIso8601String(),
-            ]);
+        $lastId = $mensajesModel->max('id') ?: $sinceId;
 
         return $this->cors(response()->json([
             'ok'            => true,
             'mensajes'      => $mensajes,
+            'last_id'       => $lastId,
             'modo_humano'   => (bool) $conv->atendida_por_humano,
         ]), $request);
     }
