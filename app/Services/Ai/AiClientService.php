@@ -101,21 +101,28 @@ class AiClientService
         $ultimoBody   = null;
         $ultimaExc    = null;
 
+        $payload = [
+            'model'             => $modelo,
+            'messages'          => $messages,
+            'temperature'       => (float) ($opts['temperature'] ?? $config?->temperatura ?? 0.85),
+            'top_p'             => 0.9,
+            'frequency_penalty' => 0.4,
+            'presence_penalty'  => 0.4,
+            'max_tokens'        => (int) ($opts['max_tokens'] ?? $config?->max_tokens ?? 700),
+        ];
+
+        // ⚠️ OpenAI rechaza 'tool_choice' si no se envían 'tools'. Solo los
+        // incluimos cuando realmente hay herramientas (el widget web no usa).
+        if (!empty($tools)) {
+            $payload['tools']       = $tools;
+            $payload['tool_choice'] = $toolChoice;
+        }
+
         for ($i = 1; $i <= $intentos; $i++) {
             try {
                 $response = Http::withToken($apiKey)
                     ->timeout(35)
-                    ->post(self::OPENAI_URL, [
-                        'model'             => $modelo,
-                        'messages'          => $messages,
-                        'temperature'       => (float) ($opts['temperature'] ?? $config?->temperatura ?? 0.85),
-                        'top_p'             => 0.9,
-                        'frequency_penalty' => 0.4,
-                        'presence_penalty'  => 0.4,
-                        'max_tokens'        => (int) ($opts['max_tokens'] ?? $config?->max_tokens ?? 700),
-                        'tools'             => $tools ?: null,
-                        'tool_choice'       => $toolChoice,
-                    ]);
+                    ->post(self::OPENAI_URL, $payload);
 
                 if ($response->successful()) {
                     return $response->json();

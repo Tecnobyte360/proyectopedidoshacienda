@@ -48,7 +48,7 @@ class WidgetChatService
 
         $basePrompt = ($config->usar_prompt_personalizado && !empty(trim($config->system_prompt ?? '')))
             ? $config->system_prompt
-            : BotPromptService::plantillaPorDefecto();
+            : BotPromptService::plantillaGenerica();   // genérica (sin hardcode de un negocio puntual)
 
         $systemPrompt = $this->promptService->renderizar($basePrompt, $contexto);
 
