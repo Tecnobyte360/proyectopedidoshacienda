@@ -24,9 +24,9 @@
                 wire:loading.attr="disabled"
                 wire:target="marcarListoParaRecoger({{ $pedido->id }})"
                 class="{{ $btnBase }} bg-gradient-to-br from-amber-500 via-orange-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 shadow-orange-500/30 hover:shadow-orange-500/40">
-            <i class="fa-solid fa-bag-shopping transition-transform group-hover:scale-110" wire:loading.class="hidden" wire:target="marcarListoParaRecoger({{ $pedido->id }})"></i>
+            <i class="fa-solid fa-circle-check transition-transform group-hover:scale-110" wire:loading.class="hidden" wire:target="marcarListoParaRecoger({{ $pedido->id }})"></i>
             <i class="fa-solid fa-spinner fa-spin hidden" wire:loading.class.remove="hidden" wire:target="marcarListoParaRecoger({{ $pedido->id }})"></i>
-            <span>Listo para recoger</span>
+            <span>Finalizar preparación</span>
         </button>
     @else
         {{-- DOMICILIO: asignar y despachar --}}

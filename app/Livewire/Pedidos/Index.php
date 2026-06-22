@@ -461,16 +461,17 @@ class Index extends Component
             $usuario = Auth::user();
             $pedido->cambiarEstado(
                 Pedido::ESTADO_REPARTIDOR_EN_CAMINO,
-                'Tu pedido está listo para que pases por la sede.',
-                'Listo para recoger',
+                'Preparación finalizada — listo para recoger.',
+                'Preparación finalizada',
                 $usuario?->name,
-                $usuario?->id
+                $usuario?->id,
+                notificarCliente: false   // ⛔ al finalizar la preparación NO se avisa al cliente
             );
 
             $this->refrescar();
             $this->dispatch('notify', [
                 'type' => 'success',
-                'message' => "Pedido #{$pedido->id} marcado como listo para recoger.",
+                'message' => "Pedido #{$pedido->id} — preparación finalizada.",
             ]);
         } catch (\Throwable $e) {
             report($e);

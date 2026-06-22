@@ -172,7 +172,8 @@ class Pedido extends Model
     ?string $descripcion = null,
     ?string $titulo = null,
     ?string $usuario = null,
-    ?int $usuarioId = null
+    ?int $usuarioId = null,
+    bool $notificarCliente = true
 ): void {
     $estadoAnterior = $this->estado;
 
@@ -257,7 +258,9 @@ class Pedido extends Model
         usuarioId: $usuarioId
     );
 
-    $this->notificarClienteCambioEstado();
+    if ($notificarCliente) {
+        $this->notificarClienteCambioEstado();
+    }
 
     // La encuesta se programa DESPUÉS de notificar la entrega para que
     // el cliente reciba primero el "fue entregado" y luego la encuesta.
