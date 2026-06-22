@@ -238,14 +238,33 @@ class ChatWidgetController extends Controller
                  . dechex(abs(crc32($widget->token)) % 0xFFFF);              // +4 chars = 13 total
 
         $conv = ConversacionWhatsapp::where('telefono_normalizado', $telFake)->first();
-        if ($conv) return $conv;
 
-        // Crear cliente placeholder para la sesión (requerido por ConversacionService)
+        // Cliente espejo de la sesión. Se mantiene SIEMPRE actualizado con el
+        // nombre / celular que el visitante escribió en el formulario del widget,
+        // para que el operador lo vea en Chat en vivo (y no "Visitante web").
         $nombreVisitante = $sesion->visitante_nombre ?: 'Visitante web';
         $cliente = \App\Models\Cliente::firstOrCreate(
             ['telefono_normalizado' => $telFake],
-            ['nombre' => $nombreVisitante, 'telefono' => $telFake, 'activo' => true]
+            ['nombre' => $nombreVisitante, 'telefono' => $sesion->visitante_telefono ?: $telFake, 'activo' => true]
         );
+
+        $updates = [];
+        if ($sesion->visitante_nombre && $cliente->nombre !== $sesion->visitante_nombre) {
+            $updates['nombre'] = $sesion->visitante_nombre;
+        }
+        if ($sesion->visitante_telefono && $cliente->telefono !== $sesion->visitante_telefono) {
+            $updates['telefono'] = $sesion->visitante_telefono;
+        }
+        if ($updates) $cliente->update($updates);
+
+        if ($conv) {
+            // Si la conversación ya existía pero el visitante recién dio sus datos,
+            // reflejar el nombre real en la conversación también.
+            if ($sesion->visitante_nombre && $conv->cliente_id !== $cliente->id) {
+                $conv->update(['cliente_id' => $cliente->id]);
+            }
+            return $conv;
+        }
 
         return ConversacionWhatsapp::create([
             'tenant_id'            => $widget->tenant_id,
