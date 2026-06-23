@@ -177,11 +177,11 @@ class ChatWidgetController extends Controller
             \Log::error('Widget /mensaje fatal: ' . $e->getMessage(), [
                 'trace' => mb_substr($e->getTraceAsString(), 0, 2000),
             ]);
+            // ⚠️ NUNCA exponer el error técnico al visitante. Mensaje genérico.
             return $this->cors(response()->json([
                 'ok'    => false,
-                'error' => $e->getMessage(),
-                'reply' => 'Error en el servidor: ' . $e->getMessage(),
-            ], 500), $request);
+                'reply' => 'Disculpa, tuve un inconveniente al procesar tu mensaje. Intenta de nuevo en un momento. 🙏',
+            ], 200), $request);
         }
     }
 
@@ -243,10 +243,24 @@ class ChatWidgetController extends Controller
         // nombre / celular que el visitante escribió en el formulario del widget,
         // para que el operador lo vea en Chat en vivo (y no "Visitante web").
         $nombreVisitante = $sesion->visitante_nombre ?: 'Visitante web';
-        $cliente = \App\Models\Cliente::firstOrCreate(
-            ['telefono_normalizado' => $telFake],
-            ['nombre' => $nombreVisitante, 'telefono' => $sesion->visitante_telefono ?: $telFake, 'activo' => true]
-        );
+        // Buscar incluyendo borrados: la llave única (tenant_id, telefono_normalizado)
+        // cuenta los soft-deleted, así que si hay uno borrado lo restauramos en vez
+        // de intentar insertar (evita el error 1062 que se mostraba al visitante).
+        $cliente = \App\Models\Cliente::withTrashed()
+            ->where('telefono_normalizado', $telFake)
+            ->first();
+        if ($cliente) {
+            if (method_exists($cliente, 'trashed') && $cliente->trashed()) {
+                $cliente->restore();
+            }
+        } else {
+            $cliente = \App\Models\Cliente::create([
+                'nombre'               => $nombreVisitante,
+                'telefono'             => $sesion->visitante_telefono ?: $telFake,
+                'telefono_normalizado' => $telFake,
+                'activo'               => true,
+            ]);
+        }
 
         $updates = [];
         if ($sesion->visitante_nombre && $cliente->nombre !== $sesion->visitante_nombre) {
