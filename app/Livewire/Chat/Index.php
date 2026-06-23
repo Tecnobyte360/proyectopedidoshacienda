@@ -1659,8 +1659,8 @@ class Index extends Component
         $primer = preg_split('/\s+/', $nombre)[0] ?? $nombre;
 
         // Enviar plantilla 'contacto_web' por Meta (sin persistir en el servicio: lo guardamos abajo con el operador)
-        $ok = app(\App\Services\Meta\MetaWhatsappCloudService::class)
-            ->enviarPlantilla($raw, 'contacto_web', [$primer], $tenant->id, 'es', null, null, false);
+        $svc = app(\App\Services\Meta\MetaWhatsappCloudService::class);
+        $ok = $svc->enviarPlantilla($raw, 'contacto_web', [$primer], $tenant->id, 'es', null, null, false);
 
         if (!$ok) {
             $this->dispatch('notify', ['type' => 'error', 'message' => '⚠️ No se pudo enviar. ¿La plantilla "contacto_web" ya está aprobada por Meta?']);
@@ -1679,12 +1679,16 @@ class Index extends Component
                 'connection_id' => $cfg ? ('meta:' . $cfg->phone_number_id) : $waConv->connection_id,
             ])->save();
 
-            app(ConversacionService::class)->agregarMensaje(
+            $msgWa = app(ConversacionService::class)->agregarMensaje(
                 $waConv,
                 MensajeWhatsapp::ROL_ASSISTANT,
                 $textoPlantilla,
                 ['meta' => ['enviado_por_humano' => true, 'usuario_id' => auth()->id(), 'origen' => 'plantilla_meta', 'plantilla' => 'contacto_web', 'provider' => 'meta']]
             );
+            $msgWa->update([
+                'mensaje_externo_id' => $svc->ultimoWamid ?: $msgWa->mensaje_externo_id,
+                'ack'                => MensajeWhatsapp::ACK_SENT,
+            ]);
 
             // Cambiar a la conversación de WhatsApp recién abierta
             $this->seleccionar($waConv->id);
@@ -2250,18 +2254,18 @@ class Index extends Component
                         ]]
                     );
                     // Guardar referencia al mensaje respondido para renderizar la cita en UI
-                    $updates = [];
+                    // + marcar ENVIADO (✓) para que no quede en "pendiente" (reloj).
+                    $updates = ['ack' => MensajeWhatsapp::ACK_SENT];
                     if ($mensajeRespondido) {
                         $updates['respondiendo_a_mensaje_id'] = $mensajeRespondido->id;
                     }
                     // 📌 Persistir wamid del mensaje recién enviado — permite que cuando el
-                    // cliente lo cite/reaccione, podamos vincularlo correctamente.
+                    // cliente lo cite/reaccione, podamos vincularlo correctamente, y que el
+                    // webhook de estados lo actualice a entregado/leído.
                     if ($wamidNuevo) {
                         $updates['mensaje_externo_id'] = $wamidNuevo;
                     }
-                    if (!empty($updates)) {
-                        $msg->update($updates);
-                    }
+                    $msg->update($updates);
                 } catch (\Throwable $e) {
                     Log::warning('No persistió mensaje manual Meta: ' . $e->getMessage());
                 }
@@ -2728,17 +2732,17 @@ class Index extends Component
             $varsOrdenadas[] = (string) ($this->plantillaChatVars[$i] ?? '');
         }
 
-        $ok = app(\App\Services\Meta\MetaWhatsappCloudService::class)
-            ->enviarPlantilla(
-                $conv->telefono_normalizado,
-                $tpl->nombre,
-                $varsOrdenadas,
-                $conv->tenant_id,
-                $tpl->idioma ?: 'es',
-                null,
-                null,
-                false   // no persistir en el servicio; lo guardamos aquí con el operador
-            );
+        $svc = app(\App\Services\Meta\MetaWhatsappCloudService::class);
+        $ok = $svc->enviarPlantilla(
+            $conv->telefono_normalizado,
+            $tpl->nombre,
+            $varsOrdenadas,
+            $conv->tenant_id,
+            $tpl->idioma ?: 'es',
+            null,
+            null,
+            false   // no persistir en el servicio; lo guardamos aquí con el operador
+        );
 
         if (!$ok) {
             $this->dispatch('notify', ['type' => 'error', 'message' => '⚠️ No se pudo enviar la plantilla.']);
@@ -2751,7 +2755,7 @@ class Index extends Component
             $body = str_replace(['{{' . ($i + 1) . '}}', '{{ ' . ($i + 1) . ' }}'], $valor, $body);
         }
         try {
-            app(\App\Services\ConversacionService::class)->agregarMensaje(
+            $msg = app(\App\Services\ConversacionService::class)->agregarMensaje(
                 $conv,
                 MensajeWhatsapp::ROL_ASSISTANT,
                 $body,
@@ -2763,6 +2767,12 @@ class Index extends Component
                     'plantilla_idioma'   => $tpl->idioma,
                 ]]
             );
+            // Guardar el wamid + marcar como ENVIADO (✓) para que no quede en "pendiente" (reloj)
+            // y para que el webhook de estados pueda actualizarlo a entregado/leído.
+            $msg->update([
+                'mensaje_externo_id' => $svc->ultimoWamid ?: $msg->mensaje_externo_id,
+                'ack'                => MensajeWhatsapp::ACK_SENT,
+            ]);
         } catch (\Throwable $e) {
             Log::warning('No se persistió mensaje plantilla en conversación: ' . $e->getMessage());
         }
