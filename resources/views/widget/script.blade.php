@@ -30,7 +30,7 @@
         .twcw-panel.open { display: flex; animation: twcw-slide 0.25s ease-out; }
         @keyframes twcw-slide { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         .twcw-header { background: linear-gradient(135deg, ${CFG.color1}, ${CFG.color2}); color: #fff; padding: 16px; display: flex; align-items: center; gap: 12px; }
-        .twcw-header img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; background: rgba(255,255,255,0.2); }
+        .twcw-header img { width: 40px; height: 40px; border-radius: 50%; object-fit: contain; background: #fff; padding: 3px; }
         .twcw-header .twcw-title { font-weight: 700; font-size: 15px; margin: 0; }
         .twcw-header .twcw-sub { font-size: 11px; opacity: 0.85; }
         .twcw-close { margin-left: auto; background: transparent; border: 0; color: #fff; cursor: pointer; font-size: 20px; opacity: 0.9; }
