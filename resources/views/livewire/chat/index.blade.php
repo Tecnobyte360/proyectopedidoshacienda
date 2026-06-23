@@ -1158,6 +1158,32 @@
                     </div>
                 </div>
 
+                {{-- 📄 Preview de documento a enviar (PDF, Word, Excel...) --}}
+                <div x-show="docDataUrl" x-cloak class="bg-slate-50 border-t border-slate-200 px-4 py-3">
+                    <div class="flex items-start gap-3">
+                        <div class="h-16 w-16 shrink-0 rounded-lg bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-500 text-2xl">
+                            <i class="fa-solid fa-file-lines"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="text-sm font-semibold text-slate-800 truncate" x-text="docName"></div>
+                            <input type="text" x-model="docCaption" placeholder="Mensaje opcional..."
+                                   class="w-full mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand focus:ring-2 focus:ring-amber-100">
+                            <div class="flex items-center gap-2 mt-2">
+                                <button @click="sendDoc()" :disabled="sendingDoc"
+                                        class="inline-flex items-center gap-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-semibold px-4 py-2 text-sm transition disabled:opacity-50">
+                                    <i class="fa-solid" :class="sendingDoc ? 'fa-circle-notch fa-spin' : 'fa-paper-plane'"></i>
+                                    <span x-text="sendingDoc ? 'Enviando...' : 'Enviar documento'"></span>
+                                </button>
+                                <button @click="discardDoc()"
+                                        class="rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold px-3 py-2 text-sm transition">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </div>
+                            <p x-show="docError" x-text="docError" class="text-xs text-rose-600 mt-1"></p>
+                        </div>
+                    </div>
+                </div>
+
                 {{-- Input para responder --}}
                 <div class="bg-white border-t border-slate-200"
                      x-data="audioRecorder()"
@@ -1419,6 +1445,15 @@
                                @change="pickImage($event)">
                     </label>
 
+                    {{-- 📎 Botón adjuntar documento (PDF, Word, Excel...) --}}
+                    <label x-show="!recording && !preview"
+                           title="Adjuntar documento (PDF, Word, Excel...)"
+                           class="flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer">
+                        <i class="fa-solid fa-paperclip"></i>
+                        <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt,application/pdf" class="hidden"
+                               @change="pickDoc($event)">
+                    </label>
+
                     {{-- Botón micrófono / detener / enviar audio --}}
                     <template x-if="!recording && !preview">
                         <button type="button" @click="start()"
@@ -1565,6 +1600,11 @@
                 imgCaption: '',
                 sendingImg: false,
                 imgError: '',
+                docDataUrl: null,
+                docName: '',
+                docCaption: '',
+                sendingDoc: false,
+                docError: '',
                 dragging: false,
                 dragCounter: 0,
                 init() {
@@ -1679,19 +1719,41 @@
                     const file = ev.dataTransfer.files && ev.dataTransfer.files[0];
                     if (!file) return;
                     this.imgError = '';
-                    if (!file.type.startsWith('image/')) {
-                        this.imgError = 'Solo se aceptan imágenes.';
-                        return;
+                    // 🖼️ Imagen → preview de imagen | 📄 cualquier otro archivo → preview de documento
+                    if (file.type.startsWith('image/')) {
+                        if (file.size > 15 * 1024 * 1024) { this.imgError = 'Imagen demasiado grande (máx 15 MB).'; return; }
+                        const reader = new FileReader();
+                        reader.onload = () => { this.imgDataUrl = reader.result; };
+                        reader.onerror = () => { this.imgError = 'No se pudo leer la imagen.'; };
+                        reader.readAsDataURL(file);
+                    } else {
+                        this.loadDoc(file);
                     }
-                    if (file.size > 15 * 1024 * 1024) {
-                        this.imgError = 'Imagen demasiado grande (máx 15 MB).';
-                        return;
-                    }
+                },
+                // ─── Documentos (PDF, Word, Excel...) ───────────────────
+                loadDoc(file) {
+                    this.docError = '';
+                    if (!file) return;
+                    if (file.size > 90 * 1024 * 1024) { this.docError = 'Documento demasiado grande (máx 90 MB).'; return; }
                     const reader = new FileReader();
-                    reader.onload = () => { this.imgDataUrl = reader.result; };
-                    reader.onerror = () => { this.imgError = 'No se pudo leer la imagen.'; };
+                    reader.onload = () => { this.docDataUrl = reader.result; this.docName = file.name || 'documento'; };
+                    reader.onerror = () => { this.docError = 'No se pudo leer el documento.'; };
                     reader.readAsDataURL(file);
                 },
+                pickDoc(e) {
+                    const f = e.target.files && e.target.files[0];
+                    if (f) this.loadDoc(f);
+                    e.target.value = '';
+                },
+                async sendDoc() {
+                    if (!this.docDataUrl || this.sendingDoc) return;
+                    this.sendingDoc = true;
+                    try {
+                        await this.$wire.enviarDocumento(this.docDataUrl, this.docName, this.docCaption);
+                        this.discardDoc();
+                    } finally { this.sendingDoc = false; }
+                },
+                discardDoc() { this.docDataUrl = null; this.docName = ''; this.docCaption = ''; this.docError = ''; },
             };
         }
     </script>

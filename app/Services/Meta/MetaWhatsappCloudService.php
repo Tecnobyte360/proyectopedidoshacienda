@@ -254,6 +254,26 @@ class MetaWhatsappCloudService
     }
 
     /**
+     * Envía un documento (PDF, Word, Excel, etc.) por URL pública.
+     */
+    public function enviarDocumento(string $telefono, string $url, ?string $filename = null, ?string $caption = null, ?int $tenantId = null): bool
+    {
+        $config = $this->resolverConfig($tenantId);
+        if (!$config) return false;
+
+        $doc = ['link' => $url];
+        if ($filename) $doc['filename'] = $filename;
+        if ($caption)  $doc['caption']  = $caption;
+
+        return $this->ejecutar($config, [
+            'messaging_product' => 'whatsapp',
+            'to'                => $this->normalizar($telefono),
+            'type'              => 'document',
+            'document'          => $doc,
+        ], 'documento');
+    }
+
+    /**
      * 👍 Envía una reacción de emoji a un mensaje específico del cliente.
      *
      * Meta soporta solo UN emoji por mensaje. Para QUITAR la reacción se manda

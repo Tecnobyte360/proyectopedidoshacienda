@@ -1620,6 +1620,113 @@ class Index extends Component
      * Recibe la imagen como data URL base64 (enviada desde JS) para
      * evitar el endpoint /livewire/upload-file (que tira 401 en producción).
      */
+    /**
+     * 📄 Envía un documento (PDF, Word, Excel...) al cliente.
+     * Recibe un data URL base64 desde el composer + nombre original.
+     */
+    public function enviarDocumento(string $dataUrl = '', string $filename = '', string $caption = ''): void
+    {
+        if (!$this->conversacionActivaId) return;
+        if ($dataUrl === '') {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Selecciona un documento primero.']);
+            return;
+        }
+
+        if (!preg_match('/^data:([^;]+);base64,(.+)$/i', $dataUrl, $m)) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Formato de documento no reconocido.']);
+            return;
+        }
+
+        $mime  = strtolower(trim($m[1]));
+        $bytes = base64_decode($m[2], true);
+
+        if ($bytes === false || strlen($bytes) < 50) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Documento inválido o vacío.']);
+            return;
+        }
+        if (strlen($bytes) > 90 * 1024 * 1024) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Documento demasiado grande (máx 90 MB).']);
+            return;
+        }
+
+        $conv = ConversacionWhatsapp::find($this->conversacionActivaId);
+        if (!$conv) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Conversación no encontrada.']);
+            return;
+        }
+
+        // Nombre y extensión seguros
+        $nombre = trim($filename) !== '' ? trim($filename) : 'documento';
+        $nombre = preg_replace('/[\\/\\\\:*?"<>|]+/', '_', $nombre);
+        $ext = strtolower(pathinfo($nombre, PATHINFO_EXTENSION) ?: match (true) {
+            str_contains($mime, 'pdf')        => 'pdf',
+            str_contains($mime, 'word')       => 'docx',
+            str_contains($mime, 'sheet')      => 'xlsx',
+            str_contains($mime, 'excel')      => 'xls',
+            str_contains($mime, 'presentation') => 'pptx',
+            default                            => 'bin',
+        });
+        if (pathinfo($nombre, PATHINFO_EXTENSION) === '') $nombre .= '.' . $ext;
+
+        $caption = trim($caption);
+
+        // Guardar copia pública para enviar por URL y mostrar en el chat
+        $stored = 'documentos-out/doc_' . now()->format('Ymd_His') . '_' . uniqid() . '.' . $ext;
+        Storage::disk('public')->put($stored, $bytes);
+        $mediaUrl = rtrim(config('app.url'), '/') . Storage::url($stored);
+
+        // 🟢 RUTA META
+        try {
+            $tenant = app(\App\Services\TenantManager::class)->current();
+            if ($tenant && $tenant->proveedorWhatsappResuelto() === \App\Models\Tenant::WA_PROVIDER_META) {
+                $checker = app(\App\Services\Whatsapp\Ventana24hChecker::class);
+                if (!$checker->abierta($conv)) {
+                    $this->dispatch('notify', ['type' => 'error', 'message' => '🔒 Ventana 24h cerrada. Usa el panel ámbar de plantilla para reabrir.']);
+                    return;
+                }
+
+                $ok = app(\App\Services\Meta\MetaWhatsappCloudService::class)
+                    ->enviarDocumento($conv->telefono_normalizado, $mediaUrl, $nombre, $caption ?: null, $conv->tenant_id);
+
+                if (!$ok) {
+                    $this->dispatch('notify', ['type' => 'error', 'message' => '⚠️ Meta rechazó el documento.']);
+                    return;
+                }
+
+                try {
+                    $mensaje = app(ConversacionService::class)->agregarMensaje(
+                        $conv,
+                        MensajeWhatsapp::ROL_ASSISTANT,
+                        $caption !== '' ? $caption : ('📄 ' . $nombre),
+                        [
+                            'tipo' => 'document',
+                            'meta' => [
+                                'enviado_por_humano' => true,
+                                'usuario_id'         => auth()->id(),
+                                'media_url'          => $mediaUrl,
+                                'filename'           => $nombre,
+                                'caption'            => $caption,
+                                'provider'           => 'meta',
+                            ],
+                        ]
+                    );
+                    $mensaje->update(['ack' => MensajeWhatsapp::ACK_SENT]);
+                } catch (\Throwable $e) {
+                    Log::warning('No persistió documento Meta: ' . $e->getMessage());
+                }
+
+                $this->dispatch('mensaje-enviado');
+                $this->dispatch('notify', ['type' => 'success', 'message' => '✓ Documento enviado']);
+                return;
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Ruta Meta documento falló: ' . $e->getMessage());
+        }
+
+        // Si el tenant NO usa Meta, por ahora no soportamos envío de documentos.
+        $this->dispatch('notify', ['type' => 'error', 'message' => 'El envío de documentos solo está disponible en conexiones Meta por ahora.']);
+    }
+
     public function enviarImagen(string $dataUrl = '', string $caption = ''): void
     {
         // 👥 Si hay un grupo abierto, enviar la imagen a TODOS los miembros.
