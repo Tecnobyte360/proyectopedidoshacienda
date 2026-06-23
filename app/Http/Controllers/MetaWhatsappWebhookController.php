@@ -222,8 +222,26 @@ class MetaWhatsappWebhookController extends Controller
                 // Quick Reply de PLANTILLA. Meta envía el texto del botón en button.text.
                 $body = $msg['button']['text'] ?? $msg['button']['payload'] ?? '';
                 break;
+            case 'location':
+                $lat = $msg['location']['latitude'] ?? null;
+                $lng = $msg['location']['longitude'] ?? null;
+                $nom = $msg['location']['name'] ?? $msg['location']['address'] ?? '';
+                $body = '📍 Ubicación' . ($nom ? ": {$nom}" : '')
+                     . ($lat && $lng ? " (https://maps.google.com/?q={$lat},{$lng})" : '');
+                break;
+            case 'contacts':
+                $nom = $msg['contacts'][0]['name']['formatted_name'] ?? 'contacto';
+                $tel = $msg['contacts'][0]['phones'][0]['phone'] ?? '';
+                $body = "👤 Contacto compartido: {$nom}" . ($tel ? " ({$tel})" : '');
+                break;
+            case 'sticker':
+                $body = '[sticker]';
+                break;
+            case 'unsupported':
+                $body = '⚠️ El cliente envió un mensaje no compatible con WhatsApp (ej. encuesta, ubicación en vivo o un tipo nuevo). Pídele que lo reenvíe como texto, foto o documento.';
+                break;
             default:
-                $body = "[mensaje tipo: {$tipo}]";
+                $body = "⚠️ Mensaje no soportado por ahora (tipo: {$tipo}).";
         }
 
         // 💬 Si el cliente está respondiendo a un mensaje específico, Meta envía
