@@ -249,6 +249,16 @@ class MetaWhatsappWebhookController extends Controller
                 $body = "⚠️ Mensaje no soportado por ahora (tipo: {$tipo}).";
         }
 
+        // 🚫 Mensajes 'system' (cambio de número, etc.) NO son del cliente: no se
+        // muestran en el chat. Solo lo registramos en el log y devolvemos 200.
+        if ($tipo === 'system') {
+            Log::info('ℹ️ Meta system message ignorado (no se persiste)', [
+                'from' => $msg['from'] ?? null,
+                'body' => $msg['system']['body'] ?? null,
+            ]);
+            return response()->json(['status' => 'system_ignored']);
+        }
+
         // 💬 Si el cliente está respondiendo a un mensaje específico, Meta envía
         // context.id con el wamid del mensaje original. Buscamos ese mensaje
         // localmente y guardamos el link para renderizar la cita en /chat.
