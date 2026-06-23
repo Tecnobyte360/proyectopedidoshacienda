@@ -127,7 +127,13 @@ class Cliente extends Model
      */
     public static function encontrarOCrearPorTelefono(string $telefonoNormalizado, ?string $nombre = null, string $canalOrigen = 'whatsapp'): self
     {
-        $cliente = self::where('telefono_normalizado', $telefonoNormalizado)->first();
+        // Incluimos los borrados lógicamente: la llave única (tenant_id,
+        // telefono_normalizado) también cuenta los soft-deleted, así que si
+        // hay uno borrado lo RESTAURAMOS en vez de intentar insertar (1062).
+        $cliente = self::withTrashed()->where('telefono_normalizado', $telefonoNormalizado)->first();
+        if ($cliente && $cliente->trashed()) {
+            $cliente->restore();
+        }
 
         // 🛡️ Validar que $nombre parezca un nombre real (no email, no tel, no cédula, no producto)
         $nombreLimpio = trim((string) $nombre);
