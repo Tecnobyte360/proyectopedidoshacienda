@@ -470,6 +470,15 @@ class WhatsappWebhookController extends Controller
                 return response()->json(['status' => 'duplicate_ignored']);
             }
 
+            // 🛡️ Dedup PERMANENTE por BD: el caché dura 10 min, pero Meta puede
+            // reintentar un webhook horas después (si una entrega falló). Si ese
+            // wamid ya está guardado, lo ignoramos para no duplicar el mensaje.
+            if (\App\Models\MensajeWhatsapp::where('mensaje_externo_id', $messageId)->exists()) {
+                Log::warning('⚠️ Mensaje duplicado ignorado (ya existe en BD)', compact('messageId', 'from'));
+                Cache::put($alreadyProcessedKey, true, now()->addMinutes(10));
+                return response()->json(['status' => 'duplicate_ignored_db']);
+            }
+
             if (!Cache::add($processingKey, true, now()->addSeconds(30))) {
                 Log::warning('⚠️ Mensaje duplicado ignorado (en proceso, pre-checks)', compact('messageId', 'from'));
                 return response()->json(['status' => 'duplicate_in_progress']);
