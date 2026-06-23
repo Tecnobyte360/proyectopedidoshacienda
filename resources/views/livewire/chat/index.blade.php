@@ -687,7 +687,21 @@
                     {{-- 📞 Llamar al cliente (lite: abre wa.me en pestaña nueva, o tel: para celular) --}}
                     @php
                         $telLlamar = $conversacionActiva->telefono_digitos;
+                        $esWidgetConv = ($conversacionActiva->canal ?? '') === 'widget';
+                        $nombreCli = trim((string) ($conversacionActiva->cliente->nombre ?? ''));
+                        $saludoWa = rawurlencode('Hola' . ($nombreCli ? ' ' . $nombreCli : '') . ' 👋, te escribimos desde la página web. ¿Continuamos por aquí?');
                     @endphp
+
+                    {{-- 🟢 Trasladar a WhatsApp: solo en conversaciones que entran por la página web (widget) --}}
+                    @if($esWidgetConv && $telLlamar)
+                        <a href="https://wa.me/{{ $telLlamar }}?text={{ $saludoWa }}" target="_blank" rel="noopener"
+                           title="Escribirle por WhatsApp (trasladar desde la web)"
+                           class="rounded-lg bg-emerald-500 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-emerald-600 transition inline-flex items-center gap-1">
+                            <i class="fa-brands fa-whatsapp text-sm"></i>
+                            <span class="hidden md:inline">Escribir por WhatsApp</span>
+                        </a>
+                    @endif
+
                     {{-- 👥 Agregar este cliente a un grupo --}}
                     <div x-data="{ openG: false }" class="relative">
                         <button type="button" @click="openG = !openG" @click.outside="openG = false"
