@@ -240,6 +240,11 @@ class MetaWhatsappWebhookController extends Controller
             case 'unsupported':
                 $body = '⚠️ El cliente envió un mensaje no compatible con WhatsApp (ej. encuesta, ubicación en vivo o un tipo nuevo). Pídele que lo reenvíe como texto, foto o documento.';
                 break;
+            case 'system':
+                // Notificación administrativa de WhatsApp (no es un mensaje del cliente):
+                // p. ej. el cliente cambió de número. Usamos el texto que da Meta.
+                $body = 'ℹ️ ' . ($msg['system']['body'] ?? 'El cliente actualizó su información de WhatsApp (cambio de número).');
+                break;
             default:
                 $body = "⚠️ Mensaje no soportado por ahora (tipo: {$tipo}).";
         }
