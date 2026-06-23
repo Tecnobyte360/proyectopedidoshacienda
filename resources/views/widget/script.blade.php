@@ -33,6 +33,8 @@
         .twcw-header img { width: 40px; height: 40px; border-radius: 50%; object-fit: contain; background: #fff; padding: 3px; }
         .twcw-header .twcw-title { font-weight: 700; font-size: 15px; margin: 0; }
         .twcw-header .twcw-sub { font-size: 11px; opacity: 0.85; }
+        .twcw-notice { background: #eff6ff; color: #1e3a8a; font-size: 11.5px; line-height: 1.4; padding: 9px 14px; border-bottom: 1px solid #dbeafe; display: flex; gap: 8px; align-items: flex-start; }
+        .twcw-notice .twcw-dot { color: #16a34a; font-size: 9px; margin-top: 3px; }
         .twcw-close { margin-left: auto; background: transparent; border: 0; color: #fff; cursor: pointer; font-size: 20px; opacity: 0.9; }
         .twcw-messages { flex: 1; padding: 16px; overflow-y: auto; background: #f8fafc; display: flex; flex-direction: column; gap: 8px; }
         .twcw-msg { max-width: 80%; padding: 10px 14px; border-radius: 18px; font-size: 14px; line-height: 1.4; white-space: pre-wrap; word-wrap: break-word; }
@@ -69,6 +71,10 @@
                     <p class="twcw-sub">En línea</p>
                 </div>
                 <button class="twcw-close" aria-label="Cerrar">×</button>
+            </div>
+            <div class="twcw-notice">
+                <span class="twcw-dot">●</span>
+                <span>Estás en un chat <b>en línea</b>. Un asesor te atenderá por aquí. Si se pierde la conexión, te escribimos por <b>WhatsApp</b> al número que nos dejes. 💬</span>
             </div>
             <form class="twcw-name-form" style="display:none;">
                 <p style="font-size:13px;color:#475569;margin:0 0 14px;">Para atenderte mejor, déjanos tus datos 👇</p>
