@@ -256,7 +256,7 @@ class MetaWhatsappWebhookController extends Controller
                 'from' => $msg['from'] ?? null,
                 'body' => $msg['system']['body'] ?? null,
             ]);
-            return response()->json(['status' => 'system_ignored']);
+            return;
         }
 
         // 💬 Si el cliente está respondiendo a un mensaje específico, Meta envía
