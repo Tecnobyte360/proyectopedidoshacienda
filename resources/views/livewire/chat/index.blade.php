@@ -316,7 +316,7 @@
                             </span>
                         </div>
                         <div class="flex items-center justify-between gap-2">
-                            <div class="text-xs truncate font-mono {{ $tieneNoLeidos ? 'text-slate-700' : 'text-slate-500' }}">{{ $c->telefono_normalizado }}</div>
+                            <div class="text-xs truncate font-mono {{ $tieneNoLeidos ? 'text-slate-700' : 'text-slate-500' }}">{{ $c->telefono_visible }}</div>
                             @if($tieneNoLeidos)
                                 @if(($c->no_leidos ?? 0) > 0)
                                     {{-- Hay mensajes nuevos reales del cliente: badge con número --}}
@@ -669,7 +669,7 @@
                             @endif
                         </div>
                         <div class="text-xs text-slate-500 font-mono">
-                            {{ $conversacionActiva->telefono_normalizado }}
+                            {{ $conversacionActiva->telefono_visible }}
                             @if($conversacionActiva->atendida_por_humano)
                                 <span class="ml-2 inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700">
                                     <i class="fa-solid fa-user"></i> ATENDIDA POR TI
@@ -686,7 +686,7 @@
                 <div class="flex items-center gap-1.5 flex-shrink-0">
                     {{-- 📞 Llamar al cliente (lite: abre wa.me en pestaña nueva, o tel: para celular) --}}
                     @php
-                        $telLlamar = preg_replace('/[^0-9]/', '', $conversacionActiva->telefono_normalizado ?? '');
+                        $telLlamar = $conversacionActiva->telefono_digitos;
                     @endphp
                     {{-- 👥 Agregar este cliente a un grupo --}}
                     <div x-data="{ openG: false }" class="relative">
@@ -2211,7 +2211,7 @@
                                 Estado del pedido
                             </h3>
                             <p class="text-xs text-slate-500">
-                                {{ $conversacionActiva->telefono_normalizado }}
+                                {{ $conversacionActiva->telefono_visible }}
                                 @if($conversacionActiva->cliente?->nombre)
                                     · {{ $conversacionActiva->cliente->nombre }}
                                 @endif
@@ -2696,7 +2696,7 @@
                             </span>
                             <div class="min-w-0 flex-1">
                                 <p class="text-sm font-medium text-slate-800 truncate">{{ $c->nombre ?: 'Cliente' }}</p>
-                                <p class="text-xs text-slate-400 truncate">{{ $c->telefono_normalizado }}</p>
+                                <p class="text-xs text-slate-400 truncate">{{ $c->telefono_visible }}</p>
                             </div>
                             <span class="h-5 w-5 shrink-0 rounded-md border flex items-center justify-center {{ $sel ? 'bg-brand border-brand text-white' : 'border-slate-300' }}">
                                 @if($sel) <i class="fa-solid fa-check text-[10px]"></i> @endif

@@ -71,6 +71,32 @@ class ConversacionWhatsapp extends Model
         return $this->belongsTo(Cliente::class);
     }
 
+    /**
+     * Teléfono a mostrar en la UI. Para el chat web (canal 'widget') el
+     * telefono_normalizado es un código interno (w....); en ese caso usamos
+     * el celular real que el visitante dejó en el formulario (cliente->telefono).
+     */
+    public function getTelefonoVisibleAttribute(): string
+    {
+        if (($this->canal ?? '') === 'widget') {
+            $real = trim((string) ($this->cliente->telefono ?? ''));
+            if ($real !== '' && !str_starts_with($real, 'w')) {
+                return $real;
+            }
+            return 'Cliente web (sin tel.)';
+        }
+        return (string) $this->telefono_normalizado;
+    }
+
+    /** Solo dígitos del teléfono real, para armar enlaces wa.me / tel:. */
+    public function getTelefonoDigitosAttribute(): string
+    {
+        $base = ($this->canal ?? '') === 'widget'
+            ? (string) ($this->cliente->telefono ?? '')
+            : (string) $this->telefono_normalizado;
+        return preg_replace('/[^0-9]/', '', $base) ?: '';
+    }
+
     public function sede(): BelongsTo
     {
         return $this->belongsTo(Sede::class);

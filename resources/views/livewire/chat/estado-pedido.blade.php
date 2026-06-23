@@ -9,7 +9,7 @@
                 Estado estructurado del pedido
             </h2>
             <p class="text-sm text-slate-500">
-                Cliente: <strong>{{ $conversacion->telefono_normalizado }}</strong>
+                Cliente: <strong>{{ $conversacion->telefono_visible }}</strong>
                 @if($conversacion->cliente_id)
                     · {{ $conversacion->cliente?->nombre }}
                 @endif
