@@ -71,7 +71,8 @@ class MetaWhatsappCloudService
         ?int   $tenantId = null,
         string $idioma   = 'es',
         ?string $headerImagenUrl = null,
-        ?string $botonUrlParam = null
+        ?string $botonUrlParam = null,
+        bool   $persistir = true
     ): bool {
         $config = $this->resolverConfig($tenantId);
         if (!$config) return false;
@@ -124,7 +125,7 @@ class MetaWhatsappCloudService
 
         // 💾 Persistir en mensajes_whatsapp para que aparezca en el chat de la UI.
         // Reconstruimos el cuerpo desde body_preview de la plantilla + variables.
-        if ($ok && $this->ultimoWamid) {
+        if ($persistir && $ok && $this->ultimoWamid) {
             $this->persistirOutbound(
                 config: $config,
                 telefono: $telefono,

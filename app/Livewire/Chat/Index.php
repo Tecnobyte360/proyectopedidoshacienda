@@ -1658,14 +1658,16 @@ class Index extends Component
         $nombre = trim((string) ($conv->cliente->nombre ?? '')) ?: 'cliente';
         $primer = preg_split('/\s+/', $nombre)[0] ?? $nombre;
 
-        // Enviar plantilla 'contacto_web' por Meta
+        // Enviar plantilla 'contacto_web' por Meta (sin persistir en el servicio: lo guardamos abajo con el operador)
         $ok = app(\App\Services\Meta\MetaWhatsappCloudService::class)
-            ->enviarPlantilla($raw, 'contacto_web', [$primer], $tenant->id, 'es');
+            ->enviarPlantilla($raw, 'contacto_web', [$primer], $tenant->id, 'es', null, null, false);
 
         if (!$ok) {
             $this->dispatch('notify', ['type' => 'error', 'message' => '⚠️ No se pudo enviar. ¿La plantilla "contacto_web" ya está aprobada por Meta?']);
             return;
         }
+
+        $textoPlantilla = "Hola {$primer} 👋, recibimos tu mensaje en nuestra página web. Un asesor continuará tu atención por aquí. ¿En qué te podemos ayudar?";
 
         // Abrir / crear la conversación de WhatsApp en la plataforma
         try {
@@ -1680,8 +1682,8 @@ class Index extends Component
             app(ConversacionService::class)->agregarMensaje(
                 $waConv,
                 MensajeWhatsapp::ROL_ASSISTANT,
-                "📲 Te escribimos por WhatsApp (plantilla \"contacto_web\"). Continúa la conversación aquí.",
-                ['meta' => ['enviado_por_humano' => true, 'usuario_id' => auth()->id(), 'plantilla' => 'contacto_web', 'provider' => 'meta']]
+                $textoPlantilla,
+                ['meta' => ['enviado_por_humano' => true, 'usuario_id' => auth()->id(), 'origen' => 'plantilla_meta', 'plantilla' => 'contacto_web', 'provider' => 'meta']]
             );
 
             // Cambiar a la conversación de WhatsApp recién abierta
@@ -2732,7 +2734,10 @@ class Index extends Component
                 $tpl->nombre,
                 $varsOrdenadas,
                 $conv->tenant_id,
-                $tpl->idioma ?: 'es'
+                $tpl->idioma ?: 'es',
+                null,
+                null,
+                false   // no persistir en el servicio; lo guardamos aquí con el operador
             );
 
         if (!$ok) {
