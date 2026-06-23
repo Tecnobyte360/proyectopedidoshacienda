@@ -692,14 +692,19 @@
                         $saludoWa = rawurlencode('Hola' . ($nombreCli ? ' ' . $nombreCli : '') . ' 👋, te escribimos desde la página web. ¿Continuamos por aquí?');
                     @endphp
 
-                    {{-- 🟢 Trasladar a WhatsApp: solo en conversaciones que entran por la página web (widget) --}}
+                    {{-- 🟢 Trasladar a WhatsApp DESDE EL NEGOCIO: solo en chats de la web (widget) --}}
                     @if($esWidgetConv && $telLlamar)
-                        <a href="https://wa.me/{{ $telLlamar }}?text={{ $saludoWa }}" target="_blank" rel="noopener"
-                           title="Escribirle por WhatsApp (trasladar desde la web)"
-                           class="rounded-lg bg-emerald-500 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-emerald-600 transition inline-flex items-center gap-1">
-                            <i class="fa-brands fa-whatsapp text-sm"></i>
+                        <button type="button"
+                                wire:click="escribirPorWhatsapp({{ $conversacionActiva->id }})"
+                                wire:confirm="Se enviará un WhatsApp al cliente desde el número del negocio para continuar por allí. ¿Continuar?"
+                                wire:loading.attr="disabled"
+                                wire:target="escribirPorWhatsapp"
+                                title="Escribirle por WhatsApp desde el número del negocio (trasladar la conversación)"
+                                class="rounded-lg bg-emerald-500 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-emerald-600 transition inline-flex items-center gap-1 disabled:opacity-50">
+                            <i class="fa-brands fa-whatsapp text-sm" wire:loading.remove wire:target="escribirPorWhatsapp"></i>
+                            <i class="fa-solid fa-circle-notch fa-spin text-sm" wire:loading wire:target="escribirPorWhatsapp"></i>
                             <span class="hidden md:inline">Escribir por WhatsApp</span>
-                        </a>
+                        </button>
                     @endif
 
                     {{-- 👥 Agregar este cliente a un grupo --}}

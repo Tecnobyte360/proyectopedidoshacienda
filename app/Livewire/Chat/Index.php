@@ -1621,6 +1621,79 @@ class Index extends Component
      * evitar el endpoint /livewire/upload-file (que tira 401 en producción).
      */
     /**
+     * 🟢 Traslada un chat de la WEB (widget) a WhatsApp: envía la plantilla
+     * 'contacto_web' al celular que dejó el visitante (desde el número del
+     * negocio por Meta) y abre/crea la conversación de WhatsApp en la plataforma.
+     */
+    public function escribirPorWhatsapp(int $convId): void
+    {
+        $conv = ConversacionWhatsapp::find($convId);
+        if (!$conv) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Conversación no encontrada.']);
+            return;
+        }
+        if (($conv->canal ?? '') !== 'widget') {
+            $this->dispatch('notify', ['type' => 'warning', 'message' => 'Esta opción es solo para chats de la página web.']);
+            return;
+        }
+
+        $tenant = app(\App\Services\TenantManager::class)->current();
+        if (!$tenant || $tenant->proveedorWhatsappResuelto() !== \App\Models\Tenant::WA_PROVIDER_META) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Este negocio no tiene WhatsApp (Meta) configurado.']);
+            return;
+        }
+
+        // Celular real del visitante (lo dejó en el formulario del widget)
+        $raw = preg_replace('/\D/', '', (string) ($conv->cliente->telefono ?? ''));
+        if ($raw === '') {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Este cliente no dejó su número de celular.']);
+            return;
+        }
+        if (strlen($raw) === 10) $raw = '57' . $raw;          // Colombia: anteponer indicativo
+        if (strlen($raw) < 11) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'El celular del cliente no es válido.']);
+            return;
+        }
+
+        $nombre = trim((string) ($conv->cliente->nombre ?? '')) ?: 'cliente';
+        $primer = preg_split('/\s+/', $nombre)[0] ?? $nombre;
+
+        // Enviar plantilla 'contacto_web' por Meta
+        $ok = app(\App\Services\Meta\MetaWhatsappCloudService::class)
+            ->enviarPlantilla($raw, 'contacto_web', [$primer], $tenant->id, 'es');
+
+        if (!$ok) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => '⚠️ No se pudo enviar. ¿La plantilla "contacto_web" ya está aprobada por Meta?']);
+            return;
+        }
+
+        // Abrir / crear la conversación de WhatsApp en la plataforma
+        try {
+            $cliente = \App\Models\Cliente::encontrarOCrearPorTelefono($raw, $nombre);
+            $cfg = \App\Models\MetaWhatsappConfig::actual();
+            $waConv = app(ConversacionService::class)->obtenerOCrearActiva($raw, $cliente->id);
+            $waConv->forceFill([
+                'canal'         => 'whatsapp',
+                'connection_id' => $cfg ? ('meta:' . $cfg->phone_number_id) : $waConv->connection_id,
+            ])->save();
+
+            app(ConversacionService::class)->agregarMensaje(
+                $waConv,
+                MensajeWhatsapp::ROL_ASSISTANT,
+                "📲 Te escribimos por WhatsApp (plantilla \"contacto_web\"). Continúa la conversación aquí.",
+                ['meta' => ['enviado_por_humano' => true, 'usuario_id' => auth()->id(), 'plantilla' => 'contacto_web', 'provider' => 'meta']]
+            );
+
+            // Cambiar a la conversación de WhatsApp recién abierta
+            $this->seleccionar($waConv->id);
+        } catch (\Throwable $e) {
+            Log::warning('Trasladar a WhatsApp: ' . $e->getMessage());
+        }
+
+        $this->dispatch('notify', ['type' => 'success', 'message' => '✅ Mensaje de WhatsApp enviado al cliente. Sigue la conversación aquí.']);
+    }
+
+    /**
      * 📄 Envía un documento (PDF, Word, Excel...) al cliente.
      * Recibe un data URL base64 desde el composer + nombre original.
      */
