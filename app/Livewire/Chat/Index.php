@@ -1672,7 +1672,7 @@ class Index extends Component
         // Abrir / crear la conversación de WhatsApp en la plataforma
         try {
             $cliente = \App\Models\Cliente::encontrarOCrearPorTelefono($raw, $nombre);
-            $cfg = \App\Models\MetaWhatsappConfig::actual();
+            $cfg = \App\Models\MetaWhatsappConfig::activaActual();
             $waConv = app(ConversacionService::class)->obtenerOCrearActiva($raw, $cliente->id);
             $waConv->forceFill([
                 'canal'         => 'whatsapp',
