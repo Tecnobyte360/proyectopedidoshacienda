@@ -1215,6 +1215,22 @@
                             <i class="fa-brands fa-whatsapp"></i> Ir a WhatsApp
                         </button>
                     </div>
+                @elseif(($conversacionActiva->canal ?? '') === 'widget' && $conversacionActiva->telefono_digitos)
+                    {{-- 🟢 Cliente web SIN hilo de WhatsApp todavía → ofrecer trasladarlo --}}
+                    <div class="bg-emerald-50 border-t border-emerald-200 px-4 py-2.5 flex items-center gap-3">
+                        <i class="fa-brands fa-whatsapp text-emerald-600 text-base"></i>
+                        <div class="flex-1 text-[12px] text-emerald-800 leading-tight">
+                            Este cliente dejó su WhatsApp (<b>+{{ $conversacionActiva->telefono_digitos }}</b>). Si ya no está en la página, <b>pásalo a WhatsApp</b> para seguir la conversación.
+                        </div>
+                        <button wire:click="escribirPorWhatsapp({{ $conversacionActiva->id }})"
+                                wire:confirm="Se enviará un WhatsApp al cliente desde el número del negocio para continuar por allí. ¿Continuar?"
+                                wire:loading.attr="disabled" wire:target="escribirPorWhatsapp"
+                                class="shrink-0 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[12px] font-bold px-3 py-1.5 inline-flex items-center gap-1.5 transition disabled:opacity-50">
+                            <i class="fa-brands fa-whatsapp" wire:loading.remove wire:target="escribirPorWhatsapp"></i>
+                            <i class="fa-solid fa-circle-notch fa-spin" wire:loading wire:target="escribirPorWhatsapp"></i>
+                            Escribir por WhatsApp
+                        </button>
+                    </div>
                 @elseif(($conversacionActiva->canal ?? 'whatsapp') === 'whatsapp' && $convWebRelacionada)
                     <div class="bg-sky-50 border-t border-sky-200 px-4 py-2.5 flex items-center gap-3">
                         <i class="fa-solid fa-globe text-sky-600 text-base"></i>
