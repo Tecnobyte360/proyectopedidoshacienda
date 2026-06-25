@@ -452,7 +452,19 @@
                                     </div>
                                     <div class="min-w-0 max-w-[180px]">
                                         <div class="font-semibold text-slate-800 truncate">{{ $cli->nombre }}</div>
-                                        <div class="text-[10px] text-slate-500 md:hidden truncate">
+                                        @php
+                                            $oMap = [
+                                                'web'      => ['🌐 Página web', 'bg-sky-50 text-sky-700 ring-sky-200'],
+                                                'widget'   => ['🌐 Página web', 'bg-sky-50 text-sky-700 ring-sky-200'],
+                                                'whatsapp' => ['🟢 WhatsApp',   'bg-emerald-50 text-emerald-700 ring-emerald-200'],
+                                                'manual'   => ['✍️ Manual',     'bg-violet-50 text-violet-700 ring-violet-200'],
+                                                'instagram'=> ['📸 Instagram',  'bg-pink-50 text-pink-700 ring-pink-200'],
+                                                'campana'  => ['📣 Campaña',    'bg-amber-50 text-amber-700 ring-amber-200'],
+                                            ];
+                                            $o = $oMap[$cli->canal_origen] ?? ['• ' . ($cli->canal_origen ?: 'Otro'), 'bg-slate-100 text-slate-600 ring-slate-200'];
+                                        @endphp
+                                        <span class="inline-flex items-center mt-0.5 px-1.5 py-0.5 rounded-md ring-1 text-[10px] font-semibold {{ $o[1] }}" title="Ingresó por">{{ $o[0] }}</span>
+                                        <div class="text-[10px] text-slate-500 md:hidden truncate mt-0.5">
                                             {{ $cli->pais_codigo }} {{ $cli->telefono }}
                                         </div>
                                     </div>

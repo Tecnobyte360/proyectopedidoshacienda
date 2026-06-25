@@ -258,6 +258,7 @@ class ChatWidgetController extends Controller
                 'nombre'               => $nombreVisitante,
                 'telefono'             => $sesion->visitante_telefono ?: $telFake,
                 'telefono_normalizado' => $telFake,
+                'canal_origen'         => 'web',
                 'activo'               => true,
             ]);
         }
