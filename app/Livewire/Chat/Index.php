@@ -2609,6 +2609,18 @@ class Index extends Component
             ? ConversacionWhatsapp::with(['cliente', 'mensajes', 'pedido'])->find($this->conversacionActivaId)
             : null;
 
+        // 🔗 Si la conversación activa es del chat WEB (widget) y el cliente dejó
+        // su celular, buscar su conversación de WhatsApp para ofrecer continuar allí.
+        $convWhatsappRelacionada = null;
+        if ($conversacionActiva && ($conversacionActiva->canal ?? '') === 'widget') {
+            $telReal = preg_replace('/\D+/', '', (string) ($conversacionActiva->cliente->telefono ?? ''));
+            if ($telReal !== '' && !str_starts_with($telReal, 'w')) {
+                if (strlen($telReal) === 10) $telReal = '57' . $telReal;
+                $convWhatsappRelacionada = ConversacionWhatsapp::where('telefono_normalizado', $telReal)
+                    ->where('canal', 'whatsapp')->orderByDesc('id')->first();
+            }
+        }
+
         // 📋 Estado estructurado del pedido (para el modal). Solo se carga si
         // el modal está abierto, para no consumir BD innecesariamente.
         $pedidoEstado = null;
@@ -2686,6 +2698,7 @@ class Index extends Component
         return view('livewire.chat.index', compact(
             'conversaciones',
             'conversacionActiva',
+            'convWhatsappRelacionada',
             'pedidoEstado',
             'promptInspeccion',
             'plantillasMetaAprobadas',

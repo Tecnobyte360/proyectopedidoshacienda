@@ -1203,6 +1203,21 @@
                     </div>
                 </div>
 
+                {{-- 🔗 Aviso: conversación WEB que ya tiene hilo de WhatsApp --}}
+                @if(($conversacionActiva->canal ?? '') === 'widget' && $convWhatsappRelacionada)
+                    <div class="bg-emerald-50 border-t border-emerald-200 px-4 py-3 flex items-center gap-3">
+                        <i class="fa-brands fa-whatsapp text-emerald-600 text-lg"></i>
+                        <div class="flex-1 text-[12.5px] text-emerald-800 leading-tight">
+                            <b>Esta es la conversación de la página web.</b> Lo que escribas aquí va al chat web (solo le llega si tiene la página abierta).
+                            Este cliente ya está en <b>WhatsApp</b> — continúa por allí.
+                        </div>
+                        <button wire:click="seleccionar({{ $convWhatsappRelacionada->id }})"
+                                class="shrink-0 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[12px] font-bold px-3 py-2 inline-flex items-center gap-1.5 transition">
+                            <i class="fa-brands fa-whatsapp"></i> Abrir WhatsApp
+                        </button>
+                    </div>
+                @endif
+
                 {{-- Input para responder --}}
                 <div class="bg-white border-t border-slate-200"
                      x-data="audioRecorder()"
