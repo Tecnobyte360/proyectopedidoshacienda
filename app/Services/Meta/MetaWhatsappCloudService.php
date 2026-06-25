@@ -200,7 +200,7 @@ class MetaWhatsappCloudService
                     'nombre_cliente'       => 'Cliente',
                     'estado'               => 'activa',
                     'canal'                => 'whatsapp',
-                    'connection_id'        => 'meta:' . $config->phone_number_id,
+                    // connection_id es FK entero (TecnoByteApp); en Meta va nulo.
                 ]);
             }
 

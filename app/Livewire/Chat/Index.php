@@ -1672,12 +1672,10 @@ class Index extends Component
         // Abrir / crear la conversación de WhatsApp en la plataforma
         try {
             $cliente = \App\Models\Cliente::encontrarOCrearPorTelefono($raw, $nombre);
-            $cfg = \App\Models\MetaWhatsappConfig::activaActual();
             $waConv = app(ConversacionService::class)->obtenerOCrearActiva($raw, $cliente->id);
-            $waConv->forceFill([
-                'canal'         => 'whatsapp',
-                'connection_id' => $cfg ? ('meta:' . $cfg->phone_number_id) : $waConv->connection_id,
-            ])->save();
+            // Marcar como conversación de WhatsApp (Meta enruta por tenant+teléfono,
+            // no por connection_id — ese campo es FK entero de TecnoByteApp, va nulo).
+            $waConv->forceFill(['canal' => 'whatsapp'])->save();
 
             $msgWa = app(ConversacionService::class)->agregarMensaje(
                 $waConv,
