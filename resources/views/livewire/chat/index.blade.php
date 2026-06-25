@@ -1233,7 +1233,7 @@
                      x-data="audioRecorder()"
                      x-init="init()">
 
-                @if($tenantUsaMeta)
+                @if($tenantUsaMeta && ($conversacionActiva->canal ?? 'whatsapp') !== 'widget')
                     {{-- 🟢 Indicador de ventana 24h Meta + botón plantillas inline --}}
                     @if($ventana24hAbierta)
                         <div class="relative px-4 py-1.5 bg-emerald-50 border-b border-emerald-100 flex items-center justify-between gap-2 text-[11px] text-emerald-700"
@@ -1418,7 +1418,7 @@
 
                 <form wire:submit.prevent="enviar"
                       class="px-3 py-3 flex items-center gap-2"
-                      @if($tenantUsaMeta && !$ventana24hAbierta) style="opacity:0.4; pointer-events:none;" @endif
+                      @if($tenantUsaMeta && !$ventana24hAbierta && ($conversacionActiva->canal ?? 'whatsapp') !== 'widget') style="opacity:0.4; pointer-events:none;" @endif
                       x-data="slashMenu({{ $respuestasRapidas->toJson() }})">
                     <div class="flex-1 relative" x-show="!recording && !preview">
                         {{-- 💡 Popup respuestas rápidas (estilo Slack /comando) --}}
