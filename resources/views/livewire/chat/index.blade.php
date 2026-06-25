@@ -1203,17 +1203,27 @@
                     </div>
                 </div>
 
-                {{-- 🔗 Aviso: conversación WEB que ya tiene hilo de WhatsApp --}}
+                {{-- 🔗 Enlace entre canales del mismo cliente (puedes seguir por cualquiera) --}}
                 @if(($conversacionActiva->canal ?? '') === 'widget' && $convWhatsappRelacionada)
-                    <div class="bg-emerald-50 border-t border-emerald-200 px-4 py-3 flex items-center gap-3">
-                        <i class="fa-brands fa-whatsapp text-emerald-600 text-lg"></i>
-                        <div class="flex-1 text-[12.5px] text-emerald-800 leading-tight">
-                            <b>Esta es la conversación de la página web.</b> Lo que escribas aquí va al chat web (solo le llega si tiene la página abierta).
-                            Este cliente ya está en <b>WhatsApp</b> — continúa por allí.
+                    <div class="bg-emerald-50 border-t border-emerald-200 px-4 py-2.5 flex items-center gap-3">
+                        <i class="fa-brands fa-whatsapp text-emerald-600 text-base"></i>
+                        <div class="flex-1 text-[12px] text-emerald-800 leading-tight">
+                            Estás en el <b>chat de la página web</b>. Este cliente también está en <b>WhatsApp</b> — puedes seguir por donde prefieras.
                         </div>
                         <button wire:click="seleccionar({{ $convWhatsappRelacionada->id }})"
-                                class="shrink-0 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[12px] font-bold px-3 py-2 inline-flex items-center gap-1.5 transition">
-                            <i class="fa-brands fa-whatsapp"></i> Abrir WhatsApp
+                                class="shrink-0 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[12px] font-bold px-3 py-1.5 inline-flex items-center gap-1.5 transition">
+                            <i class="fa-brands fa-whatsapp"></i> Ir a WhatsApp
+                        </button>
+                    </div>
+                @elseif(($conversacionActiva->canal ?? 'whatsapp') === 'whatsapp' && $convWebRelacionada)
+                    <div class="bg-sky-50 border-t border-sky-200 px-4 py-2.5 flex items-center gap-3">
+                        <i class="fa-solid fa-globe text-sky-600 text-base"></i>
+                        <div class="flex-1 text-[12px] text-sky-800 leading-tight">
+                            Estás en <b>WhatsApp</b>. Este cliente también escribió por la <b>página web</b> — puedes seguir por donde prefieras.
+                        </div>
+                        <button wire:click="seleccionar({{ $convWebRelacionada->id }})"
+                                class="shrink-0 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-[12px] font-bold px-3 py-1.5 inline-flex items-center gap-1.5 transition">
+                            <i class="fa-solid fa-globe"></i> Ir al chat web
                         </button>
                     </div>
                 @endif

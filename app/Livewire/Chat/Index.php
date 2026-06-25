@@ -2609,15 +2609,26 @@ class Index extends Component
             ? ConversacionWhatsapp::with(['cliente', 'mensajes', 'pedido'])->find($this->conversacionActivaId)
             : null;
 
-        // 🔗 Si la conversación activa es del chat WEB (widget) y el cliente dejó
-        // su celular, buscar su conversación de WhatsApp para ofrecer continuar allí.
-        $convWhatsappRelacionada = null;
-        if ($conversacionActiva && ($conversacionActiva->canal ?? '') === 'widget') {
-            $telReal = preg_replace('/\D+/', '', (string) ($conversacionActiva->cliente->telefono ?? ''));
-            if ($telReal !== '' && !str_starts_with($telReal, 'w')) {
-                if (strlen($telReal) === 10) $telReal = '57' . $telReal;
-                $convWhatsappRelacionada = ConversacionWhatsapp::where('telefono_normalizado', $telReal)
-                    ->where('canal', 'whatsapp')->orderByDesc('id')->first();
+        // 🔗 Enlace entre canales del MISMO cliente (web ↔ WhatsApp) para poder
+        // seguir la conversación por el canal que prefiera el operador.
+        $convWhatsappRelacionada = null; // si estoy en WEB, su hilo de WhatsApp
+        $convWebRelacionada      = null; // si estoy en WhatsApp, su hilo web
+        if ($conversacionActiva) {
+            $canalAct = $conversacionActiva->canal ?? 'whatsapp';
+
+            if ($canalAct === 'widget') {
+                $telReal = preg_replace('/\D+/', '', (string) ($conversacionActiva->cliente->telefono ?? ''));
+                if ($telReal !== '' && !str_starts_with($telReal, 'w')) {
+                    if (strlen($telReal) === 10) $telReal = '57' . $telReal;
+                    $convWhatsappRelacionada = ConversacionWhatsapp::where('telefono_normalizado', $telReal)
+                        ->where('canal', 'whatsapp')->orderByDesc('id')->first();
+                }
+            } elseif ($canalAct === 'whatsapp') {
+                $norm  = preg_replace('/\D+/', '', (string) $conversacionActiva->telefono_normalizado);
+                $corto = (strlen($norm) === 12 && str_starts_with($norm, '57')) ? substr($norm, 2) : $norm;
+                $convWebRelacionada = ConversacionWhatsapp::where('canal', 'widget')
+                    ->whereHas('cliente', fn ($q) => $q->whereIn('telefono', array_unique([$norm, $corto])))
+                    ->orderByDesc('id')->first();
             }
         }
 
@@ -2699,6 +2710,7 @@ class Index extends Component
             'conversaciones',
             'conversacionActiva',
             'convWhatsappRelacionada',
+            'convWebRelacionada',
             'pedidoEstado',
             'promptInspeccion',
             'plantillasMetaAprobadas',
