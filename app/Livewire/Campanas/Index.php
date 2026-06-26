@@ -251,7 +251,13 @@ class Index extends Component
 
     public function render()
     {
-        $campanas = CampanaWhatsapp::orderByDesc('id')->paginate(15);
+        // Excluir 'audiencia_filtros' (puede ser un JSON enorme en envíos masivos):
+        // incluirlo en el ORDER BY hace que MySQL agote el sort buffer (error 1038).
+        $colsLista = array_values(array_diff(
+            \Illuminate\Support\Facades\Schema::getColumnListing('campanas_whatsapp'),
+            ['audiencia_filtros']
+        ));
+        $campanas = CampanaWhatsapp::orderByDesc('id')->paginate(15, $colsLista);
         $zonas    = ZonaCobertura::where('activa', true)->orderBy('nombre')->get();
         $sedes    = Sede::orderBy('nombre')->get();
 
