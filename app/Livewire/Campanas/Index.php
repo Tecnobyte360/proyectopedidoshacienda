@@ -84,8 +84,10 @@ class Index extends Component
     /** Archivo Excel/CSV temporal (.xlsx, .xls, .csv) */
     public $archivoExcel = null;
     public int $numerosImportados = 0;
-    /** Mapa teléfono(normalizado) => nombre, capturado del Excel/CSV importado */
-    public array $nombresImportados = [];
+    /** Cantidad de nombres capturados del Excel (el mapa real va en sesión, no como
+     *  propiedad pública: un arreglo grande rompería el payload de Livewire). */
+    public int $nombresImportadosCount = 0;
+    private const SESION_NOMBRES = 'campana_nombres_importados';
 
     /** Imagen para envío masivo (Livewire temp file) */
     public $imagen = null;
@@ -175,10 +177,14 @@ class Index extends Component
             $this->telefonosManual = implode("\n", array_values($telefonos));
             $this->audienciaTipo = 'manual';
             $this->numerosImportados = count($telefonos);
-            // Guardar el nombre capturado por teléfono (solo los que traen nombre)
-            $this->nombresImportados = array_filter($nombres, fn ($n) => trim((string) $n) !== '');
+            // Guardar el nombre capturado por teléfono (solo los que traen nombre).
+            // Va en SESIÓN, no en una propiedad pública: con miles de filas un
+            // arreglo gigante rompería el payload de Livewire al guardar.
+            $nombresLimpios = array_filter($nombres, fn ($n) => trim((string) $n) !== '');
+            session([self::SESION_NOMBRES => $nombresLimpios]);
+            $this->nombresImportadosCount = count($nombresLimpios);
 
-            $conNombre = count($this->nombresImportados);
+            $conNombre = $this->nombresImportadosCount;
             $this->dispatch('notify', [
                 'type'    => 'success',
                 'message' => "Importados {$this->numerosImportados} números"
@@ -457,8 +463,9 @@ class Index extends Component
     {
         $this->reset(['editandoId', 'nombre', 'mensaje', 'zonaId', 'sedeId',
                       'telefonosManual', 'programadaPara', 'imagen',
-                      'archivoExcel', 'numerosImportados', 'nombresImportados', 'mediaUrlExistente',
+                      'archivoExcel', 'numerosImportados', 'nombresImportadosCount', 'mediaUrlExistente',
                       'plantillaMetaId', 'plantillaVariables']);
+        session()->forget(self::SESION_NOMBRES);
         $this->audienciaTipo   = 'todos';
         $this->minPedidos      = 1;
         $this->intervaloMinSeg = 8;
@@ -484,7 +491,10 @@ class Index extends Component
         $this->grupoClienteId   = $f['grupo_id']     ?? null;
         $this->minPedidos       = $f['min_pedidos']  ?? 1;
         $this->telefonosManual  = isset($f['telefonos']) ? implode("\n", $f['telefonos']) : '';
-        $this->nombresImportados= $f['nombres'] ?? [];
+        // Los nombres ya guardados se conservan desde audiencia_filtros al guardar;
+        // limpiamos la sesión para no mezclar con un Excel anterior.
+        session()->forget(self::SESION_NOMBRES);
+        $this->nombresImportadosCount = count($f['nombres'] ?? []);
         $this->intervaloMinSeg  = $c->intervalo_min_seg;
         $this->intervaloMaxSeg  = $c->intervalo_max_seg;
         $this->loteTamano       = $c->lote_tamano;
@@ -525,9 +535,15 @@ class Index extends Component
         if ($this->audienciaTipo === 'con_pedidos')                   $filtros['min_pedidos'] = $this->minPedidos;
         if ($this->audienciaTipo === 'manual') {
             $filtros['telefonos'] = array_values(array_filter(array_map('trim', preg_split('/[\s,]+/', $this->telefonosManual))));
-            // 👤 Nombres capturados del Excel (tel normalizado => nombre)
-            if (!empty($this->nombresImportados)) {
-                $filtros['nombres'] = $this->nombresImportados;
+            // 👤 Nombres capturados del Excel (tel normalizado => nombre), desde sesión.
+            $nombres = session(self::SESION_NOMBRES, []);
+            // Si no se resubió Excel pero se está editando, conservar los ya guardados.
+            if (empty($nombres) && $this->editandoId) {
+                $prev = CampanaWhatsapp::find($this->editandoId);
+                $nombres = $prev->audiencia_filtros['nombres'] ?? [];
+            }
+            if (!empty($nombres)) {
+                $filtros['nombres'] = $nombres;
             }
         }
 
