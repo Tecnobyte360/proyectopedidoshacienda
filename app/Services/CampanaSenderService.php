@@ -272,8 +272,20 @@ class CampanaSenderService
                         : [];
 
                     $metaSvc = app(\App\Services\Meta\MetaWhatsappCloudService::class);
-                    // 🖼️ Si la campaña tiene media_url, va como HEADER de imagen
-                    $imagenHeader = $c->media_url ?: null;
+                    // 🖼️ La imagen solo se envía si la PLANTILLA tiene header de imagen.
+                    // Si no, Meta rechaza con "Template does not contain ... component".
+                    $imagenHeader = null;
+                    if ($c->media_url) {
+                        $headerTipo = \App\Models\MetaWhatsappPlantilla::withoutGlobalScopes()
+                            ->where('tenant_id', $c->tenant_id)
+                            ->where('nombre', $c->plantilla_meta_nombre)
+                            ->value('header_tipo');
+                        if (in_array(strtolower((string) $headerTipo), ['image', 'imagen'], true)) {
+                            $imagenHeader = $c->media_url;
+                        } else {
+                            Log::warning("Campaña #{$c->id}: plantilla '{$c->plantilla_meta_nombre}' no tiene header de imagen (header_tipo=" . var_export($headerTipo, true) . ") → se ignora la imagen adjunta.");
+                        }
+                    }
                     $ok = $metaSvc->enviarPlantilla(
                         $d->telefono,
                         $c->plantilla_meta_nombre,
