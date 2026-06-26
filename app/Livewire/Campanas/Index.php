@@ -84,6 +84,8 @@ class Index extends Component
     /** Archivo Excel/CSV temporal (.xlsx, .xls, .csv) */
     public $archivoExcel = null;
     public int $numerosImportados = 0;
+    /** Mapa teléfono(normalizado) => nombre, capturado del Excel/CSV importado */
+    public array $nombresImportados = [];
 
     /** Imagen para envío masivo (Livewire temp file) */
     public $imagen = null;
@@ -173,10 +175,15 @@ class Index extends Component
             $this->telefonosManual = implode("\n", array_values($telefonos));
             $this->audienciaTipo = 'manual';
             $this->numerosImportados = count($telefonos);
+            // Guardar el nombre capturado por teléfono (solo los que traen nombre)
+            $this->nombresImportados = array_filter($nombres, fn ($n) => trim((string) $n) !== '');
 
+            $conNombre = count($this->nombresImportados);
             $this->dispatch('notify', [
                 'type'    => 'success',
-                'message' => "Importados {$this->numerosImportados} números. Audiencia cambiada a 'manual'.",
+                'message' => "Importados {$this->numerosImportados} números"
+                    . ($conNombre ? " ({$conNombre} con nombre)" : '')
+                    . ". Audiencia cambiada a 'manual'.",
             ]);
         } catch (\Throwable $e) {
             $this->dispatch('notify', [
@@ -450,7 +457,7 @@ class Index extends Component
     {
         $this->reset(['editandoId', 'nombre', 'mensaje', 'zonaId', 'sedeId',
                       'telefonosManual', 'programadaPara', 'imagen',
-                      'archivoExcel', 'numerosImportados', 'mediaUrlExistente',
+                      'archivoExcel', 'numerosImportados', 'nombresImportados', 'mediaUrlExistente',
                       'plantillaMetaId', 'plantillaVariables']);
         $this->audienciaTipo   = 'todos';
         $this->minPedidos      = 1;
@@ -477,6 +484,7 @@ class Index extends Component
         $this->grupoClienteId   = $f['grupo_id']     ?? null;
         $this->minPedidos       = $f['min_pedidos']  ?? 1;
         $this->telefonosManual  = isset($f['telefonos']) ? implode("\n", $f['telefonos']) : '';
+        $this->nombresImportados= $f['nombres'] ?? [];
         $this->intervaloMinSeg  = $c->intervalo_min_seg;
         $this->intervaloMaxSeg  = $c->intervalo_max_seg;
         $this->loteTamano       = $c->lote_tamano;
@@ -515,7 +523,13 @@ class Index extends Component
         if ($this->audienciaTipo === 'sede' && $this->sedeId)         $filtros['sede_id'] = $this->sedeId;
         if ($this->audienciaTipo === 'grupo' && $this->grupoClienteId) $filtros['grupo_id'] = $this->grupoClienteId;
         if ($this->audienciaTipo === 'con_pedidos')                   $filtros['min_pedidos'] = $this->minPedidos;
-        if ($this->audienciaTipo === 'manual')                        $filtros['telefonos'] = array_values(array_filter(array_map('trim', preg_split('/[\s,]+/', $this->telefonosManual))));
+        if ($this->audienciaTipo === 'manual') {
+            $filtros['telefonos'] = array_values(array_filter(array_map('trim', preg_split('/[\s,]+/', $this->telefonosManual))));
+            // 👤 Nombres capturados del Excel (tel normalizado => nombre)
+            if (!empty($this->nombresImportados)) {
+                $filtros['nombres'] = $this->nombresImportados;
+            }
+        }
 
         // Subir imagen al disco público si vino una nueva
         // ✅ Aislamiento por tenant: cada empresa tiene su propia carpeta

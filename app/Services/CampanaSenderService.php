@@ -87,16 +87,24 @@ class CampanaSenderService
                 break;
 
             case 'manual':
-                $lista = collect($filtros['telefonos'] ?? []);
+                $lista       = collect($filtros['telefonos'] ?? []);
+                $nombresMap  = $filtros['nombres'] ?? []; // tel(normalizado) => nombre (del Excel)
                 foreach ($lista as $tel) {
                     $tel = preg_replace('/\D+/', '', $tel);
                     if ($tel === '') continue;
                     $cl = Cliente::where('telefono_normalizado', $tel)->first();
-                    $clientes->push($cl ?: (object) [
-                        'telefono_normalizado' => $tel,
-                        'nombre'               => 'Cliente',
-                        'id'                   => null,
-                    ]);
+                    // Preferir el nombre del Excel; si no, el del cliente en BD; si no, genérico
+                    $nombreExcel = trim((string) ($nombresMap[$tel] ?? ''));
+                    if ($cl) {
+                        if ($nombreExcel !== '') $cl->nombre = $nombreExcel; // no se guarda en BD, solo para la campaña
+                        $clientes->push($cl);
+                    } else {
+                        $clientes->push((object) [
+                            'telefono_normalizado' => $tel,
+                            'nombre'               => $nombreExcel !== '' ? $nombreExcel : 'Cliente',
+                            'id'                   => null,
+                        ]);
+                    }
                 }
                 break;
         }
@@ -257,8 +265,10 @@ class CampanaSenderService
                 // (única opción válida para tenants con provider=meta fuera de
                 // ventana 24h, y obligatoria para mensajes proactivos masivos).
                 if ($c->usaPlantillaMeta()) {
+                    // Personalizar por destinatario: si una variable trae {nombre}
+                    // o {primer_nombre}, se reemplaza con el nombre de ESTE cliente.
                     $varsCampana = is_array($c->plantilla_meta_variables)
-                        ? array_values($c->plantilla_meta_variables)
+                        ? array_map(fn ($v) => $this->renderizar((string) $v, $d), array_values($c->plantilla_meta_variables))
                         : [];
 
                     $metaSvc = app(\App\Services\Meta\MetaWhatsappCloudService::class);

@@ -614,13 +614,14 @@
                                                         {{ $ph }}
                                                     </span>
                                                     <input type="text" wire:model="plantillaVariables.{{ $i }}"
-                                                           placeholder="Valor para {{ $ph }}"
+                                                           placeholder="Valor para {{ $ph }} (ej. {nombre})"
                                                            class="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-sm">
                                                 </div>
                                             @endfor
-                                            <p class="text-[10px] text-slate-500">
-                                                Estas variables se enviarán igual para TODOS los destinatarios.
-                                                Para personalización por cliente, usa los placeholders que Meta soporte en la plantilla.
+                                            <p class="text-[11px] text-emerald-700 bg-emerald-50 rounded px-2 py-1.5 leading-snug">
+                                                💡 <b>Personalizar por cliente:</b> escribe <code>{nombre}</code> o <code>{primer_nombre}</code> como valor
+                                                y se reemplazará por el nombre de cada destinatario (el que viene en tu Excel, columna “Nombre”).
+                                                También puedes usar <code>{telefono}</code>. Si escribes un texto fijo, va igual para todos.
                                             </p>
                                         </div>
                                     @endif
