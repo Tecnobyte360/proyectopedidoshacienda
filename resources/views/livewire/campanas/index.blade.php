@@ -46,10 +46,17 @@
             </div>
         </div>
 
-        <div class="rounded-xl bg-amber-50 border border-amber-200 p-4 text-xs text-amber-800">
-            <p class="font-bold mb-1"><i class="fa-solid fa-shield-halved"></i> Anti-baneo activado</p>
-            <p>El envío usa intervalos aleatorios entre cada mensaje y descansos por lote para evitar que WhatsApp banee tu número (ya que estamos usando whatsapp-web.js, no la API oficial de Meta). Asegúrate que el cron <code class="bg-white px-1 rounded">campanas:procesar</code> corra cada minuto.</p>
-        </div>
+        @if($providerMeta)
+            <div class="rounded-xl bg-emerald-50 border border-emerald-200 p-4 text-xs text-emerald-800">
+                <p class="font-bold mb-1"><i class="fa-brands fa-meta"></i> WhatsApp oficial (Meta) — envíos por plantilla aprobada</p>
+                <p>Este negocio usa la <b>API oficial de Meta</b>. Los comunicados masivos se envían con una <b>plantilla aprobada</b>. Recuerda: la imagen solo se envía si la plantilla tiene encabezado de imagen; si no, se ignora automáticamente.</p>
+            </div>
+        @else
+            <div class="rounded-xl bg-amber-50 border border-amber-200 p-4 text-xs text-amber-800">
+                <p class="font-bold mb-1"><i class="fa-solid fa-shield-halved"></i> Anti-baneo activado</p>
+                <p>El envío usa intervalos aleatorios entre cada mensaje y descansos por lote para evitar que WhatsApp banee tu número. Asegúrate que el worker de cola esté activo.</p>
+            </div>
+        @endif
 
         {{-- 🔄 MONITOR DE COLA DE JOBS (auto-refresh 5s) --}}
         @if(($colaJobs && $colaJobs->isNotEmpty()) || ($failedJobs && $failedJobs->isNotEmpty()))
@@ -717,6 +724,19 @@
                         <p class="text-xs text-slate-600 mb-3">
                             Se enviará a cada destinatario junto con el mensaje como caption. Tamaño máx: 20 MB.
                         </p>
+
+                        @php
+                            $plantillaAceptaImagen = $providerMeta && $plantillaSeleccionada
+                                ? in_array(strtolower((string) $plantillaSeleccionada->header_tipo), ['image','imagen'], true)
+                                : true;
+                        @endphp
+                        @if($providerMeta && $plantillaSeleccionada && !$plantillaAceptaImagen)
+                            <div class="mb-3 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-[11.5px] text-amber-800">
+                                ⚠️ La plantilla <b>“{{ $plantillaSeleccionada->nombre }}”</b> es de <b>solo texto</b> (no tiene encabezado de imagen).
+                                Si subes una imagen <b>se ignorará</b> al enviar. Para mandar imagen, usa una plantilla con encabezado de imagen.
+                            </div>
+                        @endif
+
                         <input type="file" wire:model="imagen" accept="image/*"
                                class="block w-full text-xs text-slate-600 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-sky-600 file:text-white file:font-semibold file:cursor-pointer hover:file:bg-sky-700">
                         <div wire:loading wire:target="imagen" class="text-xs text-sky-700 mt-2">

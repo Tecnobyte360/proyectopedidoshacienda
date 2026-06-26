@@ -526,7 +526,20 @@ class Index extends Component
 
     public function guardar(): void
     {
-        $this->validate();
+        try {
+            $this->validate([], [], [
+                'nombre'        => 'Nombre de la campaña',
+                'audienciaTipo' => 'Audiencia',
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $primero = collect($e->errors())->flatten()->first() ?: 'Revisa los campos marcados.';
+            // Mensaje claro si falta el nombre (el error más común, arriba del formulario)
+            if (array_key_exists('nombre', $e->errors())) {
+                $primero = '✋ Falta el "Nombre de la campaña" (campo obligatorio, arriba del formulario).';
+            }
+            $this->dispatch('notify', ['type' => 'error', 'message' => $primero]);
+            throw $e;
+        }
 
         $filtros = [];
         if ($this->audienciaTipo === 'zona' && $this->zonaId)         $filtros['zona_id'] = $this->zonaId;
