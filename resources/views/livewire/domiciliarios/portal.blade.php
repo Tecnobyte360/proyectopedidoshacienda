@@ -152,14 +152,34 @@
                             @endif
 
                             @if($p->estado === 'en_preparacion' || $p->estado === 'nuevo')
-                                <button wire:click="marcarEnCamino({{ $p->id }})"
-                                        wire:confirm="¿Iniciar ruta del pedido #{{ $p->id }}? Se le avisará al cliente que su pedido va en camino."
+                                <button type="button"
+                                        @click="Swal.fire({
+                                            title: '🛵 ¿Iniciar ruta?',
+                                            html: 'Pedido <b>#{{ $p->id }}</b><br>Se le avisará al cliente que su pedido va en camino.',
+                                            icon: 'question',
+                                            showCancelButton: true,
+                                            confirmButtonText: 'Sí, iniciar ruta',
+                                            cancelButtonText: 'Cancelar',
+                                            confirmButtonColor: '#7c3aed',
+                                            cancelButtonColor: '#94a3b8',
+                                            reverseButtons: true
+                                        }).then(r => { if (r.isConfirmed) $wire.marcarEnCamino({{ $p->id }}) })"
                                         class="inline-flex items-center justify-center gap-1.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold text-sm py-2.5 transition">
                                     <i class="fa-solid fa-motorcycle"></i> Iniciar ruta
                                 </button>
                             @elseif($p->estado === 'repartidor_en_camino')
-                                <button wire:click="marcarEntregado({{ $p->id }})"
-                                        wire:confirm="¿Confirmar que entregaste el pedido #{{ $p->id }}?"
+                                <button type="button"
+                                        @click="Swal.fire({
+                                            title: '✅ ¿Confirmar entrega?',
+                                            html: 'Pedido <b>#{{ $p->id }}</b><br>Confirma que ya lo entregaste al cliente.',
+                                            icon: 'question',
+                                            showCancelButton: true,
+                                            confirmButtonText: 'Sí, entregado',
+                                            cancelButtonText: 'Cancelar',
+                                            confirmButtonColor: '#059669',
+                                            cancelButtonColor: '#94a3b8',
+                                            reverseButtons: true
+                                        }).then(r => { if (r.isConfirmed) $wire.marcarEntregado({{ $p->id }}) })"
                                         class="inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm py-2.5 transition">
                                     <i class="fa-solid fa-check"></i> Entregado
                                 </button>
@@ -262,5 +282,19 @@
                 }
             }
         }
+    </script>
+
+    {{-- 🔔 Mensajes de éxito/aviso como toast bonito (SweetAlert) --}}
+    <script>
+        document.addEventListener('livewire:initialized', () => {
+            Livewire.on('notify', (e) => {
+                const d = Array.isArray(e) ? e[0] : e;
+                if (!window.Swal || !d) return;
+                Swal.fire({
+                    toast: true, position: 'top', timer: 2600, timerProgressBar: true,
+                    showConfirmButton: false, icon: d.type || 'success', title: d.message || '',
+                });
+            });
+        });
     </script>
 </div>
