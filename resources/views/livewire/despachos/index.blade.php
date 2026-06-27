@@ -984,6 +984,8 @@
                     });
 
                     window._despachosDomis.forEach(d => {
+                        // 🚫 No dibujar domiciliarios desconectados (sin GPS en vivo)
+                        if (d.desconectado) return;
                         const colorEstado = window._dpColorEstado(d.estado, d.desconectado);
 
                         // Pin de moto estilo Waze (gris si desconectado)
