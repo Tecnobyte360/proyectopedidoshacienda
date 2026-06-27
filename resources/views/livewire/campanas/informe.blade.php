@@ -261,13 +261,33 @@
                     <h3 class="text-sm font-semibold text-slate-900">Destinatarios</h3>
                     <p class="text-[12px] text-slate-500 mt-0.5">Tracking individual por cliente</p>
                 </div>
-                <div class="relative">
-                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-slate-400"></i>
-                    <input wire:model.live.debounce.400ms="busqueda" type="text"
-                           placeholder="Buscar nombre o teléfono"
-                           class="rounded-md border-slate-200 text-[13px] pl-8 pr-3 py-1.5 w-64 focus:border-slate-400 focus:ring-2 focus:ring-slate-200">
+                <div class="flex items-center gap-2">
+                    <div class="relative">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-slate-400"></i>
+                        <input wire:model.live.debounce.400ms="busqueda" type="text"
+                               placeholder="Buscar nombre o teléfono"
+                               class="rounded-md border-slate-200 text-[13px] pl-8 pr-3 py-1.5 w-64 focus:border-slate-400 focus:ring-2 focus:ring-slate-200">
+                    </div>
+                    {{-- 🤖 Analizar interesados con IA --}}
+                    @if(($kpis['sin_analizar'] ?? 0) > 0)
+                        <button wire:click="analizarInteresados" wire:loading.attr="disabled" wire:target="analizarInteresados"
+                                class="shrink-0 rounded-md bg-violet-600 hover:bg-violet-700 text-white text-[12px] font-semibold px-3 py-1.5 inline-flex items-center gap-1.5 transition disabled:opacity-60">
+                            <i class="fa-solid fa-wand-magic-sparkles" wire:loading.remove wire:target="analizarInteresados"></i>
+                            <i class="fa-solid fa-circle-notch fa-spin" wire:loading wire:target="analizarInteresados"></i>
+                            <span>Analizar interesados con IA ({{ $kpis['sin_analizar'] }})</span>
+                        </button>
+                    @endif
                 </div>
             </div>
+
+            {{-- Resumen de interés (IA) --}}
+            @if(($kpis['interesados'] ?? 0) + ($kpis['no_interesados'] ?? 0) + ($kpis['dudas'] ?? 0) > 0)
+                <div class="flex flex-wrap gap-2 mt-3">
+                    <span class="inline-flex items-center gap-1.5 rounded-md bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 px-2.5 py-1 text-[12px] font-semibold">😊 Interesados: {{ $kpis['interesados'] }}</span>
+                    <span class="inline-flex items-center gap-1.5 rounded-md bg-amber-50 text-amber-700 ring-1 ring-amber-200 px-2.5 py-1 text-[12px] font-semibold">🤔 Dudas: {{ $kpis['dudas'] }}</span>
+                    <span class="inline-flex items-center gap-1.5 rounded-md bg-slate-100 text-slate-600 ring-1 ring-slate-200 px-2.5 py-1 text-[12px] font-semibold">🙅 No interesados: {{ $kpis['no_interesados'] }}</span>
+                </div>
+            @endif
 
             {{-- Filtros chips --}}
             @php
@@ -275,6 +295,9 @@
                     'todos'         => ['Todos',           $kpis['total'],         'bg-slate-100 text-slate-700 hover:bg-slate-200'],
                     'leyeron'       => ['Leyeron',         $kpis['leidos'],        'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'],
                     'respondieron'  => ['Respondieron',    $kpis['respondieron'],  'bg-amber-50 text-amber-700 hover:bg-amber-100'],
+                    'interesados'   => ['😊 Interesados',  $kpis['interesados'],   'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'],
+                    'dudas'         => ['🤔 Dudas',        $kpis['dudas'],         'bg-amber-50 text-amber-700 hover:bg-amber-100'],
+                    'no_interesados'=> ['🙅 No interesados', $kpis['no_interesados'], 'bg-slate-100 text-slate-600 hover:bg-slate-200'],
                     'clicaron'      => ['Clicaron',        $kpis['clicaron'],      'bg-violet-50 text-violet-700 hover:bg-violet-100'],
                     'reaccionaron' => ['Reaccionaron',    $kpis['reaccionaron'],  'bg-rose-50 text-rose-700 hover:bg-rose-100'],
                     'convirtieron' => ['Convirtieron',    $kpis['convirtieron'],  'bg-fuchsia-50 text-fuchsia-700 hover:bg-fuchsia-100'],
@@ -304,6 +327,7 @@
                         <th class="px-3 py-2.5 text-center w-16" title="Entregado">Entr.</th>
                         <th class="px-3 py-2.5 text-center w-16" title="Leído">Leído</th>
                         <th class="px-3 py-2.5 text-center w-20">Resp.</th>
+                        <th class="px-3 py-2.5 text-left w-64">Interés (IA)</th>
                         <th class="px-3 py-2.5 text-left">Botón</th>
                         <th class="px-3 py-2.5 text-center w-14">React.</th>
                         <th class="px-3 py-2.5 text-center w-20">Pedido</th>
@@ -343,6 +367,26 @@
                                           title="{{ $d->respondio_at }}">
                                         {{ $d->respuestas_count }}
                                     </span>
+                                @else
+                                    <span class="text-slate-300">—</span>
+                                @endif
+                            </td>
+                            <td class="px-3 py-2.5">
+                                @php
+                                    $iMap = [
+                                        'interesado'    => ['😊 Interesado',   'bg-emerald-50 text-emerald-700 ring-emerald-200'],
+                                        'duda'          => ['🤔 Duda',         'bg-amber-50 text-amber-700 ring-amber-200'],
+                                        'no_interesado' => ['🙅 No interesado','bg-slate-100 text-slate-600 ring-slate-200'],
+                                    ];
+                                @endphp
+                                @if($d->interes && isset($iMap[$d->interes]))
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-md ring-1 text-[11.5px] font-semibold {{ $iMap[$d->interes][1] }}"
+                                          title="{{ $d->interes_motivo }}">{{ $iMap[$d->interes][0] }}</span>
+                                    @if($d->respuesta_texto)
+                                        <div class="text-[11px] text-slate-400 truncate max-w-[230px] mt-0.5" title="{{ $d->respuesta_texto }}">“{{ \Illuminate\Support\Str::limit($d->respuesta_texto, 50) }}”</div>
+                                    @endif
+                                @elseif($d->respondio_at)
+                                    <span class="text-slate-300 text-[11px]">sin analizar</span>
                                 @else
                                     <span class="text-slate-300">—</span>
                                 @endif

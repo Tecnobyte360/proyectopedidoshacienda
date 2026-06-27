@@ -29,6 +29,7 @@ Route::prefix('domiciliario')->group(function () {
     Route::get ('pedidos',               [$c, 'pedidos']);
     Route::post('pedidos/{id}/iniciar',  [$c, 'iniciarRuta'])->whereNumber('id');
     Route::post('pedidos/{id}/entregar', [$c, 'entregar'])->whereNumber('id');
+    Route::post('pedidos/{id}/no-entregar', [$c, 'noEntregar'])->whereNumber('id');
     Route::post('ubicacion',             [$c, 'ubicacion']);
 });
 
@@ -50,6 +51,7 @@ Route::prefix('movil')->group(function () {
         Route::post('chat/conversaciones/{id}/enviar',     [$chat, 'enviar'])->whereNumber('id');
         Route::post('chat/conversaciones/{id}/media',      [$chat, 'enviarMedia'])->whereNumber('id');
         Route::get ('chat/plantillas',                     [$chat, 'plantillas']);
+        Route::get ('chat/respuestas-rapidas',             [$chat, 'respuestasRapidas']);
         Route::post('chat/conversaciones/{id}/plantilla',  [$chat, 'enviarPlantilla'])->whereNumber('id');
         Route::post('chat/conversaciones/{id}/favorito',   [$chat, 'favorito'])->whereNumber('id');
         Route::post('chat/conversaciones/{id}/no-leida',   [$chat, 'noLeida'])->whereNumber('id');

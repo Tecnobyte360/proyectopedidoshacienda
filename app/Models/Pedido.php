@@ -46,6 +46,8 @@ class Pedido extends Model
         'resumen_conversacion',
         'codigo_seguimiento',
         'token_entrega',
+        'foto_entrega',
+        'motivo_no_entrega',
         'fecha_estado',
         'fecha_entregado',
         'fecha_cancelado',

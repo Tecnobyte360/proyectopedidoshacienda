@@ -33,6 +33,79 @@ class Informe extends Component
         $this->resetPage();
     }
 
+    /**
+     * 🤖 Clasifica con IA la respuesta de cada cliente que contestó la campaña:
+     * Interesado / No interesado / Duda. Procesa por tandas.
+     */
+    public function analizarInteresados(): void
+    {
+        $tenantId = $this->campana->tenant_id;
+        app(\App\Services\TenantManager::class)->set(\App\Models\Tenant::withoutGlobalScopes()->find($tenantId));
+
+        $pendientes = CampanaDestinatario::withoutGlobalScopes()
+            ->where('campana_id', $this->campana->id)
+            ->whereNotNull('respondio_at')
+            ->whereNull('interes')
+            ->limit(40) // por tanda, para no demorar
+            ->get();
+
+        if ($pendientes->isEmpty()) {
+            $this->dispatch('notify', ['type' => 'info', 'message' => 'No hay respuestas nuevas por analizar.']);
+            return;
+        }
+
+        $ai = app(\App\Services\Ai\AiClientService::class);
+        $contextoCampana = trim((string) ($this->campana->mensaje ?: $this->campana->plantilla_meta_nombre));
+        $analizados = 0;
+
+        foreach ($pendientes as $d) {
+            $telNorm = preg_replace('/\D+/', '', (string) $d->telefono);
+            $conv = \App\Models\ConversacionWhatsapp::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->where('telefono_normalizado', $telNorm)
+                ->orderByDesc('id')->first();
+
+            $reply = null;
+            if ($conv) {
+                $reply = $conv->mensajes()
+                    ->where('rol', \App\Models\MensajeWhatsapp::ROL_USER)
+                    ->when($d->enviado_at, fn ($q) => $q->where('created_at', '>=', $d->enviado_at))
+                    ->orderByDesc('id')->value('contenido');
+            }
+            if (!$reply) continue;
+
+            try {
+                $resp = $ai->chat([
+                    ['role' => 'system', 'content' =>
+                        "Eres un clasificador de intención comercial. Te paso el mensaje de una campaña y la respuesta de un cliente. "
+                        . "Clasifica el INTERÉS del cliente en comprar/cotizar. Responde SOLO un JSON válido: "
+                        . '{"interes":"interesado|no_interesado|duda","motivo":"máx 8 palabras"}. '
+                        . "'interesado' = muestra intención de comprar, cotizar o saber precio. "
+                        . "'no_interesado' = rechaza o dice que no le sirve. "
+                        . "'duda' = pregunta algo o es ambiguo."],
+                    ['role' => 'user', 'content' => "Campaña: {$contextoCampana}\nRespuesta del cliente: {$reply}"],
+                ], 'none', null, ['temperature' => 0, 'max_tokens' => 80]);
+
+                $txt  = trim((string) ($resp['choices'][0]['message']['content'] ?? ''));
+                $txt  = trim(preg_replace('/```json|```/', '', $txt));
+                $json = json_decode($txt, true);
+                $interes = $json['interes'] ?? null;
+                if (!in_array($interes, ['interesado', 'no_interesado', 'duda'], true)) $interes = 'duda';
+
+                $d->update([
+                    'interes'         => $interes,
+                    'interes_motivo'  => mb_substr((string) ($json['motivo'] ?? ''), 0, 255),
+                    'respuesta_texto' => mb_substr((string) $reply, 0, 1000),
+                ]);
+                $analizados++;
+            } catch (\Throwable $e) {
+                \Log::warning('Analizar interés campaña falló: ' . $e->getMessage());
+            }
+        }
+
+        $this->dispatch('notify', ['type' => 'success', 'message' => "✅ Analizados {$analizados} clientes con IA."]);
+    }
+
     public function getKpisProperty(): array
     {
         $q = CampanaDestinatario::query()
@@ -44,6 +117,10 @@ class Informe extends Component
         $entregados = (clone $q)->whereNotNull('entregado_at')->count();
         $leidos = (clone $q)->whereNotNull('leido_at')->count();
         $respondieron = (clone $q)->whereNotNull('respondio_at')->count();
+        $interesados   = (clone $q)->where('interes', 'interesado')->count();
+        $noInteresados = (clone $q)->where('interes', 'no_interesado')->count();
+        $dudas         = (clone $q)->where('interes', 'duda')->count();
+        $sinAnalizar   = (clone $q)->whereNotNull('respondio_at')->whereNull('interes')->count();
         $clicaron = (clone $q)->whereNotNull('boton_click_at')->count();
         $reaccionaron = (clone $q)->whereNotNull('reaccion_at')->count();
         $convirtieron = (clone $q)->whereNotNull('pedido_id')->count();
@@ -64,6 +141,10 @@ class Informe extends Component
             'entregados'    => $entregados,
             'leidos'        => $leidos,
             'respondieron'  => $respondieron,
+            'interesados'   => $interesados,
+            'no_interesados'=> $noInteresados,
+            'dudas'         => $dudas,
+            'sin_analizar'  => $sinAnalizar,
             'clicaron'      => $clicaron,
             'reaccionaron'  => $reaccionaron,
             'convirtieron' => $convirtieron,
@@ -168,6 +249,9 @@ class Informe extends Component
         match ($this->filtro) {
             'leyeron'      => $q->whereNotNull('leido_at'),
             'respondieron' => $q->whereNotNull('respondio_at'),
+            'interesados'  => $q->where('interes', 'interesado'),
+            'no_interesados' => $q->where('interes', 'no_interesado'),
+            'dudas'        => $q->where('interes', 'duda'),
             'clicaron'     => $q->whereNotNull('boton_click_at'),
             'reaccionaron' => $q->whereNotNull('reaccion_at'),
             'convirtieron' => $q->whereNotNull('pedido_id'),

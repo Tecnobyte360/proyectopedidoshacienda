@@ -217,6 +217,16 @@ class ChatController extends Controller
         return response()->json(['ok' => true]);
     }
 
+    /** Lista de respuestas rápidas activas del tenant. */
+    public function respuestasRapidas(Request $r)
+    {
+        $u = $this->ctx($r);
+        if (!$u->can('chat.usar')) return response()->json(['ok' => false, 'message' => 'Sin permiso.'], 403);
+        $rows = \App\Models\RespuestaRapida::where('activa', true)
+            ->orderBy('orden')->get(['id', 'atajo', 'texto']);
+        return response()->json(['ok' => true, 'respuestas' => $rows]);
+    }
+
     /** Marcar/desmarcar como favorito (fijar). */
     public function favorito(Request $r, int $id)
     {

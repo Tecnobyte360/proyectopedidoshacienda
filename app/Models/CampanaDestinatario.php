@@ -17,6 +17,8 @@ class CampanaDestinatario extends Model
         'nombre', 'telefono',
         'estado', 'mensaje_renderizado', 'enviado_at', 'error_detalle', 'intentos',
         'respondio_at', 'respuestas_count',
+        // 🤖 Interés (clasificación IA de la respuesta)
+        'interes', 'interes_motivo', 'respuesta_texto',
         // 📊 Tracking marketing
         'mensaje_externo_id',
         'entregado_at', 'leido_at',

@@ -67,6 +67,8 @@ class DomiciliarioApiController extends Controller
             'metodo_pago'   => $p->pago_metodo ?? null,
             'notas'         => $p->notas ?: null,
             'token_entrega' => $p->token_entrega,
+            'foto_entrega'  => $p->foto_entrega,
+            'motivo_no_entrega' => $p->motivo_no_entrega,
             'lat'           => $p->lat !== null ? (float) $p->lat : null,
             'lng'           => $p->lng !== null ? (float) $p->lng : null,
         ];
@@ -157,7 +159,7 @@ class DomiciliarioApiController extends Controller
         return response()->json(['ok' => true, 'pedido' => $this->serializarPedido($p->fresh())]);
     }
 
-    /** POST /api/domiciliario/pedidos/{id}/entregar */
+    /** POST /api/domiciliario/pedidos/{id}/entregar  { codigo?, foto? } */
     public function entregar(Request $r, int $id)
     {
         $dom = $this->domiciliarioDesde($r);
@@ -167,8 +169,50 @@ class DomiciliarioApiController extends Controller
         if (!$p) return response()->json(['ok' => false, 'message' => 'Pedido no encontrado.'], 404);
 
         if ($p->estado !== Pedido::ESTADO_ENTREGADO) {
-            $p->cambiarEstado(Pedido::ESTADO_ENTREGADO, 'Entregado por ' . $dom->nombre, 'Entregado');
+            // Validar código de entrega que el cliente recibió por WhatsApp
+            $codigo = strtoupper(trim((string) $r->input('codigo', '')));
+            $real   = strtoupper(trim((string) ($p->token_entrega ?? '')));
+            if ($real !== '' && $codigo !== '' && $codigo !== $real) {
+                return response()->json(['ok' => false, 'message' => 'El código no coincide. Pídeselo de nuevo al cliente.'], 422);
+            }
+
+            // Foto de prueba de entrega (base64 data URL)
+            $foto = (string) $r->input('foto', '');
+            if (str_starts_with($foto, 'data:')) {
+                try {
+                    [$meta, $b64] = explode(',', $foto, 2);
+                    $ext  = str_contains($meta, 'png') ? 'png' : 'jpg';
+                    $path = 'entregas/pedido_' . $p->id . '_' . now()->timestamp . '.' . $ext;
+                    \Storage::disk('public')->put($path, base64_decode($b64));
+                    $p->foto_entrega = \Storage::disk('public')->url($path);
+                    $p->saveQuietly();
+                } catch (\Throwable $e) { Log::warning('API foto entrega: ' . $e->getMessage()); }
+            }
+
+            $msg = 'Entregado por ' . $dom->nombre . ($codigo !== '' ? ' (código verificado)' : '');
+            $p->cambiarEstado(Pedido::ESTADO_ENTREGADO, $msg, 'Entregado');
         }
+        return response()->json(['ok' => true, 'pedido' => $this->serializarPedido($p->fresh())]);
+    }
+
+    /** POST /api/domiciliario/pedidos/{id}/no-entregar  { motivo } */
+    public function noEntregar(Request $r, int $id)
+    {
+        $dom = $this->domiciliarioDesde($r);
+        if (!$dom) return response()->json(['ok' => false, 'message' => 'No autorizado.'], 401);
+
+        $p = Pedido::where('domiciliario_id', $dom->id)->where('id', $id)->first();
+        if (!$p) return response()->json(['ok' => false, 'message' => 'Pedido no encontrado.'], 404);
+
+        $motivo = trim((string) $r->input('motivo', ''));
+        if ($motivo === '') return response()->json(['ok' => false, 'message' => 'Indica el motivo.'], 422);
+
+        $p->motivo_no_entrega = $motivo;
+        // Registrar la novedad sin cambiar de estado: el pedido sigue activo para reintentar.
+        $p->observacion_estado = '⚠️ No entregado: ' . $motivo . ' — ' . $dom->nombre;
+        $p->saveQuietly();
+        Log::info("Pedido #{$p->id} marcado NO entregado por {$dom->nombre}: {$motivo}");
+
         return response()->json(['ok' => true, 'pedido' => $this->serializarPedido($p->fresh())]);
     }
 
