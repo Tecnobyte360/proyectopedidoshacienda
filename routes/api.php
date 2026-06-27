@@ -32,6 +32,25 @@ Route::prefix('domiciliario')->group(function () {
     Route::post('ubicacion',             [$c, 'ubicacion']);
 });
 
+/*
+|--------------------------------------------------------------------------
+| 📱 App móvil Kivox (usuarios con roles/permisos) — login Sanctum + Chat
+|--------------------------------------------------------------------------
+*/
+Route::prefix('movil')->group(function () {
+    Route::post('login', [\App\Http\Controllers\Api\Movil\AuthController::class, 'login']);
+
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::post('logout', [\App\Http\Controllers\Api\Movil\AuthController::class, 'logout']);
+        Route::get ('yo',     [\App\Http\Controllers\Api\Movil\AuthController::class, 'yo']);
+
+        $chat = \App\Http\Controllers\Api\Movil\ChatController::class;
+        Route::get ('chat/conversaciones',                 [$chat, 'conversaciones']);
+        Route::get ('chat/conversaciones/{id}/mensajes',   [$chat, 'mensajes'])->whereNumber('id');
+        Route::post('chat/conversaciones/{id}/enviar',     [$chat, 'enviar'])->whereNumber('id');
+    });
+});
+
 Route::get('/whatsapp-webhook', function () {
     return response()->json([
         'status' => 'webhook active'
