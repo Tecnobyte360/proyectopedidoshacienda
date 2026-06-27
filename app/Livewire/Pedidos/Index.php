@@ -227,29 +227,22 @@ class Index extends Component
 
                     $pedido->domiciliario_id = $domiciliario->id;
                     $pedido->fecha_asignacion_domiciliario = now();
-                    $pedido->fecha_salida_domiciliario     = now();
                     $pedido->save();
 
                     $pedido->registrarHistorial(
                         estadoNuevo: $pedido->estado,
                         estadoAnterior: $pedido->estado,
                         titulo: 'Domiciliario asignado (despacho masivo)',
-                        descripcion: "Asignado a {$domiciliario->nombre}",
+                        descripcion: "Asignado a {$domiciliario->nombre}. Pendiente de que inicie la ruta.",
                         usuario: $usuario?->name,
                         usuarioId: $usuario?->id
                     );
 
-                    $token = $pedido->generarTokenEntrega();
+                    // Código de entrega listo; se envía al cliente cuando el
+                    // domiciliario inicie la ruta desde su portal.
+                    $pedido->generarTokenEntrega();
 
-                    $pedido->cambiarEstado(
-                        Pedido::ESTADO_REPARTIDOR_EN_CAMINO,
-                        "Tu pedido va en camino con {$domiciliario->nombre}.",
-                        'Pedido en camino',
-                        $usuario?->name,
-                        $usuario?->id
-                    );
-
-                    $pedido->notificarTokenEntrega($token);
+                    // ⛳ NO se marca "en camino": lo inicia el domiciliario.
                     $totalDespachados++;
                 }
 
@@ -654,7 +647,6 @@ class Index extends Component
 
             $pedido->domiciliario_id = $domiciliarioNuevo->id;
             $pedido->fecha_asignacion_domiciliario = now();
-            $pedido->fecha_salida_domiciliario = now();
             $pedido->save();
 
             $domiciliarioNuevo->estado = 'ocupado';
@@ -664,29 +656,23 @@ class Index extends Component
                 estadoNuevo: $pedido->estado,
                 estadoAnterior: $pedido->estado,
                 titulo: 'Domiciliario asignado',
-                descripcion: 'Se asignó el domiciliario ' . $domiciliarioNuevo->nombre . ' al pedido.',
+                descripcion: 'Se asignó ' . $domiciliarioNuevo->nombre . '. Pendiente de que el domiciliario inicie la ruta.',
                 usuario: $usuario?->name,
                 usuarioId: $usuario?->id
             );
 
-            $token = $pedido->generarTokenEntrega();
+            // Genera el código de entrega (se le envía al cliente cuando el
+            // DOMICILIARIO inicie la ruta desde su portal, no ahora).
+            $pedido->generarTokenEntrega();
 
-            $pedido->cambiarEstado(
-                Pedido::ESTADO_REPARTIDOR_EN_CAMINO,
-                'Tu pedido ya va en camino.',
-                'Pedido en camino',
-                $usuario?->name,
-                $usuario?->id
-            );
-
-            $pedido->notificarTokenEntrega($token);
-
+            // ⛳ Ya NO se marca "en camino" aquí. El domiciliario lo inicia desde
+            // su celular (Portal → "Iniciar ruta"); ahí se notifica al cliente.
             $this->cerrarModalDespacho();
             $this->refrescar();
 
             $this->dispatch('notify', [
                 'type'    => 'success',
-                'message' => "Pedido #{$pedido->id} asignado y despachado correctamente.",
+                'message' => "Pedido #{$pedido->id} asignado a {$domiciliarioNuevo->nombre}. Él iniciará la ruta desde su celular.",
             ]);
         } catch (\Throwable $e) {
             report($e);

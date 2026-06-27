@@ -100,13 +100,25 @@ class Portal extends Component
 
         if ($pedido->estado === Pedido::ESTADO_REPARTIDOR_EN_CAMINO) return;
 
+        // Marca la hora real de salida (la inicia el domiciliario, no el admin)
+        $pedido->fecha_salida_domiciliario = now();
+        $pedido->save();
+
         $pedido->cambiarEstado(
             Pedido::ESTADO_REPARTIDOR_EN_CAMINO,
-            "Marcado en camino por {$this->domiciliario->nombre}",
-            'En camino'
+            'Tu pedido ya va en camino.',
+            'Pedido en camino'
         );
 
-        $this->dispatch('notify', ['type' => 'success', 'message' => '🛵 Pedido en camino']);
+        // Enviar el código de entrega al cliente justo cuando arranca la ruta
+        try {
+            $token = $pedido->token_entrega ?: $pedido->generarTokenEntrega();
+            $pedido->notificarTokenEntrega($token);
+        } catch (\Throwable $e) {
+            \Log::warning('No se pudo notificar token de entrega al iniciar ruta: ' . $e->getMessage());
+        }
+
+        $this->dispatch('notify', ['type' => 'success', 'message' => '🛵 Ruta iniciada — pedido en camino']);
     }
 
     public function marcarEntregado(int $pedidoId): void
