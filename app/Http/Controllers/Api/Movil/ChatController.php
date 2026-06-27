@@ -59,6 +59,8 @@ class ChatController extends Controller
                 'telefono'  => $c->telefono_visible ?? $c->telefono_normalizado,
                 'canal'     => $c->canal ?: 'whatsapp',
                 'no_leidos' => (int) ($c->no_leidos ?? 0),
+                'favorito'  => $c->fijada_at !== null,
+                'no_leida'  => (bool) ($c->marcada_no_leida ?? false),
                 'ultimo'    => $ultimo ? mb_substr((string) ($ultimo->contenido ?: '[adjunto]'), 0, 60) : '',
                 'ultimo_mio'=> $ultimo ? ($ultimo->rol === MensajeWhatsapp::ROL_ASSISTANT) : false,
                 'ultimo_at' => optional($c->ultimo_mensaje_at)->toIso8601String(),
@@ -84,10 +86,12 @@ class ChatController extends Controller
                 $meta = $this->metaArr($m);
                 return [
                     'id'        => $m->id,
+                    'wamid'     => $m->mensaje_externo_id,
                     'contenido' => (string) ($m->contenido ?? ''),
                     'tipo'      => $m->tipo ?: 'text',
                     'media_url' => $meta['media_url'] ?? null,
                     'mio'       => in_array($m->rol, [MensajeWhatsapp::ROL_ASSISTANT], true),
+                    'reaccion'  => $m->reaccion_operador ?: $m->reaccion_cliente,
                     'at'        => optional($m->created_at)->toIso8601String(),
                 ];
             })->values(),
@@ -211,5 +215,56 @@ class ChatController extends Controller
 
         if (!$ok) return response()->json(['ok' => false, 'message' => 'No se pudo enviar la plantilla.'], 422);
         return response()->json(['ok' => true]);
+    }
+
+    /** Marcar/desmarcar como favorito (fijar). */
+    public function favorito(Request $r, int $id)
+    {
+        $u = $this->ctx($r);
+        if (!$u->can('chat.usar')) return response()->json(['ok' => false, 'message' => 'Sin permiso.'], 403);
+        $conv = ConversacionWhatsapp::find($id);
+        if (!$conv) return response()->json(['ok' => false, 'message' => 'No encontrada.'], 404);
+        $valor = filter_var($r->input('valor', true), FILTER_VALIDATE_BOOLEAN);
+        $conv->update(['fijada_at' => $valor ? now() : null]);
+        return response()->json(['ok' => true, 'favorito' => $valor]);
+    }
+
+    /** Marcar/desmarcar como no leída. */
+    public function noLeida(Request $r, int $id)
+    {
+        $u = $this->ctx($r);
+        if (!$u->can('chat.usar')) return response()->json(['ok' => false, 'message' => 'Sin permiso.'], 403);
+        $conv = ConversacionWhatsapp::find($id);
+        if (!$conv) return response()->json(['ok' => false, 'message' => 'No encontrada.'], 404);
+        $valor = filter_var($r->input('valor', true), FILTER_VALIDATE_BOOLEAN);
+        $data = ['marcada_no_leida' => $valor];
+        if ($valor && (int) ($conv->no_leidos ?? 0) === 0) $data['no_leidos'] = 1;
+        if (!$valor) $data['no_leidos'] = 0;
+        $conv->update($data);
+        return response()->json(['ok' => true, 'no_leida' => $valor]);
+    }
+
+    /** Reaccionar a un mensaje del cliente (emoji), como en WhatsApp. */
+    public function reaccionar(Request $r, int $mid)
+    {
+        $u = $this->ctx($r);
+        if (!$u->can('chat.usar')) return response()->json(['ok' => false, 'message' => 'Sin permiso.'], 403);
+        $r->validate(['emoji' => 'nullable|string|max:8']);
+        $m = MensajeWhatsapp::find($mid);
+        if (!$m) return response()->json(['ok' => false, 'message' => 'Mensaje no encontrado.'], 404);
+        $conv = ConversacionWhatsapp::find($m->conversacion_id);
+        if (!$conv) return response()->json(['ok' => false, 'message' => 'Conversación no encontrada.'], 404);
+
+        $emoji  = (string) $r->input('emoji', '');
+        $tenant = app(TenantManager::class)->current();
+        $tel    = preg_replace('/\D+/', '', (string) $conv->telefono_normalizado);
+
+        // Enviar a Meta solo si el mensaje tiene wamid (es del cliente entrante)
+        if ($m->mensaje_externo_id) {
+            try { app(MetaWhatsappCloudService::class)->enviarReaccion($tel, $m->mensaje_externo_id, $emoji, $tenant->id); }
+            catch (\Throwable $e) { \Log::warning('Reacción móvil: ' . $e->getMessage()); }
+        }
+        $m->update(['reaccion_operador' => $emoji ?: null, 'reaccion_operador_at' => $emoji ? now() : null]);
+        return response()->json(['ok' => true, 'reaccion' => $emoji]);
     }
 }

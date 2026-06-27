@@ -51,6 +51,9 @@ Route::prefix('movil')->group(function () {
         Route::post('chat/conversaciones/{id}/media',      [$chat, 'enviarMedia'])->whereNumber('id');
         Route::get ('chat/plantillas',                     [$chat, 'plantillas']);
         Route::post('chat/conversaciones/{id}/plantilla',  [$chat, 'enviarPlantilla'])->whereNumber('id');
+        Route::post('chat/conversaciones/{id}/favorito',   [$chat, 'favorito'])->whereNumber('id');
+        Route::post('chat/conversaciones/{id}/no-leida',   [$chat, 'noLeida'])->whereNumber('id');
+        Route::post('chat/mensajes/{mid}/reaccion',        [$chat, 'reaccionar'])->whereNumber('mid');
     });
 });
 
