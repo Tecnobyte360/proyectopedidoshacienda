@@ -16,6 +16,22 @@ Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
 
+/*
+|--------------------------------------------------------------------------
+| 🛵 App móvil de Domiciliarios (Kivox Repartidores)
+|--------------------------------------------------------------------------
+| Auth simple por TOKEN del domiciliario (header Authorization: Bearer {token}).
+| El token es el mismo del portal web /d/{token} y resuelve también el tenant.
+*/
+Route::prefix('domiciliario')->group(function () {
+    $c = \App\Http\Controllers\Api\DomiciliarioApiController::class;
+    Route::post('login',                 [$c, 'login']);
+    Route::get ('pedidos',               [$c, 'pedidos']);
+    Route::post('pedidos/{id}/iniciar',  [$c, 'iniciarRuta'])->whereNumber('id');
+    Route::post('pedidos/{id}/entregar', [$c, 'entregar'])->whereNumber('id');
+    Route::post('ubicacion',             [$c, 'ubicacion']);
+});
+
 Route::get('/whatsapp-webhook', function () {
     return response()->json([
         'status' => 'webhook active'
