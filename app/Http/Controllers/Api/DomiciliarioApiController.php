@@ -72,14 +72,38 @@ class DomiciliarioApiController extends Controller
         ];
     }
 
-    /** POST /api/domiciliario/login  { token } */
+    /**
+     * POST /api/domiciliario/login
+     * Modo credenciales: { email, password }  → valida usuario y devuelve token.
+     * Modo token (compatibilidad): Authorization: Bearer {token}.
+     * Siempre devuelve `token` para que la app lo use en las siguientes llamadas.
+     */
     public function login(Request $r)
     {
+        $email = trim((string) $r->input('email'));
+        $pass  = (string) $r->input('password');
+
+        if ($email !== '') {
+            $u = \App\Models\User::withoutGlobalScopes()->where('email', $email)->first();
+            if (!$u || !\Illuminate\Support\Facades\Hash::check($pass, $u->password)) {
+                return response()->json(['ok' => false, 'message' => 'Usuario o clave incorrectos.'], 401);
+            }
+            $dom = Domiciliario::withoutGlobalScopes()
+                ->where('user_id', $u->id)->where('activo', true)->first();
+            if (!$dom) {
+                return response()->json(['ok' => false, 'message' => 'Tu usuario no está vinculado a un domiciliario activo.'], 403);
+            }
+            $tenant = Tenant::withoutGlobalScopes()->find($dom->tenant_id);
+            if ($tenant) app(TenantManager::class)->set($tenant);
+            return response()->json(['ok' => true, 'token' => $dom->token_acceso, 'domiciliario' => $this->serializarDomi($dom)]);
+        }
+
+        // Compatibilidad: login por token (Bearer)
         $dom = $this->domiciliarioDesde($r);
         if (!$dom) {
-            return response()->json(['ok' => false, 'message' => 'Token inválido o domiciliario inactivo.'], 401);
+            return response()->json(['ok' => false, 'message' => 'Credenciales o token inválidos.'], 401);
         }
-        return response()->json(['ok' => true, 'domiciliario' => $this->serializarDomi($dom)]);
+        return response()->json(['ok' => true, 'token' => $dom->token_acceso, 'domiciliario' => $this->serializarDomi($dom)]);
     }
 
     /** GET /api/domiciliario/pedidos */
