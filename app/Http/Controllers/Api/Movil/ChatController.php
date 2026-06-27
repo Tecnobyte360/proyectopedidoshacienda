@@ -60,6 +60,7 @@ class ChatController extends Controller
                 'canal'     => $c->canal ?: 'whatsapp',
                 'no_leidos' => (int) ($c->no_leidos ?? 0),
                 'ultimo'    => $ultimo ? mb_substr((string) ($ultimo->contenido ?: '[adjunto]'), 0, 60) : '',
+                'ultimo_mio'=> $ultimo ? ($ultimo->rol === MensajeWhatsapp::ROL_ASSISTANT) : false,
                 'ultimo_at' => optional($c->ultimo_mensaje_at)->toIso8601String(),
             ];
         })->values()]);
