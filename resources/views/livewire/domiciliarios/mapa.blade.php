@@ -207,29 +207,43 @@
                 switch(estado) {
                     case 'disponible': return '#10b981';
                     case 'en_ruta':    return '#3b82f6';
-                    case 'ocupado':    return '#f97316';
+                    case 'ocupado':    return '#f59e0b'; // ámbar (más agradable que el naranja chillón)
                     case 'descanso':   return '#64748b';
                     default:           return '#94a3b8';
                 }
             }
 
-            // 🏍️ Marker grande, redondo, con icono de moto GRANDE bien visible
+            // 🛵 Marcador estilo Waze: insignia circular limpia con ring blanco,
+            // degradado por estado, sombra suave y una colita inferior discreta.
+            function gradPorEstado(estado) {
+                switch(estado) {
+                    case 'disponible': return ['#34d399', '#10b981'];
+                    case 'en_ruta':    return ['#60a5fa', '#3b82f6'];
+                    case 'ocupado':    return ['#fbbf24', '#f59e0b'];
+                    case 'descanso':   return ['#94a3b8', '#64748b'];
+                    default:           return ['#cbd5e1', '#94a3b8'];
+                }
+            }
             function svgMoto(estado) {
-                const color = colorPorEstado(estado);
+                const [c1, c2] = gradPorEstado(estado);
                 const svg = `
-<svg xmlns="http://www.w3.org/2000/svg" width="64" height="80" viewBox="0 0 64 80">
+<svg xmlns="http://www.w3.org/2000/svg" width="50" height="60" viewBox="0 0 50 60">
   <defs>
-    <filter id="sh" x="-50%" y="-50%" width="200%" height="200%">
-      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-opacity="0.45"/>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/>
+    </linearGradient>
+    <filter id="s" x="-60%" y="-60%" width="220%" height="220%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2.2" flood-opacity="0.32"/>
     </filter>
   </defs>
-  <!-- Pin shape -->
-  <path filter="url(#sh)" fill="${color}" stroke="white" stroke-width="3"
-        d="M32 2C16.5 2 4 14.5 4 30c0 22 28 48 28 48s28-26 28-48C60 14.5 47.5 2 32 2z"/>
-  <!-- White circle inside -->
-  <circle cx="32" cy="30" r="18" fill="white"/>
-  <!-- Motorcycle emoji as text (very visible) -->
-  <text x="32" y="40" font-size="28" text-anchor="middle">🏍️</text>
+  <!-- colita -->
+  <path d="M25 57 L18.5 43 H31.5 Z" fill="#ffffff" filter="url(#s)"/>
+  <!-- ring blanco -->
+  <circle cx="25" cy="23" r="20" fill="#ffffff" filter="url(#s)"/>
+  <!-- círculo de color -->
+  <circle cx="25" cy="23" r="16" fill="url(#g)"/>
+  <!-- moto -->
+  <text x="25" y="31" font-size="20" text-anchor="middle">🛵</text>
 </svg>`;
                 return 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
             }
@@ -237,12 +251,11 @@
             function svgPing(estado) {
                 const color = colorPorEstado(estado);
                 const svg = `
-<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">
-  <circle cx="50" cy="50" r="22" fill="${color}" opacity="0.3">
-    <animate attributeName="r" from="22" to="46" dur="1.8s" repeatCount="indefinite"/>
-    <animate attributeName="opacity" from="0.45" to="0" dur="1.8s" repeatCount="indefinite"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 72 72">
+  <circle cx="36" cy="36" r="12" fill="${color}" opacity="0.28">
+    <animate attributeName="r" from="12" to="30" dur="2s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" from="0.35" to="0" dur="2s" repeatCount="indefinite"/>
   </circle>
-  <circle cx="50" cy="50" r="22" fill="${color}" opacity="0.4"/>
 </svg>`;
                 return 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
             }
@@ -278,13 +291,13 @@
 
                 const iconMoto = {
                     url: svgMoto(d.estado),
-                    scaledSize: new google.maps.Size(64, 80),
-                    anchor: new google.maps.Point(32, 80),
+                    scaledSize: new google.maps.Size(50, 60),
+                    anchor: new google.maps.Point(25, 57),
                 };
                 const iconPing = {
                     url: svgPing(d.estado),
-                    scaledSize: new google.maps.Size(100, 100),
-                    anchor: new google.maps.Point(50, 50),
+                    scaledSize: new google.maps.Size(72, 72),
+                    anchor: new google.maps.Point(36, 50),
                 };
 
                 // Si ya existe → animar movimiento
