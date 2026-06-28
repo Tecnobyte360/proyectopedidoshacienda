@@ -282,6 +282,12 @@ class Index extends Component
             //    estados que el usuario puede ver. El super-admin pasa todos los
             //    can() (Gate::before) → ve todo. Un usuario sin permisos de
             //    estado no ve ningún pedido.
+            // 🧪 Pedidos de prueba: ocultos para producción. Solo el super-admin los ve.
+            $u = auth()->user();
+            if (!$u || !$u->hasRole('super-admin')) {
+                $q->where(function ($qp) { $qp->where('es_prueba', false)->orWhereNull('es_prueba'); });
+            }
+
             $estadosPerm    = $this->estadosPermitidos();
             $verProgramados = $this->puedeVerProgramados();
             $q->where(function ($qq) use ($estadosPerm, $verProgramados) {

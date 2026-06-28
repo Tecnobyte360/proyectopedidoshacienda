@@ -36,6 +36,12 @@ class IntegracionExportService
      */
     public function exportarPedido(Pedido $pedido): array
     {
+        // 🧪 Pedido de prueba: NUNCA se exporta a HGI/ERP.
+        if ($pedido->es_prueba) {
+            Log::info("🧪 Pedido #{$pedido->id} es de prueba — NO se exporta a HGI.");
+            return ['exportadas' => 0, 'resultados' => [], 'prueba' => true];
+        }
+
         $integraciones = Integracion::where('tenant_id', $pedido->tenant_id)
             ->where('activo', true)
             ->where('exporta_pedidos', true)

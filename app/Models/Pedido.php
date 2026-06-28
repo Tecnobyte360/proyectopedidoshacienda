@@ -48,6 +48,7 @@ class Pedido extends Model
         'token_entrega',
         'foto_entrega',
         'motivo_no_entrega',
+        'es_prueba',
         'fecha_estado',
         'fecha_entregado',
         'fecha_cancelado',
