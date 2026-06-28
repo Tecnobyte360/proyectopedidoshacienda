@@ -121,6 +121,7 @@ class CrearManual extends Component
                         'cantidad'    => (float) ($p['quantity'] ?? 1),
                         'unidad'      => $p['unit'] ?? 'unidad',
                         'precio'      => (float) ($prodMatch?->precio_base ?? 0),
+                        'observacion' => trim((string) ($p['observacion'] ?? '')),
                     ];
                 }
             }
@@ -414,6 +415,7 @@ class CrearManual extends Component
             'cantidad'    => 1,
             'unidad'      => $prod->unidad ?: 'unidad',
             'precio'      => (float) ($prod->precio_base ?? 0),
+            'observacion' => '',
         ];
         $this->busquedaProducto = '';
     }
@@ -863,6 +865,8 @@ class CrearManual extends Component
                 //    controlador lo respeta en pedidos manuales en vez de
                 //    re-preciar al precio base del catálogo.
                 'precio_unitario' => (float) ($p['precio'] ?? 0),
+                // 📝 Observación por producto que dejó el operador
+                'observacion'     => trim((string) ($p['observacion'] ?? '')),
             ], $this->productos)),
             'customer_name'  => $this->nombre_cliente,
             'cedula'         => $this->cedula,

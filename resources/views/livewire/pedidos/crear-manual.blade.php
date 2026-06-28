@@ -302,12 +302,24 @@
                                             <td class="px-3 py-2.5 text-right font-semibold text-slate-800">
                                                 ${{ number_format(((float) ($p['cantidad'] ?? 0)) * ((float) ($p['precio'] ?? 0)), 0, ',', '.') }}
                                             </td>
-                                            <td class="px-2 py-2.5 text-center">
+                                            <td class="px-2 py-2.5 text-center align-top">
                                                 <button type="button" wire:click="eliminarProducto({{ $idx }})"
                                                         class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-rose-500 hover:bg-rose-50 hover:text-rose-700 transition"
                                                         title="Eliminar">
                                                     <i class="fa-solid fa-trash text-xs"></i>
                                                 </button>
+                                            </td>
+                                        </tr>
+                                        {{-- 📝 Observación por producto --}}
+                                        <tr class="border-0">
+                                            <td colspan="6" class="px-3 pb-3 pt-0">
+                                                <div class="flex items-center gap-2">
+                                                    <i class="fa-solid fa-pen-to-square text-[11px] text-amber-500"></i>
+                                                    <input type="text" wire:model.lazy="productos.{{ $idx }}.observacion"
+                                                           maxlength="500"
+                                                           placeholder="Observación de este producto (ej: bien molido, sin grasa, empacar aparte…)"
+                                                           class="w-full rounded-lg border border-amber-200 bg-amber-50/40 text-[12.5px] px-2.5 py-1.5 focus:border-amber-400 focus:ring-1 focus:ring-amber-300/30 focus:outline-none">
+                                                </div>
                                             </td>
                                         </tr>
                                     @endforeach

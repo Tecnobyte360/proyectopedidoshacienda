@@ -647,7 +647,15 @@
                                                 <span class="inline-flex items-center justify-center min-w-[32px] h-[18px] rounded bg-slate-900 text-white text-[10px] font-bold shrink-0 mt-0.5">
                                                     {{ $cantFmt }}{{ $unitLbl }}
                                                 </span>
-                                                <span class="text-slate-800 font-medium leading-tight">{{ $detalle->producto }}</span>
+                                                <div class="min-w-0">
+                                                    <span class="text-slate-800 font-medium leading-tight">{{ $detalle->producto }}</span>
+                                                    @if(!empty($detalle->observacion))
+                                                        <div class="mt-0.5 flex items-start gap-1 text-[11px] text-amber-700">
+                                                            <i class="fa-solid fa-pen-to-square text-[9px] mt-0.5"></i>
+                                                            <span class="leading-tight">{{ $detalle->observacion }}</span>
+                                                        </div>
+                                                    @endif
+                                                </div>
                                             </div>
                                             <span class="font-mono text-slate-700 text-[11px] font-semibold whitespace-nowrap">
                                                 ${{ number_format((float) $detalle->subtotal, 0, ',', '.') }}

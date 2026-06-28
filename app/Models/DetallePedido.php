@@ -21,6 +21,7 @@ class DetallePedido extends Model
         'corte_nombre',
         'precio_unitario',
         'subtotal',
+        'observacion',
     ];
 
     protected $casts = [

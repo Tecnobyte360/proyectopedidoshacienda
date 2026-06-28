@@ -8201,6 +8201,8 @@ TXT;
                 // agregar_producto_al_pedido con el parámetro corte.
                 $corteLinea = trim((string) ($product['corte'] ?? ''));
 
+                $obsLinea = trim((string) ($product['observacion'] ?? ''));
+
                 $productosValidados[] = [
                     'producto_id'     => $producto->id ?? null,
                     'codigo_producto' => $producto->codigo ?? null,
@@ -8210,6 +8212,7 @@ TXT;
                     'corte_nombre'    => $corteLinea ?: null,
                     'precio_unitario' => $precio,
                     'subtotal'        => $sub,
+                    'observacion'     => $obsLinea !== '' ? mb_substr($obsLinea, 0, 500) : null,
                 ];
 
                 Log::info('✅ Producto resuelto', [
