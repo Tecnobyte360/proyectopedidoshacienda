@@ -65,4 +65,22 @@ class AuthController extends Controller
         $u = $r->user();
         return response()->json(['ok' => true, 'user' => ['id' => $u->id, 'nombre' => $u->name, 'email' => $u->email]]);
     }
+
+    /** Registra/actualiza el token FCM del dispositivo del usuario (para push). */
+    public function registrarToken(Request $r)
+    {
+        $r->validate(['token' => 'required|string']);
+        $u = $r->user();
+        $dom = Domiciliario::withoutGlobalScopes()->where('user_id', $u->id)->first();
+        \App\Models\DeviceToken::updateOrCreate(
+            ['token' => $r->token],
+            [
+                'tenant_id'       => $u->tenant_id,
+                'user_id'         => $u->id,
+                'domiciliario_id' => $dom?->id,
+                'plataforma'      => $r->input('plataforma', 'android'),
+            ]
+        );
+        return response()->json(['ok' => true]);
+    }
 }

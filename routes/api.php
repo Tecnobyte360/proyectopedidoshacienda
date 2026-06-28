@@ -44,6 +44,7 @@ Route::prefix('movil')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('logout', [\App\Http\Controllers\Api\Movil\AuthController::class, 'logout']);
         Route::get ('yo',     [\App\Http\Controllers\Api\Movil\AuthController::class, 'yo']);
+        Route::post('device-token', [\App\Http\Controllers\Api\Movil\AuthController::class, 'registrarToken']);
 
         $chat = \App\Http\Controllers\Api\Movil\ChatController::class;
         Route::get ('chat/conversaciones',                 [$chat, 'conversaciones']);
