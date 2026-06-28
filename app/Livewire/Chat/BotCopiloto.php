@@ -3,6 +3,7 @@
 namespace App\Livewire\Chat;
 
 use App\Models\BotSugerencia;
+use App\Models\ConfiguracionBot;
 use App\Models\ConversacionWhatsapp;
 use App\Models\MensajeWhatsapp;
 use App\Services\BotShadowService;
@@ -28,6 +29,8 @@ class BotCopiloto extends Component
     public string $texto = '';
     public bool $cargando = false;
     public bool $oculto = false;
+    /** Suiche: si está OFF, el copiloto NO genera sugerencias (ahorra tokens). */
+    public bool $activo = true;
 
     /** id del último mensaje del cliente ya procesado (para detectar nuevos). */
     public ?int $ultimoClienteId = null;
@@ -35,7 +38,24 @@ class BotCopiloto extends Component
     public function mount(?int $conversacionId = null): void
     {
         $this->conversacionId = $conversacionId;
+        $this->activo = (bool) (ConfiguracionBot::actual()->copiloto_activo ?? true);
         $this->verificar();
+    }
+
+    /** 🔘 Suiche del operador: prende/apaga las sugerencias del bot (persistente). */
+    public function toggleActivo(): void
+    {
+        $cfg = ConfiguracionBot::actual();
+        $cfg->copiloto_activo = !$cfg->copiloto_activo;
+        $cfg->save();
+        $this->activo = (bool) $cfg->copiloto_activo;
+
+        if ($this->activo) {
+            $this->ultimoClienteId = null; // forzar regenerar
+            $this->verificar();
+        } else {
+            $this->reset(['sugerenciaId', 'texto', 'oculto', 'ultimoClienteId', 'cargando']);
+        }
     }
 
     /** Cuando el chat cambia de conversación, reseteamos y generamos. */
@@ -54,6 +74,14 @@ class BotCopiloto extends Component
     public function verificar(): void
     {
         if (!$this->conversacionId) return;
+
+        // 🔘 Suiche OFF → no generar nada (cero tokens).
+        if (!$this->activo) {
+            if ($this->sugerenciaId || $this->texto) {
+                $this->reset(['sugerenciaId', 'texto', 'oculto']);
+            }
+            return;
+        }
 
         $conv = ConversacionWhatsapp::find($this->conversacionId);
         if (!$conv) return;
@@ -83,6 +111,7 @@ class BotCopiloto extends Component
 
     public function generar(): void
     {
+        if (!$this->activo) return;
         $this->reset(['sugerenciaId', 'texto', 'oculto']);
         if (!$this->conversacionId) return;
 

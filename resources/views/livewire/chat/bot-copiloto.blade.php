@@ -1,4 +1,16 @@
 <div wire:poll.6s="verificar">
+    {{-- 🔘 Suiche: prender/apagar las sugerencias del bot (ahorra tokens) --}}
+    <div class="mx-3 mb-2 flex items-center justify-between rounded-lg bg-slate-50 ring-1 ring-slate-200 px-3 py-1.5">
+        <span class="inline-flex items-center gap-1.5 text-[11.5px] font-semibold {{ $activo ? 'text-violet-700' : 'text-slate-400' }}">
+            <i class="fa-solid fa-robot text-[11px]"></i>
+            Sugerencias del bot {{ $activo ? '· activadas' : '· apagadas' }}
+        </span>
+        <button type="button" wire:click="toggleActivo" title="Prender/apagar sugerencias del bot"
+                class="relative inline-flex h-5 w-9 items-center rounded-full transition {{ $activo ? 'bg-violet-600' : 'bg-slate-300' }}">
+            <span class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition {{ $activo ? 'translate-x-4' : 'translate-x-0.5' }}"></span>
+        </button>
+    </div>
+
     @if($cargando)
         <div class="mx-3 mb-2 rounded-xl border border-violet-200 bg-violet-50/60 px-4 py-3">
             <div class="flex items-center gap-2 text-[13px] text-violet-600">
