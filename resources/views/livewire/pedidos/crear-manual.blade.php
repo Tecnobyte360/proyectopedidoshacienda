@@ -204,10 +204,18 @@
                         </span>
                         <span>Productos del pedido</span>
                     </h3>
-                    <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-700">
-                        <i class="fa-solid fa-box text-[9px]"></i>
-                        {{ count($productos ?? []) }} {{ count($productos ?? []) === 1 ? 'item' : 'items' }}
-                    </span>
+                    <div class="flex items-center gap-2">
+                        <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-700">
+                            <i class="fa-solid fa-box text-[9px]"></i>
+                            {{ count($productos ?? []) }} {{ count($productos ?? []) === 1 ? 'item' : 'items' }}
+                        </span>
+                        <button type="button" wire:click="nuevoPedido"
+                                wire:confirm="¿Vaciar el pedido en construcción y empezar de cero?"
+                                class="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold text-rose-600 hover:bg-rose-50 transition"
+                                title="Vaciar el borrador y empezar un pedido nuevo">
+                            <i class="fa-solid fa-eraser text-[10px]"></i> Vaciar
+                        </button>
+                    </div>
                 </div>
 
                 <div class="p-5">

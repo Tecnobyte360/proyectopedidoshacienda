@@ -76,12 +76,69 @@ class CrearManual extends Component
     public ?string $linkPagoGenerado = null;
     public ?int    $pedidoCreadoId   = null;
 
+    /** Campos del pedido manual que se guardan como borrador (auto-save). */
+    private array $camposBorrador = [
+        'telefono', 'nombre_cliente', 'cedula', 'email', 'productos',
+        'metodo_entrega', 'costo_envio', 'sede_id', 'direccion', 'barrio', 'ciudad',
+        'domiciliario_id', 'metodo_pago', 'cupon', 'notas', 'direccionLat', 'direccionLng',
+    ];
+
+    private function claveBorrador(): string
+    {
+        return 'pedido_manual_borrador_' . (auth()->id() ?? 'anon') . '_' . ($this->conversacionId ?? '0');
+    }
+
+    /** 💾 Guarda el pedido en construcción en la sesión (sobrevive cambiar de pantalla). */
+    public function guardarBorrador(): void
+    {
+        $data = [];
+        foreach ($this->camposBorrador as $c) {
+            $data[$c] = $this->$c;
+        }
+        session()->put($this->claveBorrador(), $data);
+    }
+
+    private function restaurarBorrador(): void
+    {
+        $data = session()->get($this->claveBorrador());
+        if (!is_array($data)) return;
+        foreach ($data as $k => $v) {
+            if (in_array($k, $this->camposBorrador, true)) {
+                $this->$k = $v;
+            }
+        }
+    }
+
+    public function limpiarBorrador(): void
+    {
+        session()->forget($this->claveBorrador());
+    }
+
+    /** 🧹 Descarta el borrador y deja el formulario en blanco para un pedido nuevo. */
+    public function nuevoPedido(): void
+    {
+        $this->limpiarBorrador();
+        $this->reset($this->camposBorrador);
+        $this->metodo_entrega = 'recoger';
+        $this->metodo_pago    = 'efectivo';
+        $this->dispatch('notify', ['type' => 'success', 'message' => '🧹 Pedido vaciado.']);
+    }
+
+    /** Auto-guardar el borrador en cada cambio (menos las búsquedas). */
+    public function updated($name): void
+    {
+        if (str_starts_with((string) $name, 'busqueda')) return;
+        $this->guardarBorrador();
+    }
+
     public function mount(?int $conv = null): void
     {
         $this->conversacionId = $conv;
         if ($conv) {
             $this->precargarDesdeConversacion($conv);
         }
+        // ♻️ Restaurar el pedido en construcción si el operador se salió y volvió.
+        $this->restaurarBorrador();
     }
 
     private function precargarDesdeConversacion(int $convId): void
@@ -418,12 +475,14 @@ class CrearManual extends Component
             'observacion' => '',
         ];
         $this->busquedaProducto = '';
+        $this->guardarBorrador();
     }
 
     public function eliminarProducto(int $idx): void
     {
         unset($this->productos[$idx]);
         $this->productos = array_values($this->productos);
+        $this->guardarBorrador();
     }
 
     /**
@@ -1005,6 +1064,9 @@ class CrearManual extends Component
             } catch (\Throwable $e) {
                 Log::warning('No se pudo marcar estado confirmado: ' . $e->getMessage());
             }
+
+            // ✅ Pedido creado → descartar el borrador para que no reaparezca.
+            $this->limpiarBorrador();
 
             // 💳 Si se generó link de pago, mostrarlo en pantalla en vez de redirigir.
             if ($this->linkPagoGenerado) {
