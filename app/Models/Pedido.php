@@ -129,6 +129,25 @@ class Pedido extends Model
                 \Log::warning('Auto-asignacion (created) fallo: ' . $e->getMessage());
             }
         });
+
+        // 🔔 Push al domiciliario cuando le asignan (o reasignan) un pedido
+        static::updated(function ($pedido) {
+            if (!$pedido->wasChanged('domiciliario_id') || !$pedido->domiciliario_id) return;
+            try {
+                $tokens = \App\Models\DeviceToken::where('domiciliario_id', $pedido->domiciliario_id)
+                    ->pluck('token')->all();
+                if (empty($tokens)) return;
+                $cliente = $pedido->cliente_nombre ?: 'un cliente';
+                app(\App\Services\FcmService::class)->enviarAMuchos(
+                    $tokens,
+                    '🛵 Nuevo pedido asignado',
+                    "Pedido #{$pedido->id} para {$cliente}",
+                    ['tipo' => 'pedido', 'pedido_id' => (string) $pedido->id]
+                );
+            } catch (\Throwable $e) {
+                \Log::warning('Push asignacion fallo: ' . $e->getMessage());
+            }
+        });
     }
 
     /*

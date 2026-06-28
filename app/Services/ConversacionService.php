@@ -84,7 +84,7 @@ class ConversacionService
         ?string $contenido,
         array $opciones = []
     ): MensajeWhatsapp {
-        return DB::transaction(function () use ($conversacion, $rol, $contenido, $opciones) {
+        $mensaje = DB::transaction(function () use ($conversacion, $rol, $contenido, $opciones) {
             $mensaje = MensajeWhatsapp::create([
                 'conversacion_id'    => $conversacion->id,
                 'rol'                => $rol,
@@ -122,6 +122,44 @@ class ConversacionService
 
             return $mensaje;
         });
+
+        // 🔔 Push a la app móvil cuando entra un mensaje del cliente
+        if ($rol === MensajeWhatsapp::ROL_USER) {
+            try { $this->notificarPushChat($conversacion, $contenido, $opciones); }
+            catch (\Throwable $e) { Log::warning('Push chat: ' . $e->getMessage()); }
+        }
+
+        return $mensaje;
+    }
+
+    /** Envía push a los usuarios (con chat) del tenant cuando llega un mensaje del cliente. */
+    private function notificarPushChat(ConversacionWhatsapp $conversacion, ?string $contenido, array $opciones): void
+    {
+        $tenantId = $conversacion->tenant_id;
+        if (!$tenantId) return;
+
+        $tokensQ = \App\Models\DeviceToken::where('tenant_id', $tenantId)->whereNotNull('user_id')->get();
+        if ($tokensQ->isEmpty()) return;
+
+        // Filtrar por usuarios con permiso de chat (si falla el check, enviar a todos)
+        $tokens = [];
+        try {
+            $users = \App\Models\User::withoutGlobalScopes()->whereIn('id', $tokensQ->pluck('user_id')->unique())->get()->keyBy('id');
+            foreach ($tokensQ as $t) {
+                $u = $users->get($t->user_id);
+                if ($u && $u->can('chat.usar')) $tokens[] = $t->token;
+            }
+        } catch (\Throwable $e) {
+            $tokens = $tokensQ->pluck('token')->all();
+        }
+        if (empty($tokens)) return;
+
+        $nombre = $conversacion->cliente->nombre ?? $conversacion->nombre_contacto ?? $conversacion->telefono ?? 'Cliente';
+        $texto  = $contenido ? mb_substr($contenido, 0, 90) : '📎 Adjunto';
+
+        app(\App\Services\FcmService::class)->enviarAMuchos($tokens, $nombre, $texto, [
+            'tipo' => 'chat', 'conversacion_id' => (string) $conversacion->id,
+        ]);
     }
 
     /**
