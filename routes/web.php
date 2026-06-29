@@ -176,6 +176,7 @@ Route::get('/', function () {
 
 // 📄 Páginas legales públicas (requeridas por App Review de Meta/Instagram)
 Route::view('/privacidad',      'legal.privacidad')->name('legal.privacidad');
+Route::view('/privacidad-repartidores', 'legal.privacidad-repartidores')->name('legal.privacidad-repartidores');
 Route::view('/terminos',        'legal.terminos')->name('legal.terminos');
 Route::view('/eliminar-datos',  'legal.eliminar-datos')->name('legal.eliminar-datos');
 
