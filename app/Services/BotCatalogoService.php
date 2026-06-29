@@ -587,20 +587,29 @@ class BotCatalogoService
         if ($porNombreExacto) return $porNombreExacto;
 
         // 3) Palabras clave + nombre + descripcion (en live no hay palabras_clave)
-        $tokens = collect(explode(' ', $entrada))->filter()->values();
+        // 🛡️ Quitamos palabras vacías (de, la, con, y...) que rompen el match.
+        // Ej: "chuleta DE pierna" no debe fallar contra "Chuleta-Pierna".
+        $stopwords = ['de','del','la','el','los','las','un','una','unos','unas','con',
+                      'y','o','para','por','en','a','al','un','x'];
+        $tokens = collect(explode(' ', $entrada))
+            ->filter(fn ($t) => $t !== '' && !in_array($t, $stopwords, true))
+            ->values();
 
-        $candidatos = $productos->filter(function ($p) use ($tokens) {
-            $bag = collect($p->palabras_clave ?? [])
-                ->push($p->nombre ?? '')
-                ->push($p->descripcion_corta ?? $p->descripcion ?? '')
-                ->map(fn ($t) => $this->normalizar((string) $t))
-                ->join(' ');
+        if ($tokens->isNotEmpty()) {
+            $candidatos = $productos->filter(function ($p) use ($tokens) {
+                $bag = collect($p->palabras_clave ?? [])
+                    ->push($p->nombre ?? '')
+                    ->push($p->descripcion_corta ?? $p->descripcion ?? '')
+                    ->map(fn ($t) => $this->normalizar((string) $t))
+                    ->join(' ');
 
-            return $tokens->every(fn ($t) => str_contains($bag, $t));
-        });
+                return $tokens->every(fn ($t) => str_contains($bag, $t));
+            });
 
-        if ($candidatos->isNotEmpty()) {
-            return $candidatos->first();
+            if ($candidatos->isNotEmpty()) {
+                // Si hay varios, preferir el de nombre más corto (match más preciso)
+                return $candidatos->sortBy(fn ($p) => mb_strlen($this->normalizar((string) $p->nombre)))->first();
+            }
         }
 
         // 4) Coincidencia parcial
