@@ -1122,6 +1122,30 @@ class WhatsappWebhookController extends Controller
             $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_USER, $message, $this->opcionesMensajeEntrante($messageId, $data['mensaje']['respondiendoAMensajeId'] ?? null));
         }
 
+        // ════════════════════════════════════════════════════════════════════
+        // 🏧 MODO MENÚ DETERMINISTA (sin IA) — bancos / instituciones.
+        // Si el tenant está en modo menú, respondemos con el árbol FIJO y
+        // salimos ANTES de cualquier lógica de IA / horario / pedidos. Cero
+        // alucinación, datos exactos, sin costo de tokens.
+        // ════════════════════════════════════════════════════════════════════
+        $cfgMenu = \App\Models\ConfiguracionBot::actual();
+        if (!empty($cfgMenu->bot_modo_menu) && is_array($cfgMenu->menu_json) && !empty($cfgMenu->menu_json)) {
+            try {
+                $replyMenu = app(\App\Services\MenuDeterministaService::class)
+                    ->responder($cfgMenu->menu_json, $tenantId, $telefonoNorm, $message);
+                if ($replyMenu !== '') {
+                    $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_ASSISTANT, $replyMenu);
+                }
+                Log::info('🏧 MODO MENÚ determinista respondió', [
+                    'conv_id' => $conversacion->id,
+                    'in'      => mb_substr($message, 0, 40),
+                ]);
+                return $replyMenu;
+            } catch (\Throwable $e) {
+                Log::error('🏧 MODO MENÚ falló (cae a flujo normal): ' . $e->getMessage());
+            }
+        }
+
         // ── HISTORIAL: reducido a últimos 10 (en vez de 20) para evitar
         // que historial viejo confunda al bot. 10 = ~5 turnos = suficiente.
         // 🧠 Memoria conversacional ampliada: 50 mensajes (~20k tokens).
