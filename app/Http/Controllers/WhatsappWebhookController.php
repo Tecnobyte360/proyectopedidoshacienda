@@ -2432,6 +2432,22 @@ TXT;
             $reply    = $followUp['choices'][0]['message']['content']
                 ?? ($ultimoResultado['mensaje_sugerido'] ?? 'Listo, agregado a tu pedido ✅');
 
+            // 🛡️ TRANSPARENCIA / ANTI-ALUCINACIÓN: si NINGÚN producto se agregó de
+            //    verdad (todas las tool calls fallaron — p.ej. no está en catálogo),
+            //    el bot NO puede decirle "agregado ✅" al cliente. Reemplazamos la
+            //    respuesta del LLM por la verdad (el mensaje real del resultado).
+            $algunoAgregado = collect($resultados)->contains(fn ($r) => ($r['ok'] ?? false) === true);
+            if (!$algunoAgregado) {
+                $msgReal = $ultimoResultado['mensaje_sugerido']
+                    ?? 'No pude agregar ese producto a tu pedido. ¿Me confirmas cuál es para mostrarte las opciones que sí tengo?';
+                Log::warning('🛡️ Add-producto sin éxito — reemplazando respuesta del LLM por la verdad', [
+                    'from'      => $from,
+                    'reply_llm' => mb_substr((string) $reply, 0, 120),
+                    'msg_real'  => mb_substr((string) $msgReal, 0, 120),
+                ]);
+                $reply = $msgReal;
+            }
+
             $conversationHistory[] = ['role' => 'assistant', 'content' => $reply];
             Cache::put($cacheKey, $conversationHistory, now()->addMinutes(45));
 
