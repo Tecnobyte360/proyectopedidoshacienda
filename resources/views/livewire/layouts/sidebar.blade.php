@@ -83,6 +83,7 @@
                     // ⚠️ Items de configuración del bot / Meta API son solo para super-admin.
                     // El admin de un tenant NO debe verlos (ni siquiera desde su propio subdominio).
                     ['name' => 'Bot WhatsApp',      'icon' => 'fa-robot',              'route' => 'configuracion.bot',      'badge' => null, 'permission' => 'bot.configurar', 'solo_super_admin' => true],
+                    ['name' => 'Menú del Bot',      'icon' => 'fa-list-ol',            'route' => 'configuracion.menu-bot', 'badge' => 'NUEVO', 'permission' => 'bot.configurar', 'solo_super_admin' => true],
                     ['name' => 'Respuestas rápidas','icon' => 'fa-bolt',               'route' => 'configuracion.respuestas-rapidas', 'badge' => null, 'permission' => 'respuestas_rapidas.gestionar'],
                     ['name' => 'Lecciones del bot','icon' => 'fa-graduation-cap',    'route' => 'configuracion.bot-lecciones', 'badge' => 'NUEVO', 'permission' => 'bot.configurar', 'solo_super_admin' => true],
                     ['name' => 'Meta WhatsApp',     'icon' => 'fa-brands fa-whatsapp', 'route' => 'meta-whatsapp.index',    'badge' => 'NUEVO', 'permission' => 'bot.configurar', 'solo_super_admin' => true],
@@ -120,6 +121,7 @@
 
                     // ─── Plataforma: features que controla solo el super-admin (visibles desde el panel admin). ───
                     ['name' => 'Bot WhatsApp',      'icon' => 'fa-robot',              'route' => 'configuracion.bot',           'badge' => null, 'permission' => 'bot.configurar', 'solo_super_admin' => true],
+                    ['name' => 'Menú del Bot',      'icon' => 'fa-list-ol',            'route' => 'configuracion.menu-bot',      'badge' => 'NUEVO', 'permission' => 'bot.configurar', 'solo_super_admin' => true],
                     ['name' => 'Lecciones del bot', 'icon' => 'fa-graduation-cap',     'route' => 'configuracion.bot-lecciones', 'badge' => null, 'permission' => 'bot.configurar', 'solo_super_admin' => true],
                     ['name' => 'Meta WhatsApp',     'icon' => 'fa-brands fa-whatsapp', 'route' => 'meta-whatsapp.index',         'badge' => null, 'permission' => 'bot.configurar', 'solo_super_admin' => true],
                     ['name' => 'Monitor LLM',       'icon' => 'fa-microchip',          'route' => 'monitoreo.llm',               'badge' => null, 'permission' => 'bot.configurar', 'solo_super_admin' => true],

@@ -12,6 +12,7 @@
         'reportes.index'       => ['Reportes',       'Métricas de ventas y operaciones',           'fa-chart-line'],
         'ans.index'            => ['ANS Tiempos',    'Configuración de tiempos por estado',        'fa-stopwatch'],
         'configuracion.bot'    => ['Bot WhatsApp',   'Comportamiento de la asesora IA',            'fa-robot'],
+        'configuracion.menu-bot' => ['Menú del Bot', 'Editor de menú por opciones (sin IA)',      'fa-list-ol'],
         'pagos.index'          => ['Pagos',          'Transacciones de Wompi',                     'fa-credit-card'],
         'rutas.index'          => ['Rutas',          'Pedidos asignados con ruta optimizada',      'fa-route'],
         'clientes.index'       => ['Clientes',       'Quién compra, qué compra, cuánto compra',    'fa-users'],

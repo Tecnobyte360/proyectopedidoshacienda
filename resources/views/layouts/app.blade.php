@@ -166,7 +166,7 @@
             'chat.index', 'pedidos.index', 'pedidos.seguimiento',
             'admin.billing-envios', 'admin.dashboard', 'admin.ventas', 'admin.tenants.index',
             'monitoreo.llamadas', 'monitoreo.costos-meta', 'monitoreo.llm',
-            'configuracion.bot', 'configuracion.bot-lecciones',
+            'configuracion.bot', 'configuracion.menu-bot', 'configuracion.bot-lecciones',
             'meta-whatsapp.index', 'alertas.index',
             'perfil.seguridad',
         ];
