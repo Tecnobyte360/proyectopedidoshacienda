@@ -945,6 +945,12 @@
                                                                             <div class="font-medium text-slate-800 leading-tight">
                                                                                 {{ $d->producto ?? 'Producto' }}
                                                                             </div>
+                                                                            @if(!empty($d->observacion))
+                                                                                <div class="mt-0.5 flex items-start gap-1 text-[10px] text-amber-700">
+                                                                                    <i class="fa-solid fa-pen-to-square text-[8px] mt-0.5"></i>
+                                                                                    <span class="leading-tight">{{ $d->observacion }}</span>
+                                                                                </div>
+                                                                            @endif
                                                                             @if($d->precio_unitario && $cant > 1)
                                                                                 <div class="text-[9px] text-slate-400 mt-0.5">
                                                                                     ${{ $precioUnit }} c/u
