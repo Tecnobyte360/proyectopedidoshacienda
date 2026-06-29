@@ -338,7 +338,9 @@ class MetaCallingService
                     'ringing_at'      => now(),
                     'meta_payload'    => $callData,
                 ]);
-                // TODO: emitir broadcast a chat para notificar operadores
+                // 🔔 Push a la app móvil: avisar llamada entrante
+                try { $this->notificarLlamadaEntrante($call); }
+                catch (\Throwable $e) { Log::warning('📞 push llamada entrante: ' . $e->getMessage()); }
                 continue;
             }
 
@@ -414,6 +416,32 @@ class MetaCallingService
                 'expira_at' => $expira?->toDateTimeString(),
             ]);
         }
+    }
+
+    /** 🔔 Notifica por push (app móvil) a los usuarios con chat del tenant: llamada entrante. */
+    private function notificarLlamadaEntrante(WhatsappCall $call): void
+    {
+        $tokensQ = \App\Models\DeviceToken::where('tenant_id', $call->tenant_id)->whereNotNull('user_id')->get();
+        if ($tokensQ->isEmpty()) return;
+
+        $tokens = [];
+        try {
+            $users = \App\Models\User::withoutGlobalScopes()->whereIn('id', $tokensQ->pluck('user_id')->unique())->get()->keyBy('id');
+            foreach ($tokensQ as $t) {
+                $u = $users->get($t->user_id);
+                if ($u && $u->can('chat.usar')) $tokens[] = $t->token;
+            }
+        } catch (\Throwable $e) {
+            $tokens = $tokensQ->pluck('token')->all();
+        }
+        if (empty($tokens)) return;
+
+        app(\App\Services\FcmService::class)->enviarAMuchos(
+            $tokens,
+            '📞 Llamada entrante',
+            ($call->telefono ?: 'Un cliente') . ' te está llamando por WhatsApp',
+            ['tipo' => 'llamada', 'call_id' => (string) $call->call_id, 'telefono' => (string) $call->telefono]
+        );
     }
 
     private function finalizar(WhatsappCall $call, string $estado, string $motivo): void
