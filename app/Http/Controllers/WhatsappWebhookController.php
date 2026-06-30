@@ -356,7 +356,9 @@ class WhatsappWebhookController extends Controller
 
         Log::info('📥 DATOS NORMALIZADOS', compact('from', 'name', 'message', 'messageId', 'fromMe', 'connectionId'));
 
-        if (!$from || !$message) {
+        // ⚠️ Usar strlen y no !$message: en PHP "0" se evalúa como falsy y
+        // un mensaje legítimo de "0" (ej. volver al menú) se ignoraba.
+        if (!$from || !strlen((string) $message)) {
             Log::warning('⚠️ Mensaje ignorado: faltan datos', compact('from', 'message'));
             return response()->json(['status' => 'ignored']);
         }
