@@ -26,6 +26,7 @@ class Index extends Component
     public string $busqueda     = '';
     public string $filtroEstado = 'todas';   // todas | activa | humano | bot | internos
     public string $filtroCanal  = 'todos';   // todos | whatsapp | instagram | widget
+    public string $filtroNumero = 'todos';   // todos | meta:<phone_number_id> — filtra por número de WhatsApp (tenants con varios)
 
     // 👥 Grupos de clientes (estilo WhatsApp: filtrar chats por grupo)
     public bool   $mostrarGrupos    = false;  // despliega la fila de grupos
@@ -452,6 +453,12 @@ class Index extends Component
 
     /** Al cambiar el filtro de canal, reiniciamos el scroll infinito. */
     public function updatedFiltroCanal(): void
+    {
+        $this->limiteConversaciones = 60;
+    }
+
+    /** Al cambiar el filtro de número de WhatsApp, reiniciamos el scroll infinito. */
+    public function updatedFiltroNumero(): void
     {
         $this->limiteConversaciones = 60;
     }
@@ -2589,6 +2596,8 @@ class Index extends Component
             ->when($this->filtroCanal === 'instagram', fn ($q) => $q->where('canal', 'instagram'))
             ->when($this->filtroCanal === 'messenger', fn ($q) => $q->where('canal', 'messenger'))
             ->when($this->filtroCanal === 'widget',    fn ($q) => $q->where('canal', 'widget'))
+            // ☎️ Filtro por número de WhatsApp (cuando el tenant tiene varios números conectados)
+            ->when($this->filtroNumero !== 'todos', fn ($q) => $q->where('connection_id', $this->filtroNumero))
             // 📌 Fijadas siempre arriba (ordenadas por cuándo se fijaron, más recientes primero)
             ->orderByRaw('CASE WHEN fijada_at IS NULL THEN 1 ELSE 0 END')
             ->orderByDesc('fijada_at')
@@ -2704,6 +2713,18 @@ class Index extends Component
         // 👥 Clientes para el modal "Crear lista" (chats recientes o búsqueda)
         $clientesParaLista = $this->modalCrearGrupo ? $this->clientesParaLista : collect();
 
+        // ☎️ Números de WhatsApp del tenant (para el selector cuando hay varios)
+        $numerosWhatsapp = collect();
+        try {
+            $numerosWhatsapp = \App\Models\MetaWhatsappConfig::where('activo', true)
+                ->get(['phone_number_id', 'display_name'])
+                ->map(fn ($c) => [
+                    'connection_id' => 'meta:' . $c->phone_number_id,
+                    'label'         => $c->display_name ?: ('Número ' . $c->phone_number_id),
+                ])
+                ->values();
+        } catch (\Throwable $e) { /* tabla puede no existir */ }
+
         return view('livewire.chat.index', compact(
             'conversaciones',
             'conversacionActiva',
@@ -2717,7 +2738,8 @@ class Index extends Component
             'totalNoLeidos',
             'totalFavoritos',
             'gruposChat',
-            'clientesParaLista'
+            'clientesParaLista',
+            'numerosWhatsapp'
         ))->layout('layouts.app');
     }
 

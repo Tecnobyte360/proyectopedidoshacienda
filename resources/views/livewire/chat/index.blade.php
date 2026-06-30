@@ -81,6 +81,20 @@
                    placeholder="Buscar cliente o teléfono..."
                    class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-brand focus:ring-brand">
 
+            {{-- ☎️ Selector de número de WhatsApp (solo si el tenant tiene varios) --}}
+            @if(isset($numerosWhatsapp) && count($numerosWhatsapp) > 1)
+                <div class="flex items-center gap-2">
+                    <i class="fa-brands fa-whatsapp text-emerald-600 text-sm"></i>
+                    <select wire:model.live="filtroNumero"
+                            class="flex-1 rounded-xl border border-slate-200 px-2.5 py-1.5 text-xs text-slate-700 focus:border-brand focus:ring-brand">
+                        <option value="todos">Todos los números ({{ count($numerosWhatsapp) }})</option>
+                        @foreach($numerosWhatsapp as $num)
+                            <option value="{{ $num['connection_id'] }}">{{ $num['label'] }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            @endif
+
             {{-- 🔖 Filtros rápidos (estilo WhatsApp): No leídos · Favoritos · Grupos --}}
             <div class="flex gap-1.5 overflow-x-auto pb-0.5" style="scrollbar-width:none;">
                 <button wire:click="$set('filtroEstado', 'todas')"
