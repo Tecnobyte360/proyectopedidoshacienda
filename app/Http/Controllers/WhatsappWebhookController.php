@@ -8404,14 +8404,29 @@ TXT;
                 if (str_starts_with($telCorto, '57') && strlen($telCorto) === 12) {
                     $telCorto = substr($telCorto, 2);
                 }
-                $cliente = Cliente::create([
-                    'cedula'               => $cedulaManual,
-                    'nombre'               => $nombreForm,
-                    'telefono'             => $telCorto,
-                    'telefono_normalizado' => $telefonoWhatsapp,
-                    'canal_origen'         => 'manual',
-                    'activo'               => true,
-                ]);
+                // 🛡️ FIX: NO existe por cédula, pero puede existir por TELÉFONO.
+                // Crear uno nuevo con el mismo teléfono rompe la restricción única
+                // (tenant_id, telefono_normalizado) y hacía FALLAR todo el pedido.
+                // Si ya hay un cliente con ese teléfono → reusarlo (y completarle
+                // la cédula/nombre si le faltan). Si no, crear.
+                $cliente = Cliente::where('telefono_normalizado', $telefonoWhatsapp)->first();
+                if ($cliente) {
+                    $cambios = [];
+                    if (trim((string) $cliente->cedula) === '') $cambios['cedula'] = $cedulaManual;
+                    if (in_array(trim((string) $cliente->nombre), ['', 'Cliente'], true)) $cambios['nombre'] = $nombreForm;
+                    if ($cambios) {
+                        try { $cliente->update($cambios); } catch (\Throwable $e) { /* no romper el pedido por esto */ }
+                    }
+                } else {
+                    $cliente = Cliente::create([
+                        'cedula'               => $cedulaManual,
+                        'nombre'               => $nombreForm,
+                        'telefono'             => $telCorto,
+                        'telefono_normalizado' => $telefonoWhatsapp,
+                        'canal_origen'         => 'manual',
+                        'activo'               => true,
+                    ]);
+                }
             }
         }
         if (!$cliente) {
