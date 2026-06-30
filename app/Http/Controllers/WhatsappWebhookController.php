@@ -7878,7 +7878,11 @@ TXT;
 
         // Si la validación sugirió una sede más cercana, la usamos.
         // Esto permite que una cadena con varias sedes despache desde la más próxima.
-        if (!empty($validacion['sede_sugerida_id'])) {
+        // 🛡️ EXCEPCIÓN: en PEDIDO MANUAL con sede elegida por el operador,
+        // se RESPETA esa sede (no se reasigna a la más cercana). El operador
+        // sabe desde dónde quiere despachar.
+        $sedeManualForzada = !empty($orderData['manual']) && !empty($orderData['sede_id']);
+        if (!empty($validacion['sede_sugerida_id']) && !$sedeManualForzada) {
             $sedeSugerida = Sede::find($validacion['sede_sugerida_id']);
             if ($sedeSugerida && $sedeSugerida->activa) {
                 Log::info('📍 Despachando desde sede más cercana', [
@@ -7888,6 +7892,11 @@ TXT;
                 ]);
                 $sede = $sedeSugerida;
             }
+        } elseif (!empty($validacion['sede_sugerida_id']) && $sedeManualForzada) {
+            Log::info('🏢 Pedido manual: se respeta la sede elegida por el operador (no se reasigna a la más cercana)', [
+                'sede_elegida'   => $sede?->nombre,
+                'sede_sugerida'  => optional(Sede::find($validacion['sede_sugerida_id']))->nombre,
+            ]);
         }
 
         // ── VALIDACIÓN DE HORARIO DE LA SEDE ──────────────────────────────
