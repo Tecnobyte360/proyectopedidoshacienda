@@ -102,6 +102,14 @@ Schedule::command('bot:auditoria-diaria')
     ->withoutOverlapping()
     ->runInBackground();
 
+// 📸 Auto-renovación de tokens de Instagram (para que NUNCA expiren).
+// Refresca los que estén a <15 días de vencer. Corre a diario.
+Schedule::command('instagram:refrescar-tokens')
+    ->dailyAt('03:20')
+    ->timezone('America/Bogota')
+    ->withoutOverlapping()
+    ->runInBackground();
+
 // 🧹 Liberar conversaciones huérfanas (modo humano sin atención >2h)
 // Evita que clientes queden colgados sin respuesta del bot ni del equipo.
 Schedule::command('bot:liberar-conversaciones-huerfanas --horas=2')

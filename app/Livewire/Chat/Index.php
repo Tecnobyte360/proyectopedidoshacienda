@@ -87,6 +87,16 @@ class Index extends Component
      */
     public function mount(\Illuminate\Http\Request $request): void
     {
+        // 🎯 Si el tenant tiene VARIOS números, cargar directamente el PRIMERO
+        // (no "Todos"), para que el operador vea un número a la vez.
+        try {
+            $nums = \App\Models\MetaWhatsappConfig::where('activo', true)
+                ->orderBy('id')->pluck('phone_number_id');
+            if ($nums->count() > 1) {
+                $this->filtroNumero = (string) $nums->first();
+            }
+        } catch (\Throwable $e) { /* ignore */ }
+
         $convId = (int) $request->query('conv', 0);
         if ($convId <= 0) return;
 
@@ -2232,9 +2242,12 @@ class Index extends Component
                 }
 
                 $svc = app(\App\Services\Meta\MetaWhatsappCloudService::class);
+                // 🎯 Responder DESDE el número de la conversación (tenant multi-número):
+                // connection_id guarda el phone_number_id del número que recibió el chat.
+                $numSalida = $conv->connection_id ? (string) $conv->connection_id : null;
                 $ok = $wamidReferencia
-                    ? $svc->enviarTextoRespuesta($conv->telefono_normalizado, $texto, $wamidReferencia, $conv->tenant_id)
-                    : $svc->enviarTexto($conv->telefono_normalizado, $texto, $conv->tenant_id);
+                    ? $svc->enviarTextoRespuesta($conv->telefono_normalizado, $texto, $wamidReferencia, $conv->tenant_id, $numSalida)
+                    : $svc->enviarTexto($conv->telefono_normalizado, $texto, $conv->tenant_id, $numSalida);
 
                 // 📌 Capturar wamid del mensaje que acabamos de enviar para futuras citas/reacciones del cliente
                 $wamidNuevo = $svc->ultimoWamid;
@@ -2719,7 +2732,7 @@ class Index extends Component
             $numerosWhatsapp = \App\Models\MetaWhatsappConfig::where('activo', true)
                 ->get(['phone_number_id', 'display_name'])
                 ->map(fn ($c) => [
-                    'connection_id' => 'meta:' . $c->phone_number_id,
+                    'connection_id' => (string) $c->phone_number_id,
                     'label'         => $c->display_name ?: ('Número ' . $c->phone_number_id),
                 ])
                 ->values();

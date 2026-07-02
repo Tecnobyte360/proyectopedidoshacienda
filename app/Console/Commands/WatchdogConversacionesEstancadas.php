@@ -112,6 +112,15 @@ class WatchdogConversacionesEstancadas extends Command
                     ]);
                     continue;
                 }
+                // 🏧 MODO MENÚ determinista: el menú SIEMPRE responde y no usa IA.
+                // No se rescata con IA (Banco Plaza y similares no tienen IA).
+                if ($cfgTenant && (bool) ($cfgTenant->bot_modo_menu ?? false)) {
+                    Log::info('🐕 Watchdog: skip — tenant en modo menú determinista (sin IA)', [
+                        'conversacion_id' => $conv->id,
+                        'tenant_id'       => $conv->tenant_id,
+                    ]);
+                    continue;
+                }
             }
 
             // 🛡️ NO rescatar si la conv YA generó un pedido reciente (configurable).

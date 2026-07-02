@@ -190,7 +190,7 @@ class WhatsappWebhookController extends Controller
                 $telefonoNorm = preg_replace('/\D+/', '', $from);
                 $cliente = \App\Models\Cliente::encontrarOCrearPorTelefono($telefonoNorm, $name);
                 $conv = app(\App\Services\ConversacionService::class)
-                    ->obtenerOCrearActiva($telefonoNorm, $cliente->id, null, $connectionId ? (int) $connectionId : null);
+                    ->obtenerOCrearActiva($telefonoNorm, $cliente->id, null, $this->connIdNum($connectionId));
 
                 app(\App\Services\ConversacionService::class)->agregarMensaje(
                     $conv,
@@ -233,7 +233,7 @@ class WhatsappWebhookController extends Controller
                 $telefonoNorm = preg_replace('/\D+/', '', $from);
                 $cliente = \App\Models\Cliente::encontrarOCrearPorTelefono($telefonoNorm, $name);
                 $conv = app(\App\Services\ConversacionService::class)
-                    ->obtenerOCrearActiva($telefonoNorm, $cliente->id, null, $connectionId ? (int) $connectionId : null);
+                    ->obtenerOCrearActiva($telefonoNorm, $cliente->id, null, $this->connIdNum($connectionId));
 
                 app(\App\Services\ConversacionService::class)->agregarMensaje(
                     $conv,
@@ -283,7 +283,7 @@ class WhatsappWebhookController extends Controller
                 $telefonoNorm = preg_replace('/\D+/', '', $from);
                 $cliente = \App\Models\Cliente::encontrarOCrearPorTelefono($telefonoNorm, $name);
                 $conv = app(\App\Services\ConversacionService::class)
-                    ->obtenerOCrearActiva($telefonoNorm, $cliente->id, null, $connectionId ? (int) $connectionId : null);
+                    ->obtenerOCrearActiva($telefonoNorm, $cliente->id, null, $this->connIdNum($connectionId));
 
                 // Icono según extensión (solo cosmético para el contenido textual)
                 $icono = match (true) {
@@ -512,7 +512,7 @@ class WhatsappWebhookController extends Controller
 
                 $cliente = \App\Models\Cliente::encontrarOCrearPorTelefono($telNormCheck, $usuarioInterno?->nombre ?: $name);
                 $conv = app(\App\Services\ConversacionService::class)
-                    ->obtenerOCrearActiva($telNormCheck, $cliente->id, null, $connectionId ? (int) $connectionId : null);
+                    ->obtenerOCrearActiva($telNormCheck, $cliente->id, null, $this->connIdNum($connectionId));
 
                 // Marcar la conversación como interna
                 if (!$conv->es_interna) $conv->update(['es_interna' => true, 'atendida_por_humano' => true]);
@@ -619,7 +619,11 @@ class WhatsappWebhookController extends Controller
                 $convLoop = \App\Models\ConversacionWhatsapp::where('telefono_normalizado', $telefonoNorm)
                     ->where('estado', \App\Models\ConversacionWhatsapp::ESTADO_ACTIVA)
                     ->orderByDesc('id')->first();
-                if ($convLoop) {
+                // 🏧 En MODO MENÚ determinista, repetir el mismo menú es NORMAL
+                // (el cliente navega con 0 y vuelve a ver el mismo menú). NO es un
+                // loop ni un error, y NO debe inyectarse el mensaje de IA ("asesor").
+                $esModoMenuAntiLoop = (bool) (\App\Models\ConfiguracionBot::actual()->bot_modo_menu ?? false);
+                if ($convLoop && !$esModoMenuAntiLoop) {
                     $hashReply = md5(mb_substr(mb_strtolower(trim((string) $reply)), 0, 200));
                     $ventanaDesde = now()->subMinutes(10);
                     $ultimosBot = \App\Models\MensajeWhatsapp::where('conversacion_id', $convLoop->id)
@@ -1041,7 +1045,7 @@ class WhatsappWebhookController extends Controller
         try {
             $cliente = \App\Models\Cliente::encontrarOCrearPorTelefono($from, $name);
             $conv = app(\App\Services\ConversacionService::class)
-                ->obtenerOCrearActiva($from, $cliente->id, null, $connectionId ? (int) $connectionId : null);
+                ->obtenerOCrearActiva($from, $cliente->id, null, $this->connIdNum($connectionId));
 
             app(\App\Services\ConversacionService::class)->agregarMensaje(
                 $conv,
@@ -1116,7 +1120,7 @@ class WhatsappWebhookController extends Controller
             $telefonoNorm,
             $cliente->id,
             $sedeId,
-            $connectionId ? (int) $connectionId : null
+            $this->connIdNum($connectionId)
         );
 
         // Persistir mensaje del cliente (a menos que el buffer ya lo haya hecho al instante)
@@ -1134,7 +1138,7 @@ class WhatsappWebhookController extends Controller
         if (!empty($cfgMenu->bot_modo_menu) && is_array($cfgMenu->menu_json) && !empty($cfgMenu->menu_json)) {
             try {
                 $replyMenu = app(\App\Services\MenuDeterministaService::class)
-                    ->responder($cfgMenu->menu_json, $tenantId, $telefonoNorm, $message);
+                    ->responder($cfgMenu->menu_json, $tenantId, $telefonoNorm, $message, is_string($connectionId) ? $connectionId : null);
                 if ($replyMenu !== '') {
                     $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_ASSISTANT, $replyMenu);
                 }
@@ -1280,7 +1284,7 @@ class WhatsappWebhookController extends Controller
             if (str_contains($primerNombreRouter, '@')) $primerNombreRouter = '';
 
             $decision = app(\App\Services\Bots\RouterDeterminista::class)
-                ->decidir($conversacion, $message, $primerNombreRouter, $connectionId ? (int) $connectionId : null);
+                ->decidir($conversacion, $message, $primerNombreRouter, $this->connIdNum($connectionId));
 
             if ($decision['accion'] === 'reply') {
                 $reply = $decision['reply'];
@@ -10336,6 +10340,21 @@ PROMPT;
         return array_merge($base, ['mensaje_externo_id' => $messageId]);
     }
 
+    /**
+     * Convierte el connectionId a un entero para la columna connection_id (bigint).
+     * Para Meta ("meta:{phone_number_id}") devuelve el phone_number_id numérico,
+     * así las conversaciones quedan etiquetadas por NÚMERO (para filtrar en el chat).
+     */
+    private function connIdNum($connectionId): ?int
+    {
+        if ($connectionId === null || $connectionId === '') return null;
+        if (is_string($connectionId) && str_starts_with($connectionId, 'meta:')) {
+            $n = substr($connectionId, 5);
+            return is_numeric($n) ? (int) $n : null;
+        }
+        return is_numeric($connectionId) ? (int) $connectionId : null;
+    }
+
     private function enviarRespuestaWhatsapp(string $from, string $reply, $connectionId = null): bool
     {
         // 🛡️ GUARD: solo enviar a números reales de WhatsApp. El espejo del
@@ -10360,8 +10379,11 @@ PROMPT;
 
         if ($vieneDeMeta || $tenantUsaMeta) {
             try {
+                // 🎯 Si el mensaje entró por un número Meta específico (meta:{phone_number_id}),
+                // respondemos DESDE ese mismo número (tenant con varios números).
+                $phoneNumberIdSalida = $vieneDeMeta ? substr($connectionId, 5) : null;
                 $ok = app(\App\Services\Meta\MetaWhatsappCloudService::class)
-                    ->enviarTexto($from, $reply, $tenant?->id);
+                    ->enviarTexto($from, $reply, $tenant?->id, $phoneNumberIdSalida);
                 Log::info('📤 BOT → Meta', ['to' => $from, 'ok' => $ok, 'preview' => mb_substr($reply, 0, 60)]);
                 return $ok;
             } catch (\Throwable $e) {

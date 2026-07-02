@@ -29,11 +29,23 @@ class ConversacionService
         ?int $sedeId = null,
         ?int $connectionId = null
     ): ConversacionWhatsapp {
-        // Buscar la conversación más reciente del teléfono (cualquier estado no-archivada)
-        $conv = ConversacionWhatsapp::where('telefono_normalizado', $telefonoNormalizado)
-            ->where('estado', '!=', ConversacionWhatsapp::ESTADO_ARCHIVADA)
-            ->orderByDesc('id')
-            ->first();
+        // Buscar la conversación del teléfono. 🎯 Si sabemos por qué NÚMERO entró
+        // (connectionId), la conversación se separa por número: así un mismo cliente
+        // que escribe a dos números del mismo tenant (ej. ciudadanos vs colaboradores)
+        // tiene una conversación por número, y no se mezclan.
+        $base = ConversacionWhatsapp::where('telefono_normalizado', $telefonoNormalizado)
+            ->where('estado', '!=', ConversacionWhatsapp::ESTADO_ARCHIVADA);
+
+        if ($connectionId) {
+            // 1) Conversación de ESTE número. 2) Si no hay, adopta una sin número
+            //    asignado (legacy) para no duplicar. Si no, se crea nueva.
+            $conv = (clone $base)->where('connection_id', $connectionId)->orderByDesc('id')->first()
+                ?: (clone $base)->where(function ($w) {
+                        $w->whereNull('connection_id')->orWhere('connection_id', 0);
+                    })->orderByDesc('id')->first();
+        } else {
+            $conv = $base->orderByDesc('id')->first();
+        }
 
         if ($conv) {
             $updates = [];
@@ -46,6 +58,12 @@ class ConversacionService
             // Actualizar cliente_id si llegó después
             if ($clienteId && !$conv->cliente_id) {
                 $updates['cliente_id'] = $clienteId;
+            }
+
+            // 🎯 Etiquetar la conversación con el número (connection_id) si aún no
+            // lo tiene. Permite filtrar por número en el chat (tenants multi-número).
+            if ($connectionId && empty($conv->connection_id)) {
+                $updates['connection_id'] = $connectionId;
             }
 
             if ($updates) {

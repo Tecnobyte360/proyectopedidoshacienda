@@ -87,7 +87,6 @@
                     <i class="fa-brands fa-whatsapp text-emerald-600 text-sm"></i>
                     <select wire:model.live="filtroNumero"
                             class="flex-1 rounded-xl border border-slate-200 px-2.5 py-1.5 text-xs text-slate-700 focus:border-brand focus:ring-brand">
-                        <option value="todos">Todos los números ({{ count($numerosWhatsapp) }})</option>
                         @foreach($numerosWhatsapp as $num)
                             <option value="{{ $num['connection_id'] }}">{{ $num['label'] }}</option>
                         @endforeach

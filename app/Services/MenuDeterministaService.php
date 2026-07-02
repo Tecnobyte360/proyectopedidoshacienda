@@ -49,7 +49,7 @@ class MenuDeterministaService
      * @param string $telefono Teléfono normalizado del cliente.
      * @param string $texto    Mensaje crudo del cliente.
      */
-    public function responder(array $menu, $tenantId, string $telefono, string $texto): string
+    public function responder(array $menu, $tenantId, string $telefono, string $texto, ?string $connectionId = null): string
     {
         $welcome = $menu['welcome'] ?? null;
         $nodes   = $menu['nodes'] ?? [];
@@ -59,16 +59,25 @@ class MenuDeterministaService
             return 'En este momento el servicio no está disponible. Intenta más tarde.';
         }
 
-        $cacheKey = "wa_menu_t{$tenantId}_{$telefono}";
+        // 🎯 Nodo de ENTRADA según el NÚMERO por el que entró el mensaje. Un mismo
+        // tenant puede tener varios números (ej. ciudadanos y colaboradores), cada
+        // uno arrancando en su propio menú. Se define en menu_json['entradas'].
+        $entryNode = 'welcome';
+        if ($connectionId && !empty($menu['entradas'][$connectionId])) {
+            $entryNode = (string) $menu['entradas'][$connectionId];
+        }
+
+        // Estado aislado por número + teléfono (para no mezclar flujos entre números)
+        $connKey  = $connectionId ? substr(md5($connectionId), 0, 8) : 'x';
+        $cacheKey = "wa_menu_t{$tenantId}_{$connKey}_{$telefono}";
         $estado   = Cache::get($cacheKey);   // id del nodo donde está parado el cliente
 
         $limpio = trim(mb_strtolower($texto));
         $digito = $this->extraerDigito($texto);
 
-        // ── 1) Primer contacto, saludo, o estado perdido → WELCOME ──
+        // ── 1) Primer contacto, saludo, o estado perdido → nodo de ENTRADA ──
         if ($estado === null || $this->esSaludo($limpio)) {
-            Cache::put($cacheKey, 'welcome', now()->addHours(12));
-            return $welcome['text'];
+            return $this->irANodo($menu, $cacheKey, $entryNode);
         }
 
         // ── Nodo actual ──

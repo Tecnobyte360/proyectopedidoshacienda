@@ -29,9 +29,9 @@ class MetaWhatsappCloudService
      *
      * @param string $messageIdReferencia wamid.xxx al que se responde
      */
-    public function enviarTextoRespuesta(string $telefono, string $mensaje, string $messageIdReferencia, ?int $tenantId = null): bool
+    public function enviarTextoRespuesta(string $telefono, string $mensaje, string $messageIdReferencia, ?int $tenantId = null, ?string $phoneNumberId = null): bool
     {
-        $config = $this->resolverConfig($tenantId);
+        $config = $this->resolverConfig($tenantId, $phoneNumberId);
         if (!$config) return false;
 
         return $this->ejecutar($config, [
@@ -43,9 +43,9 @@ class MetaWhatsappCloudService
         ], 'texto-respuesta');
     }
 
-    public function enviarTexto(string $telefono, string $mensaje, ?int $tenantId = null): bool
+    public function enviarTexto(string $telefono, string $mensaje, ?int $tenantId = null, ?string $phoneNumberId = null): bool
     {
-        $config = $this->resolverConfig($tenantId);
+        $config = $this->resolverConfig($tenantId, $phoneNumberId);
         if (!$config) return false;
 
         $payload = [
@@ -389,8 +389,18 @@ class MetaWhatsappCloudService
      * Resuelve config Meta para el tenant. Si pasamos tenant_id explícito
      * lo usa, si no, usa el del scope actual.
      */
-    public function resolverConfig(?int $tenantId = null): ?MetaWhatsappConfig
+    public function resolverConfig(?int $tenantId = null, ?string $phoneNumberId = null): ?MetaWhatsappConfig
     {
+        // 🎯 Prioridad: número específico (phone_number_id). Permite que un tenant
+        // con VARIOS números responda SIEMPRE desde el número que recibió el mensaje.
+        if ($phoneNumberId) {
+            $c = MetaWhatsappConfig::query()
+                ->withoutGlobalScopes()
+                ->where('phone_number_id', $phoneNumberId)
+                ->where('activo', true)
+                ->first();
+            if ($c) return $c;
+        }
         if ($tenantId) {
             return MetaWhatsappConfig::query()
                 ->withoutGlobalScopes()
