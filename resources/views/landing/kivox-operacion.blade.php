@@ -173,11 +173,11 @@
 <section class="subhero oper" id="top">
   <div class="wrap">
     <div>
-      <a class="back" href="/site" style="color:#EAF6EE"><i class="fa-solid fa-arrow-left"></i> Volver a KIVOX</a>
+      <a class="back" href="/" style="color:#EAF6EE"><i class="fa-solid fa-arrow-left"></i> Volver a KIVOX</a>
       <h1>Convierte cada conversación en un pedido entregado</h1>
       <p class="sub">El motor que mueve tu negocio: pedidos que se crean en tu ERP, pagos en línea y domicilios con mapa en vivo. Del chat a la puerta del cliente, sin digitar dos veces.</p>
       <div class="cta-row">
-        <a class="btn btn-lime" href="/site#demo">Solicitar demo <span class="arr"><i class="fa-solid fa-arrow-right"></i></span></a>
+        <a class="btn btn-lime" href="/#demo">Solicitar demo <span class="arr"><i class="fa-solid fa-arrow-right"></i></span></a>
         <a class="btn btn-line" href="/comunicacion" style="color:#EAF6EE;border-color:rgba(198,244,95,.4)"><i class="fa-solid fa-comments"></i> Ver Omnicanalidad</a>
       </div>
     </div>

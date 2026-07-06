@@ -59,11 +59,11 @@
 <section class="subhero comm" id="top">
   <div class="wrap">
     <div>
-      <a class="back" href="/site"><i class="fa-solid fa-arrow-left"></i> Volver a KIVOX</a>
+      <a class="back" href="/"><i class="fa-solid fa-arrow-left"></i> Volver a KIVOX</a>
       <h1>Atiende y véndele a tus clientes por todos lados</h1>
       <p class="sub">Tus clientes te escriben por WhatsApp, Instagram, Facebook o tu web. KIVOX lo unifica todo en una sola bandeja, con inteligencia artificial que atiende y vende 24/7.</p>
       <div class="cta-row">
-        <a class="btn btn-ink" href="/site#demo">Solicitar demo <span class="arr"><i class="fa-solid fa-arrow-right"></i></span></a>
+        <a class="btn btn-ink" href="/#demo">Solicitar demo <span class="arr"><i class="fa-solid fa-arrow-right"></i></span></a>
         <a class="btn btn-line" href="/operacion"><i class="fa-solid fa-gears"></i> Ver Pedidos &amp; Domicilios</a>
       </div>
       <div class="trust-row">

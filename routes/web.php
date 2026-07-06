@@ -160,7 +160,7 @@ Route::get('/', function () {
 
     // Root domain (kivox.co / www.kivox.co): landing comercial pública
     if ($esRoot) {
-        return view('landing.kivox');
+        return view('landing.kivox-site');
     }
 
     // Subdominios de tenant (admin/la-hacienda/etc): redirigir según user
@@ -173,6 +173,11 @@ Route::get('/', function () {
     }
     return redirect('/pedidos');
 });
+
+// 🌐 La landing corporativa ahora vive en el root '/'. Se mantiene '/site' como alias 301 (enlaces antiguos).
+Route::redirect('/site', '/', 301)->name('landing.preview');
+Route::get('/comunicacion', fn () => view('landing.kivox-comunicacion'))->name('landing.comunicacion');
+Route::get('/operacion', fn () => view('landing.kivox-operacion'))->name('landing.operacion');
 
 // 📄 Páginas legales públicas (requeridas por App Review de Meta/Instagram)
 Route::view('/privacidad',      'legal.privacidad')->name('legal.privacidad');
@@ -236,6 +241,8 @@ Route::middleware(['no_super_sin_imp'])->group(function () {
         ->name('zonas.editor-mapa');
     Route::get('/despachos',     DespachosIndex::class)->middleware('permission:despachos.gestionar|despachos.ver_propios')->name('despachos.index');
     Route::get('/reportes',      ReportesIndex::class)->middleware('permission:reportes.ver')->name('reportes.index');
+    // 📊 Informe de domiciliarios — pedidos del día que llevó cada domiciliario
+    Route::get('/informes/domiciliarios', \App\Livewire\Informes\Domiciliarios::class)->name('informes.domiciliarios');
     Route::get('/ans-tiempos',   AnsIndex::class)->middleware('permission:ans.gestionar')->name('ans.index');
     // 🛡️ Plataforma: solo super-admin (Kivox global). Los tenants NO ven Meta config / Bot config / Monitor LLM / Costos Meta.
     Route::get('/meta-whatsapp', \App\Livewire\MetaWhatsapp\Index::class)
@@ -286,6 +293,10 @@ Route::middleware(['no_super_sin_imp'])->group(function () {
     Route::get('/rutas', \App\Livewire\Rutas\Index::class)
         ->middleware('permission:despachos.gestionar')
         ->name('rutas.index');
+
+    // 🖨️ Panel de impresoras (estado del agente + prueba de impresión)
+    Route::get('/impresion', \App\Livewire\Impresion\Index::class)
+        ->name('impresion.index');
     Route::get('/pagos', \App\Livewire\Pagos\Index::class)
         ->middleware('permission:pagos_clientes.ver|pagos_clientes.gestionar')
         ->name('pagos.index');
