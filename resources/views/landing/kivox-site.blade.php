@@ -309,11 +309,11 @@ header::after{content:'';position:absolute;left:0;bottom:0;height:2px;width:100%
 .ia-feats .f{display:flex;gap:13px;font-size:15px;font-weight:600;align-items:flex-start;line-height:1.55}
 .ia-feats .f i{color:var(--lime);margin-top:3px}
 /* filmstrip */
-.strip-wrap{overflow-x:auto;scroll-snap-type:x mandatory;display:flex;gap:18px;padding:52px 24px 20px;max-width:1240px;margin:0 auto;scrollbar-width:none}
+.strip-wrap{overflow-x:auto;scroll-snap-type:x mandatory;display:flex;align-items:center;justify-content:flex-start;gap:18px;padding:52px 24px 20px;max-width:1240px;margin:0 auto;scrollbar-width:none}
 .strip-wrap::-webkit-scrollbar{display:none}
-.clip{flex:0 0 min(460px,86vw);scroll-snap-align:center;border-radius:22px;overflow:hidden;position:relative;border:1.5px solid var(--ink);background:var(--ink)}
-.clip video{width:100%;aspect-ratio:16/10;object-fit:cover;display:block}
-.clip.v video{aspect-ratio:9/13}
+.clip{flex:0 0 auto;height:min(380px,52vh);scroll-snap-align:center;border-radius:22px;overflow:hidden;position:relative;border:1.5px solid var(--ink);background:var(--ink);box-shadow:0 24px 50px rgba(13,18,14,.16)}
+.clip video{height:100%;width:auto;aspect-ratio:16/9;object-fit:cover;display:block}
+.clip.v video{aspect-ratio:9/16}
 .clip .cap{position:absolute;left:14px;bottom:14px;right:14px;display:flex;justify-content:space-between;align-items:center;background:rgba(13,18,14,.78);backdrop-filter:blur(8px);color:#fff;font-size:12.5px;font-weight:700;border-radius:12px;padding:10px 15px}
 .clip .cap i{color:var(--lime)}
 .strip-hint{text-align:center;font-size:12.5px;color:var(--gray);font-weight:600;margin-top:8px}
@@ -861,7 +861,6 @@ footer{background:var(--ink);color:#B9C4BB;padding:70px 24px 34px;border-radius:
     </div>
     {{-- Texto --}}
     <div class="nos-text reveal d1">
-      <div class="num-tag">Quiénes somos</div>
       <h2>Detrás de KIVOX está <span style="color:var(--green-d)">TecnoByte360</span></h2>
       <p class="lead" style="margin-top:16px"><strong style="color:var(--ink)">TecnoByte360 es una compañía colombiana de desarrollo de software</strong>. Creamos soluciones tecnológicas a la medida para empresas de todo tipo — y KIVOX es uno de nuestros productos. Hoy muchas empresas tienen WhatsApp, Instagram, Facebook, su web y su ERP por separado, y <strong style="color:var(--ink)">no saben cómo integrarlos ni administrarlos correctamente</strong>. Por eso creamos KIVOX: para conectar y ordenar todos tus medios en una sola plataforma.</p>
       <div class="nos-points">
@@ -883,7 +882,6 @@ footer{background:var(--ink);color:#B9C4BB;padding:70px 24px 34px;border-radius:
 {{-- ============ QUÉ HACE (2 pilares) ============ --}}
 <section id="modulos" class="center" style="padding-top:40px">
   <div class="wrap">
-    <div class="num-tag reveal" style="justify-content:center;display:inline-flex">Qué hace</div>
     <h2 class="reveal d1">Dos mundos, una sola plataforma</h2>
     <p class="lead reveal d2">KIVOX conecta las dos mitades de tu negocio: la que <strong style="color:var(--ink)">habla</strong> con tus clientes y la que <strong style="color:var(--ink)">entrega</strong>.</p>
     <div class="pil2 reveal d2">
@@ -927,7 +925,6 @@ footer{background:var(--ink);color:#B9C4BB;padding:70px 24px 34px;border-radius:
 {{-- ============ MAPA EN VIVO ============ --}}
 <section id="mapa" class="center" style="padding-top:40px">
   <div class="wrap">
-    <div class="num-tag reveal" style="justify-content:center;display:inline-flex">Despachos en tiempo real</div>
     <h2 class="reveal d1">Mira a tus domiciliarios<br>moverse en el mapa, en vivo</h2>
     <p class="lead reveal d2">Cada domiciliario con GPS en tiempo real. Sabes quién está disponible, quién va en ruta y dónde está cada pedido — al segundo.</p>
     <div class="livemap-wrap reveal d2">
@@ -949,7 +946,6 @@ footer{background:var(--ink);color:#B9C4BB;padding:70px 24px 34px;border-radius:
 {{-- ============ CONECTA TODA LA EMPRESA ============ --}}
 <section id="conecta">
   <div class="wrap">
-    <div class="num-tag reveal">Para qué usar KIVOX</div>
     <h2 class="reveal d1">Conecta varios números verificados por Meta<br>a todos tus asesores, en un solo lugar.</h2>
     <div class="conx">
       <div class="reveal d1">
@@ -989,7 +985,6 @@ footer{background:var(--ink);color:#B9C4BB;padding:70px 24px 34px;border-radius:
     </div>
 
     <div style="text-align:center;margin-top:70px">
-      <div class="num-tag reveal" style="justify-content:center;display:inline-flex">Un canal para cada área</div>
       <h2 class="reveal d1" style="font-size:clamp(26px,3.6vw,40px)">Conecta todos los departamentos de tu empresa</h2>
       <p class="lead reveal d2" style="margin:14px auto 0">El bot deriva cada conversación al área correcta según palabras clave — y silencia hasta que el equipo responde.</p>
     </div>
@@ -1011,7 +1006,6 @@ footer{background:var(--ink);color:#B9C4BB;padding:70px 24px 34px;border-radius:
   <div class="ia">
     <div class="wrap ia-grid">
       <div>
-        <div class="num-tag reveal">Inteligencia artificial</div>
         <h2 class="reveal d1">El empleado que nunca duerme, nunca se enferma y nunca deja un chat en visto.</h2>
         <div class="ia-feats reveal d2">
           <div class="f"><i class="fa-solid fa-comment-dots"></i><span>Conversa en lenguaje natural — tus clientes no notan la diferencia</span></div>
@@ -1032,7 +1026,6 @@ footer{background:var(--ink);color:#B9C4BB;padding:70px 24px 34px;border-radius:
 {{-- ============ EN PRODUCCIÓN (filmstrip) ============ --}}
 <section id="produccion" style="padding-bottom:60px">
   <div class="wrap">
-    <div class="num-tag reveal">En producción</div>
     <h2 class="reveal d1">Esto no es un render.<br>Es KIVOX trabajando hoy.</h2>
     <p class="lead reveal d2" style="margin-top:22px">Grabado en el punto de venta de un cliente real: pedidos entrando, despachos en el mapa y comandas imprimiéndose solas.</p>
   </div>
@@ -1047,7 +1040,6 @@ footer{background:var(--ink);color:#B9C4BB;padding:70px 24px 34px;border-radius:
 {{-- ============ ASÍ SE VE POR DENTRO ============ --}}
 <section id="dentro" style="padding-top:40px">
   <div class="wrap">
-    <div class="num-tag reveal">Así se ve por dentro</div>
     <h2 class="reveal d1">Una plataforma que da gusto usar</h2>
     <p class="lead reveal d2">Del inicio de sesión al reporte de ventas — así se ve KIVOX por dentro, sin maquillaje.</p>
     <div class="shots reveal d2">
@@ -1155,7 +1147,6 @@ footer{background:var(--ink);color:#B9C4BB;padding:70px 24px 34px;border-radius:
 {{-- ============ ERP ============ --}}
 <section id="erp" style="padding-top:40px">
   <div class="wrap">
-    <div class="num-tag reveal">Integraciones</div>
     <h2 class="reveal d1">Habla el idioma de tu ERP.</h2>
     <div class="erp-list reveal d2">
       <div class="erp-it"><span style="display:inline-flex;align-items:center;gap:16px"><img src="/logos/sap.svg" alt="SAP" style="height:34px;width:auto">SAP Business One</span> <small>Pedidos · Inventario · Socios de negocio</small></div>
@@ -1171,7 +1162,6 @@ footer{background:var(--ink);color:#B9C4BB;padding:70px 24px 34px;border-radius:
 {{-- ============ CASOS ============ --}}
 <section style="padding-top:40px">
   <div class="wrap">
-    <div class="num-tag reveal">Para quién</div>
     <h2 class="reveal d1">Si tus clientes te escriben,<br>KIVOX es para ti.</h2>
     <div class="cases reveal d2">
       <span class="case"><i class="fa-solid fa-utensils"></i> Restaurantes</span>
