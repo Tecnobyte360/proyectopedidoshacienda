@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>KIVOX — Operación & Comercio | Pedidos, ERP, pagos y despachos</title>
+<title>KIVOX — Pedidos & Domicilios | Pedidos, ERP, pagos y despachos</title>
 <meta name="description" content="Convierte cada conversación en un pedido entregado: toma de pedidos, integración con tu ERP (SAP, HGI), pasarelas de pago (Wompi, Bold) y despachos con mapa en vivo. El mundo de operación de KIVOX.">
 <meta name="robots" content="index,follow">
 <link rel="canonical" href="https://kivox.co/operacion">
@@ -46,10 +46,22 @@
 .paycard{background:var(--forest);border-radius:16px;padding:18px;color:#fff}
 .paycard .amt{font-family:'Space Grotesk';font-weight:700;font-size:24px}
 .paycard .go{margin-top:12px;background:var(--green);text-align:center;border-radius:10px;padding:11px;font-weight:800;font-size:13px}
+.kpi-card{background:#fff;border:1px solid var(--line);border-radius:20px;padding:18px;box-shadow:var(--shadow-l)}
+.kpi-hd{display:flex;align-items:center;gap:11px;margin-bottom:15px}
+.kpi-hd .kpi-ic{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,#0EA26B,#0B8659);color:#fff;display:grid;place-items:center;font-size:15px;box-shadow:0 6px 16px rgba(14,162,107,.28)}
+.kpi-hd b{font-size:14px;color:var(--ink);display:block;line-height:1.2}
+.kpi-hd small{font-size:11px;color:var(--gray)}
+.kpi-hd .kpi-live{margin-left:auto;font-size:10px;font-weight:800;color:#0B8659;background:#E7F8EE;border-radius:99px;padding:4px 10px;display:inline-flex;gap:6px;align-items:center;letter-spacing:.04em}
+.kpi-hd .kpi-live::before{content:'';width:7px;height:7px;border-radius:50%;background:#12B76A;animation:cpulse 1.4s infinite}
 .kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:11px}
-.kpi{background:var(--cream2);border:1px solid var(--line);border-radius:12px;padding:15px}
-.kpi b{font-size:20px;display:block;color:var(--ink)}
-.kpi small{font-size:11px;color:var(--gray);font-weight:700}
+.kpi{position:relative;background:var(--cream);border:1px solid var(--line);border-radius:14px;padding:14px;transition:.2s;overflow:hidden}
+.kpi:hover{border-color:var(--green);transform:translateY(-3px);box-shadow:0 12px 26px rgba(7,48,31,.08)}
+.kpi .ki{width:30px;height:30px;border-radius:9px;background:#EAF7F0;color:var(--green-d);display:grid;place-items:center;font-size:13px;margin-bottom:10px}
+.kpi b{font-family:'Space Grotesk',sans-serif;font-size:24px;display:block;color:var(--ink);letter-spacing:-.02em;line-height:1}
+.kpi small{font-size:11px;color:var(--gray);font-weight:700;display:block;margin-top:4px}
+.kpi em{font-style:normal;font-size:10px;font-weight:800;margin-top:9px;display:inline-flex;align-items:center;gap:4px}
+.kpi em.up{color:#0B8659}
+.kpi em.muted{color:var(--gray)}
 /* mapa */
 .livemap-wrap{border-radius:22px;overflow:hidden;border:1px solid var(--line);box-shadow:var(--shadow-l);background:#fff;margin-top:40px}
 .livemap-bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:14px 20px;border-bottom:1px solid var(--line)}
@@ -166,7 +178,7 @@
       <p class="sub">El motor que mueve tu negocio: pedidos que se crean en tu ERP, pagos en línea y domicilios con mapa en vivo. Del chat a la puerta del cliente, sin digitar dos veces.</p>
       <div class="cta-row">
         <a class="btn btn-lime" href="/site#demo">Solicitar demo <span class="arr"><i class="fa-solid fa-arrow-right"></i></span></a>
-        <a class="btn btn-line" href="/comunicacion" style="color:#EAF6EE;border-color:rgba(198,244,95,.4)"><i class="fa-solid fa-comments"></i> Ver Comunicación</a>
+        <a class="btn btn-line" href="/comunicacion" style="color:#EAF6EE;border-color:rgba(198,244,95,.4)"><i class="fa-solid fa-comments"></i> Ver Omnicanalidad</a>
       </div>
     </div>
     <div class="fvis reveal d1">
@@ -204,11 +216,18 @@
       </ul>
     </div>
     <div class="fvis reveal d1">
-      <div class="kpis">
-        <div class="kpi"><b>312</b><small>Pedidos hoy</small></div>
-        <div class="kpi"><b>$4,2 M</b><small>Ventas del día</small></div>
-        <div class="kpi"><b>#8842</b><small>Último pedido</small></div>
-        <div class="kpi"><b>2,1 s</b><small>Toma por IA</small></div>
+      <div class="kpi-card">
+        <div class="kpi-hd">
+          <span class="kpi-ic"><i class="fa-solid fa-chart-line"></i></span>
+          <div><b>Resumen de hoy</b><small>Actualizado en tiempo real</small></div>
+          <span class="kpi-live">EN VIVO</span>
+        </div>
+        <div class="kpis">
+          <div class="kpi"><span class="ki"><i class="fa-solid fa-bag-shopping"></i></span><b>312</b><small>Pedidos hoy</small><em class="up"><i class="fa-solid fa-arrow-trend-up"></i> +18% vs. ayer</em></div>
+          <div class="kpi"><span class="ki"><i class="fa-solid fa-sack-dollar"></i></span><b>$4,2 M</b><small>Ventas del día</small><em class="up"><i class="fa-solid fa-arrow-trend-up"></i> +12% vs. ayer</em></div>
+          <div class="kpi"><span class="ki"><i class="fa-solid fa-receipt"></i></span><b>#8842</b><small>Último pedido</small><em class="muted"><i class="fa-solid fa-clock"></i> hace 40 s</em></div>
+          <div class="kpi"><span class="ki"><i class="fa-solid fa-bolt"></i></span><b>2,1 s</b><small>Toma por IA</small><em class="up"><i class="fa-solid fa-gauge-high"></i> Respuesta veloz</em></div>
+        </div>
       </div>
     </div>
   </div>
@@ -405,7 +424,7 @@
     <p>Agenda una demo y mira a KIVOX tomar pedidos, cobrar y despachar en vivo con los datos de tu negocio.</p>
     <div style="display:flex;gap:13px;justify-content:center;flex-wrap:wrap;position:relative;z-index:2">
       <a class="btn btn-ink" href="https://wa.me/573216499744?text=Hola%2C%20quiero%20una%20demo%20de%20KIVOX" target="_blank" rel="noopener"><i class="fa-brands fa-whatsapp"></i> Solicitar demo <span class="arr"><i class="fa-solid fa-arrow-right"></i></span></a>
-      <a class="btn btn-line" href="/comunicacion" style="border-color:rgba(13,18,14,.35)"><i class="fa-solid fa-comments"></i> Ver Comunicación</a>
+      <a class="btn btn-line" href="/comunicacion" style="border-color:rgba(13,18,14,.35)"><i class="fa-solid fa-comments"></i> Ver Omnicanalidad</a>
     </div>
   </div>
 </section>
