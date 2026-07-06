@@ -325,14 +325,17 @@ header::after{content:'';position:absolute;left:0;bottom:0;height:2px;width:100%
 .ia-feats .f{display:flex;gap:13px;font-size:15px;font-weight:600;align-items:flex-start;line-height:1.55}
 .ia-feats .f i{color:var(--lime);margin-top:3px}
 /* filmstrip */
-.strip-wrap{overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x mandatory;display:flex;align-items:center;justify-content:flex-start;gap:18px;padding:52px 24px 20px;max-width:1240px;margin:0 auto;scrollbar-width:none}
+.strip-wrap{overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x mandatory;display:flex;align-items:center;justify-content:center;gap:14px;padding:52px 24px 20px;max-width:1240px;margin:0 auto;scrollbar-width:none}
 .strip-wrap::-webkit-scrollbar{display:none}
-.clip{flex:0 0 auto;height:min(380px,52vh);scroll-snap-align:center;border-radius:22px;overflow:hidden;position:relative;border:1.5px solid var(--ink);background:var(--ink);box-shadow:0 24px 50px rgba(13,18,14,.16)}
+.clip{flex:0 0 auto;height:min(285px,19vw);scroll-snap-align:center;border-radius:22px;overflow:hidden;position:relative;border:1.5px solid var(--ink);background:var(--ink);box-shadow:0 24px 50px rgba(13,18,14,.16)}
 .clip video{height:100%;width:auto;aspect-ratio:16/9;object-fit:cover;display:block}
 .clip.v video{aspect-ratio:9/16}
+/* en móvil: tira deslizable con clips más grandes */
+@media(max-width:900px){.strip-wrap{justify-content:flex-start;gap:16px}.clip{height:min(340px,48vh)}}
 .clip .cap{position:absolute;left:14px;bottom:14px;right:14px;display:flex;justify-content:space-between;align-items:center;background:rgba(13,18,14,.78);backdrop-filter:blur(8px);color:#fff;font-size:12.5px;font-weight:700;border-radius:12px;padding:10px 15px}
 .clip .cap i{color:var(--lime)}
 .strip-hint{text-align:center;font-size:12.5px;color:var(--gray);font-weight:600;margin-top:8px}
+@media(min-width:901px){.strip-hint{display:none}}
 /* así se ve por dentro */
 .shots{margin-top:44px}
 .shot-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px}
