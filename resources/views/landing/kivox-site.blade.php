@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>KIVOX — Atención y ventas por WhatsApp con IA | Omnicanal + ERP</title>
+<title>KIVOX — TecnoByte360 | Atención y ventas por WhatsApp con IA</title>
 <meta name="description" content="Software omnicanal con inteligencia artificial: atiende y vende por WhatsApp, Instagram, Facebook y web, toma pedidos automáticamente y conéctalos a tu ERP (SAP Business One, HGI y API a medida). Chatbot con IA, pagos en línea y domicilios con mapa en vivo. Hecho en Colombia.">
 <meta name="keywords" content="software omnicanal, chatbot WhatsApp con IA, atención al cliente WhatsApp, CRM WhatsApp, tomar pedidos por WhatsApp, WhatsApp Business API, integración ERP, SAP Business One, HGI, inteligencia artificial ventas, KIVOX, Colombia">
 <meta name="author" content="TecnoByte360">
@@ -52,8 +52,8 @@
   --gray:#6C7A70;--line:#E4E6DC;--line-f:rgba(198,244,95,.14);
 }
 *{margin:0;padding:0;box-sizing:border-box;-webkit-font-smoothing:antialiased}
-html{scroll-behavior:smooth;overflow-x:hidden;max-width:100%}
-body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:var(--cream);color:var(--ink);letter-spacing:-.002em;overflow-x:hidden;max-width:100%;width:100%;position:relative}
+html{scroll-behavior:smooth;overflow-x:hidden;max-width:100%;overscroll-behavior-x:none}
+body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:var(--cream);color:var(--ink);letter-spacing:-.002em;overflow-x:hidden;max-width:100%;width:100%;position:relative;overscroll-behavior-x:none}
 a{color:inherit;text-decoration:none}img{max-width:100%}
 .disp{font-family:'Space Grotesk',sans-serif;font-weight:700;letter-spacing:-.02em}
 section{position:relative;padding:100px 24px}
@@ -325,7 +325,7 @@ header::after{content:'';position:absolute;left:0;bottom:0;height:2px;width:100%
 .ia-feats .f{display:flex;gap:13px;font-size:15px;font-weight:600;align-items:flex-start;line-height:1.55}
 .ia-feats .f i{color:var(--lime);margin-top:3px}
 /* filmstrip */
-.strip-wrap{overflow-x:auto;scroll-snap-type:x mandatory;display:flex;align-items:center;justify-content:flex-start;gap:18px;padding:52px 24px 20px;max-width:1240px;margin:0 auto;scrollbar-width:none}
+.strip-wrap{overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x mandatory;display:flex;align-items:center;justify-content:flex-start;gap:18px;padding:52px 24px 20px;max-width:1240px;margin:0 auto;scrollbar-width:none}
 .strip-wrap::-webkit-scrollbar{display:none}
 .clip{flex:0 0 auto;height:min(380px,52vh);scroll-snap-align:center;border-radius:22px;overflow:hidden;position:relative;border:1.5px solid var(--ink);background:var(--ink);box-shadow:0 24px 50px rgba(13,18,14,.16)}
 .clip video{height:100%;width:auto;aspect-ratio:16/9;object-fit:cover;display:block}
@@ -1116,13 +1116,13 @@ footer{background:var(--ink);color:#B9C4BB;padding:70px 24px 34px;border-radius:
   <div class="foot">
     <div>
       <a class="logo" href="#top" style="color:#fff"><img src="https://kivox.co/storage/plataforma/plataforma-logo-1779417616.png" alt="KIVOX" style="height:30px" onerror="this.style.display='none'">KIVOX</a>
-      <p style="font-size:14.5px;line-height:1.7;margin-top:16px;max-width:330px;color:#8fa094">Plataforma omnicanal empresarial con inteligencia artificial. Un producto de TecnoByte360.</p>
+      <p style="font-size:14.5px;line-height:1.7;margin-top:16px;max-width:330px;color:#8fa094">Plataforma omnicanal empresarial con inteligencia artificial. Un producto de <a href="https://portafolio.tecnobyte360.com/" target="_blank" rel="noopener" style="color:#C6F45F;font-weight:700">TecnoByte360</a>.</p>
     </div>
     <div><h4>Plataforma</h4><a href="#nosotros">Por qué KIVOX</a><a href="#modulos">Qué hace</a><a href="#ia">Inteligencia artificial</a><a href="#erp">Integraciones</a></div>
     <div><h4>Empresa</h4><a href="https://admin.kivox.co/login">Acceder</a><a href="mailto:comercial@tecnobyte360.com">Contacto</a><a href="/privacidad">Privacidad</a><a href="/terminos">Términos</a></div>
   </div>
   <div class="foot-mark">KIVOX</div>
-  <div class="foot-copy"><span>© {{ date('Y') }} KIVOX · Un producto de TecnoByte360</span><span>Hecho en Colombia 🇨🇴</span></div>
+  <div class="foot-copy"><span>© {{ date('Y') }} KIVOX · Un producto de <a href="https://portafolio.tecnobyte360.com/" target="_blank" rel="noopener" style="color:#C6F45F;font-weight:700">TecnoByte360</a></span><span>Hecho en Colombia 🇨🇴</span></div>
 </footer>
 
 @verbatim
