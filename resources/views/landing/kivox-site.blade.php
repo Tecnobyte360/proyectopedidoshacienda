@@ -3,22 +3,38 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>KIVOX — Tu empresa entera, respondiendo en segundos</title>
-<meta name="description" content="KIVOX conecta WhatsApp, Instagram, Facebook, tu web y tu ERP en una sola plataforma con inteligencia artificial. Vende más, atiende mejor y automatiza procesos. Integrado con SAP Business One, HGI y cualquier ERP o API a medida.">
-<meta name="robots" content="index,follow">
+<title>KIVOX — Atención y ventas por WhatsApp con IA | Omnicanal + ERP</title>
+<meta name="description" content="Software omnicanal con inteligencia artificial: atiende y vende por WhatsApp, Instagram, Facebook y web, toma pedidos automáticamente y conéctalos a tu ERP (SAP Business One, HGI y API a medida). Chatbot con IA, pagos en línea y domicilios con mapa en vivo. Hecho en Colombia.">
+<meta name="keywords" content="software omnicanal, chatbot WhatsApp con IA, atención al cliente WhatsApp, CRM WhatsApp, tomar pedidos por WhatsApp, WhatsApp Business API, integración ERP, SAP Business One, HGI, inteligencia artificial ventas, KIVOX, Colombia">
+<meta name="author" content="TecnoByte360">
+<meta name="robots" content="index,follow,max-image-preview:large">
+<meta name="language" content="es">
+<meta name="geo.region" content="CO">
+<meta name="geo.placename" content="Colombia">
 <link rel="canonical" href="https://kivox.co">
 <meta property="og:type" content="website">
+<meta property="og:locale" content="es_CO">
 <meta property="og:site_name" content="KIVOX">
-<meta property="og:title" content="KIVOX — Plataforma omnicanal empresarial con IA">
-<meta property="og:description" content="Tu empresa entera, respondiendo en segundos. Canales + IA + ERP en una sola plataforma.">
+<meta property="og:title" content="KIVOX — Atención y ventas por WhatsApp con IA">
+<meta property="og:description" content="Software omnicanal con IA: atiende, vende y toma pedidos por WhatsApp, Instagram y web, conectado a tu ERP. Pagos en línea y domicilios con mapa en vivo.">
 <meta property="og:url" content="https://kivox.co">
-<meta property="og:image" content="https://kivox.co/storage/plataforma/plataforma-logo-1779417616.png">
+<meta property="og:image" content="https://kivox.co/img/og-kivox.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="KIVOX — Atención y ventas por WhatsApp con inteligencia artificial">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="KIVOX — Atención y ventas por WhatsApp con IA">
+<meta name="twitter:description" content="Software omnicanal con IA: WhatsApp, Instagram, web y ERP en una sola plataforma. Pagos y domicilios con mapa en vivo.">
+<meta name="twitter:image" content="https://kivox.co/img/og-kivox.jpg">
 <meta name="theme-color" content="#FBFBF7">
 <link rel="icon" type="image/png" href="https://kivox.co/storage/plataforma/plataforma-logo-1779417616.png">
 @verbatim
 <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"SoftwareApplication","name":"KIVOX","applicationCategory":"BusinessApplication","operatingSystem":"Web","description":"Plataforma omnicanal empresarial con inteligencia artificial. Conecta WhatsApp, Instagram, Facebook, web y ERP (SAP Business One, HGI y API a medida).","url":"https://kivox.co","author":{"@type":"Organization","name":"TecnoByte360","email":"comercial@tecnobyte360.com"},"offers":{"@type":"Offer","priceCurrency":"COP","price":"0","description":"Demo gratuita"}}
+{"@context":"https://schema.org","@graph":[
+{"@type":"Organization","@id":"https://kivox.co/#organization","name":"KIVOX","url":"https://kivox.co","logo":{"@type":"ImageObject","url":"https://kivox.co/storage/plataforma/plataforma-logo-1779417616.png"},"image":"https://kivox.co/img/og-kivox.jpg","description":"Plataforma omnicanal empresarial con inteligencia artificial para atender y vender por WhatsApp, Instagram, Facebook y web, con integración a ERP.","email":"comercial@tecnobyte360.com","areaServed":{"@type":"Country","name":"Colombia"},"parentOrganization":{"@type":"Organization","name":"TecnoByte360","url":"https://portafolio.tecnobyte360.com/"},"contactPoint":{"@type":"ContactPoint","contactType":"sales","email":"comercial@tecnobyte360.com","availableLanguage":["Spanish"],"areaServed":"CO"}},
+{"@type":"WebSite","@id":"https://kivox.co/#website","url":"https://kivox.co","name":"KIVOX","inLanguage":"es-CO","publisher":{"@id":"https://kivox.co/#organization"}},
+{"@type":"SoftwareApplication","name":"KIVOX","applicationCategory":"BusinessApplication","operatingSystem":"Web","inLanguage":"es-CO","url":"https://kivox.co","description":"Software omnicanal con IA: atiende y vende por WhatsApp, Instagram, Facebook y web, toma pedidos automáticamente y los conecta a tu ERP (SAP Business One, HGI y API a medida). Incluye pagos en línea y domicilios con mapa en vivo.","publisher":{"@id":"https://kivox.co/#organization"},"offers":{"@type":"Offer","priceCurrency":"COP","price":"0","description":"Demo gratuita"}}
+]}
 </script>
 @endverbatim
 <link rel="preconnect" href="https://fonts.googleapis.com">

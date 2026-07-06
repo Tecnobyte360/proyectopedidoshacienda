@@ -179,6 +179,26 @@ Route::redirect('/site', '/', 301)->name('landing.preview');
 Route::get('/comunicacion', fn () => view('landing.kivox-comunicacion'))->name('landing.comunicacion');
 Route::get('/operacion', fn () => view('landing.kivox-operacion'))->name('landing.operacion');
 
+// 🗺️ Sitemap XML para buscadores (solo en el root domain kivox.co)
+Route::get('/sitemap.xml', function () {
+    $hoy = now()->toDateString();
+    $urls = [
+        ['loc' => 'https://kivox.co/',              'pri' => '1.0', 'freq' => 'weekly'],
+        ['loc' => 'https://kivox.co/comunicacion',  'pri' => '0.9', 'freq' => 'monthly'],
+        ['loc' => 'https://kivox.co/operacion',     'pri' => '0.9', 'freq' => 'monthly'],
+        ['loc' => 'https://kivox.co/privacidad',    'pri' => '0.3', 'freq' => 'yearly'],
+        ['loc' => 'https://kivox.co/terminos',      'pri' => '0.3', 'freq' => 'yearly'],
+    ];
+    $xml  = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
+    $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
+    foreach ($urls as $u) {
+        $xml .= "  <url><loc>{$u['loc']}</loc><lastmod>{$hoy}</lastmod>"
+              . "<changefreq>{$u['freq']}</changefreq><priority>{$u['pri']}</priority></url>\n";
+    }
+    $xml .= '</urlset>';
+    return response($xml, 200)->header('Content-Type', 'application/xml');
+})->name('sitemap');
+
 // 📄 Páginas legales públicas (requeridas por App Review de Meta/Instagram)
 Route::view('/privacidad',      'legal.privacidad')->name('legal.privacidad');
 Route::view('/privacidad-repartidores', 'legal.privacidad-repartidores')->name('legal.privacidad-repartidores');
