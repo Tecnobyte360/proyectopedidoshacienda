@@ -771,12 +771,6 @@ footer{background:var(--ink);color:#B9C4BB;padding:70px 24px 34px;border-radius:
     <div>
       <h1 class="reveal">Tu empresa entera, respondiendo en <span class="hl">2 segundos<svg viewBox="0 0 300 14" preserveAspectRatio="none"><path d="M4 10 C 80 2, 220 2, 296 8"/></svg></span>.<span class="spark"><i class="fa-solid fa-bolt"></i></span></h1>
       <p class="hsub reveal d1">Atiende, vende y gestiona pedidos <b>automáticamente</b> por WhatsApp, Instagram y más.</p>
-      <div class="hfeats reveal d1">
-        <div class="hf"><span class="hf-ic"><i class="fa-solid fa-bolt"></i></span><b>Respuesta instantánea</b></div>
-        <div class="hf"><span class="hf-ic"><i class="fa-solid fa-shield-halved"></i></span><b>Pago seguro integrado</b></div>
-        <div class="hf"><span class="hf-ic"><i class="fa-solid fa-chart-simple"></i></span><b>Todo tu negocio en un solo lugar</b></div>
-        <div class="hf"><span class="hf-ic"><i class="fa-solid fa-user-group"></i></span><b>Nadie tocó el teléfono</b></div>
-      </div>
       <div class="hctas reveal d2">
         <a class="btn btn-ink btn-grad" href="#demo">Solicitar demo <span class="arr"><i class="fa-solid fa-arrow-right"></i></span></a>
         <a class="btn btn-line" href="#modulos">Qué hace KIVOX</a>
