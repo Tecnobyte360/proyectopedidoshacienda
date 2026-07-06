@@ -98,6 +98,8 @@ header::after{content:'';position:absolute;left:0;bottom:0;height:2px;width:100%
 .hero{padding:124px 24px 20px;overflow:hidden}
 @media(max-width:960px){.hero{padding:120px 24px 30px}}
 .hero .hgrid{display:grid;grid-template-columns:1.1fr .9fr;gap:44px;align-items:center}
+.hero .hgrid>*{min-width:0}
+.phone-zone{max-width:100%}
 @media(max-width:960px){.hero .hgrid{grid-template-columns:1fr}}
 .hero h1{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:clamp(33px,4.3vw,58px);line-height:1.08;letter-spacing:-.018em}
 .hero h1 .hl{position:relative;display:inline-block;color:var(--green-d)}
@@ -110,21 +112,59 @@ header::after{content:'';position:absolute;left:0;bottom:0;height:2px;width:100%
 .hero .chip{font-size:12.5px;font-weight:700;color:var(--ink2);background:#fff;border:1px solid var(--line);border-radius:999px;padding:9px 16px;display:inline-flex;gap:8px;align-items:center}
 .hero .chip i{color:var(--green)}
 /* badge circular girando */
-.spin-badge{position:absolute;top:-30px;right:6%;width:112px;height:112px;z-index:5;display:grid;place-items:center}
+.spin-badge{position:absolute;top:-26px;left:-2%;width:104px;height:104px;z-index:5;display:grid;place-items:center}
 @media(max-width:960px){.spin-badge{display:none}}
 .spin-badge svg{position:absolute;inset:0;animation:spin 14s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 .spin-badge .c{width:52px;height:52px;border-radius:50%;background:var(--lime);display:grid;place-items:center;font-size:20px;color:var(--ink)}
 /* phone */
-.phone-zone{position:relative;display:flex;justify-content:center}
-.phone{width:min(340px,88vw);background:var(--ink);border-radius:44px;padding:12px;box-shadow:0 50px 100px rgba(13,18,14,.28);position:relative;z-index:2;transform:rotate(2.5deg) translateY(18px)}
-@media(max-width:960px){.phone{transform:rotate(2.5deg)}}
+.phone-zone{position:relative;display:flex;justify-content:center;align-items:center;min-height:600px}
+@media(max-width:960px){.phone-zone{min-height:auto;margin-top:26px}}
+/* ===== escenario 3D premium ===== */
+.stage-glow{position:absolute;inset:-6% -8%;z-index:0;pointer-events:none}
+.stage-glow .rays{position:absolute;left:50%;top:47%;width:760px;height:760px;transform:translate(-50%,-50%);background:conic-gradient(from 0deg,transparent 0 6deg,rgba(198,244,95,.28) 7deg 9deg,transparent 10deg 18deg,rgba(14,162,107,.20) 19deg 21deg,transparent 22deg 29deg,rgba(198,244,95,.22) 30deg 32deg,transparent 33deg 41deg,rgba(14,162,107,.16) 42deg 44deg,transparent 45deg);border-radius:50%;-webkit-mask:radial-gradient(circle,transparent 20%,#000 30%,#000 60%,transparent 74%);mask:radial-gradient(circle,transparent 20%,#000 30%,#000 60%,transparent 74%);animation:spin 46s linear infinite}
+.stage-glow .halo{position:absolute;left:50%;top:47%;width:560px;height:560px;transform:translate(-50%,-50%);background:radial-gradient(circle,rgba(30,201,133,.5),rgba(14,162,107,.24) 40%,rgba(198,244,95,.10) 60%,transparent 72%);filter:blur(3px);animation:haloPulse 5s ease-in-out infinite}
+@keyframes haloPulse{50%{opacity:.75;transform:translate(-50%,-50%) scale(1.05)}}
+@media(max-width:600px){.stage-glow .rays{width:460px;height:460px}.stage-glow .halo{width:320px;height:320px}}
+/* pódium glossy */
+.podium{position:absolute;left:50%;bottom:1%;width:380px;height:130px;transform:translateX(-50%);z-index:2;pointer-events:none}
+.podium .disc{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);width:340px;height:96px;border-radius:50%;background:radial-gradient(ellipse at 50% 32%,#2fe098,#0fa869 48%,#0a6e49);box-shadow:0 40px 80px rgba(15,168,105,.6),0 0 60px rgba(47,224,152,.45),inset 0 9px 24px rgba(255,255,255,.4),inset 0 -12px 22px rgba(6,60,40,.45)}
+.podium .ring{position:absolute;left:50%;bottom:-4px;transform:translateX(-50%);width:404px;height:118px;border-radius:50%;border:2px solid rgba(198,244,95,.7);box-shadow:0 0 50px rgba(198,244,95,.5);animation:ringGlow 4s ease-in-out infinite}
+@keyframes ringGlow{50%{opacity:.45;transform:translateX(-50%) scale(1.04)}}
+@media(max-width:600px){.podium{width:260px;bottom:-4%}.podium .disc{width:240px;height:64px}.podium .ring{width:280px;height:80px}}
+/* chips flotantes de beneficio */
+.fchip{position:absolute;z-index:6;display:flex;align-items:center;gap:9px;background:rgba(255,255,255,.92);backdrop-filter:blur(6px);border:1px solid var(--line);border-radius:14px;padding:10px 14px;font-size:12.5px;font-weight:800;color:var(--ink);box-shadow:0 18px 40px rgba(13,18,14,.14);max-width:186px;line-height:1.25}
+.fchip i{width:26px;height:26px;flex:none;border-radius:8px;background:#EAF7F0;color:var(--green-d);display:grid;place-items:center;font-size:12px}
+.fchip.fc1{top:20%;right:-3%;animation:floaty 5.5s ease-in-out infinite}
+.fchip.fc2{top:45%;right:-6%;animation:floaty 6.5s ease-in-out .6s infinite}
+.fchip.fc3{top:69%;right:-2%;animation:floaty 6s ease-in-out 1.2s infinite}
+@keyframes floaty{50%{transform:translateY(-11px)}}
+@media(max-width:1180px){.fchip{max-width:160px;font-size:11.5px}.fchip.fc1{right:-6%}.fchip.fc2{right:-9%}.fchip.fc3{right:-6%}}
+@media(max-width:960px){.fchip.fc1{top:8%;right:0}.fchip.fc2{top:44%;right:-2%}.fchip.fc3{top:80%;right:2%}}
+@media(max-width:600px){.fchip{display:none}}
+/* spark del titular */
+.hero h1 .spark{display:inline-block;color:var(--lime-d);margin-left:6px;font-size:.62em;transform:translateY(-.18em);filter:drop-shadow(0 2px 6px rgba(198,244,95,.6));animation:sparkle 2.4s ease-in-out infinite}
+@keyframes sparkle{0%,100%{opacity:1;transform:translateY(-.18em) scale(1)}50%{opacity:.55;transform:translateY(-.18em) scale(.82)}}
+/* subtítulo, features y trust */
+.hsub{margin-top:22px;font-size:clamp(16px,1.4vw,19px);color:var(--gray2,#546055);line-height:1.55;max-width:520px}
+.hsub b{color:var(--green-d);font-weight:800}
+.hfeats{display:grid;grid-template-columns:repeat(4,auto);gap:22px;margin-top:30px}
+@media(max-width:520px){.hfeats{grid-template-columns:repeat(2,1fr);gap:16px}}
+.hf{display:flex;flex-direction:column;gap:9px;max-width:120px}
+.hf-ic{width:44px;height:44px;border-radius:13px;background:linear-gradient(135deg,#eafaf0,#d6f6e4);border:1px solid #cdeeda;color:var(--green-d);display:grid;place-items:center;font-size:17px;box-shadow:0 8px 18px rgba(14,162,107,.14)}
+.hf b{font-size:12.5px;font-weight:800;color:var(--ink);line-height:1.28}
+.htrust{display:inline-flex;align-items:center;gap:9px;margin-top:26px;font-size:13.5px;font-weight:700;color:var(--gray2,#546055)}
+.htrust i{color:var(--green)}
+.btn-grad{background:linear-gradient(135deg,#12B76A,#0B8659)!important;color:#fff!important;border:none!important;box-shadow:0 14px 30px rgba(11,134,89,.32)}
+.btn-grad:hover{filter:brightness(1.05);transform:translateY(-2px)}
+.phone{width:min(330px,86vw);background:var(--ink);border-radius:44px;padding:12px;box-shadow:0 60px 110px rgba(10,70,46,.4),0 20px 50px rgba(13,18,14,.28);position:relative;z-index:3;transform:rotate(-1deg) translateY(-28px)}
+@media(max-width:960px){.phone{transform:rotate(-1deg)}}
 .verif{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;background:#25D366;color:#fff;font-size:8px;vertical-align:middle;margin-left:3px}
-.meta-badge{position:absolute;top:8px;left:-6%;z-index:6;display:flex;align-items:center;gap:10px;background:#fff;border:1px solid var(--line);border-radius:14px;padding:10px 15px;box-shadow:0 20px 44px rgba(13,18,14,.14);transform:rotate(-3deg)}
+.meta-badge{position:absolute;top:2%;right:-4%;z-index:7;display:flex;align-items:center;gap:10px;background:#fff;border:1px solid var(--line);border-radius:14px;padding:10px 15px;box-shadow:0 20px 44px rgba(13,18,14,.14);transform:rotate(3deg)}
 .meta-badge i{font-size:24px;color:#0081FB}
 .meta-badge span{font-size:11px;font-weight:600;color:var(--gray);line-height:1.3}
 .meta-badge b{color:var(--ink);font-size:12.5px;font-weight:800}
-@media(max-width:960px){.meta-badge{left:2%;top:-6px}}
+@media(max-width:960px){.meta-badge{right:2%;top:-6px}}
 .phone .screen{background:#EDE8DF;border-radius:34px;overflow:hidden}
 .phone .ph-top{display:flex;align-items:center;gap:10px;background:var(--green-d);color:#fff;padding:14px 16px 12px}
 .phone .ph-top .av{width:36px;height:36px;border-radius:50%;background:#fff;display:grid;place-items:center;font-size:14px;overflow:hidden;flex-shrink:0}
@@ -646,9 +686,16 @@ footer{background:var(--ink);color:#B9C4BB;padding:70px 24px 34px;border-radius:
   .hubmap .hub{width:64px;height:64px;border-radius:18px}
   .hubmap .hub img{width:38px;height:38px}
   .relmap .warn{font-size:10px;padding:5px 11px}
+  /* navbar: solo hamburguesa en móvil (evita desborde horizontal) */
+  .nav .btn{display:none}
+  .hero .hgrid>div{max-width:100%;min-width:0}
+  .hsub{max-width:100%;overflow-wrap:anywhere}
+  .hfeats{margin-top:24px}
+  .hctas{flex-direction:column;align-items:stretch;width:100%}
+  .hctas .btn{width:100%;justify-content:center}
   /* teléfono un poco más chico y centrado */
-  .phone{transform:none!important;margin:0 auto}
-  .meta-badge{top:-10px;left:0;padding:8px 12px}
+  .phone{width:min(300px,82vw);transform:none!important;margin:0 auto}
+  .meta-badge{top:-10px;right:0;left:auto;padding:8px 12px}
   .meta-badge i{font-size:20px}
   .spin-badge{display:none}
   .erp-it{font-size:18px}
@@ -697,7 +744,7 @@ footer{background:var(--ink);color:#B9C4BB;padding:70px 24px 34px;border-radius:
     </div>
     <div style="display:flex;gap:10px;align-items:center">
       <a class="btn btn-line btn-sm" href="https://admin.kivox.co/login">Acceder</a>
-      <a class="btn btn-ink btn-sm" href="#demo">Solicitar demo <span class="arr"><i class="fa-solid fa-arrow-right"></i></span></a>
+      <a class="btn btn-ink btn-sm btn-grad" href="#demo">Solicitar demo <span class="arr"><i class="fa-solid fa-arrow-right"></i></span></a>
       <button class="burger" id="burger" aria-label="Menú"><i class="fa-solid fa-bars"></i></button>
     </div>
   </nav>
@@ -722,13 +769,26 @@ footer{background:var(--ink);color:#B9C4BB;padding:70px 24px 34px;border-radius:
 <section class="hero" id="top">
   <div class="wrap hgrid">
     <div>
-      <h1 class="reveal">Tu empresa entera, respondiendo en <span class="hl">2 segundos<svg viewBox="0 0 300 14" preserveAspectRatio="none"><path d="M4 10 C 80 2, 220 2, 296 8"/></svg></span>.</h1>
+      <h1 class="reveal">Tu empresa entera, respondiendo en <span class="hl">2 segundos<svg viewBox="0 0 300 14" preserveAspectRatio="none"><path d="M4 10 C 80 2, 220 2, 296 8"/></svg></span>.<span class="spark"><i class="fa-solid fa-bolt"></i></span></h1>
+      <p class="hsub reveal d1">Atiende, vende y gestiona pedidos <b>automáticamente</b> por WhatsApp, Instagram y más.</p>
+      <div class="hfeats reveal d1">
+        <div class="hf"><span class="hf-ic"><i class="fa-solid fa-bolt"></i></span><b>Respuesta instantánea</b></div>
+        <div class="hf"><span class="hf-ic"><i class="fa-solid fa-shield-halved"></i></span><b>Pago seguro integrado</b></div>
+        <div class="hf"><span class="hf-ic"><i class="fa-solid fa-chart-simple"></i></span><b>Todo tu negocio en un solo lugar</b></div>
+        <div class="hf"><span class="hf-ic"><i class="fa-solid fa-user-group"></i></span><b>Nadie tocó el teléfono</b></div>
+      </div>
       <div class="hctas reveal d2">
-        <a class="btn btn-ink" href="#demo">Solicitar demo <span class="arr"><i class="fa-solid fa-arrow-right"></i></span></a>
+        <a class="btn btn-ink btn-grad" href="#demo">Solicitar demo <span class="arr"><i class="fa-solid fa-arrow-right"></i></span></a>
         <a class="btn btn-line" href="#modulos">Qué hace KIVOX</a>
       </div>
+      <p class="htrust reveal d2"><i class="fa-solid fa-circle-check"></i> Seguro, confiable y 100% automatizado</p>
     </div>
     <div class="phone-zone reveal d2">
+      <div class="stage-glow"><span class="rays"></span><span class="halo"></span></div>
+      <div class="podium"><span class="disc"></span><span class="ring"></span></div>
+      <div class="fchip fc1"><i class="fa-regular fa-clock"></i> Responde al instante</div>
+      <div class="fchip fc2"><i class="fa-solid fa-cart-shopping"></i> Cierra más ventas</div>
+      <div class="fchip fc3"><i class="fa-solid fa-chart-line"></i> Ahorra tiempo y aumenta tu productividad</div>
       <div class="spin-badge">
         <svg viewBox="0 0 100 100"><defs><path id="circ" d="M 50,50 m -38,0 a 38,38 0 1,1 76,0 a 38,38 0 1,1 -76,0"/></defs><text style="font-size:10.5px;font-weight:700;letter-spacing:.18em;fill:#0D120E;font-family:'Space Grotesk',sans-serif"><textPath href="#circ">OMNICANAL · IA · PEDIDOS · ERP · </textPath></text></svg>
         <span class="c"><i class="fa-solid fa-bolt"></i></span>
