@@ -531,6 +531,18 @@ header::after{content:'';position:absolute;left:0;bottom:0;height:2px;width:100%
 .case{display:inline-flex;align-items:center;gap:9px;background:#fff;border:1.5px solid var(--line);border-radius:999px;padding:13px 22px;font-size:14.5px;font-weight:700;color:var(--ink2);transition:.2s}
 .case:hover{border-color:var(--ink);transform:translateY(-3px)}
 .case i{color:var(--green)}
+/* industrias con fotos */
+.ind-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:38px}
+@media(max-width:900px){.ind-grid{grid-template-columns:repeat(2,1fr);gap:12px}}
+.ind{position:relative;border-radius:18px;overflow:hidden;aspect-ratio:4/5;border:1px solid var(--line);box-shadow:0 16px 36px rgba(13,18,14,.12)}
+.ind img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .55s cubic-bezier(.2,.7,.2,1)}
+.ind:hover img{transform:scale(1.08)}
+.ind::after{content:'';position:absolute;inset:0;background:linear-gradient(to top,rgba(7,48,31,.9) 2%,rgba(7,48,31,.35) 46%,rgba(7,48,31,.05) 72%)}
+.ind .lbl{position:absolute;left:0;right:0;bottom:0;z-index:2;padding:16px 15px 15px;display:flex;align-items:center;gap:10px;color:#fff}
+.ind .lbl i{width:34px;height:34px;flex:none;border-radius:10px;background:rgba(198,244,95,.2);border:1px solid rgba(198,244,95,.45);color:var(--lime);display:grid;place-items:center;font-size:14px}
+.ind .lbl b{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:15.5px;letter-spacing:-.01em}
+.ind-more{display:inline-flex;align-items:center;gap:10px;margin-top:26px;font-size:15px;font-weight:700;color:var(--ink2)}
+.ind-more i{color:var(--green)}
 /* testimonio */
 .t-quote{max-width:1000px;margin:0 auto;text-align:center}
 .t-quote .st{color:#E9A13B;font-size:18px;letter-spacing:5px;margin-bottom:28px}
@@ -1047,16 +1059,18 @@ footer{background:var(--ink);color:#B9C4BB;padding:70px 24px 34px;border-radius:
 <section style="padding-top:40px">
   <div class="wrap">
     <h2 class="reveal d1">Si tus clientes te escriben,<br>KIVOX es para ti.</h2>
-    <div class="cases reveal d2">
-      <span class="case"><i class="fa-solid fa-utensils"></i> Restaurantes</span>
-      <span class="case"><i class="fa-solid fa-warehouse"></i> Distribuidoras</span>
-      <span class="case"><i class="fa-solid fa-screwdriver-wrench"></i> Ferreterías</span>
-      <span class="case"><i class="fa-solid fa-industry"></i> Industrias</span>
-      <span class="case"><i class="fa-solid fa-store"></i> Comercios</span>
-      <span class="case"><i class="fa-solid fa-briefcase"></i> Servicios</span>
-      <span class="case"><i class="fa-solid fa-truck-ramp-box"></i> Logística</span>
-      <span class="case"><i class="fa-solid fa-building-columns"></i> Financiero</span>
+    <p class="lead reveal d2">Vendas, cotices o atiendas por WhatsApp o redes, KIVOX se adapta a tu operación — sin importar el sector.</p>
+    <div class="ind-grid reveal d2">
+      <div class="ind"><img src="/img/industrias/restaurantes.jpg" alt="Restaurantes" loading="lazy"><span class="lbl"><i class="fa-solid fa-utensils"></i><b>Restaurantes</b></span></div>
+      <div class="ind"><img src="/img/industrias/distribuidoras.jpg" alt="Distribuidoras" loading="lazy"><span class="lbl"><i class="fa-solid fa-warehouse"></i><b>Distribuidoras</b></span></div>
+      <div class="ind"><img src="/img/industrias/ferreterias.jpg" alt="Ferreterías" loading="lazy"><span class="lbl"><i class="fa-solid fa-screwdriver-wrench"></i><b>Ferreterías</b></span></div>
+      <div class="ind"><img src="/img/industrias/industrias.jpg" alt="Industrias" loading="lazy"><span class="lbl"><i class="fa-solid fa-industry"></i><b>Industrias</b></span></div>
+      <div class="ind"><img src="/img/industrias/comercios.jpg" alt="Comercios" loading="lazy"><span class="lbl"><i class="fa-solid fa-store"></i><b>Comercios</b></span></div>
+      <div class="ind"><img src="/img/industrias/servicios.jpg" alt="Servicios" loading="lazy"><span class="lbl"><i class="fa-solid fa-briefcase"></i><b>Servicios</b></span></div>
+      <div class="ind"><img src="/img/industrias/logistica.jpg" alt="Logística" loading="lazy"><span class="lbl"><i class="fa-solid fa-truck-ramp-box"></i><b>Logística</b></span></div>
+      <div class="ind"><img src="/img/industrias/financiero.jpg" alt="Financiero" loading="lazy"><span class="lbl"><i class="fa-solid fa-building-columns"></i><b>Financiero</b></span></div>
     </div>
+    <p class="ind-more reveal d2"><i class="fa-solid fa-circle-plus"></i> Y cualquier otra industria donde tus clientes escriban.</p>
   </div>
 </section>
 
@@ -1075,7 +1089,7 @@ footer{background:var(--ink);color:#B9C4BB;padding:70px 24px 34px;border-radius:
     <h2 class="disp">¿Hablamos?</h2>
     <p>Agenda una demo gratuita y mira a KIVOX atender, vender y despachar en vivo con los datos de tu negocio.</p>
     <div style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap;position:relative;z-index:2">
-      <a class="btn btn-ink" href="https://wa.me/573216499744?text=Hola%2C%20quiero%20una%20demo%20de%20KIVOX" target="_blank" rel="noopener"><i class="fa-brands fa-whatsapp"></i> Solicitar demo <span class="arr"><i class="fa-solid fa-arrow-right"></i></span></a>
+      <a class="btn btn-ink" href="https://wa.me/573216499744?text=Hola%2C%20quiero%20una%20demo%20de%20KIVOX" onclick="return kivoxOpenChat(event)"><i class="fa-brands fa-whatsapp"></i> Solicitar demo <span class="arr"><i class="fa-solid fa-arrow-right"></i></span></a>
       <a class="btn btn-line" href="mailto:comercial@tecnobyte360.com" style="border-color:rgba(13,18,14,.35)"><i class="fa-solid fa-envelope"></i> comercial@tecnobyte360.com</a>
     </div>
   </div>
@@ -1097,6 +1111,12 @@ footer{background:var(--ink);color:#B9C4BB;padding:70px 24px 34px;border-radius:
 
 @verbatim
 <script>
+/* abre el widget de chat de KIVOX; si aún no cargó, cae a WhatsApp */
+function kivoxOpenChat(e){
+  var b=document.querySelector('.twcw-container .twcw-btn')||document.querySelector('.twcw-btn');
+  if(b){ if(e&&e.preventDefault)e.preventDefault(); b.click(); return false; }
+  return true; /* deja seguir al href de WhatsApp como respaldo */
+}
 addEventListener('scroll',()=>{document.getElementById('bar').style.width=(scrollY/(document.body.scrollHeight-innerHeight)*100)+'%'},{passive:true});
 const burger=document.getElementById('burger'),mnav=document.getElementById('mnav');
 burger.addEventListener('click',()=>mnav.classList.toggle('open'));
