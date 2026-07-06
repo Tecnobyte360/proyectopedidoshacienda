@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>KIVOX — Tu empresa entera, respondiendo en segundos</title>
-<meta name="description" content="KIVOX conecta WhatsApp, Instagram, Facebook, tu web y tu ERP en una sola plataforma con inteligencia artificial. Vende más, atiende mejor y automatiza procesos. Integrado con SAP Business One, HGI, Siigo y Alegra.">
+<meta name="description" content="KIVOX conecta WhatsApp, Instagram, Facebook, tu web y tu ERP en una sola plataforma con inteligencia artificial. Vende más, atiende mejor y automatiza procesos. Integrado con SAP Business One, HGI y cualquier ERP o API a medida.">
 <meta name="robots" content="index,follow">
 <link rel="canonical" href="https://kivox.co">
 <meta property="og:type" content="website">
@@ -18,7 +18,7 @@
 <link rel="icon" type="image/png" href="https://kivox.co/storage/plataforma/plataforma-logo-1779417616.png">
 @verbatim
 <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"SoftwareApplication","name":"KIVOX","applicationCategory":"BusinessApplication","operatingSystem":"Web","description":"Plataforma omnicanal empresarial con inteligencia artificial. Conecta WhatsApp, Instagram, Facebook, web y ERP (SAP Business One, HGI, Siigo, Alegra).","url":"https://kivox.co","author":{"@type":"Organization","name":"TecnoByte360","email":"comercial@tecnobyte360.com"},"offers":{"@type":"Offer","priceCurrency":"COP","price":"0","description":"Demo gratuita"}}
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"KIVOX","applicationCategory":"BusinessApplication","operatingSystem":"Web","description":"Plataforma omnicanal empresarial con inteligencia artificial. Conecta WhatsApp, Instagram, Facebook, web y ERP (SAP Business One, HGI y API a medida).","url":"https://kivox.co","author":{"@type":"Organization","name":"TecnoByte360","email":"comercial@tecnobyte360.com"},"offers":{"@type":"Offer","priceCurrency":"COP","price":"0","description":"Demo gratuita"}}
 </script>
 @endverbatim
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1037,113 +1037,6 @@ footer{background:var(--ink);color:#B9C4BB;padding:70px 24px 34px;border-radius:
   <div class="strip-hint"><i class="fa-solid fa-arrows-left-right"></i> Desliza para ver más</div>
 </section>
 
-{{-- ============ ASÍ SE VE POR DENTRO ============ --}}
-<section id="dentro" style="padding-top:40px">
-  <div class="wrap">
-    <h2 class="reveal d1">Una plataforma que da gusto usar</h2>
-    <p class="lead reveal d2">Del inicio de sesión al reporte de ventas — así se ve KIVOX por dentro, sin maquillaje.</p>
-    <div class="shots reveal d2">
-      <div class="shot-tabs" id="shotTabs">
-        <button class="shot-tab on" data-p="login" data-url="admin.kivox.co/login" data-c="Acceso seguro y multiempresa"><i class="fa-solid fa-right-to-bracket"></i> Iniciar sesión</button>
-        <button class="shot-tab" data-p="chat" data-url="admin.kivox.co/chat" data-c="Todos los canales en una sola bandeja"><i class="fa-solid fa-comments"></i> Chat en vivo</button>
-        <button class="shot-tab" data-p="desp" data-url="admin.kivox.co/despachos" data-c="Domiciliarios con GPS en tiempo real"><i class="fa-solid fa-map-location-dot"></i> Despachos</button>
-        <button class="shot-tab" data-p="dep" data-url="admin.kivox.co/departamentos" data-c="El bot deriva por palabras clave a cada área"><i class="fa-solid fa-sitemap"></i> Departamentos IA</button>
-        <button class="shot-tab" data-p="rep" data-url="admin.kivox.co/reportes" data-c="Ventas, entregas y top productos al segundo"><i class="fa-solid fa-chart-line"></i> Reportes</button>
-      </div>
-      <div class="shot-frame">
-        <div class="shot-bar"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i><span class="shot-url" id="shotUrl">admin.kivox.co/login</span></div>
-        <div class="shot-view">
-          {{-- LOGIN --}}
-          <div class="mk on" data-panel="login">
-            <div class="mklogin">
-              <div class="l"><div class="lg">K</div><div class="tg">CONECTA · COMUNICA · TRANSFORMA</div></div>
-              <div class="r">
-                <div class="lgm">K</div>
-                <h4>Iniciar sesión</h4>
-                <div class="sub">Ingresa con tus credenciales para continuar</div>
-                <div class="fld"><i class="fa-solid fa-envelope"></i> tucorreo@empresa.com</div>
-                <div class="fld"><i class="fa-solid fa-lock"></i> ••••••••</div>
-                <div class="sbtn">Iniciar sesión</div>
-              </div>
-            </div>
-          </div>
-          {{-- CHAT --}}
-          <div class="mk" data-panel="chat">
-            <div class="mkchat">
-              <div class="cside">
-                <div class="b"><i class="fa-solid fa-bolt"></i> KIVOX</div>
-                <div class="it on"><i class="fa-solid fa-comments"></i> Chat en vivo</div>
-                <div class="it"><i class="fa-solid fa-bag-shopping"></i> Pedidos</div>
-                <div class="it"><i class="fa-solid fa-users"></i> Clientes</div>
-                <div class="it"><i class="fa-solid fa-bullhorn"></i> Campañas</div>
-                <div class="it"><i class="fa-solid fa-chart-line"></i> Reportes</div>
-              </div>
-              <div class="clist">
-                <div class="c on"><span class="av">RF</span><span><b>Ruiz Fernanda</b><small>Pedido #103 en camino</small></span></div>
-                <div class="c"><span class="av" style="background:#DC2743">ZM</span><span><b>Zuelen M.</b><small>Vi la promo ✨</small></span></div>
-                <div class="c"><span class="av" style="background:#1877F2">VO</span><span><b>Vergara Oscar</b><small>¿Domicilio hoy?</small></span></div>
-                <div class="c"><span class="av">SR</span><span><b>Sandra Rojas</b><small>Gracias 🙌</small></span></div>
-              </div>
-              <div class="cconv">
-                <span class="tg"><i class="fa-brands fa-whatsapp"></i> WhatsApp · Ruiz Fernanda</span>
-                <div class="m in">¿Cuánto debo consignar por el domicilio?</div>
-                <div class="m out">Hola 👋 Tu pedido #103 va en $113.615. Domiciliario: Humberto Álvarez 🛵</div>
-                <div class="m in">Perfecto, gracias</div>
-                <div class="m out">¡Con gusto! Sale para tu dirección 🚚</div>
-              </div>
-            </div>
-          </div>
-          {{-- DESPACHOS --}}
-          <div class="mk" data-panel="desp">
-            <div class="mkdesp">
-              <div class="grid"></div>
-              <div class="road" style="top:38%;left:8%;width:60%;transform:rotate(-8deg)"></div>
-              <div class="road" style="top:64%;left:20%;width:55%;transform:rotate(6deg)"></div>
-              <div class="hd"><i class="fa-solid fa-map-location-dot" style="color:#12B76A"></i> Mapa de domiciliarios <span class="live">3 EN VIVO</span></div>
-              <div class="pin g" style="left:28%;top:44%">🛵</div>
-              <div class="pin b" style="left:58%;top:36%">🛵</div>
-              <div class="pin g" style="left:70%;top:62%">🛵</div>
-              <div class="pin o" style="left:44%;top:70%">🛵</div>
-              <div class="pin" style="left:82%;top:48%;background:#fff;border:1px solid #E4EAF2">🏠</div>
-              <div class="zoom"><span>+</span><span>−</span></div>
-            </div>
-          </div>
-          {{-- DEPARTAMENTOS --}}
-          <div class="mk" data-panel="dep">
-            <div class="mkdep">
-              <div class="hd"><i class="fa-solid fa-sitemap"></i> Departamentos · el bot deriva por palabras clave</div>
-              <div class="g">
-                <div class="card"><div class="t"><i class="fa-solid fa-headset" style="color:#12B76A"></i> Servicio al cliente <span class="st">● Activo</span></div><div class="kw"><span>pedido</span><span>ayuda</span><span>estado</span></div></div>
-                <div class="card"><div class="t"><i class="fa-solid fa-handshake" style="color:#3B82F6"></i> Comercial <span class="st">● Activo</span></div><div class="kw"><span>cotización</span><span>mayorista</span><span>b2b</span></div></div>
-                <div class="card"><div class="t"><i class="fa-solid fa-user-tie" style="color:#7C5CFF"></i> RR.HH. <span class="st">● Activo</span></div><div class="kw"><span>vacante</span><span>empleo</span><span>hoja de vida</span></div></div>
-                <div class="card"><div class="t"><i class="fa-solid fa-truck-fast" style="color:#F59E0B"></i> Logística <span class="st">● Activo</span></div><div class="kw"><span>envío</span><span>rastrear</span><span>guía</span></div></div>
-                <div class="card"><div class="t"><i class="fa-solid fa-file-invoice-dollar" style="color:#EC4899"></i> Facturación <span class="st">● Activo</span></div><div class="kw"><span>factura</span><span>pago</span><span>iva</span></div></div>
-                <div class="card"><div class="t"><i class="fa-solid fa-plus" style="color:#0891B2"></i> Nuevo depto. <span class="st">+</span></div><div class="kw"><span>crea el que necesites</span></div></div>
-              </div>
-            </div>
-          </div>
-          {{-- REPORTES --}}
-          <div class="mk" data-panel="rep">
-            <div class="mkrep">
-              <div class="kpis">
-                <div class="kpi hero"><small>Ingresos</small><b>$2.724.450</b></div>
-                <div class="kpi"><small>Pedidos</small><b>28</b></div>
-                <div class="kpi"><small>Entregados</small><b>25</b></div>
-                <div class="kpi"><small>Cancelados</small><b>0</b></div>
-              </div>
-              <div class="row">
-                <div class="panel"><div class="pt">Evolución de ventas · últimos 7 días</div><div class="bars"><i style="height:20%"></i><i style="height:16%"></i><i style="height:22%"></i><i style="height:18%"></i><i style="height:26%"></i><i style="height:40%"></i><i style="height:100%"></i></div></div>
-                <div class="panel"><div class="pt">Pedidos por estado</div><div class="donut"></div></div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="shot-cap" id="shotCap"><b>Acceso seguro y multiempresa</b></div>
-    </div>
-  </div>
-</section>
-
 {{-- ============ ERP ============ --}}
 <section id="erp" style="padding-top:40px">
   <div class="wrap">
@@ -1151,9 +1044,6 @@ footer{background:var(--ink);color:#B9C4BB;padding:70px 24px 34px;border-radius:
     <div class="erp-list reveal d2">
       <div class="erp-it"><span style="display:inline-flex;align-items:center;gap:16px"><img src="/logos/sap.svg" alt="SAP" style="height:34px;width:auto">SAP Business One</span> <small>Pedidos · Inventario · Socios de negocio</small></div>
       <div class="erp-it"><span style="display:inline-flex;align-items:center;gap:16px"><img src="/logos/hgi.png" alt="HGI" style="height:34px;width:auto">HGI</span> <small>Documentos · Cartera · Terceros</small></div>
-      <div class="erp-it">Siigo <small>Facturación · Clientes</small></div>
-      <div class="erp-it">Alegra <small>Facturación · Inventario</small></div>
-      <div class="erp-it"><span style="display:inline-flex;align-items:center;gap:16px"><img src="/logos/wo.png" alt="World Office" style="height:30px;width:auto">World Office</span> <small>Documentos · Contabilidad</small></div>
       <div class="erp-it">Tu ERP o API a medida <small>REST · Webhooks · Bases de datos</small></div>
     </div>
   </div>
@@ -1217,19 +1107,6 @@ addEventListener('scroll',()=>{document.getElementById('bar').style.width=(scrol
 const burger=document.getElementById('burger'),mnav=document.getElementById('mnav');
 burger.addEventListener('click',()=>mnav.classList.toggle('open'));
 mnav.addEventListener('click',()=>mnav.classList.remove('open'));
-/* galería "así se ve por dentro" */
-const shotTabs=document.getElementById('shotTabs');
-if(shotTabs){
-  const sUrl=document.getElementById('shotUrl'),sCap=document.getElementById('shotCap');
-  const panels=document.querySelectorAll('.shot-view .mk');
-  shotTabs.addEventListener('click',e=>{
-    const b=e.target.closest('.shot-tab');if(!b)return;
-    shotTabs.querySelectorAll('.shot-tab').forEach(x=>x.classList.remove('on'));b.classList.add('on');
-    sUrl.textContent=b.dataset.url;
-    sCap.innerHTML='<b>'+b.dataset.c+'</b>';
-    panels.forEach(p=>p.classList.toggle('on',p.dataset.panel===b.dataset.p));
-  });
-}
 
 /* chat del teléfono (loop) */
 const guion=[
