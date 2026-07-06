@@ -753,7 +753,6 @@ footer{background:var(--ink);color:#B9C4BB;padding:70px 24px 34px;border-radius:
         <div class="nav-drop"><div class="dd">
           <div class="dh"><i class="fa-solid fa-comments"></i> Omnicanalidad &amp; Marketing</div>
           <a href="#modulos"><i class="fa-solid fa-layer-group"></i> Atención omnicanal</a>
-          <a href="#ia"><i class="fa-solid fa-robot"></i> Bots con IA</a>
           <a href="#modulos"><i class="fa-solid fa-bullhorn"></i> Campañas masivas</a>
           <a href="#conecta"><i class="fa-solid fa-sitemap"></i> Departamentos</a>
         </div></div>
@@ -780,7 +779,6 @@ footer{background:var(--ink);color:#B9C4BB;padding:70px 24px 34px;border-radius:
 <div class="mnav" id="mnav">
   <div class="mg">Omnicanalidad &amp; Marketing</div>
   <a href="#modulos">Atención omnicanal</a>
-  <a href="#ia">Bots con IA</a>
   <a href="#modulos">Campañas masivas</a>
   <a href="#conecta">Departamentos</a>
   <div class="mg">Pedidos &amp; Domicilios</div>
@@ -1023,28 +1021,6 @@ footer{background:var(--ink);color:#B9C4BB;padding:70px 24px 34px;border-radius:
   </div>
 </section>
 
-{{-- ============ IA (forest) ============ --}}
-<section id="ia" style="padding:60px 16px">
-  <div class="ia">
-    <div class="wrap ia-grid">
-      <div>
-        <h2 class="reveal d1">El empleado que nunca duerme, nunca se enferma y nunca deja un chat en visto.</h2>
-        <div class="ia-feats reveal d2">
-          <div class="f"><i class="fa-solid fa-comment-dots"></i><span>Conversa en lenguaje natural — tus clientes no notan la diferencia</span></div>
-          <div class="f"><i class="fa-solid fa-bag-shopping"></i><span>Toma pedidos completos y los crea en tu ERP</span></div>
-          <div class="f"><i class="fa-solid fa-gears"></i><span>Automatiza procesos internos: cartera, encuestas, recordatorios</span></div>
-        </div>
-      </div>
-      <div class="ia-stats reveal d2">
-        <div class="ia-st"><b>91%</b><span>de conversaciones resueltas sin intervención humana</span></div>
-        <div class="ia-st"><b>2,1 s</b><span>tiempo promedio de respuesta, a cualquier hora</span></div>
-        <div class="ia-st"><b>∞</b><span>clientes atendidos a la vez, sin filas ni esperas</span></div>
-        <div class="ia-st"><b>24/7</b><span>vendiendo mientras tu competencia duerme</span></div>
-      </div>
-    </div>
-  </div>
-</section>
-
 {{-- ============ EN PRODUCCIÓN (filmstrip) ============ --}}
 <section id="produccion" style="padding-bottom:60px">
   <div class="wrap">
@@ -1118,7 +1094,7 @@ footer{background:var(--ink);color:#B9C4BB;padding:70px 24px 34px;border-radius:
       <a class="logo" href="#top" style="color:#fff"><img src="https://kivox.co/storage/plataforma/plataforma-logo-1779417616.png" alt="KIVOX" style="height:30px" onerror="this.style.display='none'">KIVOX</a>
       <p style="font-size:14.5px;line-height:1.7;margin-top:16px;max-width:330px;color:#8fa094">Plataforma omnicanal empresarial con inteligencia artificial. Un producto de <a href="https://portafolio.tecnobyte360.com/" target="_blank" rel="noopener" style="color:#C6F45F;font-weight:700">TecnoByte360</a>.</p>
     </div>
-    <div><h4>Plataforma</h4><a href="#nosotros">Por qué KIVOX</a><a href="#modulos">Qué hace</a><a href="#ia">Inteligencia artificial</a><a href="#erp">Integraciones</a></div>
+    <div><h4>Plataforma</h4><a href="#nosotros">Por qué KIVOX</a><a href="#modulos">Qué hace</a><a href="#erp">Integraciones</a></div>
     <div><h4>Empresa</h4><a href="https://admin.kivox.co/login">Acceder</a><a href="mailto:comercial@tecnobyte360.com">Contacto</a><a href="/privacidad">Privacidad</a><a href="/terminos">Términos</a></div>
   </div>
   <div class="foot-mark">KIVOX</div>
