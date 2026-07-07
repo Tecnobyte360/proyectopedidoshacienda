@@ -1067,15 +1067,18 @@
                         bounds.extend(marker.getPosition());
                     });
 
-                    if (window._despachosDomis.length > 1) {
+                    // 🛡️ Solo encuadrar si REALMENTE hay algo dibujado (marcadores o zonas).
+                    // Si no hay nada, fitBounds con límites vacíos manda el mapa a 0,0 (océano).
+                    if (!bounds.isEmpty()) {
                         map.fitBounds(bounds, { top: 60, right: 40, bottom: 60, left: 40 });
                         const listener = google.maps.event.addListener(map, 'idle', () => {
                             if (map.getZoom() > 15) map.setZoom(15);
                             google.maps.event.removeListener(listener);
                         });
-                    } else if (window._despachosDomis.length === 1) {
-                        map.setCenter(window._despachosDomis[0]);
-                        map.setZoom(15);
+                    } else {
+                        // Ningún domiciliario en vivo y sin zonas: quedarse en la sede.
+                        map.setCenter({ lat: cfg.centerLat, lng: cfg.centerLng });
+                        map.setZoom(cfg.zoom || 12);
                     }
                 };
 
