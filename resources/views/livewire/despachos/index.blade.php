@@ -987,8 +987,8 @@
                     });
 
                     window._despachosDomis.forEach(d => {
-                        // 🚫 No dibujar domiciliarios desconectados (sin GPS en vivo)
-                        if (d.desconectado) return;
+                        // ✅ Dibujar TODOS: los EN VIVO a color, los desconectados en GRIS
+                        // (última ubicación conocida). Antes se ocultaban y el mapa quedaba vacío.
                         const colorEstado = window._dpColorEstado(d.estado, d.desconectado);
 
                         // Pin de moto estilo Waze (gris si desconectado)
@@ -1064,7 +1064,9 @@
                         marker.addListener('click', () => labelDiv.open({ anchor: marker, map }));
 
                         el._markers[d.id] = { marker, pulse, info: labelDiv };
-                        bounds.extend(marker.getPosition());
+                        // Solo encuadrar con los EN VIVO; los desconectados (ubicación vieja
+                        // o registros de prueba lejanos) se dibujan pero no arrastran el mapa.
+                        if (!d.desconectado) bounds.extend(marker.getPosition());
                     });
 
                     // 🛡️ Solo encuadrar si REALMENTE hay algo dibujado (marcadores o zonas).
