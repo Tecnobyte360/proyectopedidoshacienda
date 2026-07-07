@@ -201,7 +201,7 @@ Route::get('/sitemap.xml', function () {
 
 // 🤖 Asistente IA + SAP (producto modular integrado a SAP B1 Service Layer) — módulo Ventas
 Route::middleware(['auth'])->prefix('asistente-sap')->group(function () {
-    Route::get('/',        [\App\Http\Controllers\Sap\AsistenteSapController::class, 'index'])->name('sap.asistente');
+    Route::get('/',        \App\Livewire\Sap\Chat::class)->name('sap.asistente');
     Route::post('/mensaje',[\App\Http\Controllers\Sap\AsistenteSapController::class, 'mensaje'])->name('sap.asistente.mensaje');
     Route::get('/ping',    [\App\Http\Controllers\Sap\AsistenteSapController::class, 'ping'])->name('sap.asistente.ping');
     // Panel de activación por cliente (solo super-admin)
