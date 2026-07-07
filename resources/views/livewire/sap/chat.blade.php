@@ -5,6 +5,20 @@
         @keyframes iasap-glow { 0%,100% { box-shadow:0 0 0 0 rgba(16,185,129,.35);} 50%{ box-shadow:0 0 0 8px rgba(16,185,129,0);} }
         @keyframes iasap-float { 0%,100%{ transform:translateY(0);} 50%{ transform:translateY(-6px);} }
         .iasap-msg { animation: iasap-in .35s cubic-bezier(.2,.8,.2,1) both; }
+        .astep { display:flex; align-items:center; gap:9px; font-size:13.5px; font-weight:600; color:#64748b; opacity:0; transform:translateY(4px); animation: astepIn .35s ease forwards; }
+        .astep + .astep { margin-top:9px; }
+        .astep .dot { position:relative; width:17px; height:17px; flex:none; }
+        .astep .dot .sp { position:absolute; inset:0; border:2px solid #d1fae5; border-top-color:#10b981; border-radius:50%; animation: aspin .7s linear infinite; }
+        .astep .dot .ok { position:absolute; inset:0; display:grid; place-items:center; color:#10b981; font-size:12px; opacity:0; }
+        .as1 { animation-delay:.05s; } .as2 { animation-delay:1.15s; } .as3 { animation-delay:2.3s; }
+        .as1 .sp { animation: aspin .7s linear infinite, aOut 0s linear 1.15s forwards; }
+        .as1 .ok { animation: aIn .25s ease 1.15s forwards; }
+        .as2 .sp { animation: aspin .7s linear infinite, aOut 0s linear 2.3s forwards; }
+        .as2 .ok { animation: aIn .25s ease 2.3s forwards; }
+        @keyframes astepIn { to { opacity:1; transform:none; } }
+        @keyframes aspin { to { transform: rotate(360deg); } }
+        @keyframes aOut { to { opacity:0; } }
+        @keyframes aIn { to { opacity:1; } }
         .iasap-bot-av { animation: iasap-glow 2.4s ease-out infinite; }
         .iasap-scroll::-webkit-scrollbar { width:8px; }
         .iasap-scroll::-webkit-scrollbar-thumb { background:#d1d5db; border-radius:99px; }
@@ -102,12 +116,10 @@
                 <span class="iasap-bot-av flex h-9 w-9 flex-none items-center justify-center rounded-xl text-white text-sm bg-gradient-to-br from-emerald-500 to-emerald-700 shadow">
                     <i class="fa-solid fa-robot"></i>
                 </span>
-                <div class="rounded-2xl rounded-tl-sm px-4 py-3.5 bg-white border border-slate-200 shadow-sm">
-                    <span class="inline-flex gap-1.5">
-                        <span class="h-2 w-2 rounded-full bg-emerald-400 animate-bounce" style="animation-delay:0s"></span>
-                        <span class="h-2 w-2 rounded-full bg-emerald-400 animate-bounce" style="animation-delay:.15s"></span>
-                        <span class="h-2 w-2 rounded-full bg-emerald-400 animate-bounce" style="animation-delay:.3s"></span>
-                    </span>
+                <div class="rounded-2xl rounded-tl-sm px-4 py-3.5 bg-white border border-slate-200 shadow-sm min-w-[210px]">
+                    <div class="astep as1"><span class="dot"><span class="sp"></span><i class="ok fa-solid fa-check"></i></span> Analizando tu solicitud</div>
+                    <div class="astep as2"><span class="dot"><span class="sp"></span><i class="ok fa-solid fa-check"></i></span> Consultando SAP en vivo</div>
+                    <div class="astep as3"><span class="dot"><span class="sp"></span><i class="ok fa-solid fa-check"></i></span> Procesando resultados</div>
                 </div>
             </div>
         </div>
