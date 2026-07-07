@@ -3,6 +3,7 @@
 namespace App\Livewire\Sap;
 
 use App\Services\Sap\Asistente\AsistenteSapService;
+use Illuminate\Support\Str;
 use Livewire\Component;
 
 /**
@@ -34,11 +35,13 @@ class Chat extends Component
         );
         array_pop($historial);
 
-        $r = app(AsistenteSapService::class)->responder($texto, $historial);
+        $r    = app(AsistenteSapService::class)->responder($texto, $historial);
+        $resp = $r['respuesta'] ?? 'No obtuve respuesta.';
 
         $this->mensajes[] = [
             'role'    => 'assistant',
-            'content' => $r['respuesta'] ?? 'No obtuve respuesta.',
+            'content' => $resp,
+            'html'    => Str::markdown($resp, ['html_input' => 'escape', 'allow_unsafe_links' => false]),
             'tools'   => array_values(array_map(fn ($t) => $t['tool'] ?? '', $r['tools_usadas'] ?? [])),
         ];
     }
