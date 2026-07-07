@@ -40,18 +40,6 @@
         $estaImpersonando = session()->has('tenant_imitado_id');
         $verSoloAdmin = $esSuperAdmin && !$estaImpersonando;
 
-        // ¿El tenant actual tiene el Asistente IA + SAP activo (con agentes)?
-        $sapAgentesActivos = false;
-        if ($tenantActivo) {
-            try {
-                $sapCfg = \App\Models\SapTenantConfig::where('tenant_id', $tenantActivo->id)
-                    ->where('activo', true)->first();
-                $sapAgentesActivos = $sapCfg && count($sapCfg->agentesActivos()) > 0;
-            } catch (\Throwable $e) {
-                $sapAgentesActivos = false;
-            }
-        }
-
         $sectionsRaw = [
             [
                 'title' => 'Principal',
@@ -60,7 +48,6 @@
                     ['name' => 'Crear pedido', 'icon' => 'fa-cart-plus',    'route' => 'pedidos.crear-manual','badge' => null, 'permission' => 'pedidos.crear'],
                     ['name' => 'Chat en vivo', 'icon' => 'fa-headset',      'route' => 'chat.index',         'badge' => null,  'permission' => 'chat.usar'],
                     ['name' => 'Enrutar pedidos', 'icon' => 'fa-route',  'route' => 'despachos.index',    'badge' => null,  'permission' => 'despachos.gestionar'],
-                    ['name' => 'IA SAP', 'icon' => 'fa-robot', 'route' => 'sap.asistente', 'badge' => 'IA', 'permission' => null, 'condicion' => $sapAgentesActivos],
                 ],
             ],
             [

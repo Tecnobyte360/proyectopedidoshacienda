@@ -557,6 +557,9 @@
     })();
     </script>
     @endcan
+
+    {{-- Widget flotante del Asistente IA + SAP (se muestra solo si el tenant tiene agentes activos) --}}
+    @livewire('sap.chat-widget')
     @endauth
 </body>
 </html>
