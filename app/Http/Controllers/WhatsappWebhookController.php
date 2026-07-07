@@ -562,23 +562,32 @@ class WhatsappWebhookController extends Controller
                 return response()->json(['status' => 'superseded_by_newer_message']);
             }
 
-            // 🛡️ GUARD ANTI-ALUCINACIÓN: pedidos fuera de horario
-            $reply = $this->aplicarGuardPedidosProgramados($reply);
+            // 🏧 MODO MENÚ: las respuestas del menú determinista son FIJAS y
+            // autoritativas (bancos/instituciones). NO se les aplica ningún
+            // guard ni validador anti-alucinación de IA — eso es solo para
+            // respuestas generadas por LLM. (Ej: el "24/7" de un teléfono de
+            // emergencias NO es un horario inventado.)
+            $enModoMenu = (bool) (optional(\App\Models\ConfiguracionBot::actual())->bot_modo_menu);
 
-            // 🛡️ GUARD CRÍTICO: el bot dice "pedido confirmado" SIN haber
-            // llamado la tool confirmar_pedido en este turno. Esto es
-            // alucinación pura, basada en historial viejo.
-            // Si detectamos esto, REEMPLAZAMOS por un mensaje seguro.
-            $reply = $this->aplicarGuardPedidoFalsoConfirmado($reply, $toolCalls ?? []);
-
-            // 🛡️ VALIDADOR ANTI-ALUCINACIÓN POST-LLM (capa profesional):
-            //    Detecta precios/productos/horarios/promesas inventadas y
-            //    reescribe con respuestas seguras del catálogo real.
             $replyAntesValidador = $reply;
-            try {
-                $reply = app(\App\Services\Bots\ValidadorRespuestaLLM::class)->validar($reply);
-            } catch (\Throwable $e) {
-                Log::warning('Validador respuesta LLM falló (continúa con reply original): ' . $e->getMessage());
+            if (!$enModoMenu) {
+                // 🛡️ GUARD ANTI-ALUCINACIÓN: pedidos fuera de horario
+                $reply = $this->aplicarGuardPedidosProgramados($reply);
+
+                // 🛡️ GUARD CRÍTICO: el bot dice "pedido confirmado" SIN haber
+                // llamado la tool confirmar_pedido en este turno. Esto es
+                // alucinación pura, basada en historial viejo.
+                // Si detectamos esto, REEMPLAZAMOS por un mensaje seguro.
+                $reply = $this->aplicarGuardPedidoFalsoConfirmado($reply, $toolCalls ?? []);
+
+                // 🛡️ VALIDADOR ANTI-ALUCINACIÓN POST-LLM (capa profesional):
+                //    Detecta precios/productos/horarios/promesas inventadas y
+                //    reescribe con respuestas seguras del catálogo real.
+                try {
+                    $reply = app(\App\Services\Bots\ValidadorRespuestaLLM::class)->validar($reply);
+                } catch (\Throwable $e) {
+                    Log::warning('Validador respuesta LLM falló (continúa con reply original): ' . $e->getMessage());
+                }
             }
 
             // 🛡️ Si el validador modificó el reply, actualizar el ÚLTIMO mensaje
@@ -1136,20 +1145,31 @@ class WhatsappWebhookController extends Controller
         // ════════════════════════════════════════════════════════════════════
         $cfgMenu = \App\Models\ConfiguracionBot::actual();
         if (!empty($cfgMenu->bot_modo_menu) && is_array($cfgMenu->menu_json) && !empty($cfgMenu->menu_json)) {
+            $replyMenu = '';
             try {
                 $replyMenu = app(\App\Services\MenuDeterministaService::class)
                     ->responder($cfgMenu->menu_json, $tenantId, $telefonoNorm, $message, is_string($connectionId) ? $connectionId : null);
-                if ($replyMenu !== '') {
-                    $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_ASSISTANT, $replyMenu);
-                }
-                Log::info('🏧 MODO MENÚ determinista respondió', [
-                    'conv_id' => $conversacion->id,
-                    'in'      => mb_substr($message, 0, 40),
-                ]);
-                return $replyMenu;
             } catch (\Throwable $e) {
-                Log::error('🏧 MODO MENÚ falló (cae a flujo normal): ' . $e->getMessage());
+                // 🛡️ BLINDAJE: en modo menú (bancos/instituciones) NUNCA caemos a IA.
+                // Si el motor falla, re-mostramos el menú de bienvenida en vez de
+                // dejar que el flujo de IA genere una respuesta no autorizada.
+                Log::error('🏧 MODO MENÚ falló (se re-muestra menú, NO IA): ' . $e->getMessage());
+                $replyMenu = $cfgMenu->menu_json['welcome']['text'] ?? 'Menú no disponible. Intenta de nuevo.';
             }
+
+            if ($replyMenu === '') {
+                // Nunca respuesta vacía en modo menú: re-mostrar bienvenida.
+                $replyMenu = $cfgMenu->menu_json['welcome']['text'] ?? '';
+            }
+            if ($replyMenu !== '') {
+                $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_ASSISTANT, $replyMenu);
+            }
+            Log::info('🏧 MODO MENÚ determinista respondió', [
+                'conv_id' => $conversacion->id,
+                'in'      => mb_substr($message, 0, 40),
+            ]);
+            // 🔒 SIEMPRE retornamos aquí: un tenant en modo menú jamás continúa a IA.
+            return $replyMenu;
         }
 
         // ── HISTORIAL: reducido a últimos 10 (en vez de 20) para evitar
@@ -8077,11 +8097,18 @@ TXT;
         // 🛡️ ADEMÁS de notes/payment_method, detectar pickup en address si contiene
         // "sede" o "recoger" — el LLM a veces pone "Sede Principal" como address
         $addressForDetect = (string) ($orderData['address'] ?? '');
+        // 🚚 Marca explícita de DOMICILIO (la manda el pedido manual). Cuando
+        //    está presente, el sede_id (sede que despacha) NO debe interpretarse
+        //    como "recoger" — un domicilio también sale de una sede.
+        $marcaDomicilioExplicita = (($orderData['metodo_entrega'] ?? null) === 'domicilio');
         $esPickup = !empty($orderData['pickup'])
-            || !empty($orderData['sede_id'])
+            || (!$marcaDomicilioExplicita && !empty($orderData['sede_id']))
             || (isset($pickupTime) && $pickupTime !== null)
             || preg_match('/\b(recog(?:er|erlo|erla|emos|ida|ido)|paso\s+por|pasar\s+por|en\s+sede|recoj[oa]|en\s+la\s+sede|recoge\s+en\s+sede)\b/iu', $textoEntrega) === 1
             || preg_match('/^\s*sede(\s|$|:)/iu', $addressForDetect) === 1; // address comienza con "Sede X"
+        if ($marcaDomicilioExplicita && empty($orderData['pickup'])) {
+            $esPickup = false; // domicilio explícito gana (salvo pickup=true explícito)
+        }
 
         // 🛡️ FUENTE DE VERDAD: el estado persistente. Si el captador determinista
         //    detectó "recoger" en la conversación, gana sobre lo que el LLM
@@ -8465,7 +8492,9 @@ TXT;
 
         // ── VALIDACIÓN: pedido mínimo por zona ──────────────────────────────
         // Solo aplica si hay zona (es domicilio) y tiene mínimo configurado.
-        if ($zonaCobertura && (float) $zonaCobertura->pedido_minimo > 0) {
+        // ⚠️ EXCEPCIÓN: en pedidos MANUALES el operador decide; no se bloquea
+        // por el mínimo de zona (igual que la excepción de cobertura).
+        if ($zonaCobertura && (float) $zonaCobertura->pedido_minimo > 0 && !$esPedidoManual) {
             $minimo = (float) $zonaCobertura->pedido_minimo;
             if ($subtotalProductos < $minimo) {
                 Cache::forget($confirmKey);

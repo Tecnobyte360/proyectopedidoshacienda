@@ -229,6 +229,14 @@ class DomiciliarioApiController extends Controller
             'ubicacion_actualizada_at' => now(),
         ])->save();
 
+        // 📡 Emitir la ubicación en tiempo real (Reverb) para que el mapa de
+        // /despachos mueva el marcador SOLO, sin que nadie tenga que refrescar.
+        try {
+            event(new \App\Events\DomiciliarioUbicacion($dom));
+        } catch (\Throwable $e) {
+            \Log::warning('Broadcast ubicación domiciliario falló: ' . $e->getMessage());
+        }
+
         return response()->json(['ok' => true]);
     }
 }

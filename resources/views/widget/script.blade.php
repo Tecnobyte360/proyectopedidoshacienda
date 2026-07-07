@@ -18,13 +18,14 @@
     const css = `
         .twcw-container * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
         .twcw-container { position: fixed; z-index: 2147483647; ${CFG.pos === 'bottom-left' ? 'left: 20px;' : 'right: 20px;'} bottom: 20px; }
-        .twcw-btn { width: 60px; height: 60px; border-radius: 50%; background: linear-gradient(135deg, ${CFG.color1}, ${CFG.color2}); color: #fff; cursor: pointer; border: none; box-shadow: 0 8px 24px rgba(0,0,0,0.25); display: flex; align-items: center; justify-content: center; font-size: 28px; transition: transform 0.2s; flex: 0 0 auto; }
+        .twcw-btn { position: relative; width: 62px; height: 62px; border-radius: 50%; background: linear-gradient(135deg, ${CFG.color1}, ${CFG.color2}); color: #fff; cursor: pointer; border: none; box-shadow: 0 8px 24px rgba(0,0,0,0.25); display: flex; align-items: center; justify-content: center; font-size: 28px; transition: transform 0.2s; flex: 0 0 auto; animation: twcw-pulse 2.4s ease-out infinite; }
         .twcw-btn:hover { transform: scale(1.08); }
+        @keyframes twcw-pulse { 0% { box-shadow: 0 8px 24px rgba(0,0,0,0.25), 0 0 0 0 ${CFG.color1}66; } 70% { box-shadow: 0 8px 24px rgba(0,0,0,0.25), 0 0 0 16px ${CFG.color1}00; } 100% { box-shadow: 0 8px 24px rgba(0,0,0,0.25), 0 0 0 0 ${CFG.color1}00; } }
         .twcw-launcher { display: flex; align-items: center; gap: 10px; ${CFG.pos === 'bottom-left' ? 'flex-direction: row-reverse;' : ''} }
-        .twcw-cta { background: #fff; color: #1e293b; font-size: 13.5px; font-weight: 600; padding: 10px 14px; border-radius: 24px; box-shadow: 0 6px 20px rgba(0,0,0,0.18); white-space: nowrap; cursor: pointer; display: flex; align-items: center; gap: 8px; animation: twcw-bounce 2.6s ease-in-out infinite; }
-        .twcw-cta:hover { background: #f8fafc; }
-        .twcw-cta-x { color: #94a3b8; font-weight: 700; font-size: 15px; line-height: 1; cursor: pointer; }
-        @keyframes twcw-bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+        .twcw-cta { background: linear-gradient(135deg, ${CFG.color1}, ${CFG.color2}); color: #fff; font-size: 14px; font-weight: 700; padding: 11px 16px; border-radius: 24px; box-shadow: 0 8px 24px ${CFG.color1}55; white-space: nowrap; cursor: pointer; display: flex; align-items: center; gap: 8px; animation: twcw-bounce 2.6s ease-in-out infinite; }
+        .twcw-cta:hover { filter: brightness(1.08); }
+        .twcw-cta-x { color: rgba(255,255,255,0.7); font-weight: 700; font-size: 15px; line-height: 1; cursor: pointer; }
+        @keyframes twcw-bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
         .twcw-launcher.hide-cta .twcw-cta { display: none; }
         .twcw-panel { position: fixed; ${CFG.pos === 'bottom-left' ? 'left: 20px;' : 'right: 20px;'} bottom: 95px; width: 360px; max-width: calc(100vw - 40px); height: 520px; max-height: calc(100vh - 120px); background: #fff; border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.25); display: none; flex-direction: column; overflow: hidden; }
         .twcw-panel.open { display: flex; animation: twcw-slide 0.25s ease-out; }
@@ -60,8 +61,8 @@
     container.className = 'twcw-container';
     container.innerHTML = `
         <div class="twcw-launcher">
-            <div class="twcw-cta"><span class="twcw-cta-text">💬 ${escapeHtml(CFG.cta || '¿Tienes una pregunta?')}</span><span class="twcw-cta-x" title="Cerrar">×</span></div>
-            <button class="twcw-btn" title="Abrir chat">💬</button>
+            <div class="twcw-cta"><span class="twcw-cta-text">💬 ${escapeHtml(CFG.cta || 'Charlemos en línea')}</span><span class="twcw-cta-x" title="Cerrar">×</span></div>
+            <button class="twcw-btn" title="Abrir chat">${CFG.avatar ? `<img src="${CFG.avatar}" alt="" style="width:40px;height:40px;object-fit:contain;border-radius:50%;background:#fff;padding:3px;">` : '💬'}</button>
         </div>
         <div class="twcw-panel" role="dialog" aria-label="Chat">
             <div class="twcw-header">

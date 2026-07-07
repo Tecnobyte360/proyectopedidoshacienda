@@ -12,7 +12,7 @@
 
 <h2>1. Definiciones</h2>
 <ul>
-    <li><strong>Kivox</strong>: plataforma SaaS de inbox unificado (WhatsApp + Instagram + Web) operada por TecnoByte360 S.A.S.</li>
+    <li><strong>Kivox</strong>: plataforma SaaS de inbox unificado (WhatsApp + Instagram + Web) operada por TecnoByte360</li>
     <li><strong>Tenant</strong>: el comercio o empresa que contrata Kivox para atender a sus propios clientes.</li>
     <li><strong>Usuario operador</strong>: empleado o agente del tenant con acceso al panel.</li>
     <li><strong>Cliente final</strong>: consumidor que escribe al tenant por WhatsApp/Instagram/Web.</li>
@@ -47,7 +47,7 @@
 
 <h2>5. Propiedad intelectual</h2>
 <p>
-    El software, marca, logos y diseño de Kivox son propiedad de TecnoByte360 S.A.S.
+    El software, marca, logos y diseño de Kivox son propiedad de TecnoByte360
     El tenant conserva la propiedad de sus datos, mensajes y contenido del catálogo.
     Otorgas a Kivox una licencia limitada y no exclusiva para procesar esos datos con el único fin
     de prestarte el servicio.
@@ -89,7 +89,7 @@
 
 <h2>11. Contacto</h2>
 <p>
-    <strong>TecnoByte360 S.A.S.</strong> — <a href="mailto:soporte@kivox.co">soporte@kivox.co</a> — <a href="https://kivox.co">kivox.co</a>
+    <strong>TecnoByte360</strong> — <a href="mailto:comercial@tecnobyte360.com">comercial@tecnobyte360.com</a> — <a href="https://kivox.co">kivox.co</a>
 </p>
 
 @endsection

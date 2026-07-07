@@ -940,6 +940,9 @@ class CrearManual extends Component
         ];
 
         if ($this->metodo_entrega === 'domicilio') {
+            // 🚚 Marca EXPLÍCITA de domicilio: evita que el sede_id (sede que
+            //    despacha) haga que el pedido se detecte por error como "recoger".
+            $orderData['metodo_entrega'] = 'domicilio';
             $orderData['address']      = $this->direccion;
             $orderData['neighborhood'] = $this->barrio;
             $orderData['location']     = $this->ciudad;
@@ -1109,8 +1112,12 @@ class CrearManual extends Component
 
             // Texto de confirmación legible (con link de pago si existe).
             $total = number_format((float) ($pedido->total ?? 0), 0, ',', '.');
+            // 🏷️ La Hacienda (tenant 1) pidió NO mostrar el precio al cliente por WhatsApp.
+            $ocultarPrecio = $tenant && (int) $tenant->id === 1;
             $texto = "✅ *¡Pedido recibido!*\n"
-                . "Hola {$this->nombre_cliente}, registramos tu pedido *#{$pedido->id}* por *\${$total}*.\n";
+                . ($ocultarPrecio
+                    ? "Hola {$this->nombre_cliente}, registramos tu pedido *#{$pedido->id}*.\n"
+                    : "Hola {$this->nombre_cliente}, registramos tu pedido *#{$pedido->id}* por *\${$total}*.\n");
             if ($linkPago) {
                 $texto .= "\n💳 *Paga aquí con tarjeta, Nequi o PSE:*\n{$linkPago}\n";
             }

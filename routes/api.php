@@ -243,3 +243,11 @@ Route::patch('/whatsapp-webhook/orders/{id}/status', function (Request $request,
         ],
     ]);
 });
+/*
+|--------------------------------------------------------------------------
+| 🖨️ AGENTE DE IMPRESIÓN (Modo B — cola en la nube)
+| El agente (servicio de Windows) en el PC de la impresora consulta y confirma.
+|--------------------------------------------------------------------------
+*/
+Route::post('/impresion/poll',      [\App\Http\Controllers\Api\ImpresionAgenteController::class, 'poll']);
+Route::post('/impresion/confirmar', [\App\Http\Controllers\Api\ImpresionAgenteController::class, 'confirmar']);

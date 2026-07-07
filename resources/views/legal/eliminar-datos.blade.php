@@ -35,7 +35,7 @@
     </li>
     <li>
         <strong>Vía email</strong>: envía un correo a
-        <a href="mailto:soporte@kivox.co?subject=Eliminaci%C3%B3n%20de%20datos">soporte@kivox.co</a>
+        <a href="mailto:comercial@tecnobyte360.com?subject=Eliminaci%C3%B3n%20de%20datos">comercial@tecnobyte360.com</a>
         con el asunto <strong>"Eliminación de datos"</strong>, incluyendo:
         <ul class="mt-2">
             <li>Tu número de teléfono o usuario de Instagram</li>
@@ -51,7 +51,7 @@
 </p>
 <ul>
     <li>Entra al panel de administración del tenant → Configuración → <em>Eliminar cuenta</em></li>
-    <li>O envía un correo a <a href="mailto:soporte@kivox.co?subject=Baja%20de%20tenant">soporte@kivox.co</a> desde
+    <li>O envía un correo a <a href="mailto:comercial@tecnobyte360.com?subject=Baja%20de%20tenant">comercial@tecnobyte360.com</a> desde
         un correo registrado como administrador del tenant solicitando la baja.</li>
 </ul>
 
@@ -80,7 +80,7 @@
 
 <h2>6. Contacto</h2>
 <p>
-    Dudas o problemas: <a href="mailto:soporte@kivox.co">soporte@kivox.co</a>
+    Dudas o problemas: <a href="mailto:comercial@tecnobyte360.com">comercial@tecnobyte360.com</a>
 </p>
 
 @endsection

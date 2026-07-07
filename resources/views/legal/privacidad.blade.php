@@ -6,7 +6,7 @@
 @section('contenido')
 
 <p>
-    En <strong>Kivox</strong> (operado por <strong>TecnoByte360 S.A.S.</strong>, domiciliada en Colombia)
+    En <strong>Kivox</strong> (operado por <strong>TecnoByte360</strong>, domiciliada en Colombia)
     respetamos tu privacidad. Esta política explica qué datos personales recopilamos, cómo los usamos, con quién los
     compartimos y qué derechos tienes sobre ellos, en cumplimiento de la Ley 1581 de 2012 de Colombia y el
     Reglamento General de Protección de Datos (GDPR) cuando aplique.
@@ -116,8 +116,8 @@
 
 <h2>11. Contacto</h2>
 <p>
-    <strong>Responsable del tratamiento</strong>: TecnoByte360 S.A.S.<br>
-    <strong>Correo</strong>: <a href="mailto:soporte@kivox.co">soporte@kivox.co</a><br>
+    <strong>Responsable del tratamiento</strong>: TecnoByte360<br>
+    <strong>Correo</strong>: <a href="mailto:comercial@tecnobyte360.com">comercial@tecnobyte360.com</a><br>
     <strong>Sitio</strong>: <a href="https://kivox.co">https://kivox.co</a>
 </p>
 

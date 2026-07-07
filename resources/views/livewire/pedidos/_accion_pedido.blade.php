@@ -29,16 +29,37 @@
             <span>Finalizar preparación</span>
         </button>
     @else
-        {{-- DOMICILIO: asignar y despachar --}}
-        <button type="button"
-                wire:click="abrirModalDespacho({{ $pedido->id }})"
-                wire:loading.attr="disabled"
-                wire:target="abrirModalDespacho({{ $pedido->id }})"
-                class="{{ $btnBase }} bg-gradient-to-br from-violet-500 via-purple-600 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 shadow-violet-500/30 hover:shadow-violet-500/40">
-            <i class="fa-solid fa-motorcycle transition-transform group-hover:translate-x-0.5" wire:loading.class="hidden" wire:target="abrirModalDespacho({{ $pedido->id }})"></i>
-            <i class="fa-solid fa-spinner fa-spin hidden" wire:loading.class.remove="hidden" wire:target="abrirModalDespacho({{ $pedido->id }})"></i>
-            <span>{{ $pedido->domiciliario ? 'Reasignar y despachar' : 'Asignar y despachar' }}</span>
-        </button>
+        {{-- DOMICILIO: 1) Finalizar preparación (imprime comanda)  2) Asignar y despachar --}}
+        <div class="flex flex-col gap-2">
+            @unless($pedido->preparacion_finalizada)
+                {{-- Solo si NO se ha finalizado la preparación --}}
+                <button type="button"
+                        wire:click="imprimirComanda({{ $pedido->id }})"
+                        wire:loading.attr="disabled"
+                        wire:target="imprimirComanda({{ $pedido->id }})"
+                        class="{{ $btnBase }} bg-gradient-to-br from-amber-500 via-orange-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 shadow-orange-500/30 hover:shadow-orange-500/40 disabled:cursor-not-allowed">
+                    <i class="fa-solid fa-print transition-transform group-hover:scale-110" wire:loading.class="hidden" wire:target="imprimirComanda({{ $pedido->id }})"></i>
+                    <i class="fa-solid fa-spinner fa-spin hidden" wire:loading.class.remove="hidden" wire:target="imprimirComanda({{ $pedido->id }})"></i>
+                    <span wire:loading.remove wire:target="imprimirComanda({{ $pedido->id }})">Finalizar preparación</span>
+                    <span wire:loading wire:target="imprimirComanda({{ $pedido->id }})">Enviando a impresora...</span>
+                </button>
+            @else
+                {{-- Ya finalizada: no se puede volver a finalizar --}}
+                <span class="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-emerald-100/50 px-3 py-2.5 text-xs font-bold text-emerald-700 shadow-sm">
+                    <i class="fa-solid fa-circle-check"></i>
+                    Preparación finalizada
+                </span>
+            @endunless
+            <button type="button"
+                    wire:click="abrirModalDespacho({{ $pedido->id }})"
+                    wire:loading.attr="disabled"
+                    wire:target="abrirModalDespacho({{ $pedido->id }})"
+                    class="{{ $btnBase }} bg-gradient-to-br from-violet-500 via-purple-600 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 shadow-violet-500/30 hover:shadow-violet-500/40">
+                <i class="fa-solid fa-motorcycle transition-transform group-hover:translate-x-0.5" wire:loading.class="hidden" wire:target="abrirModalDespacho({{ $pedido->id }})"></i>
+                <i class="fa-solid fa-spinner fa-spin hidden" wire:loading.class.remove="hidden" wire:target="abrirModalDespacho({{ $pedido->id }})"></i>
+                <span>{{ $pedido->domiciliario ? 'Reasignar y despachar' : 'Asignar y despachar' }}</span>
+            </button>
+        </div>
     @endif
 
 @elseif($pedido->estado === \App\Models\Pedido::ESTADO_REPARTIDOR_EN_CAMINO)

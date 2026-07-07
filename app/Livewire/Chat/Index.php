@@ -1399,6 +1399,38 @@ class Index extends Component
 
         $nombreEnvio = 'voice_' . uniqid() . '.' . $extEnvio;
 
+        // 📷 RUTA INSTAGRAM
+        if ($conv->canal === 'instagram') {
+            // Guardar el audio convertido en público para enviar por URL
+            $filenameIg = 'audios-out/audio_' . now()->format('Ymd_His') . '_' . uniqid() . '.' . $extEnvio;
+            Storage::disk('public')->put($filenameIg, $bytesEnvio);
+            $mediaUrlIg = rtrim(config('app.url'), '/') . Storage::url($filenameIg);
+
+            $tenant = app(\App\Services\TenantManager::class)->current();
+            $igsid  = $conv->igsid ?: $conv->telefono_normalizado;
+            $igSvc  = app(\App\Services\InstagramMessagingService::class);
+            $res    = $igSvc->enviarMedia($tenant, $igsid, $mediaUrlIg, 'audio');
+            // Instagram rechaza algunos formatos de audio → fallback: enviar enlace.
+            if (empty($res['ok'])) {
+                $res = $igSvc->enviarTexto($tenant, $igsid, '🎤 Nota de voz: ' . $mediaUrlIg);
+                if (empty($res['ok'])) {
+                    $this->dispatch('notify', ['type' => 'error', 'message' => '⚠️ Instagram rechazó el audio: ' . ($res['error'] ?? 'error')]);
+                    return;
+                }
+            }
+            try {
+                $mensaje = app(ConversacionService::class)->agregarMensaje($conv, MensajeWhatsapp::ROL_ASSISTANT, '🎤 Nota de voz', [
+                    'tipo' => 'audio',
+                    'mensaje_externo_id' => $res['message_id'] ?? null,
+                    'meta' => ['enviado_por_humano' => true, 'usuario_id' => auth()->id(), 'media_url' => $mediaUrlIg, 'mime' => 'audio/mpeg', 'canal' => 'instagram'],
+                ]);
+                $mensaje->update(['ack' => MensajeWhatsapp::ACK_SENT]);
+            } catch (\Throwable $e) { Log::warning('No persistió audio IG: ' . $e->getMessage()); }
+            $this->dispatch('mensaje-enviado');
+            $this->dispatch('notify', ['type' => 'success', 'message' => '✓ Audio enviado por Instagram']);
+            return;
+        }
+
         // 🟢 RUTA META: si el tenant usa Meta, mandamos el audio por URL pública
         // a la Cloud API. Meta NO acepta video/webm — debe ser audio/mpeg, ogg,
         // amr, mp4 o aac. Persistimos el archivo YA CONVERTIDO y usamos esa URL.
@@ -1769,6 +1801,30 @@ class Index extends Component
         Storage::disk('public')->put($stored, $bytes);
         $mediaUrl = rtrim(config('app.url'), '/') . Storage::url($stored);
 
+        // 📷 RUTA INSTAGRAM: IG DM no acepta archivos arbitrarios → enviamos enlace.
+        if ($conv->canal === 'instagram') {
+            $tenant = app(\App\Services\TenantManager::class)->current();
+            $igsid  = $conv->igsid ?: $conv->telefono_normalizado;
+            $textoEnlace = ($caption !== '' ? $caption . "\n" : '') . '📄 ' . $nombre . ': ' . $mediaUrl;
+            $res = app(\App\Services\InstagramMessagingService::class)
+                ->enviarTexto($tenant, $igsid, $textoEnlace);
+            if (empty($res['ok'])) {
+                $this->dispatch('notify', ['type' => 'error', 'message' => '⚠️ Instagram rechazó el documento: ' . ($res['error'] ?? 'error')]);
+                return;
+            }
+            try {
+                $mensaje = app(ConversacionService::class)->agregarMensaje($conv, MensajeWhatsapp::ROL_ASSISTANT, $caption !== '' ? $caption : ('📄 ' . $nombre), [
+                    'tipo' => 'document',
+                    'mensaje_externo_id' => $res['message_id'] ?? null,
+                    'meta' => ['enviado_por_humano' => true, 'usuario_id' => auth()->id(), 'media_url' => $mediaUrl, 'filename' => $nombre, 'caption' => $caption, 'canal' => 'instagram'],
+                ]);
+                $mensaje->update(['ack' => MensajeWhatsapp::ACK_SENT]);
+            } catch (\Throwable $e) { Log::warning('No persistió documento IG: ' . $e->getMessage()); }
+            $this->dispatch('mensaje-enviado');
+            $this->dispatch('notify', ['type' => 'success', 'message' => '✓ Documento enviado por Instagram']);
+            return;
+        }
+
         // 🟢 RUTA META
         try {
             $tenant = app(\App\Services\TenantManager::class)->current();
@@ -1875,6 +1931,29 @@ class Index extends Component
         $mediaUrl = rtrim(config('app.url'), '/') . Storage::url($filename);
 
         $nombreEnvio = 'image_' . uniqid() . '.' . $extOrig;
+
+        // 📷 RUTA INSTAGRAM
+        if ($conv->canal === 'instagram') {
+            $tenant = app(\App\Services\TenantManager::class)->current();
+            $igsid  = $conv->igsid ?: $conv->telefono_normalizado;
+            $res = app(\App\Services\InstagramMessagingService::class)
+                ->enviarMedia($tenant, $igsid, $mediaUrl, 'image');
+            if (empty($res['ok'])) {
+                $this->dispatch('notify', ['type' => 'error', 'message' => '⚠️ Instagram rechazó la imagen: ' . ($res['error'] ?? 'error')]);
+                return;
+            }
+            try {
+                $mensaje = app(ConversacionService::class)->agregarMensaje($conv, MensajeWhatsapp::ROL_ASSISTANT, $caption !== '' ? $caption : '🖼️ Imagen', [
+                    'tipo' => 'image',
+                    'mensaje_externo_id' => $res['message_id'] ?? null,
+                    'meta' => ['enviado_por_humano' => true, 'usuario_id' => auth()->id(), 'media_url' => $mediaUrl, 'caption' => $caption, 'canal' => 'instagram'],
+                ]);
+                $mensaje->update(['ack' => MensajeWhatsapp::ACK_SENT]);
+            } catch (\Throwable $e) { Log::warning('No persistió imagen IG: ' . $e->getMessage()); }
+            $this->dispatch('mensaje-enviado');
+            $this->dispatch('notify', ['type' => 'success', 'message' => '✓ Imagen enviada por Instagram']);
+            return;
+        }
 
         // 🟢 RUTA META: tenant con Meta envía imagen vía URL pública
         try {
@@ -2213,6 +2292,88 @@ class Index extends Component
             $this->dispatch('mensaje-enviado');
             $this->dispatch('notify', ['type' => 'success', 'message' => '✓ Enviado al widget web']);
             return;
+        }
+
+        // 📷 RUTA INSTAGRAM: DM por graph.instagram.com (API de Instagram Login).
+        // El canal 'instagram' no usa WhatsApp ni TecnoByteApp.
+        if ($conv->canal === 'instagram') {
+            try {
+                $tenant = app(\App\Services\TenantManager::class)->current();
+                $igsid  = $conv->igsid ?: $conv->telefono_normalizado;
+
+                // 💬 ¿Responder citando un mensaje del cliente?
+                // Instagram Login NO soporta cita nativa (reply_to), así que
+                // anteponemos un extracto del mensaje citado al texto, para que
+                // el cliente sepa a qué le estamos respondiendo.
+                $mensajeRespondido = null;
+                $replyToMid        = null;
+                $textoEnviar       = $texto;
+                if ($this->respondiendoAMensajeId) {
+                    $mensajeRespondido = MensajeWhatsapp::find($this->respondiendoAMensajeId);
+                    if ($mensajeRespondido) {
+                        if ($mensajeRespondido->mensaje_externo_id) {
+                            $replyToMid = $mensajeRespondido->mensaje_externo_id;
+                        }
+                        $orig = trim((string) $mensajeRespondido->contenido);
+                        if ($orig === '') {
+                            $orig = match ($mensajeRespondido->tipo) {
+                                'image'    => '🖼️ Imagen',
+                                'audio'    => '🎤 Nota de voz',
+                                'video'    => '🎥 Video',
+                                'document' => '📄 Documento',
+                                default    => 'mensaje',
+                            };
+                        }
+                        if (mb_strlen($orig) > 120) $orig = mb_substr($orig, 0, 120) . '…';
+                        $textoEnviar = "↩️ \"{$orig}\"\n\n{$texto}";
+                    }
+                }
+
+                $res = app(\App\Services\InstagramMessagingService::class)
+                    ->enviarTexto($tenant, $igsid, $textoEnviar, $replyToMid);
+
+                if (empty($res['ok'])) {
+                    $this->dispatch('notify', [
+                        'type'    => 'error',
+                        'message' => '⚠️ Instagram rechazó el envío: ' . ($res['error'] ?? 'error desconocido'),
+                    ]);
+                    return;
+                }
+
+                try {
+                    $msg = app(ConversacionService::class)->agregarMensaje(
+                        $conv,
+                        MensajeWhatsapp::ROL_ASSISTANT,
+                        $texto,
+                        [
+                            'mensaje_externo_id' => $res['message_id'] ?? null,
+                            'meta' => [
+                                'enviado_por_humano' => true,
+                                'usuario_id'         => auth()->id(),
+                                'canal'              => 'instagram',
+                            ],
+                        ]
+                    );
+                    $updates = ['ack' => MensajeWhatsapp::ACK_SENT];
+                    if ($mensajeRespondido) {
+                        $updates['respondiendo_a_mensaje_id'] = $mensajeRespondido->id;
+                    }
+                    $msg->update($updates);
+                } catch (\Throwable $e) {
+                    Log::warning('No persistió mensaje IG: ' . $e->getMessage());
+                }
+                $this->cancelarRespuesta();
+
+                $this->nuevoMensaje = '';
+                $this->cancelarRespuesta();
+                $this->dispatch('mensaje-enviado');
+                $this->dispatch('notify', ['type' => 'success', 'message' => '✓ Enviado por Instagram']);
+                return;
+            } catch (\Throwable $e) {
+                Log::error('Error enviando IG DM: ' . $e->getMessage());
+                $this->dispatch('notify', ['type' => 'error', 'message' => 'Error: ' . $e->getMessage()]);
+                return;
+            }
         }
 
         // 🟢 RUTA META: si el tenant usa Meta, mandamos directo por la Cloud API

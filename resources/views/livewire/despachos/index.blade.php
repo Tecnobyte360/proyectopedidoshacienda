@@ -844,6 +844,9 @@
                 <div wire:ignore>
                     <div id="mapaDespachosLive" style="width: 100%; height: 520px; background: #f1f5f9;"></div>
                 </div>
+                {{-- 📡 Datos frescos de posiciones — se actualizan en cada wire:poll (30s).
+                     El mapa (arriba, en wire:ignore) los lee para mover los marcadores solo. --}}
+                <div id="despachosDomisData" data-domis='@json($domisData)' style="display:none"></div>
 
                 @push('scripts')
                 <script>
@@ -1085,12 +1088,52 @@
                     }
                 })();
 
-                // Re-inicializar si Livewire reemplazó el contenedor
+                // 🔄 Mueve/actualiza los marcadores con datos frescos SIN re-crear
+                // el mapa (mantiene zoom/pan). Si cambia el CONJUNTO de domiciliarios
+                // (entró/salió alguno), re-inicializa completo.
+                window.actualizarMarcadoresDespachos = function(fresh) {
+                    const el = document.getElementById('mapaDespachosLive');
+                    if (!el || !el._gmap || !el._markers) return;
+                    const activos = (fresh || []).filter(d => !d.desconectado);
+                    const idsFresh = new Set(activos.map(d => Number(d.id)));
+                    const idsMapa  = new Set(Object.keys(el._markers).map(Number));
+                    const mismos = idsFresh.size === idsMapa.size && [...idsFresh].every(id => idsMapa.has(id));
+                    if (!mismos) {
+                        // Cambió el conjunto → limpiar y re-inicializar
+                        Object.values(el._markers).forEach(m => {
+                            if (m.marker) m.marker.setMap(null);
+                            if (m.pulse)  m.pulse.setMap(null);
+                        });
+                        el._markers = {};
+                        el._mapaInit = false;
+                        window._despachosDomis = fresh;
+                        window.initDespachosMapa();
+                        return;
+                    }
+                    // Mismo conjunto → solo mover posiciones
+                    activos.forEach(d => {
+                        const m = el._markers[d.id];
+                        if (m && m.marker && d.lat && d.lng) {
+                            const pos = { lat: parseFloat(d.lat), lng: parseFloat(d.lng) };
+                            m.marker.setPosition(pos);
+                            if (m.pulse) m.pulse.setPosition(pos);
+                        }
+                    });
+                    window._despachosDomis = fresh;
+                    console.log('🗺️ Mapa despachos: posiciones actualizadas (' + activos.length + ' domiciliarios en vivo) — ' + new Date().toLocaleTimeString());
+                };
+
+                // Re-inicializar / actualizar cuando Livewire refresca (wire:poll 30s)
                 document.addEventListener('livewire:initialized', () => {
                     Livewire.hook('morph.updated', () => {
                         const el = document.getElementById('mapaDespachosLive');
-                        if (el && !el._mapaInit && window.google && window.google.maps) {
-                            window.initDespachosMapa();
+                        if (!el || !window.google || !window.google.maps) return;
+                        if (!el._mapaInit) { window.initDespachosMapa(); return; }
+                        // Leer datos frescos del holder (se actualizó en el morph) y mover marcadores
+                        const holder = document.getElementById('despachosDomisData');
+                        if (holder) {
+                            try { window.actualizarMarcadoresDespachos(JSON.parse(holder.dataset.domis || '[]')); }
+                            catch (e) {}
                         }
                     });
                 });

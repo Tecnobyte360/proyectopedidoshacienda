@@ -496,6 +496,10 @@
                                         </span>
                                     @endif
                                 </div>
+                                @php $cedulaRow2 = $pedido->cedula ?: ($pedido->estadoPedidoBot->cedula ?? ($pedido->cliente->cedula ?? null)); @endphp
+                                @if($cedulaRow2)
+                                    <div class="text-[11px] font-mono text-slate-400">CC {{ $cedulaRow2 }}</div>
+                                @endif
                                 <div class="text-xs text-slate-500">{{ $pedido->created_at?->diffForHumans() }}</div>
                             </div>
                         </div>
@@ -805,6 +809,10 @@
                                                     </span>
                                                 @endif
                                             </div>
+                                            @php $cedulaRow = $pedido->cedula ?: ($pedido->estadoPedidoBot->cedula ?? ($pedido->cliente->cedula ?? null)); @endphp
+                                            @if($cedulaRow)
+                                                <div class="text-[10px] font-mono text-slate-400 truncate">CC {{ $cedulaRow }}</div>
+                                            @endif
                                             <div class="text-[11px] text-slate-500 truncate flex items-center gap-1 flex-wrap">
                                                 @if($esRecogerRow)
                                                     <span class="inline-flex items-center gap-1 rounded-md bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-700 whitespace-nowrap"

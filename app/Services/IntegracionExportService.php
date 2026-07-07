@@ -398,6 +398,10 @@ class IntegracionExportService
             'IntAnoCartera'     => (int) $ctx['ano'],
             'IntPeriodoCartera' => (int) $ctx['mes'],
             'IntBodega'         => $this->resolver($cfg['bodega']      ?? '1', $ctx),
+            // 💱 MONEDA: HGI exige un código de moneda válido (ej. '01' = pesos).
+            //    Sin esto HGI NO muestra el documento en pantalla aunque esté en la
+            //    tabla. Configurable por cfg['moneda']; default '01'.
+            'StrMoneda'         => $this->resolver($cfg['moneda']      ?? '01', $ctx),
             // 🏢 La sucursal de la SEDE manda; si la sede no tiene, cae al config.
             'StrSucursal'       => ($ctx['pedido.sucursal'] ?? '') !== ''
                                     ? $ctx['pedido.sucursal']

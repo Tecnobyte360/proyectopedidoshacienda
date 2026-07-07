@@ -274,7 +274,7 @@ class Index extends Component
     {
         try {
             // 🏢 Filtrar por sede del operador. Admin/Gerente ven todo.
-            $q = Pedido::with(['detalles', 'sede', 'domiciliario', 'zonaCobertura', 'estadoPedidoBot'])
+            $q = Pedido::with(['detalles', 'sede', 'domiciliario', 'zonaCobertura', 'estadoPedidoBot', 'cliente:id,nombre,cedula'])
                 ->latest();
             $q = \App\Support\SedeScopeFilter::aplicar($q);
 
@@ -287,6 +287,15 @@ class Index extends Component
             if (!$u || !$u->hasRole('super-admin')) {
                 $q->where(function ($qp) { $qp->where('es_prueba', false)->orWhereNull('es_prueba'); });
             }
+
+            // ✅ Ocultar los pedidos cuya PREPARACIÓN ya se finalizó, MIENTRAS sigan
+            //    "en preparación". (Cuando pasan a en_camino/entregado vuelven a verse
+            //    en su tab correspondiente.) Así desaparecen del tab "En preparación".
+            $q->where(function ($qf) {
+                $qf->where('estado', '!=', Pedido::ESTADO_EN_PREPARACION)
+                   ->orWhere('preparacion_finalizada', false)
+                   ->orWhereNull('preparacion_finalizada');
+            });
 
             $estadosPerm    = $this->estadosPermitidos();
             $verProgramados = $this->puedeVerProgramados();
@@ -467,6 +476,10 @@ class Index extends Component
                 notificarCliente: false   // ⛔ al finalizar la preparación NO se avisa al cliente
             );
 
+            // 🖨️ Al finalizar la preparación, imprimir la comanda del pedido.
+            try { app(\App\Services\TicketImpresionService::class)->encolarComanda($pedido->fresh()); }
+            catch (\Throwable $e) { \Log::warning('No se encoló comanda (recoger): ' . $e->getMessage()); }
+
             $this->refrescar();
             $this->dispatch('notify', [
                 'type' => 'success',
@@ -516,6 +529,47 @@ class Index extends Component
             $this->dispatch('notify', [
                 'type' => 'error',
                 'message' => 'No se pudo confirmar la recogida.',
+            ]);
+        }
+    }
+
+    /**
+     * 🖨️ Finalizar preparación (domicilio): imprime la comanda del pedido.
+     * No cambia el estado — el pedido sigue en preparación para luego despacharlo.
+     */
+    public function imprimirComanda(int $pedidoId): void
+    {
+        try {
+            $pedido = Pedido::findOrFail($pedidoId);
+            $encolado = app(\App\Services\TicketImpresionService::class)->encolarComanda($pedido);
+
+            // ✅ Marcar preparación como finalizada → desaparece del tab "En preparación".
+            //    El despacho (asignar domiciliario) se hace desde /rutas o /despachos.
+            if (!$pedido->preparacion_finalizada) {
+                $pedido->forceFill([
+                    'preparacion_finalizada'    => true,
+                    'preparacion_finalizada_at' => now(),
+                ])->saveQuietly();
+            }
+
+            if ($encolado) {
+                $this->dispatch('notify', [
+                    'type'    => 'success',
+                    'message' => "✅ Pedido #{$pedido->id} finalizado. Comanda enviada a la impresora.",
+                ]);
+            } else {
+                // Ya se había enviado hace poco (evita duplicados por doble clic).
+                $this->dispatch('notify', [
+                    'type'    => 'info',
+                    'message' => "🖨️ La comanda del pedido #{$pedido->id} ya se envió. Revisa la impresora.",
+                ]);
+            }
+            $this->refrescar();
+        } catch (\Throwable $e) {
+            report($e);
+            $this->dispatch('notify', [
+                'type'    => 'error',
+                'message' => 'No se pudo enviar la comanda a la impresora.',
             ]);
         }
     }
