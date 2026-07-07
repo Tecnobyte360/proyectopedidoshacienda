@@ -3,6 +3,8 @@
 namespace App\Services\Sap\Asistente;
 
 use App\Services\Ai\AiClientService;
+use App\Services\Sap\SapServiceLayerClient;
+use App\Services\TenantManager;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -25,13 +27,21 @@ class AsistenteSapService
     ) {}
 
     /**
-     * @param  string $mensaje    Pregunta del usuario.
-     * @param  array  $historial  Mensajes previos [['role'=>'user|assistant','content'=>...]].
+     * @param  string   $mensaje    Pregunta del usuario.
+     * @param  array    $historial  Mensajes previos [['role'=>'user|assistant','content'=>...]].
+     * @param  int|null $tenantId   Tenant; si es null se resuelve el actual.
      * @return array{ok:bool, respuesta:string, tools_usadas:array}
      */
-    public function responder(string $mensaje, array $historial = []): array
+    public function responder(string $mensaje, array $historial = [], ?int $tenantId = null): array
     {
-        $tools    = $this->tools->definiciones();
+        $tenantId = $tenantId ?: app(TenantManager::class)->id();
+        $sap      = SapServiceLayerClient::paraTenant($tenantId);
+        $tools    = $this->tools->definiciones($tenantId);
+
+        if (empty($tools)) {
+            return ['ok' => true, 'respuesta' => 'Este cliente no tiene agentes de SAP activos todavía. Actívalos desde la administración del asistente.', 'tools_usadas' => []];
+        }
+
         $messages = array_merge(
             [['role' => 'system', 'content' => $this->systemPrompt()]],
             $this->normalizarHistorial($historial),
@@ -69,7 +79,7 @@ class AsistenteSapService
                 $toolsUsadas[] = ['tool' => $nombre, 'args' => $args];
 
                 try {
-                    $resultado = $this->tools->ejecutar($nombre, $args);
+                    $resultado = $this->tools->ejecutar($nombre, $args, $sap);
                 } catch (\Throwable $e) {
                     Log::error("Asistente SAP tool {$nombre} falló: " . $e->getMessage());
                     $resultado = ['ok' => false, 'error' => 'excepcion_tool', 'detalle' => $e->getMessage()];

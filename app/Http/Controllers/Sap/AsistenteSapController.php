@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Sap;
 use App\Http\Controllers\Controller;
 use App\Services\Sap\Asistente\AsistenteSapService;
 use App\Services\Sap\SapServiceLayerClient;
+use App\Services\TenantManager;
 use Illuminate\Http\Request;
 
 /**
@@ -32,9 +33,10 @@ class AsistenteSapController extends Controller
         return response()->json($resultado);
     }
 
-    /** GET: diagnóstico rápido de conexión al Service Layer. */
-    public function ping(SapServiceLayerClient $sap)
+    /** GET: diagnóstico rápido de conexión al Service Layer del tenant actual. */
+    public function ping(TenantManager $tenants)
     {
+        $sap = SapServiceLayerClient::paraTenant($tenants->id());
         return response()->json($sap->ping());
     }
 }

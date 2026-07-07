@@ -48,8 +48,19 @@ class SapServiceLayerClient
         $this->bridgeToken = (string) ($cfg['bridge_token'] ?? '');
 
         // La sesión se cachea por (url + company + user) para soportar
-        // varias conexiones/tenants en el futuro sin colisionar.
+        // varias conexiones/tenants sin colisionar.
         $this->cacheKey = 'sap_sl_session_' . md5($this->baseUrl . '|' . $this->company . '|' . $this->username);
+    }
+
+    /**
+     * Construye un cliente con la conexión del TENANT indicado. Si el tenant no
+     * tiene conexión propia en `sap_tenant_configs`, usa la global de config
+     * (útil para pruebas locales de un solo cliente).
+     */
+    public static function paraTenant(?int $tenantId): self
+    {
+        $cfg = \App\Models\SapTenantConfig::paraTenant($tenantId)?->conexion();
+        return new self($cfg); // null → config('sap.connection')
     }
 
     /* ─────────────────────────── API pública ─────────────────────────── */
