@@ -293,44 +293,8 @@
             </div>
         </div>
 
-        {{-- HEADLINE --}}
-        <div class="fade-3 mb-4">
-            <span class="inline-flex items-center gap-2 rounded-full pill px-4 py-1.5 text-[10px] sm:text-[11px] uppercase tracking-[0.3em] text-white/60 font-semibold">
-                <span class="h-1.5 w-1.5 rounded-full bg-[var(--brand)] animate-pulse"></span>
-                Próximamente
-            </span>
-        </div>
-
-        <h1 class="fade-4 display text-[40px] sm:text-[64px] lg:text-[84px] text-white max-w-4xl mx-auto">
-            Algo <span class="serif gradient-text">grande</span><br class="sm:hidden">
-            está <span class="highlight shimmer-text">por venir</span>
-        </h1>
-
-        <p class="fade-5 mt-6 text-[14px] sm:text-[17px] text-white/55 max-w-2xl mx-auto leading-relaxed">
-            La plataforma que unifica <span class="text-white/85 font-semibold">WhatsApp</span>,
-            <span class="text-white/85 font-semibold">Instagram</span> y toda tu operación de
-            pedidos con <span class="text-white/85 font-semibold">inteligencia artificial</span>.
-            Hecha para negocios que no se detienen.
-        </p>
-
-        {{-- FEATURE PILLS --}}
-        <div class="fade-6 mt-8 flex flex-wrap items-center justify-center gap-2.5 sm:gap-3 max-w-2xl mx-auto">
-            <span class="pill rounded-full px-4 py-2 text-[11px] sm:text-[12px] font-semibold text-white/70">
-                <i class="fa-brands fa-whatsapp text-[var(--brand)] mr-1.5"></i>Bots con IA
-            </span>
-            <span class="pill rounded-full px-4 py-2 text-[11px] sm:text-[12px] font-semibold text-white/70">
-                <i class="fa-brands fa-instagram text-[var(--brand)] mr-1.5"></i>Instagram Direct
-            </span>
-            <span class="pill rounded-full px-4 py-2 text-[11px] sm:text-[12px] font-semibold text-white/70">
-                <i class="fa-solid fa-motorcycle text-[var(--brand)] mr-1.5"></i>Pedidos y domicilios
-            </span>
-            <span class="pill rounded-full px-4 py-2 text-[11px] sm:text-[12px] font-semibold text-white/70">
-                <i class="fa-solid fa-chart-line text-[var(--brand)] mr-1.5"></i>Métricas en vivo
-            </span>
-        </div>
-
         {{-- AUDIO PLAYER --}}
-        <div class="mt-10 sm:mt-14 fade-7">
+        <div class="mt-8 sm:mt-12 fade-3">
             <p class="text-[11px] sm:text-[12px] uppercase tracking-[0.25em] text-white/40 font-semibold mb-5">
                 <i class="fa-solid fa-headphones"></i> Escucha el manifiesto en voz
             </p>

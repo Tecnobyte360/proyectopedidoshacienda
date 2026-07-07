@@ -8492,8 +8492,6 @@ TXT;
 
         // ── VALIDACIÓN: pedido mínimo por zona ──────────────────────────────
         // Solo aplica si hay zona (es domicilio) y tiene mínimo configurado.
-        // ⚠️ EXCEPCIÓN: en pedidos MANUALES el operador decide; no se bloquea
-        // por el mínimo de zona (igual que la excepción de cobertura).
         if ($zonaCobertura && (float) $zonaCobertura->pedido_minimo > 0 && !$esPedidoManual) {
             $minimo = (float) $zonaCobertura->pedido_minimo;
             if ($subtotalProductos < $minimo) {

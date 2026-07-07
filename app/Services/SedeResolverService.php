@@ -67,7 +67,7 @@ class SedeResolverService
             return [
                 'sede'             => $alternativa ?: $ganadora,
                 'cubierta'         => true,
-                'distancia_km'     => round($ganadora->_distancia_punto_km, 2),
+                'distancia_km'     => ($ganadora->_distancia_punto_km >= 1e9 ? null : round($ganadora->_distancia_punto_km, 2)),
                 'sedes_candidatas' => $candidatas,
                 'sede_alternativa' => $alternativa,
                 'recoger_en_sede'  => null,
@@ -87,7 +87,7 @@ class SedeResolverService
         return [
             'sede'             => null,
             'cubierta'         => false,
-            'distancia_km'     => $masCercana ? round($masCercana->_distancia_punto_km, 2) : null,
+            'distancia_km'     => ($masCercana && $masCercana->_distancia_punto_km < 1e9 ? round($masCercana->_distancia_punto_km, 2) : null),
             'sedes_candidatas' => collect(),
             'sede_alternativa' => null,
             'recoger_en_sede'  => $masCercana,

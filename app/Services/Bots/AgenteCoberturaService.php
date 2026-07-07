@@ -72,7 +72,7 @@ class AgenteCoberturaService
                 ? implode(', ', array_slice($ciudadesCubiertas, 0, 6))
                 : 'Bello, Girardota, etc.';
             $reply = "Para validar tu cobertura necesito saber el municipio o barrio 🙏\n\n"
-                   . "*¿En qué ciudad / barrio queda* `{$direccion}`?\n\n"
+                   . "¿En qué ciudad o barrio queda \"{$direccion}\"?\n\n"
                    . "(Cubrimos: {$listaCiudades})";
             Log::info('🗺️ AgenteCoberturaService: dirección ambigua, pidiendo ciudad', [
                 'conv_id'  => $conv->id,
@@ -138,9 +138,9 @@ class AgenteCoberturaService
                 $listaCiudades = $ciudadesCubiertas
                     ? implode(', ', array_slice($ciudadesCubiertas, 0, 6))
                     : 'Bello, Girardota, etc.';
-                $reply = "Encontré tu dirección en *{$display}*, pero no llegamos ahí 😕\n\n"
-                       . "Si querías decir una de estas ciudades, dímelo: *{$listaCiudades}*.\n\n"
-                       . "Si la dirección es correcta en {$ciudadResuelta}, te ofrezco *recoger en sede*.";
+                $reply = "Encontré tu dirección en {$display}, pero no llegamos ahí 😕\n\n"
+                       . "Si querías decir una de estas ciudades, dímelo: {$listaCiudades}.\n\n"
+                       . "Si la dirección es correcta en {$ciudadResuelta}, te ofrezco recoger en sede.";
                 Log::info('🗺️ AgenteCoberturaService: ciudad resuelta NO cubierta, pidiendo clarificación', [
                     'conv_id'        => $conv->id,
                     'direccion'      => $direccion,

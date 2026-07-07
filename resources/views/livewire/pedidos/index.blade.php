@@ -132,6 +132,7 @@
             // (porque los KPIs son justamente las pestañas de estado).
             $pedidos          = $this->pedidosBase;
             $pedidosFiltrados = $this->pedidosFiltrados;
+            $pedidosPagina    = $this->pedidosPagina;   // 📄 rebanada de la página actual
 
             $todos       = $pedidos->count();
             // 'confirmado' es legacy → cuenta como nuevo
@@ -459,7 +460,7 @@
         {{-- ╔═══ CARDS para móvil/tablet (< lg) ═══╗ --}}
         {{-- Responsivo: 1 col en mobile chico, 2 cols en sm, 2 cols hasta lg --}}
         <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:hidden">
-            @forelse($pedidosFiltrados as $pedido)
+            @forelse($pedidosPagina as $pedido)
                 @php
                     $meta = $estadosMeta[$pedido->estado] ?? null;
                     $iniciales = collect(explode(' ', trim($pedido->cliente_nombre ?? 'CL')))
@@ -733,7 +734,7 @@
                     </thead>
 
                     <tbody class="divide-y divide-slate-100">
-                        @forelse($pedidosFiltrados as $pedido)
+                        @forelse($pedidosPagina as $pedido)
                             @php
                                 $meta = $estadosMeta[$pedido->estado] ?? null;
                                 $iniciales = collect(explode(' ', trim($pedido->cliente_nombre ?? 'CL')))
@@ -1116,6 +1117,34 @@
                 </table>
             </div>
         </div>
+
+        {{-- 📄 PAGINADOR (aparece solo si hay más de una página) --}}
+        @if($this->totalPaginas > 1)
+            @php $tp = $this->totalPaginas; @endphp
+            <div class="flex items-center justify-between gap-3 flex-wrap px-4 py-3 mt-1">
+                <span class="text-xs text-slate-500">
+                    Página <b class="text-slate-700">{{ $pagina }}</b> de <b class="text-slate-700">{{ $tp }}</b>
+                    · {{ $pedidosFiltrados->count() }} {{ Str::plural('pedido', $pedidosFiltrados->count()) }}
+                </span>
+                <div class="flex items-center gap-1">
+                    <button type="button" wire:click="paginaAnterior" @disabled($pagina <= 1)
+                        class="px-3 py-1.5 rounded-lg border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">
+                        <i class="fa-solid fa-chevron-left"></i>
+                    </button>
+                    @for($i = max(1, $pagina - 2); $i <= min($tp, $pagina + 2); $i++)
+                        <button type="button" wire:click="irAPagina({{ $i }})"
+                            class="min-w-[36px] px-2 py-1.5 rounded-lg text-sm font-bold border transition
+                            {{ $i == $pagina ? 'bg-brand text-white border-brand' : 'border-slate-200 text-slate-600 hover:bg-slate-50' }}">
+                            {{ $i }}
+                        </button>
+                    @endfor
+                    <button type="button" wire:click="paginaSiguiente" @disabled($pagina >= $tp)
+                        class="px-3 py-1.5 rounded-lg border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </button>
+                </div>
+            </div>
+        @endif
 
         {{-- MODAL DESPACHO --}}
         {{-- ⚖️ EDITOR DE PRODUCTOS: modificar kilos/cantidad y recalcular --}}

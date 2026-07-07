@@ -46,6 +46,10 @@ class Index extends Component
     public array $itemsEditar            = []; // [{id,producto,cantidad,unidad,precio_unitario,subtotal}]
     public float $costoEnvioEditar       = 0.0;
 
+    // 📄 Paginación de la lista de pedidos (útil sobre todo en "Entregados").
+    public int $pagina    = 1;
+    public int $porPagina = 20;
+
     /**
      * Livewire 3 — formato `echo:CANAL,NOMBRE_EVENTO`.
      * Cuando el event class usa `broadcastAs('pedido.confirmado')`,
@@ -265,9 +269,43 @@ class Index extends Component
     public function cambiarTab(string $estado): void
     {
         $this->estado = $estado;
+        $this->pagina = 1;   // al cambiar de pestaña, volver a la página 1
     }
 
-    public function updatedZona(): void {}
+    public function updatedZona(): void { $this->pagina = 1; }
+    public function updatedTipoEntrega(): void { $this->pagina = 1; }
+
+    /* ─────────────────────────── Paginación ─────────────────────────── */
+
+    #[Computed]
+    public function totalPaginas(): int
+    {
+        $total = $this->pedidosFiltrados->count();
+        return max(1, (int) ceil($total / max(1, $this->porPagina)));
+    }
+
+    /** La "rebanada" de pedidos de la página actual (lo que se pinta). */
+    #[Computed]
+    public function pedidosPagina()
+    {
+        $pag = min(max(1, $this->pagina), $this->totalPaginas);
+        return $this->pedidosFiltrados->forPage($pag, $this->porPagina)->values();
+    }
+
+    public function paginaSiguiente(): void
+    {
+        if ($this->pagina < $this->totalPaginas) $this->pagina++;
+    }
+
+    public function paginaAnterior(): void
+    {
+        if ($this->pagina > 1) $this->pagina--;
+    }
+
+    public function irAPagina(int $n): void
+    {
+        $this->pagina = min(max(1, $n), $this->totalPaginas);
+    }
 
     #[Computed]
     public function pedidos()
