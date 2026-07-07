@@ -199,6 +199,13 @@ Route::get('/sitemap.xml', function () {
     return response($xml, 200)->header('Content-Type', 'application/xml');
 })->name('sitemap');
 
+// 🤖 Asistente IA + SAP (producto modular integrado a SAP B1 Service Layer) — módulo Ventas
+Route::middleware(['auth'])->prefix('asistente-sap')->group(function () {
+    Route::get('/',        [\App\Http\Controllers\Sap\AsistenteSapController::class, 'index'])->name('sap.asistente');
+    Route::post('/mensaje',[\App\Http\Controllers\Sap\AsistenteSapController::class, 'mensaje'])->name('sap.asistente.mensaje');
+    Route::get('/ping',    [\App\Http\Controllers\Sap\AsistenteSapController::class, 'ping'])->name('sap.asistente.ping');
+});
+
 // 📄 Páginas legales públicas (requeridas por App Review de Meta/Instagram)
 Route::view('/privacidad',      'legal.privacidad')->name('legal.privacidad');
 Route::view('/privacidad-repartidores', 'legal.privacidad-repartidores')->name('legal.privacidad-repartidores');
