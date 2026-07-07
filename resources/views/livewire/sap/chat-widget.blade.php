@@ -7,6 +7,22 @@
         @keyframes iasap-glow { 0%,100%{ box-shadow:0 0 0 0 rgba(16,185,129,.45);} 50%{ box-shadow:0 0 0 10px rgba(16,185,129,0);} }
         .iasap-msg { animation: iasap-in .3s cubic-bezier(.2,.8,.2,1) both; }
         .iasap-launch { animation: iasap-glow 2.4s ease-out infinite; }
+        /* Pasos del agente en vivo */
+        .astep { display:flex; align-items:center; gap:9px; font-size:12.5px; font-weight:600; color:#64748b; opacity:0; transform:translateY(4px); animation: astepIn .35s ease forwards; }
+        .astep + .astep { margin-top:8px; }
+        .astep.done { color:#0f172a; }
+        .astep .dot { position:relative; width:16px; height:16px; flex:none; }
+        .astep .dot .sp { position:absolute; inset:0; border:2px solid #d1fae5; border-top-color:#10b981; border-radius:50%; animation: aspin .7s linear infinite; }
+        .astep .dot .ok { position:absolute; inset:0; display:grid; place-items:center; color:#10b981; font-size:12px; opacity:0; }
+        .as1 { animation-delay:.05s; } .as2 { animation-delay:1.15s; } .as3 { animation-delay:2.3s; }
+        .as1 .sp { animation: aspin .7s linear infinite, aOut 0s linear 1.15s forwards; }
+        .as1 .ok { animation: aIn .25s ease 1.15s forwards; }
+        .as2 .sp { animation: aspin .7s linear infinite, aOut 0s linear 2.3s forwards; }
+        .as2 .ok { animation: aIn .25s ease 2.3s forwards; }
+        @keyframes astepIn { to { opacity:1; transform:none; } }
+        @keyframes aspin { to { transform: rotate(360deg); } }
+        @keyframes aOut { to { opacity:0; } }
+        @keyframes aIn { to { opacity:1; } }
         .iasap-scroll::-webkit-scrollbar { width:6px; }
         .iasap-scroll::-webkit-scrollbar-thumb { background:#d1d5db; border-radius:99px; }
         .md-body { font-size:13.5px; line-height:1.6; color:#334155; }
@@ -101,15 +117,13 @@
                 @endforelse
 
                 <div wire:loading.flex wire:target="enviar,preguntar" class="iasap-msg gap-2">
-                    <span class="flex h-7 w-7 flex-none items-center justify-center rounded-lg text-white text-xs bg-gradient-to-br from-emerald-500 to-emerald-700 shadow">
+                    <span class="iasap-launch flex h-7 w-7 flex-none items-center justify-center rounded-lg text-white text-xs bg-gradient-to-br from-emerald-500 to-emerald-700 shadow">
                         <i class="fa-solid fa-robot"></i>
                     </span>
-                    <div class="rounded-2xl rounded-tl-sm px-3.5 py-3 bg-white border border-slate-200 shadow-sm">
-                        <span class="inline-flex gap-1">
-                            <span class="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-bounce" style="animation-delay:0s"></span>
-                            <span class="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-bounce" style="animation-delay:.15s"></span>
-                            <span class="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-bounce" style="animation-delay:.3s"></span>
-                        </span>
+                    <div class="rounded-2xl rounded-tl-sm px-4 py-3 bg-white border border-slate-200 shadow-sm min-w-[190px]">
+                        <div class="astep as1"><span class="dot"><span class="sp"></span><i class="ok fa-solid fa-check"></i></span> Analizando tu solicitud</div>
+                        <div class="astep as2"><span class="dot"><span class="sp"></span><i class="ok fa-solid fa-check"></i></span> Consultando SAP en vivo</div>
+                        <div class="astep as3"><span class="dot"><span class="sp"></span><i class="ok fa-solid fa-check"></i></span> Procesando resultados</div>
                     </div>
                 </div>
             </div>
