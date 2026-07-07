@@ -131,16 +131,26 @@ class BoldService
      * Valida la firma HMAC-SHA256 del webhook de Bold.
      *
      * Bold envía header: x-bold-signature
-     * Firma = HMAC_SHA256(webhook_secret, raw_body)
+     * Algoritmo oficial (https://developers.bold.co/webhook):
+     *   1. base64(raw_body)
+     *   2. HMAC_SHA256(secret, base64_body)  →  salida en HEX
+     * En modo PRUEBAS Bold firma con secret = cadena vacía.
      */
     public function validarFirma(string $rawBody, string $firmaRecibida): bool
     {
         $tenant = $this->tenantActual();
-        if (!$tenant || empty($tenant->bold_webhook_secret)) {
+        if (!$tenant) {
             return false;
         }
 
-        $firmaCalculada = hash_hmac('sha256', $rawBody, $tenant->bold_webhook_secret);
+        // En producción se requiere el secret; en pruebas Bold usa secret vacío.
+        $secret = (string) ($tenant->bold_webhook_secret ?? '');
+        if ($tenant->bold_modo === 'production' && $secret === '') {
+            return false;
+        }
+
+        // ⚠️ Bold calcula la firma sobre el body YA codificado en base64.
+        $firmaCalculada = hash_hmac('sha256', base64_encode($rawBody), $secret);
         return hash_equals($firmaCalculada, $firmaRecibida);
     }
 
