@@ -61,6 +61,34 @@ class Index extends Component
         ]);
     }
 
+    /**
+     * Consulta el estado real en la API de Bold y actualiza el pedido.
+     * Sirve para saber si un pago Bold quedó aprobado/rechazado sin depender
+     * del webhook.
+     */
+    public function sincronizarConBold(int $pedidoId): void
+    {
+        $pedido = Pedido::find($pedidoId);
+        if (!$pedido) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Pedido no encontrado.']);
+            return;
+        }
+
+        $tenant = app(\App\Services\TenantManager::class)->current();
+        $r = (new \App\Services\BoldService())->paraTenant($tenant)->consultarEstado($pedido);
+
+        if (!$r['ok']) {
+            $this->dispatch('notify', ['type' => 'warning', 'message' => $r['mensaje']]);
+            return;
+        }
+
+        $this->dispatch('notify', [
+            'type'    => $r['estado'] === 'aprobado' ? 'success' : 'info',
+            'message' => $r['mensaje'],
+        ]);
+        $this->dispatch('$refresh');
+    }
+
     public function regenerarLink(int $pedidoId): void
     {
         $pedido = Pedido::find($pedidoId);

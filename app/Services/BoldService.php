@@ -128,6 +128,84 @@ class BoldService
     }
 
     /**
+     * 🔎 Consulta el estado REAL de un pedido directamente en la API de Bold
+     * (GET /online/link/v1/{payment_link}) y actualiza el pedido.
+     * No depende del webhook: sirve para verificar a mano si un pago quedó
+     * aprobado o rechazado.
+     *
+     * Docs: https://developers.bold.co/pagos-en-linea/api-link-de-pagos
+     */
+    public function consultarEstado(Pedido $pedido): array
+    {
+        $tenant = $this->tenantActual();
+
+        if (!$tenant || empty($tenant->bold_api_key)) {
+            return ['ok' => false, 'estado' => $pedido->estado_pago, 'mensaje' => 'Bold no está configurado para este tenant.'];
+        }
+        if (empty($pedido->bold_payment_id)) {
+            return ['ok' => false, 'estado' => $pedido->estado_pago, 'mensaje' => 'Este pedido no tiene link de pago de Bold.'];
+        }
+
+        $resp = Http::withHeaders([
+            'Authorization' => 'x-api-key ' . $tenant->bold_api_key,
+            'Accept'        => 'application/json',
+        ])
+            ->timeout(15)
+            ->get($this->apiBase() . '/online/link/v1/' . $pedido->bold_payment_id);
+
+        if ($resp->failed()) {
+            Log::warning('💳 Bold consulta estado falló', [
+                'tenant_id' => $tenant->id,
+                'pedido_id' => $pedido->id,
+                'status'    => $resp->status(),
+                'body'      => substr($resp->body(), 0, 300),
+            ]);
+            return ['ok' => false, 'estado' => $pedido->estado_pago, 'mensaje' => 'No se pudo consultar el estado en Bold (HTTP ' . $resp->status() . ').'];
+        }
+
+        $data    = $resp->json();
+        $payload = $data['payload'] ?? $data;
+        $status  = strtoupper((string) ($payload['status'] ?? ''));
+
+        // Mapa de estados de Bold → estado_pago interno
+        $estadoNuevo = match ($status) {
+            'PAID'                    => 'aprobado',
+            'REJECTED'                => 'rechazado',
+            'CANCELLED'               => 'fallido',
+            'EXPIRED'                 => 'fallido',
+            'ACTIVE', 'PROCESSING'    => 'pendiente',
+            default                   => $pedido->estado_pago,
+        };
+
+        $pedido->update([
+            'estado_pago' => $estadoNuevo,
+            'pasarela_usada' => 'bold',
+            'pago_at'     => $estadoNuevo === 'aprobado' ? ($pedido->pago_at ?? now()) : $pedido->pago_at,
+        ]);
+
+        Log::info('💳 Bold estado consultado', [
+            'tenant_id' => $tenant->id,
+            'pedido_id' => $pedido->id,
+            'bold_status' => $status,
+            'estado_pago' => $estadoNuevo,
+        ]);
+
+        $mensajes = [
+            'aprobado'  => 'El pago está APROBADO ✅',
+            'rechazado' => 'El pago fue RECHAZADO ❌',
+            'fallido'   => $status === 'EXPIRED' ? 'El link EXPIRÓ sin pago ⌛' : 'El pago fue CANCELADO ⚠️',
+            'pendiente' => 'El pago sigue PENDIENTE (aún no pagan) ⏳',
+        ];
+
+        return [
+            'ok'      => true,
+            'estado'  => $estadoNuevo,
+            'status_bold' => $status,
+            'mensaje' => $mensajes[$estadoNuevo] ?? ('Estado en Bold: ' . $status),
+        ];
+    }
+
+    /**
      * Valida la firma HMAC-SHA256 del webhook de Bold.
      *
      * Bold envía header: x-bold-signature
