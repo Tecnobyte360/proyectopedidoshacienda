@@ -201,6 +201,9 @@
                     @livewire('suscripcion-banner')
                 </div>
             @endif
+
+            {{-- 🤖 Widget flotante Asistente IA + SAP (solo si el tenant tiene agentes activos) --}}
+            @livewire('sap.chat-widget')
         @endauth
 
         @if($aplicarCard)
@@ -557,9 +560,6 @@
     })();
     </script>
     @endcan
-
-    {{-- Widget flotante del Asistente IA + SAP (se muestra solo si el tenant tiene agentes activos) --}}
-    @livewire('sap.chat-widget')
     @endauth
 </body>
 </html>

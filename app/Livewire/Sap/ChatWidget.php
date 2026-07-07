@@ -16,7 +16,6 @@ class ChatWidget extends Component
     use WithSapChat;
 
     public bool $activo = false;
-    public bool $abierto = false;
 
     public function mount(): void
     {

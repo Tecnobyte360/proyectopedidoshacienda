@@ -41,7 +41,7 @@
     </style>
     @endverbatim
 
-    <div x-data="{ open: @entangle('abierto') }" class="fixed bottom-5 right-5 z-[9998] flex flex-col items-end gap-3"
+    <div x-data="{ open: false }" class="fixed bottom-5 right-5 z-[9998] flex flex-col items-end gap-3"
          style="font-family:'Plus Jakarta Sans',system-ui,sans-serif">
 
         {{-- POPUP --}}
@@ -145,7 +145,7 @@
         </div>
 
         {{-- LAUNCHER --}}
-        <button x-show="!open" x-cloak @click="open=true"
+        <button x-show="!open" @click="open=true"
                 class="iasap-launch group flex items-center gap-2 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-700 text-white h-14 pl-4 pr-5 shadow-xl shadow-emerald-600/30 hover:scale-105 transition">
             <i class="fa-solid fa-robot text-lg"></i>
             <span class="font-bold text-sm">IA SAP</span>
