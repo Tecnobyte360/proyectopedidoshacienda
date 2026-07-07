@@ -71,31 +71,31 @@
                             <div class="p-5 grid sm:grid-cols-2 gap-4">
                                 <label class="text-sm">
                                     <span class="block font-semibold text-slate-600 mb-1">Modo de conexión</span>
-                                    <select wire:model.live="sl_mode" class="w-full rounded-xl border-slate-300 text-sm focus:border-emerald-500 focus:ring-emerald-500">
+                                    <select wire:model.live="sl_mode" class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 shadow-sm focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 focus:outline-none">
                                         <option value="direct">Directo (KIVOX → SAP)</option>
                                         <option value="bridge">Puente / agente en la red del cliente</option>
                                     </select>
                                 </label>
                                 <label class="text-sm">
                                     <span class="block font-semibold text-slate-600 mb-1">Timeout (segundos)</span>
-                                    <input type="number" wire:model="sl_timeout" class="w-full rounded-xl border-slate-300 text-sm focus:border-emerald-500 focus:ring-emerald-500">
+                                    <input type="number" wire:model="sl_timeout" class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 shadow-sm focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 focus:outline-none">
                                 </label>
 
                                 @if ($sl_mode === 'direct')
                                     <label class="text-sm sm:col-span-2">
                                         <span class="block font-semibold text-slate-600 mb-1">URL del Service Layer</span>
                                         <input type="text" wire:model="sl_url" autocomplete="off" placeholder="https://host:50000"
-                                            class="w-full rounded-xl border-slate-300 text-sm focus:border-emerald-500 focus:ring-emerald-500">
+                                            class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 shadow-sm focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 focus:outline-none">
                                     </label>
                                     <label class="text-sm">
                                         <span class="block font-semibold text-slate-600 mb-1">Company DB</span>
                                         <input type="text" wire:model="sl_company" autocomplete="off"
-                                            class="w-full rounded-xl border-slate-300 text-sm focus:border-emerald-500 focus:ring-emerald-500">
+                                            class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 shadow-sm focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 focus:outline-none">
                                     </label>
                                     <label class="text-sm">
                                         <span class="block font-semibold text-slate-600 mb-1">Usuario SAP</span>
                                         <input type="text" wire:model="sl_username" autocomplete="off" name="sap_user_{{ $tenantId }}"
-                                            class="w-full rounded-xl border-slate-300 text-sm focus:border-emerald-500 focus:ring-emerald-500">
+                                            class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 shadow-sm focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 focus:outline-none">
                                     </label>
                                     <label class="text-sm sm:col-span-2">
                                         <span class="block font-semibold text-slate-600 mb-1">
@@ -103,18 +103,18 @@
                                             @if($tienePassword)<span class="text-emerald-600 font-normal">· guardada (deja vacío para conservar)</span>@endif
                                         </span>
                                         <input type="password" wire:model="sl_password" autocomplete="new-password" name="sap_pass_{{ $tenantId }}" placeholder="••••••••"
-                                            class="w-full rounded-xl border-slate-300 text-sm focus:border-emerald-500 focus:ring-emerald-500">
+                                            class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 shadow-sm focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 focus:outline-none">
                                     </label>
                                 @else
                                     <label class="text-sm sm:col-span-2">
                                         <span class="block font-semibold text-slate-600 mb-1">URL del puente / agente</span>
                                         <input type="text" wire:model="bridge_url" autocomplete="off" placeholder="https://agente-cliente:puerto"
-                                            class="w-full rounded-xl border-slate-300 text-sm focus:border-emerald-500 focus:ring-emerald-500">
+                                            class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 shadow-sm focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 focus:outline-none">
                                     </label>
                                     <label class="text-sm sm:col-span-2">
                                         <span class="block font-semibold text-slate-600 mb-1">Token del puente <span class="text-slate-400 font-normal">(deja vacío para conservar)</span></span>
                                         <input type="password" wire:model="bridge_token" autocomplete="new-password" placeholder="••••••••"
-                                            class="w-full rounded-xl border-slate-300 text-sm focus:border-emerald-500 focus:ring-emerald-500">
+                                            class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 shadow-sm focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 focus:outline-none">
                                     </label>
                                 @endif
                             </div>
