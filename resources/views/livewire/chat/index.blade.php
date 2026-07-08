@@ -2870,28 +2870,49 @@
          - Se puede MINIMIZAR (colapsa a una barrita) para ver el chat completo.
          - El borrador se auto-guarda por conversación: al cerrar/reabrir sigue igual. --}}
     @if($mostrarCrearPedido && $conversacionActivaId)
-        <div x-data="{ min: false }"
-             wire:key="panel-crear-pedido"
-             class="fixed bottom-0 right-0 z-[80] p-2 sm:p-3 pointer-events-none">
-            <div :class="min ? 'h-12 w-72' : 'h-[90vh] w-[min(600px,96vw)]'"
-                 class="pointer-events-auto bg-slate-50 rounded-2xl shadow-2xl ring-1 ring-slate-200 flex flex-col overflow-hidden transition-all duration-200">
+        <div wire:key="panel-crear-pedido"
+             x-data="{
+                min: false,
+                x: null, y: null, dragging: false, offX: 0, offY: 0,
+                startDrag(e) {
+                    if (e.button !== undefined && e.button !== 0) return;
+                    const r = this.$root.getBoundingClientRect();
+                    this.x = r.left; this.y = r.top;
+                    this.offX = e.clientX - r.left; this.offY = e.clientY - r.top;
+                    this.dragging = true;
+                    const mv = (ev) => {
+                        if (!this.dragging) return;
+                        ev.preventDefault();
+                        this.x = Math.min(window.innerWidth - 90, Math.max(0, ev.clientX - this.offX));
+                        this.y = Math.min(window.innerHeight - 40, Math.max(0, ev.clientY - this.offY));
+                    };
+                    const up = () => { this.dragging = false; window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); };
+                    window.addEventListener('pointermove', mv);
+                    window.addEventListener('pointerup', up);
+                }
+             }"
+             :style="x === null ? 'bottom:0.5rem; right:0.5rem;' : ('left:' + x + 'px; top:' + y + 'px;')"
+             class="fixed z-[80] pointer-events-none">
+            <div :class="min ? 'h-12 w-72' : 'h-[88vh] w-[min(600px,96vw)]'"
+                 class="pointer-events-auto bg-slate-50 rounded-2xl shadow-2xl ring-1 ring-slate-200 flex flex-col overflow-hidden transition-[height,width] duration-200">
 
-                {{-- Barra superior (arrastre visual + acciones) --}}
-                <div class="flex items-center justify-between px-4 py-2.5 border-b border-slate-200 bg-white shrink-0">
-                    <button type="button" @click="min = !min"
-                            class="font-bold text-slate-800 flex items-center gap-2 min-w-0">
+                {{-- Barra superior: ARRASTRAR desde aquí para mover el panel --}}
+                <div x-on:pointerdown="startDrag($event)" style="touch-action:none"
+                     class="flex items-center justify-between px-3 py-2.5 border-b border-slate-200 bg-white shrink-0 cursor-move select-none"
+                     :class="dragging ? 'bg-emerald-50' : ''">
+                    <div class="font-bold text-slate-800 flex items-center gap-2 min-w-0">
+                        <i class="fa-solid fa-grip-vertical text-slate-300"></i>
                         <i class="fa-solid fa-cart-plus text-emerald-500"></i>
                         <span class="truncate">Crear pedido</span>
                         <span x-show="min" class="text-[11px] font-normal text-emerald-600">(minimizado)</span>
-                    </button>
-                    <div class="flex items-center gap-1 shrink-0">
-                        {{-- Minimizar / Restaurar --}}
-                        <button type="button" @click="min = !min"
+                    </div>
+                    {{-- Botones: no deben iniciar arrastre --}}
+                    <div class="flex items-center gap-1 shrink-0" x-on:pointerdown.stop>
+                        <button type="button" x-on:click="min = !min"
                                 :title="min ? 'Restaurar' : 'Minimizar (sigue guardado)'"
                                 class="h-8 w-8 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition flex items-center justify-center">
                             <i class="fa-solid" :class="min ? 'fa-window-maximize' : 'fa-window-minimize'"></i>
                         </button>
-                        {{-- Cerrar (el borrador queda guardado) --}}
                         <button type="button" wire:click="cerrarCrearPedido"
                                 title="Cerrar (el pedido en construcción queda guardado)"
                                 class="h-8 w-8 rounded-lg text-slate-500 hover:bg-rose-50 hover:text-rose-600 transition flex items-center justify-center">
@@ -2900,8 +2921,7 @@
                     </div>
                 </div>
 
-                {{-- Cuerpo: se oculta al minimizar, PERO el componente sigue montado
-                     (no se pierde nada) --}}
+                {{-- Cuerpo: se oculta al minimizar, PERO el componente sigue montado --}}
                 <div x-show="!min" class="flex-1 overflow-y-auto">
                     @livewire('pedidos.crear-manual',
                         ['conv' => $conversacionActivaId, 'embebido' => true],
