@@ -1,4 +1,4 @@
-<div class="min-h-screen bg-slate-50/50">
+<div class="{{ $embebido ?? false ? '' : 'min-h-screen bg-slate-50/50' }}">
     @php
         // Clases reutilizables para inputs (Tailwind v4 ya no estiliza inputs nativos)
         $inputCls = 'w-full rounded-xl border border-slate-300 bg-white text-sm text-slate-800 placeholder:text-slate-400 px-3.5 py-2.5 shadow-sm transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none disabled:bg-slate-50 disabled:text-slate-500';
@@ -7,11 +7,10 @@
         $cardCls = 'rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden';
     @endphp
 
-    <div class="px-4 lg:px-8 py-6 w-full max-w-[1600px] mx-auto pb-32">
+    <div class="{{ ($embebido ?? false) ? 'px-3 py-3 pb-10' : 'px-4 lg:px-8 py-6 pb-32 max-w-[1600px] mx-auto' }} w-full">
 
-        {{-- ═══════════════════════════════════════════════════════════════
-             HEADER profesional
-             ═══════════════════════════════════════════════════════════════ --}}
+        {{-- HEADER profesional — oculto en modo embebido (la tarjeta flotante ya tiene su barra) --}}
+        @unless($embebido ?? false)
         <div class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden mb-6">
             <div class="h-1 bg-gradient-to-r from-emerald-500 to-cyan-500"></div>
             <div class="p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -49,6 +48,7 @@
                 </a>
             </div>
         </div>
+        @endunless
 
         {{-- Mensajes de Livewire --}}
         @if (session()->has('error'))
@@ -678,6 +678,15 @@
                                 </p>
                             @endif
                         </div>
+                    </div>
+                    <div>
+                        <label class="{{ $labelCls }}">
+                            <i class="fa-solid fa-clock text-slate-400 mr-1"></i>
+                            ¿Para qué hora es el pedido?
+                        </label>
+                        <input type="time" wire:model="hora_pedido"
+                               class="{{ $inputCls }}">
+                        <p class="mt-1 text-[11px] text-slate-400">Opcional — hora en que debe estar listo/entregarse.</p>
                     </div>
                     <div>
                         <label class="{{ $labelCls }}">
