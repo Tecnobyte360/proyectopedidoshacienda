@@ -2921,8 +2921,9 @@
                     </div>
                 </div>
 
-                {{-- Cuerpo: se oculta al minimizar, PERO el componente sigue montado --}}
-                <div x-show="!min" class="flex-1 overflow-y-auto">
+                {{-- Cuerpo: se oculta al minimizar, PERO el componente sigue montado.
+                     min-h-0 es CLAVE para que el scroll funcione dentro del panel flex. --}}
+                <div x-show="!min" class="flex-1 min-h-0 overflow-y-auto">
                     @livewire('pedidos.crear-manual',
                         ['conv' => $conversacionActivaId, 'embebido' => true],
                         key('crear-manual-'.$conversacionActivaId))
