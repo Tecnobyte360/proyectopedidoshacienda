@@ -90,6 +90,8 @@
                         </label>
                         {{-- 🌍 Selector de país (propio, sin CDN) + número --}}
                         <div x-data="telefonoPais(@js($telefono))" x-init="init()" class="flex gap-2">
+                            {{-- 📵 Input oculto que SÍ se enlaza a Livewire (fuente de verdad del teléfono) --}}
+                            <input type="hidden" wire:model.live.debounce.400ms="telefono" x-ref="hid">
                             {{-- Selector de país con bandera --}}
                             <div class="relative shrink-0">
                                 <select x-model="indicativo" @change="sync()"
@@ -1000,7 +1002,6 @@
                 return {
                     indicativo: '57',
                     numero: '',
-                    _commitT: null,
                     init() {
                         let v = (valorInicial || '').replace(/\D+/g, '');
                         if (v) {
@@ -1009,7 +1010,8 @@
                             if (hit) { this.indicativo = hit; this.numero = v.slice(hit.length); }
                             else { this.numero = v; } // 10 dígitos → local, default CO
                         }
-                        this.sync();
+                        // Empujar el valor inicial al input oculto (wire:model).
+                        this.$nextTick(() => this.push(true));
                         // Si Livewire cambia el teléfono (ej. buscar por cédula), re-sincronizar.
                         this.$wire.$watch('telefono', (val) => {
                             const limpio = (val || '').replace(/\D+/g, '');
@@ -1025,19 +1027,18 @@
                         const limpio = (this.numero || '').replace(/\D+/g, '');
                         return limpio ? (this.indicativo + limpio) : '';
                     },
-                    sync() {
-                        // Mientras escribe: set DIFERIDO (no salta el cursor).
-                        this.$wire.set('telefono', this.valorTel(), false);
-                        // 🛡️ Y confirma al servidor poco después de dejar de escribir. Es
-                        // CLAVE porque el chat se auto-refresca (wire:poll) y borraría el
-                        // valor diferido. El set 'live' lo deja guardado de verdad.
-                        clearTimeout(this._commitT);
-                        this._commitT = setTimeout(() => this.commit(), 400);
+                    // ✅ Escribe el valor en el input OCULTO (wire:model="telefono") y avisa a
+                    //    Livewire con eventos nativos. Método canónico: el valor SIEMPRE llega
+                    //    al servidor. inmediato=true fuerza commit al instante (blur/inicio).
+                    push(inmediato) {
+                        const h = this.$refs.hid;
+                        if (!h) return;
+                        h.value = this.valorTel();
+                        h.dispatchEvent(new Event('input', { bubbles: true }));
+                        if (inmediato) h.dispatchEvent(new Event('change', { bubbles: true }));
                     },
-                    commit() {
-                        // set LIVE (sin 3er arg) → viaja al servidor y queda persistido.
-                        this.$wire.set('telefono', this.valorTel());
-                    },
+                    sync()   { this.push(false); },  // mientras escribe (debounced)
+                    commit() { this.push(true); },   // al salir del campo
                 };
             }
         </script>

@@ -1,6 +1,6 @@
 <div style="height: calc(100vh - 4rem)"
      class="flex flex-col lg:flex-row bg-slate-100 overflow-hidden w-full max-w-full"
-     wire:poll.2s="refrescar">
+     @if(!$mostrarCrearPedido) wire:poll.2s="refrescar" @endif>
 
     {{-- 📐 En la página del chat, todo debe caber en la pantalla (sin scroll grande).
          - Ocultamos el footer global "Desarrollado por..." (empujaba la página).
