@@ -2865,28 +2865,44 @@
         </div>
     @endif
 
-    {{-- 🛒 PANEL LATERAL: Crear pedido dentro del chat (sin salir de la interfaz).
-         El borrador se auto-guarda por conversación, así que si lo cierras y lo
-         vuelves a abrir, sigue todo como lo dejaste. --}}
+    {{-- 🛒 PANEL FLOTANTE: Crear pedido dentro del chat, SIN tapar la conversación.
+         - Sin fondo oscuro: el chat queda visible y usable detrás.
+         - Se puede MINIMIZAR (colapsa a una barrita) para ver el chat completo.
+         - El borrador se auto-guarda por conversación: al cerrar/reabrir sigue igual. --}}
     @if($mostrarCrearPedido && $conversacionActivaId)
-        <div class="fixed inset-0 z-[80] flex justify-end" wire:key="panel-crear-pedido">
-            {{-- Fondo: NO cierra al hacer click (evita perder lo que va escribiendo) --}}
-            <div class="absolute inset-0 bg-slate-900/50"></div>
+        <div x-data="{ min: false }"
+             wire:key="panel-crear-pedido"
+             class="fixed bottom-0 right-0 z-[80] p-2 sm:p-3 pointer-events-none">
+            <div :class="min ? 'h-12 w-72' : 'h-[90vh] w-[min(600px,96vw)]'"
+                 class="pointer-events-auto bg-slate-50 rounded-2xl shadow-2xl ring-1 ring-slate-200 flex flex-col overflow-hidden transition-all duration-200">
 
-            <div class="relative h-full w-full max-w-4xl bg-slate-50 shadow-2xl flex flex-col">
-                <div class="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-white shrink-0">
-                    <div class="font-bold text-slate-800 flex items-center gap-2">
+                {{-- Barra superior (arrastre visual + acciones) --}}
+                <div class="flex items-center justify-between px-4 py-2.5 border-b border-slate-200 bg-white shrink-0">
+                    <button type="button" @click="min = !min"
+                            class="font-bold text-slate-800 flex items-center gap-2 min-w-0">
                         <i class="fa-solid fa-cart-plus text-emerald-500"></i>
-                        Crear pedido
-                        <span class="text-[11px] font-normal text-slate-400">· se guarda solo si lo cierras</span>
-                    </div>
-                    <button type="button" wire:click="cerrarCrearPedido"
-                            title="Cerrar (el pedido en construcción queda guardado)"
-                            class="h-9 w-9 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition flex items-center justify-center">
-                        <i class="fa-solid fa-xmark text-lg"></i>
+                        <span class="truncate">Crear pedido</span>
+                        <span x-show="min" class="text-[11px] font-normal text-emerald-600">(minimizado)</span>
                     </button>
+                    <div class="flex items-center gap-1 shrink-0">
+                        {{-- Minimizar / Restaurar --}}
+                        <button type="button" @click="min = !min"
+                                :title="min ? 'Restaurar' : 'Minimizar (sigue guardado)'"
+                                class="h-8 w-8 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition flex items-center justify-center">
+                            <i class="fa-solid" :class="min ? 'fa-window-maximize' : 'fa-window-minimize'"></i>
+                        </button>
+                        {{-- Cerrar (el borrador queda guardado) --}}
+                        <button type="button" wire:click="cerrarCrearPedido"
+                                title="Cerrar (el pedido en construcción queda guardado)"
+                                class="h-8 w-8 rounded-lg text-slate-500 hover:bg-rose-50 hover:text-rose-600 transition flex items-center justify-center">
+                            <i class="fa-solid fa-xmark text-lg"></i>
+                        </button>
+                    </div>
                 </div>
-                <div class="flex-1 overflow-y-auto">
+
+                {{-- Cuerpo: se oculta al minimizar, PERO el componente sigue montado
+                     (no se pierde nada) --}}
+                <div x-show="!min" class="flex-1 overflow-y-auto">
                     @livewire('pedidos.crear-manual',
                         ['conv' => $conversacionActivaId, 'embebido' => true],
                         key('crear-manual-'.$conversacionActivaId))
