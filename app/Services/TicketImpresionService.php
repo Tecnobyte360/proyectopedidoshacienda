@@ -70,6 +70,13 @@ class TicketImpresionService
         foreach ($pedido->detalles as $d) {
             $cant = rtrim(rtrim(number_format((float) $d->cantidad, 2, '.', ''), '0'), '.');
             $out .= $cant . ' x ' . mb_substr((string) $d->producto, 0, 34) . "\n";
+            // Observacion del producto (ej. "1 kilo picado", "8 porciones a 120 grs")
+            $obs = trim((string) $d->observacion);
+            if ($obs !== '') {
+                foreach (explode("\n", wordwrap('>> ' . $obs, self::ANCHO - 2, "\n", true)) as $ln) {
+                    $out .= '  ' . $ln . "\n";
+                }
+            }
         }
         $out .= str_repeat('-', self::ANCHO) . "\n";
         $out .= 'Fecha: ' . optional($pedido->created_at)->format('d/m/Y h:i a') . "\n";
