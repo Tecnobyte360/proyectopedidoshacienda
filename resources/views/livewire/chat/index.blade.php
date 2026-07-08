@@ -2891,9 +2891,9 @@
                     window.addEventListener('pointerup', up);
                 }
              }"
-             :style="x === null ? 'bottom:0.5rem; right:0.5rem;' : ('left:' + x + 'px; top:' + y + 'px;')"
+             :style="x === null ? 'top:4.75rem; right:0.75rem;' : ('left:' + x + 'px; top:' + y + 'px;')"
              class="fixed z-[80] pointer-events-none">
-            <div :class="min ? 'h-12 w-72' : 'h-[88vh] w-[min(600px,96vw)]'"
+            <div :class="min ? 'h-12 w-72' : 'h-[calc(100vh-5.75rem)] w-[min(600px,96vw)]'"
                  class="pointer-events-auto bg-slate-50 rounded-2xl shadow-2xl ring-1 ring-slate-200 flex flex-col overflow-hidden transition-[height,width] duration-200">
 
                 {{-- Barra superior: ARRASTRAR desde aquí para mover el panel --}}
