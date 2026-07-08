@@ -69,7 +69,9 @@ class TicketImpresionService
         $out .= str_repeat('-', self::ANCHO) . "\n";
         foreach ($pedido->detalles as $d) {
             $cant = rtrim(rtrim(number_format((float) $d->cantidad, 2, '.', ''), '0'), '.');
-            $out .= $cant . ' x ' . mb_substr((string) $d->producto, 0, 34) . "\n";
+            $uni  = $this->normalizarUnidad((string) $d->unidad);
+            $encab = $cant . ($uni !== '' ? ' ' . $uni : '') . ' x ';
+            $out .= $encab . mb_substr((string) $d->producto, 0, self::ANCHO - mb_strlen($encab)) . "\n";
             // Observacion del producto (ej. "1 kilo picado", "8 porciones a 120 grs")
             $obs = trim((string) $d->observacion);
             if ($obs !== '') {
@@ -123,6 +125,28 @@ class TicketImpresionService
         ]);
 
         return true;
+    }
+
+    /**
+     * Normaliza la unidad de venta a una etiqueta corta y legible para la comanda.
+     * Los datos vienen inconsistentes (Kl, kg, Und, UNS, PAQ, "porciones "...).
+     */
+    private function normalizarUnidad(string $u): string
+    {
+        $u = trim(mb_strtolower($u));
+        if ($u === '') return '';
+
+        return match (true) {
+            in_array($u, ['kl', 'kg', 'kilo', 'kilos', 'kilogramo', 'kilogramos'], true) => 'Kg',
+            in_array($u, ['lb', 'lbs', 'libra', 'libras'], true)                          => 'Lb',
+            in_array($u, ['gr', 'g', 'grs', 'gramo', 'gramos'], true)                     => 'Gr',
+            in_array($u, ['und', 'un', 'uns', 'u', 'unidad', 'unidades'], true)           => 'Und',
+            in_array($u, ['paq', 'paquete', 'paquetes'], true)                            => 'Paq',
+            in_array($u, ['porcion', 'porciones', 'porc', 'porcs'], true)                 => 'Porc',
+            in_array($u, ['bandeja', 'bandejas', 'band'], true)                           => 'Band',
+            in_array($u, ['bolsa', 'bolsas'], true)                                       => 'Bolsa',
+            default => mb_convert_case($u, MB_CASE_TITLE),
+        };
     }
 
     private function centrar(string $t, ?int $ancho = null): string
