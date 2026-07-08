@@ -34,6 +34,10 @@ class CrearManual extends Component
     /** 🔲 Si se renderiza dentro del Chat en vivo (panel lateral): no redirige. */
     public bool $embebido = false;
 
+    /** 📞 Teléfono en 2 partes (binding NATIVO de Livewire, sin Alpine frágil). */
+    public string $indicativoPais = '57';
+    public string $numeroLocal    = '';
+
     // Cliente
     public string $telefono       = '';
     public string $nombre_cliente = '';
@@ -81,10 +85,39 @@ class CrearManual extends Component
 
     /** Campos del pedido manual que se guardan como borrador (auto-save). */
     private array $camposBorrador = [
-        'telefono', 'nombre_cliente', 'cedula', 'email', 'productos',
+        'telefono', 'indicativoPais', 'numeroLocal', 'nombre_cliente', 'cedula', 'email', 'productos',
         'metodo_entrega', 'costo_envio', 'sede_id', 'direccion', 'barrio', 'ciudad',
         'domiciliario_id', 'metodo_pago', 'cupon', 'notas', 'hora_pedido', 'direccionLat', 'direccionLng',
     ];
+
+    /** Indicativos conocidos (más largo → más corto) para separar bien. */
+    private const INDICATIVOS = ['593','591','507','506','502','598','51','58','57','56','55','54','52','34','1'];
+
+    /** Compone $telefono a partir de indicativo + número local. */
+    private function componerTelefono(): void
+    {
+        $num = preg_replace('/\D+/', '', (string) $this->numeroLocal);
+        $this->telefono = $num !== '' ? ($this->indicativoPais . $num) : '';
+    }
+
+    /** Separa $telefono en indicativo + número local (para mostrarlo en los campos). */
+    private function sincronizarPartesTelefono(): void
+    {
+        $t = preg_replace('/\D+/', '', (string) $this->telefono);
+        if ($t === '') { $this->numeroLocal = ''; return; }
+        foreach (self::INDICATIVOS as $c) {
+            if (str_starts_with($t, $c) && strlen($t) > 10) {
+                $this->indicativoPais = $c;
+                $this->numeroLocal    = substr($t, strlen($c));
+                return;
+            }
+        }
+        $this->numeroLocal = $t; // 10 dígitos → local, indicativo por defecto
+    }
+
+    /** Cuando cambian las partes (Livewire nativo), recomponer el teléfono. */
+    public function updatedNumeroLocal(): void   { $this->componerTelefono(); }
+    public function updatedIndicativoPais(): void { $this->componerTelefono(); }
 
     private function claveBorrador(): string
     {
@@ -143,6 +176,8 @@ class CrearManual extends Component
         }
         // ♻️ Restaurar el pedido en construcción si el operador se salió y volvió.
         $this->restaurarBorrador();
+        // 📞 Mostrar el teléfono precargado en los campos (indicativo + número).
+        $this->sincronizarPartesTelefono();
     }
 
     private function precargarDesdeConversacion(int $convId): void
@@ -704,6 +739,7 @@ class CrearManual extends Component
         $this->nombre_cliente      = '';
         $this->email               = '';
         $this->telefono            = '';
+        $this->numeroLocal         = '';
         $this->direccion           = '';
         $this->barrio              = '';
         $this->telefonoDesdeErp    = false;
@@ -722,6 +758,7 @@ class CrearManual extends Component
             $telLocal = $this->normalizarTel($cliente->telefono_normalizado ?? $cliente->telefono ?? '');
             if ($this->esTelefonoValido($telLocal)) {
                 $this->telefono = $telLocal;
+                $this->sincronizarPartesTelefono();
             }
         }
 
@@ -823,6 +860,7 @@ class CrearManual extends Component
             if (!$this->esTelefonoValido($this->telefono) && $this->esTelefonoValido($telErp)) {
                 $this->telefono = $telErp;
                 $this->telefonoDesdeErp = true; // 🏷️ marcar que vino del ERP
+                $this->sincronizarPartesTelefono();
             }
             if (empty($this->direccion) && !empty($clienteErp['StrDireccion'])) {
                 $this->direccion = $clienteErp['StrDireccion'];
@@ -854,6 +892,9 @@ class CrearManual extends Component
 
     public function crearPedido()
     {
+        // 📞 Asegurar que el teléfono esté compuesto desde los campos (red de seguridad).
+        $this->componerTelefono();
+
         // Validación mínima
         if (empty($this->productos)) {
             $this->dispatch('notify', ['type' => 'error', 'message' => 'Debes agregar al menos un producto.']);

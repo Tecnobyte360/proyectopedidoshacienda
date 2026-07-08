@@ -88,13 +88,11 @@
                             <i class="fa-solid fa-phone text-slate-400 mr-1"></i>
                             Teléfono <span class="text-rose-500">*</span>
                         </label>
-                        {{-- 🌍 Selector de país (propio, sin CDN) + número --}}
-                        <div x-data="telefonoPais(@js($telefono))" x-init="init()" class="flex gap-2">
-                            {{-- 📵 Input oculto que SÍ se enlaza a Livewire (fuente de verdad del teléfono) --}}
-                            <input type="hidden" wire:model.live.debounce.400ms="telefono" x-ref="hid">
+                        {{-- 🌍 Selector de país + número — binding NATIVO de Livewire (infalible) --}}
+                        <div class="flex gap-2">
                             {{-- Selector de país con bandera --}}
                             <div class="relative shrink-0">
-                                <select x-model="indicativo" @change="sync()"
+                                <select wire:model.live="indicativoPais"
                                         class="appearance-none rounded-xl border border-slate-300 bg-white text-sm py-3 pl-3 pr-8 shadow-sm focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none cursor-pointer">
                                     <option value="57">🇨🇴 +57</option>
                                     <option value="1">🇺🇸 +1</option>
@@ -112,7 +110,7 @@
                             {{-- Número sin indicativo --}}
                             <div class="relative flex-1">
                                 <i class="fa-brands fa-whatsapp absolute left-3 top-1/2 -translate-y-1/2 text-emerald-500"></i>
-                                <input type="tel" x-model="numero" @input="sync()" @blur="commit()"
+                                <input type="tel" wire:model.blur="numeroLocal"
                                        placeholder="300 123 4567"
                                        class="w-full rounded-xl border border-slate-300 bg-white text-sm pl-10 pr-4 py-3 shadow-sm transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none">
                             </div>
