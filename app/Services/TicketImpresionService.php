@@ -48,6 +48,12 @@ class TicketImpresionService
         // Encabezado EXTRA grande con el número de pedido
         $out .= self::T_GRANDE . $this->centrar('PEDIDO #' . $pedido->id, self::ANCHO_G) . "\n";
 
+        // ⏰ Hora para la que es el pedido (destacada, si viene)
+        $hora = $pedido->hora_entrega ? substr((string) $pedido->hora_entrega, 0, 5) : '';
+        if ($hora !== '') {
+            $out .= self::T_ALTO . $this->centrar('*** PARA LAS ' . $hora . ' ***', self::ANCHO) . "\n";
+        }
+
         // Cuerpo en DOBLE ALTO (letra grande, ancho normal = 42 caracteres)
         $out .= self::T_ALTO;
         $out .= str_repeat('-', self::ANCHO) . "\n";

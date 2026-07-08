@@ -58,6 +58,7 @@ class CrearManual extends Component
     public string $metodo_pago = 'efectivo';
     public string $cupon       = '';
     public string $notas       = '';
+    public ?string $hora_pedido = null;   // ⏰ Hora para la que es el pedido (HH:MM)
 
     // Productos disponibles para autocomplete
     public string $busquedaProducto = '';
@@ -80,7 +81,7 @@ class CrearManual extends Component
     private array $camposBorrador = [
         'telefono', 'nombre_cliente', 'cedula', 'email', 'productos',
         'metodo_entrega', 'costo_envio', 'sede_id', 'direccion', 'barrio', 'ciudad',
-        'domiciliario_id', 'metodo_pago', 'cupon', 'notas', 'direccionLat', 'direccionLng',
+        'domiciliario_id', 'metodo_pago', 'cupon', 'notas', 'hora_pedido', 'direccionLat', 'direccionLng',
     ];
 
     private function claveBorrador(): string
@@ -934,6 +935,8 @@ class CrearManual extends Component
             'payment_method' => $this->metodo_pago,
             'coupon_code'    => $this->cupon,
             'notes'          => trim(($this->notas ? $this->notas . "\n" : '') . '[CREADO MANUALMENTE]'),
+            // ⏰ Hora para la que es el pedido (se guarda en hora_entrega)
+            'pickup_time'    => $this->hora_pedido ?: null,
             // 🚩 Marca que es un pedido manual → salta el cortafuego anti-fantasma
             //    del bot (el operador agrega productos a mano).
             'manual'         => true,
