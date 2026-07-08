@@ -110,7 +110,7 @@
                             {{-- Número sin indicativo --}}
                             <div class="relative flex-1">
                                 <i class="fa-brands fa-whatsapp absolute left-3 top-1/2 -translate-y-1/2 text-emerald-500"></i>
-                                <input type="tel" x-model="numero" @input="sync()" @blur="$wire.$commit()"
+                                <input type="tel" x-model="numero" @input="sync()" @blur="commit()"
                                        placeholder="300 123 4567"
                                        class="w-full rounded-xl border border-slate-300 bg-white text-sm pl-10 pr-4 py-3 shadow-sm transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none">
                             </div>
@@ -1021,15 +1021,22 @@
                             }
                         });
                     },
-                    sync() {
+                    valorTel() {
                         const limpio = (this.numero || '').replace(/\D+/g, '');
-                        // 3er arg = false → DIFERIDO: no hace roundtrip al servidor en
-                        // cada tecla (eso causaba que el número "saltara" mientras se escribía).
-                        this.$wire.set('telefono', limpio ? (this.indicativo + limpio) : '', false);
-                        // 🛡️ Pero SÍ confirmamos el valor al servidor poco después de dejar de
-                        // escribir, para que al crear el pedido el teléfono ya esté guardado.
+                        return limpio ? (this.indicativo + limpio) : '';
+                    },
+                    sync() {
+                        // Mientras escribe: set DIFERIDO (no salta el cursor).
+                        this.$wire.set('telefono', this.valorTel(), false);
+                        // 🛡️ Y confirma al servidor poco después de dejar de escribir. Es
+                        // CLAVE porque el chat se auto-refresca (wire:poll) y borraría el
+                        // valor diferido. El set 'live' lo deja guardado de verdad.
                         clearTimeout(this._commitT);
-                        this._commitT = setTimeout(() => { try { this.$wire.$commit(); } catch (e) {} }, 350);
+                        this._commitT = setTimeout(() => this.commit(), 400);
+                    },
+                    commit() {
+                        // set LIVE (sin 3er arg) → viaja al servidor y queda persistido.
+                        this.$wire.set('telefono', this.valorTel());
                     },
                 };
             }
