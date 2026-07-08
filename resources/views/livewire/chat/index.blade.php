@@ -2891,10 +2891,10 @@
                     window.addEventListener('pointerup', up);
                 }
              }"
-             :style="x === null ? 'top:4.75rem; right:0.75rem;' : ('left:' + x + 'px; top:' + y + 'px;')"
-             class="fixed z-[80] pointer-events-none">
-            <div :class="min ? 'h-12 w-72' : 'h-[calc(100vh-5.75rem)] w-[min(600px,96vw)]'"
-                 class="pointer-events-auto bg-slate-50 rounded-2xl shadow-2xl ring-1 ring-slate-200 flex flex-col overflow-hidden transition-[height,width] duration-200">
+             :style="'z-index:80; ' + (x === null ? 'top:4.75rem; right:0.75rem;' : ('left:' + x + 'px; top:' + y + 'px;'))"
+             class="fixed pointer-events-none">
+            <div :style="min ? 'height:3rem; width:18rem;' : 'height:calc(100vh - 5.75rem); width:min(600px, 96vw);'"
+                 class="pointer-events-auto bg-slate-50 rounded-2xl shadow-2xl ring-1 ring-slate-200 flex flex-col overflow-hidden transition-all duration-200">
 
                 {{-- Barra superior: ARRASTRAR desde aquí para mover el panel --}}
                 <div x-on:pointerdown="startDrag($event)" style="touch-action:none"
@@ -2922,8 +2922,8 @@
                 </div>
 
                 {{-- Cuerpo: se oculta al minimizar, PERO el componente sigue montado.
-                     min-h-0 es CLAVE para que el scroll funcione dentro del panel flex. --}}
-                <div x-show="!min" class="flex-1 min-h-0 overflow-y-auto">
+                     min-height:0 inline es CLAVE para que el scroll funcione (flexbox). --}}
+                <div x-show="!min" class="flex-1" style="min-height:0; overflow-y:auto;">
                     @livewire('pedidos.crear-manual',
                         ['conv' => $conversacionActivaId, 'embebido' => true],
                         key('crear-manual-'.$conversacionActivaId))
