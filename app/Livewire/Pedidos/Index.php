@@ -326,14 +326,13 @@ class Index extends Component
                 $q->where(function ($qp) { $qp->where('es_prueba', false)->orWhereNull('es_prueba'); });
             }
 
-            // ✅ Ocultar los pedidos cuya PREPARACIÓN ya se finalizó, MIENTRAS sigan
-            //    "en preparación". (Cuando pasan a en_camino/entregado vuelven a verse
-            //    en su tab correspondiente.) Así desaparecen del tab "En preparación".
-            $q->where(function ($qf) {
-                $qf->where('estado', '!=', Pedido::ESTADO_EN_PREPARACION)
-                   ->orWhere('preparacion_finalizada', false)
-                   ->orWhereNull('preparacion_finalizada');
-            });
+            // ⚠️ ANTES: se ocultaban los pedidos con preparación finalizada que seguían
+            //    "en_preparacion", asumiendo que ya pasaban a despacho/ruta. PERO si el
+            //    domiciliario no inicia la ruta desde su celular (portal cerrado), el
+            //    pedido se queda en_preparacion + asignado y quedaba INVISIBLE en
+            //    Gestión de Pedidos. Ahora se mantienen visibles en "En preparación"
+            //    hasta que realmente pasen a "en camino"/"entregado" (ahí ya salen por
+            //    su propio estado). No afecta al cliente (no notifica nada).
 
             $estadosPerm    = $this->estadosPermitidos();
             $verProgramados = $this->puedeVerProgramados();
