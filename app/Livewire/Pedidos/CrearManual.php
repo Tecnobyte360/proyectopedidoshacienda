@@ -897,11 +897,11 @@ class CrearManual extends Component
 
         // Validación mínima
         if (empty($this->productos)) {
-            $this->dispatch('notify', ['type' => 'error', 'message' => 'Debes agregar al menos un producto.']);
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Agrega al menos un producto al pedido antes de crearlo.']);
             return;
         }
         if (empty($this->telefono)) {
-            $this->dispatch('notify', ['type' => 'error', 'message' => 'Falta el teléfono del cliente.']);
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Escribe el teléfono del cliente (celular con WhatsApp) para continuar.']);
             return;
         }
         // ⚠️ Teléfono sospechoso → frenar y pedir confirmación una vez.
@@ -915,11 +915,11 @@ class CrearManual extends Component
             return;
         }
         if (empty($this->nombre_cliente)) {
-            $this->dispatch('notify', ['type' => 'error', 'message' => 'Falta el nombre del cliente.']);
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Escribe el nombre del cliente.']);
             return;
         }
         if ($this->metodo_entrega === 'domicilio' && empty($this->direccion)) {
-            $this->dispatch('notify', ['type' => 'error', 'message' => 'Falta la dirección para domicilio.']);
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Escribe la dirección de entrega para el domicilio.']);
             return;
         }
         // 🌐 RESPALDO server-side: si el navegador no fijó las coordenadas (Google
@@ -951,7 +951,7 @@ class CrearManual extends Component
             return;
         }
         if ($this->metodo_entrega === 'recoger' && empty($this->sede_id)) {
-            $this->dispatch('notify', ['type' => 'error', 'message' => 'Falta la sede de recogida.']);
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Selecciona la sede donde el cliente va a recoger el pedido.']);
             return;
         }
 
@@ -1147,10 +1147,11 @@ class CrearManual extends Component
 
             return redirect()->route('pedidos.index');
         } catch (\Throwable $e) {
+            // El detalle técnico queda en el log; al usuario le mostramos algo claro.
             Log::error('Error creando pedido manual: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
             $this->dispatch('notify', [
                 'type'    => 'error',
-                'message' => '❌ Error: ' . $e->getMessage(),
+                'message' => 'No se pudo crear el pedido. Revisa los datos e inténtalo de nuevo. Si sigue igual, avisa al soporte.',
             ]);
         }
     }
