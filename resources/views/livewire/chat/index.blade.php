@@ -3,9 +3,14 @@
      wire:poll.2s="refrescar">
 
     {{-- 📐 En la página del chat, todo debe caber en la pantalla (sin scroll grande).
-         El footer global "Desarrollado por..." empuja la página fuera de la vista,
-         así que lo ocultamos SOLO aquí y el chat ocupa exactamente viewport - topbar. --}}
-    <style>main > footer.app-credit { display: none !important; }</style>
+         - Ocultamos el footer global "Desarrollado por..." (empujaba la página).
+         - Bloqueamos el scroll de la PÁGINA (body): el chat ya cabe exacto y solo debe
+           scrollear la lista de mensajes por dentro. Así no queda el scrollcito sobrante. --}}
+    <style>
+        main > footer.app-credit { display: none !important; }
+        html, body { overflow: hidden !important; height: 100%; }
+        main { min-height: 0 !important; }
+    </style>
 
     @php $cfgBot = \App\Models\ConfiguracionBot::actual(); @endphp
 
