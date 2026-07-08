@@ -1068,14 +1068,20 @@ class CrearManual extends Component
                     app(EstadoPedidoService::class)->marcarConfirmado($conv, $pedido->id);
 
                     // 🛵 Asignar domiciliario (solo a domicilio). Si el operador
-                    //    eligió uno, ese; si no, el sistema sugiere el mejor.
+                    //    eligió uno, se respeta SIEMPRE. Si NO eligió, solo se
+                    //    auto-sugiere cuando el tenant tiene activada la asignación
+                    //    automática (config del bot). Si está en manual → queda sin
+                    //    domiciliario y se asigna desde /despachos.
                     if ($this->metodo_entrega === 'domicilio') {
                         try {
                             $domId = $this->domiciliario_id;
                             if (!$domId) {
-                                $sug = app(\App\Services\AsignacionDomiciliarioService::class)
-                                    ->sugerirSinGuardar($pedido);
-                                $domId = $sug?->id;
+                                $cfgBot = \App\Models\ConfiguracionBot::actual();
+                                if ($cfgBot && $cfgBot->auto_asignar_domiciliario) {
+                                    $sug = app(\App\Services\AsignacionDomiciliarioService::class)
+                                        ->sugerirSinGuardar($pedido);
+                                    $domId = $sug?->id;
+                                }
                             }
                             if ($domId) {
                                 $pedido->domiciliario_id = $domId;
