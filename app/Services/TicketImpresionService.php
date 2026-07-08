@@ -52,6 +52,11 @@ class TicketImpresionService
         $out .= self::T_ALTO;
         $out .= str_repeat('-', self::ANCHO) . "\n";
         $out .= 'Cliente: ' . mb_substr((string) $pedido->cliente_nombre, 0, 32) . "\n";
+        // Cedula del cliente (solo si el comercio la captura, ej. La Hacienda).
+        $cedula = optional($pedido->cliente)->cedula;
+        if (!empty($cedula)) {
+            $out .= 'Cedula: ' . mb_substr((string) $cedula, 0, 30) . "\n";
+        }
         if ($pedido->telefono_contacto || $pedido->telefono) {
             $out .= 'Tel: ' . ($pedido->telefono_contacto ?: $pedido->telefono) . "\n";
         }
@@ -106,7 +111,7 @@ class TicketImpresionService
             'impresora_id' => $imp->id,
             'pedido_id'    => $pedido->id,
             'tipo'         => 'ticket',
-            'contenido'    => $this->ticketPedido($pedido->loadMissing('detalles')),
+            'contenido'    => $this->ticketPedido($pedido->loadMissing('detalles', 'cliente')),
             'estado'       => \App\Models\TrabajoImpresion::ESTADO_PENDIENTE,
         ]);
 
