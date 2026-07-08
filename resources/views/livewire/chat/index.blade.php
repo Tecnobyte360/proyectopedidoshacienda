@@ -783,13 +783,14 @@
                         </div>
                     </div>
 
-                    {{-- 🛒 Crear pedido manual (precarga datos del estado) --}}
-                    <a href="{{ route('pedidos.crear-manual', ['conv' => $conversacionActiva->id]) }}"
-                       title="Crear pedido manualmente con datos del chat ya pre-cargados"
+                    {{-- 🛒 Crear pedido manual EN EL MISMO CHAT (panel lateral, precarga datos) --}}
+                    <button type="button"
+                       wire:click="abrirCrearPedido"
+                       title="Crear pedido sin salir del chat (datos precargados). El borrador se guarda si lo cierras."
                        class="rounded-lg bg-emerald-500 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-emerald-600 transition inline-flex items-center gap-1">
                         <i class="fa-solid fa-cart-plus"></i>
                         <span class="hidden md:inline">Crear pedido</span>
-                    </a>
+                    </button>
 
                     {{-- 📋 Modal de estado del pedido (datos estructurados) --}}
                     <button type="button"
@@ -2860,6 +2861,36 @@
                         title="Crear lista">
                     <i class="fa-solid fa-check text-xl"></i>
                 </button>
+            </div>
+        </div>
+    @endif
+
+    {{-- 🛒 PANEL LATERAL: Crear pedido dentro del chat (sin salir de la interfaz).
+         El borrador se auto-guarda por conversación, así que si lo cierras y lo
+         vuelves a abrir, sigue todo como lo dejaste. --}}
+    @if($mostrarCrearPedido && $conversacionActivaId)
+        <div class="fixed inset-0 z-[80] flex justify-end" wire:key="panel-crear-pedido">
+            {{-- Fondo: NO cierra al hacer click (evita perder lo que va escribiendo) --}}
+            <div class="absolute inset-0 bg-slate-900/50"></div>
+
+            <div class="relative h-full w-full max-w-4xl bg-slate-50 shadow-2xl flex flex-col">
+                <div class="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-white shrink-0">
+                    <div class="font-bold text-slate-800 flex items-center gap-2">
+                        <i class="fa-solid fa-cart-plus text-emerald-500"></i>
+                        Crear pedido
+                        <span class="text-[11px] font-normal text-slate-400">· se guarda solo si lo cierras</span>
+                    </div>
+                    <button type="button" wire:click="cerrarCrearPedido"
+                            title="Cerrar (el pedido en construcción queda guardado)"
+                            class="h-9 w-9 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition flex items-center justify-center">
+                        <i class="fa-solid fa-xmark text-lg"></i>
+                    </button>
+                </div>
+                <div class="flex-1 overflow-y-auto">
+                    @livewire('pedidos.crear-manual',
+                        ['conv' => $conversacionActivaId, 'embebido' => true],
+                        key('crear-manual-'.$conversacionActivaId))
+                </div>
             </div>
         </div>
     @endif

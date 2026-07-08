@@ -33,6 +33,9 @@ class Index extends Component
     public ?int   $grupoFiltroId    = null;   // grupo seleccionado (filtra chats)
     public string $nuevoGrupoNombre = '';     // crear grupo rápido
 
+    // 🛒 Panel lateral "Crear pedido" embebido en el chat (sin salir de la interfaz)
+    public bool   $mostrarCrearPedido  = false;
+
     // 👥 Modal "Crear lista" estilo WhatsApp (nombre + selección múltiple)
     public bool   $modalCrearGrupo     = false;
     public string $nombreListaNueva    = '';
@@ -696,6 +699,35 @@ class Index extends Component
         $this->nuevoGrupoNombre = '';
         $this->grupoFiltroId = $g->id;
         $this->dispatch('notify', ['type' => 'success', 'message' => "Grupo '{$nombre}' creado."]);
+    }
+
+    /* ─── Panel lateral "Crear pedido" embebido ─── */
+
+    public function abrirCrearPedido(): void
+    {
+        if (!$this->conversacionActivaId) {
+            $this->dispatch('notify', ['type' => 'warning', 'message' => 'Abre una conversación primero.']);
+            return;
+        }
+        $this->mostrarCrearPedido = true;
+    }
+
+    public function cerrarCrearPedido(): void
+    {
+        // Solo se oculta el panel; el borrador del pedido queda guardado por
+        // conversación, así que al reabrir sigue todo como estaba.
+        $this->mostrarCrearPedido = false;
+    }
+
+    /** El componente crear-manual avisa que ya creó el pedido. */
+    #[On('pedido-manual-creado')]
+    public function onPedidoManualCreado($pedidoId = null, $tieneLink = false): void
+    {
+        // Si generó link de pago, dejamos el panel abierto para copiar el link;
+        // si no, lo cerramos y el operador sigue en el chat.
+        if (!$tieneLink) {
+            $this->mostrarCrearPedido = false;
+        }
     }
 
     /* ─── Modal "Crear lista" estilo WhatsApp (nombre + multi-selección) ─── */

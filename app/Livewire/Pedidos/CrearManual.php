@@ -31,6 +31,8 @@ class CrearManual extends Component
 {
     // Origen
     public ?int $conversacionId = null;
+    /** 🔲 Si se renderiza dentro del Chat en vivo (panel lateral): no redirige. */
+    public bool $embebido = false;
 
     // Cliente
     public string $telefono       = '';
@@ -132,9 +134,10 @@ class CrearManual extends Component
         $this->guardarBorrador();
     }
 
-    public function mount(?int $conv = null): void
+    public function mount(?int $conv = null, bool $embebido = false): void
     {
         $this->conversacionId = $conv;
+        $this->embebido = $embebido;
         if ($conv) {
             $this->precargarDesdeConversacion($conv);
         }
@@ -1073,6 +1076,19 @@ class CrearManual extends Component
 
             // ✅ Pedido creado → descartar el borrador para que no reaparezca.
             $this->limpiarBorrador();
+
+            // 🔲 Embebido en el chat: nunca redirigir. Avisar al chat que se creó
+            //    para que refresque/cierre el panel (si no hay link de pago).
+            if ($this->embebido) {
+                $this->dispatch('pedido-manual-creado', pedidoId: $pedido->id, tieneLink: (bool) $this->linkPagoGenerado);
+                $this->dispatch('notify', [
+                    'type'    => 'success',
+                    'message' => $this->linkPagoGenerado
+                        ? '✅ Pedido creado. Link de pago abajo y enviado al cliente.'
+                        : '✅ Pedido creado y cliente notificado.',
+                ]);
+                return; // se queda en el chat
+            }
 
             // 💳 Si se generó link de pago, mostrarlo en pantalla en vez de redirigir.
             if ($this->linkPagoGenerado) {
