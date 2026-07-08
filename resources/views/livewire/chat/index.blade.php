@@ -12,6 +12,12 @@
         main { min-height: 0 !important; }
     </style>
 
+    {{-- 📍 Definir aquí la función del autocompletado de dirección para que el panel
+         "Crear pedido" embebido la tenga disponible (sino solo existe en su página). --}}
+    @once
+        @include('livewire.pedidos._direccion-autocomplete-script')
+    @endonce
+
     @php $cfgBot = \App\Models\ConfiguracionBot::actual(); @endphp
 
     {{-- Bot apagado global → la pill bonita ahora vive en el topbar (resources/views/livewire/layouts/topbar.blade.php) --}}
