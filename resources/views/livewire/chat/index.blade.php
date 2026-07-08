@@ -1,5 +1,11 @@
-<div class="h-[calc(100vh-5rem)] flex flex-col lg:flex-row bg-slate-100 overflow-x-hidden w-full max-w-full"
+<div style="height: calc(100vh - 4rem)"
+     class="flex flex-col lg:flex-row bg-slate-100 overflow-hidden w-full max-w-full"
      wire:poll.2s="refrescar">
+
+    {{-- 📐 En la página del chat, todo debe caber en la pantalla (sin scroll grande).
+         El footer global "Desarrollado por..." empuja la página fuera de la vista,
+         así que lo ocultamos SOLO aquí y el chat ocupa exactamente viewport - topbar. --}}
+    <style>main > footer.app-credit { display: none !important; }</style>
 
     @php $cfgBot = \App\Models\ConfiguracionBot::actual(); @endphp
 
