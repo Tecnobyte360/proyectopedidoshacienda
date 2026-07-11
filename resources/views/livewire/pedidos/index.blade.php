@@ -582,6 +582,13 @@
                                 @endif
                             @else
                                 {{-- ━━ DESPACHO A DOMICILIO ━━ --}}
+                                {{-- 🏢 Sede origen (la sede que montó el pedido) --}}
+                                @if($pedido->sede)
+                                    <div class="flex items-center gap-2">
+                                        <i class="fa-solid fa-store w-4 text-center text-emerald-500"></i>
+                                        <span class="font-semibold text-slate-700">Sede: {{ $pedido->sede->nombre }}</span>
+                                    </div>
+                                @endif
                                 @if($pedido->zonaCobertura)
                                     <div class="flex items-center gap-2">
                                         <i class="fa-solid fa-map-location-dot w-4 text-center" style="color: {{ $pedido->zonaCobertura->color }}"></i>
