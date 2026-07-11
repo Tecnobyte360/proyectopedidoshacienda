@@ -1004,9 +1004,12 @@ class CrearManual extends Component
             $orderData['costo_envio']        = $envioManual;
             $orderData['costo_envio_manual'] = true;
             // 🏢 Sede que atiende este pedido (la elige el operador). Permite montar
-            //    desde una sede un pedido para otra.
-            if ($this->sede_id) {
-                $orderData['sede_id'] = (int) $this->sede_id;
+            //    desde una sede un pedido para otra. Si NO elige sede, se registra la
+            //    sede del operador que montó el pedido (sede origen), para que en
+            //    Gestión de Pedidos siempre se vea de dónde salió.
+            $sedeOrigen = $this->sede_id ?: (auth()->user()->sede_id ?? null);
+            if ($sedeOrigen) {
+                $orderData['sede_id'] = (int) $sedeOrigen;
             }
             // 📍 Coordenadas de la dirección (si se eligió de Google Maps) para
             //    que el pedido entre en la ruta optimizada y el mapa de despachos.
