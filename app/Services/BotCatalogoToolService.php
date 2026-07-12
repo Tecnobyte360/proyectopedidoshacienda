@@ -92,6 +92,36 @@ class BotCatalogoToolService
             }
         }
 
+        // 🧠 FALLBACK INTELIGENTE: si NADA coincidió, consultar al AGENTE INTÉRPRETE
+        //    experto (el cliente pudo usar un nombre coloquial/regional). El intérprete
+        //    deduce el producto real, lo APRENDE (palabras_clave) y re-buscamos.
+        // 🔒 CANDADO: por ahora SOLO en el tenant de PRUEBAS (#17) para validar antes
+        //    de soltarlo en producción. Para habilitarlo a todos, quitar este id o
+        //    ampliar la lista $tenantsInterprete.
+        $tenantsInterprete = [17];
+        if (in_array((int) app(\App\Services\TenantManager::class)->id(), $tenantsInterprete, true)
+            && ($resultado['encontrados'] ?? 0) === 0) {
+            try {
+                $oficial = app(\App\Services\BotInterpreteProductoService::class)
+                    ->interpretarNombre($query, $sedeId, $this->listaPrecio);
+                if ($oficial) {
+                    $r2 = $this->buscarInternoConSede($oficial, $categoria, $limite, $sedeId);
+                    if (($r2['encontrados'] ?? 0) === 0) {
+                        $r2 = $this->buscarInternoConSede($oficial, $categoria, $limite, null);
+                    }
+                    if (($r2['encontrados'] ?? 0) > 0) {
+                        $resultado = $r2;
+                        $resultado['interpretado'] = true;
+                        $resultado['nota_interprete'] = "El cliente dijo \"{$query}\" (nombre coloquial/regional). "
+                            . "El intérprete experto lo entendió como \"{$oficial}\". CONFÍRMALE al cliente que es "
+                            . "lo que busca antes de agregarlo (ej: \"¿Te refieres a {$oficial}? 👍\").";
+                    }
+                }
+            } catch (\Throwable $e) {
+                \Log::warning('🧠 Intérprete fallback falló: ' . $e->getMessage());
+            }
+        }
+
         return $resultado;
     }
 
