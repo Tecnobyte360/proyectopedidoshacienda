@@ -12,6 +12,10 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         channels: __DIR__.'/../routes/channels.php',
         health: '/up',
+        then: function () {
+            // 📄 Facturación electrónica (API pública por API key; trae su propio prefijo)
+            require __DIR__.'/../routes/facturacion.php';
+        },
     )
     ->withMiddleware(function (Middleware $middleware): void {
         // 🔐 Trust the reverse proxy (nginx) so Laravel honors X-Forwarded-Proto
