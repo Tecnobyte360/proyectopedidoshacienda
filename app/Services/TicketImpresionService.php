@@ -56,6 +56,11 @@ class TicketImpresionService
 
         // Cuerpo en DOBLE ALTO (letra grande, ancho normal = 42 caracteres)
         $out .= self::T_ALTO;
+        // 🏢 Sede desde donde se MONTÓ el pedido (si no, la sede asignada)
+        $sedeNombre = optional($pedido->sedeCreadora)->nombre ?: optional($pedido->sede)->nombre;
+        if (!empty($sedeNombre)) {
+            $out .= $this->centrar('SEDE: ' . mb_strtoupper((string) $sedeNombre), self::ANCHO) . "\n";
+        }
         $out .= str_repeat('-', self::ANCHO) . "\n";
         $out .= 'Cliente: ' . mb_substr((string) $pedido->cliente_nombre, 0, 32) . "\n";
         // Cedula del cliente (solo si el comercio la captura, ej. La Hacienda).
@@ -126,7 +131,7 @@ class TicketImpresionService
             'impresora_id' => $imp->id,
             'pedido_id'    => $pedido->id,
             'tipo'         => 'ticket',
-            'contenido'    => $this->ticketPedido($pedido->loadMissing('detalles', 'cliente')),
+            'contenido'    => $this->ticketPedido($pedido->loadMissing('detalles', 'cliente', 'sede', 'sedeCreadora')),
             'estado'       => \App\Models\TrabajoImpresion::ESTADO_PENDIENTE,
         ]);
 
