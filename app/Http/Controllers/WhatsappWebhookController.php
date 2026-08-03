@@ -7930,9 +7930,12 @@ TXT;
         //    cierre validaba la zona equivocada y rechazaba por mínimo). Si el
         //    estado tiene una dirección validada, usamos SU dirección y SU
         //    barrio (aunque el barrio esté vacío — significa "sin barrio").
+        // 🚩 EXCEPCIÓN pedido MANUAL: el operador escribe la dirección a mano y ESA
+        //    manda. No la pisamos con la del estado (que trae la guardada/validada del
+        //    cliente), o la comanda saldría con una dirección distinta a la que puso.
         try {
             $estadoDir = \App\Models\ConversacionPedidoEstado::where('conversacion_id', $conversacion->id)->first();
-            if ($estadoDir && !empty($estadoDir->direccion)) {
+            if (!$esPedidoManual && $estadoDir && !empty($estadoDir->direccion)) {
                 $direccion = $this->sanitizarPlaceholderLLM((string) $estadoDir->direccion);
                 $barrio    = $this->sanitizarPlaceholderLLM((string) $estadoDir->barrio);
             }
