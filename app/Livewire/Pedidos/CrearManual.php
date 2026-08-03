@@ -984,6 +984,9 @@ class CrearManual extends Component
             // 🚩 Marca que es un pedido manual → salta el cortafuego anti-fantasma
             //    del bot (el operador agrega productos a mano).
             'manual'         => true,
+            // 🏢 Quién montó el pedido y de qué sede (para marcar "otra sede").
+            'usuario_creador_id' => auth()->id(),
+            'creado_por_sede_id' => auth()->user()->sede_id ?? null,
         ];
 
         if ($this->metodo_entrega === 'domicilio') {
@@ -1122,6 +1125,17 @@ class CrearManual extends Component
                 }
             } catch (\Throwable $e) {
                 Log::warning('No se pudo marcar estado confirmado: ' . $e->getMessage());
+            }
+
+            // 🛡️ Si el pedido NO se creó (el controlador devolvió un mensaje en vez de
+            //    crearlo: cédula faltante, guard, etc.), NO reventar con "$pedido->id
+            //    on null": mostrarle al operador el motivo real y quedarse en el panel.
+            if (!$pedido) {
+                $motivo = trim(strip_tags((string) ($resultado ?? '')));
+                $motivo = $motivo !== '' ? mb_substr($motivo, 0, 220) : 'No se pudo registrar el pedido. Revisa los datos e inténtalo de nuevo.';
+                Log::warning('Pedido manual no se creó: ' . $motivo, ['tel' => $telInternacional]);
+                $this->dispatch('notify', ['type' => 'warning', 'message' => $motivo]);
+                return;
             }
 
             // ✅ Pedido creado → descartar el borrador para que no reaparezca.

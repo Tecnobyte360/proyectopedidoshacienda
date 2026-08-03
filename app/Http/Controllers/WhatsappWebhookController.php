@@ -1337,6 +1337,24 @@ class WhatsappWebhookController extends Controller
 
         $systemPrompt = $this->getSystemPrompt($pedidosInfo, $this->infoEmpresa(), $nombreParaPrompt, $ansInfo, $sedeId, $from);
 
+        // 🔧 REGLA LA HACIENDA — NO mostrar el TOTAL del pedido. Los productos se
+        //    venden POR PESO, así que el valor total se define AL FACTURAR. Se
+        //    permite el valor por libra/kg y subtotal por línea (estimado), pero
+        //    nunca un total sumado del pedido. Va como override fuerte al final
+        //    del prompt para anular el ejemplo de resumen que muestra "Total".
+        $tenantsSinTotal = [1, 17];
+        if (in_array((int) (app(\App\Services\TenantManager::class)->id() ?? 0), $tenantsSinTotal, true)) {
+            $systemPrompt .= "\n\n═══════════════════════════════════════════════════════════════════════════════\n"
+                . "# 🧾 REGLA CRÍTICA DE PRECIOS DE ESTE NEGOCIO (ANULA CUALQUIER EJEMPLO ANTERIOR)\n"
+                . "Los productos se venden POR PESO, así que el valor final se define AL FACTURAR.\n"
+                . "- SÍ puedes decir el valor por LIBRA/KILO de cada producto y el subtotal por línea como referencia.\n"
+                . "- ❌ NUNCA muestres un *Total*, *Total a pagar* ni *Subtotal general* del pedido. Ningún valor sumado del pedido.\n"
+                . "- En el resumen antes de confirmar, EN LUGAR del total escribe exactamente esta línea:\n"
+                . "  🧾 *El valor total se calcula al facturar según el peso.*\n"
+                . "- Si el cliente pregunta el total, explícale que el valor exacto se define al pesar/facturar y dale el valor por libra como referencia.\n"
+                . "Esta regla es OBLIGATORIA y anula el ejemplo de resumen que muestra 'Total: \$...'.";
+        }
+
         // ── NOTA DE RECHAZO RECIENTE DE COBERTURA ────────────────────────
         // Si en los últimos 15 min rechazamos una dirección por cobertura,
         // inyectamos un system con regla dura para que la IA no repita el
@@ -2259,11 +2277,18 @@ TXT;
                 $reply        = $msg['content'] ?? null;
                 $nextToolCalls = $msg['tool_calls'] ?? null;
 
-                // Si Claude respondió texto → terminamos
-                if (!empty($reply)) break;
-
-                // Si NO hay nuevas tool_calls → terminamos (caemos al fallback)
+                // 🔧 Si NO hay nuevas tool_calls, terminamos: el texto (si vino)
+                //    es la respuesta final; si está vacío, cae al fallback.
                 if (empty($nextToolCalls)) break;
+
+                // 🔧 Si SÍ hay tool_calls pendientes, el modelo todavía NO terminó,
+                //    aunque haya mandado un texto de preámbulo ("déjame revisar…",
+                //    "déjame mostrar dónde estamos…"). Ese preámbulo NO es la
+                //    respuesta final → lo descartamos y seguimos el loop para
+                //    EJECUTAR las tools y generar la respuesta real.
+                //    (Bug anterior: rompía en el preámbulo y descartaba la tool
+                //    pendiente → el cliente veía el "déjame…" colgado sin cierre.)
+                $reply = null;
 
                 // 🚨 Si Claude pide confirmar_pedido o registrar_datos_cliente,
                 // SALIR del loop y dejar que el flujo principal del controller
@@ -2549,13 +2574,25 @@ TXT;
             try {
                 $estadoSrv2 = app(\App\Services\EstadoPedidoService::class);
                 $estadoActual = $estadoSrv2->obtener($conversacion);
-                if ($direccion && empty($estadoActual->direccion)) {
+                // 🔧 El cliente puede CORREGIR su dirección (ej: primero da una
+                //    ciudad no cubierta y luego una cubierta). validar_cobertura
+                //    se invoca SIEMPRE con la dirección que el cliente acaba de
+                //    dar, así que esa es la vigente → hay que SOBREESCRIBIR, no
+                //    solo rellenar cuando está vacía (bug: la primera dirección
+                //    se quedaba pegada y el cierre validaba la zona equivocada).
+                if ($direccion !== '') {
                     $estadoActual->direccion = $direccion;
-                }
-                if ($barrio && empty($estadoActual->barrio)) {
+                    // El barrio pertenece a ESTA dirección → sincronizarlo (incluso
+                    // vaciarlo). Si la corrección no trae barrio, limpiamos el
+                    // anterior para no arrastrar el barrio de otra ciudad (bug:
+                    // "Poblado" de Medellín quedaba pegado al corregir a Bello y
+                    // el cierre validaba la zona equivocada).
+                    $estadoActual->barrio = $barrio;
+                } elseif ($barrio !== '') {
                     $estadoActual->barrio = $barrio;
                 }
-                if ($ciudad && empty($estadoActual->ciudad)) {
+                // Ciudad solo si el LLM la envió explícitamente (no el default 'Bello').
+                if ($ciudad !== '' && !empty($args['ciudad'])) {
                     $estadoActual->ciudad = $ciudad;
                 }
                 $estadoActual->save();
@@ -2571,6 +2608,32 @@ TXT;
             $instruccionInternaPostCobertura = ($resultado['cubierta'] ?? false)
                 ? "🚨 SISTEMA: la cobertura ya quedó validada. Tu siguiente acción OBLIGATORIA es invocar `confirmar_pedido` con todos los datos recopilados. NO repitas la validación de cobertura. NO digas 'te despachamos' en texto. INVOCA LA FUNCIÓN."
                 : "🚨 SISTEMA: cobertura NO disponible en esta dirección. Ofrece al cliente recoger en sede o cambiar de dirección. NO confirmes pedido aún.";
+
+            // 🔧 MÍNIMO TEMPRANO: si la zona tiene pedido mínimo y el carrito NO
+            //    lo alcanza, FRENAR AQUÍ (no dejar avanzar a confirmar_pedido).
+            //    Antes el mínimo solo se validaba al confirmar → el cliente daba
+            //    todos los datos y hasta el final le decían "no se puede".
+            if (($resultado['cubierta'] ?? false) && (float) ($resultado['pedido_minimo'] ?? 0) > 0) {
+                try {
+                    $minZona = (float) $resultado['pedido_minimo'];
+                    $estMin = app(\App\Services\EstadoPedidoService::class)->obtener($conversacion);
+                    $subtotalCarrito = collect($estMin->productos ?? [])->sum(fn ($p) =>
+                        (float) ($p['subtotal'] ?? ((float) ($p['quantity'] ?? 0) * (float) ($p['precio_unitario'] ?? 0))));
+                    if ($subtotalCarrito > 0 && $subtotalCarrito < $minZona) {
+                        $minStr   = '$' . number_format($minZona, 0, ',', '.');
+                        $faltaStr = '$' . number_format($minZona - $subtotalCarrito, 0, ',', '.');
+                        $instruccionInternaPostCobertura =
+                            "🚨 SISTEMA: la dirección SÍ tiene cobertura, PERO el pedido actual todavía NO alcanza el "
+                            . "pedido mínimo de domicilio de esa zona (mínimo {$minStr}; le faltan {$faltaStr}). "
+                            . "NO invoques `confirmar_pedido` ni pidas datos de cierre todavía. Dile amablemente al "
+                            . "cliente que para domicilio en esa zona el mínimo es {$minStr} y que le faltan {$faltaStr}, "
+                            . "y ofrécele AGREGAR más productos o cambiar a RECOGER EN SEDE. Espera a que alcance el "
+                            . "mínimo o elija recoger antes de continuar.";
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning('Mínimo temprano: no se pudo evaluar — ' . $e->getMessage());
+                }
+            }
 
             // Respuesta de la tool para OpenAI — formato segunda llamada
             $toolResponseMessages = array_merge(
@@ -7515,7 +7578,11 @@ TXT;
         try {
             $cfgUmbral = \App\Models\ConfiguracionBot::actual();
             $umbralMax = (int) ($cfgUmbral?->pedido_max_auto ?? 500000); // default $500.000
-            if ($umbralMax > 0) {
+            // 🚩 Los pedidos MANUALES (operador) NO se derivan a Comercial por monto:
+            //    el operador ES el humano y monta el pedido a propósito. El guard de
+            //    umbral es solo para el BOT. Sin esto, pedidos grandes manuales
+            //    no se creaban y CrearManual reventaba (Attempt to read id on null).
+            if ($umbralMax > 0 && !$esPedidoManual) {
                 $totalEstimado = 0;
                 foreach (($orderData['products'] ?? []) as $p) {
                     $qty = (float) ($p['quantity'] ?? 0);
@@ -7855,6 +7922,23 @@ TXT;
         // 🛡️ Sanitizar placeholders del LLM (<UNKNOWN>, null, N/A, etc.)
         $direccion = $this->sanitizarPlaceholderLLM((string) ($orderData['address'] ?? ''));
         $barrio    = $this->sanitizarPlaceholderLLM((string) ($orderData['neighborhood'] ?? ''));
+
+        // 🔧 Preferir la dirección YA VALIDADA en el estado persistente: la fijó
+        //    validar_cobertura (fuente de verdad). El orderData del LLM puede
+        //    traer un barrio STALE de una dirección anterior de otra ciudad
+        //    (bug: "Poblado" de Medellín pegado tras corregir a Bello → el
+        //    cierre validaba la zona equivocada y rechazaba por mínimo). Si el
+        //    estado tiene una dirección validada, usamos SU dirección y SU
+        //    barrio (aunque el barrio esté vacío — significa "sin barrio").
+        try {
+            $estadoDir = \App\Models\ConversacionPedidoEstado::where('conversacion_id', $conversacion->id)->first();
+            if ($estadoDir && !empty($estadoDir->direccion)) {
+                $direccion = $this->sanitizarPlaceholderLLM((string) $estadoDir->direccion);
+                $barrio    = $this->sanitizarPlaceholderLLM((string) $estadoDir->barrio);
+            }
+        } catch (\Throwable $e) {
+            // Si falla, seguimos con lo del orderData.
+        }
 
         // 🧠 Detectar ciudad: priorizar campos explícitos del bot.
         // El bot LLM puede mandar la ciudad en cualquiera de estos campos:
@@ -8623,6 +8707,10 @@ TXT;
 
         $pedido = Pedido::create([
             'sede_id'               => $sede?->id,
+            // 🏢 Quién y de qué sede montó el pedido (manual). Permite marcar en
+            //    Gestión de Pedidos cuando lo montó un operador de OTRA sede.
+            'usuario_creador_id'    => $orderData['usuario_creador_id'] ?? null,
+            'creado_por_sede_id'    => $orderData['creado_por_sede_id'] ?? null,
             'cliente_id'            => $cliente->id,
             'empresa_id'            => $empresaId,
             'fecha_pedido'          => now(),
