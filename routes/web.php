@@ -373,6 +373,7 @@ Route::middleware(['no_super_sin_imp'])->group(function () {
     Route::get('/alertas',           AlertasIndex::class)->middleware(['permission:alertas.ver', 'role:super-admin'])->name('alertas.index');
     Route::get('/felicitaciones',    FelicitacionesIndex::class)->middleware('permission:felicitaciones.ver')->name('felicitaciones.index');
     Route::get('/encuestas',         EncuestasIndex::class)->middleware('permission:reportes.ver')->name('encuestas.index');
+    Route::get('/encuestas/constructor', \App\Livewire\Encuestas\Constructor::class)->middleware('permission:reportes.ver')->name('encuestas.constructor');
     Route::get('/sedes',             SedesIndex::class)->middleware('permission:sedes.gestionar')->name('sedes.index');
     Route::get('/sedes/{sede}/editor-cobertura', \App\Livewire\Sedes\EditorCobertura::class)
         ->middleware('permission:sedes.gestionar')
@@ -470,6 +471,11 @@ Route::get('/seguimiento-pedido/{codigo}', SeguimientoPedido::class)
 Route::get('/encuesta/{token}', \App\Livewire\Encuestas\Responder::class)
     ->where('token', '[\w\-]+')
     ->name('encuesta.responder');
+
+// Encuesta PERSONALIZADA pública (constructor) — link compartible /e/{token}
+Route::get('/e/{token}', \App\Livewire\Encuestas\ResponderForm::class)
+    ->where('token', '[\w\-]+')
+    ->name('encuesta.form');
 
 // Portal del domiciliario (sin auth — accede con su token único desde el celular)
 Route::get('/d/{token}', \App\Livewire\Domiciliarios\Portal::class)
