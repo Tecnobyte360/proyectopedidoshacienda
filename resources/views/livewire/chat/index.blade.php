@@ -1486,8 +1486,13 @@
                                     <div class="flex items-center gap-1.5 mb-0.5">
                                         <i class="fa-solid fa-bolt text-amber-500 text-[9px]"></i>
                                         <span class="text-[11px] font-bold text-slate-800" x-text="r.atajo || '(sin atajo)'"></span>
+                                        <template x-if="r.adjunto_path">
+                                            <span class="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700">
+                                                <i class="fa-solid fa-paperclip"></i> <span x-text="r.adjunto_tipo === 'image' ? 'imagen' : 'PDF'"></span>
+                                            </span>
+                                        </template>
                                     </div>
-                                    <p class="text-[10px] text-slate-500 truncate" x-text="r.texto"></p>
+                                    <p class="text-[10px] text-slate-500 truncate" x-text="r.texto || (r.adjunto_nombre ? '📎 ' + r.adjunto_nombre : '')"></p>
                                 </button>
                             </template>
                         </div>
@@ -1891,7 +1896,12 @@
                 },
 
                 seleccionar(r) {
-                    this.$wire.set('nuevoMensaje', r.texto);
+                    if (r.adjunto_path) {
+                        // 📎 Con adjunto: se envía el archivo (texto = caption) directo.
+                        this.$wire.usarRespuestaRapida(r.id);
+                    } else {
+                        this.$wire.set('nuevoMensaje', r.texto);
+                    }
                     this.open = false;
                     this.$nextTick(() => this.$refs.ta?.focus());
                 },

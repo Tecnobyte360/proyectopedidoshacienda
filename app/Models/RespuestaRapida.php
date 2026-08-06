@@ -15,10 +15,26 @@ class RespuestaRapida extends Model
 
     protected $table = 'respuestas_rapidas';
 
-    protected $fillable = ['tenant_id', 'atajo', 'texto', 'orden', 'activa'];
+    protected $fillable = [
+        'tenant_id', 'atajo', 'texto', 'orden', 'activa',
+        'adjunto_path', 'adjunto_nombre', 'adjunto_mime', 'adjunto_tipo',
+    ];
 
     protected $casts = [
         'activa' => 'boolean',
         'orden'  => 'integer',
     ];
+
+    public function tieneAdjunto(): bool
+    {
+        return !empty($this->adjunto_path);
+    }
+
+    /** URL pública del adjunto (para mostrarlo/enviarlo). */
+    public function getAdjuntoUrlAttribute(): ?string
+    {
+        return $this->adjunto_path
+            ? rtrim(config('app.url'), '/') . \Illuminate\Support\Facades\Storage::url($this->adjunto_path)
+            : null;
+    }
 }

@@ -127,11 +127,38 @@
                     </div>
 
                     <div>
-                        <label class="block text-[11px] font-semibold text-slate-700 mb-1">Texto del mensaje *</label>
-                        <textarea wire:model="texto" rows="5" maxlength="2000"
-                                  placeholder="Hola, gracias por escribir..."
+                        <label class="block text-[11px] font-semibold text-slate-700 mb-1">Texto del mensaje <span class="text-slate-400 font-normal">(o solo adjunto)</span></label>
+                        <textarea wire:model="texto" rows="4" maxlength="2000"
+                                  placeholder="Hola, gracias por escribir... (será el texto/caption)"
                                   class="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm focus:border-brand focus:ring-2 focus:ring-brand/20"></textarea>
                         @error('texto') <p class="text-[11px] text-rose-600 mt-1">{{ $message }}</p> @enderror
+                    </div>
+
+                    {{-- 📎 Adjunto (PDF o imagen) --}}
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-700 mb-1">Adjunto <span class="text-slate-400 font-normal">(PDF o imagen — opcional)</span></label>
+
+                        @if($editandoId && $adjuntoActualNombre && !$quitarAdjunto && !$adjunto)
+                            <div class="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                                <span class="text-xs text-slate-700 truncate">
+                                    <i class="fa-solid {{ $adjuntoActualTipo === 'image' ? 'fa-image text-indigo-500' : 'fa-file-pdf text-rose-500' }}"></i>
+                                    {{ $adjuntoActualNombre }}
+                                </span>
+                                <button type="button" wire:click="$set('quitarAdjunto', true)" class="text-xs text-rose-600 hover:underline shrink-0">Quitar</button>
+                            </div>
+                        @else
+                            <input type="file" wire:model="adjunto" accept=".pdf,image/*"
+                                   class="w-full text-xs file:mr-2 file:rounded-md file:border-0 file:bg-brand-soft file:px-3 file:py-1.5 file:text-brand-dark file:font-semibold">
+                            <div wire:loading wire:target="adjunto" class="text-[11px] text-brand mt-1">Subiendo…</div>
+                            @error('adjunto') <p class="text-[11px] text-rose-600 mt-1">{{ $message }}</p> @enderror
+                            @if($adjunto)
+                                <p class="text-[11px] text-emerald-600 mt-1"><i class="fa-solid fa-check"></i> {{ $adjunto->getClientOriginalName() }}</p>
+                            @endif
+                            @if($editandoId && $adjuntoActualNombre && $quitarAdjunto)
+                                <p class="text-[11px] text-slate-400 mt-1">Se quitará el adjunto actual al guardar. <button type="button" wire:click="$set('quitarAdjunto', false)" class="text-brand hover:underline">Deshacer</button></p>
+                            @endif
+                        @endif
+                        <p class="text-[10px] text-slate-400 mt-1">Al usar la respuesta, se envía el archivo con el texto como mensaje.</p>
                     </div>
 
                     <div class="grid grid-cols-2 gap-3">

@@ -2955,8 +2955,33 @@ class Index extends Component
         try {
             $resp = \App\Models\RespuestaRapida::find($id);
             if (!$resp) return;
+
+            // 📎 Con adjunto → enviar el archivo (texto = caption) reusando el flujo de media.
+            if ($resp->tieneAdjunto()) {
+                $abs = Storage::disk('public')->path($resp->adjunto_path);
+                if (is_file($abs)) {
+                    $bytes   = @file_get_contents($abs);
+                    $mime    = $resp->adjunto_mime ?: 'application/octet-stream';
+                    $caption = (string) ($resp->texto ?? '');
+                    if ($bytes !== false) {
+                        $dataUrl = 'data:' . $mime . ';base64,' . base64_encode($bytes);
+                        if ($resp->adjunto_tipo === 'image') {
+                            $this->enviarImagen($dataUrl, $caption);
+                        } else {
+                            $this->enviarDocumento($dataUrl, $resp->adjunto_nombre ?: 'documento', $caption);
+                        }
+                        return;
+                    }
+                }
+                // Si el archivo no está en disco, caer a solo texto para no quedar en blanco.
+                $this->dispatch('notify', ['type' => 'warning', 'message' => 'El adjunto no se encontró; se usará solo el texto.']);
+            }
+
+            // Sin adjunto → pegar el texto en la caja (comportamiento clásico).
             $this->nuevoMensaje = $resp->texto;
-        } catch (\Throwable $e) { /* silent */ }
+        } catch (\Throwable $e) {
+            Log::warning('usarRespuestaRapida: ' . $e->getMessage());
+        }
     }
 
     /**
