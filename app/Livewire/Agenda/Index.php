@@ -110,7 +110,7 @@ class Index extends Component
             return;
         }
 
-        Cita::create([
+        $cita = Cita::create([
             'paciente_nombre'   => trim($this->nc_nombre),
             'paciente_telefono' => trim($this->nc_telefono) ?: null,
             'inicio_at'         => $inicio,
@@ -121,7 +121,15 @@ class Index extends Component
             'creado_por'        => auth()->id(),
         ]);
 
-        // TODO fase 2: crear evento en Google Calendar (si google_conectado).
+        // 📅 Sincronizar con Google Calendar si está conectado (no bloquea la cita).
+        if ($cfg->google_conectado) {
+            try {
+                $eventId = app(\App\Services\Agenda\GoogleCalendarService::class)->crearEvento($cfg, $cita);
+                if ($eventId) $cita->update(['google_event_id' => $eventId]);
+            } catch (\Throwable $e) {
+                \Log::warning('Agenda: no se creó evento en Google: ' . $e->getMessage());
+            }
+        }
 
         $this->reset(['nc_slot', 'nc_nombre', 'nc_telefono', 'nc_motivo']);
         $this->dispatch('notify', ['type' => 'success', 'message' => '✅ Cita agendada.']);
@@ -131,7 +139,26 @@ class Index extends Component
     {
         if (!in_array($estado, Cita::ESTADOS, true)) return;
         $c = Cita::find($id);
-        if ($c) { $c->estado = $estado; $c->save(); }
+        if (!$c) return;
+        $c->estado = $estado;
+        $c->save();
+
+        // Si se cancela y había evento en Google, borrarlo.
+        if ($estado === 'cancelada' && $c->google_event_id) {
+            try {
+                $cfg = AgendaConfiguracion::paraTenantActual();
+                if ($cfg->google_conectado) {
+                    app(\App\Services\Agenda\GoogleCalendarService::class)->eliminarEvento($cfg, $c->google_event_id);
+                    $c->update(['google_event_id' => null]);
+                }
+            } catch (\Throwable $e) { \Log::warning('Agenda: no se borró evento Google: ' . $e->getMessage()); }
+        }
+    }
+
+    public function desconectarGoogle(): void
+    {
+        app(\App\Services\Agenda\GoogleCalendarService::class)->desconectar(AgendaConfiguracion::paraTenantActual());
+        $this->dispatch('notify', ['type' => 'success', 'message' => 'Google Calendar desconectado.']);
     }
 
     public function render()
@@ -156,6 +183,7 @@ class Index extends Component
             'cfg'      => $cfg,
             'slots'    => $slots,
             'proximas' => $proximas,
+            'googleConfigurado' => app(\App\Services\Agenda\GoogleCalendarService::class)->configurado(),
         ])->layout('layouts.app');
     }
 }

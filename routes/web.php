@@ -375,6 +375,8 @@ Route::middleware(['no_super_sin_imp'])->group(function () {
     Route::get('/encuestas',         EncuestasIndex::class)->middleware('permission:reportes.ver')->name('encuestas.index');
     Route::get('/encuestas/constructor', \App\Livewire\Encuestas\Constructor::class)->middleware('permission:reportes.ver')->name('encuestas.constructor');
     Route::get('/agenda', \App\Livewire\Agenda\Index::class)->middleware('permission:reportes.ver')->name('agenda.index');
+    Route::get('/agenda/google/conectar', [\App\Http\Controllers\Agenda\GoogleCalendarController::class, 'conectar'])->middleware('permission:reportes.ver')->name('agenda.google.conectar');
+    Route::get('/agenda/google/callback', [\App\Http\Controllers\Agenda\GoogleCalendarController::class, 'callback'])->name('agenda.google.callback');
     Route::get('/sedes',             SedesIndex::class)->middleware('permission:sedes.gestionar')->name('sedes.index');
     Route::get('/sedes/{sede}/editor-cobertura', \App\Livewire\Sedes\EditorCobertura::class)
         ->middleware('permission:sedes.gestionar')

@@ -64,4 +64,13 @@ return [
         'max_unidades_por_producto' => (int) env('WHATSAPP_MAX_UNIDADES_PRODUCTO', 500),
     ],
 
+    // 📅 Google Calendar (Agenda). UN solo OAuth app de KIVOX; cada tenant
+    // autoriza su propia cuenta de Google (refresh token por tenant).
+    // El redirect_uri DEBE registrarse igual en Google Cloud Console.
+    'google_calendar' => [
+        'client_id'     => env('GOOGLE_CALENDAR_CLIENT_ID'),
+        'client_secret' => env('GOOGLE_CALENDAR_CLIENT_SECRET'),
+        'redirect_uri'  => env('GOOGLE_CALENDAR_REDIRECT_URI', rtrim(env('APP_URL', ''), '/') . '/agenda/google/callback'),
+    ],
+
 ];

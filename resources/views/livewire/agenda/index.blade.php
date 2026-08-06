@@ -1,6 +1,13 @@
 <div class="min-h-screen bg-slate-50">
     <div class="w-full px-4 py-6 sm:px-6 sm:py-8 lg:px-8 space-y-6">
 
+        @if(session('success'))
+            <div class="rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 text-sm">{{ session('success') }}</div>
+        @endif
+        @if(session('error'))
+            <div class="rounded-xl bg-rose-50 border border-rose-200 text-rose-800 px-4 py-3 text-sm">{{ session('error') }}</div>
+        @endif
+
         {{-- HEADER --}}
         <div class="rounded-2xl border border-[#fbe9d7] bg-gradient-to-r from-brand-soft/40 via-white to-white p-5 shadow-sm">
             <div class="flex flex-wrap items-center justify-between gap-4">
@@ -62,13 +69,29 @@
                     </div>
                 </div>
 
-                {{-- Google (fase 2) --}}
-                <div class="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 flex items-center justify-between gap-3">
+                {{-- Google Calendar --}}
+                <div class="rounded-xl border {{ $cfg->google_conectado ? 'border-emerald-200 bg-emerald-50' : 'border-dashed border-slate-300 bg-slate-50' }} p-4 flex items-center justify-between gap-3">
                     <div class="text-sm text-slate-600">
                         <i class="fa-brands fa-google text-indigo-500"></i>
-                        <strong>Google Calendar</strong> — {{ $cfg->google_conectado ? 'Conectado ('.$cfg->google_cuenta_email.')' : 'No conectado' }}
+                        <strong>Google Calendar</strong> —
+                        @if($cfg->google_conectado)
+                            <span class="text-emerald-700 font-semibold">Conectado</span>
+                            @if($cfg->google_cuenta_email)<span class="text-slate-500">({{ $cfg->google_cuenta_email }})</span>@endif
+                        @else
+                            <span class="text-slate-500">No conectado</span>
+                        @endif
                     </div>
-                    <button type="button" disabled class="text-xs px-3 py-2 rounded-lg bg-slate-200 text-slate-400 font-semibold cursor-not-allowed">Conectar (próximamente)</button>
+                    @if($cfg->google_conectado)
+                        <button type="button" wire:click="desconectarGoogle" wire:confirm="¿Desconectar Google Calendar?"
+                                class="text-xs px-3 py-2 rounded-lg bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 font-semibold">Desconectar</button>
+                    @elseif($googleConfigurado)
+                        <a href="{{ route('agenda.google.conectar') }}"
+                           class="text-xs px-3 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 font-semibold">
+                            <i class="fa-brands fa-google"></i> Conectar Google Calendar
+                        </a>
+                    @else
+                        <span class="text-[11px] text-amber-600 font-semibold text-right max-w-[220px]">Faltan las credenciales de Google en el servidor (Client ID/Secret).</span>
+                    @endif
                 </div>
 
                 <div class="flex justify-end">
