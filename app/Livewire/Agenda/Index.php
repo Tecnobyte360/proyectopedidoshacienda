@@ -23,6 +23,10 @@ class Index extends Component
     public bool   $activa       = true;
     public bool   $mostrarConfig = false;
 
+    // ── Credenciales Google (por tenant) ───────────────────
+    public string $g_client_id     = '';
+    public string $g_client_secret = '';   // vacío = no cambiar
+
     // ── Nueva cita ─────────────────────────────────────────
     public string $nc_fecha    = '';
     public ?string $nc_slot    = null;   // ISO datetime del slot elegido
@@ -39,7 +43,29 @@ class Index extends Component
         $this->hora_inicio  = substr((string) $cfg->hora_inicio, 0, 5);
         $this->hora_fin     = substr((string) $cfg->hora_fin, 0, 5);
         $this->activa       = (bool) $cfg->activa;
+        $this->g_client_id  = (string) $cfg->google_client_id;
         $this->nc_fecha     = Carbon::now($cfg->zona_horaria ?: 'America/Bogota')->format('Y-m-d');
+    }
+
+    /** Guarda las credenciales OAuth de Google del tenant. */
+    public function guardarGoogleCreds(): void
+    {
+        $this->validate([
+            'g_client_id'     => 'required|string|max:200',
+            'g_client_secret' => 'nullable|string|max:200',
+        ], [], ['g_client_id' => 'Client ID', 'g_client_secret' => 'Client Secret']);
+
+        $cfg = AgendaConfiguracion::paraTenantActual();
+        $data = ['google_client_id' => trim($this->g_client_id)];
+        if (trim($this->g_client_secret) !== '') {
+            $data['google_client_secret'] = trim($this->g_client_secret);
+        } elseif (!$cfg->google_client_secret) {
+            $this->addError('g_client_secret', 'Ingresa el Client Secret.');
+            return;
+        }
+        $cfg->update($data);
+        $this->g_client_secret = '';
+        $this->dispatch('notify', ['type' => 'success', 'message' => 'Credenciales de Google guardadas. Ahora pulsa "Conectar".']);
     }
 
     public function guardarConfig(): void
@@ -183,7 +209,8 @@ class Index extends Component
             'cfg'      => $cfg,
             'slots'    => $slots,
             'proximas' => $proximas,
-            'googleConfigurado' => app(\App\Services\Agenda\GoogleCalendarService::class)->configurado(),
+            'googleConfigurado' => app(\App\Services\Agenda\GoogleCalendarService::class)->configurado($cfg),
+            'googleRedirectUri' => (string) config('services.google_calendar.redirect_uri'),
         ])->layout('layouts.app');
     }
 }

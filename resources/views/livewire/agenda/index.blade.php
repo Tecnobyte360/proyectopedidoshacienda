@@ -69,29 +69,63 @@
                     </div>
                 </div>
 
-                {{-- Google Calendar --}}
-                <div class="rounded-xl border {{ $cfg->google_conectado ? 'border-emerald-200 bg-emerald-50' : 'border-dashed border-slate-300 bg-slate-50' }} p-4 flex items-center justify-between gap-3">
-                    <div class="text-sm text-slate-600">
-                        <i class="fa-brands fa-google text-indigo-500"></i>
-                        <strong>Google Calendar</strong> —
+                {{-- Google Calendar (credenciales por tenant) --}}
+                <div class="rounded-xl border {{ $cfg->google_conectado ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-slate-50' }} p-4 space-y-3">
+                    <div class="flex items-center justify-between gap-3">
+                        <div class="text-sm text-slate-700">
+                            <i class="fa-brands fa-google text-indigo-500"></i>
+                            <strong>Google Calendar</strong> —
+                            @if($cfg->google_conectado)
+                                <span class="text-emerald-700 font-semibold">Conectado</span>
+                                @if($cfg->google_cuenta_email)<span class="text-slate-500">({{ $cfg->google_cuenta_email }})</span>@endif
+                            @else
+                                <span class="text-slate-500">No conectado</span>
+                            @endif
+                        </div>
                         @if($cfg->google_conectado)
-                            <span class="text-emerald-700 font-semibold">Conectado</span>
-                            @if($cfg->google_cuenta_email)<span class="text-slate-500">({{ $cfg->google_cuenta_email }})</span>@endif
-                        @else
-                            <span class="text-slate-500">No conectado</span>
+                            <button type="button" wire:click="desconectarGoogle" wire:confirm="¿Desconectar Google Calendar?"
+                                    class="text-xs px-3 py-2 rounded-lg bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 font-semibold shrink-0">Desconectar</button>
                         @endif
                     </div>
-                    @if($cfg->google_conectado)
-                        <button type="button" wire:click="desconectarGoogle" wire:confirm="¿Desconectar Google Calendar?"
-                                class="text-xs px-3 py-2 rounded-lg bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 font-semibold">Desconectar</button>
-                    @elseif($googleConfigurado)
-                        <a href="{{ route('agenda.google.conectar') }}"
-                           class="text-xs px-3 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 font-semibold">
-                            <i class="fa-brands fa-google"></i> Conectar Google Calendar
-                        </a>
-                    @else
-                        <span class="text-[11px] text-amber-600 font-semibold text-right max-w-[220px]">Faltan las credenciales de Google en el servidor (Client ID/Secret).</span>
-                    @endif
+
+                    @unless($cfg->google_conectado)
+                        {{-- URI de redirección a registrar en Google Cloud --}}
+                        <div class="text-[11px] text-slate-500">
+                            En Google Cloud registra esta <strong>URI de redirección</strong>:
+                            <span class="inline-flex items-center gap-1">
+                                <code class="text-[11px] bg-white border border-slate-200 rounded px-1.5 py-0.5">{{ $googleRedirectUri }}</code>
+                                <button type="button" onclick="navigator.clipboard.writeText('{{ $googleRedirectUri }}')" class="text-slate-400 hover:text-slate-700"><i class="fa-regular fa-copy"></i></button>
+                            </span>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Client ID de Google</label>
+                                <input wire:model="g_client_id" class="w-full rounded-xl border-slate-200 text-sm" placeholder="xxxx.apps.googleusercontent.com">
+                                @error('g_client_id')<span class="text-xs text-rose-600">{{ $message }}</span>@enderror
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Client Secret</label>
+                                <input wire:model="g_client_secret" type="password" autocomplete="new-password"
+                                       placeholder="{{ $cfg->google_client_id ? '•••• (guardado, déjalo vacío para no cambiar)' : 'GOCSPX-...' }}"
+                                       class="w-full rounded-xl border-slate-200 text-sm">
+                                @error('g_client_secret')<span class="text-xs text-rose-600">{{ $message }}</span>@enderror
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-2">
+                            <button type="button" wire:click="guardarGoogleCreds"
+                                    class="text-xs px-3 py-2 rounded-lg bg-slate-200 text-slate-700 hover:bg-slate-300 font-semibold">Guardar credenciales</button>
+                            @if($googleConfigurado)
+                                <a href="{{ route('agenda.google.conectar') }}"
+                                   class="text-xs px-3 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 font-semibold">
+                                    <i class="fa-brands fa-google"></i> Conectar Google Calendar
+                                </a>
+                            @else
+                                <span class="text-[11px] text-slate-400">Guarda el Client ID + Secret para habilitar "Conectar".</span>
+                            @endif
+                        </div>
+                    @endunless
                 </div>
 
                 <div class="flex justify-end">

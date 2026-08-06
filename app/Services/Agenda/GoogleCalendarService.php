@@ -22,24 +22,37 @@ class GoogleCalendarService
     private const USERINFO = 'https://www.googleapis.com/oauth2/v2/userinfo';
     private const SCOPES = 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/userinfo.email';
 
-    /** ¿Están cargadas las credenciales OAuth de la plataforma? */
-    public function configurado(): bool
+    /** Credenciales del TENANT; si no tiene, cae al .env global (compatibilidad). */
+    private function clientId(AgendaConfiguracion $cfg): ?string
     {
-        return !empty(config('services.google_calendar.client_id'))
-            && !empty(config('services.google_calendar.client_secret'));
+        return $cfg->google_client_id ?: config('services.google_calendar.client_id');
+    }
+    private function clientSecret(AgendaConfiguracion $cfg): ?string
+    {
+        return $cfg->google_client_secret ?: config('services.google_calendar.client_secret');
+    }
+    private function redirectUri(): string
+    {
+        return (string) config('services.google_calendar.redirect_uri');
+    }
+
+    /** ¿El tenant tiene cargadas sus credenciales OAuth? */
+    public function configurado(AgendaConfiguracion $cfg): bool
+    {
+        return !empty($this->clientId($cfg)) && !empty($this->clientSecret($cfg));
     }
 
     /** URL de consentimiento de Google. `state` lleva el tenant_id. */
-    public function urlAutorizacion(int $tenantId): string
+    public function urlAutorizacion(AgendaConfiguracion $cfg): string
     {
         return self::AUTH . '?' . http_build_query([
-            'client_id'     => config('services.google_calendar.client_id'),
-            'redirect_uri'  => config('services.google_calendar.redirect_uri'),
+            'client_id'     => $this->clientId($cfg),
+            'redirect_uri'  => $this->redirectUri(),
             'response_type' => 'code',
             'scope'         => self::SCOPES,
             'access_type'   => 'offline',   // para obtener refresh_token
             'prompt'        => 'consent',
-            'state'         => $tenantId,
+            'state'         => $cfg->tenant_id,
         ]);
     }
 
@@ -48,9 +61,9 @@ class GoogleCalendarService
     {
         $resp = Http::asForm()->post(self::TOKEN, [
             'code'          => $code,
-            'client_id'     => config('services.google_calendar.client_id'),
-            'client_secret' => config('services.google_calendar.client_secret'),
-            'redirect_uri'  => config('services.google_calendar.redirect_uri'),
+            'client_id'     => $this->clientId($cfg),
+            'client_secret' => $this->clientSecret($cfg),
+            'redirect_uri'  => $this->redirectUri(),
             'grant_type'    => 'authorization_code',
         ]);
         if (!$resp->successful()) {
@@ -95,8 +108,8 @@ class GoogleCalendarService
         }
         // refrescar
         $resp = Http::asForm()->post(self::TOKEN, [
-            'client_id'     => config('services.google_calendar.client_id'),
-            'client_secret' => config('services.google_calendar.client_secret'),
+            'client_id'     => $this->clientId($cfg),
+            'client_secret' => $this->clientSecret($cfg),
             'refresh_token' => $cfg->google_refresh_token,
             'grant_type'    => 'refresh_token',
         ]);

@@ -18,15 +18,16 @@ class GoogleCalendarController extends Controller
     /** Inicia el consentimiento OAuth. */
     public function conectar(Request $request)
     {
-        if (!$this->google->configurado()) {
-            return redirect()->route('agenda.index')
-                ->with('error', 'Faltan las credenciales de Google (GOOGLE_CALENDAR_CLIENT_ID/SECRET).');
-        }
         $tenantId = (int) app(TenantManager::class)->id();
         if (!$tenantId) {
             return redirect()->route('agenda.index')->with('error', 'No hay tenant en contexto.');
         }
-        return redirect()->away($this->google->urlAutorizacion($tenantId));
+        $cfg = AgendaConfiguracion::paraTenantActual();
+        if (!$this->google->configurado($cfg)) {
+            return redirect()->route('agenda.index')
+                ->with('error', 'Primero guarda el Client ID y Client Secret de Google en la configuración.');
+        }
+        return redirect()->away($this->google->urlAutorizacion($cfg));
     }
 
     /** Callback de Google: intercambia el code y guarda los tokens. */

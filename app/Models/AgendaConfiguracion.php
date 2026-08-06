@@ -15,7 +15,7 @@ class AgendaConfiguracion extends Model
     protected $table = 'agenda_configuraciones';
     protected $guarded = ['id'];
 
-    protected $hidden = ['google_access_token', 'google_refresh_token'];
+    protected $hidden = ['google_access_token', 'google_refresh_token', 'google_client_secret'];
 
     protected $casts = [
         'dias'                  => 'array',
@@ -23,6 +23,7 @@ class AgendaConfiguracion extends Model
         'google_conectado'      => 'boolean',
         'google_access_token'   => 'encrypted',
         'google_refresh_token'  => 'encrypted',
+        'google_client_secret'  => 'encrypted',
         'google_token_expira_at' => 'datetime',
         'duracion_min'          => 'integer',
         'buffer_min'            => 'integer',
