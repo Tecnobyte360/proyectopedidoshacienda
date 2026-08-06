@@ -374,6 +374,7 @@ Route::middleware(['no_super_sin_imp'])->group(function () {
     Route::get('/felicitaciones',    FelicitacionesIndex::class)->middleware('permission:felicitaciones.ver')->name('felicitaciones.index');
     Route::get('/encuestas',         EncuestasIndex::class)->middleware('permission:reportes.ver')->name('encuestas.index');
     Route::get('/encuestas/constructor', \App\Livewire\Encuestas\Constructor::class)->middleware('permission:reportes.ver')->name('encuestas.constructor');
+    Route::get('/agenda', \App\Livewire\Agenda\Index::class)->middleware('permission:reportes.ver')->name('agenda.index');
     Route::get('/sedes',             SedesIndex::class)->middleware('permission:sedes.gestionar')->name('sedes.index');
     Route::get('/sedes/{sede}/editor-cobertura', \App\Livewire\Sedes\EditorCobertura::class)
         ->middleware('permission:sedes.gestionar')

@@ -80,6 +80,7 @@
                     ['name' => 'Informe domiciliarios', 'icon' => 'fa-chart-column',   'route' => 'informes.domiciliarios', 'badge' => null, 'permission' => 'despachos.gestionar'],
                     ['name' => 'Encuestas',         'icon' => 'fa-star-half-stroke',   'route' => 'encuestas.index',        'badge' => null, 'permission' => 'reportes.ver'],
                     ['name' => 'Crear Encuestas',   'icon' => 'fa-square-poll-vertical','route' => 'encuestas.constructor',  'badge' => 'NUEVO', 'permission' => 'reportes.ver'],
+                    ['name' => 'Agenda / Citas',    'icon' => 'fa-calendar-check',     'route' => 'agenda.index',           'badge' => 'NUEVO', 'permission' => 'reportes.ver'],
                     ['name' => 'Pagos',             'icon' => 'fa-credit-card',        'route' => 'pagos.index',            'badge' => null, 'permission' => 'pagos_clientes.ver'],
                     ['name' => 'ANS Tiempos',       'icon' => 'fa-stopwatch',          'route' => 'ans.index',              'badge' => null, 'permission' => 'ans.gestionar'],
                     // ⚠️ Items de configuración del bot / Meta API son solo para super-admin.
