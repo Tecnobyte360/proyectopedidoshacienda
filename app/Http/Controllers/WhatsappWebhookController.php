@@ -1360,6 +1360,24 @@ class WhatsappWebhookController extends Controller
         // inyectamos un system con regla dura para que la IA no repita el
         // mismo intento ni el mismo texto literal en bucle.
         $extraSystem = [];
+
+        // 🏪 OPCIÓN RECOGER EN SEDE (solo si el tenant la ofrece; La Hacienda no).
+        try {
+            $cfgRecoger = \App\Models\ConfiguracionBot::actual();
+            if ($cfgRecoger && $cfgRecoger->bot_ofrece_recoger) {
+                $sedeRec = \App\Models\Sede::where('activa', true)->whereNotNull('direccion')->orderBy('id')->first();
+                $dirRec  = $sedeRec ? trim(($sedeRec->nombre ? $sedeRec->nombre . ' — ' : '') . $sedeRec->direccion) : 'nuestra sede';
+                $extraSystem[] = [
+                    'role'    => 'system',
+                    'content' => "🏪 ENTREGA — este negocio ofrece DOS opciones. Al tomar el pedido, ANTES de pedir la dirección, "
+                        . "PREGÚNTALE al cliente si prefiere *RECOGER EN SEDE* o *ENVÍO A DOMICILIO*.\n"
+                        . "- Si elige RECOGER: NO pidas dirección ni valides cobertura. En `confirmar_pedido` pon pickup=true. "
+                        . "NO cobres envío. Indícale que lo recoge en: {$dirRec}.\n"
+                        . "- Si elige DOMICILIO: sigue el flujo normal (dirección + cobertura + envío).",
+                ];
+            }
+        } catch (\Throwable $e) { /* no bloquear el flujo */ }
+
         $tenantIdNota = app(\App\Services\TenantManager::class)->id() ?? 'none';
         $rechazoIndexKey = "wa_rechazo_cobertura_idx_t{$tenantIdNota}_{$telefonoNorm}";
         $ultimoRechazo = Cache::get($rechazoIndexKey);
