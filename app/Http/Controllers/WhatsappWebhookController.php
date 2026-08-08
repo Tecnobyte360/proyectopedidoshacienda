@@ -1878,6 +1878,23 @@ TXT;
         $toolCalls   = $response['choices'][0]['message']['tool_calls'] ?? null;
         $textContent = $response['choices'][0]['message']['content'] ?? null;
 
+        // 🛟 P0-1 · RED DE SEGURIDAD DEL CARRITO
+        // Si la IA respondió SOLO texto (sin tool) pero ACUSÓ haber anotado /
+        // confirmado productos, es muy probable que el carrito estructurado haya
+        // quedado vacío o parcial (la IA "narró" sin llamar agregar_producto).
+        // Reconciliamos: forzamos la captura de los productos que el cliente
+        // pidió, validados contra catálogo (action=update = cantidad absoluta,
+        // nunca dobla). Gateado por tenant (bot_confirmar_con_boton).
+        if (empty($toolCalls) && $this->debeReconciliarCarrito($textContent, $conversacion)) {
+            try {
+                $this->reconciliarCarritoDesdeConversacion(
+                    $conversacion, $systemPrompt, $conversationHistory, $toolsFiltradas, $connectionId, $from
+                );
+            } catch (\Throwable $e) {
+                Log::warning('🛟 Reconciliación de carrito falló (continúa flujo normal): ' . $e->getMessage());
+            }
+        }
+
         // ── Tool calls DINÁMICAS (consultas guardadas con usar_en_bot=true) ──
         // El nombre de las tools dinámicas siempre empieza con "consulta_".
         if ($toolCalls && str_starts_with($toolCalls[0]['function']['name'] ?? '', 'consulta_')) {
@@ -10755,6 +10772,103 @@ PROMPT;
             Log::warning('intentarBotonConfirmacion falló (continúa flujo normal): ' . $e->getMessage());
             return false;
         }
+    }
+
+    /**
+     * 🛟 ¿Debe intentarse reconciliar el carrito? True si el tenant tiene el
+     * modo de pedido robusto activo y la IA acusó (en texto) anotar/confirmar
+     * productos con alguna cantidad.
+     */
+    private function debeReconciliarCarrito(?string $textContent, \App\Models\ConversacionWhatsapp $conv): bool
+    {
+        $cfg = \App\Models\ConfiguracionBot::actual();
+        if (!$cfg || !($cfg->bot_confirmar_con_boton ?? false)) return false; // Guayacán/nuevos; Hacienda intacta
+        $t = mb_strtolower(\Illuminate\Support\Str::ascii(trim((string) $textContent)));
+        if ($t === '') return false;
+        $acuse = preg_match('/(anot|agregu|anad|sum[eo]|registr|listo|va pues|te confirmo|confirmo tu|confirmamos|resumen|tu pedido|el pedido)/', $t) === 1;
+        if (!$acuse) return false;
+        // Señal de producto concreto: menciona alguna cantidad.
+        return preg_match('/\d/', $t) === 1;
+    }
+
+    /**
+     * 🛟 Reconciliación determinista del carrito: pide al modelo (una llamada
+     * enfocada, sin conversar) que registre vía agregar_producto_al_pedido los
+     * productos que el cliente pidió y que faltan/están mal, con cantidad TOTAL.
+     * Se procesa con action=update (absoluto → no dobla) y validación de catálogo.
+     */
+    private function reconciliarCarritoDesdeConversacion(
+        \App\Models\ConversacionWhatsapp $conv,
+        string $systemPrompt,
+        array $conversationHistory,
+        ?array $toolsFiltradas,
+        $connectionId,
+        string $from
+    ): void {
+        $estado = app(\App\Services\EstadoPedidoService::class)->obtener($conv);
+        $carritoActual = collect($estado->productos ?? [])->map(fn ($p) => [
+            'name'     => $p['name'] ?? '',
+            'quantity' => $p['quantity'] ?? 0,
+            'unit'     => $p['unit'] ?? '',
+        ])->values()->all();
+
+        // Solo exponemos la tool de agregar.
+        $soloAgregar = null;
+        if (is_array($toolsFiltradas)) {
+            $soloAgregar = array_values(array_filter(
+                $toolsFiltradas,
+                fn ($t) => ($t['function']['name'] ?? '') === 'agregar_producto_al_pedido'
+            ));
+        }
+        if (empty($soloAgregar)) {
+            $all = $this->getToolsDefinicion();
+            $soloAgregar = array_values(array_filter(
+                $all,
+                fn ($t) => ($t['function']['name'] ?? '') === 'agregar_producto_al_pedido'
+            ));
+        }
+        if (empty($soloAgregar)) return;
+
+        $instr = "🛟 RECONCILIACIÓN DE PEDIDO (uso interno — NO converses, NO escribas texto).\n"
+            . "Pedido REGISTRADO ahora mismo: " . json_encode($carritoActual, JSON_UNESCAPED_UNICODE) . "\n"
+            . "Revisa TODA la conversación y determina los productos que el cliente pidió.\n"
+            . "Por CADA producto que el cliente pidió y que NO esté registrado (o esté con cantidad equivocada), "
+            . "llama `agregar_producto_al_pedido` con name (nombre exacto del catálogo), quantity (cantidad TOTAL) y unit.\n"
+            . "NUNCA inventes un producto que el cliente no mencionó. Si el pedido ya refleja lo que pidió, no llames nada.";
+
+        $reconMsgs = array_merge(
+            [['role' => 'system', 'content' => $systemPrompt]],
+            $conversationHistory,
+            [['role' => 'system', 'content' => $instr]]
+        );
+
+        $resp = $this->llamarOpenAI($reconMsgs, 'auto', $soloAgregar);
+        $tcs  = $resp['choices'][0]['message']['tool_calls'] ?? [];
+        $tcs  = array_filter((array) $tcs, fn ($tc) => ($tc['function']['name'] ?? '') === 'agregar_producto_al_pedido');
+        if (empty($tcs)) return;
+
+        $agregados = 0;
+        foreach ($tcs as $tc) {
+            $args  = json_decode($tc['function']['arguments'] ?? '{}', true) ?: [];
+            $name  = trim((string) ($args['name'] ?? ''));
+            $code  = trim((string) ($args['code'] ?? ''));
+            $qty   = (float) ($args['quantity'] ?? 0);
+            $unit  = strtolower(trim((string) ($args['unit'] ?? '')));
+            $corte = trim((string) ($args['corte'] ?? ''));
+            if (($name === '' && $code === '') || $qty <= 0) continue;
+
+            // action=update → cantidad ABSOLUTA (agrega si falta, no dobla si ya está).
+            $r = $this->procesarAgregarProductoAlPedido($conv, 'update', $name, $code, $qty, $unit, $connectionId, $corte);
+            if ($r['ok'] ?? false) $agregados++;
+        }
+
+        Log::info('🛟 Reconciliación de carrito ejecutada', [
+            'conv_id'       => $conv->id,
+            'from'          => $from,
+            'tool_calls'    => count($tcs),
+            'agregados'     => $agregados,
+            'carrito_antes' => count($carritoActual),
+        ]);
     }
 
     private function enviarRespuestaWhatsapp(string $from, string $reply, $connectionId = null): bool
