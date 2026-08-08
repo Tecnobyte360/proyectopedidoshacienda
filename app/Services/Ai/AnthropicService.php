@@ -64,6 +64,14 @@ class AnthropicService
         $toolsAnt = $this->traducirTools($tools);
         $toolChoiceAnt = $this->traducirToolChoice($toolChoice);
 
+        // 🛡️ Algunos modelos (ej. claude-sonnet-4-6) NO aceptan "prefill": la
+        //    conversación no puede terminar en un turno 'assistant', o la API
+        //    devuelve 400 "does not support assistant message prefill".
+        //    Quitamos los assistant finales para que termine en 'user'.
+        while (count($messagesAnt) > 1 && (($messagesAnt[count($messagesAnt) - 1]['role'] ?? '') === 'assistant')) {
+            array_pop($messagesAnt);
+        }
+
         $payload = [
             'model'       => $model,
             'max_tokens'  => $maxTokens,
