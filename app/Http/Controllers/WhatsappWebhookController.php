@@ -562,6 +562,17 @@ class WhatsappWebhookController extends Controller
                 return response()->json(['status' => 'superseded_by_newer_message']);
             }
 
+            // 🛟 P0-1 · RECONCILIACIÓN DE FIN DE TURNO (choke point único).
+            // Si tras procesar el turno el carrito quedó VACÍO pero el cliente ya
+            // pidió productos (con cantidad), los capturamos de forma FORZADA y
+            // validada contra catálogo. Cubre el caso en que la IA llamó
+            // buscar_productos y "narró" el producto sin guardarlo. Gate por tenant.
+            try {
+                $this->reconciliarCarritoFinDeTurno($from, $connectionId);
+            } catch (\Throwable $e) {
+                Log::warning('🛟 Reconc fin-turno falló (continúa): ' . $e->getMessage());
+            }
+
             // 🏧 MODO MENÚ: las respuestas del menú determinista son FIJAS y
             // autoritativas (bancos/instituciones). NO se les aplica ningún
             // guard ni validador anti-alucinación de IA — eso es solo para
@@ -10921,6 +10932,87 @@ PROMPT;
             'agregados'     => $agregados,
             'carrito_antes' => count($carritoActual),
         ]);
+    }
+
+    /**
+     * 🛟 Reconciliación de fin de turno (choke point único en receive()).
+     * Si el carrito está vacío pero el cliente ya pidió (cantidad presente en
+     * mensajes recientes), extrae los productos de forma FORZADA contra el
+     * catálogo y los registra. No pisa carritos ya poblados.
+     */
+    private function reconciliarCarritoFinDeTurno(string $from, $connectionId): void
+    {
+        $cfg = \App\Models\ConfiguracionBot::actual();
+        if (!$cfg || !($cfg->bot_confirmar_con_boton ?? false)) return; // Guayacán/nuevos; Hacienda intacta
+
+        $telNorm = $this->normalizarTelefono($from);
+        $conv = \App\Models\ConversacionWhatsapp::where('telefono_normalizado', $telNorm)->orderByDesc('id')->first();
+        if (!$conv) return;
+
+        $estado = app(\App\Services\EstadoPedidoService::class)->obtener($conv);
+        if (!empty($estado->productos)) return;   // ya hay carrito → no pisar
+        if ($estado->confirmado_at) return;
+
+        // Señal de que el cliente está pidiendo: alguna cantidad en sus mensajes recientes.
+        $ultUser = \App\Models\MensajeWhatsapp::where('conversacion_id', $conv->id)
+            ->where('rol', 'user')->orderByDesc('id')->limit(6)->pluck('contenido')->all();
+        if (preg_match('/\d/', mb_strtolower(implode(' ', $ultUser))) !== 1) return;
+
+        // Catálogo (nombres exactos) para anclar la extracción.
+        $nombres = [];
+        try {
+            $nombres = collect(app(\App\Services\BotCatalogoService::class)->productosActivos())
+                ->map(fn ($p) => trim((string) ($p->nombre ?? '')))->filter()->take(60)->values()->all();
+        } catch (\Throwable $e) { /* sin catálogo, resolverProducto igual valida */ }
+
+        $agregarDef = collect($this->getToolsDefinicion())
+            ->first(fn ($t) => ($t['function']['name'] ?? '') === 'agregar_producto_al_pedido');
+        if (!$agregarDef) return;
+
+        $hist = \App\Models\MensajeWhatsapp::where('conversacion_id', $conv->id)
+            ->whereIn('rol', ['user', 'assistant'])->orderByDesc('id')->limit(14)
+            ->get(['rol', 'contenido'])->reverse()->values()
+            ->map(fn ($m) => [
+                'role'    => $m->rol === 'assistant' ? 'assistant' : 'user',
+                'content' => mb_strimwidth((string) $m->contenido, 0, 300, '…'),
+            ])->all();
+        if (empty($hist)) return;
+
+        $instr = "Eres un EXTRACTOR de pedidos (NO converses, NO escribas texto).\n"
+            . (!empty($nombres) ? ("Catálogo disponible (usa el nombre EXACTO):\n- " . implode("\n- ", $nombres) . "\n\n") : "")
+            . "Del historial, identifica los productos que el CLIENTE pidió con su cantidad TOTAL y unidad. "
+            . "Llama `agregar_producto_al_pedido` UNA vez por producto. "
+            . "NUNCA inventes un producto que no esté en el catálogo o que el cliente no haya pedido.";
+
+        $msgs = array_merge([['role' => 'system', 'content' => $instr]], $hist);
+
+        $resp = $this->llamarOpenAI(
+            $msgs,
+            ['type' => 'function', 'function' => ['name' => 'agregar_producto_al_pedido']],
+            [$agregarDef]
+        );
+        $tcs = array_filter(
+            (array) ($resp['choices'][0]['message']['tool_calls'] ?? []),
+            fn ($tc) => ($tc['function']['name'] ?? '') === 'agregar_producto_al_pedido'
+        );
+        if (empty($tcs)) {
+            Log::info('🛟 Reconc fin-turno: sin extracción', ['conv' => $conv->id]);
+            return;
+        }
+
+        $ok = 0;
+        foreach ($tcs as $tc) {
+            $a = json_decode($tc['function']['arguments'] ?? '{}', true) ?: [];
+            $name = trim((string) ($a['name'] ?? ''));
+            $code = trim((string) ($a['code'] ?? ''));
+            $qty  = (float) ($a['quantity'] ?? 0);
+            $unit = strtolower(trim((string) ($a['unit'] ?? '')));
+            $corte = trim((string) ($a['corte'] ?? ''));
+            if (($name === '' && $code === '') || $qty <= 0) continue;
+            $r = $this->procesarAgregarProductoAlPedido($conv, 'update', $name, $code, $qty, $unit, $connectionId, $corte);
+            if ($r['ok'] ?? false) $ok++;
+        }
+        Log::info('🛟 Reconc fin-turno ejecutada', ['conv' => $conv->id, 'calls' => count($tcs), 'agregados' => $ok]);
     }
 
     private function enviarRespuestaWhatsapp(string $from, string $reply, $connectionId = null): bool
