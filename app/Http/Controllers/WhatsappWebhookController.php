@@ -1677,6 +1677,35 @@ TXT;
         );
         $toolChoicePorPaso = $orchestrator->toolChoice($pasoActualOrch);
 
+        // 🛒 MODO PEDIDO ROBUSTO (Guayacán/nuevos): habilitar que la IA CAPTURE
+        // productos con la tool durante la selección. Sin esto, en PASO_PRODUCTO
+        // la tool `agregar_producto_al_pedido` está OCULTA y la captura depende de
+        // un regex por texto que se rompe con nombres que llevan tamaño
+        // (ej. "Chiroso 250 g Molido") → carrito vacío. Gateado por tenant;
+        // La Hacienda queda intacta (flag off).
+        try {
+            $cfgRobusto = \App\Models\ConfiguracionBot::actual();
+            if ($cfgRobusto && ($cfgRobusto->bot_confirmar_con_boton ?? false)) {
+                $tieneAgregar = collect($toolsFiltradas)->contains(
+                    fn ($t) => ($t['function']['name'] ?? '') === 'agregar_producto_al_pedido'
+                );
+                if (!$tieneAgregar) {
+                    $agregarDef = collect($this->getToolsDefinicion())->first(
+                        fn ($t) => ($t['function']['name'] ?? '') === 'agregar_producto_al_pedido'
+                    );
+                    if ($agregarDef) {
+                        $toolsFiltradas[] = $agregarDef;
+                        $messages[] = ['role' => 'system', 'content' =>
+                            "🛒 CAPTURA OBLIGATORIA DE PRODUCTOS: apenas el cliente deje clara una "
+                            . "variedad/presentación y su cantidad (ej. 'el Chiroso molido, 2' o "
+                            . "'2 unidades de X 250 g'), DEBES llamar `agregar_producto_al_pedido` con "
+                            . "name = nombre EXACTO del catálogo (incluye tamaño y grano/molido), quantity y unit. "
+                            . "PROHIBIDO decir 'listo/anotado' sin haber llamado la tool en ESTE mismo turno."];
+                    }
+                }
+            }
+        } catch (\Throwable $e) { /* no bloquear el flujo */ }
+
         // 🛡️ BLOQUEO ANTI-DUPLICADOS: si el cliente ya tiene un pedido NO cancelado
         // creado en los últimos 30 min, REMOVER `confirmar_pedido` de las tools
         // disponibles. Esto previene que el LLM por inercia confirme dos veces
