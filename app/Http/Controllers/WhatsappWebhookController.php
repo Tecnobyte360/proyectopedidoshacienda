@@ -10959,7 +10959,9 @@ PROMPT;
         if (!$conv) return;
 
         $estado = app(\App\Services\EstadoPedidoService::class)->obtener($conv);
-        if (!empty($estado->productos)) return;   // ya hay carrito → no pisar
+        // NO exigimos carrito vacío: el cliente puede ir agregando productos en
+        // varios turnos (ej. "3 amarillo y 2 reserva especial" con la variedad
+        // aclarada después). Reconciliamos el pedido COMPLETO en cada turno.
         if ($estado->confirmado_at) return;
 
         // 🧱 Ventana del pedido ACTUAL: solo mensajes posteriores al último pedido
@@ -10975,19 +10977,30 @@ PROMPT;
             if ($ultPed) $desde = $ultPed->created_at;
         } catch (\Throwable $e) { /* sin filtro */ }
 
-        // Señal de que el cliente está pidiendo: alguna cantidad en sus mensajes recientes.
-        $ultUser = \App\Models\MensajeWhatsapp::where('conversacion_id', $conv->id)
-            ->where('rol', 'user')
-            ->when($desde, fn ($q) => $q->where('created_at', '>', $desde))
-            ->orderByDesc('id')->limit(6)->pluck('contenido')->all();
-        if (preg_match('/\d/', mb_strtolower(implode(' ', $ultUser))) !== 1) return;
-
-        // Catálogo (nombres exactos) para anclar la extracción.
+        // Catálogo (nombres exactos) para anclar la extracción Y detectar señal.
         $nombres = [];
         try {
             $nombres = collect(app(\App\Services\BotCatalogoService::class)->productosActivos())
                 ->map(fn ($p) => trim((string) ($p->nombre ?? '')))->filter()->take(60)->values()->all();
         } catch (\Throwable $e) { /* sin catálogo, resolverProducto igual valida */ }
+
+        // Señal de ordering en los mensajes recientes del cliente (ventana actual):
+        // una cantidad (dígito) O la mención de un producto del catálogo
+        // (ej. "el chiroso", "geisha") — así capturamos variedades sin número.
+        $ultUser = \App\Models\MensajeWhatsapp::where('conversacion_id', $conv->id)
+            ->where('rol', 'user')
+            ->when($desde, fn ($q) => $q->where('created_at', '>', $desde))
+            ->orderByDesc('id')->limit(8)->pluck('contenido')->all();
+        $blob = mb_strtolower(\Illuminate\Support\Str::ascii(implode(' ', $ultUser)));
+        if (trim($blob) === '') return;
+        $tieneDigito = preg_match('/\d/', $blob) === 1;
+        $tieneProducto = false;
+        foreach ($nombres as $nm) {
+            foreach (preg_split('/\s+/', mb_strtolower(\Illuminate\Support\Str::ascii($nm))) as $w) {
+                if (mb_strlen($w) >= 5 && str_contains($blob, $w)) { $tieneProducto = true; break 2; }
+            }
+        }
+        if (!$tieneDigito && !$tieneProducto) return;
 
         $agregarDef = collect($this->getToolsDefinicion())
             ->first(fn ($t) => ($t['function']['name'] ?? '') === 'agregar_producto_al_pedido');
