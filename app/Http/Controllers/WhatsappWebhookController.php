@@ -10956,9 +10956,24 @@ PROMPT;
         if (!empty($estado->productos)) return;   // ya hay carrito → no pisar
         if ($estado->confirmado_at) return;
 
+        // 🧱 Ventana del pedido ACTUAL: solo mensajes posteriores al último pedido
+        // confirmado de esta conversación. Evita que "quiero otro pedido" arrastre
+        // los items del pedido anterior (bug: 2º pedido salía con items del 1º).
+        $desde = null;
+        try {
+            $ultPed = \App\Models\Pedido::withoutGlobalScopes()
+                ->where('tenant_id', $conv->tenant_id)
+                ->where(fn ($q) => $q->where('telefono_whatsapp', 'like', '%' . $telNorm . '%')
+                                     ->orWhere('telefono', 'like', '%' . $telNorm . '%'))
+                ->orderByDesc('id')->first();
+            if ($ultPed) $desde = $ultPed->created_at;
+        } catch (\Throwable $e) { /* sin filtro */ }
+
         // Señal de que el cliente está pidiendo: alguna cantidad en sus mensajes recientes.
         $ultUser = \App\Models\MensajeWhatsapp::where('conversacion_id', $conv->id)
-            ->where('rol', 'user')->orderByDesc('id')->limit(6)->pluck('contenido')->all();
+            ->where('rol', 'user')
+            ->when($desde, fn ($q) => $q->where('created_at', '>', $desde))
+            ->orderByDesc('id')->limit(6)->pluck('contenido')->all();
         if (preg_match('/\d/', mb_strtolower(implode(' ', $ultUser))) !== 1) return;
 
         // Catálogo (nombres exactos) para anclar la extracción.
@@ -10973,7 +10988,9 @@ PROMPT;
         if (!$agregarDef) return;
 
         $hist = \App\Models\MensajeWhatsapp::where('conversacion_id', $conv->id)
-            ->whereIn('rol', ['user', 'assistant'])->orderByDesc('id')->limit(14)
+            ->whereIn('rol', ['user', 'assistant'])
+            ->when($desde, fn ($q) => $q->where('created_at', '>', $desde))
+            ->orderByDesc('id')->limit(14)
             ->get(['rol', 'contenido'])->reverse()->values()
             ->map(fn ($m) => [
                 'role'    => $m->rol === 'assistant' ? 'assistant' : 'user',
