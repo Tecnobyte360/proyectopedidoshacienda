@@ -312,7 +312,7 @@ class Index extends Component
     {
         try {
             // 🏢 Filtrar por sede del operador. Admin/Gerente ven todo.
-            $q = Pedido::with(['detalles', 'sede', 'domiciliario', 'zonaCobertura', 'estadoPedidoBot', 'cliente:id,nombre,cedula'])
+            $q = Pedido::with(['detalles', 'sede', 'sedeCreadora', 'domiciliario', 'zonaCobertura', 'estadoPedidoBot', 'cliente:id,nombre,cedula'])
                 ->latest();
             $q = \App\Support\SedeScopeFilter::aplicar($q);
 
@@ -578,7 +578,16 @@ class Index extends Component
     {
         try {
             $pedido = Pedido::findOrFail($pedidoId);
-            $encolado = app(\App\Services\TicketImpresionService::class)->encolarComanda($pedido);
+
+            // 🖨️ ¿Este tenant tiene impresora activa? Si NO (ej. Guayacán), la
+            //    comanda NO aplica: solo se finaliza la preparación, sin mensajes
+            //    de impresora (antes salía "ya se envió, revisa la impresora" en falso).
+            $tieneImpresora = \App\Models\Impresora::where('tenant_id', $pedido->tenant_id)
+                ->where('activa', true)->exists();
+
+            $encolado = $tieneImpresora
+                ? app(\App\Services\TicketImpresionService::class)->encolarComanda($pedido)
+                : false;
 
             // ✅ Marcar preparación como finalizada → desaparece del tab "En preparación".
             //    El despacho (asignar domiciliario) se hace desde /rutas o /despachos.
@@ -589,7 +598,13 @@ class Index extends Component
                 ])->saveQuietly();
             }
 
-            if ($encolado) {
+            if (!$tieneImpresora) {
+                // Tenant sin impresora → solo finaliza, sin mención a impresora.
+                $this->dispatch('notify', [
+                    'type'    => 'success',
+                    'message' => "✅ Pedido #{$pedido->id} — preparación finalizada.",
+                ]);
+            } elseif ($encolado) {
                 $this->dispatch('notify', [
                     'type'    => 'success',
                     'message' => "✅ Pedido #{$pedido->id} finalizado. Comanda enviada a la impresora.",
