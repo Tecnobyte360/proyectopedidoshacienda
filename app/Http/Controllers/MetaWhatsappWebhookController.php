@@ -183,6 +183,7 @@ class MetaWhatsappWebhookController extends Controller
         $body = '';
         $mediaUrl = null;
         $mediaType = $tipo;
+        $interactiveId = null; // 🔘 id del botón/lista tocado (payload determinista)
         switch ($tipo) {
             case 'text':
                 $body = $msg['text']['body'] ?? '';
@@ -217,6 +218,10 @@ class MetaWhatsappWebhookController extends Controller
                 $body = $msg['interactive']['button_reply']['title']
                      ?? $msg['interactive']['list_reply']['title']
                      ?? '';
+                // 🔘 El id es el payload DETERMINISTA (ej. 'kivox_confirmar_pedido').
+                $interactiveId = $msg['interactive']['button_reply']['id']
+                     ?? $msg['interactive']['list_reply']['id']
+                     ?? null;
                 break;
             case 'button':
                 // Quick Reply de PLANTILLA. Meta envía el texto del botón en button.text.
@@ -352,6 +357,8 @@ class MetaWhatsappWebhookController extends Controller
                 // 💬 Si es respuesta a otro mensaje, lo pasamos para que el legacy
                 // lo persista en respondiendo_a_mensaje_id
                 'respondiendoAMensajeId' => $respondiendoAId,
+                // 🔘 id del botón interactivo tocado (payload determinista)
+                'interactive_id'         => $interactiveId,
             ],
             'provider' => 'meta',
         ];

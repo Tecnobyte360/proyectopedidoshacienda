@@ -715,7 +715,12 @@ class WhatsappWebhookController extends Controller
 
             Log::info('💬 RESPUESTA GENERADA', compact('reply', 'from', 'messageId', 'connectionId'));
 
-            $sent = $this->enviarRespuestaWhatsapp($from, $reply, $connectionId);
+            // 🔘 Si el tenant usa confirmación por BOTÓN y el pedido ya está
+            // completo, en vez del texto libre de la IA enviamos el resumen
+            // exacto (armado desde el carrito) + botones interactivos. WYSIWYG.
+            $sent = $this->intentarBotonConfirmacion($from, $reply, $connectionId)
+                ? true
+                : $this->enviarRespuestaWhatsapp($from, $reply, $connectionId);
 
             if ($messageId && $sent) {
                 Cache::put("processed_whatsapp_msg_{$messageId}", true, now()->addMinutes(10));
@@ -1196,6 +1201,29 @@ class WhatsappWebhookController extends Controller
         // pueda saber si el cliente actual ya tiene cedula/correo registrados
         // y no se los pida de nuevo.
         request()->attributes->set('telefono_cliente_actual', $cliente->telefono_normalizado);
+
+        // ════════════════════════════════════════════════════════════════════
+        // 🔘 BOTÓN DE CONFIRMACIÓN (Meta) — resolución DETERMINISTA (sin IA).
+        // Cuando el cliente toca uno de nuestros botones interactivos, WhatsApp
+        // reenvía el TÍTULO del botón como cuerpo del mensaje. Lo detectamos y
+        // cerramos/modificamos/cancelamos el pedido leyendo el carrito real.
+        // ════════════════════════════════════════════════════════════════════
+        $accionBoton = $this->accionBotonConfirmacion($message);
+        if ($accionBoton !== null) {
+            $replyBoton = $this->manejarBotonConfirmacion(
+                $accionBoton,
+                $conversacion,
+                $from,
+                $nombreParaPrompt,
+                $conversationHistory,
+                $connectionId,
+                $convService,
+                $tenantId
+            );
+            if ($replyBoton !== null) {
+                return $replyBoton;
+            }
+        }
 
         // ════════════════════════════════════════════════════════════════════
         // 🛡️ EARLY GUARD — VALIDACIÓN DE HORARIO ANTES DE TODO
@@ -10504,6 +10532,219 @@ PROMPT;
             return is_numeric($n) ? (int) $n : null;
         }
         return is_numeric($connectionId) ? (int) $connectionId : null;
+    }
+
+    /** 🔘 Títulos EXACTOS de los botones (WhatsApp reenvía el título como cuerpo). */
+    private const BTN_CONFIRMAR_TITULO = '✅ Confirmar pedido';
+    private const BTN_MODIFICAR_TITULO = '✏️ Modificar';
+    private const BTN_CANCELAR_TITULO  = '❌ Cancelar';
+
+    /**
+     * Detecta si el mensaje entrante es el tap de uno de nuestros botones de
+     * confirmación (por título exacto). Devuelve 'confirmar'|'modificar'|'cancelar'|null.
+     */
+    private function accionBotonConfirmacion(string $message): ?string
+    {
+        return match (trim($message)) {
+            self::BTN_CONFIRMAR_TITULO => 'confirmar',
+            self::BTN_MODIFICAR_TITULO => 'modificar',
+            self::BTN_CANCELAR_TITULO  => 'cancelar',
+            default                    => null,
+        };
+    }
+
+    /**
+     * Resuelve el tap de un botón de confirmación de forma DETERMINISTA desde el
+     * carrito estructurado (sin IA). Persiste el mensaje y devuelve el texto
+     * (el caller lo envía por WhatsApp). Null si no aplica.
+     */
+    private function manejarBotonConfirmacion(
+        string $accion,
+        \App\Models\ConversacionWhatsapp $conversacion,
+        string $from,
+        string $name,
+        array $conversationHistory,
+        $connectionId,
+        \App\Services\ConversacionService $convService,
+        $tenantId
+    ): ?string {
+        $estado = app(\App\Services\EstadoPedidoService::class)->obtener($conversacion);
+
+        if ($accion === 'cancelar') {
+            try {
+                $estado->update([
+                    'paso_actual'     => \App\Models\ConversacionPedidoEstado::PASO_ABANDONADO,
+                    'abandonado_at'   => now(),
+                    'motivo_abandono' => 'cliente_cancelo_boton',
+                ]);
+            } catch (\Throwable $e) { /* no crítico */ }
+            $reply = "Listo, cancelé el pedido ❌. Cuando quieras retomar, aquí estoy ☕";
+            $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_ASSISTANT, $reply);
+            return $reply;
+        }
+
+        if ($accion === 'modificar') {
+            $reply = "Claro 👍 ¿Qué deseas cambiar? Puedes ajustar los *productos*, las *cantidades*, la *dirección* o tus *datos*.";
+            $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_ASSISTANT, $reply);
+            return $reply;
+        }
+
+        // accion === 'confirmar'
+        if ($estado->confirmado_at && $estado->pedido_id) {
+            $reply = "Tu pedido ya está registrado ✅ (#{$estado->pedido_id}). Si necesitas algo más, dime. ☕";
+            $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_ASSISTANT, $reply);
+            return $reply;
+        }
+
+        $cierre = app(\App\Services\Bots\BotCierreService::class)->intentarCierre($conversacion);
+        if (!($cierre['ok'] ?? false)) {
+            $faltan = $cierre['faltantes'] ?? $estado->camposFaltantes();
+            $lista  = !empty($faltan) ? implode(', ', $faltan) : 'algunos datos';
+            $reply  = "Antes de confirmar me falta: *{$lista}*. ¿Me lo pasas para cerrar tu pedido? 🙏";
+            $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_ASSISTANT, $reply);
+            return $reply;
+        }
+
+        $cacheKeyEstado = "whatsapp_chat_t{$tenantId}_{$from}";
+        $reply = $this->guardarPedidoDesdeToolCall(
+            $cierre['orderData'],
+            $from,
+            $name,
+            $conversationHistory,
+            $cacheKeyEstado,
+            $connectionId,
+            $conversacion,
+            $convService
+        );
+        // guardarPedidoDesdeToolCall NO persiste el mensaje: lo hacemos aquí
+        // (igual que el bloque de menú determinista). receive() lo envía.
+        $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_ASSISTANT, $reply);
+        return $reply;
+    }
+
+    /**
+     * ¿El texto es una PETICIÓN de confirmación (resumen + pregunta)? Se usa
+     * para decidir si sustituimos el texto por el mensaje con botones.
+     */
+    private function replyPideConfirmacion(string $reply): bool
+    {
+        $lower = mb_strtolower($reply);
+        $tienePregunta = preg_match('/(?:confirm(?:as|amos|o)|est[áa]\s+(?:bien|correcto)|todo\s+(?:bien|correcto)|de\s+acuerdo|procedo|cerramos)/iu', $lower) === 1;
+        $tieneResumen  = preg_match('/\b(?:total|subtotal)\s*:?\s*\$?\s*[\d.,]+/iu', $lower) === 1
+            || preg_match('/💰|📋|resumen|pedido/u', $reply) === 1;
+        return $tienePregunta && $tieneResumen;
+    }
+
+    /**
+     * Arma el resumen del pedido EXACTAMENTE desde el carrito estructurado
+     * (verdad en BD), no desde el texto del LLM. Garantiza WYSIWYG.
+     */
+    private function construirResumenPedidoDesdeEstado(\App\Models\ConversacionPedidoEstado $estado): string
+    {
+        $lineas = [];
+        $subtotalProductos = 0.0;
+        foreach (($estado->productos ?: []) as $p) {
+            if (!is_array($p)) continue;
+            $nombre = trim((string) ($p['name'] ?? $p['producto'] ?? ''));
+            if ($nombre === '') continue;
+            $cant = (float) ($p['quantity'] ?? $p['cantidad'] ?? 0);
+            $sub  = (float) ($p['subtotal'] ?? 0);
+            if ($sub <= 0) {
+                $sub = (float) ($p['precio_unitario'] ?? 0) * $cant;
+            }
+            $subtotalProductos += $sub;
+            $cantTxt = rtrim(rtrim(number_format($cant, 2, '.', ''), '0'), '.');
+            $lineas[] = "• {$cantTxt} {$nombre} — $" . number_format($sub, 0, ',', '.');
+        }
+
+        $envio = (float) ($estado->costo_envio ?? 0);
+        $total = $subtotalProductos + $envio;
+
+        $txt = "Te confirmo el pedido ☕\n\n" . implode("\n", $lineas) . "\n";
+        if ($estado->metodo_entrega === \App\Models\ConversacionPedidoEstado::METODO_RECOGER) {
+            $txt .= "*Total — $" . number_format($total, 0, ',', '.') . "*\n\n";
+            $txt .= "🏬 Recoges en: " . ($estado->sede?->nombre ?: 'la sede') . "\n";
+        } else {
+            if ($envio > 0) $txt .= "🛵 Envío — $" . number_format($envio, 0, ',', '.') . "\n";
+            $txt .= "*Total — $" . number_format($total, 0, ',', '.') . "*\n\n";
+            $dir = trim(($estado->direccion ?? '')
+                . ($estado->barrio ? ', ' . $estado->barrio : '')
+                . ($estado->ciudad ? ', ' . $estado->ciudad : ''));
+            if ($dir !== '') $txt .= "📍 Entrega: {$dir}\n";
+        }
+        $nom = trim((string) $estado->nombre_cliente);
+        if ($nom !== '') $txt .= "👤 {$nom}" . ($estado->cedula ? " — CC {$estado->cedula}" : '') . "\n";
+        $txt .= "\n¿Confirmamos el pedido?";
+
+        return mb_substr($txt, 0, 1024);
+    }
+
+    /**
+     * 🔘 Si el tenant tiene la confirmación por botón activa y el pedido está
+     * completo (sin confirmar), envía el resumen del carrito + botones
+     * interactivos y actualiza el mensaje persistido. Devuelve true si envió
+     * los botones (el caller entonces NO envía el texto).
+     */
+    private function intentarBotonConfirmacion(string $from, string $reply, $connectionId): bool
+    {
+        try {
+            $cfg = \App\Models\ConfiguracionBot::actual();
+            if (!$cfg || !($cfg->bot_confirmar_con_boton ?? false)) return false;
+
+            // Los botones interactivos son de Meta Cloud API.
+            $vieneDeMeta   = is_string($connectionId) && str_starts_with($connectionId, 'meta:');
+            $tenant        = app(\App\Services\TenantManager::class)->current();
+            $tenantUsaMeta = $tenant && $tenant->proveedorWhatsappResuelto() === \App\Models\Tenant::WA_PROVIDER_META;
+            if (!$vieneDeMeta && !$tenantUsaMeta) return false;
+
+            // El texto debe ser una PETICIÓN de confirmación (resumen + pregunta).
+            if (!$this->replyPideConfirmacion($reply)) return false;
+
+            $telNorm = $this->normalizarTelefono($from);
+            $conv = \App\Models\ConversacionWhatsapp::where('telefono_normalizado', $telNorm)
+                ->orderByDesc('id')->first();
+            if (!$conv) return false;
+
+            $estado = app(\App\Services\EstadoPedidoService::class)->obtener($conv);
+            if (!$estado->estaCompleto() || $estado->confirmado_at) return false;
+
+            // Cuerpo WYSIWYG desde el carrito real.
+            $cuerpo = $this->construirResumenPedidoDesdeEstado($estado);
+
+            $phoneNumberIdSalida = $vieneDeMeta ? substr($connectionId, 5) : null;
+            $ok = app(\App\Services\Meta\MetaWhatsappCloudService::class)->enviarBotones(
+                $from,
+                $cuerpo,
+                [
+                    ['id' => 'kivox_confirmar_pedido', 'title' => self::BTN_CONFIRMAR_TITULO],
+                    ['id' => 'kivox_modificar_pedido', 'title' => self::BTN_MODIFICAR_TITULO],
+                    ['id' => 'kivox_cancelar_pedido',  'title' => self::BTN_CANCELAR_TITULO],
+                ],
+                $tenant?->id,
+                $phoneNumberIdSalida,
+                false // no persistir aquí: actualizamos el mensaje ya persistido por el LLM
+            );
+            if (!$ok) return false;
+
+            // Que el chat muestre EXACTAMENTE lo que recibió el cliente.
+            try {
+                $ultMsg = \App\Models\MensajeWhatsapp::where('conversacion_id', $conv->id)
+                    ->where('rol', \App\Models\MensajeWhatsapp::ROL_ASSISTANT)
+                    ->orderByDesc('id')->first();
+                if ($ultMsg && $ultMsg->contenido === $reply) {
+                    $ultMsg->update(['contenido' => $cuerpo]);
+                } elseif (!$ultMsg || $ultMsg->contenido !== $cuerpo) {
+                    app(\App\Services\ConversacionService::class)
+                        ->agregarMensaje($conv, \App\Models\MensajeWhatsapp::ROL_ASSISTANT, $cuerpo);
+                }
+            } catch (\Throwable $e) { /* no crítico */ }
+
+            Log::info('🔘 Confirmación por BOTÓN enviada', ['conv_id' => $conv->id, 'to' => $from]);
+            return true;
+        } catch (\Throwable $e) {
+            Log::warning('intentarBotonConfirmacion falló (continúa flujo normal): ' . $e->getMessage());
+            return false;
+        }
     }
 
     private function enviarRespuestaWhatsapp(string $from, string $reply, $connectionId = null): bool

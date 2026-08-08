@@ -59,6 +59,67 @@ class MetaWhatsappCloudService
     }
 
     /**
+     * 🔘 Envía un mensaje interactivo con botones de respuesta rápida
+     * (interactive / button). Máximo 3 botones. Requiere ventana 24h abierta.
+     *
+     * @param array $botones lista de ['id' => 'kivox_confirmar_pedido', 'title' => '✅ Confirmar']
+     *                       (title máx 20 chars, id máx 256 chars, máx 3 botones)
+     * @return bool
+     */
+    public function enviarBotones(
+        string $telefono,
+        string $cuerpo,
+        array  $botones,
+        ?int   $tenantId = null,
+        ?string $phoneNumberId = null,
+        bool   $persistir = true
+    ): bool {
+        $config = $this->resolverConfig($tenantId, $phoneNumberId);
+        if (!$config) return false;
+
+        // Meta: cuerpo máx 1024 chars, título de botón máx 20 chars, máx 3 botones.
+        $cuerpo = mb_substr($cuerpo, 0, 1024);
+        $buttons = [];
+        foreach (array_slice($botones, 0, 3) as $b) {
+            $id    = mb_substr((string) ($b['id'] ?? ''), 0, 256);
+            $title = mb_substr((string) ($b['title'] ?? ''), 0, 20);
+            if ($id === '' || $title === '') continue;
+            $buttons[] = ['type' => 'reply', 'reply' => ['id' => $id, 'title' => $title]];
+        }
+        if (empty($buttons)) return false;
+
+        $payload = [
+            'messaging_product' => 'whatsapp',
+            'to'                => $this->normalizar($telefono),
+            'type'              => 'interactive',
+            'interactive'       => [
+                'type'   => 'button',
+                'body'   => ['text' => $cuerpo],
+                'action' => ['buttons' => $buttons],
+            ],
+        ];
+
+        $ok = $this->ejecutar($config, $payload, 'botones');
+
+        if ($persistir && $ok && $this->ultimoWamid) {
+            $this->persistirOutbound(
+                config: $config,
+                telefono: $telefono,
+                contenido: $cuerpo,
+                wamid: $this->ultimoWamid,
+                meta: [
+                    'enviado_por_humano' => false,
+                    'provider'           => 'meta',
+                    'tipo'               => 'interactive_buttons',
+                    'botones'            => array_map(fn ($b) => $b['reply'], $buttons),
+                ],
+            );
+        }
+
+        return $ok;
+    }
+
+    /**
      * Envía plantilla aprobada (template). NO requiere sesión abierta.
      * @param string $plantilla nombre EXACTO de la template en Meta
      * @param array  $variables substitución posicional: ['{{1}}' => 'x', '{{2}}' => 'y']
