@@ -1200,8 +1200,8 @@ class CrearManual extends Component
             $ocultarPrecio = $tenant && (int) $tenant->id === 1;
             $texto = "✅ *¡Pedido recibido!*\n"
                 . ($ocultarPrecio
-                    ? "Hola {$this->nombre_cliente}, registramos tu pedido *#{$pedido->id}*.\n"
-                    : "Hola {$this->nombre_cliente}, registramos tu pedido *#{$pedido->id}* por *\${$total}*.\n");
+                    ? "Hola {$this->nombre_cliente}, registramos tu pedido *#{$pedido->numero_visible}*.\n"
+                    : "Hola {$this->nombre_cliente}, registramos tu pedido *#{$pedido->numero_visible}* por *\${$total}*.\n");
             if ($linkPago) {
                 $texto .= "\n💳 *Paga aquí con tarjeta, Nequi o PSE:*\n{$linkPago}\n";
             }
