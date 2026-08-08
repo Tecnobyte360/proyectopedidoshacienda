@@ -283,12 +283,13 @@ class BotCierreService
             'type' => 'function',
             'function' => [
                 'name' => 'confirmar_pedido',
-                'description' => 'Registrar el pedido del cliente con todos los datos.',
+                'description' => 'Registrar el pedido del cliente con todos los datos. OBLIGATORIO: en "products" incluye TODOS los productos que el cliente pidió, sin omitir ninguno. Si el cliente mencionó varios productos en un mismo mensaje (ej. "un chiroso y dos amarillos"), TODOS deben ir en el array. Antes de confirmar, verifica que la cantidad de productos y unidades coincida con lo que el cliente pidió.',
                 'parameters' => [
                     'type' => 'object',
                     'properties' => [
                         'products' => [
                             'type' => 'array',
+                            'description' => 'Lista COMPLETA de productos del pedido: una entrada por CADA producto/variedad/presentación que el cliente pidió. NUNCA omitas un producto que el cliente mencionó, aunque sea de otra línea (ej. Amarillo + Reserva/Chiroso van ambos).',
                             'items' => [
                                 'type' => 'object',
                                 'properties' => [
