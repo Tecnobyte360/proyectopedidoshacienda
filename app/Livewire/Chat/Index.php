@@ -1350,6 +1350,11 @@ class Index extends Component
             'atendida_por_humano' => false,
             'departamento_id'     => null,
             'derivada_at'         => null,
+            // 🤖 Limpiar también la marca de "requiere humano" para que el bot
+            //    retome de verdad (si no, seguía pausado por la derivación).
+            'requiere_humano'       => false,
+            'humano_motivo'         => null,
+            'humano_solicitado_at'  => null,
         ]);
 
         // Registrar en mensajes del sistema para auditoria
