@@ -101,7 +101,7 @@
                                 </select>
                                 <div class="text-xs text-slate-500 space-y-0.5 pt-1">
                                     @foreach($grupo['pedidos'] as $p)
-                                        <div>• #{{ $p->id }} {{ $p->cliente_nombre }} — {{ $p->direccion }}</div>
+                                        <div>• #{{ $p->numero_visible }} {{ $p->cliente_nombre }} — {{ $p->direccion }}</div>
                                     @endforeach
                                 </div>
                             </div>
@@ -481,7 +481,7 @@
                             </div>
                             <div class="min-w-0">
                                 <div class="text-[10px] font-mono text-slate-400">
-                                    PED-{{ str_pad($pedido->id, 3, '0', STR_PAD_LEFT) }}
+                                    PED-{{ str_pad($pedido->numero_visible, 3, '0', STR_PAD_LEFT) }}
                                 </div>
                                 <div class="font-bold text-slate-800 truncate flex items-center gap-1.5">
                                     {{ $pedido->cliente_nombre }}
@@ -582,11 +582,25 @@
                                 @endif
                             @else
                                 {{-- ━━ DESPACHO A DOMICILIO ━━ --}}
-                                {{-- 🏢 Sede origen (la sede que montó el pedido) --}}
+                                {{-- 🏢 Sede origen (badge de color por sede) + marca si la montó otra sede --}}
                                 @if($pedido->sede)
-                                    <div class="flex items-center gap-2">
-                                        <i class="fa-solid fa-store w-4 text-center text-emerald-500"></i>
-                                        <span class="font-semibold text-slate-700">Sede: {{ $pedido->sede->nombre }}</span>
+                                    @php
+                                        $sedePal = [['#dbeafe','#1e40af'],['#dcfce7','#166534'],['#fef3c7','#92400e'],['#fce7f3','#9d174d'],['#ede9fe','#5b21b6'],['#cffafe','#155e75'],['#ffedd5','#9a3412'],['#e2e8f0','#334155']];
+                                        $sc = $sedePal[(int)($pedido->sede_id ?? 0) % count($sedePal)];
+                                        $otraSede = $pedido->creado_por_sede_id && (int)$pedido->creado_por_sede_id !== (int)$pedido->sede_id;
+                                    @endphp
+                                    <div class="flex items-center gap-1.5 flex-wrap">
+                                        <span class="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-bold uppercase tracking-wide"
+                                              style="background: {{ $sc[0] }}; color: {{ $sc[1] }}">
+                                            <i class="fa-solid fa-store"></i> {{ $pedido->sede->nombre }}
+                                        </span>
+                                        @if($otraSede)
+                                            <span class="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-bold uppercase tracking-wide"
+                                                  style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5;"
+                                                  title="Montado por un operador de otra sede{{ $pedido->sedeCreadora ? ': '.$pedido->sedeCreadora->nombre : '' }}">
+                                                <i class="fa-solid fa-triangle-exclamation"></i> Otra sede{{ $pedido->sedeCreadora ? ': '.$pedido->sedeCreadora->nombre : '' }}
+                                            </span>
+                                        @endif
                                     </div>
                                 @endif
                                 @if($pedido->zonaCobertura)
@@ -780,7 +794,7 @@
                                 <td class="px-3 py-3.5 align-middle">
                                     <div class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-700 whitespace-nowrap">
                                         <i class="fa-solid fa-hashtag text-[9px] text-slate-400"></i>
-                                        {{ str_pad($pedido->id, 3, '0', STR_PAD_LEFT) }}
+                                        {{ str_pad($pedido->numero_visible, 3, '0', STR_PAD_LEFT) }}
                                     </div>
                                     @if(!empty($pedido->erp_documento_id))
                                         <div class="mt-1 inline-flex items-center gap-1 rounded-lg bg-indigo-50 border border-indigo-200 px-2 py-0.5 text-[10px] font-bold text-indigo-700 whitespace-nowrap"
@@ -923,7 +937,7 @@
                                                         <div class="flex items-center justify-between">
                                                             <span class="text-xs font-bold text-slate-700">
                                                                 <i class="fa-solid fa-cart-shopping text-brand mr-1"></i>
-                                                                Detalle del pedido #{{ $pedido->id }}
+                                                                Detalle del pedido #{{ $pedido->numero_visible }}
                                                             </span>
                                                             <span class="text-[10px] text-slate-500">
                                                                 {{ $totalLineas }} {{ $totalLineas === 1 ? 'ítem' : 'ítems' }}
