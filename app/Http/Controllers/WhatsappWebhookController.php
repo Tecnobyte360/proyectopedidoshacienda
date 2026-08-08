@@ -10814,10 +10814,23 @@ PROMPT;
         if (!$cfg || !($cfg->bot_confirmar_con_boton ?? false)) return false; // Guayacán/nuevos; Hacienda intacta
         $t = mb_strtolower(\Illuminate\Support\Str::ascii(trim((string) $textContent)));
         if ($t === '') return false;
+
+        // ¿El carrito está vacío/parcial? (la reconciliación es más urgente ahí)
+        $carritoVacio = true;
+        try {
+            $est = app(\App\Services\EstadoPedidoService::class)->obtener($conv);
+            $carritoVacio = empty($est->productos);
+        } catch (\Throwable $e) { /* asumir vacío */ }
+
+        // Acuse de que anotó/confirma productos.
         $acuse = preg_match('/(anot|agregu|anad|sum[eo]|registr|listo|va pues|te confirmo|confirmo tu|confirmamos|resumen|tu pedido|el pedido)/', $t) === 1;
-        if (!$acuse) return false;
-        // Señal de producto concreto: menciona alguna cantidad.
-        return preg_match('/\d/', $t) === 1;
+        // El bot avanza hacia entrega/confirmación (señal de que los productos YA debían estar).
+        $avanza = preg_match('/(recog|recoges|domicilio|despacho|env[íi]o|envio|entrega|cobertura|confirm|total|subtotal)/', $t) === 1;
+        $hasDigit = preg_match('/\d/', $t) === 1;
+
+        // Disparar si acusa agregar con cantidad, o si el carrito está vacío y el
+        // bot ya está hablando de producto/entrega/confirmación.
+        return ($acuse && $hasDigit) || ($carritoVacio && ($acuse || $avanza) && $hasDigit);
     }
 
     /**
@@ -10858,6 +10871,10 @@ PROMPT;
         }
         if (empty($soloAgregar)) return;
 
+        Log::info('🛟 Reconciliación DISPARADA', [
+            'conv_id' => $conv->id, 'from' => $from, 'carrito_antes' => count($carritoActual),
+        ]);
+
         $instr = "🛟 RECONCILIACIÓN DE PEDIDO (uso interno — NO converses, NO escribas texto).\n"
             . "Pedido REGISTRADO ahora mismo: " . json_encode($carritoActual, JSON_UNESCAPED_UNICODE) . "\n"
             . "Revisa TODA la conversación y determina los productos que el cliente pidió.\n"
@@ -10871,7 +10888,13 @@ PROMPT;
             [['role' => 'system', 'content' => $instr]]
         );
 
-        $resp = $this->llamarOpenAI($reconMsgs, 'auto', $soloAgregar);
+        // 🔒 TOOL FORZADA: la API garantiza la llamada (el modelo no puede narrar
+        // en vez de guardar). Es la clave para que el carrito NUNCA quede vacío.
+        $resp = $this->llamarOpenAI(
+            $reconMsgs,
+            ['type' => 'function', 'function' => ['name' => 'agregar_producto_al_pedido']],
+            $soloAgregar
+        );
         $tcs  = $resp['choices'][0]['message']['tool_calls'] ?? [];
         $tcs  = array_filter((array) $tcs, fn ($tc) => ($tc['function']['name'] ?? '') === 'agregar_producto_al_pedido');
         if (empty($tcs)) return;
