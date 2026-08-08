@@ -326,6 +326,10 @@
                             <span class="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-blue-500 text-white text-[10px] border-2 border-white" title="Atendida por humano">
                                 <i class="fa-solid fa-user"></i>
                             </span>
+                        @elseif($c->requiere_humano)
+                            <span class="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-white text-[10px] border-2 border-white" title="Esperando asesor (derivada)">
+                                <i class="fa-solid fa-user-clock"></i>
+                            </span>
                         @else
                             <span class="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white text-[10px] border-2 border-white" title="Bot atiende">
                                 <i class="fa-solid fa-robot"></i>
@@ -703,6 +707,10 @@
                             @if($conversacionActiva->atendida_por_humano)
                                 <span class="ml-2 inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700">
                                     <i class="fa-solid fa-user"></i> ATENDIDA POR TI
+                                </span>
+                            @elseif($conversacionActiva->requiere_humano)
+                                <span class="ml-2 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">
+                                    <i class="fa-solid fa-user-clock"></i> ESPERANDO ASESOR
                                 </span>
                             @else
                                 <span class="ml-2 inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">

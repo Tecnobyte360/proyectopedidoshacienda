@@ -2306,6 +2306,20 @@ class Index extends Component
         // ⚠️ NO se auto-activa modo humano. El bot SIGUE respondiendo al cliente.
         // Si quieres silenciar al bot, usa el botón "Tomar control" explícitamente.
 
+        // 🤝 EXCEPCIÓN: si la conversación YA estaba DERIVADA a humano
+        // (el bot dijo "te conecto con un asesor"), el asesor que responde la
+        // TOMA automáticamente: se marca atendida por humano para que el bot
+        // deje de re-derivar en bucle y se active el indicador humano.
+        // Esto NO afecta el modo mixto de conversaciones normales (solo aplica
+        // cuando requiere_humano ya está activo).
+        if ($conv->requiere_humano && !$conv->atendida_por_humano) {
+            $conv->update([
+                'atendida_por_humano' => true,
+                'humano_atendido_at'  => now(),
+            ]);
+            $conv->refresh();
+        }
+
         // Si la conversación es de un WIDGET WEB (no WhatsApp), no usamos TecnoByteApp.
         // El widget pollea los mensajes del operador y los muestra.
         if ($conv->canal === 'widget') {
