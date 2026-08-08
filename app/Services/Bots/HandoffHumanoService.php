@@ -137,6 +137,23 @@ class HandoffHumanoService
         return true;
     }
 
+    /**
+     * Deriva a humano cuando la IA se cayó (error técnico), SIEMPRE que la
+     * derivación esté activa para el tenant. Devuelve el mensaje al cliente o null.
+     */
+    public function derivarPorFallaTecnica(ConversacionWhatsapp $conv): ?string
+    {
+        if ($conv->requiere_humano) return null;
+        $cfg = \App\Models\ConfiguracionBot::actual();
+        if (!$cfg || !($cfg->derivacion_activa ?? true)) return null;
+
+        return $this->derivar(
+            $conv,
+            'falla_tecnica_ia',
+            'La IA no está disponible (error técnico). Se deriva la conversación para atención humana.'
+        );
+    }
+
     private function derivar(ConversacionWhatsapp $conv, string $motivo, string $razon): string
     {
         try {

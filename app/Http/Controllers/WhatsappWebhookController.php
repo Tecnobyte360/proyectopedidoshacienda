@@ -1827,7 +1827,22 @@ TXT;
             Log::warning('🚨 LLM completamente caído — respuesta degradada al cliente', [
                 'from' => $from,
             ]);
-            // Mensaje más útil cuando el LLM está completamente caído
+
+            // 🤝 Si la IA se cae y la derivación está activa, pasar la conversación
+            //    a un HUMANO (marcar requiere_humano + notificar) en vez de dejar
+            //    al cliente esperando. Antes solo mostraba "problema temporal".
+            try {
+                $convFalla = \App\Models\ConversacionWhatsapp::where('telefono_normalizado', $this->normalizarTelefono($from))
+                    ->latest('id')->first();
+                if ($convFalla) {
+                    $msgDeriv = app(\App\Services\Bots\HandoffHumanoService::class)->derivarPorFallaTecnica($convFalla);
+                    if ($msgDeriv) return $msgDeriv;
+                }
+            } catch (\Throwable $e) {
+                Log::warning('No se pudo derivar por falla de IA: ' . $e->getMessage());
+            }
+
+            // Fallback final (derivación desactivada o falló): mensaje al cliente.
             return "Estamos teniendo un problema temporal con el sistema. 🙏 "
                  . "Inténtalo en 1 minuto, o escribe *asesor* si necesitas ayuda inmediata.";
         }
