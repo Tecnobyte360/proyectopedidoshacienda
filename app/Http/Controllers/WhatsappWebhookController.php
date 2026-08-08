@@ -1721,12 +1721,18 @@ TXT;
         // creado en los últimos 30 min, REMOVER `confirmar_pedido` de las tools
         // disponibles. Esto previene que el LLM por inercia confirme dos veces
         // el mismo pedido cuando el cliente solo saluda después.
-        if (isset($hayPedidoReciente) && $hayPedidoReciente && $minutosDesdePedido < 30) {
+        // Solo bloqueamos re-confirmar si el cliente NO está armando un pedido
+        // NUEVO. Si el carrito tiene items (ya empezó "otro pedido"), dejamos
+        // confirmar_pedido disponible → varios pedidos el mismo día están OK.
+        // El duplicado accidental (mismo carrito) lo frena el confirmKey (2 min)
+        // + la idempotencia por productos en guardarPedidoDesdeToolCall.
+        $carritoEnCurso = !empty(optional($estadoActualParaTools)->productos);
+        if (isset($hayPedidoReciente) && $hayPedidoReciente && $minutosDesdePedido < 30 && !$carritoEnCurso) {
             $toolsFiltradas = array_values(array_filter(
                 $toolsFiltradas,
                 fn ($t) => ($t['function']['name'] ?? '') !== 'confirmar_pedido'
             ));
-            Log::info('🛡️ confirmar_pedido REMOVIDO de tools (pedido reciente)', [
+            Log::info('🛡️ confirmar_pedido REMOVIDO de tools (pedido reciente, carrito vacío)', [
                 'pedido_id'  => $ultimoPedido->id,
                 'minutos'    => $minutosDesdePedido,
                 'tools_left' => count($toolsFiltradas),
