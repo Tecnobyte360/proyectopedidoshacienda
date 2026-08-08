@@ -10754,9 +10754,6 @@ PROMPT;
             $tenantUsaMeta = $tenant && $tenant->proveedorWhatsappResuelto() === \App\Models\Tenant::WA_PROVIDER_META;
             if (!$vieneDeMeta && !$tenantUsaMeta) return false;
 
-            // El texto debe ser una PETICIÓN de confirmación (resumen + pregunta).
-            if (!$this->replyPideConfirmacion($reply)) return false;
-
             $telNorm = $this->normalizarTelefono($from);
             $conv = \App\Models\ConversacionWhatsapp::where('telefono_normalizado', $telNorm)
                 ->orderByDesc('id')->first();
@@ -10774,6 +10771,12 @@ PROMPT;
             // estado quede 100% (p.ej. cobertura). Si al tocar Confirmar falta
             // algo, BotCierreService lo pide. Así el botón SIEMPRE aparece.
             if (empty($estado->productos) || $estado->confirmado_at) return false;
+
+            // Disparar si el bot pidió confirmación O si el pedido YA está completo.
+            // Esto rescata el caso en que la IA se confunde y pide datos de más
+            // (ej. "dame la dirección" en un pedido de RECOGER): igual mostramos
+            // el botón y el cliente puede confirmar.
+            if (!$this->replyPideConfirmacion($reply) && !$estado->estaCompleto()) return false;
 
             // Cuerpo WYSIWYG desde el carrito real.
             $cuerpo = $this->construirResumenPedidoDesdeEstado($estado);
