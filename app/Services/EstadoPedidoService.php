@@ -309,6 +309,30 @@ class EstadoPedidoService
             if (!\App\Models\Cliente::nombreNoEsProducto($candidato)) {
                 $esNombreValido = false;
             }
+            // 🛡️ Rechazar cuando el "nombre" son en realidad palabras de la
+            //    DIRECCIÓN/barrio/ciudad. La IA a veces mete "Poblado Medellin"
+            //    (barrio + ciudad) como customer_name al procesar la dirección.
+            //    Si TODAS las palabras del candidato están en el texto de la
+            //    dirección, no es un nombre de persona.
+            $lugares = mb_strtolower(trim(
+                (string) ($orderData['neighborhood'] ?? '') . ' ' .
+                (string) ($orderData['location']     ?? '') . ' ' .
+                (string) ($orderData['city']         ?? '') . ' ' .
+                (string) ($estado->barrio            ?? '') . ' ' .
+                (string) ($estado->ciudad            ?? '')
+            ));
+            if ($lugares !== '') {
+                $palabrasLugar = array_filter(preg_split('/\s+/', $lugares));
+                $palabrasCand  = array_filter(preg_split('/\s+/', mb_strtolower($candidato)));
+                if (!empty($palabrasCand) && empty(array_diff($palabrasCand, $palabrasLugar))) {
+                    $esNombreValido = false;
+                    Log::warning('🛡️ customer_name rechazado: son palabras de la dirección', [
+                        'conv_id'       => $conv->id,
+                        'customer_name' => $candidato,
+                        'lugares'       => $lugares,
+                    ]);
+                }
+            }
 
             if ($esNombreValido) {
                 $estado->nombre_cliente = $candidato;
@@ -429,6 +453,13 @@ class EstadoPedidoService
     public function captarCobertura(ConversacionWhatsapp $conv, array $resultado): ConversacionPedidoEstado
     {
         $estado = $this->obtener($conv);
+
+        // 🏬 Si el pedido es de RECOGER, la cobertura/envío NO aplica. Ignoramos
+        // cualquier resultado para no cobrar envío ni convertirlo en domicilio.
+        if ($estado->metodo_entrega === ConversacionPedidoEstado::METODO_RECOGER) {
+            Log::info('🏬 captarCobertura ignorado — pedido es de RECOGER', ['conv_id' => $conv->id]);
+            return $estado;
+        }
 
         if (($resultado['cubierta'] ?? false) === true) {
             $estado->cobertura_validada = true;
@@ -949,6 +980,26 @@ class EstadoPedidoService
                     'direccion_anterior' => $direccionAnterior,
                 ]);
             }
+        }
+
+        // 4.0 OVERRIDE EXPLÍCITO DE RECOGER (alta prioridad).
+        // Si el cliente dice claramente que recoge, GANA sobre cualquier
+        // domicilio/envío fijado antes (p.ej. si el bot forzó cobertura por ver
+        // la palabra "sede"). Así nunca se cobra envío en un pedido de recoger.
+        $msgRec = mb_strtolower(\Illuminate\Support\Str::ascii($msg));
+        $diceRecoger = preg_match('/\b(recojo|recogo|recoger|recogerlo|lo recojo|yo recojo|paso a recoger|voy a recoger|recoger en sede|en la sede|reclamo en (la )?sede)\b/', $msgRec) === 1;
+        $diceDomicilio = preg_match('/\b(domicilio|despach|envi[oa]|enviad|mandad|a mi casa|para (mi )?casa|me lo mand)\b/', $msgRec) === 1;
+        if ($diceRecoger && !$diceDomicilio
+            && ($estado->metodo_entrega !== ConversacionPedidoEstado::METODO_RECOGER
+                || !empty($estado->costo_envio) || !empty($estado->direccion))) {
+            $estado->metodo_entrega     = ConversacionPedidoEstado::METODO_RECOGER;
+            $estado->costo_envio        = null;
+            $estado->distancia_km       = null;
+            $estado->direccion          = null;
+            $estado->barrio             = null;
+            $estado->cobertura_validada = false;
+            $cambio = true;
+            Log::info('🏬 RECOGER override explícito (limpia envío/dirección)', ['conv_id' => $conv->id]);
         }
 
         // 4. MÉTODO DE ENTREGA — despacho / recoger
