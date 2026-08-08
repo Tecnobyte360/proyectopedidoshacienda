@@ -10987,10 +10987,13 @@ PROMPT;
         // Señal de ordering en los mensajes recientes del cliente (ventana actual):
         // una cantidad (dígito) O la mención de un producto del catálogo
         // (ej. "el chiroso", "geisha") — así capturamos variedades sin número.
+        // Solo el ÚLTIMO mensaje del cliente: así reconciliamos cuando acaba de
+        // nombrar producto/cantidad, y NO en turnos como "recoger"/"sí" (evita
+        // que la reconciliación re-lea y desestabilice un carrito ya correcto).
         $ultUser = \App\Models\MensajeWhatsapp::where('conversacion_id', $conv->id)
             ->where('rol', 'user')
             ->when($desde, fn ($q) => $q->where('created_at', '>', $desde))
-            ->orderByDesc('id')->limit(8)->pluck('contenido')->all();
+            ->orderByDesc('id')->limit(1)->pluck('contenido')->all();
         $blob = mb_strtolower(\Illuminate\Support\Str::ascii(implode(' ', $ultUser)));
         if (trim($blob) === '') return;
         $tieneDigito = preg_match('/\d/', $blob) === 1;
