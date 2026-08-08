@@ -29,6 +29,8 @@ class Pedido extends Model
         'tenant_id',
         'pedido_origen_id',
         'sede_id',
+        'usuario_creador_id',
+        'creado_por_sede_id',
         'empresa_id',
         'fecha_pedido',
         'hora_entrega',
@@ -108,6 +110,24 @@ class Pedido extends Model
         });
 
         static::created(function ($pedido) {
+            // 🔢 Consecutivo POR TENANT (cada empresa su propia numeración).
+            //    Con bloqueo para no saltar ni duplicar. La Hacienda ya viene
+            //    backfilleada con numero_pedido = id, así que continúa su serie.
+            if (empty($pedido->numero_pedido) && $pedido->tenant_id) {
+                try {
+                    \Illuminate\Support\Facades\DB::transaction(function () use ($pedido) {
+                        $max = static::withoutGlobalScopes()
+                            ->where('tenant_id', $pedido->tenant_id)
+                            ->lockForUpdate()
+                            ->max('numero_pedido');
+                        $pedido->numero_pedido = (int) $max + 1;
+                        $pedido->saveQuietly();
+                    });
+                } catch (\Throwable $e) {
+                    \Log::warning('numero_pedido no asignado (pedido ' . $pedido->id . '): ' . $e->getMessage());
+                }
+            }
+
             $pedido->registrarHistorial(
                 estadoNuevo: $pedido->estado,
                 estadoAnterior: null,
@@ -151,6 +171,15 @@ class Pedido extends Model
         });
     }
 
+    /**
+     * 🔢 Número de pedido que se muestra al cliente/operador: el consecutivo
+     * POR TENANT. Si por alguna razón no tiene (pedidos muy viejos), cae al id.
+     */
+    public function getNumeroVisibleAttribute(): int
+    {
+        return (int) ($this->numero_pedido ?: $this->id);
+    }
+
     /*
     |==========================================================================
     | RELACIONES
@@ -160,6 +189,18 @@ class Pedido extends Model
     public function sede()
     {
         return $this->belongsTo(Sede::class);
+    }
+
+    /** 🏢 Sede desde la que un operador MONTÓ el pedido (para marcar "otra sede"). */
+    public function sedeCreadora()
+    {
+        return $this->belongsTo(Sede::class, 'creado_por_sede_id');
+    }
+
+    /** 👤 Usuario (operador) que montó el pedido manual. */
+    public function usuarioCreador()
+    {
+        return $this->belongsTo(\App\Models\User::class, 'usuario_creador_id');
     }
 
     public function pedidoOrigen()
@@ -1021,7 +1062,7 @@ MSG;
         $vars = array_merge([
             'nombre'            => $primerNombre,
             'nombre_completo'   => $this->cliente_nombre ?: '',
-            'pedido'            => $this->id,
+            'pedido'            => $this->numero_visible,
             'subtotal'          => '$' . number_format((float) $this->subtotal, 0, ',', '.'),
             'envio'             => '$' . number_format($envio, 0, ',', '.'),
             'envio_o_gratis'    => $envio > 0 ? '$' . number_format($envio, 0, ',', '.') : 'GRATIS',

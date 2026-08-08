@@ -46,7 +46,7 @@ class TicketImpresionService
     {
         $out  = self::NEGRITA_ON;
         // Encabezado EXTRA grande con el número de pedido
-        $out .= self::T_GRANDE . $this->centrar('PEDIDO #' . $pedido->id, self::ANCHO_G) . "\n";
+        $out .= self::T_GRANDE . $this->centrar('PEDIDO #' . $pedido->numero_visible, self::ANCHO_G) . "\n";
 
         // ⏰ Hora para la que es el pedido (destacada, si viene)
         $hora = $pedido->hora_entrega ? substr((string) $pedido->hora_entrega, 0, 5) : '';
