@@ -10706,7 +10706,17 @@ PROMPT;
             if (!$conv) return false;
 
             $estado = app(\App\Services\EstadoPedidoService::class)->obtener($conv);
-            if (!$estado->estaCompleto() || $estado->confirmado_at) return false;
+            Log::info('🔘 intentarBotonConfirmacion gate', [
+                'conv_id'      => $conv->id,
+                'estaCompleto' => $estado->estaCompleto(),
+                'n_productos'  => count($estado->productos ?? []),
+                'confirmado'   => (bool) $estado->confirmado_at,
+            ]);
+            // Basta con que haya productos y no esté confirmado. NO exigimos
+            // estaCompleto(): la IA suele pedir confirmación antes de que el
+            // estado quede 100% (p.ej. cobertura). Si al tocar Confirmar falta
+            // algo, BotCierreService lo pide. Así el botón SIEMPRE aparece.
+            if (empty($estado->productos) || $estado->confirmado_at) return false;
 
             // Cuerpo WYSIWYG desde el carrito real.
             $cuerpo = $this->construirResumenPedidoDesdeEstado($estado);
