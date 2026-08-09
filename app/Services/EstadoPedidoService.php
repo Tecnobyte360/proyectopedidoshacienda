@@ -991,8 +991,14 @@ class EstadoPedidoService
         // domicilio/envío fijado antes (p.ej. si el bot forzó cobertura por ver
         // la palabra "sede"). Así nunca se cobra envío en un pedido de recoger.
         $msgRec = mb_strtolower(\Illuminate\Support\Str::ascii($msg));
-        $diceRecoger = preg_match('/\b(recojo|recogo|recoger|recogerlo|lo recojo|yo recojo|paso a recoger|voy a recoger|recoger en sede|en la sede|reclamo en (la )?sede)\b/', $msgRec) === 1;
-        $diceDomicilio = preg_match('/\b(domicilio|despach|envi[oa]|enviad|mandad|a mi casa|para (mi )?casa|me lo mand)\b/', $msgRec) === 1;
+        $diceRecoger = false;
+        foreach (['recojo','recogo','recoger','paso a recoger','voy a recoger','en la sede','en sede','reclamo en'] as $kwR) {
+            if (str_contains($msgRec, $kwR)) { $diceRecoger = true; break; }
+        }
+        $diceDomicilio = false;
+        foreach (['domicilio','despach','envio','envia','enviad','mandad','a mi casa','para casa','me lo mand'] as $kwD) {
+            if (str_contains($msgRec, $kwD)) { $diceDomicilio = true; break; }
+        }
         if ($diceRecoger && !$diceDomicilio
             && ($estado->metodo_entrega !== ConversacionPedidoEstado::METODO_RECOGER
                 || !empty($estado->costo_envio) || !empty($estado->direccion))) {
