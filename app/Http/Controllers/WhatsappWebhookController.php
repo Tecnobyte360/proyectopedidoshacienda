@@ -9171,6 +9171,27 @@ TXT;
             $avisoProgramado = "📅 *Pedido programado* — estamos cerrados ahora, pero ya te lo dejamos en cola para preparar el {$cuando}.\n\n";
         }
 
+        // 🏬 RECOGER: mensaje dedicado (la plantilla de domicilio dejaría
+        // "Lo enviamos a: [vacío]"). Construimos uno limpio con "Recoges en: sede".
+        if (($pedido->metodo_entrega ?? null) === 'recoger'
+            || (empty($pedido->direccion) && !empty($pedido->sede_id))) {
+            $sedeNom = $pedido->sede?->nombre ?: (\App\Models\Sede::find($pedido->sede_id)?->nombre ?? 'nuestra sede');
+            $nomCli  = trim((string) ($pedido->cliente_nombre ?? ''));
+            $saludo  = $nomCli !== '' ? ' ' . explode(' ', $nomCli)[0] : '';
+            $numVis  = $pedido->numero_visible ?? $pedido->id;
+            $totalFmt = '$' . number_format((float) $pedido->total, 0, ',', '.');
+            $msgRec = "☕ ¡Listo{$saludo}! Tu pedido quedó confirmado.\n"
+                . "🧾 *Pedido #{$numVis}*\n{$productosStr}\n\n"
+                . "🏬 *Recoges en:* {$sedeNom}\n"
+                . ($pedido->telefono_contacto ? "☎️ *Contacto:* {$pedido->telefono_contacto}\n" : '')
+                . $beneficioTxt
+                . "💳 *Total a pagar:* {$totalFmt}\n"
+                . $bloquePago
+                . "🔗 Seguir tu pedido aquí:\n{$pedido->url_seguimiento}\n\n"
+                . "Guarda *#{$numVis}* para cualquier consulta. Gracias por elegirnos 🌿";
+            return $avisoProgramado . $msgRec;
+        }
+
         // Renderizar con variables — usa el helper del modelo + extras específicos
         $mensaje = $pedido->renderizarPlantilla($plantilla, [
             'productos'         => $productosStr,
