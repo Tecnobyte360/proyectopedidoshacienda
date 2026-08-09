@@ -9183,6 +9183,32 @@ TXT;
             'link_seguimiento'  => $pedido->url_seguimiento,
         ]);
 
+        // 🏬 RECOGER: el mensaje no debe decir "Lo enviamos a"/"Dirección" (queda
+        // vacío). Reemplazamos esa línea por "Recoges en: [sede]" y quitamos la
+        // línea de barrio vacía. Sin regex (str_contains) para robustez.
+        $esRecogerPed = ($pedido->metodo_entrega ?? null) === 'recoger'
+            || (empty($pedido->direccion) && !empty($pedido->sede_id));
+        if ($esRecogerPed) {
+            $sedeNom = $pedido->sede?->nombre ?: (\App\Models\Sede::find($pedido->sede_id)?->nombre ?? 'nuestra sede');
+            $lineas = explode("\n", (string) $mensaje);
+            $out = [];
+            $reemplazado = false;
+            foreach ($lineas as $ln) {
+                $lnl = mb_strtolower($ln);
+                if (!$reemplazado && (str_contains($lnl, 'lo enviamos a') || str_contains($lnl, 'direcci'))) {
+                    $out[] = "🏬 *Recoges en:* {$sedeNom}";
+                    $reemplazado = true;
+                    continue;
+                }
+                // Quitar línea de barrio vacía (termina en ":")
+                if (str_contains($lnl, 'barrio') && str_ends_with(rtrim($lnl), ':')) {
+                    continue;
+                }
+                $out[] = $ln;
+            }
+            $mensaje = implode("\n", $out);
+        }
+
         return $avisoProgramado . $mensaje;
     }
 
