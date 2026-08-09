@@ -304,6 +304,10 @@ MSG;
                 'max_tokens'                => 700,
                 'nombre_asesora'            => 'Sofía',
                 'activo'                    => true,
+                // 🆕 Los tenants NUEVOS nacen con la toma de pedido robusta
+                // (carrito confiable + botón de confirmación + recoger sin envío).
+                // Los existentes conservan su valor (La Hacienda sigue en false).
+                'bot_confirmar_con_boton'   => true,
             ];
 
             // Si hay tenant, busca su config; si no, fallback a la primera (legacy)
