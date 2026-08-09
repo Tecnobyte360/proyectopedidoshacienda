@@ -37,18 +37,12 @@ class WatchdogConversacionesEstancadas extends Command
         // 🎛️ Configuración desde BD — editable en /configuracion-bot
         $cfgGlobal = \App\Models\ConfiguracionBot::actual();
 
-        // 🤖 Si el BOT GLOBAL está apagado (activo=false), no tiene sentido
-        // rescatar mensajes porque el bot tampoco respondería al rescate.
-        if (!((bool) ($cfgGlobal->activo ?? true))) {
-            Log::info('🐕 Watchdog: skip — bot global desactivado (cfg.activo=false)');
-            return self::SUCCESS;
-        }
-
-        $activo = (bool) ($cfgGlobal->watchdog_activo ?? true);
-        if (!$activo) {
-            Log::info('🐕 Watchdog: desactivado por configuración');
-            return self::SUCCESS;
-        }
+        // ⚠️ MULTI-TENANT: NO cortar globalmente por cfg.actual() — en el
+        // scheduler NO hay tenant seteado y actual() devuelve una config
+        // arbitraria (a veces activo=false) que apagaba el watchdog para TODOS
+        // los tenants (bug: ninguna conversación se rescataba jamás). La
+        // activación se decide POR TENANT dentro de cada loop (activo +
+        // watchdog_activo + no modo_menú).
 
         $minSegs     = max(10, min(300, (int) ($cfgGlobal->watchdog_min_segundos ?? 30)));
         $maxMins     = max(1,  min(120, (int) ($cfgGlobal->watchdog_max_minutos ?? 5)));
@@ -105,8 +99,8 @@ class WatchdogConversacionesEstancadas extends Command
                 $cfgTenant = \App\Models\ConfiguracionBot::withoutGlobalScopes()
                     ->where('tenant_id', $conv->tenant_id)
                     ->first();
-                if ($cfgTenant && !(bool) $cfgTenant->activo) {
-                    Log::info('🐕 Watchdog: skip — bot del tenant desactivado', [
+                if ($cfgTenant && (!(bool) $cfgTenant->activo || !(bool) ($cfgTenant->watchdog_activo ?? true))) {
+                    Log::info('🐕 Watchdog: skip — bot/watchdog del tenant desactivado', [
                         'conversacion_id' => $conv->id,
                         'tenant_id'       => $conv->tenant_id,
                     ]);
@@ -266,6 +260,19 @@ class WatchdogConversacionesEstancadas extends Command
             if (str_starts_with((string) ($ultimoMsg->mensaje_externo_id ?? ''), 'watchdog_')) {
                 Log::info("MODO2 conv {$conv->id}: skip — ya es watchdog_");
                 continue;
+            }
+
+            // Guard POR TENANT: solo rescatar si el bot del tenant está activo,
+            // el watchdog está activo y NO está en modo menú determinista.
+            if ($conv->tenant_id) {
+                $cfgT2 = \App\Models\ConfiguracionBot::withoutGlobalScopes()
+                    ->where('tenant_id', $conv->tenant_id)->first();
+                if ($cfgT2 && (!(bool) $cfgT2->activo
+                        || !(bool) ($cfgT2->watchdog_activo ?? true)
+                        || (bool) ($cfgT2->bot_modo_menu ?? false))) {
+                    Log::info("MODO2 conv {$conv->id}: skip — tenant bot/watchdog off o modo menú");
+                    continue;
+                }
             }
 
             // 🧍 NO rescatar conversaciones en MODO HUMANO (operador atiende)
