@@ -11073,14 +11073,16 @@ PROMPT;
             ->orderByDesc('id')->limit(1)->pluck('contenido')->all();
         $blob = mb_strtolower(\Illuminate\Support\Str::ascii(implode(' ', $ultUser)));
         if (trim($blob) === '') return;
-        $tieneDigito = preg_match('/\d/', $blob) === 1;
+        // Requerimos que el ÚLTIMO mensaje mencione un PRODUCTO del catálogo.
+        // Un dígito solo (cédula "1007767612", teléfono) NO dispara — evita que
+        // la reconciliación re-lea y corrompa cantidades en turnos no-producto.
         $tieneProducto = false;
         foreach ($nombres as $nm) {
             foreach (preg_split('/\s+/', mb_strtolower(\Illuminate\Support\Str::ascii($nm))) as $w) {
                 if (mb_strlen($w) >= 5 && str_contains($blob, $w)) { $tieneProducto = true; break 2; }
             }
         }
-        if (!$tieneDigito && !$tieneProducto) return;
+        if (!$tieneProducto) return;
 
         $agregarDef = collect($this->getToolsDefinicion())
             ->first(fn ($t) => ($t['function']['name'] ?? '') === 'agregar_producto_al_pedido');
@@ -11119,6 +11121,16 @@ PROMPT;
             return;
         }
 
+        // 🛡️ MAX: la reconciliación NUNCA reduce una cantidad ya capturada
+        // (evita corromper "2 Molido" → "1" por una re-lectura ambigua). Solo
+        // agrega faltantes o SUBE. Las reducciones reales las hace el cliente
+        // vía la tool normal, no el rescate.
+        $curMap = [];
+        foreach (($estado->fresh()->productos ?? []) as $p) {
+            $k = mb_strtolower(\Illuminate\Support\Str::ascii(trim((string) ($p['name'] ?? ''))));
+            if ($k !== '') $curMap[$k] = (float) ($p['quantity'] ?? 0);
+        }
+
         $ok = 0;
         foreach ($tcs as $tc) {
             $a = json_decode($tc['function']['arguments'] ?? '{}', true) ?: [];
@@ -11128,6 +11140,14 @@ PROMPT;
             $unit = strtolower(trim((string) ($a['unit'] ?? '')));
             $corte = trim((string) ($a['corte'] ?? ''));
             if (($name === '' && $code === '') || $qty <= 0) continue;
+
+            // No reducir: si ya está en el carrito con cantidad >= la extraída, saltar.
+            $k = mb_strtolower(\Illuminate\Support\Str::ascii($name));
+            $cur = $curMap[$k] ?? 0;
+            if ($cur > 0 && $qty <= $cur) {
+                continue;
+            }
+
             $r = $this->procesarAgregarProductoAlPedido($conv, 'update', $name, $code, $qty, $unit, $connectionId, $corte);
             if ($r['ok'] ?? false) $ok++;
         }
