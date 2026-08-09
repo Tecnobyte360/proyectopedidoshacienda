@@ -2781,6 +2781,37 @@ TXT;
             $reply    = $followUp['choices'][0]['message']['content']
                 ?? ($resultado['mensaje_sugerido'] ?? 'Déjame verificar tu dirección un momento 🙌');
 
+            // 🛟 ANTI-DEAD-END: la cobertura YA se validó (tenemos $resultado). Si
+            // la IA respondió una PROMESA HUECA ("déjame verificar/revisar la
+            // cobertura", "dame un momento") en vez del resultado, la
+            // reemplazamos por el resultado REAL. Nunca dejar al cliente
+            // esperando algo que ya se hizo (bug: conversación congelada).
+            $replyLow = mb_strtolower(\Illuminate\Support\Str::ascii((string) $reply));
+            $promesaHueca = str_contains($replyLow, 'dejame verific') || str_contains($replyLow, 'dejame revis')
+                || str_contains($replyLow, 'dejame valid') || str_contains($replyLow, 'voy a verific')
+                || str_contains($replyLow, 'voy a revis') || str_contains($replyLow, 'permiteme')
+                || str_contains($replyLow, 'dame un momento') || str_contains($replyLow, 'un momento')
+                || str_contains($replyLow, 'ya verifico') || str_contains($replyLow, 'ya reviso')
+                || str_contains($replyLow, 'estoy verificando') || str_contains($replyLow, 'verificar la cobertura')
+                || str_contains($replyLow, 'verificar tu direccion');
+            if ($promesaHueca) {
+                if ($resultado['cubierta'] ?? false) {
+                    $envioC = (float) ($resultado['costo_envio'] ?? 0);
+                    $ciudadTxt = $ciudad !== '' ? " en {$ciudad}" : '';
+                    $reply = "✅ ¡Sí llegamos a tu dirección{$ciudadTxt}!\n"
+                        . ($envioC > 0 ? "🛵 Envío: $" . number_format($envioC, 0, ',', '.') . "\n" : '')
+                        . "¿Confirmamos tu pedido?";
+                } else {
+                    $sedeRec  = \App\Models\Sede::where('activa', true)->orderBy('id')->first();
+                    $sedeNomR = $sedeRec?->nombre ?: 'nuestra sede';
+                    $reply = "😕 Por ahora no tengo cobertura de domicilio confirmada en esa dirección. "
+                        . "Puedes *recoger* en {$sedeNomR}, o darme otra dirección. ¿Cómo prefieres?";
+                }
+                Log::info('🛟 Anti-dead-end: promesa hueca de cobertura reemplazada', [
+                    'from' => $from, 'cubierta' => $resultado['cubierta'] ?? false,
+                ]);
+            }
+
             // 🛡️ Si el LLM tras validar_cobertura llamó otra tool (en vez de
             // responder texto), procesar esa tool en cascada — caso típico:
             // valida cobertura → confirmar_pedido en el mismo flujo.
