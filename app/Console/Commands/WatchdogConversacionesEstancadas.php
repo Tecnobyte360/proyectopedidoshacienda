@@ -32,6 +32,23 @@ class WatchdogConversacionesEstancadas extends Command
      */
     private const FRASES_ESPERA_REGEX = '/\b(?:un\s+momento|d[eé]jame\s+(?:verificar|revisar|consultar|buscar)|verificando|consultando|revisando|buscando|procesando|registrando|creando|confirmando|ya\s+(?:te|le)\s+(?:respondo|aviso|consulto|confirmo|registro)|enseguida\s+(?:te|le)|en\s+un\s+momento|(?:ahora|voy\s+a)\s+(?:confirmo|registro|verifico|reviso|consulto|busco)|estoy\s+(?:verificando|revisando|buscando|confirmando|procesando|registrando)|me\s+permito\s+(?:verificar|revisar|consultar))\b/iu';
 
+    /**
+     * connectionId para el re-post: para tenants Meta (connection_id null) usa
+     * "meta:{phone_number_id}" para que el webhook resuelva el tenant y responda
+     * por Meta Cloud API. Sin esto, el rescate no resolvía tenant y el bot
+     * quedaba "apagado" (activo=false global) → no respondía.
+     */
+    private function resolverConnId(\App\Models\ConversacionWhatsapp $conv)
+    {
+        if (!empty($conv->connection_id)) return $conv->connection_id;
+        if ($conv->tenant_id) {
+            $mc = \App\Models\MetaWhatsappConfig::withoutGlobalScopes()
+                ->where('tenant_id', $conv->tenant_id)->where('activo', true)->first();
+            if ($mc && $mc->phone_number_id) return 'meta:' . $mc->phone_number_id;
+        }
+        return 0;
+    }
+
     public function handle(): int
     {
         // 🎛️ Configuración desde BD — editable en /configuracion-bot
@@ -154,7 +171,7 @@ class WatchdogConversacionesEstancadas extends Command
                 // que causaron el silencio ya pasaron).
                 $payload = [
                     'usuario'  => ['id' => 0, 'name' => 'Watchdog', 'email' => ''],
-                    'conexion' => ['id' => $conv->connection_id ?? 0, 'name' => 'WATCHDOG', 'status' => 'CONNECTED'],
+                    'conexion' => ['id' => $this->resolverConnId($conv), 'name' => 'WATCHDOG', 'status' => 'CONNECTED'],
                     'chat'     => [
                         'id'             => $conv->id,
                         'name'           => $conv->cliente?->nombre ?? 'Cliente',
@@ -321,7 +338,7 @@ class WatchdogConversacionesEstancadas extends Command
                 // El contenido pide explícitamente que continúe lo que prometió
                 $payload = [
                     'usuario'  => ['id' => 0, 'name' => 'Watchdog', 'email' => ''],
-                    'conexion' => ['id' => $conv->connection_id ?? 0, 'name' => 'WATCHDOG', 'status' => 'CONNECTED'],
+                    'conexion' => ['id' => $this->resolverConnId($conv), 'name' => 'WATCHDOG', 'status' => 'CONNECTED'],
                     'chat'     => [
                         'id'             => $conv->id,
                         'name'           => $conv->cliente?->nombre ?? 'Cliente',
