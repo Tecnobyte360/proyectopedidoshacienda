@@ -10726,9 +10726,8 @@ PROMPT;
             $conversacion,
             $convService
         );
-        // guardarPedidoDesdeToolCall NO persiste el mensaje: lo hacemos aquí
-        // (igual que el bloque de menú determinista). receive() lo envía.
-        $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_ASSISTANT, $reply);
+        // guardarPedidoDesdeToolCall YA persiste el mensaje de confirmación.
+        // NO lo persistimos otra vez aquí (causaba mensaje DUPLICADO). receive() lo envía.
         return $reply;
     }
 
