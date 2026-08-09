@@ -184,6 +184,7 @@ class MetaWhatsappWebhookController extends Controller
         $mediaUrl = null;
         $mediaType = $tipo;
         $interactiveId = null; // 🔘 id del botón/lista tocado (payload determinista)
+        $orderItems = null;    // 🛒 items del carrito nativo (webhook type=order)
         switch ($tipo) {
             case 'text':
                 $body = $msg['text']['body'] ?? '';
@@ -226,6 +227,26 @@ class MetaWhatsappWebhookController extends Controller
             case 'button':
                 // Quick Reply de PLANTILLA. Meta envía el texto del botón en button.text.
                 $body = $msg['button']['text'] ?? $msg['button']['payload'] ?? '';
+                break;
+            case 'order':
+                // 🛒🟢 CARRITO NATIVO: el cliente armó su pedido con el catálogo
+                //     dentro de WhatsApp y lo envió. Meta manda los productos
+                //     exactos (product_retailer_id = código/SKU + cantidad).
+                $items = $msg['order']['product_items'] ?? [];
+                $orderItems = [];
+                $resumen = [];
+                foreach ($items as $it) {
+                    $sku = trim((string) ($it['product_retailer_id'] ?? ''));
+                    $qty = (float) ($it['quantity'] ?? 0);
+                    if ($sku === '' || $qty <= 0) continue;
+                    $orderItems[] = ['sku' => $sku, 'qty' => $qty];
+                    $qtyTxt = rtrim(rtrim(number_format($qty, 2, '.', ''), '0'), '.');
+                    $resumen[] = "{$qtyTxt}× {$sku}";
+                }
+                $nota = trim((string) ($msg['order']['text'] ?? ''));
+                $body = '🛒 Pedido desde el catálogo: ' . (implode(', ', $resumen) ?: '(vacío)')
+                      . ($nota !== '' ? " — Nota: {$nota}" : '');
+                $mediaType = 'order';
                 break;
             case 'location':
                 $lat = $msg['location']['latitude'] ?? null;
@@ -359,6 +380,8 @@ class MetaWhatsappWebhookController extends Controller
                 'respondiendoAMensajeId' => $respondiendoAId,
                 // 🔘 id del botón interactivo tocado (payload determinista)
                 'interactive_id'         => $interactiveId,
+                // 🛒 items del carrito nativo (webhook type=order) — [ [sku,qty], ... ]
+                'order_items'            => $orderItems,
             ],
             'provider' => 'meta',
         ];

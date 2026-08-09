@@ -113,6 +113,14 @@ class WhatsappWebhookController extends Controller
         $fromMe       = (bool) ($data['mensaje']['fromMe'] ?? $data['fromMe'] ?? false);
         $connectionId = $data['conexion']['id'] ?? $data['connectionId'] ?? $data['whatsappId'] ?? null;
 
+        // 🛒🟢 CARRITO NATIVO: si el mensaje trae items de una orden de catálogo
+        //     (webhook type=order de Meta), los guardamos por messageId para que
+        //     procesarMensaje los capture de forma determinista (por SKU).
+        $orderItemsIn = $data['mensaje']['order_items'] ?? $data['order_items'] ?? null;
+        if (is_array($orderItemsIn) && !empty($orderItemsIn) && $messageId) {
+            Cache::put("wa_order_items_{$messageId}", $orderItemsIn, now()->addMinutes(10));
+        }
+
         // 📸 profilePicUrl ahora viene en chat.profilePicUrl (cambio en EstradaHub
         // mayo 2026). Si está presente, lo guardamos en cache para que el job
         // de sincronización lo use directamente sin re-llamar al API.
@@ -953,6 +961,46 @@ class WhatsappWebhookController extends Controller
 
                 Log::info('🧍 Modo humano activo — bot NO responde', ['phone' => $from]);
                 return '';   // sin respuesta automática
+            }
+        }
+
+        // ════════════════════════════════════════════════════════════════════
+        // 🛒🟢 CARRITO NATIVO DE WHATSAPP — orden desde el catálogo de Meta.
+        // Si este mensaje trae un carrito (webhook type=order), lo capturamos
+        // DETERMINISTA (por SKU, precio real) y salimos ANTES del buffer y de la
+        // IA. Cero desincronización: el carrito de Meta es la fuente de verdad.
+        // ════════════════════════════════════════════════════════════════════
+        $orderItems = ($messageId && Cache::has("wa_order_items_{$messageId}"))
+            ? Cache::pull("wa_order_items_{$messageId}")
+            : null;
+        if (is_array($orderItems) && !empty($orderItems)) {
+            try {
+                $sedeId      = $this->obtenerSedeIdDesdeConexion($connectionId);
+                $cliente     = \App\Models\Cliente::encontrarOCrearPorTelefono($telefonoNorm, $name);
+                $convService = app(\App\Services\ConversacionService::class);
+                $conv        = $convService->obtenerOCrearActiva(
+                    $telefonoNorm, $cliente->id, $sedeId, $this->connIdNum($connectionId)
+                );
+
+                // Persistir el mensaje del cliente (resumen del carrito) en el chat.
+                $convService->agregarMensaje(
+                    $conv,
+                    \App\Models\MensajeWhatsapp::ROL_USER,
+                    $message !== '' ? $message : '🛒 (pedido enviado desde el catálogo)',
+                    $this->opcionesMensajeEntrante($messageId, null)
+                );
+
+                $reply = $this->capturarPedidoDesdeCatalogo($conv, $orderItems, $connectionId);
+                $convService->agregarMensaje($conv, \App\Models\MensajeWhatsapp::ROL_ASSISTANT, $reply);
+
+                Log::info('🛒🟢 Orden de catálogo procesada (determinista)', [
+                    'conv_id' => $conv->id,
+                    'items'   => count($orderItems),
+                ]);
+                return $reply;
+            } catch (\Throwable $e) {
+                Log::error('🛒🔴 Error procesando orden de catálogo: ' . $e->getMessage());
+                // cae al flujo normal si algo falla
             }
         }
 
@@ -6833,6 +6881,90 @@ TXT;
       }
 
       return $productosEstado;
+  }
+
+  /**
+   * 🛒🟢 CARRITO NATIVO DE WHATSAPP — captura DETERMINISTA desde el catálogo de Meta.
+   *
+   * Cuando el cliente arma un carrito con el catálogo dentro de WhatsApp y lo
+   * envía, Meta manda un webhook `type=order` con los productos EXACTOS
+   * (product_retailer_id = código/SKU + cantidad). Aquí los volcamos al carrito
+   * estructurado (conversacion_pedido_estado) por CÓDIGO, con precio real del
+   * catálogo — sin pasar por la IA, así que NUNCA se desincroniza.
+   *
+   * @param array $items [ ['sku'=>'GA250M','qty'=>2], ... ]
+   * @return string mensaje para responderle al cliente (resumen + siguiente paso)
+   */
+  public function capturarPedidoDesdeCatalogo(
+      \App\Models\ConversacionWhatsapp $conv,
+      array $items,
+      int|string|null $connectionId
+  ): string {
+      $estadoSrv = app(\App\Services\EstadoPedidoService::class);
+
+      // 🧹 Carrito NUEVO: vaciar lo anterior para que un pedido no arrastre items
+      //    de un pedido pasado (el carrito de Meta es la fuente de verdad ahora).
+      $this->procesarAgregarProductoAlPedido($conv, 'clear', '', '', 0, '', $connectionId, '');
+
+      $ultimo = null;
+      $noEncontrados = [];
+      foreach ($items as $it) {
+          $sku = trim((string) ($it['sku'] ?? ''));
+          $qty = (float) ($it['qty'] ?? 0);
+          if ($sku === '' || $qty <= 0) continue;
+
+          $r = $this->procesarAgregarProductoAlPedido(
+              $conv, 'add', '', $sku, $qty, '', $connectionId, ''
+          );
+          if (($r['ok'] ?? false) === true) {
+              $ultimo = $r;
+          } else {
+              $noEncontrados[] = $sku;
+          }
+      }
+
+      // Releer el carrito ya consolidado
+      $estado    = $estadoSrv->obtener($conv->fresh());
+      $productos = is_array($estado->productos) ? $estado->productos : [];
+
+      if (empty($productos)) {
+          return "Recibí tu carrito 🛒 pero no logré identificar los productos. "
+               . "¿Me dices qué querías y te ayudo a armarlo? 🙌";
+      }
+
+      // Resumen legible del carrito
+      $lineas = [];
+      $subtotal = 0;
+      foreach ($productos as $p) {
+          $nombre = (string) ($p['name'] ?? $p['producto'] ?? 'Producto');
+          $cant   = (float) ($p['quantity'] ?? $p['cantidad'] ?? 0);
+          $pu     = (float) ($p['precio_unitario'] ?? $p['price'] ?? 0);
+          $sub    = (float) ($p['subtotal'] ?? ($cant * $pu));
+          $subtotal += $sub;
+          $cantTxt = rtrim(rtrim(number_format($cant, 2, '.', ''), '0'), '.');
+          $lineas[] = "• {$cantTxt} × {$nombre} — $" . number_format($sub, 0, ',', '.');
+      }
+
+      $reply  = "¡Recibí tu pedido del catálogo! 🛒☕\n\n";
+      $reply .= implode("\n", $lineas);
+      $reply .= "\n\n*Subtotal:* $" . number_format($subtotal, 0, ',', '.');
+
+      if (!empty($noEncontrados)) {
+          $reply .= "\n\n⚠️ No pude agregar: " . implode(', ', $noEncontrados)
+                  . " (avísame y lo reviso).";
+      }
+
+      $reply .= "\n\n¿Cómo lo prefieres? 🚚 *Domicilio* o 🏬 *Recoger en tienda*?";
+
+      Log::info('🛒🟢 Pedido capturado desde catálogo Meta', [
+          'conv_id'       => $conv->id,
+          'items_meta'    => count($items),
+          'items_carrito' => count($productos),
+          'no_encontrados'=> $noEncontrados,
+          'subtotal'      => $subtotal,
+      ]);
+
+      return $reply;
   }
 
   /**

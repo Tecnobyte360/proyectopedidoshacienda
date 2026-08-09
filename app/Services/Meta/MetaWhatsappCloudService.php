@@ -120,6 +120,93 @@ class MetaWhatsappCloudService
     }
 
     /**
+     * 🛒 Envía un mensaje de LISTA DE PRODUCTOS (Multi-Product Message).
+     * El cliente ve los productos del catálogo dentro de WhatsApp y puede
+     * armar un carrito sin salir del chat. Requiere:
+     *   - catálogo conectado al WABA + carrito activado en el número
+     *   - $catalogId (Commerce Manager) y product_retailer_id = SKU (código)
+     *
+     * @param array $secciones [ ['title'=>'Cafés', 'skus'=>['GA250M','GA250G',...] ], ... ]
+     *                         máx 10 secciones y 30 productos en total.
+     */
+    public function enviarProductos(
+        string  $telefono,
+        string  $header,
+        string  $cuerpo,
+        string  $catalogId,
+        array   $secciones,
+        ?int    $tenantId = null,
+        ?string $phoneNumberId = null,
+        ?string $footer = null,
+        bool    $persistir = true
+    ): bool {
+        $config = $this->resolverConfig($tenantId, $phoneNumberId);
+        if (!$config) return false;
+
+        $sections = [];
+        $total = 0;
+        foreach ($secciones as $sec) {
+            $items = [];
+            foreach (($sec['skus'] ?? []) as $sku) {
+                $sku = trim((string) $sku);
+                if ($sku === '' || $total >= 30) continue;
+                $items[] = ['product_retailer_id' => $sku];
+                $total++;
+            }
+            if (empty($items)) continue;
+            $sections[] = [
+                'title'         => mb_substr((string) ($sec['title'] ?? 'Productos'), 0, 24),
+                'product_items' => $items,
+            ];
+            if (count($sections) >= 10) break;
+        }
+        if (empty($sections)) return false;
+
+        $interactive = [
+            'type'   => 'product_list',
+            'header' => ['type' => 'text', 'text' => mb_substr($header, 0, 60)],
+            'body'   => ['text' => mb_substr($cuerpo, 0, 1024)],
+            'action' => [
+                'catalog_id' => $catalogId,
+                'sections'   => $sections,
+            ],
+        ];
+        if ($footer) {
+            $interactive['footer'] = ['text' => mb_substr($footer, 0, 60)];
+        }
+
+        $payload = [
+            'messaging_product' => 'whatsapp',
+            'to'                => $this->normalizar($telefono),
+            'type'              => 'interactive',
+            'interactive'       => $interactive,
+        ];
+
+        $ok = $this->ejecutar($config, $payload, 'product_list');
+
+        if ($persistir && $ok && $this->ultimoWamid) {
+            $this->persistirOutbound(
+                config: $config,
+                telefono: $telefono,
+                contenido: $header . " — " . $cuerpo . " 🛒 (catálogo)",
+                wamid: $this->ultimoWamid,
+                meta: [
+                    'enviado_por_humano' => false,
+                    'provider'           => 'meta',
+                    'tipo'               => 'product_list',
+                    'catalog_id'         => $catalogId,
+                    'skus'               => array_values(array_unique(array_merge(...array_map(
+                        fn ($s) => array_column($s['product_items'], 'product_retailer_id'),
+                        $sections
+                    )))),
+                ],
+            );
+        }
+
+        return $ok;
+    }
+
+    /**
      * Envía plantilla aprobada (template). NO requiere sesión abierta.
      * @param string $plantilla nombre EXACTO de la template en Meta
      * @param array  $variables substitución posicional: ['{{1}}' => 'x', '{{2}}' => 'y']

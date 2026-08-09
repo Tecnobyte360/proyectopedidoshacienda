@@ -20,6 +20,7 @@ class MetaWhatsappConfig extends Model
         'tenant_id',
         'phone_number_id',
         'waba_id',
+        'catalog_id',
         'access_token',
         'api_version',
         'verify_token',

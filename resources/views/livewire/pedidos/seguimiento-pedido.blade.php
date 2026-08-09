@@ -1,938 +1,276 @@
+@php
+    $t       = $tenant ?? null;
+    $accent  = $t?->color_primario ?: '#1f6f8b';
+    $marca   = $t?->nombre ?: 'Seguimiento';
+    $logo    = $t?->logo_url ?: null;
+    $inicial = mb_strtoupper(mb_substr($marca, 0, 1));
+
+    $esRecoger    = ($pedido->metodo_entrega ?? '') === 'recoger';
+    $estadoActual = $pedido->estado ?? 'nuevo';
+    $cancelado    = $estadoActual === 'cancelado';
+
+    // 4 pasos estilo DOBLAMOS (varía el 3º según recoger/domicilio)
+    $pasos = [
+        ['key' => 'recibido',    'label' => 'Pedido recibido', 'icon' => 'fa-solid fa-receipt'],
+        ['key' => 'preparacion', 'label' => 'En preparación',  'icon' => 'fa-solid fa-mug-hot'],
+        $esRecoger
+            ? ['key' => 'transito', 'label' => 'Listo para recoger', 'icon' => 'fa-solid fa-store']
+            : ['key' => 'transito', 'label' => 'En camino',          'icon' => 'fa-solid fa-motorcycle'],
+        ['key' => 'entregado',   'label' => 'Entregado',       'icon' => 'fa-solid fa-circle-check'],
+    ];
+
+    // Mapa estado → índice del paso
+    $mapa = [
+        'nuevo' => 0, 'recibido' => 0, 'pendiente' => 0,
+        'en_preparacion' => 1, 'en_preparacion_pickup' => 1, 'preparando' => 1,
+        'repartidor_en_camino' => 2, 'en_camino' => 2, 'pickup_listo' => 2, 'listo' => 2, 'muy_cerca' => 2,
+        'entregado' => 3, 'completado' => 3,
+    ];
+    $indiceActual = $mapa[$estadoActual] ?? 0;
+
+    // Hero según estado
+    if ($cancelado) {
+        $heroTitulo = 'Tu pedido fue cancelado';
+        $heroSub    = 'Si crees que es un error, escríbenos por WhatsApp.';
+        $heroIcon   = 'fa-solid fa-ban';
+        $pill       = 'Cancelado';
+    } elseif ($indiceActual >= 3) {
+        $heroTitulo = '¡Tu pedido fue entregado!';
+        $heroSub    = 'Gracias por tu compra. ☕';
+        $heroIcon   = 'fa-solid fa-circle-check';
+        $pill       = 'Entregado';
+    } elseif ($indiceActual == 2) {
+        $heroTitulo = $esRecoger ? '¡Tu pedido está listo para recoger!' : '¡Tu pedido va en camino!';
+        $heroSub    = $esRecoger ? 'Pasa por él cuando quieras.' : 'Ya casi llega. Prepárate para recibirlo.';
+        $heroIcon   = $esRecoger ? 'fa-solid fa-store' : 'fa-solid fa-motorcycle';
+        $pill       = $esRecoger ? 'Listo' : 'En camino';
+    } elseif ($indiceActual == 1) {
+        $heroTitulo = 'Estamos preparando tu pedido';
+        $heroSub    = 'Te avisamos apenas avance. ☕';
+        $heroIcon   = 'fa-solid fa-mug-hot';
+        $pill       = 'En preparación';
+    } else {
+        $heroTitulo = '¡Recibimos tu pedido!';
+        $heroSub    = 'En un momento empezamos a prepararlo.';
+        $heroIcon   = 'fa-solid fa-receipt';
+        $pill       = 'Recibido';
+    }
+
+    $numeroVisible = $pedido->numero_visible ?? $pedido->id;
+@endphp
+
 <div
     id="seguimiento-pedido-root"
     data-codigo-seguimiento="{{ $pedido->codigo_seguimiento }}"
-    class="tracking-page min-h-screen bg-white text-slate-800 overflow-x-hidden"
+    class="trk"
+    style="--accent: {{ $accent }};"
 >
-    <div id="seguimiento-estado-flash" class="status-flash hidden opacity-0">
-        <div class="status-flash__icon">
-            <i class="fa-solid fa-bolt"></i>
-        </div>
+    {{-- Toast de actualización en tiempo real (lo usa el JS de real-time) --}}
+    <div id="seguimiento-estado-flash" class="trk-flash hidden opacity-0">
+        <div class="trk-flash__icon"><i class="fa-solid fa-bolt"></i></div>
         <div>
-            <p class="status-flash__title">Actualización en tiempo real</p>
-            <p id="seguimiento-estado-flash-text" class="status-flash__text">El estado de tu pedido cambió.</p>
+            <p class="trk-flash__title">Actualización en tiempo real</p>
+            <p id="seguimiento-estado-flash-text" class="trk-flash__text">El estado de tu pedido cambió.</p>
         </div>
     </div>
 
-    <div class="bg-glow bg-glow-1"></div>
-    <div class="bg-glow bg-glow-2"></div>
-
-  @php
-    $estados = [
-        'nuevo' => [
-            'label' => 'Pedido recibido',
-            'icon' => 'fa-solid fa-bell',
-            'color' => 'blue',
-        ],
-        'en_preparacion' => [
-            'label' => 'En preparación',
-            'icon' => 'fa-solid fa-utensils',
-            'color' => 'amber',
-        ],
-        'repartidor_en_camino' => [
-            'label' => 'Repartidor en camino',
-            'icon' => 'fa-solid fa-motorcycle',
-            'color' => 'violet',
-        ],
-        'entregado' => [
-            'label' => 'Entregado',
-            'icon' => 'fa-solid fa-circle-check',
-            'color' => 'emerald',
-        ],
-        'cancelado' => [
-            'label' => 'Cancelado',
-            'icon' => 'fa-solid fa-ban',
-            'color' => 'rose',
-        ],
-    ];
-
-    $estadoActual = $pedido->estado ?? 'nuevo';
-
-    $metaEstado = $estados[$estadoActual] ?? [
-        'label' => ucfirst(str_replace('_', ' ', $estadoActual)),
-        'icon' => 'fa-solid fa-circle',
-        'color' => 'blue',
-    ];
-
-    $ordenEstados = ['nuevo', 'en_preparacion', 'repartidor_en_camino', 'entregado'];
-    $indiceActual = array_search($estadoActual, $ordenEstados);
-@endphp
-
-    <div class="page">
-        <div class="glass header">
-            <div class="header-left">
-                <h1 class="header-title">
-                    Hola, <span>{{ $pedido->cliente_nombre ?? 'Cliente' }}</span> 👋
-                </h1>
-
-                <p class="header-desc">
-                    {{ $metaEstado['label'] === 'Cancelado'
-                        ? 'Tu pedido fue cancelado. Puedes revisar los detalles a continuación.'
-                        : 'Estamos procesando tu pedido. Aquí verás cada avance en tiempo real.' }}
-                </p>
-
-                <div class="header-tags">
-                    <div class="tag code">
-                        <i class="fa-solid fa-receipt"></i>
-                        Pedido #{{ str_pad($pedido->id, 5, '0', STR_PAD_LEFT) }}
-                    </div>
-                </div>
-            </div>
-
-            <div class="header-right">
-                <span class="total-label">Total del pedido</span>
-                <span class="total-display">${{ number_format($pedido->total, 0, ',', '.') }}</span>
-                <span class="total-label" style="margin-top:4px;">
-                    {{ ucfirst($pedido->canal ?? 'whatsapp') }} ·
-                    {{ optional($pedido->fecha_pedido ?? $pedido->created_at)->format('d/m/Y') }}
-                </span>
+    {{-- Barra de marca --}}
+    <header class="trk-top">
+        <div class="trk-brand">
+            @if ($logo)
+                <img src="{{ $logo }}" alt="{{ $marca }}" class="trk-logo">
+            @else
+                <div class="trk-logo trk-logo--letter">{{ $inicial }}</div>
+            @endif
+            <div class="trk-brand-txt">
+                <span class="trk-brand-name">{{ $marca }}</span>
+                <span class="trk-brand-sub">Seguimiento</span>
             </div>
         </div>
+        <div class="trk-live" title="Se actualiza en vivo">
+            <span class="trk-live-dot"></span> En vivo
+        </div>
+    </header>
 
-        {{-- ╔═══ Estado de pago Wompi ═══╗ --}}
+    <main class="trk-main">
+        {{-- HERO --}}
+        <section class="trk-hero {{ $cancelado ? 'is-cancel' : ($indiceActual>=3 ? 'is-done' : '') }}">
+            <div class="trk-hero-icon"><i class="{{ $heroIcon }}"></i></div>
+            <h1 class="trk-hero-title">{{ $heroTitulo }}</h1>
+            <p class="trk-hero-sub">{{ $heroSub }}</p>
+            <span class="trk-pill"><i class="fa-solid fa-circle"></i> {{ $pill }}</span>
+        </section>
+
+        {{-- Saludo + pedido --}}
+        <div class="trk-hola">
+            Hola <b>{{ $pedido->cliente_nombre ?? 'Cliente' }}</b>
+            <span class="trk-hola-sep">·</span>
+            Pedido <b>#{{ $numeroVisible }}</b>
+        </div>
+
+        {{-- Estado de pago (si aplica) --}}
         @php
-            $linkPago = $pedido->urlPagoWompi();
+            $linkPago   = $pedido->urlPagoWompi();
             $estadoPago = $pedido->estado_pago ?? 'pendiente';
         @endphp
-        @if ($linkPago || $estadoPago !== 'pendiente')
-            <div class="glass" style="background: linear-gradient(135deg, #ede9fe, #f3e8ff); padding: 18px 22px; border-radius: 18px; margin-bottom: 16px; border: 1px solid #c4b5fd;">
-                <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
-                    <div style="display:flex; align-items:center; gap:12px; min-width:0; flex: 1;">
-                        <div style="width:44px; height:44px; border-radius:12px; background:#7c3aed; color:white; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0;">
-                            @if ($estadoPago === 'aprobado')
-                                ✅
-                            @elseif (in_array($estadoPago, ['rechazado', 'fallido']))
-                                ❌
-                            @else
-                                💳
-                            @endif
-                        </div>
-                        <div style="min-width:0;">
-                            <div style="font-weight:800; color:#5b21b6; font-size:15px;">
-                                @if ($estadoPago === 'aprobado')
-                                    Pago confirmado
-                                @elseif ($estadoPago === 'rechazado')
-                                    Pago rechazado
-                                @elseif ($estadoPago === 'fallido')
-                                    Pago fallido — intenta de nuevo
-                                @elseif ($estadoPago === 'reembolsado')
-                                    Pago reembolsado
-                                @else
-                                    Pago en línea con Wompi
-                                @endif
-                            </div>
-                            <div style="font-size:12px; color:#6d28d9; margin-top:2px;">
-                                @if ($estadoPago === 'aprobado')
-                                    Recibimos tu pago el {{ optional($pedido->pagado_at)->format('d/m/Y h:i a') }}.
-                                @else
-                                    Paga con tarjeta, Nequi, PSE o Bancolombia. Procesamiento seguro.
-                                @endif
-                            </div>
-                        </div>
-                    </div>
-
-                    @if ($linkPago && !in_array($estadoPago, ['aprobado', 'reembolsado']))
-                        <a href="{{ $linkPago }}" target="_blank" rel="noopener"
-                           style="display:inline-flex; align-items:center; gap:8px; background:#7c3aed; color:white; font-weight:700; padding:10px 20px; border-radius:12px; text-decoration:none; font-size:14px; box-shadow:0 4px 12px rgba(124,58,237,0.35); flex-shrink:0;">
-                            💳 Pagar ahora
-                        </a>
-                    @endif
+        @if (!$cancelado && ($linkPago || $estadoPago === 'aprobado'))
+            <div class="trk-pago {{ $estadoPago === 'aprobado' ? 'ok' : '' }}">
+                <div class="trk-pago-ico">{!! $estadoPago === 'aprobado' ? '✅' : '💳' !!}</div>
+                <div class="trk-pago-txt">
+                    <b>{{ $estadoPago === 'aprobado' ? 'Pago confirmado' : 'Paga en línea' }}</b>
+                    <span>{{ $estadoPago === 'aprobado' ? 'Recibimos tu pago, ¡gracias!' : 'Tarjeta, Nequi, PSE o Bancolombia.' }}</span>
                 </div>
-            </div>
-        @endif
-
-        @if ($estadoActual !== 'cancelado')
-            <div class="glass progress-section progress-dark">
-                <p class="section-title">Progreso del pedido</p>
-
-                <div class="steps-track">
-                    @foreach ($ordenEstados as $i => $estadoPaso)
-                        @php
-                            $paso = $estados[$estadoPaso];
-                            $completado = $indiceActual !== false && $i < $indiceActual;
-                            $activo = $estadoPaso === $estadoActual;
-                        @endphp
-
-                        <div class="step-item {{ $completado ? 'completed' : '' }} {{ $activo ? 'active' : '' }}">
-                            <div class="step-icon-wrap">
-                                <i class="{{ $paso['icon'] }}"></i>
-                            </div>
-                            <p class="step-label">{{ $paso['label'] }}</p>
-                            <div class="step-indicator"></div>
-                        </div>
-                    @endforeach
-                </div>
-            </div>
-        @endif
-
-        <div class="body-grid">
-            <div class="glass history-panel">
-                <div class="panel-header">
-                    <h2 class="panel-title">Historial del pedido</h2>
-                    <span class="panel-count">{{ $historial->count() }} eventos</span>
-                </div>
-
-                <div class="timeline">
-                    @forelse($historial->sortByDesc('fecha_evento') as $item)
-                        @php
-                            $color = $estados[$item->estado_nuevo]['color'] ?? 'blue';
-                            $icon = $estados[$item->estado_nuevo]['icon'] ?? 'fa-solid fa-circle';
-                            $titulo =
-                                $item->titulo ?:
-                                $estados[$item->estado_nuevo]['label'] ??
-                                    ucfirst(str_replace('_', ' ', $item->estado_nuevo));
-                        @endphp
-
-                        <div class="timeline-item">
-                            <div class="timeline-left">
-                                <div class="timeline-dot {{ $color }}">
-                                    <i class="{{ $icon }}"></i>
-                                </div>
-                                <div class="timeline-line"></div>
-                            </div>
-
-                            <div class="timeline-body">
-                                <p class="tl-title">{{ $titulo }}</p>
-
-                                @if ($item->descripcion)
-                                    <p class="tl-desc">{{ $item->descripcion }}</p>
-                                @endif
-
-                                <div class="tl-time">
-                                    <i class="fa-regular fa-clock" style="font-size:10px;"></i>
-                                    {{ optional($item->fecha_evento)->format('d/m/Y · h:i a') }}
-                                </div>
-                            </div>
-                        </div>
-                    @empty
-                        <div class="timeline-item">
-                            <div class="timeline-body">
-                                <p class="tl-title">Sin movimientos</p>
-                                <p class="tl-desc">Todavía no hay actualizaciones registradas para este pedido.</p>
-                            </div>
-                        </div>
-                    @endforelse
-                </div>
-            </div>
-
-            <div class="right-col">
-                <div class="glass products-panel">
-                    <div class="panel-header" style="margin-bottom:0;">
-                        <h2 class="panel-title">Productos</h2>
-                    </div>
-
-                    <div class="product-list">
-                        @forelse($pedido->detalles as $detalle)
-                            <div class="product-row">
-                                <div class="product-icon">
-                                    <i class="fa-solid fa-box"></i>
-                                </div>
-
-                                <div style="flex:1;">
-                                    <p class="product-name">{{ $detalle->producto }}</p>
-                                    <p class="product-qty">
-                                        {{ rtrim(rtrim(number_format($detalle->cantidad, 3, '.', ''), '0'), '.') }}
-                                        {{ $detalle->unidad }}
-                                    </p>
-                                </div>
-
-                                <p class="product-price">${{ number_format($detalle->subtotal, 0, ',', '.') }}</p>
-                            </div>
-                        @empty
-                            <div class="product-row">
-                                <div style="flex:1;">
-                                    <p class="product-name">No hay productos registrados</p>
-                                </div>
-                            </div>
-                        @endforelse
-                    </div>
-                </div>
-
-                @if ($pedido->notas)
-                    <div class="glass notes-panel">
-                        <h2 class="panel-title">Notas del pedido</h2>
-                        <p class="notes-text">{{ $pedido->notas }}</p>
-                    </div>
+                @if ($linkPago && $estadoPago !== 'aprobado')
+                    <a href="{{ $linkPago }}" target="_blank" rel="noopener" class="trk-pago-btn">Pagar</a>
                 @endif
             </div>
-        </div>
-    </div>
+        @endif
+
+        {{-- TIMELINE VERTICAL --}}
+        @unless ($cancelado)
+        <section class="trk-card">
+            <div class="trk-steps">
+                @foreach ($pasos as $i => $paso)
+                    @php $done = $i <= $indiceActual; $isNow = $i === $indiceActual; @endphp
+                    <div class="trk-step {{ $done ? 'done' : 'todo' }} {{ $isNow ? 'now' : '' }}">
+                        <div class="trk-step-rail">
+                            <div class="trk-step-node">
+                                <i class="fa-solid {{ $done ? 'fa-check' : 'fa-circle' }}"></i>
+                            </div>
+                            @unless ($loop->last)
+                                <div class="trk-step-line {{ $i < $indiceActual ? 'fill' : '' }}"></div>
+                            @endunless
+                        </div>
+                        <div class="trk-step-body">
+                            <p class="trk-step-label">{{ $paso['label'] }}</p>
+                            @php
+                                $ev = $historial->firstWhere('estado_nuevo', $estadoActual);
+                                $evPaso = $historial->first(function ($h) use ($mapa, $i) {
+                                    return ($mapa[$h->estado_nuevo] ?? -1) === $i;
+                                });
+                            @endphp
+                            @if ($evPaso && $evPaso->fecha_evento)
+                                <p class="trk-step-time">{{ optional($evPaso->fecha_evento)->format('d/m · h:i a') }}</p>
+                            @elseif ($isNow)
+                                <p class="trk-step-time">En proceso…</p>
+                            @endif
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </section>
+        @endunless
+
+        {{-- PRODUCTOS --}}
+        <section class="trk-card">
+            <div class="trk-card-head">
+                <h2>Tu pedido</h2>
+                <span class="trk-total">${{ number_format($pedido->total, 0, ',', '.') }}</span>
+            </div>
+            <div class="trk-prods">
+                @forelse ($pedido->detalles as $d)
+                    <div class="trk-prod">
+                        <span class="trk-prod-q">{{ rtrim(rtrim(number_format($d->cantidad, 3, '.', ''), '0'), '.') }}×</span>
+                        <span class="trk-prod-n">{{ $d->producto }}</span>
+                        <span class="trk-prod-p">${{ number_format($d->subtotal, 0, ',', '.') }}</span>
+                    </div>
+                @empty
+                    <div class="trk-prod"><span class="trk-prod-n">Sin productos registrados</span></div>
+                @endforelse
+            </div>
+            @if ($esRecoger)
+                <div class="trk-entrega"><i class="fa-solid fa-store"></i> Recoges en sede{{ $pedido->sede?->nombre ? ': '.$pedido->sede->nombre : '' }}</div>
+            @elseif ($pedido->direccion)
+                <div class="trk-entrega"><i class="fa-solid fa-location-dot"></i> {{ $pedido->direccion }}{{ $pedido->barrio ? ', '.$pedido->barrio : '' }}</div>
+            @endif
+        </section>
+
+        <p class="trk-foot">Esta página se actualiza sola. {{ $marca }}</p>
+    </main>
 
     @push('styles')
-        <style>
-            *,
-            :before,
-            :after {
-                box-sizing: border-box
-            }
-
-            :root {
-                --bg: #ffffff;
-                --surface: rgba(255, 255, 255, 0.9);
-                --surface-hover: rgba(255, 255, 255, 1);
-                --border: rgba(0, 0, 0, 0.08);
-                --border-strong: rgba(0, 0, 0, 0.15);
-                --text-primary: #0f172a;
-                --text-secondary: rgba(15, 23, 42, 0.7);
-                --text-muted: rgba(15, 23, 42, 0.5);
-                --accent: #10b981;
-                --accent-glow: rgba(16, 185, 129, 0.25);
-                --accent-dim: rgba(16, 185, 129, 0.1);
-            }
-
-            .tracking-page {
-                font-family: 'DM Sans', sans-serif;
-                position: relative
-            }
-
-            .tracking-page::before {
-                content: '';
-                position: fixed;
-                inset: 0;
-                background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
-                pointer-events: none;
-                z-index: 0;
-                opacity: .4
-            }
-
-            .status-flash {
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                z-index: 80;
-                display: flex;
-                align-items: center;
-                gap: 12px;
-                min-width: 280px;
-                max-width: 360px;
-                padding: 14px 16px;
-                border-radius: 18px;
-                border: 1px solid rgba(16, 185, 129, 0.2);
-                background: rgba(255, 255, 255, 0.96);
-                box-shadow: 0 22px 50px rgba(15, 23, 42, 0.16);
-                backdrop-filter: blur(16px);
-                transition: opacity .35s ease, transform .35s ease;
-                transform: translateY(0);
-            }
-
-            .status-flash.hidden {
-                display: none;
-            }
-
-            .status-flash.opacity-0 {
-                opacity: 0;
-                transform: translateY(-10px);
-            }
-
-            .status-flash.opacity-100 {
-                opacity: 1;
-                transform: translateY(0);
-            }
-
-            .status-flash__icon {
-                width: 42px;
-                height: 42px;
-                border-radius: 14px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                background: rgba(16, 185, 129, 0.12);
-                color: #10b981;
-                flex-shrink: 0;
-            }
-
-            .status-flash__title {
-                margin: 0;
-                font-size: 12px;
-                font-weight: 800;
-                letter-spacing: .14em;
-                text-transform: uppercase;
-                color: #10b981;
-            }
-
-            .status-flash__text {
-                margin: 4px 0 0;
-                font-size: 13px;
-                color: var(--text-primary);
-                font-weight: 600;
-            }
-
-            .bg-glow {
-                position: fixed;
-                border-radius: 50%;
-                filter: blur(120px);
-                pointer-events: none;
-                z-index: 0
-            }
-
-            .bg-glow-1 {
-                width: 600px;
-                height: 600px;
-                top: -200px;
-                left: -150px;
-                background: radial-gradient(circle, rgba(16, 212, 142, .06) 0%, transparent 70%)
-            }
-
-            .bg-glow-2 {
-                width: 500px;
-                height: 500px;
-                bottom: -100px;
-                right: -100px;
-                background: radial-gradient(circle, rgba(255, 255, 255, 0.07) 0%, transparent 70%)
-            }
-
-            .page {
-                position: relative;
-                z-index: 1;
-                width: 100%;
-                max-width: 100%;
-                padding: 2.5rem 2rem 4rem;
-            }
-
-            .glass {
-                background: var(--surface);
-                border: 1px solid var(--border);
-                backdrop-filter: blur(20px);
-                -webkit-backdrop-filter: blur(20px);
-                border-radius: 20px;
-                transition: border-color .3s, background .3s
-            }
-
-            .glass:hover {
-                border-color: var(--border-strong);
-                background: var(--surface-hover)
-            }
-
-            .header {
-                display: grid;
-                grid-template-columns: 1fr auto;
-                gap: 2rem;
-                align-items: center;
-                padding: 2rem 2.5rem;
-                margin-bottom: 1.5rem;
-                animation: fadeUp .6s ease both;
-                position: relative;
-                overflow: hidden
-            }
-
-            .header::before {
-                content: '';
-                position: absolute;
-                inset: 0;
-                background: linear-gradient(135deg, rgba(16, 212, 142, .04) 0%, transparent 60%);
-                border-radius: inherit
-            }
-
-            .header h1 {
-                font-family: 'Syne', sans-serif;
-                font-size: clamp(1.8rem, 4vw, 2.8rem);
-                font-weight: 800;
-                color: var(--text-primary);
-                line-height: 1.1;
-                letter-spacing: -.02em
-            }
-
-            .header h1 span {
-                color: var(--accent)
-            }
-
-            .header-right {
-                display: flex;
-                flex-direction: column;
-                align-items: flex-end;
-                gap: .5rem
-            }
-
-            .total-display {
-                font-family: 'Syne', sans-serif;
-                font-size: 2.6rem;
-                font-weight: 800;
-                color: var(--text-primary);
-                letter-spacing: -.03em;
-                line-height: 1
-            }
-
-            .total-label {
-                font-size: 11px;
-                letter-spacing: .18em;
-                text-transform: uppercase;
-                color: var(--text-muted);
-                text-align: right
-            }
-
-            .progress-section {
-                padding: 2rem 2.5rem;
-                margin-bottom: 1.5rem;
-                animation: fadeUp .6s .15s ease both
-            }
-
-            .progress-dark {
-                background: #0f172a;
-                border: 1px solid rgba(255, 255, 255, 0.08);
-            }
-
-            .progress-dark .section-title,
-            .progress-dark .step-label {
-                color: rgba(255, 255, 255, 0.6);
-            }
-
-            .progress-dark:hover {
-                background: #0f172a !important;
-                border-color: rgba(255, 255, 255, 0.08);
-            }
-
-            .progress-dark .step-item:not(:last-child)::after {
-                background: rgba(255, 255, 255, 0.15);
-            }
-
-            .progress-dark .step-icon-wrap {
-                background: rgba(255, 255, 255, 0.05);
-                border-color: rgba(255, 255, 255, 0.15);
-                color: rgba(255, 255, 255, 0.6);
-            }
-
-            .progress-dark .step-item.completed .step-icon-wrap {
-                background: rgba(16, 185, 129, 0.2);
-                border-color: rgba(16, 185, 129, 0.4);
-                color: #10b981;
-            }
-
-            .progress-dark .step-item.active .step-icon-wrap {
-                background: #10b981;
-                border-color: #10b981;
-                color: #0f172a;
-                box-shadow: 0 0 0 6px rgba(16, 185, 129, 0.15), 0 0 20px rgba(16, 185, 129, 0.4);
-            }
-
-            .progress-dark .step-item.active .step-label {
-                color: #ffffff;
-            }
-
-            .section-title {
-                font-family: 'Syne', sans-serif;
-                font-size: .8rem;
-                font-weight: 700;
-                letter-spacing: .22em;
-                text-transform: uppercase;
-                color: var(--text-muted);
-                margin-bottom: 2.25rem
-            }
-
-            .steps-track {
-                display: flex;
-                align-items: flex-start;
-                gap: 0;
-                position: relative
-            }
-
-            .step-item {
-                flex: 1;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                position: relative
-            }
-
-            .step-item:not(:last-child)::after {
-                content: '';
-                position: absolute;
-                top: 20px;
-                left: 50%;
-                width: 100%;
-                height: 2px;
-                background: var(--border-strong);
-                z-index: 0
-            }
-
-            .step-item.completed:not(:last-child)::after {
-                background: linear-gradient(90deg, var(--accent), rgba(16, 212, 142, .4))
-            }
-
-            .step-icon-wrap {
-                position: relative;
-                z-index: 1;
-                width: 40px;
-                height: 40px;
-                border-radius: 12px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 14px;
-                border: 1.5px solid var(--border-strong);
-                background: rgba(255, 255, 255, .04);
-                color: var(--text-muted);
-                transition: all .4s ease
-            }
-
-            .step-item.completed .step-icon-wrap {
-                background: rgba(16, 212, 142, .12);
-                border-color: rgba(16, 212, 142, .35);
-                color: var(--accent)
-            }
-
-            .step-item.active .step-icon-wrap {
-                background: var(--accent);
-                border-color: var(--accent);
-                color: #070d1a;
-                box-shadow: 0 0 0 6px var(--accent-dim), 0 0 20px var(--accent-glow);
-                transform: scale(1.12)
-            }
-
-            .step-label {
-                margin-top: .75rem;
-                font-size: 11px;
-                font-weight: 600;
-                text-align: center;
-                color: var(--text-muted);
-                letter-spacing: .04em;
-                max-width: 90px;
-                line-height: 1.35
-            }
-
-            .step-item.completed .step-label {
-                color: var(--accent)
-            }
-
-            .step-item.active .step-label {
-                color: var(--text-primary)
-            }
-
-            .step-indicator {
-                width: 6px;
-                height: 6px;
-                border-radius: 50%;
-                background: transparent;
-                margin-top: .4rem
-            }
-
-            .step-item.active .step-indicator {
-                background: var(--accent);
-                box-shadow: 0 0 6px var(--accent);
-                animation: pulse-dot 1.8s infinite
-            }
-
-            .body-grid {
-                display: grid;
-                grid-template-columns: 1fr 380px;
-                gap: 1.5rem;
-                animation: fadeUp .6s .22s ease both
-            }
-
-            .history-panel {
-                padding: 2rem 2.5rem
-            }
-
-            .panel-header {
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                margin-bottom: 1.75rem
-            }
-
-            .panel-title {
-                font-family: 'Syne', sans-serif;
-                font-size: 1.05rem;
-                font-weight: 700;
-                color: var(--text-primary)
-            }
-
-            .panel-count {
-                font-size: 11.5px;
-                font-weight: 600;
-                letter-spacing: .1em;
-                color: var(--text-muted);
-                background: rgba(255, 255, 255, .05);
-                border: 1px solid var(--border);
-                padding: 4px 12px;
-                border-radius: 100px
-            }
-
-            .timeline {
-                display: flex;
-                flex-direction: column
-            }
-
-            .timeline-item {
-                display: flex;
-                gap: 1rem;
-                padding-bottom: 1.5rem;
-                position: relative
-            }
-
-            .timeline-item:not(:last-child) .timeline-line {
-                display: block
-            }
-
-            .timeline-left {
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                flex-shrink: 0
-            }
-
-            .timeline-dot {
-                width: 30px;
-                height: 30px;
-                border-radius: 9px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 11px;
-                flex-shrink: 0;
-                border: 1px solid
-            }
-
-            .timeline-dot.blue {
-                background: rgba(74, 158, 255, .12);
-                border-color: rgba(74, 158, 255, .25);
-                color: #4a9eff
-            }
-
-            .timeline-dot.amber {
-                background: rgba(245, 166, 35, .12);
-                border-color: rgba(245, 166, 35, .25);
-                color: #f5a623
-            }
-
-            .timeline-dot.violet {
-                background: rgba(167, 139, 250, .12);
-                border-color: rgba(167, 139, 250, .25);
-                color: #a78bfa
-            }
-
-            .timeline-dot.indigo {
-                background: rgba(129, 140, 248, .12);
-                border-color: rgba(129, 140, 248, .25);
-                color: #818cf8
-            }
-
-            .timeline-dot.emerald {
-                background: rgba(16, 212, 142, .12);
-                border-color: rgba(16, 212, 142, .25);
-                color: #10d48e
-            }
-
-            .timeline-dot.rose {
-                background: rgba(251, 113, 133, .12);
-                border-color: rgba(251, 113, 133, .25);
-                color: #fb7185
-            }
-
-            .timeline-line {
-                flex: 1;
-                width: 1px;
-                background: var(--border);
-                min-height: 16px;
-                display: none;
-                margin: 4px 0
-            }
-
-            .timeline-body {
-                flex: 1;
-                padding: .9rem 1.1rem;
-                border-radius: 14px;
-                background: rgba(255, 255, 255, .025);
-                border: 1px solid var(--border);
-                transition: background .25s, border-color .25s
-            }
-
-            .timeline-body:hover {
-                background: rgba(255, 255, 255, .05);
-                border-color: var(--border-strong)
-            }
-
-            .tl-title {
-                font-size: 13.5px;
-                font-weight: 600;
-                color: var(--text-primary);
-                margin-bottom: .25rem
-            }
-
-            .tl-desc {
-                font-size: 12.5px;
-                color: var(--text-secondary);
-                line-height: 1.55
-            }
-
-            .tl-time {
-                display: flex;
-                align-items: center;
-                gap: 5px;
-                font-size: 11.5px;
-                color: var(--text-muted);
-                margin-top: .5rem
-            }
-
-            .right-col {
-                display: flex;
-                flex-direction: column;
-                gap: 1.25rem
-            }
-
-            .products-panel,
-            .notes-panel {
-                padding: 1.75rem
-            }
-
-            .product-list {
-                display: flex;
-                flex-direction: column;
-                gap: .65rem;
-                margin-top: 1.25rem
-            }
-
-            .product-row {
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                gap: 1rem;
-                padding: .85rem 1rem;
-                border-radius: 12px;
-                background: rgba(255, 255, 255, .025);
-                border: 1px solid var(--border);
-                transition: background .2s, border-color .2s
-            }
-
-            .product-row:hover {
-                background: rgba(255, 255, 255, .05);
-                border-color: var(--border-strong)
-            }
-
-            .product-icon {
-                width: 34px;
-                height: 34px;
-                border-radius: 9px;
-                background: var(--accent-dim);
-                border: 1px solid rgba(16, 212, 142, .2);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 13px;
-                color: var(--accent);
-                flex-shrink: 0
-            }
-
-            .product-name {
-                font-size: 13px;
-                font-weight: 600;
-                color: var(--text-primary)
-            }
-
-            .product-qty {
-                font-size: 11.5px;
-                color: var(--text-muted);
-                margin-top: 2px
-            }
-
-            .product-price {
-                font-family: 'Syne', sans-serif;
-                font-size: 13.5px;
-                font-weight: 700;
-                color: var(--text-primary);
-                white-space: nowrap
-            }
-
-            .notes-text {
-                font-size: 13px;
-                color: var(--text-secondary);
-                line-height: 1.65;
-                margin-top: .75rem
-            }
-
-            @keyframes fadeUp {
-                from {
-                    opacity: 0;
-                    transform: translateY(22px)
-                }
-
-                to {
-                    opacity: 1;
-                    transform: translateY(0)
-                }
-            }
-
-            @keyframes pulse-dot {
-                0%, 100% {
-                    box-shadow: 0 0 0 0 rgba(16, 212, 142, .5)
-                }
-
-                50% {
-                    box-shadow: 0 0 0 6px rgba(16, 212, 142, 0)
-                }
-            }
-
-            @media (max-width:900px) {
-                .body-grid {
-                    grid-template-columns: 1fr
-                }
-
-                .header {
-                    grid-template-columns: 1fr
-                }
-
-                .header-right {
-                    align-items: flex-start
-                }
-            }
-
-            @media (max-width:580px) {
-                .header,
-                .progress-section,
-                .history-panel {
-                    padding: 1.5rem
-                }
-
-                .products-panel,
-                .notes-panel {
-                    padding: 1.25rem
-                }
-
-                .status-flash {
-                    left: 16px;
-                    right: 16px;
-                    min-width: auto;
-                    max-width: none;
-                }
-            }
-        </style>
-    @endpush
-
-    @push('scripts')
-       
-
-        <script>
-            document.addEventListener('DOMContentLoaded', () => {
-                document.querySelectorAll('.timeline-item').forEach((el, i) => {
-                    el.style.opacity = '0';
-                    el.style.transform = 'translateX(-16px)';
-                    el.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
-                    setTimeout(() => {
-                        el.style.opacity = '1';
-                        el.style.transform = 'translateX(0)';
-                    }, 350 + i * 110);
-                });
-
-                document.querySelectorAll('.product-row').forEach((el, i) => {
-                    el.style.opacity = '0';
-                    el.style.transform = 'translateY(10px)';
-                    el.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
-                    setTimeout(() => {
-                        el.style.opacity = '1';
-                        el.style.transform = 'translateY(0)';
-                    }, 500 + i * 80);
-                });
-
-                const activeStep = document.querySelector('.step-item.active .step-icon-wrap');
-                if (activeStep) {
-                    setInterval(() => {
-                        activeStep.style.boxShadow =
-                            '0 0 0 6px rgba(16,212,142,0.2), 0 0 28px rgba(16,212,142,0.35)';
-                        setTimeout(() => {
-                            activeStep.style.boxShadow =
-                                '0 0 0 6px rgba(16,212,142,0.06), 0 0 14px rgba(16,212,142,0.2)';
-                        }, 900);
-                    }, 1800);
-                }
-            });
-        </script>
+    <style>
+        :root { --ok:#22a565; --ok-soft:#e7f6ee; --ink:#0f172a; --ink2:#64748b; --line:#e6e9ef; }
+        *,:before,:after{box-sizing:border-box}
+        .trk{min-height:100vh;background:#f4f6f8;font-family:'DM Sans',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:var(--ink);padding-bottom:32px}
+        .trk-top{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+        .trk-brand{display:flex;align-items:center;gap:11px;min-width:0}
+        .trk-logo{width:38px;height:38px;border-radius:11px;object-fit:cover;flex-shrink:0;box-shadow:0 2px 6px rgba(0,0,0,.08)}
+        .trk-logo--letter{display:grid;place-items:center;background:var(--accent);color:#fff;font-weight:800;font-size:18px;font-family:Syne,sans-serif}
+        .trk-brand-txt{display:flex;flex-direction:column;line-height:1.15;min-width:0}
+        .trk-brand-name{font-weight:800;font-size:15px;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .trk-brand-sub{font-size:11px;color:var(--ink2);text-transform:uppercase;letter-spacing:.12em}
+        .trk-live{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:var(--ok);background:var(--ok-soft);padding:6px 11px;border-radius:999px}
+        .trk-live-dot{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 0 rgba(34,165,101,.5);animation:trkpulse 1.8s infinite}
+        @keyframes trkpulse{0%,100%{box-shadow:0 0 0 0 rgba(34,165,101,.5)}50%{box-shadow:0 0 0 6px rgba(34,165,101,0)}}
+
+        .trk-main{max-width:520px;margin:0 auto;padding:18px 16px 0}
+
+        .trk-hero{position:relative;border-radius:22px;padding:30px 24px 26px;text-align:left;color:#fff;overflow:hidden;
+            background:linear-gradient(135deg, color-mix(in srgb,var(--accent) 92%, #000 8%), color-mix(in srgb,var(--accent) 60%, #0f172a 40%));
+            box-shadow:0 16px 34px rgba(15,23,42,.18)}
+        .trk-hero.is-done{background:linear-gradient(135deg,#12995f,#0b6b43)}
+        .trk-hero.is-cancel{background:linear-gradient(135deg,#b91c3b,#7f1225)}
+        .trk-hero-icon{width:52px;height:52px;border-radius:15px;display:grid;place-items:center;background:rgba(255,255,255,.18);font-size:22px;margin-bottom:14px}
+        .trk-hero-title{font-family:Syne,sans-serif;font-size:clamp(22px,6vw,28px);font-weight:800;line-height:1.12;margin:0;letter-spacing:-.02em;text-wrap:balance}
+        .trk-hero-sub{margin:8px 0 0;font-size:14px;opacity:.9}
+        .trk-pill{display:inline-flex;align-items:center;gap:7px;margin-top:16px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.25);padding:6px 14px;border-radius:999px;font-size:12.5px;font-weight:700}
+        .trk-pill i{font-size:7px}
+
+        .trk-hola{margin:16px 4px 4px;font-size:14.5px;color:var(--ink2)}
+        .trk-hola b{color:var(--ink)}
+        .trk-hola-sep{margin:0 6px;color:#cbd5e1}
+
+        .trk-pago{display:flex;align-items:center;gap:12px;background:#fff;border:1px solid var(--line);border-radius:16px;padding:14px 16px;margin-top:12px}
+        .trk-pago.ok{background:var(--ok-soft);border-color:#bfe6cf}
+        .trk-pago-ico{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;background:#f1f5f9;font-size:18px;flex-shrink:0}
+        .trk-pago-txt{display:flex;flex-direction:column;min-width:0;flex:1}
+        .trk-pago-txt b{font-size:14px}
+        .trk-pago-txt span{font-size:12px;color:var(--ink2);margin-top:1px}
+        .trk-pago-btn{background:var(--accent);color:#fff;font-weight:700;text-decoration:none;padding:9px 16px;border-radius:11px;font-size:13.5px;flex-shrink:0}
+
+        .trk-card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:18px 18px;margin-top:14px}
+        .trk-card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+        .trk-card-head h2{font-family:Syne,sans-serif;font-size:15px;font-weight:800;margin:0}
+        .trk-total{font-family:Syne,sans-serif;font-weight:800;font-size:17px;color:var(--ink)}
+
+        /* Timeline vertical */
+        .trk-steps{display:flex;flex-direction:column}
+        .trk-step{display:flex;gap:14px}
+        .trk-step-rail{display:flex;flex-direction:column;align-items:center;flex-shrink:0}
+        .trk-step-node{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-size:13px;flex-shrink:0;
+            background:#eef1f5;color:#b3bdcb;border:2px solid #e2e7ee;transition:all .3s}
+        .trk-step.done .trk-step-node{background:var(--ok);color:#fff;border-color:var(--ok);box-shadow:0 4px 10px rgba(34,165,101,.28)}
+        .trk-step.todo .trk-step-node i{font-size:8px}
+        .trk-step.now .trk-step-node{animation:trknode 1.8s infinite}
+        @keyframes trknode{0%,100%{box-shadow:0 0 0 0 rgba(34,165,101,.45)}50%{box-shadow:0 0 0 7px rgba(34,165,101,0)}}
+        .trk-step-line{width:3px;flex:1;min-height:26px;background:#e2e7ee;border-radius:2px;margin:3px 0}
+        .trk-step-line.fill{background:var(--ok)}
+        .trk-step-body{padding-bottom:20px;padding-top:5px}
+        .trk-step:last-child .trk-step-body{padding-bottom:2px}
+        .trk-step-label{margin:0;font-size:15px;font-weight:700;color:#9aa5b4}
+        .trk-step.done .trk-step-label{color:var(--ink)}
+        .trk-step-time{margin:2px 0 0;font-size:12px;color:var(--ink2)}
+        .trk-step.now .trk-step-label{color:var(--ok)}
+
+        .trk-prods{display:flex;flex-direction:column;gap:9px}
+        .trk-prod{display:flex;align-items:baseline;gap:9px;font-size:14px}
+        .trk-prod-q{font-weight:800;color:var(--accent);flex-shrink:0}
+        .trk-prod-n{flex:1;color:var(--ink);min-width:0}
+        .trk-prod-p{font-weight:700;color:var(--ink2);white-space:nowrap}
+        .trk-entrega{margin-top:14px;padding-top:12px;border-top:1px dashed var(--line);font-size:13px;color:var(--ink2);display:flex;align-items:center;gap:8px}
+        .trk-entrega i{color:var(--accent)}
+
+        .trk-foot{text-align:center;color:#9aa5b4;font-size:12.5px;margin:22px 0 0}
+
+        .trk-flash{position:fixed;top:14px;left:16px;right:16px;max-width:360px;margin:0 auto;z-index:80;display:flex;align-items:center;gap:12px;
+            padding:13px 15px;border-radius:15px;background:#fff;border:1px solid #bfe6cf;box-shadow:0 18px 40px rgba(15,23,42,.18);transition:opacity .35s,transform .35s}
+        .trk-flash.hidden{display:none}
+        .trk-flash.opacity-0{opacity:0;transform:translateY(-10px)}
+        .trk-flash.opacity-100{opacity:1;transform:translateY(0)}
+        .trk-flash__icon{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:var(--ok-soft);color:var(--ok);flex-shrink:0}
+        .trk-flash__title{margin:0;font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--ok)}
+        .trk-flash__text{margin:3px 0 0;font-size:13px;font-weight:600;color:var(--ink)}
+    </style>
     @endpush
 </div>

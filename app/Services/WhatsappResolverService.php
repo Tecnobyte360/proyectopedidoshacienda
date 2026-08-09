@@ -312,6 +312,10 @@ class WhatsappResolverService
                 return null;
             } catch (\Throwable $e) {
                 Log::error('🔴 login excepción: ' . $e->getMessage());
+                // 🔧 Si wa-api está CAÍDO (timeout/conexión rechazada), activar
+                //    backoff para NO reintentar cada ~10s (cada intento bloquea
+                //    10s completos). Se reintenta pasado el tiempo por si vuelve.
+                Cache::put($backoffKey, true, now()->addMinutes(10));
                 return null;
             }
         } finally {

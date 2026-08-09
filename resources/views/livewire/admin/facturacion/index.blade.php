@@ -156,6 +156,10 @@
                 </div>
 
                 <div class="p-6 space-y-5">
+                    {{-- 🪤 Señuelos: Chrome/gestor de claves rellena ESTOS y deja limpios los reales --}}
+                    <input type="text" name="fakeusernameremembered" autocomplete="username" tabindex="-1" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0">
+                    <input type="password" name="fakepasswordremembered" autocomplete="new-password" tabindex="-1" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0">
+
                     {{-- Tenant --}}
                     <div>
                         <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Empresa (tenant)</label>
@@ -173,17 +177,17 @@
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <div class="sm:col-span-2">
                             <label class="block text-xs font-bold text-slate-500 uppercase mb-1">NIT</label>
-                            <input wire:model="nit" class="w-full rounded-xl border-slate-200 text-sm" placeholder="900123456">
+                            <input wire:model="nit" autocomplete="off" class="w-full rounded-xl border-slate-200 text-sm" placeholder="900123456">
                             @error('nit') <span class="text-xs text-rose-600">{{ $message }}</span> @enderror
                         </div>
                         <div>
                             <label class="block text-xs font-bold text-slate-500 uppercase mb-1">DV</label>
-                            <input wire:model="dv" class="w-full rounded-xl border-slate-200 text-sm" placeholder="7">
+                            <input wire:model="dv" autocomplete="off" class="w-full rounded-xl border-slate-200 text-sm" placeholder="7">
                         </div>
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Razón social</label>
-                        <input wire:model="razon_social" class="w-full rounded-xl border-slate-200 text-sm">
+                        <input wire:model="razon_social" autocomplete="off" class="w-full rounded-xl border-slate-200 text-sm">
                         @error('razon_social') <span class="text-xs text-rose-600">{{ $message }}</span> @enderror
                     </div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -196,7 +200,7 @@
                         </div>
                         <div>
                             <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Cód. municipio (DANE)</label>
-                            <input wire:model="municipio_codigo" class="w-full rounded-xl border-slate-200 text-sm" placeholder="05001">
+                            <input wire:model="municipio_codigo" autocomplete="off" class="w-full rounded-xl border-slate-200 text-sm" placeholder="05001">
                         </div>
                     </div>
                     <div>
@@ -217,17 +221,17 @@
                         </div>
                         <div>
                             <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Set de pruebas (TestSetId)</label>
-                            <input wire:model="test_set_id" class="w-full rounded-xl border-slate-200 text-sm">
+                            <input wire:model="test_set_id" autocomplete="off" class="w-full rounded-xl border-slate-200 text-sm">
                         </div>
                     </div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Software ID</label>
-                            <input wire:model="software_id" class="w-full rounded-xl border-slate-200 text-sm">
+                            <input wire:model="software_id" autocomplete="off" class="w-full rounded-xl border-slate-200 text-sm">
                         </div>
                         <div>
                             <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Software PIN</label>
-                            <input wire:model="software_pin" type="password" placeholder="{{ $configId ? '•••• (sin cambios)' : '' }}" class="w-full rounded-xl border-slate-200 text-sm">
+                            <input wire:model="software_pin" type="password" autocomplete="new-password" placeholder="{{ $configId ? '•••• (sin cambios)' : '' }}" class="w-full rounded-xl border-slate-200 text-sm">
                             <span class="text-[10px] text-slate-400">Se guarda cifrado. Déjalo vacío para no cambiarlo.</span>
                         </div>
                     </div>
@@ -245,7 +249,7 @@
                         </div>
                         <div>
                             <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Contraseña certificado</label>
-                            <input wire:model="certificado_password" type="password" placeholder="{{ $configId ? '•••• (sin cambios)' : '' }}" class="w-full rounded-xl border-slate-200 text-sm">
+                            <input wire:model="certificado_password" type="password" autocomplete="new-password" placeholder="{{ $configId ? '•••• (sin cambios)' : '' }}" class="w-full rounded-xl border-slate-200 text-sm">
                             <label class="block text-xs font-bold text-slate-500 uppercase mb-1 mt-2">Vence</label>
                             <input wire:model="certificado_vence_at" type="date" class="w-full rounded-xl border-slate-200 text-sm">
                         </div>

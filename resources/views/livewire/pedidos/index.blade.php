@@ -994,13 +994,34 @@
                                                                 @endforeach
                                                             </tbody>
                                                             <tfoot class="bg-slate-50 border-t border-slate-200">
+                                                                @php
+                                                                    $esRecogerDet = ($pedido->tipo_entrega ?? 'domicilio') === 'recoger';
+                                                                    $envioDet     = (float) ($pedido->costo_envio ?? 0);
+                                                                    $totalFinalDet = (float) ($pedido->total ?? ($totalPedido + $envioDet));
+                                                                @endphp
+                                                                {{-- Tipo de entrega --}}
                                                                 <tr>
-                                                                    <td colspan="2" class="px-3 py-2 text-right text-[10px] font-bold uppercase text-slate-600 tracking-wider">
-                                                                        Total productos
+                                                                    <td colspan="2" class="px-3 py-1.5 text-right text-[10px] font-bold uppercase text-slate-500 tracking-wider">Entrega</td>
+                                                                    <td class="px-3 py-1.5 text-right whitespace-nowrap text-[11px] font-bold {{ $esRecogerDet ? 'text-amber-700' : 'text-indigo-700' }}">
+                                                                        {{ $esRecogerDet ? '🏪 Recoge en sede' : '🛵 Domicilio' }}
                                                                     </td>
-                                                                    <td class="px-3 py-2 text-right whitespace-nowrap font-mono text-xs font-bold text-emerald-700">
-                                                                        ${{ number_format((float) $totalPedido, 0, ',', '.') }}
-                                                                    </td>
+                                                                </tr>
+                                                                {{-- Subtotal productos --}}
+                                                                <tr>
+                                                                    <td colspan="2" class="px-3 py-1.5 text-right text-[10px] font-bold uppercase text-slate-600 tracking-wider">Productos</td>
+                                                                    <td class="px-3 py-1.5 text-right whitespace-nowrap font-mono text-[11px] font-semibold text-slate-700">${{ number_format((float) $totalPedido, 0, ',', '.') }}</td>
+                                                                </tr>
+                                                                {{-- Envío (solo si es domicilio) --}}
+                                                                @unless($esRecogerDet)
+                                                                <tr>
+                                                                    <td colspan="2" class="px-3 py-1.5 text-right text-[10px] font-bold uppercase text-slate-600 tracking-wider">Envío</td>
+                                                                    <td class="px-3 py-1.5 text-right whitespace-nowrap font-mono text-[11px] font-semibold text-slate-700">${{ number_format($envioDet, 0, ',', '.') }}</td>
+                                                                </tr>
+                                                                @endunless
+                                                                {{-- Total real (productos + envío) --}}
+                                                                <tr class="border-t border-slate-200">
+                                                                    <td colspan="2" class="px-3 py-2 text-right text-[10px] font-extrabold uppercase text-slate-700 tracking-wider">Total</td>
+                                                                    <td class="px-3 py-2 text-right whitespace-nowrap font-mono text-xs font-extrabold text-emerald-700">${{ number_format($totalFinalDet, 0, ',', '.') }}</td>
                                                                 </tr>
                                                             </tfoot>
                                                         </table>

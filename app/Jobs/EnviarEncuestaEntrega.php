@@ -86,7 +86,16 @@ class EnviarEncuestaEntrega implements ShouldQueue
             } catch (\Throwable $e) {}
         }
 
-        if (!$connectionId) {
+        // 📱 Los tenants Meta NO dependen de una conexión wa-api: el sender
+        //    (WhatsappSenderService::enviarTexto) enruta a Meta por provider e
+        //    ignora el connection_id. Solo el canal legacy (TecnoByteApp) exige
+        //    una conexión válida. Antes se lanzaba excepción para TODOS → al
+        //    limpiar los connection_ids de un tenant Meta, las encuestas
+        //    quedaban "sin enviar".
+        $esMeta = $tenant
+            && $tenant->proveedorWhatsappResuelto() === \App\Models\Tenant::WA_PROVIDER_META;
+
+        if (!$connectionId && !$esMeta) {
             Log::error('Encuesta: NO HAY connection_ids válidos en el tenant', [
                 'tenant_id' => $tenant?->id,
                 'encuesta_id' => $encuesta->id,
@@ -97,7 +106,7 @@ class EnviarEncuestaEntrega implements ShouldQueue
         $ok = $wa->enviarTexto(
             $this->telefono,
             $this->mensaje,
-            $connectionId,
+            $connectionId,   // null en Meta; el sender lo ignora y enruta por provider
             true,
             ['origen' => 'encuesta_entrega', 'encuesta_id' => $encuesta->id]
         );

@@ -69,6 +69,12 @@ class FotoPerfilWhatsappService
         $profilePicUrl = \Cache::get($cacheKey);
 
         if (empty($profilePicUrl)) {
+            // 🔧 Tenants Meta NO tienen sesión wa-api: no intentar login (cada
+            //    intento se cuelga 10s con timeout). Su foto llega por el cache
+            //    del webhook (ruta rápida de arriba) o simplemente no aplica.
+            if ($tenant->proveedorWhatsappResuelto() === \App\Models\Tenant::WA_PROVIDER_META) {
+                return $cliente->foto_url ?: null;
+            }
             // RUTA LENTA: consultar API. Solo si no llegó en webhook.
             try {
                 $resolver = app(WhatsappResolverService::class);

@@ -39,6 +39,11 @@ class AutoReconectarWhatsapp extends Command
 
         foreach ($tenants as $tenant) {
             try {
+                // 🔧 Tenants Meta NO usan wa-api → no intentar reconectar
+                //    (dispara timeouts de 10s contra el servidor viejo).
+                if ($tenant->proveedorWhatsappResuelto() === \App\Models\Tenant::WA_PROVIDER_META) {
+                    continue;
+                }
                 app(\App\Services\TenantManager::class)->set($tenant);
                 $resultado = $this->procesarTenant($tenant);
                 $totalIntentos += $resultado['intentos'];
