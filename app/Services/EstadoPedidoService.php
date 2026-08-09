@@ -375,7 +375,11 @@ class EstadoPedidoService
             || !empty($orderData['sede_id'])
             || (empty($orderData['address']) && !empty($orderData['location']))
             || $addressEsSede
-            || $notesDicenRecoger;
+            || $notesDicenRecoger
+            // 🏬 Respetar el método ya fijado: si el cliente ya eligió RECOGER,
+            // NO lo convertimos en domicilio aunque la IA mande una dirección
+            // (suele mandar la dirección de la sede).
+            || $estado->metodo_entrega === ConversacionPedidoEstado::METODO_RECOGER;
 
         if ($esRecoger) {
             $estado->metodo_entrega = ConversacionPedidoEstado::METODO_RECOGER;
@@ -998,6 +1002,14 @@ class EstadoPedidoService
             $estado->direccion          = null;
             $estado->barrio             = null;
             $estado->cobertura_validada = false;
+            // 🏢 Auto-asignar sede si solo hay una activa (para que el pedido de
+            // recoger quede COMPLETO y se pueda confirmar sin pedir "cuál sede").
+            if (empty($estado->sede_id)) {
+                $sedesActivas = \App\Models\Sede::where('activa', true)->orderBy('id')->get();
+                if ($sedesActivas->count() === 1) {
+                    $estado->sede_id = $sedesActivas->first()->id;
+                }
+            }
             $cambio = true;
             Log::info('🏬 RECOGER override explícito (limpia envío/dirección)', ['conv_id' => $conv->id]);
         }
