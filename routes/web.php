@@ -470,6 +470,11 @@ Route::middleware(['solo_principal'])->group(function () {
 Route::get('/seguimiento-pedido/{codigo}', SeguimientoPedido::class)
     ->name('pedidos.seguimiento');
 
+// Feed de catálogo para Meta (Commerce Manager / WhatsApp) — público, sin auth.
+Route::get('/catalogo-meta/{tenant}.csv', [\App\Http\Controllers\MetaCatalogFeedController::class, 'csv'])
+    ->where('tenant', '[0-9]+')
+    ->name('catalogo.meta.feed');
+
 // Encuesta pública post-entrega (sin auth — el cliente la abre desde su WhatsApp)
 Route::get('/encuesta/{token}', \App\Livewire\Encuestas\Responder::class)
     ->where('token', '[\w\-]+')
