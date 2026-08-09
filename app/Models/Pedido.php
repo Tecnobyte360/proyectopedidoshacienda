@@ -252,20 +252,6 @@ class Pedido extends Model
         $this->fecha_entregado = now();
     }
 
-    // 🛵 Auto-asignación al cambiar de estado (configurable)
-    try {
-        $cfgBot = \App\Models\ConfiguracionBot::actual();
-        $estadoTrigger = (string) ($cfgBot->asignar_en_estado ?: self::ESTADO_EN_PREPARACION);
-        if (($cfgBot->auto_asignar_domiciliario ?? false)
-            && $nuevoEstado === $estadoTrigger
-            && !$this->domiciliario_id) {
-            app(\App\Services\AsignacionDomiciliarioService::class)->asignar($this);
-            $this->refresh();
-        }
-    } catch (\Throwable $e) {
-        \Log::warning('Auto-asignacion (cambiarEstado) fallo: ' . $e->getMessage());
-    }
-
     // 🛵 Liberar al domiciliario al entregar/cancelar si NO le quedan más
     // pedidos activos. Lo deja 'disponible' para que pueda recibir nuevos.
     if (in_array($nuevoEstado, [self::ESTADO_ENTREGADO, self::ESTADO_CANCELADO], true) && $this->domiciliario_id) {
@@ -311,6 +297,23 @@ class Pedido extends Model
     }
 
     $this->save();
+
+    // 🛵 Auto-asignación de domiciliario — DESPUÉS del save() (antes, el
+    // $this->refresh() interno recargaba el estado viejo de la BD y REVERTÍA
+    // el cambio recién hecho → el pedido volvía a 'nuevo'). No aplica a RECOGER.
+    try {
+        $cfgBot = \App\Models\ConfiguracionBot::actual();
+        $estadoTrigger = (string) ($cfgBot->asignar_en_estado ?: self::ESTADO_EN_PREPARACION);
+        if (($cfgBot->auto_asignar_domiciliario ?? false)
+            && $nuevoEstado === $estadoTrigger
+            && ($this->metodo_entrega ?? '') !== 'recoger'
+            && !$this->domiciliario_id) {
+            app(\App\Services\AsignacionDomiciliarioService::class)->asignar($this);
+            $this->refresh();
+        }
+    } catch (\Throwable $e) {
+        \Log::warning('Auto-asignacion (cambiarEstado) fallo: ' . $e->getMessage());
+    }
 
     $this->registrarHistorial(
         estadoNuevo: $nuevoEstado,
