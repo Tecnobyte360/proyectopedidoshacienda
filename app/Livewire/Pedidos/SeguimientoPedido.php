@@ -47,9 +47,14 @@ class SeguimientoPedido extends Component
 
     public function render()
     {
+        $tenant = $this->pedido->tenant_id
+            ? \App\Models\Tenant::withoutGlobalScopes()->find($this->pedido->tenant_id)
+            : null;
+
         return view('livewire.pedidos.seguimiento-pedido', [
             'historial' => $this->pedido->historialEstados()->orderBy('fecha_evento')->get(),
             'pedido'    => $this->pedido,
+            'tenant'    => $tenant,
         ])->layout('layouts.public');
     }
 }
