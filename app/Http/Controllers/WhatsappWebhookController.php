@@ -1202,6 +1202,30 @@ class WhatsappWebhookController extends Controller
         }
 
         // ════════════════════════════════════════════════════════════════════
+        // 🛒🟢 CATÁLOGO NATIVO — ofrecer productos dentro de WhatsApp.
+        // Si el tenant tiene carrito nativo (catalog_id) y el cliente muestra
+        // intención de pedir/ver productos con el carrito VACÍO, le mandamos el
+        // catálogo interactivo para que arme el pedido sin salir de WhatsApp.
+        // Anti-spam: máx 1 vez cada 10 min. Fallback: si Meta aún no propagó el
+        // catálogo, enviarCatalogoWhatsapp devuelve false y sigue el flujo normal.
+        // ════════════════════════════════════════════════════════════════════
+        try {
+            $catKey = "wa_catalogo_enviado_t{$tenantId}_{$telefonoNorm}";
+            if (!Cache::has($catKey) && $this->clienteQuiereVerCatalogo($message)) {
+                $estadoCat = app(\App\Services\EstadoPedidoService::class)->obtener($conversacion);
+                $carritoVacio = empty($estadoCat->productos);
+                if ($carritoVacio && $this->enviarCatalogoWhatsapp($conversacion, $from, $connectionId)) {
+                    // enviarProductos ya persistió el mensaje del catálogo en el chat.
+                    // Retornamos '' para NO mandar un texto extra encima.
+                    Cache::put($catKey, true, now()->addMinutes(10));
+                    return '';
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('🛒 Trigger catálogo falló (sigue flujo normal): ' . $e->getMessage());
+        }
+
+        // ════════════════════════════════════════════════════════════════════
         // 🏧 MODO MENÚ DETERMINISTA (sin IA) — bancos / instituciones.
         // Si el tenant está en modo menú, respondemos con el árbol FIJO y
         // salimos ANTES de cualquier lógica de IA / horario / pedidos. Cero
@@ -5465,6 +5489,30 @@ TXT;
     |==========================================================================
     */
 
+    /**
+     * 🛒 ¿El cliente quiere ver productos / hacer un pedido? Se usa para ofrecer
+     * el catálogo nativo de WhatsApp (solo tenants con carrito nativo).
+     * Deliberadamente conservador: intención clara de comprar/ver menú.
+     */
+    private function clienteQuiereVerCatalogo(string $message): bool
+    {
+        $msg = ' ' . mb_strtolower(trim(\Illuminate\Support\Str::ascii($message))) . ' ';
+        if (trim($msg) === '') return false;
+
+        $frases = [
+            'quiero pedir', 'hacer un pedido', 'hacer pedido', 'quiero hacer un pedido',
+            'quiero comprar', 'deseo pedir', 'necesito pedir', 'quiero ordenar',
+            'ver productos', 'ver el catalogo', 'ver catalogo', 'catalogo',
+            'menu', 'la carta', 'ver la carta', 'que productos', 'que tienen',
+            'que venden', 'que manejan', 'lista de precios', 'los precios',
+            'quiero un cafe', 'quiero cafe', 'quiero comprar cafe',
+        ];
+        foreach ($frases as $f) {
+            if (str_contains($msg, $f)) return true;
+        }
+        return false;
+    }
+
     private function esConsultaEstadoPedido(string $message): bool
     {
         $msg = mb_strtolower(trim($message));
@@ -6881,6 +6929,67 @@ TXT;
       }
 
       return $productosEstado;
+  }
+
+  /**
+   * 🛒🟢 Envía el CATÁLOGO dentro de WhatsApp (Multi-Product Message) con los
+   * productos activos del tenant. Solo aplica a tenants con catalog_id configurado
+   * (carrito nativo). Devuelve true si Meta aceptó el mensaje.
+   *
+   * Fallback seguro: si Meta aún no propagó el catálogo (o no hay config), devuelve
+   * false y el llamador continúa con el flujo normal de texto.
+   */
+  public function enviarCatalogoWhatsapp(
+      \App\Models\ConversacionWhatsapp $conv,
+      string $from,
+      int|string|null $connectionId
+  ): bool {
+      $tenantId = app(\App\Services\TenantManager::class)->id();
+      $cfg = \App\Models\MetaWhatsappConfig::where('tenant_id', $tenantId)
+          ->where('activo', true)
+          ->first();
+      if (!$cfg || empty($cfg->catalog_id)) {
+          return false; // tenant sin carrito nativo → flujo normal
+      }
+
+      // Productos activos del tenant (máx 30 en un Multi-Product Message).
+      $sedeId = $this->obtenerSedeIdDesdeConexion($connectionId);
+      $productos = \App\Models\Producto::where('activo', true)
+          ->orderBy('nombre')
+          ->take(30)
+          ->get();
+
+      $skus = $productos
+          ->map(fn ($p) => trim((string) ($p->codigo ?? '')))
+          ->filter(fn ($c) => $c !== '')
+          ->values()
+          ->all();
+
+      if (empty($skus)) return false;
+
+      $ok = app(\App\Services\Meta\MetaWhatsappCloudService::class)->enviarProductos(
+          telefono: $from,
+          header: 'Nuestro catálogo ☕',
+          cuerpo: "Toca *Ver artículos*, elige lo que quieras y agrégalo al carrito 🛒. Cuando termines, envíanos el pedido y seguimos.",
+          catalogId: (string) $cfg->catalog_id,
+          secciones: [['title' => 'Productos', 'skus' => $skus]],
+          tenantId: $tenantId,
+          phoneNumberId: $cfg->phone_number_id,
+          footer: 'Arma tu pedido aquí mismo'
+      );
+
+      if ($ok) {
+          Log::info('🛒🟢 Catálogo enviado dentro de WhatsApp', [
+              'conv_id' => $conv->id,
+              'skus'    => count($skus),
+          ]);
+      } else {
+          Log::info('🛒🟡 Catálogo no enviado (propagación Meta o error) — sigue flujo normal', [
+              'conv_id' => $conv->id,
+          ]);
+      }
+
+      return $ok;
   }
 
   /**
