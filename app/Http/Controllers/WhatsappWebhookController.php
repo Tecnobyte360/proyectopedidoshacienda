@@ -1793,6 +1793,7 @@ TXT;
         // la tool `mostrar_catalogo` para que la IA lo envíe con CUALQUIER redacción
         // ("quiero pedir", "qué manejan", "info", etc.), sin depender de palabras
         // clave. La Hacienda y otros sin catálogo quedan intactos (no se inyecta).
+        $tieneCatalogoNativo = false;
         try {
             $tidCat = app(\App\Services\TenantManager::class)->id();
             $tieneCat = \App\Models\MetaWhatsappConfig::where('tenant_id', $tidCat)
@@ -1800,6 +1801,7 @@ TXT;
                 ->whereNotNull('catalog_id')
                 ->where('catalog_id', '!=', '')
                 ->exists();
+            $tieneCatalogoNativo = $tieneCat;
             if ($tieneCat) {
                 $yaTieneCat = collect($toolsFiltradas)->contains(
                     fn ($t) => ($t['function']['name'] ?? '') === 'mostrar_catalogo'
@@ -1952,13 +1954,35 @@ TXT;
                     . "está cubierto basado en mensajes anteriores.",
             ];
         } elseif ($preguntaProducto) {
-            // Forzar buscar_productos cuando el cliente menciona producto/cantidad
+            // Forzar tool cuando el cliente menciona producto/cantidad o pregunta por productos.
             $toolChoiceInicial = 'required'; // que invoque ALGUNA tool, no texto
             $razonForzado = 'cliente_pregunto_producto';
-            $messages[] = [
-                'role' => 'system',
-                'content' => "🚨 El cliente está mencionando un PRODUCTO o una CANTIDAD. ANTES DE RESPONDER, DEBES llamar `buscar_productos` con el texto literal del cliente. NO inventes productos ni precios — verifica en BD.",
-            ];
+            if ($tieneCatalogoNativo) {
+                // 🛒 Tenant con catálogo nativo. Si el cliente pregunta por productos
+                //    SIN dar cantidad (inquiry general, no pedido directo) y el carrito
+                //    está vacío → FORZAR mostrar_catalogo (determinista, sin depender
+                //    del criterio del LLM). Si hay cantidad ("quiero 2 X") → es pedido
+                //    directo → buscar_productos normal.
+                $carritoVacioSC = empty($estadoActualBd?->productos);
+                $tieneCantidad  = preg_match('/\d/u', $message) === 1
+                    || preg_match('/\b(un|una|unos|unas|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|media|medio|docena)\b/iu', mb_strtolower($message)) === 1;
+
+                if ($carritoVacioSC && !$tieneCantidad) {
+                    $toolChoiceInicial = ['type' => 'function', 'function' => ['name' => 'mostrar_catalogo']];
+                    $razonForzado = 'catalogo_nativo_inquiry';
+                } else {
+                    $messages[] = [
+                        'role' => 'system',
+                        'content' => "🚨 El cliente mencionó un producto/cantidad. Llama `buscar_productos` con el texto "
+                            . "literal del cliente. NO inventes productos ni precios.",
+                    ];
+                }
+            } else {
+                $messages[] = [
+                    'role' => 'system',
+                    'content' => "🚨 El cliente está mencionando un PRODUCTO o una CANTIDAD. ANTES DE RESPONDER, DEBES llamar `buscar_productos` con el texto literal del cliente. NO inventes productos ni precios — verifica en BD.",
+                ];
+            }
         } elseif (
             $datosFinalesEnTexto &&
             !empty($estadoActualBd?->direccion) &&
