@@ -5500,12 +5500,23 @@ TXT;
         if (trim($msg) === '') return false;
 
         $frases = [
-            'quiero pedir', 'hacer un pedido', 'hacer pedido', 'quiero hacer un pedido',
-            'quiero comprar', 'deseo pedir', 'necesito pedir', 'quiero ordenar',
-            'ver productos', 'ver el catalogo', 'ver catalogo', 'catalogo',
+            // Intención de pedir / comprar
+            'quiero pedir', 'hacer un pedido', 'hacer pedido', 'hacer el pedido',
+            'quiero hacer un pedido', 'para un pedido', 'para el pedido', 'para pedir',
+            'para hacer un pedido', 'quiero un pedido', 'necesito un pedido',
+            'voy a pedir', 'quisiera pedir', 'me gustaria pedir', 'deseo pedir',
+            'necesito pedir', 'quiero ordenar', 'quiero comprar', 'quiero encargar',
+            'para encargar', 'necesito comprar', 'quiero hacer una compra', 'realizar un pedido',
+            // Preguntar por productos / catálogo
+            'ver productos', 'ver los productos', 'ver todos los productos',
+            'ver los cafes', 'ver todo el catalogo', 'ver el catalogo', 'ver catalogo', 'catalogo',
             'menu', 'la carta', 'ver la carta', 'que productos', 'que tienen',
-            'que venden', 'que manejan', 'lista de precios', 'los precios',
-            'quiero un cafe', 'quiero cafe', 'quiero comprar cafe',
+            'que venden', 'que manejan', 'que ofrecen', 'que cafe', 'que cafes',
+            'cuales cafes', 'cuales productos', 'que referencias', 'las referencias',
+            'variedades', 'lista de precios', 'los precios', 'informacion de productos',
+            'info de productos', 'mostrar productos', 'muestrame los productos',
+            'muestrame el catalogo', 'me muestras', 'quiero un cafe', 'quiero cafe',
+            'quiero comprar cafe',
         ];
         foreach ($frases as $f) {
             if (str_contains($msg, $f)) return true;
