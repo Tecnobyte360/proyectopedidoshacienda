@@ -1789,6 +1789,36 @@ TXT;
             }
         } catch (\Throwable $e) { /* no bloquear el flujo */ }
 
+        // 🛒🟢 CATÁLOGO NATIVO (IA): si el tenant tiene catálogo conectado, exponer
+        // la tool `mostrar_catalogo` para que la IA lo envíe con CUALQUIER redacción
+        // ("quiero pedir", "qué manejan", "info", etc.), sin depender de palabras
+        // clave. La Hacienda y otros sin catálogo quedan intactos (no se inyecta).
+        try {
+            $tidCat = app(\App\Services\TenantManager::class)->id();
+            $tieneCat = \App\Models\MetaWhatsappConfig::where('tenant_id', $tidCat)
+                ->where('activo', true)
+                ->whereNotNull('catalog_id')
+                ->where('catalog_id', '!=', '')
+                ->exists();
+            if ($tieneCat) {
+                $yaTieneCat = collect($toolsFiltradas)->contains(
+                    fn ($t) => ($t['function']['name'] ?? '') === 'mostrar_catalogo'
+                );
+                if (!$yaTieneCat) {
+                    $catDef = collect($this->getToolsDefinicion())->first(
+                        fn ($t) => ($t['function']['name'] ?? '') === 'mostrar_catalogo'
+                    );
+                    if ($catDef) $toolsFiltradas[] = $catDef;
+                }
+                $messages[] = ['role' => 'system', 'content' =>
+                    "🛒 CATÁLOGO EN WHATSAPP: cuando el cliente quiera hacer un pedido, pregunte qué "
+                    . "productos/precios/variedades hay, pida el menú/catálogo, o muestre intención de comprar "
+                    . "SIN decir aún un producto específico, DEBES llamar la tool `mostrar_catalogo` (le mostrará "
+                    . "el catálogo interactivo para armar el carrito). PROHIBIDO enumerar productos o precios en texto. "
+                    . "Si el cliente YA dijo exactamente qué quiere (ej. 'quiero 2 de X'), NO la llames — sigue el flujo normal."];
+            }
+        } catch (\Throwable $e) { /* no bloquear el flujo */ }
+
         // 🛡️ BLOQUEO ANTI-DUPLICADOS: si el cliente ya tiene un pedido NO cancelado
         // creado en los últimos 30 min, REMOVER `confirmar_pedido` de las tools
         // disponibles. Esto previene que el LLM por inercia confirme dos veces
@@ -1995,6 +2025,24 @@ TXT;
 
         $toolCalls   = $response['choices'][0]['message']['tool_calls'] ?? null;
         $textContent = $response['choices'][0]['message']['content'] ?? null;
+
+        // 🛒🟢 Tool mostrar_catalogo → la IA decidió mostrar el catálogo nativo.
+        // Lo enviamos y salimos (sin texto extra). Funciona con CUALQUIER redacción
+        // del cliente. Fallback: si Meta aún no propagó, respondemos en texto.
+        if ($toolCalls && ($toolCalls[0]['function']['name'] ?? '') === 'mostrar_catalogo') {
+            $enviadoCat = false;
+            try {
+                $enviadoCat = $this->enviarCatalogoWhatsapp($conversacion, $from, $connectionId);
+            } catch (\Throwable $e) {
+                Log::warning('🛒 mostrar_catalogo falló: ' . $e->getMessage());
+            }
+            if ($enviadoCat) {
+                Cache::put("wa_catalogo_enviado_t{$tenantId}_{$telefonoNorm}", true, now()->addMinutes(10));
+                return ''; // enviarProductos ya persistió el catálogo; no mandar texto encima
+            }
+            return $textContent
+                ?: "Con gusto ☕ Dime qué café te provoca y la cantidad, y te ayudo a armar tu pedido.";
+        }
 
         // 🛟 P0-1 · RED DE SEGURIDAD DEL CARRITO
         // Si la IA respondió SOLO texto (sin tool) pero ACUSÓ haber anotado /
@@ -10795,6 +10843,27 @@ PROMPT;
                         ],
                     ],
                     'required' => ['pedido_id_origen', 'productos'],
+                ],
+            ],
+        ];
+
+        // 🛒🟢 Tool: mostrar_catalogo — carrito nativo de WhatsApp.
+        // Se define siempre, pero SOLO se ofrece a la IA en tenants con catálogo
+        // conectado (se re-inyecta a las tools filtradas más abajo, gateado).
+        $tools[] = [
+            'type'     => 'function',
+            'function' => [
+                'name'        => 'mostrar_catalogo',
+                'description' => 'Envía al cliente el CATÁLOGO de productos DENTRO de WhatsApp para que los vea con foto y precio '
+                    . 'y arme su pedido en un carrito, sin salir del chat. ÚSALA SIEMPRE que el cliente: quiera hacer un pedido, '
+                    . 'pregunte qué productos/precios/variedades hay, pida ver el menú o catálogo, o muestre intención de comprar '
+                    . 'SIN haber dicho todavía un producto específico. Da igual cómo lo escriba. '
+                    . 'NUNCA enumeres productos ni precios en texto: en su lugar llama esta función. '
+                    . 'NO la llames si el cliente YA dijo exactamente qué quiere (ej. "quiero 2 de X") — ahí sigue el flujo normal.',
+                'parameters'  => [
+                    'type'       => 'object',
+                    'properties' => new \stdClass(),
+                    'required'   => [],
                 ],
             ],
         ];
