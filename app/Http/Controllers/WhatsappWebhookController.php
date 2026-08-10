@@ -6952,8 +6952,14 @@ TXT;
           return false; // tenant sin carrito nativo → flujo normal
       }
 
-      // Productos activos del tenant (máx 30 en un Multi-Product Message).
+      // Productos activos del tenant.
       $sedeId = $this->obtenerSedeIdDesdeConexion($connectionId);
+      $svc = app(\App\Services\Meta\MetaWhatsappCloudService::class);
+
+      // Contar total de productos activos para decidir el formato.
+      $totalActivos = \App\Models\Producto::where('activo', true)->count();
+
+      // Traemos hasta 30 (para la lista) y el 1º sirve de miniatura del catálogo.
       $productos = \App\Models\Producto::where('activo', true)
           ->orderBy('nombre')
           ->take(30)
@@ -6967,16 +6973,29 @@ TXT;
 
       if (empty($skus)) return false;
 
-      $ok = app(\App\Services\Meta\MetaWhatsappCloudService::class)->enviarProductos(
-          telefono: $from,
-          header: 'Nuestro catálogo ☕',
-          cuerpo: "Toca *Ver artículos*, elige lo que quieras y agrégalo al carrito 🛒. Cuando termines, envíanos el pedido y seguimos.",
-          catalogId: (string) $cfg->catalog_id,
-          secciones: [['title' => 'Productos', 'skus' => $skus]],
-          tenantId: $tenantId,
-          phoneNumberId: $cfg->phone_number_id,
-          footer: 'Arma tu pedido aquí mismo'
-      );
+      // ── CATÁLOGO GRANDE (>30) → mensaje de catálogo COMPLETO con buscador ──
+      if ($totalActivos > 30) {
+          $ok = $svc->enviarMensajeCatalogo(
+              telefono: $from,
+              cuerpo: "Aquí está nuestro catálogo completo ☕. Toca *Ver catálogo*, busca lo que quieras, agrégalo al carrito 🛒 y envíanos tu pedido.",
+              thumbnailSku: $skus[0],
+              tenantId: $tenantId,
+              phoneNumberId: $cfg->phone_number_id,
+              footer: 'Busca y arma tu pedido aquí'
+          );
+      } else {
+          // ── CATÁLOGO PEQUEÑO (≤30) → lista directa de productos ──
+          $ok = $svc->enviarProductos(
+              telefono: $from,
+              header: 'Nuestro catálogo ☕',
+              cuerpo: "Toca *Ver artículos*, elige lo que quieras y agrégalo al carrito 🛒. Cuando termines, envíanos el pedido y seguimos.",
+              catalogId: (string) $cfg->catalog_id,
+              secciones: [['title' => 'Productos', 'skus' => $skus]],
+              tenantId: $tenantId,
+              phoneNumberId: $cfg->phone_number_id,
+              footer: 'Arma tu pedido aquí mismo'
+          );
+      }
 
       if ($ok) {
           Log::info('🛒🟢 Catálogo enviado dentro de WhatsApp', [

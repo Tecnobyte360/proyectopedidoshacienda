@@ -207,6 +207,64 @@ class MetaWhatsappCloudService
     }
 
     /**
+     * 🛒🔎 Envía un MENSAJE DE CATÁLOGO (catalog_message). A diferencia de la
+     * lista de productos, este abre el CATÁLOGO COMPLETO con BUSCADOR nativo de
+     * WhatsApp — ideal para catálogos grandes (muchos productos). El cliente
+     * busca, arma el carrito y lo envía (webhook type=order, misma captura).
+     *
+     * @param string $thumbnailSku SKU del producto que se muestra como miniatura.
+     */
+    public function enviarMensajeCatalogo(
+        string  $telefono,
+        string  $cuerpo,
+        string  $thumbnailSku,
+        ?int    $tenantId = null,
+        ?string $phoneNumberId = null,
+        ?string $footer = null,
+        bool    $persistir = true
+    ): bool {
+        $config = $this->resolverConfig($tenantId, $phoneNumberId);
+        if (!$config) return false;
+
+        $interactive = [
+            'type'   => 'catalog_message',
+            'body'   => ['text' => mb_substr($cuerpo, 0, 1024)],
+            'action' => [
+                'name'       => 'catalog_message',
+                'parameters' => ['thumbnail_product_retailer_id' => trim($thumbnailSku)],
+            ],
+        ];
+        if ($footer) {
+            $interactive['footer'] = ['text' => mb_substr($footer, 0, 60)];
+        }
+
+        $payload = [
+            'messaging_product' => 'whatsapp',
+            'to'                => $this->normalizar($telefono),
+            'type'              => 'interactive',
+            'interactive'       => $interactive,
+        ];
+
+        $ok = $this->ejecutar($config, $payload, 'catalog_message');
+
+        if ($persistir && $ok && $this->ultimoWamid) {
+            $this->persistirOutbound(
+                config: $config,
+                telefono: $telefono,
+                contenido: $cuerpo . " 🛒🔎 (catálogo completo)",
+                wamid: $this->ultimoWamid,
+                meta: [
+                    'enviado_por_humano' => false,
+                    'provider'           => 'meta',
+                    'tipo'               => 'catalog_message',
+                ],
+            );
+        }
+
+        return $ok;
+    }
+
+    /**
      * Envía plantilla aprobada (template). NO requiere sesión abierta.
      * @param string $plantilla nombre EXACTO de la template en Meta
      * @param array  $variables substitución posicional: ['{{1}}' => 'x', '{{2}}' => 'y']
