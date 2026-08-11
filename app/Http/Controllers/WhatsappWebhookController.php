@@ -7720,7 +7720,21 @@ TXT;
           // etc.) Y el cliente no especificó departamento → pedir clarificación
           // ANTES de geocodificar para evitar adivinanzas.
           $deptosDuplicados = $this->departamentosDeMunicipioAmbiguo($ciudad ?: '');
-          if (!empty($deptosDuplicados) && !$this->mensajeContieneDepartamento($telefonoCliente)) {
+          // 🛡️ Si el DEPARTAMENTO ya viene en la dirección/barrio/ciudad guardada
+          //    (ej. "...La Estrella, Antioquia"), NO pedir clarificación — ya lo
+          //    tenemos. Esto evita que al CONFIRMAR (último msg = tap del botón) se
+          //    pierda el departamento que el cliente ya dio y se bloquee el pedido.
+          $textoUbic = mb_strtolower(\Illuminate\Support\Str::ascii(
+              trim(($direccion ?? '') . ' ' . ($barrio ?? '') . ' ' . ($ciudad ?? ''))
+          ));
+          $deptoEnDireccion = false;
+          foreach ($deptosDuplicados as $dep) {
+              if (str_contains($textoUbic, mb_strtolower(\Illuminate\Support\Str::ascii($dep)))) {
+                  $deptoEnDireccion = true;
+                  break;
+              }
+          }
+          if (!empty($deptosDuplicados) && !$deptoEnDireccion && !$this->mensajeContieneDepartamento($telefonoCliente)) {
               $listaDeptos = implode(', ', $deptosDuplicados);
               Log::info('🛡️ Municipio con duplicados — pidiendo departamento', [
                   'ciudad'        => $ciudad,
