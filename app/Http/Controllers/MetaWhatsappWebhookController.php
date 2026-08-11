@@ -6,6 +6,7 @@ use App\Models\MetaWhatsappConfig;
 use App\Models\Tenant;
 use App\Services\TenantManager;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -97,6 +98,14 @@ class MetaWhatsappWebhookController extends Controller
 
                 // Procesar mensajes
                 foreach ($value['messages'] ?? [] as $msg) {
+                    // 🔁 Reenvío al WMS Doblamos: respuestas de botón de confirmación de entrega.
+                    // Estos botones NO son del bot de KIVOX (id "entrega_confirmar:/entrega_rechazar:"),
+                    // así que se reenvían al WMS y NO se procesan aquí (evita respuestas del bot).
+                    $btnId = $msg['interactive']['button_reply']['id'] ?? ($msg['button']['payload'] ?? '');
+                    if (is_string($btnId) && preg_match('/^entrega_(confirmar|rechazar):/', $btnId)) {
+                        $this->reenviarAlWmsDoblamos($msg, $value);
+                        continue;
+                    }
                     $this->procesarMensaje($msg, $value, $config, $request);
                 }
 
@@ -120,6 +129,39 @@ class MetaWhatsappWebhookController extends Controller
         }
 
         return response()->json(['status' => 'ok'], 200);
+    }
+
+    /**
+     * Reenvía una respuesta de botón de "confirmación de entrega" al webhook del
+     * WMS Doblamos, reconstruyendo el sobre de Meta que ese webhook espera.
+     * No bloquea ni afecta el flujo de KIVOX (best-effort, con try/catch).
+     */
+    private function reenviarAlWmsDoblamos(array $msg, array $value): void
+    {
+        try {
+            $url = (string) env('WMS_WHATSAPP_WEBHOOK', 'https://wms-produccion.doblamos.com/api/whatsapp/webhook');
+            if ($url === '') return;
+            $payload = [
+                'object' => 'whatsapp_business_account',
+                'entry'  => [[
+                    'changes' => [[
+                        'field' => 'messages',
+                        'value' => [
+                            'messaging_product' => 'whatsapp',
+                            'metadata'          => $value['metadata'] ?? [],
+                            'messages'          => [$msg],
+                        ],
+                    ]],
+                ]],
+            ];
+            Http::timeout(15)->acceptJson()->post($url, $payload);
+            Log::info('🔁 Reenviado a WMS Doblamos', [
+                'from'  => $msg['from'] ?? null,
+                'btn'   => $msg['interactive']['button_reply']['id'] ?? null,
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('🔁 Reenvío WMS Doblamos falló', ['error' => $e->getMessage()]);
+        }
     }
 
     /**
