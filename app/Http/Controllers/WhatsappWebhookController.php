@@ -7223,6 +7223,28 @@ TXT;
 
       if (empty($skus)) return false;
 
+      // 👋 SALUDO DE BIENVENIDA antes del catálogo — solo la PRIMERA vez que el
+      //    bot responde en esta conversación (no repetir en re-envíos). Así el
+      //    cliente recibe un saludo cordial y LUEGO el catálogo (no de golpe).
+      try {
+          $yaRespondioBot = \App\Models\MensajeWhatsapp::where('conversacion_id', $conv->id)
+              ->where('rol', \App\Models\MensajeWhatsapp::ROL_ASSISTANT)->exists();
+          if (!$yaRespondioBot) {
+              $tienda = trim((string) (optional(\App\Models\Tenant::withoutGlobalScopes()->find($tenantId))->nombre ?: ''))
+                  ?: 'nuestra tienda';
+              $nom = trim((string) optional($conv->cliente)->nombre);
+              $primer = '';
+              if ($nom !== '' && mb_strtolower($nom) !== 'cliente' && !str_contains($nom, '@')) {
+                  $primer = ' ' . (explode(' ', $nom)[0] ?? '');
+              }
+              $saludo = "¡Hola{$primer}! 👋 Bienvenid@ a *{$tienda}* ☕ Con gusto te muestro nuestros cafés 👇";
+              if ($svc->enviarTexto($from, $saludo, $tenantId, $cfg->phone_number_id)) {
+                  app(\App\Services\ConversacionService::class)
+                      ->agregarMensaje($conv, \App\Models\MensajeWhatsapp::ROL_ASSISTANT, $saludo);
+              }
+          }
+      } catch (\Throwable $e) { /* no bloquear el envío del catálogo */ }
+
       // ── CATÁLOGO GRANDE (>30) → mensaje de catálogo COMPLETO con buscador ──
       if ($totalActivos > 30) {
           $ok = $svc->enviarMensajeCatalogo(
