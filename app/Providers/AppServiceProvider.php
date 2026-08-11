@@ -35,6 +35,10 @@ class AppServiceProvider extends ServiceProvider
         URL::forceScheme('https');
     }
 
+    // 🛒⚡ Sincronización en tiempo real de productos con el catálogo de Meta
+    // (solo tenants con catalog_token). Ver ProductoObserver.
+    \App\Models\Producto::observe(\App\Observers\ProductoObserver::class);
+
     // 📦 Forzar límite de payload de Livewire a 10 MB en runtime.
     // ⚠️ La unidad es BYTES (no KB). 10 MB = 10 * 1024 * 1024 = 10485760
     // Default es 1024*1024 (1 MB). Polígonos grandes (2000+ puntos) lo exceden.

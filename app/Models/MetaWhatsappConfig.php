@@ -21,6 +21,7 @@ class MetaWhatsappConfig extends Model
         'phone_number_id',
         'waba_id',
         'catalog_id',
+        'catalog_token',
         'access_token',
         'api_version',
         'verify_token',
@@ -36,6 +37,7 @@ class MetaWhatsappConfig extends Model
 
     protected $hidden = [
         'access_token',
+        'catalog_token',
         'app_secret',
         'verify_token',
     ];
