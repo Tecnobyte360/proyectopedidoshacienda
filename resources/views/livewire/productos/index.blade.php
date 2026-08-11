@@ -88,6 +88,9 @@
                             <th class="px-3 py-3 text-center text-[10px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap hidden lg:table-cell">Sedes</th>
                             <th class="px-3 py-3 text-center text-[10px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Estado</th>
                             <th class="px-3 py-3 text-center text-[10px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Destacado</th>
+                            @if($tieneCatalogoWa ?? false)
+                            <th class="px-3 py-3 text-center text-[10px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">WhatsApp</th>
+                            @endif
                             <th class="px-3 py-3 text-right text-[10px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">Acciones</th>
                         </tr>
                     </thead>
@@ -180,6 +183,30 @@
                                     </button>
                                 </td>
 
+                                {{-- WhatsApp (estado de aprobación en el catálogo) --}}
+                                @if($tieneCatalogoWa ?? false)
+                                <td class="px-3 py-3 align-middle text-center">
+                                    @php $wa = $waEstados[$producto->codigo] ?? null; @endphp
+                                    @if($wa === 'APPROVED')
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700" title="Aprobado — ya aparece en el catálogo de WhatsApp">
+                                            <i class="fa-brands fa-whatsapp"></i> Listo
+                                        </span>
+                                    @elseif($wa === 'REJECTED')
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-semibold text-rose-700" title="Rechazado por Meta — revisa el producto (foto/precio/descripción)">
+                                            <i class="fa-solid fa-circle-xmark"></i> Rechazado
+                                        </span>
+                                    @elseif($wa !== null)
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700" title="Meta lo está revisando — aparecerá en WhatsApp cuando lo apruebe">
+                                            <i class="fa-solid fa-clock"></i> En revisión
+                                        </span>
+                                    @else
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500" title="Aún no sincronizado con el catálogo de Meta">
+                                            <i class="fa-solid fa-minus"></i> —
+                                        </span>
+                                    @endif
+                                </td>
+                                @endif
+
                                 {{-- Acciones --}}
                                 <td class="px-3 py-3 align-middle">
                                     <div class="flex items-center justify-end gap-1">
@@ -199,7 +226,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="9" class="px-6 py-16 text-center">
+                                <td colspan="{{ ($tieneCatalogoWa ?? false) ? 10 : 9 }}" class="px-6 py-16 text-center">
                                     <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-slate-50 text-slate-400">
                                         <i class="fa-solid fa-box-open text-xl"></i>
                                     </div>

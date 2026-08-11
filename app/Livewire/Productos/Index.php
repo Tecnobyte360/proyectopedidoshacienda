@@ -294,7 +294,15 @@ class Index extends Component
 
         $cortes = \App\Models\Corte::where('activo', true)->orderBy('orden')->orderBy('nombre')->get();
 
-        return view('livewire.productos.index', compact('productos', 'categorias', 'sedes', 'cortes'))
+        // 🟢 Estado de aprobación en WhatsApp por producto (solo tenants con catálogo).
+        $waEstados = [];
+        try {
+            $waEstados = app(\App\Services\Meta\MetaCatalogSyncService::class)
+                ->estadosWhatsApp((int) app(\App\Services\TenantManager::class)->id());
+        } catch (\Throwable $e) { /* no romper la tabla */ }
+        $tieneCatalogoWa = !empty($waEstados);
+
+        return view('livewire.productos.index', compact('productos', 'categorias', 'sedes', 'cortes', 'waEstados', 'tieneCatalogoWa'))
             ->layout('layouts.app');
     }
 }

@@ -5,6 +5,7 @@ namespace App\Services\Meta;
 use App\Models\MetaWhatsappConfig;
 use App\Models\Producto;
 use App\Models\Tenant;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\URL;
@@ -30,6 +31,51 @@ class MetaCatalogSyncService
                 'data'   => $this->itemData($producto),
             ],
         ], 'upsert', $sku);
+    }
+
+    /**
+     * 🟢 Estado de aprobación de cada producto EN WHATSAPP.
+     * Devuelve [ sku => 'APPROVED' | 'NO_REVIEW' | 'REJECTED' | 'PENDING' ] leído
+     * del campo capability_to_review_status (clave WHATSAPP) del catálogo de Meta.
+     * Cacheado 5 min. Vacío si el tenant no tiene catálogo/token.
+     */
+    public function estadosWhatsApp(int $tenantId): array
+    {
+        if ($tenantId <= 0) return [];
+        return Cache::remember("meta_wa_estados_t{$tenantId}", 300, function () use ($tenantId) {
+            $cfg = MetaWhatsappConfig::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)->where('activo', true)->first();
+            if (!$cfg || empty($cfg->catalog_id) || empty($cfg->catalog_token)) return [];
+
+            $api = $cfg->api_version ?: 'v25.0';
+            $url = "https://graph.facebook.com/{$api}/{$cfg->catalog_id}/products"
+                 . "?fields=retailer_id,capability_to_review_status&limit=200";
+            $map = [];
+
+            try {
+                for ($i = 0; $i < 15 && $url; $i++) {
+                    $resp = Http::withToken($cfg->catalog_token)->timeout(20)->get($url);
+                    if (!$resp->successful()) break;
+                    foreach ($resp->json('data', []) as $it) {
+                        $sku = $it['retailer_id'] ?? null;
+                        if (!$sku) continue;
+                        $wa = 'NO_REVIEW';
+                        foreach (($it['capability_to_review_status'] ?? []) as $cap) {
+                            if (($cap['key'] ?? '') === 'WHATSAPP') {
+                                $wa = $cap['value'] ?? 'NO_REVIEW';
+                                break;
+                            }
+                        }
+                        $map[$sku] = $wa;
+                    }
+                    $url = $resp->json('paging.next');
+                }
+            } catch (\Throwable $e) {
+                Log::warning('estadosWhatsApp falló: ' . $e->getMessage());
+            }
+
+            return $map;
+        });
     }
 
     /** Elimina un producto del catálogo de Meta por su SKU (id). */
