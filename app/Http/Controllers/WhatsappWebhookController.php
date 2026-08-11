@@ -11282,6 +11282,28 @@ PROMPT;
             // el botón y el cliente puede confirmar.
             if (!$this->replyPideConfirmacion($reply) && !$estado->estaCompleto()) return false;
 
+            // 🚫 ANTI-DUPLICADO: no re-enviar la MISMA confirmación una y otra vez.
+            //    Firmamos el estado del pedido (productos + entrega + datos). Si ya
+            //    mostramos exactamente esta confirmación, la suprimimos (evita el
+            //    bucle de "¿Confirmamos el pedido?" repetido en cada mensaje).
+            $telNormConf = $this->normalizarTelefono($from);
+            $firma = md5(json_encode([
+                'p' => $estado->productos,
+                'm' => $estado->metodo_entrega,
+                'd' => $estado->direccion,
+                's' => $estado->sede_id,
+                'c' => $estado->cedula,
+                'n' => $estado->nombre_cliente,
+                'e' => $estado->costo_envio,
+            ], JSON_UNESCAPED_UNICODE));
+            $firmaKey = "wa_conf_firma_t{$tenant?->id}_{$telNormConf}";
+            if (Cache::get($firmaKey) === $firma) {
+                Log::info('🔘 Confirmación duplicada suprimida (misma firma)', [
+                    'conv_id' => $conv->id,
+                ]);
+                return true; // ya se mostró: no re-enviar ni mandar texto encima
+            }
+
             // Cuerpo WYSIWYG desde el carrito real.
             $cuerpo = $this->construirResumenPedidoDesdeEstado($estado);
 
@@ -11299,6 +11321,9 @@ PROMPT;
                 false // no persistir aquí: actualizamos el mensaje ya persistido por el LLM
             );
             if (!$ok) return false;
+
+            // ✅ Guardar la firma para no repetir ESTA confirmación (30 min).
+            Cache::put($firmaKey, $firma, now()->addMinutes(30));
 
             // Que el chat muestre EXACTAMENTE lo que recibió el cliente.
             try {
