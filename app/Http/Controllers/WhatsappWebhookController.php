@@ -8180,17 +8180,40 @@ TXT;
             ->orderByDesc('id')
             ->first();
         if ($pedidoRecienteCliente) {
-            $minDesde = (int) abs(now()->diffInMinutes($pedidoRecienteCliente->created_at));
-            Log::warning('🛡️ confirmar_pedido bloqueado — cliente ya tiene pedido reciente', [
+            // 🛡️ Solo bloqueamos si es EL MISMO pedido (mismos productos). Un pedido
+            //    NUEVO con productos DISTINTOS sí se permite — el cliente puede hacer
+            //    varios pedidos el mismo día.
+            $mismoPedido = false;
+            try {
+                $prodNuevos = $orderData['products'] ?? [];
+                if (empty($prodNuevos)) {
+                    $mismoPedido = true; // sin productos = re-confirmación del mismo
+                } else {
+                    $prodExist = $pedidoRecienteCliente->productos()->get(['nombre', 'cantidad'])->toArray();
+                    $mismoPedido = $this->productosSonIguales($prodExist, $prodNuevos);
+                }
+            } catch (\Throwable $e) {
+                $mismoPedido = false; // ante la duda, permitir crear (no bloquear)
+            }
+
+            if ($mismoPedido) {
+                $minDesde = (int) abs(now()->diffInMinutes($pedidoRecienteCliente->created_at));
+                Log::warning('🛡️ confirmar_pedido bloqueado — MISMO pedido reciente (duplicado)', [
+                    'from'             => $from,
+                    'pedido_existente' => $pedidoRecienteCliente->id,
+                    'total_existente'  => $pedidoRecienteCliente->total,
+                    'minutos_desde'    => $minDesde,
+                ]);
+                $total = '$' . number_format((float) $pedidoRecienteCliente->total, 0, ',', '.');
+                return "Tu pedido #{$pedidoRecienteCliente->id} ya está registrado ✅\n\n"
+                    . "💵 Total: {$total}\n"
+                    . "Si necesitas algo distinto, cuéntame qué es y te ayudo 🙌";
+            }
+
+            Log::info('📝 Pedido reciente PERO productos distintos — se permite crear pedido nuevo', [
                 'from'               => $from,
-                'pedido_existente'   => $pedidoRecienteCliente->id,
-                'total_existente'    => $pedidoRecienteCliente->total,
-                'minutos_desde'      => $minDesde,
+                'pedido_anterior_id' => $pedidoRecienteCliente->id,
             ]);
-            $total = '$' . number_format((float) $pedidoRecienteCliente->total, 0, ',', '.');
-            return "Tu pedido #{$pedidoRecienteCliente->id} ya está registrado ✅\n\n"
-                . "💵 Total: {$total}\n"
-                . "Si necesitas algo distinto, cuéntame qué es y te ayudo 🙌";
         }
 
         // 🚨 GUARD CRÍTICO: CÉDULA OBLIGATORIA si hay lookup ERP activo.
