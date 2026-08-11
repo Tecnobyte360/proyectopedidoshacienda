@@ -590,6 +590,12 @@ class WhatsappWebhookController extends Controller
 
             $replyAntesValidador = $reply;
             if (!$enModoMenu) {
+                // 🛟 RED DE SEGURIDAD (catálogo): si el bot se descarrila y responde
+                //    algo fuera de contexto (cobertura/envío) con el carrito VACÍO,
+                //    lo reemplazamos por una pregunta clara para que el cliente sepa
+                //    qué hacer. Nunca lo dejamos con una respuesta sin sentido.
+                $reply = $this->sanearRespuestaCatalogoOffContext($reply, $from, $connectionId);
+
                 // 🛡️ GUARD ANTI-ALUCINACIÓN: pedidos fuera de horario
                 $reply = $this->aplicarGuardPedidosProgramados($reply);
 
@@ -7114,6 +7120,49 @@ TXT;
       }
 
       return $productosEstado;
+  }
+
+  /**
+   * 🛟 RED DE SEGURIDAD (tenants con catálogo): si el carrito está VACÍO pero el
+   * bot respondió algo de logística (cobertura/envío/dirección), esa respuesta
+   * está fuera de contexto (el cliente aún no ha armado pedido). La reemplazamos
+   * por una pregunta clara para que el cliente sepa qué hacer — nunca lo dejamos
+   * con una respuesta sin sentido.
+   */
+  private function sanearRespuestaCatalogoOffContext(string $reply, string $from, $connectionId): string
+  {
+      try {
+          if (trim($reply) === '') return $reply;
+          $tenantId = app(\App\Services\TenantManager::class)->id();
+          $tieneCat = \App\Models\MetaWhatsappConfig::where('tenant_id', $tenantId)
+              ->where('activo', true)->whereNotNull('catalog_id')->where('catalog_id', '!=', '')->exists();
+          if (!$tieneCat) return $reply;
+
+          $telNorm = $this->normalizarTelefono($from);
+          $conv = \App\Models\ConversacionWhatsapp::where('telefono_normalizado', $telNorm)
+              ->orderByDesc('id')->first();
+          if (!$conv) return $reply;
+
+          $estado = app(\App\Services\EstadoPedidoService::class)->obtener($conv);
+          if (!empty($estado->productos)) return $reply; // hay pedido en curso: logística válida
+
+          // Carrito VACÍO → cualquier respuesta de cobertura/envío/dirección es off-context.
+          $r = mb_strtolower(\Illuminate\Support\Str::ascii($reply));
+          $offContext = str_contains($r, 'llegamos a tu direccion')
+              || str_contains($r, 'cobertura')
+              || str_contains($r, 'resto de colombia')
+              || str_contains($r, 'costo de envio')
+              || (str_contains($r, 'envio') && str_contains($r, '$'))
+              || str_contains($r, 'quedo incompleto')
+              || str_contains($r, 'no entendi tu mensaje');
+
+          if ($offContext) {
+              Log::info('🛟 Respuesta off-context saneada (carrito vacío)', ['conv_id' => $conv->id]);
+              return "Disculpa 🙏 ¿Seguimos con tu pedido? Puedo mostrarte el *catálogo* para que elijas tus cafés, "
+                  . "o dime en qué te ayudo ☕.";
+          }
+      } catch (\Throwable $e) { /* no bloquear el envío */ }
+      return $reply;
   }
 
   /**
