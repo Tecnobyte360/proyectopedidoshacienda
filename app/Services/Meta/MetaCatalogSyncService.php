@@ -23,15 +23,16 @@ class MetaCatalogSyncService
     /** Sincroniza (CREATE/UPDATE) un producto en el catálogo de Meta. */
     public function upsert(Producto $producto): bool
     {
+        $sku = $producto->codigo ?: ('KVX-' . $producto->id);
         return $this->enviarBatch($producto->tenant_id, [
             [
                 'method' => 'UPDATE', // UPDATE crea si no existe (upsert)
                 'data'   => $this->itemData($producto),
             ],
-        ], 'upsert', $producto->codigo ?? (string) $producto->id);
+        ], 'upsert', $sku);
     }
 
-    /** Elimina un producto del catálogo de Meta por su SKU (retailer_id). */
+    /** Elimina un producto del catálogo de Meta por su SKU (id). */
     public function eliminar(int $tenantId, string $sku): bool
     {
         $sku = trim($sku);
@@ -40,7 +41,7 @@ class MetaCatalogSyncService
         return $this->enviarBatch($tenantId, [
             [
                 'method' => 'DELETE',
-                'data'   => ['retailer_id' => $sku],
+                'data'   => ['id' => $sku],
             ],
         ], 'delete', $sku);
     }
@@ -64,17 +65,18 @@ class MetaCatalogSyncService
         $descripcion = $producto->descripcion
             ?: ($producto->descripcion_corta ?: $producto->nombre);
 
+        // ⚠️ items_batch usa el formato del FEED: id, title, price "MONTO COP",
+        //    image_link, link (no retailer_id/name/image_url).
         return [
-            'retailer_id'      => $producto->codigo ?: ('KVX-' . $producto->id),
-            'name'             => mb_substr((string) $producto->nombre, 0, 200),
-            'description'      => mb_substr((string) $descripcion, 0, 9999),
-            'availability'     => 'in stock',
-            'condition'        => 'new',
-            'price'            => (int) round(((float) $producto->precio_base) * 100), // centavos
-            'currency'         => 'COP',
-            'image_url'        => $imagen,
-            'url'              => url('/'),
-            'brand'            => $marca,
+            'id'           => $producto->codigo ?: ('KVX-' . $producto->id),
+            'title'        => mb_substr((string) $producto->nombre, 0, 200),
+            'description'  => mb_substr((string) $descripcion, 0, 9999),
+            'availability' => 'in stock',
+            'condition'    => 'new',
+            'price'        => number_format((float) $producto->precio_base, 2, '.', '') . ' COP',
+            'link'         => url('/'),
+            'image_link'   => $imagen,
+            'brand'        => $marca,
         ];
     }
 
