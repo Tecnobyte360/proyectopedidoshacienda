@@ -1873,6 +1873,14 @@ TXT;
                     }
                 }
                 $messages[] = ['role' => 'system', 'content' =>
+                    "☕ PREGUNTAS SOBRE EL CAFÉ: si el cliente pregunta por notas de cata, sabor, aroma, "
+                    . "descripción, proceso o tostión de un café, RESPÓNDELE con la información real del catálogo "
+                    . "(usa `buscar_productos`/`info_producto` para obtener la descripción). Si no queda claro a cuál "
+                    . "café se refiere, pregúntale amablemente cuál es o invítalo a abrir el catálogo. "
+                    . "PROHIBIDO decir que su mensaje 'quedó incompleto', 'no se entendió' o similar cuando el mensaje "
+                    . "SÍ se entiende — eso confunde al cliente."];
+
+                $messages[] = ['role' => 'system', 'content' =>
                     "🎯 MODO PEDIDO DIRECTO (OBLIGATORIO, tiene prioridad sobre cualquier instrucción de pasos):\n"
                     . "1) Apenas el cliente tenga productos en el carrito, pídele TODO EN UN SOLO MENSAJE: "
                     . "*nombre completo*, *número de cédula*, *celular de contacto* y *dirección de entrega* "
@@ -1930,8 +1938,12 @@ TXT;
         // 🛡️ SKIP si la cobertura YA fue validada exitosamente — evita re-forzar
         // cuando el cliente repite la ciudad en sus datos de envío.
         $coberturaYaOk = $estadoActualBd?->cobertura_validada ?? false;
-        $lugarEnMsg = $preguntaProducto ? null : $this->extraerLugarDelMensaje($message);
-        $contextoEsCobertura = !$preguntaProducto && !$coberturaYaOk && $lugarEnMsg && $this->contextoSugiereCobertura($conversacion, $message);
+        // 🛒 Catálogo nativo: con carrito VACÍO nunca es una consulta de cobertura
+        //    (ej. "¿qué notas tiene el guayacán amarillo?" NO es una dirección).
+        //    Solo se valida cobertura cuando el cliente YA está pidiendo (cart lleno).
+        $bloqueoCobCatalogo = $tieneCatalogoNativo && empty($estadoActualBd?->productos);
+        $lugarEnMsg = ($preguntaProducto || $bloqueoCobCatalogo) ? null : $this->extraerLugarDelMensaje($message);
+        $contextoEsCobertura = !$bloqueoCobCatalogo && !$preguntaProducto && !$coberturaYaOk && $lugarEnMsg && $this->contextoSugiereCobertura($conversacion, $message);
 
         // 🛡️ Caso especial: el bot acaba de pedir clarificación de ciudad
         // y el cliente está respondiendo. Si el cliente dice un lugar
