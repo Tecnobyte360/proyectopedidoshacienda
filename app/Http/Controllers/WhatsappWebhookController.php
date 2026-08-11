@@ -1738,6 +1738,39 @@ TXT;
                 $estadoSrv->captarDelMensajeUsuario($conversacion, $message);
             }
 
+            // 🏠 CLIENTE QUE VUELVE: si eligió DOMICILIO, tiene una dirección
+            //    anterior y aún no dio dirección en este pedido, le ofrecemos con
+            //    BOTONES usar la misma o dar otra (no re-pedir todo por texto).
+            if ($catNativoCap) {
+                $estOfr = $estadoSrv->obtener($conversacion);
+                $esDom  = ($estOfr->metodo_entrega === \App\Models\ConversacionPedidoEstado::METODO_DOMICILIO);
+                if (!empty($estOfr->productos) && $esDom && empty($estOfr->direccion) && !$estOfr->confirmado_at) {
+                    $askDirKey = "wa_dir_preguntada_t{$tenantId}_{$telefonoNorm}";
+                    if (!Cache::has($askDirKey)) {
+                        [$dirPrev, $barrioPrev] = $this->ultimaDireccionCliente($conversacion);
+                        if ($dirPrev) {
+                            $vieneMetaDir = is_string($connectionId) && str_starts_with($connectionId, 'meta:');
+                            $pnidDir = $vieneMetaDir ? substr($connectionId, 5) : null;
+                            $cuerpoDir = "📦 ¿Te envío a tu dirección de siempre?\n📍 " . $dirPrev
+                                . ($barrioPrev ? ", {$barrioPrev}" : "");
+                            $okDir = app(\App\Services\Meta\MetaWhatsappCloudService::class)->enviarBotones(
+                                $from, $cuerpoDir,
+                                [
+                                    ['id' => 'kivox_dir_misma', 'title' => self::BTN_DIR_MISMA],
+                                    ['id' => 'kivox_dir_otra',  'title' => self::BTN_DIR_OTRA],
+                                ],
+                                $tenantId, $pnidDir, true
+                            );
+                            if ($okDir) {
+                                Cache::put($askDirKey, true, now()->addMinutes(30));
+                                Log::info('🏠 Ofrecidos botones misma/otra dirección', ['conv_id' => $conversacion->id]);
+                                return '';
+                            }
+                        }
+                    }
+                }
+            }
+
             $resumenEstado = $estadoSrv->resumenParaPrompt($conversacion);
             if ($resumenEstado !== '') {
                 $reinforceEstadoPedido[] = [
@@ -7084,6 +7117,22 @@ TXT;
   }
 
   /**
+   * 🏠 Devuelve la última dirección de entrega usada por el cliente (de su último
+   * pedido a domicilio). [direccion, barrio] o [null, null] si no hay.
+   */
+  private function ultimaDireccionCliente(\App\Models\ConversacionWhatsapp $conv): array
+  {
+      if (!$conv->cliente_id) return [null, null];
+      $p = \App\Models\Pedido::withoutGlobalScopes()
+          ->where('cliente_id', $conv->cliente_id)
+          ->whereNotNull('direccion')
+          ->where('direccion', '!=', '')
+          ->orderByDesc('id')
+          ->first();
+      return $p ? [$p->direccion, $p->barrio] : [null, null];
+  }
+
+  /**
    * 🛒🟢 Envía el CATÁLOGO dentro de WhatsApp (Multi-Product Message) con los
    * productos activos del tenant. Solo aplica a tenants con catalog_id configurado
    * (carrito nativo). Devuelve true si Meta aceptó el mensaje.
@@ -7182,9 +7231,12 @@ TXT;
   ): string {
       $estadoSrv = app(\App\Services\EstadoPedidoService::class);
 
-      // 🧹 Carrito NUEVO: vaciar lo anterior para que un pedido no arrastre items
-      //    de un pedido pasado (el carrito de Meta es la fuente de verdad ahora).
-      $this->procesarAgregarProductoAlPedido($conv, 'clear', '', '', 0, '', $connectionId, '');
+      // 🧹 PEDIDO NUEVO: reiniciar el estado por-pedido (productos, método,
+      //    dirección, cobertura, confirmado_at) para que NO arrastre datos del
+      //    pedido anterior — CONSERVANDO cédula/nombre del cliente. Así, un cliente
+      //    que vuelve NO reusa la dirección vieja en silencio: se le vuelve a
+      //    preguntar (misma/otra) y el carrito de Meta es la única fuente de verdad.
+      $estadoSrv->reiniciarParaNuevoPedido($conv);
 
       $ultimo = null;
       $noEncontrados = [];
@@ -11112,6 +11164,8 @@ PROMPT;
     private const BTN_CONFIRMAR_TITULO = '✅ Confirmar pedido';
     private const BTN_MODIFICAR_TITULO = '✏️ Modificar';
     private const BTN_CANCELAR_TITULO  = '❌ Cancelar';
+    private const BTN_DIR_MISMA        = '🏠 Misma dirección';
+    private const BTN_DIR_OTRA         = '📍 Otra dirección';
 
     /**
      * Detecta si el mensaje entrante es el tap de uno de nuestros botones de
@@ -11123,6 +11177,8 @@ PROMPT;
             self::BTN_CONFIRMAR_TITULO => 'confirmar',
             self::BTN_MODIFICAR_TITULO => 'modificar',
             self::BTN_CANCELAR_TITULO  => 'cancelar',
+            self::BTN_DIR_MISMA        => 'dir_misma',
+            self::BTN_DIR_OTRA         => 'dir_otra',
             default                    => null,
         };
     }
@@ -11143,6 +11199,55 @@ PROMPT;
         $tenantId
     ): ?string {
         $estado = app(\App\Services\EstadoPedidoService::class)->obtener($conversacion);
+
+        // 📍 Cliente eligió OTRA dirección → limpiar y pedir la nueva.
+        if ($accion === 'dir_otra') {
+            try {
+                $estado->update([
+                    'direccion' => null, 'barrio' => null, 'ciudad' => null,
+                    'cobertura_validada' => false, 'costo_envio' => null,
+                ]);
+            } catch (\Throwable $e) { /* no crítico */ }
+            $reply = "Perfecto 📍 Escríbeme la *dirección de entrega* con barrio y ciudad, por favor.";
+            $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_ASSISTANT, $reply);
+            return $reply;
+        }
+
+        // 🏠 Cliente eligió la MISMA dirección de siempre → reutilizarla y validar.
+        if ($accion === 'dir_misma') {
+            [$dirPrev, $barrioPrev] = $this->ultimaDireccionCliente($conversacion);
+            if (!$dirPrev) {
+                $reply = "Escríbeme tu *dirección de entrega* con barrio y ciudad, por favor 📍";
+                $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_ASSISTANT, $reply);
+                return $reply;
+            }
+            try {
+                $estado->update(['direccion' => $dirPrev, 'barrio' => $barrioPrev]);
+                $sedeId = $this->obtenerSedeIdDesdeConexion($connectionId);
+                $res = $this->validarCoberturaDireccion(
+                    $dirPrev, $barrioPrev, $barrioPrev ?: null, $sedeId, $this->normalizarTelefono($from)
+                );
+                app(\App\Services\EstadoPedidoService::class)->captarCobertura($conversacion, $res);
+
+                if (!($res['cubierta'] ?? false)) {
+                    $reply = "Uy, esa dirección (*{$dirPrev}*) me sale *fuera de cobertura* ahora 😕. "
+                        . "¿Me das otra dirección o prefieres *recoger en tienda*?";
+                    $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_ASSISTANT, $reply);
+                    return $reply;
+                }
+
+                // Cubierta → devolver el resumen para que salgan los botones de confirmar.
+                $estadoFresh = app(\App\Services\EstadoPedidoService::class)->obtener($conversacion->fresh());
+                $reply = $this->construirResumenPedidoDesdeEstado($estadoFresh);
+                $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_ASSISTANT, $reply);
+                return $reply;
+            } catch (\Throwable $e) {
+                Log::warning('dir_misma falló: ' . $e->getMessage());
+                $reply = "Escríbeme tu *dirección de entrega* con barrio y ciudad, por favor 📍";
+                $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_ASSISTANT, $reply);
+                return $reply;
+            }
+        }
 
         if ($accion === 'cancelar') {
             try {

@@ -136,7 +136,12 @@ class EstadoPedidoService
                     // 🏠 Hidratar dirección/barrio del último pedido del cliente
                     // si el estado actual no los tiene. Asi los clientes recurrentes
                     // no tienen que volver a dictar la direccion en cada pedido.
-                    if (empty($estado->direccion) || empty($estado->barrio)) {
+                    // 🛒 EXCEPCIÓN catálogo nativo: NO auto-rellenar la dirección —
+                    //    el bot debe PREGUNTAR (misma/otra) en cada pedido. Solo se
+                    //    conservan cédula/nombre (hidratados arriba).
+                    $catalogoNativoHidrat = \App\Models\MetaWhatsappConfig::where('tenant_id', $conv->tenant_id)
+                        ->where('activo', true)->whereNotNull('catalog_id')->where('catalog_id', '!=', '')->exists();
+                    if (!$catalogoNativoHidrat && (empty($estado->direccion) || empty($estado->barrio))) {
                         try {
                             $ultPedido = \App\Models\Pedido::where('cliente_id', $cliente->id)
                                 ->whereNotNull('direccion')
@@ -642,7 +647,7 @@ class EstadoPedidoService
             'nombre_cliente'     => $nombre,
             'email'              => $email,
             'telefono'           => $telefono,
-            'cliente_existe_erp' => $clienteErp,
+            'cliente_existe_erp' => $clienteErp ?? false,
             'datos_erp'          => $datosErp,
             // Mantener validación de cliente_erp si la tenía
             'validaciones'       => array_intersect_key($validacs, array_flip(['cliente_erp'])) ?: null,
