@@ -299,6 +299,15 @@ class MetaWhatsappWebhookController extends Controller
             } catch (\Throwable $e) { /* no es crítico */ }
         }
 
+        // 🛒🟢 PRODUCTO REFERIDO: el cliente envió UN producto puntual desde el
+        //     catálogo (no el carrito completo). Meta lo manda en
+        //     context.referred_product (catalog_id + product_retailer_id = SKU).
+        //     Lo capturamos para agregarlo al pedido de forma determinista.
+        $productoReferidoSku = trim((string) ($msg['context']['referred_product']['product_retailer_id'] ?? ''));
+        if ($productoReferidoSku !== '') {
+            $body = trim("🛒 Producto del catálogo: {$productoReferidoSku}" . ($body !== '' ? " — {$body}" : ''));
+        }
+
         // 📊 Tracking campaña: si esta respuesta apunta a un mensaje de campaña,
         // marcamos respondio_at + (si es click de botón) boton_click.
         if ($contextWamid) {
@@ -382,6 +391,8 @@ class MetaWhatsappWebhookController extends Controller
                 'interactive_id'         => $interactiveId,
                 // 🛒 items del carrito nativo (webhook type=order) — [ [sku,qty], ... ]
                 'order_items'            => $orderItems,
+                // 🛒 SKU de un producto puntual enviado desde el catálogo (referido)
+                'producto_referido_sku'  => $productoReferidoSku ?: null,
             ],
             'provider' => 'meta',
         ];

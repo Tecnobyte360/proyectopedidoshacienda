@@ -121,6 +121,12 @@ class WhatsappWebhookController extends Controller
             Cache::put("wa_order_items_{$messageId}", $orderItemsIn, now()->addMinutes(10));
         }
 
+        // 🛒🟢 PRODUCTO REFERIDO: SKU de un producto puntual enviado desde el catálogo.
+        $prodRefIn = $data['mensaje']['producto_referido_sku'] ?? null;
+        if (!empty($prodRefIn) && $messageId) {
+            Cache::put("wa_prod_referido_{$messageId}", trim((string) $prodRefIn), now()->addMinutes(10));
+        }
+
         // 📸 profilePicUrl ahora viene en chat.profilePicUrl (cambio en EstradaHub
         // mayo 2026). Si está presente, lo guardamos en cache para que el job
         // de sincronización lo use directamente sin re-llamar al API.
@@ -1007,6 +1013,68 @@ class WhatsappWebhookController extends Controller
             } catch (\Throwable $e) {
                 Log::error('🛒🔴 Error procesando orden de catálogo: ' . $e->getMessage());
                 // cae al flujo normal si algo falla
+            }
+        }
+
+        // ════════════════════════════════════════════════════════════════════
+        // 🛒🟢 PRODUCTO REFERIDO — el cliente envió UN producto del catálogo.
+        // Lo AGREGAMOS al carrito (sin resetear) y le preguntamos si quiere más
+        // o seguir. Determinista, por SKU.
+        // ════════════════════════════════════════════════════════════════════
+        $prodRefSku = ($messageId && Cache::has("wa_prod_referido_{$messageId}"))
+            ? Cache::pull("wa_prod_referido_{$messageId}")
+            : null;
+        if (!empty($prodRefSku)) {
+            try {
+                $sedeId      = $this->obtenerSedeIdDesdeConexion($connectionId);
+                $cliente     = \App\Models\Cliente::encontrarOCrearPorTelefono($telefonoNorm, $name);
+                $convService = app(\App\Services\ConversacionService::class);
+                $conv        = $convService->obtenerOCrearActiva(
+                    $telefonoNorm, $cliente->id, $sedeId, $this->connIdNum($connectionId)
+                );
+
+                // Cantidad: por defecto 1, o la que el cliente haya escrito ("quiero 2").
+                $qty = 1.0;
+                if (preg_match('/\b(\d{1,3})\b/', $message, $mq)) {
+                    $q = (float) $mq[1];
+                    if ($q > 0 && $q <= 999) $qty = $q;
+                }
+
+                $convService->agregarMensaje(
+                    $conv,
+                    \App\Models\MensajeWhatsapp::ROL_USER,
+                    $message !== '' ? $message : '🛒 (producto enviado desde el catálogo)',
+                    $this->opcionesMensajeEntrante($messageId, null)
+                );
+
+                $r = $this->procesarAgregarProductoAlPedido($conv, 'add', '', trim($prodRefSku), $qty, '', $connectionId, '');
+
+                if (($r['ok'] ?? false) === true) {
+                    $estado = app(\App\Services\EstadoPedidoService::class)->obtener($conv->fresh());
+                    $lineas = []; $subtotal = 0;
+                    foreach (($estado->productos ?: []) as $p) {
+                        $nom = (string) ($p['name'] ?? $p['producto'] ?? 'Producto');
+                        $c   = (float) ($p['quantity'] ?? $p['cantidad'] ?? 0);
+                        $pu  = (float) ($p['precio_unitario'] ?? $p['price'] ?? 0);
+                        $sub = (float) ($p['subtotal'] ?? ($c * $pu));
+                        $subtotal += $sub;
+                        $cTxt = rtrim(rtrim(number_format($c, 2, '.', ''), '0'), '.');
+                        $lineas[] = "• {$cTxt} × {$nom} — $" . number_format($sub, 0, ',', '.');
+                    }
+                    $reply = "¡Listo! Lo agregué a tu pedido 🛒☕\n\n" . implode("\n", $lineas)
+                        . "\n\n*Subtotal:* $" . number_format($subtotal, 0, ',', '.')
+                        . "\n\n¿Deseas agregar algo más del catálogo, o seguimos? 🚚 *Domicilio* o 🏬 *Recoger en tienda*?";
+                } else {
+                    $reply = "No pude agregar ese producto 😕. ¿Me dices cuál querías, o abres el catálogo de nuevo para elegirlo? 🛒";
+                }
+
+                $convService->agregarMensaje($conv, \App\Models\MensajeWhatsapp::ROL_ASSISTANT, $reply);
+                Log::info('🛒🟢 Producto referido del catálogo agregado', [
+                    'conv_id' => $conv->id, 'sku' => $prodRefSku, 'qty' => $qty, 'ok' => ($r['ok'] ?? false),
+                ]);
+                return $reply;
+            } catch (\Throwable $e) {
+                Log::error('🛒🔴 Error procesando producto referido: ' . $e->getMessage());
             }
         }
 
