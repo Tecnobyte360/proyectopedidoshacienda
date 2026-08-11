@@ -8655,14 +8655,38 @@ TXT;
             'orderData_keys'  => array_keys($orderData),
         ]);
 
-        // Resolver zona de cobertura — primero por barrio, si falla intenta geocode
-        $validacion = $this->validarCoberturaDireccion(
-            $direccion,
-            $barrio,
-            $ciudadOrden,
-            $sede?->id,
-            $from
-        );
+        // 🛡️ Si la cobertura YA fue validada en el estado del pedido (el cliente
+        //    ya la confirmó durante el flujo, con su costo de envío), NO la
+        //    re-validamos al confirmar. Re-validar aquí causaba que municipios
+        //    ambiguos (ej. "La Estrella" en Antioquia/Bolívar) pidieran de nuevo el
+        //    departamento — pero al confirmar el último mensaje es el tap del
+        //    botón, no la dirección — y bloqueaba el pedido ya listo.
+        $estadoCob = $conversacion ? app(\App\Services\EstadoPedidoService::class)->obtener($conversacion) : null;
+        if ($estadoCob
+            && $estadoCob->cobertura_validada
+            && ($estadoCob->metodo_entrega ?? '') === \App\Models\ConversacionPedidoEstado::METODO_DOMICILIO) {
+            Log::info('🛡️ Cobertura ya validada en estado — se respeta, no se re-valida al confirmar', [
+                'conv_id'     => $conversacion->id,
+                'costo_envio' => $estadoCob->costo_envio,
+                'sede_id'     => $estadoCob->sede_id,
+            ]);
+            $validacion = [
+                'cubierta'         => true,
+                'costo_envio'      => (float) ($estadoCob->costo_envio ?? 0),
+                'sede_sugerida_id' => $estadoCob->sede_id ?: ($sede?->id),
+                'distancia_km'     => $estadoCob->distancia_km,
+                'metodo_usado'     => 'cobertura_ya_validada_en_estado',
+            ];
+        } else {
+            // Resolver zona de cobertura — primero por barrio, si falla intenta geocode
+            $validacion = $this->validarCoberturaDireccion(
+                $direccion,
+                $barrio,
+                $ciudadOrden,
+                $sede?->id,
+                $from
+            );
+        }
 
         $zonaCobertura = null;
         if (!empty($validacion['zona_id'])) {
@@ -9169,6 +9193,10 @@ TXT;
             $costoEnvio = 0;
         } elseif ($envioManualSet) {
             $costoEnvio = $envioManualVal;
+        } elseif (($validacion['metodo_usado'] ?? '') === 'cobertura_ya_validada_en_estado') {
+            // 🛡️ Cobertura ya validada en el estado (no se re-validó): usar el
+            //    costo de envío que YA se le mostró y confirmó al cliente.
+            $costoEnvio = (float) ($validacion['costo_envio'] ?? 0);
         } elseif ($zonaCobertura) {
             $costoEnvio = (float) ($zonaCobertura->costo_envio ?? 0);
         } elseif ($sede && (float) ($sede->cobertura_costo_envio ?? 0) > 0) {
