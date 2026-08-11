@@ -1726,8 +1726,24 @@ TXT;
             // 🎯 ORQUESTADOR DETERMINISTA: instrucción + tools restringidas al paso
             $estadoFlujoActual = $estadoSrv->obtener($conversacion);
             $pasoActualOrch    = $estadoFlujoActual->paso_actual;
-            $reinforceFlujo[]  = app(\App\Services\FlujoPedidoOrchestrator::class)
-                ->systemMessageParaPaso($conversacion, $this->getToolsDefinicion());
+
+            // 🛒 Para tenants con catálogo nativo, en la fase de DATOS (entrega /
+            //    identificación / datos cliente) NO inyectamos la instrucción de
+            //    "un paso a la vez" del orquestador — el MODO PEDIDO DIRECTO manda
+            //    (pedir nombre+cédula+cel+dirección en UN mensaje). En producto y
+            //    confirmación sí se mantiene el orquestador.
+            $pasosDatos = [
+                \App\Models\ConversacionPedidoEstado::PASO_ENTREGA,
+                \App\Models\ConversacionPedidoEstado::PASO_IDENTIFICACION,
+                \App\Models\ConversacionPedidoEstado::PASO_DATOS_CLIENTE,
+            ];
+            $catNativoParaFlujo = \App\Models\MetaWhatsappConfig::where('tenant_id', app(\App\Services\TenantManager::class)->id())
+                ->where('activo', true)->whereNotNull('catalog_id')->where('catalog_id', '!=', '')->exists();
+
+            if (!($catNativoParaFlujo && in_array($pasoActualOrch, $pasosDatos, true))) {
+                $reinforceFlujo[] = app(\App\Services\FlujoPedidoOrchestrator::class)
+                    ->systemMessageParaPaso($conversacion, $this->getToolsDefinicion());
+            }
         } catch (\Throwable $e) {
             \Log::warning('No se pudo inyectar resumen/orquestador: ' . $e->getMessage());
         }
@@ -1818,6 +1834,30 @@ TXT;
                     . "SIN decir aún un producto específico, DEBES llamar la tool `mostrar_catalogo` (le mostrará "
                     . "el catálogo interactivo para armar el carrito). PROHIBIDO enumerar productos o precios en texto. "
                     . "Si el cliente YA dijo exactamente qué quiere (ej. 'quiero 2 de X'), NO la llames — sigue el flujo normal."];
+
+                // 🎯 MODO PEDIDO DIRECTO: pedir TODOS los datos de entrega en UN solo
+                //    mensaje, sin frases de relleno, y cerrar SIEMPRE con una pregunta.
+                //    Exponemos las tools de captura para poder procesar la respuesta
+                //    combinada en un mismo turno (nombre+cédula+dirección juntos).
+                foreach (['validar_cobertura', 'consultar_zonas_cobertura', 'registrar_datos_cliente'] as $tn) {
+                    $ya = collect($toolsFiltradas)->contains(fn ($t) => ($t['function']['name'] ?? '') === $tn);
+                    if (!$ya) {
+                        $def = collect($this->getToolsDefinicion())->first(fn ($t) => ($t['function']['name'] ?? '') === $tn);
+                        if ($def) $toolsFiltradas[] = $def;
+                    }
+                }
+                $messages[] = ['role' => 'system', 'content' =>
+                    "🎯 MODO PEDIDO DIRECTO (OBLIGATORIO, tiene prioridad sobre cualquier instrucción de pasos):\n"
+                    . "1) Apenas el cliente tenga productos en el carrito, pídele TODO EN UN SOLO MENSAJE: "
+                    . "*nombre completo*, *número de cédula*, *celular de contacto* y *dirección de entrega* "
+                    . "(o, si va a recoger, en cuál sede). NUNCA pidas estos datos por partes ni de a uno.\n"
+                    . "2) Cuando el cliente responda, procesa esos datos y valida la cobertura con la herramienta "
+                    . "EN SILENCIO. PROHIBIDO escribir frases de espera o relleno como 'estoy validando la cobertura', "
+                    . "'déjame verificar', 'dame un momento', 'permíteme', 'ya reviso', 'un momento'. NO anuncies lo que "
+                    . "vas a hacer: hazlo y responde SOLO el resultado concreto.\n"
+                    . "3) CADA mensaje tuyo DEBE terminar con UNA pregunta clara que lleve al siguiente paso. "
+                    . "Nunca cierres un mensaje sin una pregunta.\n"
+                    . "4) No te salgas NUNCA del contexto del pedido."];
             }
         } catch (\Throwable $e) { /* no bloquear el flujo */ }
 
