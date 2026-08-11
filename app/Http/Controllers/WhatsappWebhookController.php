@@ -1211,14 +1211,31 @@ class WhatsappWebhookController extends Controller
         // ════════════════════════════════════════════════════════════════════
         try {
             $catKey = "wa_catalogo_enviado_t{$tenantId}_{$telefonoNorm}";
-            if (!Cache::has($catKey) && $this->clienteQuiereVerCatalogo($message)) {
+            // Intención de pedir/ver productos O que liste productos por texto.
+            $quiereCatalogo = $this->clienteQuiereVerCatalogo($message)
+                || $this->clientePreguntaProducto($message);
+
+            if ($quiereCatalogo) {
+                $tieneCatNat = \App\Models\MetaWhatsappConfig::where('tenant_id', $tenantId)
+                    ->where('activo', true)->whereNotNull('catalog_id')->where('catalog_id', '!=', '')->exists();
                 $estadoCat = app(\App\Services\EstadoPedidoService::class)->obtener($conversacion);
                 $carritoVacio = empty($estadoCat->productos);
-                if ($carritoVacio && $this->enviarCatalogoWhatsapp($conversacion, $from, $connectionId)) {
-                    // enviarProductos ya persistió el mensaje del catálogo en el chat.
-                    // Retornamos '' para NO mandar un texto extra encima.
-                    Cache::put($catKey, true, now()->addMinutes(10));
-                    return '';
+
+                // 🛒 NO se permite pedir por texto: con carrito vacío el cliente DEBE
+                //    seleccionar en el catálogo. Mandamos el catálogo (o si ya se lo
+                //    mandamos hace poco, insistimos) y NUNCA dejamos que el LLM parsee
+                //    el pedido escrito.
+                if ($tieneCatNat && $carritoVacio) {
+                    if (!Cache::has($catKey) && $this->enviarCatalogoWhatsapp($conversacion, $from, $connectionId)) {
+                        Cache::put($catKey, true, now()->addMinutes(10));
+                        return ''; // el catálogo ya quedó persistido en el chat
+                    }
+                    // Ya se envió el catálogo hace poco (o falló el envío): insistir.
+                    $nudge = "Para tomar tu pedido necesito que elijas los productos en el *catálogo* 👆🛒 "
+                        . "(así queda exacto con cantidades y precios). Ábrelo, agrega lo que quieras al carrito y "
+                        . "envíalo por aquí. ¿Lo puedes ver bien?";
+                    $convService->agregarMensaje($conversacion, MensajeWhatsapp::ROL_ASSISTANT, $nudge);
+                    return $nudge;
                 }
             }
         } catch (\Throwable $e) {
@@ -1710,7 +1727,16 @@ TXT;
             // 🔍 CAPTURA PROACTIVA: detecta cédula/email en el mensaje del cliente
             // y los guarda en el estado ANTES de que el LLM procese. Así no se
             // pierden aunque el bot no llame la tool correcta.
-            $estadoSrv->captarDelMensajeUsuario($conversacion, $message);
+            // 🛒 EXCEPCIÓN catálogo nativo: si el carrito está VACÍO, NO capturamos
+            //    nada del texto — el cliente DEBE seleccionar los productos en el
+            //    catálogo primero (no se permite pedir por texto). Así evitamos
+            //    grabar direcciones/nombres de un "pedido escrito" antes de tiempo.
+            $catNativoCap = \App\Models\MetaWhatsappConfig::where('tenant_id', app(\App\Services\TenantManager::class)->id())
+                ->where('activo', true)->whereNotNull('catalog_id')->where('catalog_id', '!=', '')->exists();
+            $carritoVacioCap = empty($estadoSrv->obtener($conversacion)->productos);
+            if (!($catNativoCap && $carritoVacioCap)) {
+                $estadoSrv->captarDelMensajeUsuario($conversacion, $message);
+            }
 
             $resumenEstado = $estadoSrv->resumenParaPrompt($conversacion);
             if ($resumenEstado !== '') {
@@ -1998,24 +2024,15 @@ TXT;
             $toolChoiceInicial = 'required'; // que invoque ALGUNA tool, no texto
             $razonForzado = 'cliente_pregunto_producto';
             if ($tieneCatalogoNativo) {
-                // 🛒 Tenant con catálogo nativo. Si el cliente pregunta por productos
-                //    SIN dar cantidad (inquiry general, no pedido directo) y el carrito
-                //    está vacío → FORZAR mostrar_catalogo (determinista, sin depender
-                //    del criterio del LLM). Si hay cantidad ("quiero 2 X") → es pedido
-                //    directo → buscar_productos normal.
+                // 🛒 Tenant con catálogo nativo: NO se permite pedir por texto. Si el
+                //    carrito está VACÍO y el cliente menciona/lista productos (con o sin
+                //    cantidad), FORZAR mostrar_catalogo — debe seleccionar en el catálogo.
+                //    Si el carrito YA tiene productos, dejamos el flujo normal (está en
+                //    fase de datos/confirmación).
                 $carritoVacioSC = empty($estadoActualBd?->productos);
-                $tieneCantidad  = preg_match('/\d/u', $message) === 1
-                    || preg_match('/\b(un|una|unos|unas|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|media|medio|docena)\b/iu', mb_strtolower($message)) === 1;
-
-                if ($carritoVacioSC && !$tieneCantidad) {
+                if ($carritoVacioSC) {
                     $toolChoiceInicial = ['type' => 'function', 'function' => ['name' => 'mostrar_catalogo']];
-                    $razonForzado = 'catalogo_nativo_inquiry';
-                } else {
-                    $messages[] = [
-                        'role' => 'system',
-                        'content' => "🚨 El cliente mencionó un producto/cantidad. Llama `buscar_productos` con el texto "
-                            . "literal del cliente. NO inventes productos ni precios.",
-                    ];
+                    $razonForzado = 'catalogo_nativo_forzar_seleccion';
                 }
             } else {
                 $messages[] = [
