@@ -2192,6 +2192,14 @@ class Index extends Component
         $this->nuevoChatVentanaAbierta = null;
         $this->nuevoChatPlantillaId    = null;
         $this->nuevoChatPlantillaVars  = [];
+
+        // 🟢 Asegurar que render() cargue las plantillas Meta aunque no haya
+        // ninguna conversación abierta (tenantUsaMeta solo se setea al abrir chat).
+        try {
+            $tenant = app(\App\Services\TenantManager::class)->current();
+            $this->tenantUsaMeta = $tenant
+                && $tenant->proveedorWhatsappResuelto() === \App\Models\Tenant::WA_PROVIDER_META;
+        } catch (\Throwable $e) { /* dejar valor previo */ }
     }
 
     public function cerrarNuevoChat(): void
@@ -2220,6 +2228,7 @@ class Index extends Component
         // Tenants que no usan Meta (legacy) no tienen la restricción de 24h.
         $tenant = app(\App\Services\TenantManager::class)->current();
         $usaMeta = $tenant && $tenant->proveedorWhatsappResuelto() === \App\Models\Tenant::WA_PROVIDER_META;
+        $this->tenantUsaMeta = (bool) $usaMeta; // para que render() cargue las plantillas
         if (!$usaMeta) {
             $this->nuevoChatVentanaAbierta = true;
             return;
