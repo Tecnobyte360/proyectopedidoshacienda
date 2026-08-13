@@ -471,6 +471,11 @@ Route::middleware(['solo_principal'])->group(function () {
 Route::get('/seguimiento-pedido/{codigo}', SeguimientoPedido::class)
     ->name('pedidos.seguimiento');
 
+// 🥩 Carta pública (catálogo) del tenant — se abre dentro de WhatsApp desde el bot.
+Route::get('/carta/{slug}', [\App\Http\Controllers\CartaPublicaController::class, 'show'])
+    ->where('slug', '[a-z0-9\-]+')
+    ->name('carta.publica');
+
 // Feed de catálogo para Meta (Commerce Manager / WhatsApp) — público, sin auth.
 Route::get('/catalogo-meta/{tenant}.csv', [\App\Http\Controllers\MetaCatalogFeedController::class, 'csv'])
     ->where('tenant', '[0-9]+')
