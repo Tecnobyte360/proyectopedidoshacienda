@@ -27,6 +27,11 @@ class CartaPublicaController extends Controller
         'la-hacienda' => 'https://kivox.co/carta-fotos/la-hacienda-logo.jpg',
     ];
 
+    /** Colores de la carta [primario, secundario] — override sobre el branding. */
+    private const COLORS = [
+        'la-hacienda' => ['#F47920', '#C25E12'], // naranja + negro (como el logo)
+    ];
+
     public function show(string $slug)
     {
         $tenant = Tenant::withoutGlobalScopes()
@@ -84,14 +89,17 @@ class CartaPublicaController extends Controller
                 : 'https://kivox.co' . $tenant->logo_url;
         }
 
+        [$cPrim, $cSec] = self::COLORS[$slug]
+            ?? [$tenant->color_primario ?: '#c1471f', $tenant->color_secundario ?: '#a3391a'];
+
         return view('carta-publica', [
             'tenant'      => $tenant,
             'categorias'  => $cats,
             'productos'   => $prods,
             'waNumero'    => $waNumero,
             'logoUrl'     => $logoUrl,
-            'colorPrim'   => $tenant->color_primario ?: '#c1471f',
-            'colorSec'    => $tenant->color_secundario ?: '#a3391a',
+            'colorPrim'   => $cPrim,
+            'colorSec'    => $cSec,
         ]);
     }
 }

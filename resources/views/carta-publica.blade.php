@@ -29,10 +29,11 @@
 
   /* header */
   header.brand{
-    background:linear-gradient(135deg,var(--brand) 0%,var(--brand-2) 100%);
+    background:linear-gradient(135deg,#2b2b2b 0%,#0b0b0b 100%);
     color:#fff;padding:22px 20px 20px;position:relative;overflow:hidden;
+    border-bottom:3px solid var(--brand);
   }
-  header.brand::after{content:"";position:absolute;right:-30px;top:-30px;width:140px;height:140px;border-radius:50%;background:rgba(255,255,255,.08)}
+  header.brand::after{content:"";position:absolute;right:-40px;top:-40px;width:150px;height:150px;border-radius:50%;background:radial-gradient(circle,color-mix(in srgb,var(--brand) 35%,transparent),transparent 70%)}
   header.brand .row{display:flex;align-items:center;gap:13px;position:relative}
   header.brand .logo{width:56px;height:56px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;overflow:hidden;box-shadow:0 3px 10px rgba(0,0,0,.18)}
   header.brand .logo img{width:100%;height:100%;object-fit:cover}
