@@ -58,6 +58,7 @@
                     ['name' => 'Cortes',        'icon' => 'fa-scissors',     'route' => 'cortes.index',        'badge' => null, 'permission' => 'productos.ver'],
                     ['name' => 'Promociones',   'icon' => 'fa-tags',         'route' => 'promociones.index',   'badge' => null, 'permission' => 'promociones.gestionar'],
                     ['name' => 'Importaciones', 'icon' => 'fa-file-import',  'route' => 'importaciones.index', 'badge' => null, 'permission' => 'productos.ver'],
+                    ['name' => 'API (Swagger)', 'icon' => 'fa-code',        'route' => 'admin.api-docs',      'badge' => 'NUEVO', 'permission' => 'productos.ver'],
                     ['name' => 'Integraciones', 'icon' => 'fa-plug',         'route' => 'integraciones.index', 'badge' => null, 'permission' => 'productos.ver', 'solo_super_admin' => true],
                 ],
             ],
@@ -121,7 +122,6 @@
                     ['name' => 'Pagos',         'icon' => 'fa-money-bills',        'route' => 'admin.pagos.index',         'badge' => null, 'permission' => 'pagos.gestionar'],
                     ['name' => 'Envíos Billing','icon' => 'fa-paper-plane',        'route' => 'admin.billing-envios',      'badge' => 'NUEVO', 'permission' => 'tenants.gestionar'],
                     ['name' => 'Documentación',         'icon' => 'fa-book-open',  'route' => 'admin.documentacion',          'badge' => null, 'permission' => 'tenants.gestionar'],
-                    ['name' => 'API (Swagger)',         'icon' => 'fa-code',       'route' => 'admin.api-docs',               'badge' => 'NUEVO', 'permission' => 'tenants.gestionar'],
                     ['name' => 'Branding plataforma',   'icon' => 'fa-palette',    'route' => 'admin.configuracion-plataforma','badge' => null, 'permission' => 'tenants.gestionar'],
 
                     // ─── Plataforma: features que controla solo el super-admin (visibles desde el panel admin). ───

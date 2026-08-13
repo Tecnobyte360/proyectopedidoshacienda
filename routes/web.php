@@ -222,6 +222,7 @@ Route::middleware(['no_super_sin_imp'])->group(function () {
     Route::get('/pedidos', PedidosIndex::class)->middleware('permission:pedidos.ver')->name('pedidos.index');
 
     Route::get('/productos',     ProductosIndex::class)->middleware('permission:productos.ver')->name('productos.index');
+    Route::get('/api-docs',      \App\Livewire\Admin\ApiDocs::class)->middleware('permission:productos.ver')->name('admin.api-docs');
     Route::get('/categorias',    CategoriasIndex::class)->middleware('permission:categorias.gestionar')->name('categorias.index');
     Route::get('/cortes',        CortesIndex::class)->middleware('permission:productos.ver')->name('cortes.index');
     Route::get('/campanas',           CampanasIndex::class)->middleware('permission:campanas.ver|campanas.gestionar')->name('campanas.index');
@@ -424,7 +425,6 @@ Route::middleware(['solo_principal'])->group(function () {
     Route::get('/admin/suscripciones', AdminSuscripcionesIndex::class)->middleware('permission:suscripciones.gestionar')->name('admin.suscripciones.index');
     Route::get('/admin/pagos',         AdminPagosIndex::class)->middleware('permission:pagos.gestionar')->name('admin.pagos.index');
     Route::get('/admin/documentacion', AdminDocumentacion::class)->middleware('permission:tenants.gestionar')->name('admin.documentacion');
-    Route::get('/admin/api-docs', \App\Livewire\Admin\ApiDocs::class)->middleware('permission:tenants.gestionar')->name('admin.api-docs');
     Route::get('/admin/configuracion-plataforma', AdminConfiguracionPlataforma::class)->middleware('permission:tenants.gestionar')->name('admin.configuracion-plataforma');
     Route::get('/admin/facturacion', \App\Livewire\Admin\Facturacion\Index::class)->middleware('permission:tenants.gestionar')->name('admin.facturacion.index');
 
