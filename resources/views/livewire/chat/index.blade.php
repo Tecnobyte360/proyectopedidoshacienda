@@ -2168,7 +2168,8 @@
                 <div class="p-5 space-y-3">
                     <div>
                         <label class="block text-xs font-semibold text-slate-700 mb-1">Teléfono (con código país) *</label>
-                        <input type="text" wire:model="nuevoChatTel" placeholder="573001234567"
+                        <input type="text" wire:model="nuevoChatTel" wire:change="verificarVentanaNuevoChat"
+                               placeholder="573001234567"
                                class="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-mono focus:border-brand focus:ring-2 focus:ring-amber-100">
                         <p class="text-[10px] text-slate-400 mt-1">Solo dígitos. Ej: 573001234567</p>
                     </div>
@@ -2177,11 +2178,60 @@
                         <input type="text" wire:model="nuevoChatNombre" placeholder="Nombre del cliente"
                                class="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-brand focus:ring-2 focus:ring-amber-100">
                     </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1">Primer mensaje *</label>
-                        <textarea wire:model="nuevoChatMensaje" rows="3" placeholder="Hola, ¿cómo estás?"
-                                  class="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-brand focus:ring-2 focus:ring-amber-100"></textarea>
-                    </div>
+
+                    {{-- 🟢 Indicador de ventana 24h + modo de envío --}}
+                    @if($nuevoChatVentanaAbierta === null)
+                        <div class="rounded-xl bg-slate-50 border border-slate-200 px-3 py-2 text-[11px] text-slate-500 flex items-center gap-2">
+                            <i class="fa-solid fa-circle-info text-slate-400"></i>
+                            Escribe el número para saber si puedes enviar texto libre o necesitas una plantilla.
+                        </div>
+                    @elseif($nuevoChatVentanaAbierta === true)
+                        <div class="rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2 text-[11px] text-emerald-700 flex items-center gap-2">
+                            <i class="fa-solid fa-lock-open"></i>
+                            <span>Ventana de 24h <b>abierta</b> — puedes escribir un mensaje normal.</span>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Primer mensaje *</label>
+                            <textarea wire:model="nuevoChatMensaje" rows="3" placeholder="Hola, ¿cómo estás?"
+                                      class="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-brand focus:ring-2 focus:ring-amber-100"></textarea>
+                        </div>
+                    @else
+                        <div class="rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-[11px] text-amber-800 flex items-start gap-2">
+                            <i class="fa-solid fa-lock mt-0.5"></i>
+                            <span>Número nuevo o <b>sin ventana de 24h</b>. WhatsApp solo permite iniciar con una <b>plantilla aprobada</b>.</span>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Plantilla aprobada *</label>
+                            @if($plantillasMetaAprobadas->isEmpty())
+                                <p class="text-[11px] text-rose-600">No tienes plantillas aprobadas. Créalas y apruébalas en Meta primero.</p>
+                            @else
+                                <select wire:model.live="nuevoChatPlantillaId"
+                                        class="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm bg-white focus:border-brand focus:ring-2 focus:ring-amber-100">
+                                    <option value="">— Elige una plantilla —</option>
+                                    @foreach($plantillasMetaAprobadas as $pl)
+                                        <option value="{{ $pl->id }}">{{ $pl->nombre }} ({{ strtoupper($pl->idioma ?? 'es') }})</option>
+                                    @endforeach
+                                </select>
+                                @php $plSel = $nuevoChatPlantillaId ? $plantillasMetaAprobadas->firstWhere('id', (int) $nuevoChatPlantillaId) : null; @endphp
+                                @if($plSel)
+                                    @if($plSel->body_preview)
+                                        <p class="mt-2 text-[11px] text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 whitespace-pre-line">{{ $plSel->body_preview }}</p>
+                                    @endif
+                                    @if(($plSel->num_variables ?? 0) > 0)
+                                        <div class="mt-2 space-y-2">
+                                            @for($i = 1; $i <= $plSel->num_variables; $i++)
+                                                <div>
+                                                    <label class="block text-[10px] font-semibold text-slate-500 mb-0.5">Variable {{ $i }} <span class="text-slate-400">— reemplaza {{ '{{'.$i.'}}' }}</span></label>
+                                                    <input type="text" wire:model="nuevoChatPlantillaVars.{{ $i }}"
+                                                           class="w-full rounded-lg border border-slate-200 px-2.5 py-2 text-sm focus:border-brand focus:ring-2 focus:ring-amber-100">
+                                                </div>
+                                            @endfor
+                                        </div>
+                                    @endif
+                                @endif
+                            @endif
+                        </div>
+                    @endif
                 </div>
                 <div class="px-5 py-3 border-t border-slate-100 flex justify-end gap-2 bg-slate-50">
                     <button wire:click="cerrarNuevoChat"

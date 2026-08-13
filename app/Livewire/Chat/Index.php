@@ -59,6 +59,14 @@ class Index extends Component
     public string $nuevoChatNombre  = '';
     public string $nuevoChatMensaje = '';
 
+    // 🟢 Nueva conversación — modo híbrido según ventana 24h:
+    //   null  = aún no se verificó el número
+    //   true  = el cliente escribió hace <24h → permitimos texto libre
+    //   false = número nuevo o ventana cerrada → SOLO plantilla aprobada
+    public ?bool  $nuevoChatVentanaAbierta = null;
+    public ?int   $nuevoChatPlantillaId    = null;
+    public array  $nuevoChatPlantillaVars  = [];
+
     // 📋 Modal "Estado del pedido" — datos estructurados que tiene el bot
     public bool $pedidoEstadoModal = false;
     public string $pedidoEstadoTab = 'estado'; // 'estado' | 'prompt'
@@ -2181,11 +2189,69 @@ class Index extends Component
         $this->nuevoChatTel     = '';
         $this->nuevoChatNombre  = '';
         $this->nuevoChatMensaje = '';
+        $this->nuevoChatVentanaAbierta = null;
+        $this->nuevoChatPlantillaId    = null;
+        $this->nuevoChatPlantillaVars  = [];
     }
 
     public function cerrarNuevoChat(): void
     {
         $this->nuevoChatModal = false;
+    }
+
+    /**
+     * 🟢 Híbrido: al escribir el número comprobamos si existe una conversación
+     * con la ventana de 24h abierta. Si el cliente escribió hace <24h → texto
+     * libre; si es número nuevo o la ventana está cerrada → obligamos plantilla
+     * (única forma que Meta permite para iniciar una conversación).
+     * Se dispara con wire:change/blur del campo teléfono.
+     */
+    public function verificarVentanaNuevoChat(): void
+    {
+        $telefono = preg_replace('/\D+/', '', (string) $this->nuevoChatTel);
+        $this->nuevoChatPlantillaId   = null;
+        $this->nuevoChatPlantillaVars = [];
+
+        if ($telefono === '' || strlen($telefono) < 8) {
+            $this->nuevoChatVentanaAbierta = null;
+            return;
+        }
+
+        // Tenants que no usan Meta (legacy) no tienen la restricción de 24h.
+        $tenant = app(\App\Services\TenantManager::class)->current();
+        $usaMeta = $tenant && $tenant->proveedorWhatsappResuelto() === \App\Models\Tenant::WA_PROVIDER_META;
+        if (!$usaMeta) {
+            $this->nuevoChatVentanaAbierta = true;
+            return;
+        }
+
+        try {
+            $conv = ConversacionWhatsapp::where('telefono_normalizado', $telefono)
+                ->latest('id')
+                ->first();
+            $checker = app(\App\Services\Whatsapp\Ventana24hChecker::class);
+            $this->nuevoChatVentanaAbierta = $conv ? $checker->abierta($conv) : false;
+        } catch (\Throwable $e) {
+            // Ante la duda, tratamos como cerrada → forzamos plantilla (más seguro).
+            $this->nuevoChatVentanaAbierta = false;
+        }
+    }
+
+    /** Prefill de variables al elegir plantilla en el modal de nuevo chat. */
+    public function updatedNuevoChatPlantillaId(): void
+    {
+        $this->nuevoChatPlantillaVars = [];
+        if (!$this->nuevoChatPlantillaId) return;
+
+        $tpl = \App\Models\MetaWhatsappPlantilla::find($this->nuevoChatPlantillaId);
+        if (!$tpl) return;
+
+        $nombre = trim($this->nuevoChatNombre);
+        $primerNombre = $nombre !== '' ? explode(' ', $nombre)[0] : 'Hola';
+        for ($i = 1; $i <= ($tpl->num_variables ?? 0); $i++) {
+            // La 1ª variable suele ser el nombre del cliente → la pre-cargamos.
+            $this->nuevoChatPlantillaVars[$i] = ($i === 1) ? $primerNombre : '';
+        }
     }
 
     /**
@@ -2201,20 +2267,95 @@ class Index extends Component
             $this->dispatch('notify', ['type' => 'error', 'message' => 'Ingresa un teléfono válido (ej. 573001234567).']);
             return;
         }
-        if ($texto === '') {
-            $this->dispatch('notify', ['type' => 'error', 'message' => 'Escribe el primer mensaje.']);
-            return;
-        }
 
         // 🟢 RUTA META: si el tenant usa Meta, no necesitamos connection_id de TecnoByteApp.
         // Iniciamos directo via Cloud API. Si el cliente nunca te ha escrito y la ventana 24h
-        // está cerrada, Meta exigirá plantilla y avisamos al usuario.
+        // está cerrada, Meta exige plantilla → el modal ya obliga a elegir una.
         $tenant      = app(\App\Services\TenantManager::class)->current();
         $tenantUsaMeta = $tenant && $tenant->proveedorWhatsappResuelto() === \App\Models\Tenant::WA_PROVIDER_META;
 
         if ($tenantUsaMeta) {
             $cliente = \App\Models\Cliente::encontrarOCrearPorTelefono($telefono, trim($this->nuevoChatNombre) ?: 'Cliente');
             $conv = app(ConversacionService::class)->obtenerOCrearActiva($telefono, $cliente->id, null, null);
+
+            // 🔎 Re-verificar la ventana en el servidor (no confiar solo en el estado
+            // del cliente): decide si va texto libre o plantilla obligatoria.
+            $ventanaAbierta = false;
+            try {
+                $checker = app(\App\Services\Whatsapp\Ventana24hChecker::class);
+                $ventanaAbierta = $checker->abierta($conv);
+            } catch (\Throwable $e) { $ventanaAbierta = false; }
+
+            // ── VENTANA CERRADA / NÚMERO NUEVO → PLANTILLA OBLIGATORIA ──
+            if (!$ventanaAbierta) {
+                if (!$this->nuevoChatPlantillaId) {
+                    $this->dispatch('notify', ['type' => 'error', 'message' => '🔒 Número nuevo o sin ventana de 24h. Elige una plantilla aprobada para iniciar.']);
+                    return;
+                }
+                $tpl = \App\Models\MetaWhatsappPlantilla::find($this->nuevoChatPlantillaId);
+                if (!$tpl) {
+                    $this->dispatch('notify', ['type' => 'error', 'message' => 'Plantilla no encontrada.']);
+                    return;
+                }
+                $varsOrdenadas = [];
+                for ($i = 1; $i <= ($tpl->num_variables ?? 0); $i++) {
+                    $varsOrdenadas[] = (string) ($this->nuevoChatPlantillaVars[$i] ?? '');
+                }
+
+                $svcTpl = app(\App\Services\Meta\MetaWhatsappCloudService::class);
+                $okTpl = $svcTpl->enviarPlantilla(
+                    $conv->telefono_normalizado,
+                    $tpl->nombre,
+                    $varsOrdenadas,
+                    $conv->tenant_id,
+                    $tpl->idioma ?: 'es',
+                    null,
+                    null,
+                    false
+                );
+                if (!$okTpl) {
+                    $this->dispatch('notify', ['type' => 'error', 'message' => '⚠️ No se pudo enviar la plantilla. Revisa que esté aprobada.']);
+                    return;
+                }
+
+                // Persistir el mensaje con el body renderizado + wamid
+                $body = $tpl->body_preview ?: ('[plantilla:' . $tpl->nombre . ']');
+                foreach ($varsOrdenadas as $i => $valor) {
+                    $body = str_replace(['{{' . ($i + 1) . '}}', '{{ ' . ($i + 1) . ' }}'], $valor, $body);
+                }
+                try {
+                    $msgTpl = app(ConversacionService::class)->agregarMensaje(
+                        $conv,
+                        MensajeWhatsapp::ROL_ASSISTANT,
+                        $body,
+                        ['meta' => [
+                            'enviado_por_humano' => true,
+                            'usuario_id'         => auth()->id(),
+                            'origen'             => 'plantilla_meta',
+                            'plantilla'          => $tpl->nombre,
+                            'plantilla_idioma'   => $tpl->idioma,
+                            'provider'           => 'meta',
+                        ]]
+                    );
+                    $updTpl = ['ack' => MensajeWhatsapp::ACK_SENT];
+                    if ($svcTpl->ultimoWamid) $updTpl['mensaje_externo_id'] = $svcTpl->ultimoWamid;
+                    $msgTpl->update($updTpl);
+                } catch (\Throwable $e) {
+                    Log::warning('No se persistió plantilla (nuevo chat): ' . $e->getMessage());
+                }
+
+                $this->nuevoChatModal       = false;
+                $this->conversacionActivaId = $conv->id;
+                $this->dispatch('notify', ['type' => 'success', 'message' => '✓ Plantilla enviada — conversación iniciada.']);
+                $this->dispatch('chat-cambiado', conversacionId: $conv->id);
+                return;
+            }
+
+            // ── VENTANA ABIERTA → TEXTO LIBRE ──
+            if ($texto === '') {
+                $this->dispatch('notify', ['type' => 'error', 'message' => 'Escribe el primer mensaje.']);
+                return;
+            }
 
             try {
                 $svcNuevo = app(\App\Services\Meta\MetaWhatsappCloudService::class);
@@ -2261,6 +2402,10 @@ class Index extends Component
         }
 
         // ─── RUTA LEGACY (TecnoByteApp) ─────────────────────────────
+        if ($texto === '') {
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'Escribe el primer mensaje.']);
+            return;
+        }
         // Resolver connection_id del tenant actual ANTES de crear la conversación
         $connectionId = $this->resolverConnectionId();
         if (!$connectionId) {
