@@ -2220,8 +2220,9 @@
                                     @if(($plSel->num_variables ?? 0) > 0)
                                         <div class="mt-2 space-y-2">
                                             @for($i = 1; $i <= $plSel->num_variables; $i++)
+                                                @php $ph = '{{' . $i . '}}'; @endphp
                                                 <div>
-                                                    <label class="block text-[10px] font-semibold text-slate-500 mb-0.5">Variable {{ $i }} <span class="text-slate-400">— reemplaza {{ '{{'.$i.'}}' }}</span></label>
+                                                    <label class="block text-[10px] font-semibold text-slate-500 mb-0.5">Variable {{ $i }} <span class="text-slate-400">— reemplaza {{ $ph }}</span></label>
                                                     <input type="text" wire:model="nuevoChatPlantillaVars.{{ $i }}"
                                                            class="w-full rounded-lg border border-slate-200 px-2.5 py-2 text-sm focus:border-brand focus:ring-2 focus:ring-amber-100">
                                                 </div>
