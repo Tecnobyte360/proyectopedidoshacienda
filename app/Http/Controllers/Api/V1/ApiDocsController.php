@@ -26,7 +26,7 @@ class ApiDocsController extends Controller
             'info' => [
                 'title'       => 'KIVOX — API',
                 'version'     => '1.0.0',
-                'description' => "API de KIVOX para integrar otros sistemas (productos, catálogo, promociones, zonas).\n\n"
+                'description' => "API de KIVOX para integrar otros sistemas: enviar plantillas de WhatsApp, y gestionar productos, catálogo, promociones y zonas.\n\n"
                     . "**Autenticación (login requerido):**\n"
                     . "1. Llama `POST /api/v1/login` con tu email y contraseña → recibes un `token`.\n"
                     . "2. Pulsa **Authorize** 🔒 arriba y pega el token (sin la palabra Bearer).\n"
@@ -75,6 +75,46 @@ class ApiDocsController extends Controller
                 ],
                 '/api/v1/yo' => [
                     'get' => ['summary' => 'Ver mi token/empresa', 'tags' => ['Autenticación'], 'responses' => ['200' => ['description' => 'Datos del token']]],
+                ],
+
+                // ══════════════ MENSAJES (WhatsApp) ══════════════
+                '/api/v1/whatsapp/plantillas' => [
+                    'get' => [
+                        'summary'     => 'Listar plantillas disponibles',
+                        'description' => 'Devuelve las plantillas del tenant (nombre, idioma, estado APROBADA/PENDIENTE, y vista previa con {{1}}, {{2}}...). Úsalas para saber qué puedes enviar.',
+                        'tags'        => ['Mensajes'],
+                        'responses'   => [
+                            '200' => ['description' => 'Lista de plantillas', 'content' => ['application/json' => ['example' => [
+                                'ok' => true,
+                                'data' => [['nombre' => 'bienvenida_cliente', 'idioma' => 'es', 'categoria' => 'MARKETING', 'estado' => 'aprobada', 'vista_previa' => 'Hola {{1}}, bienvenido a {{2}}']],
+                            ]]]],
+                            '401' => ['description' => 'No autenticado'],
+                        ],
+                    ],
+                ],
+                '/api/v1/whatsapp/plantilla' => [
+                    'post' => [
+                        'summary'     => 'Enviar plantilla a un cliente',
+                        'description' => 'Dispara una plantilla APROBADA a un número. Las variables reemplazan {{1}}, {{2}}, ... en orden. Sale desde el WhatsApp de tu empresa.',
+                        'tags'        => ['Mensajes'],
+                        'requestBody' => ['required' => true, 'content' => ['application/json' => ['schema' => [
+                            'type' => 'object',
+                            'required' => ['telefono', 'plantilla'],
+                            'properties' => [
+                                'telefono'  => ['type' => 'string', 'example' => '573001234567', 'description' => 'Número con indicativo, solo dígitos.'],
+                                'plantilla' => ['type' => 'string', 'example' => 'bienvenida_cliente', 'description' => 'Nombre EXACTO de la plantilla aprobada.'],
+                                'idioma'    => ['type' => 'string', 'example' => 'es', 'description' => 'Código de idioma (opcional).'],
+                                'variables' => ['type' => 'array', 'items' => ['type' => 'string'], 'example' => ['Juan', 'Doblamos'], 'description' => 'Valores para {{1}}, {{2}}, ...'],
+                                'imagen_url'=> ['type' => 'string', 'description' => 'Opcional: si la plantilla tiene header de imagen.'],
+                                'boton_url' => ['type' => 'string', 'description' => 'Opcional: parámetro del botón URL dinámico.'],
+                            ],
+                        ]]]],
+                        'responses' => [
+                            '200' => ['description' => 'Enviada', 'content' => ['application/json' => ['example' => ['ok' => true, 'message' => 'Plantilla enviada.', 'telefono' => '573001234567', 'plantilla' => 'bienvenida_cliente']]]],
+                            '401' => ['description' => 'No autenticado'],
+                            '422' => ['description' => 'Datos inválidos, sin WhatsApp configurado, o plantilla no enviable'],
+                        ],
+                    ],
                 ],
 
                 // ══════════════ PRODUCTOS ══════════════
