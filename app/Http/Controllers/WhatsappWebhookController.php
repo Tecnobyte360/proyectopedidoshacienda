@@ -5370,7 +5370,10 @@ TXT;
             if (!$tenant || empty($tenant->slug)) return null;
             $habilitados = ['la-hacienda'];
             if (!in_array($tenant->slug, $habilitados, true)) return null;
-            return 'https://kivox.co/carta/' . $tenant->slug;
+            // Usar el subdominio del tenant (*.kivox.co) — ahí la API key de Google
+            // Maps sí está autorizada (el apex kivox.co no), así funciona el
+            // autocompletado de direcciones en la carta.
+            return 'https://' . $tenant->slug . '.kivox.co/carta/' . $tenant->slug;
         } catch (\Throwable $e) {
             return null;
         }

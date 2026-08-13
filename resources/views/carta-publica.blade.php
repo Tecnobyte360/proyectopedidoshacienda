@@ -123,14 +123,16 @@
   .spin{width:14px;height:14px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite;display:inline-block;vertical-align:-2px}
   @keyframes sp{to{transform:rotate(360deg)}}
 
-  /* ── desplegable de Google Places (limpio, sin íconos rotos) ── */
-  .pac-container{z-index:99999;border-radius:12px;margin-top:6px;border:1px solid var(--line-2);box-shadow:0 10px 30px rgba(0,0,0,.15);font-family:var(--font);background:#fff;overflow:hidden}
-  .pac-icon,.pac-item img{display:none !important}
-  .pac-item{padding:11px 14px;font-size:14px;color:var(--ink);border-top:1px solid var(--line);cursor:pointer;line-height:1.3}
-  .pac-item:first-child{border-top:0}
-  .pac-item:hover,.pac-item-selected{background:var(--tint)}
-  .pac-item-query{font-size:14px;color:var(--ink);font-weight:600}
-  .pac-matched{font-weight:700}
+  /* ── lista de sugerencias propia (sin íconos, con la fuente de la app) ── */
+  .co-sug{margin-top:6px;border:1px solid var(--line-2);border-radius:11px;overflow:hidden;background:#fff;box-shadow:var(--shadow)}
+  .co-sug .s{padding:11px 14px;font-size:14px;color:var(--ink);border-top:1px solid var(--line);cursor:pointer;line-height:1.25}
+  .co-sug .s:first-child{border-top:0}
+  .co-sug .s:active,.co-sug .s.hl{background:var(--tint)}
+  .co-sug .s b{font-weight:700}
+  .co-sug .s small{display:block;color:var(--ink-soft);font-size:11.5px;font-weight:500;margin-top:1px}
+  .co-sug .pw{padding:7px 14px;font-size:10px;color:var(--ink-soft);text-align:right;background:#fafafa}
+  /* ocultar el desplegable nativo de Google por si acaso aparece */
+  .pac-container{display:none !important}
 </style>
 </head>
 <body>
@@ -190,7 +192,8 @@
           <div class="co-label">Celular de contacto</div>
           <input class="co-input" id="coCel" inputmode="numeric" placeholder="30xxxxxxxx">
           <div class="co-label">Dirección de entrega</div>
-          <input class="co-input" id="coDir" placeholder="Escribe y elige tu dirección">
+          <input class="co-input" id="coDir" placeholder="Escribe y elige tu dirección" autocomplete="off">
+          <div class="co-sug hiddenx" id="coSug"></div>
           <div class="co-hint" id="coCobHint" style="display:none"></div>
           <button class="co-btn wa" id="coEnviar" onclick="enviarFinal()"><i class="fa-brands fa-whatsapp"></i> Enviar pedido</button>
         </div>
@@ -351,32 +354,40 @@ function enviarFinal(){
 // 🔎 Cédula: se valida sola al salir del campo o con Enter.
 document.getElementById('coCedula').addEventListener('blur',verificarCedula);
 document.getElementById('coCedula').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();e.target.blur();}});
-// 📍 Dirección: al editar a mano invalidamos coords previas; al salir, se valida sola.
-document.getElementById('coDir').addEventListener('input',()=>{PLACE_COORDS=null;COB_LAST='';});
-document.getElementById('coDir').addEventListener('blur',()=>{setTimeout(validarCobertura,300);});
 
-// 🗺️ Google Places Autocomplete + auto-validación al elegir una sugerencia.
-let CARTA_AUTOCOMPLETE=null;
+// 📍 Dirección: autocompletado PROPIO usando las predicciones de Google
+//    (evita el desplegable nativo que salía con íconos rotos en WhatsApp).
+let AC_SVC=null,PL_SVC=null,AC_TOKEN=null,sugTimer=null;
 window.initCartaMaps=function(){
-  try{
-    const input=document.getElementById('coDir');
-    CARTA_AUTOCOMPLETE=new google.maps.places.Autocomplete(input,{
-      componentRestrictions:{country:'co'},
-      fields:['formatted_address','geometry'],
-      types:['address'],
-    });
-    CARTA_AUTOCOMPLETE.addListener('place_changed',()=>{
-      const place=CARTA_AUTOCOMPLETE.getPlace();
-      if(!place||!place.geometry){PLACE_COORDS=null;return;}
-      if(place.formatted_address)input.value=place.formatted_address;
-      PLACE_COORDS={lat:place.geometry.location.lat(),lng:place.geometry.location.lng()};
-      validarCobertura(); // ← auto-valida, sin botón
-    });
-    // El pop-up de Google debe quedar por encima del modal
-    const obs=new MutationObserver(()=>{document.querySelectorAll('.pac-container').forEach(el=>el.style.zIndex=99999);});
-    obs.observe(document.body,{childList:true});
-  }catch(e){console.warn('Places no disponible:',e);}
+  try{ AC_SVC=new google.maps.places.AutocompleteService(); PL_SVC=new google.maps.places.PlacesService(document.createElement('div')); }
+  catch(e){ console.warn('Places no disponible:',e); }
 };
+function nuevoToken(){try{AC_TOKEN=new google.maps.places.AutocompleteSessionToken();}catch(e){AC_TOKEN=null;}}
+function ocultarSug(){const b=document.getElementById('coSug');b.classList.add('hiddenx');b.innerHTML='';}
+function buscarSug(){
+  const q=(document.getElementById('coDir').value||'').trim();
+  if(!AC_SVC||q.length<4){ocultarSug();return;}
+  if(!AC_TOKEN)nuevoToken();
+  AC_SVC.getPlacePredictions({input:q,componentRestrictions:{country:'co'},sessionToken:AC_TOKEN},(preds,status)=>{
+    const box=document.getElementById('coSug');
+    if(status!==google.maps.places.PlacesServiceStatus.OK||!preds||!preds.length){ocultarSug();return;}
+    box.innerHTML=preds.slice(0,5).map(p=>`<div class="s" data-id="${p.place_id}"><b>${p.structured_formatting.main_text}</b><small>${p.structured_formatting.secondary_text||''}</small></div>`).join('')+'<div class="pw">sugerencias de Google</div>';
+    box.classList.remove('hiddenx');
+    box.querySelectorAll('.s').forEach(el=>el.addEventListener('mousedown',ev=>{ev.preventDefault();elegirSug(el.dataset.id);}));
+  });
+}
+function elegirSug(placeId){
+  if(!PL_SVC){ocultarSug();return;}
+  PL_SVC.getDetails({placeId,fields:['formatted_address','geometry'],sessionToken:AC_TOKEN},(place,status)=>{
+    AC_TOKEN=null;ocultarSug();
+    if(status!==google.maps.places.PlacesServiceStatus.OK||!place)return;
+    document.getElementById('coDir').value=place.formatted_address||'';
+    if(place.geometry&&place.geometry.location){PLACE_COORDS={lat:place.geometry.location.lat(),lng:place.geometry.location.lng()};}
+    validarCobertura();
+  });
+}
+document.getElementById('coDir').addEventListener('input',()=>{PLACE_COORDS=null;COB_LAST='';clearTimeout(sugTimer);sugTimer=setTimeout(buscarSug,250);});
+document.getElementById('coDir').addEventListener('blur',()=>{setTimeout(ocultarSug,180);setTimeout(validarCobertura,320);});
 document.getElementById('q').addEventListener('input',render);
 buildChips();render();
 </script>
