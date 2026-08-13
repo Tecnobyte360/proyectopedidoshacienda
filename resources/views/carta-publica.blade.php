@@ -34,7 +34,8 @@
   }
   header.brand::after{content:"";position:absolute;right:-30px;top:-30px;width:140px;height:140px;border-radius:50%;background:rgba(255,255,255,.08)}
   header.brand .row{display:flex;align-items:center;gap:13px;position:relative}
-  header.brand .logo{width:46px;height:46px;border-radius:13px;background:rgba(255,255,255,.16);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;backdrop-filter:blur(2px)}
+  header.brand .logo{width:56px;height:56px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;overflow:hidden;box-shadow:0 3px 10px rgba(0,0,0,.18)}
+  header.brand .logo img{width:100%;height:100%;object-fit:cover}
   header.brand h1{font-size:20px;font-weight:800;margin:0;line-height:1.15;letter-spacing:-.01em}
   header.brand p{margin:3px 0 0;font-size:12.5px;font-weight:500;color:rgba(255,255,255,.85)}
 
@@ -95,7 +96,7 @@
 <body>
   <header class="brand">
     <div class="row">
-      <div class="logo"><i class="fa-solid fa-drumstick-bite"></i></div>
+      <div class="logo">@if(!empty($logoUrl))<img src="{{ $logoUrl }}" alt="Logo {{ $tenant->nombre }}">@else<i class="fa-solid fa-drumstick-bite"></i>@endif</div>
       <div>
         <h1>{{ $tenant->nombre }}</h1>
         <p>Arma tu pedido y envíalo por WhatsApp</p>

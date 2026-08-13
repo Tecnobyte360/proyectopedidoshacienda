@@ -22,6 +22,11 @@ class CartaPublicaController extends Controller
         'la-hacienda' => '573146153567',
     ];
 
+    /** Logo específico para la carta (tiene prioridad sobre tenant->logo_url). */
+    private const LOGOS = [
+        'la-hacienda' => 'https://kivox.co/carta-fotos/la-hacienda-logo.jpg',
+    ];
+
     public function show(string $slug)
     {
         $tenant = Tenant::withoutGlobalScopes()
@@ -71,11 +76,20 @@ class CartaPublicaController extends Controller
 
         $waNumero = self::WA_NUMEROS[$slug] ?? null;
 
+        // Logo: primero el específico de carta, si no el del branding del tenant.
+        $logoUrl = self::LOGOS[$slug] ?? null;
+        if (!$logoUrl && $tenant->logo_url) {
+            $logoUrl = str_starts_with($tenant->logo_url, 'http')
+                ? $tenant->logo_url
+                : 'https://kivox.co' . $tenant->logo_url;
+        }
+
         return view('carta-publica', [
             'tenant'      => $tenant,
             'categorias'  => $cats,
             'productos'   => $prods,
             'waNumero'    => $waNumero,
+            'logoUrl'     => $logoUrl,
             'colorPrim'   => $tenant->color_primario ?: '#c1471f',
             'colorSec'    => $tenant->color_secundario ?: '#a3391a',
         ]);
