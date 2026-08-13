@@ -24,9 +24,9 @@ class ApiDocsController extends Controller
         $spec = [
             'openapi' => '3.0.3',
             'info' => [
-                'title'       => 'KIVOX — API de WhatsApp',
+                'title'       => 'KIVOX — API',
                 'version'     => '1.0.0',
-                'description' => "API de KIVOX para integrar otros sistemas (WhatsApp, productos, catálogo).\n\n"
+                'description' => "API de KIVOX para integrar otros sistemas (productos, catálogo, promociones, zonas).\n\n"
                     . "**Autenticación (login requerido):**\n"
                     . "1. Llama `POST /api/v1/login` con tu email y contraseña → recibes un `token`.\n"
                     . "2. Pulsa **Authorize** 🔒 arriba y pega el token (sin la palabra Bearer).\n"
@@ -75,65 +75,6 @@ class ApiDocsController extends Controller
                 ],
                 '/api/v1/yo' => [
                     'get' => ['summary' => 'Ver mi token/empresa', 'tags' => ['Autenticación'], 'responses' => ['200' => ['description' => 'Datos del token']]],
-                ],
-
-                '/api/v1/whatsapp/plantillas' => [
-                    'get' => [
-                        'summary'    => 'Listar plantillas del tenant',
-                        'description'=> 'Devuelve las plantillas disponibles (nombre, idioma, estado y vista previa).',
-                        'tags'       => ['WhatsApp'],
-                        'responses'  => [
-                            '200' => [
-                                'description' => 'Lista de plantillas',
-                                'content' => ['application/json' => ['example' => [
-                                    'ok' => true,
-                                    'data' => [[
-                                        'nombre' => 'bienvenida_cliente',
-                                        'idioma' => 'es',
-                                        'categoria' => 'MARKETING',
-                                        'estado' => 'aprobada',
-                                        'vista_previa' => 'Hola {{1}}, bienvenido a {{2}} 🍽️',
-                                    ]],
-                                ]]],
-                            ],
-                            '401' => ['description' => 'API key inválida o ausente'],
-                        ],
-                    ],
-                ],
-                '/api/v1/whatsapp/plantilla' => [
-                    'post' => [
-                        'summary'    => 'Enviar plantilla a un cliente',
-                        'description'=> 'Envía una plantilla aprobada a un número específico. Las variables reemplazan {{1}}, {{2}}, ... en orden.',
-                        'tags'       => ['WhatsApp'],
-                        'requestBody' => [
-                            'required' => true,
-                            'content' => ['application/json' => [
-                                'schema' => [
-                                    'type' => 'object',
-                                    'required' => ['telefono', 'plantilla'],
-                                    'properties' => [
-                                        'telefono'  => ['type' => 'string',  'example' => '573001234567', 'description' => 'Número con indicativo, solo dígitos.'],
-                                        'plantilla' => ['type' => 'string',  'example' => 'bienvenida_cliente', 'description' => 'Nombre EXACTO de la plantilla aprobada.'],
-                                        'idioma'    => ['type' => 'string',  'example' => 'es', 'description' => 'Código de idioma (opcional).'],
-                                        'variables' => ['type' => 'array', 'items' => ['type' => 'string'], 'example' => ['Juan', 'Guayacán Café'], 'description' => 'Valores para {{1}}, {{2}}, ...'],
-                                        'imagen_url'=> ['type' => 'string', 'example' => null, 'description' => 'Opcional: si la plantilla tiene header de imagen.'],
-                                        'boton_url' => ['type' => 'string', 'example' => null, 'description' => 'Opcional: parámetro del botón URL dinámico.'],
-                                    ],
-                                ],
-                            ]],
-                        ],
-                        'responses' => [
-                            '200' => [
-                                'description' => 'Enviada',
-                                'content' => ['application/json' => ['example' => [
-                                    'ok' => true, 'message' => 'Plantilla enviada.',
-                                    'telefono' => '573001234567', 'plantilla' => 'bienvenida_cliente', 'idioma' => 'es',
-                                ]]],
-                            ],
-                            '401' => ['description' => 'API key inválida'],
-                            '422' => ['description' => 'Datos inválidos o plantilla no enviable'],
-                        ],
-                    ],
                 ],
 
                 // ══════════════ PRODUCTOS ══════════════
