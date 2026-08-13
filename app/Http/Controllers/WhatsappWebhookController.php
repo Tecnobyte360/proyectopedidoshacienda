@@ -2178,9 +2178,12 @@ TXT;
                     $toolChoiceInicial = ['type' => 'function', 'function' => ['name' => 'mostrar_catalogo']];
                     $razonForzado = 'catalogo_nativo_forzar_seleccion';
                 }
-            } elseif (!empty($cartaWebUrl) && empty($estadoActualBd?->productos)) {
-                // 🥩 Carta web: cliente pregunta por productos y el carrito está vacío
-                //    → FORZAR el botón del catálogo web (no listar categorías en texto).
+            } elseif (!empty($cartaWebUrl) && empty($estadoActualBd?->productos) && !$this->mensajeEsPedidoConcreto($message)) {
+                // 🥩 Carta web: SOLO si es una consulta GENERAL ("qué tienen", "menú")
+                //    con el carrito vacío → FORZAR el botón del catálogo web.
+                //    Si el cliente ya mandó un pedido concreto (con cantidades, ej. lo que
+                //    vuelve del catálogo), NO forzamos: dejamos que se procese el pedido
+                //    y siga el flujo normal (cédula → HGI → datos → cobertura).
                 $toolChoiceInicial = ['type' => 'function', 'function' => ['name' => 'mostrar_catalogo']];
                 $razonForzado = 'carta_web_forzar_boton';
             } else {
@@ -5371,6 +5374,20 @@ TXT;
         } catch (\Throwable $e) {
             return null;
         }
+    }
+
+    /**
+     * 🥩 ¿El mensaje es un PEDIDO CONCRETO (con cantidades) y no una consulta
+     * general? Ej. lo que vuelve del catálogo web: "• 2 kg — Solomito…".
+     * Si lo es, NO forzamos el botón del catálogo: se procesa el pedido.
+     */
+    private function mensajeEsPedidoConcreto(string $m): bool
+    {
+        // Viñetas del catálogo: "• 2 kg — ..."
+        if (preg_match('/[•\-–—]\s*\d+/u', $m)) return true;
+        // Cantidad + unidad en cualquier parte
+        if (preg_match('/\b\d+\s*(kg|kilos?|libras?|lb|gr|gramos?|und|unidad(es)?|paq|paquetes?|cajas?|bolsas?|docenas?|porciones?)\b/iu', $m)) return true;
+        return false;
     }
 
     private function obtenerSedeIdDesdeConexion(?string $connectionId): ?int
