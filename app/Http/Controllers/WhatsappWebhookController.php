@@ -2178,6 +2178,11 @@ TXT;
                     $toolChoiceInicial = ['type' => 'function', 'function' => ['name' => 'mostrar_catalogo']];
                     $razonForzado = 'catalogo_nativo_forzar_seleccion';
                 }
+            } elseif (!empty($cartaWebUrl) && empty($estadoActualBd?->productos)) {
+                // 🥩 Carta web: cliente pregunta por productos y el carrito está vacío
+                //    → FORZAR el botón del catálogo web (no listar categorías en texto).
+                $toolChoiceInicial = ['type' => 'function', 'function' => ['name' => 'mostrar_catalogo']];
+                $razonForzado = 'carta_web_forzar_boton';
             } else {
                 $messages[] = [
                     'role' => 'system',
