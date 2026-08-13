@@ -101,6 +101,7 @@ class CartaPublicaController extends Controller
             'logoUrl'     => $logoUrl,
             'colorPrim'   => $cPrim,
             'colorSec'    => $cSec,
+            'mapsKey'     => $tenant->google_maps_activo ? ($tenant->google_maps_api_key ?: null) : null,
         ]);
     }
 
@@ -162,6 +163,27 @@ class CartaPublicaController extends Controller
         app(\App\Services\TenantManager::class)->set($tenant);
 
         try {
+            // 🎯 Si vienen coordenadas exactas (de Google Places) → validamos por
+            //    punto directo (sin re-geocodificar, sin ambigüedad de municipio).
+            $lat = $request->input('lat');
+            $lng = $request->input('lng');
+            if (is_numeric($lat) && is_numeric($lng)) {
+                $res = app(\App\Services\SedeResolverService::class)
+                    ->resolverParaPunto((float) $lat, (float) $lng, $tenant->id);
+                $cub  = (bool) ($res['cubierta'] ?? false);
+                $sede = $res['sede'] ?? null;
+                return response()->json([
+                    'ok'              => true,
+                    'cubierta'        => $cub,
+                    'costo_envio'     => ($cub && $sede) ? (float) ($sede->cobertura_costo_envio ?? 0) : null,
+                    'tiempo_estimado' => ($cub && $sede) ? ($sede->cobertura_tiempo_min ?? null) : null,
+                    'pedido_minimo'   => ($cub && $sede) ? (float) ($sede->cobertura_pedido_minimo ?? 0) : null,
+                    'sede'            => $sede->nombre ?? null,
+                    'mensaje'         => $cub ? null : 'Esa dirección queda fuera de cobertura. Puedes recoger en sede.',
+                ]);
+            }
+
+            // Fallback: validar por texto de dirección (geocode + polígonos).
             $sedeId = \App\Models\Sede::where('tenant_id', $tenant->id)
                 ->where('activa', true)->value('id');
 

@@ -194,8 +194,10 @@
 <script>
 const SLUG=@json($tenant->slug);
 const CSRF=document.querySelector('meta[name=csrf-token]').content;
+const MAPS_KEY=@json($mapsKey ?? null);
 let CLIENTE={existe:null,nombre:'',telefono:'',direccion:''};
 let COBERTURA=null;
+let PLACE_COORDS=null; // lat/lng cuando el cliente elige una sugerencia de Google
 </script>
 <script>
 const TENANT=@json($tenant->nombre), WA=@json($waNumero), CATS=@json($categorias), PRODS=@json($productos);
@@ -303,8 +305,10 @@ async function validarCobertura(){
   const dir=(document.getElementById('coDir').value||'').trim();
   const hint=document.getElementById('coCobHint');hint.style.display='none';
   if(dir.length<5){hint.className='co-hint err';hint.textContent='Escribe la dirección completa.';hint.style.display='block';return;}
-  const btn=document.getElementById('coCobBtn');btn.disabled=true;btn.innerHTML='<span class="spin"></span> Validando…';
-  let res;try{res=await apiCarta('cobertura',{direccion:dir});}catch(e){res={ok:false};}
+  const btn=document.getElementById('coCobBtn');btn.disabled=true;btn.innerHTML='<span class="spin"></span> Validando cobertura…';
+  const body={direccion:dir};
+  if(PLACE_COORDS){body.lat=PLACE_COORDS.lat;body.lng=PLACE_COORDS.lng;}
+  let res;try{res=await apiCarta('cobertura',body);}catch(e){res={ok:false};}
   btn.disabled=false;btn.innerHTML='📍 Validar cobertura';
   if(!res.ok){hint.className='co-hint err';hint.textContent=res.msg||'No se pudo validar.';hint.style.display='block';return;}
   if(res.cubierta){
@@ -332,8 +336,36 @@ function enviarFinal(){
   if(COBERTURA&&COBERTURA.cubierta&&COBERTURA.costo!=null)txt+=`\nEnvío: ${fmt(COBERTURA.costo)}`;
   window.location.href=`https://wa.me/${WA}?text=${encodeURIComponent(txt)}`;
 }
+// 📍 Al editar la dirección a mano, invalidamos las coordenadas previas de Google.
+document.getElementById('coDir').addEventListener('input',()=>{PLACE_COORDS=null;});
+
+// 🗺️ Google Places Autocomplete + auto-validación al elegir una sugerencia.
+let CARTA_AUTOCOMPLETE=null;
+window.initCartaMaps=function(){
+  try{
+    const input=document.getElementById('coDir');
+    CARTA_AUTOCOMPLETE=new google.maps.places.Autocomplete(input,{
+      componentRestrictions:{country:'co'},
+      fields:['formatted_address','geometry'],
+      types:['address'],
+    });
+    CARTA_AUTOCOMPLETE.addListener('place_changed',()=>{
+      const place=CARTA_AUTOCOMPLETE.getPlace();
+      if(!place||!place.geometry){PLACE_COORDS=null;return;}
+      if(place.formatted_address)input.value=place.formatted_address;
+      PLACE_COORDS={lat:place.geometry.location.lat(),lng:place.geometry.location.lng()};
+      validarCobertura(); // ← auto-valida, sin botón
+    });
+    // El pop-up de Google debe quedar por encima del modal
+    const obs=new MutationObserver(()=>{document.querySelectorAll('.pac-container').forEach(el=>el.style.zIndex=99999);});
+    obs.observe(document.body,{childList:true});
+  }catch(e){console.warn('Places no disponible:',e);}
+};
 document.getElementById('q').addEventListener('input',render);
 buildChips();render();
 </script>
+@if(!empty($mapsKey))
+<script async defer src="https://maps.googleapis.com/maps/api/js?key={{ $mapsKey }}&libraries=places&callback=initCartaMaps&language=es&region=CO"></script>
+@endif
 </body>
 </html>
