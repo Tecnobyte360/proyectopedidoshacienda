@@ -33,6 +33,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'api.key'      => \App\Http\Middleware\ApiKeyAuth::class,
             'tenant.apikey' => \App\Http\Middleware\TenantApiKeyAuth::class,
+            'tenant.fromuser' => \App\Http\Middleware\SetTenantFromUser::class,
             'role'       => \Spatie\Permission\Middleware\RoleMiddleware::class,
             'permission' => \Spatie\Permission\Middleware\PermissionMiddleware::class,
             'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,

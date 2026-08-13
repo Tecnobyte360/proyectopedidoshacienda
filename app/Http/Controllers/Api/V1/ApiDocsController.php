@@ -24,23 +24,57 @@ class ApiDocsController extends Controller
             'info' => [
                 'title'       => 'KIVOX — API de WhatsApp',
                 'version'     => '1.0.0',
-                'description' => "API para que sistemas externos envíen mensajes por WhatsApp a través de KIVOX.\n\n"
-                    . "**Autenticación:** cada tenant tiene su propia `api_key`. Envíala en el header "
-                    . "`X-API-KEY`. El mensaje sale desde el número de WhatsApp de ese tenant.",
+                'description' => "API de KIVOX para integrar otros sistemas (WhatsApp, productos, catálogo).\n\n"
+                    . "**Autenticación (login requerido):**\n"
+                    . "1. Llama `POST /api/v1/login` con tu email y contraseña → recibes un `token`.\n"
+                    . "2. Pulsa **Authorize** 🔒 arriba y pega el token (sin la palabra Bearer).\n"
+                    . "3. Todas las peticiones van con `Authorization: Bearer <token>` y operan sobre TU empresa.",
             ],
             'servers' => [['url' => $base, 'description' => 'Producción']],
             'components' => [
                 'securitySchemes' => [
-                    'ApiKeyAuth' => [
-                        'type' => 'apiKey',
-                        'in'   => 'header',
-                        'name' => 'X-API-KEY',
-                        'description' => 'API key del tenant (empieza por kvx_...).',
+                    'BearerAuth' => [
+                        'type'   => 'http',
+                        'scheme' => 'bearer',
+                        'description' => 'Token que devuelve POST /api/v1/login.',
                     ],
                 ],
             ],
-            'security' => [['ApiKeyAuth' => []]],
+            'security' => [['BearerAuth' => []]],
             'paths' => [
+                // ══════════════ LOGIN ══════════════
+                '/api/v1/login' => [
+                    'post' => [
+                        'summary'  => 'Login — obtener token',
+                        'tags'     => ['Autenticación'],
+                        'security' => [], // público
+                        'requestBody' => ['required' => true, 'content' => ['application/json' => [
+                            'schema' => [
+                                'type' => 'object',
+                                'required' => ['email', 'password'],
+                                'properties' => [
+                                    'email'    => ['type' => 'string', 'example' => 'integracion@guayacancafe.com'],
+                                    'password' => ['type' => 'string', 'example' => '••••••••'],
+                                ],
+                            ],
+                        ]]],
+                        'responses' => [
+                            '200' => ['description' => 'Token emitido', 'content' => ['application/json' => ['example' => [
+                                'ok' => true, 'token' => '12|abcdef...', 'token_type' => 'Bearer',
+                                'tenant' => ['id' => 5, 'nombre' => 'Guayacán Café', 'slug' => 'guayacan-cafe'],
+                            ]]]],
+                            '401' => ['description' => 'Credenciales incorrectas'],
+                            '403' => ['description' => 'Usuario sin empresa / inactivo'],
+                        ],
+                    ],
+                ],
+                '/api/v1/logout' => [
+                    'post' => ['summary' => 'Logout — revocar token', 'tags' => ['Autenticación'], 'responses' => ['200' => ['description' => 'Sesión cerrada']]],
+                ],
+                '/api/v1/yo' => [
+                    'get' => ['summary' => 'Ver mi token/empresa', 'tags' => ['Autenticación'], 'responses' => ['200' => ['description' => 'Datos del token']]],
+                ],
+
                 '/api/v1/whatsapp/plantillas' => [
                     'get' => [
                         'summary'    => 'Listar plantillas del tenant',

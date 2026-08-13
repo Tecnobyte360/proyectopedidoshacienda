@@ -182,9 +182,16 @@ Route::get('openapi.json', [\App\Http\Controllers\Api\V1\ApiDocsController::clas
 
 Route::prefix('v1')->group(function () {
 
-    // 🔑 API por TENANT (api_key del tenant). Un solo key para TODO.
-    //    Header:  X-API-KEY: <api_key_del_tenant>   → todo sale/consulta de ESE tenant.
-    Route::middleware('tenant.apikey')->group(function () {
+    // 🔐 LOGIN de la API (público): email + contraseña → token Bearer.
+    Route::post('login', [\App\Http\Controllers\Api\V1\AuthApiController::class, 'login']);
+
+    // 🔒 API por TENANT — requiere LOGIN (token Bearer). Header:
+    //    Authorization: Bearer <token>   → todo sale/consulta del tenant del usuario.
+    Route::middleware(['auth:sanctum', 'tenant.fromuser'])->group(function () {
+
+        // ── Sesión ──
+        Route::post('logout', [\App\Http\Controllers\Api\V1\AuthApiController::class, 'logout']);
+        Route::get ('yo',     [\App\Http\Controllers\Api\V1\AuthApiController::class, 'yo']);
 
         // ── WhatsApp ──
         Route::get ('whatsapp/plantillas', [\App\Http\Controllers\Api\V1\WhatsappApiController::class, 'plantillas']);

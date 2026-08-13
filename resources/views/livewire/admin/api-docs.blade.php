@@ -6,8 +6,8 @@
                 <i class="fa-solid fa-code text-emerald-600"></i> API de WhatsApp — Swagger
             </h1>
             <p class="text-sm text-slate-500">
-                Documentación para integrar otros sistemas. Cada tenant usa su propia <b>api_key</b> (header <code>X-API-KEY</code>)
-                y los mensajes salen desde <b>su</b> número de WhatsApp.
+                Documentación para integrar otros sistemas. El integrador hace <b>login</b> (<code>POST /api/v1/login</code>)
+                con el usuario de su empresa, recibe un <b>token</b> y con él llama la API — todo scopeado a <b>su</b> tenant.
             </p>
         </div>
         <a href="{{ url('/api/docs') }}" target="_blank" rel="noopener"
@@ -25,6 +25,6 @@
     </div>
 
     <p class="mt-3 text-xs text-slate-400">
-        💡 En el Swagger: pulsa <b>Authorize</b> 🔒, pega la api_key del tenant y usa <b>Try it out</b> para probar en vivo.
+        💡 En el Swagger: 1) ejecuta <b>POST /login</b> con email+contraseña → copia el <b>token</b>. 2) pulsa <b>Authorize</b> 🔒 y pégalo. 3) usa <b>Try it out</b>.
     </p>
 </div>
