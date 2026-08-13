@@ -30,6 +30,7 @@ class Tenant extends Model
     protected $fillable = [
         'nombre',
         'slug',
+        'api_key',
         'logo_url',
         'favicon_url',
         'plan',

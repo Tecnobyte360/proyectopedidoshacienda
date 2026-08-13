@@ -176,7 +176,18 @@ Route::get('/whatsapp-webhook/history/{phone}', function ($phone) {
 | Lectura pública (GET) y escritura protegida con header X-API-KEY.
 | Configura API_KEY en .env.
 */
+// 📚 Documentación de la API (Swagger UI + OpenAPI). Pública (solo lectura del spec).
+Route::get('docs',         [\App\Http\Controllers\Api\V1\ApiDocsController::class, 'ui']);
+Route::get('openapi.json', [\App\Http\Controllers\Api\V1\ApiDocsController::class, 'openapi']);
+
 Route::prefix('v1')->group(function () {
+
+    // 🟢 WhatsApp por TENANT (api_key del tenant): enviar plantillas a clientes.
+    //    Header:  X-API-KEY: <api_key_del_tenant>
+    Route::middleware('tenant.apikey')->prefix('whatsapp')->group(function () {
+        Route::get ('plantillas', [\App\Http\Controllers\Api\V1\WhatsappApiController::class, 'plantillas']);
+        Route::post('plantilla',  [\App\Http\Controllers\Api\V1\WhatsappApiController::class, 'enviarPlantilla']);
+    });
 
     // Lectura pública
     Route::get('categorias',          [CategoriaApiController::class, 'index']);
