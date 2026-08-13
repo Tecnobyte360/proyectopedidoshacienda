@@ -67,6 +67,23 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        // 🔑 Las rutas /api/* SIEMPRE responden JSON (no redirigen al login web).
+        //    Así un integrador sin token recibe 401 JSON, no la página HTML.
+        $exceptions->shouldRenderJsonWhen(function ($request, $throwable) {
+            return $request->is('api/*') || $request->expectsJson();
+        });
+
+        // 🔒 Auth: sin token en /api/* → 401 JSON claro.
+        $exceptions->render(function (\Illuminate\Auth\AuthenticationException $e, $request) {
+            if ($request->is('api/*') || $request->expectsJson()) {
+                return response()->json([
+                    'ok' => false,
+                    'message' => 'No autenticado. Haz login en /api/v1/login y envía el token en Authorization: Bearer <token>.',
+                ], 401);
+            }
+            return null; // deja el comportamiento web normal (redirige a login)
+        });
+
         // Cuando un usuario autenticado no tiene el permiso, mostrar pantalla 403
         $exceptions->render(function (\Spatie\Permission\Exceptions\UnauthorizedException $e, $request) {
             if ($request->expectsJson()) {
