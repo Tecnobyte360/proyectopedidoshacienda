@@ -120,8 +120,17 @@
   .co-hint.warn{background:#fff4e5;color:#8a5a1e}
   .co-hint.err{background:#fdecec;color:#b23b3b}
   .hiddenx{display:none}
-  .spin{width:14px;height:14px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite;display:inline-block}
+  .spin{width:14px;height:14px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite;display:inline-block;vertical-align:-2px}
   @keyframes sp{to{transform:rotate(360deg)}}
+
+  /* ── desplegable de Google Places (limpio, sin íconos rotos) ── */
+  .pac-container{z-index:99999;border-radius:12px;margin-top:6px;border:1px solid var(--line-2);box-shadow:0 10px 30px rgba(0,0,0,.15);font-family:var(--font);background:#fff;overflow:hidden}
+  .pac-icon,.pac-item img{display:none !important}
+  .pac-item{padding:11px 14px;font-size:14px;color:var(--ink);border-top:1px solid var(--line);cursor:pointer;line-height:1.3}
+  .pac-item:first-child{border-top:0}
+  .pac-item:hover,.pac-item-selected{background:var(--tint)}
+  .pac-item-query{font-size:14px;color:var(--ink);font-weight:600}
+  .pac-matched{font-weight:700}
 </style>
 </head>
 <body>
@@ -166,15 +175,14 @@
       <div class="sheet-body">
         <div class="co-sum" id="coSum"></div>
 
-        {{-- Paso 1: cédula --}}
+        {{-- Paso 1: cédula (se valida sola al salir del campo) --}}
         <div id="coCedulaWrap">
           <div class="co-label">Tu número de cédula o NIT</div>
-          <input class="co-input" id="coCedula" inputmode="numeric" autocomplete="off" placeholder="Ej. 1036457890">
-          <button class="co-btn" id="coCedulaBtn" onclick="verificarCedula()">Continuar</button>
-          <div class="co-hint err" id="coCedulaHint" style="display:none"></div>
+          <input class="co-input" id="coCedula" inputmode="numeric" autocomplete="off" placeholder="Escríbela y toca fuera para continuar">
+          <div class="co-hint" id="coCedulaHint" style="display:none"></div>
         </div>
 
-        {{-- Paso 2: datos + dirección --}}
+        {{-- Paso 2: datos + dirección (cobertura se valida sola) --}}
         <div id="coDatos" class="hiddenx">
           <div class="co-hint ok" id="coSaludo" style="display:none"></div>
           <div class="co-label">Nombre completo</div>
@@ -182,8 +190,7 @@
           <div class="co-label">Celular de contacto</div>
           <input class="co-input" id="coCel" inputmode="numeric" placeholder="30xxxxxxxx">
           <div class="co-label">Dirección de entrega</div>
-          <input class="co-input" id="coDir" placeholder="Cra 50 # 47-80, barrio, municipio">
-          <button class="co-btn dark" id="coCobBtn" onclick="validarCobertura()">📍 Validar cobertura</button>
+          <input class="co-input" id="coDir" placeholder="Escribe y elige tu dirección">
           <div class="co-hint" id="coCobHint" style="display:none"></div>
           <button class="co-btn wa" id="coEnviar" onclick="enviarFinal()"><i class="fa-brands fa-whatsapp"></i> Enviar pedido</button>
         </div>
@@ -280,37 +287,42 @@ async function apiCarta(path,body){
   const r=await fetch(`/carta/${SLUG}/${path}`,{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':CSRF,'Accept':'application/json'},body:JSON.stringify(body)});
   return r.json();
 }
+const SPIN='<span class="spin" style="border-top-color:var(--brand);border-color:rgba(0,0,0,.15)"></span>';
 async function verificarCedula(){
   const ced=(document.getElementById('coCedula').value||'').replace(/\D+/g,'');
-  const hint=document.getElementById('coCedulaHint');hint.style.display='none';
-  if(ced.length<5){hint.textContent='Escribe una cédula válida.';hint.style.display='block';return;}
-  const btn=document.getElementById('coCedulaBtn');btn.disabled=true;btn.innerHTML='<span class="spin"></span> Consultando…';
+  const hint=document.getElementById('coCedulaHint');
+  if(ced.length<5){hint.style.display='none';return;}
+  if(ced===CLIENTE.cedula)return; // ya verificada
+  hint.className='co-hint';hint.style.display='block';hint.innerHTML=SPIN+' Consultando en HGI…';
   let res;try{res=await apiCarta('cliente',{cedula:ced});}catch(e){res={ok:false};}
-  btn.disabled=false;btn.textContent='Actualizar';
-  if(!res.ok){hint.textContent=res.msg||'No se pudo consultar. Intenta de nuevo.';hint.style.display='block';return;}
+  if(!res.ok){hint.className='co-hint err';hint.textContent=res.msg||'No se pudo consultar. Intenta de nuevo.';return;}
   CLIENTE.cedula=ced;CLIENTE.existe=!!res.existe;
   document.getElementById('coDatos').classList.remove('hiddenx');
   const saludo=document.getElementById('coSaludo');
   if(res.existe){
-    saludo.innerHTML=`¡Hola <b>${(res.nombre||'').split(' ')[0]||''}</b>! 👋 Ya estás registrado en HGI. Confirma tus datos:`;saludo.style.display='block';
+    hint.style.display='none';
+    saludo.innerHTML=`¡Hola <b>${(res.nombre||'').split(' ')[0]||''}</b>! 👋 Ya estás registrado. Confirma tus datos:`;saludo.style.display='block';
     document.getElementById('coNombre').value=res.nombre||'';
     document.getElementById('coCel').value=res.telefono||'';
     document.getElementById('coDir').value=res.direccion||'';
   }else{
+    hint.className='co-hint';hint.innerHTML='Cliente nuevo — completa tus datos 👇';hint.style.display='block';
     saludo.style.display='none';
   }
   document.getElementById('coDatos').scrollIntoView({behavior:'smooth',block:'nearest'});
 }
+let COB_LAST='';
 async function validarCobertura(){
   const dir=(document.getElementById('coDir').value||'').trim();
-  const hint=document.getElementById('coCobHint');hint.style.display='none';
-  if(dir.length<5){hint.className='co-hint err';hint.textContent='Escribe la dirección completa.';hint.style.display='block';return;}
-  const btn=document.getElementById('coCobBtn');btn.disabled=true;btn.innerHTML='<span class="spin"></span> Validando cobertura…';
+  const hint=document.getElementById('coCobHint');
+  if(dir.length<5)return;
+  if(dir===COB_LAST)return; // no revalidar lo mismo
+  COB_LAST=dir;
+  hint.className='co-hint';hint.style.display='block';hint.innerHTML=SPIN+' Validando cobertura…';
   const body={direccion:dir};
   if(PLACE_COORDS){body.lat=PLACE_COORDS.lat;body.lng=PLACE_COORDS.lng;}
   let res;try{res=await apiCarta('cobertura',body);}catch(e){res={ok:false};}
-  btn.disabled=false;btn.innerHTML='📍 Validar cobertura';
-  if(!res.ok){hint.className='co-hint err';hint.textContent=res.msg||'No se pudo validar.';hint.style.display='block';return;}
+  if(!res.ok){hint.className='co-hint err';hint.textContent=res.msg||'No se pudo validar.';COB_LAST='';return;}
   if(res.cubierta){
     COBERTURA={cubierta:true,costo:res.costo_envio,tiempo:res.tiempo_estimado};
     let t='✅ ¡Tenemos cobertura!';
@@ -336,8 +348,12 @@ function enviarFinal(){
   if(COBERTURA&&COBERTURA.cubierta&&COBERTURA.costo!=null)txt+=`\nEnvío: ${fmt(COBERTURA.costo)}`;
   window.location.href=`https://wa.me/${WA}?text=${encodeURIComponent(txt)}`;
 }
-// 📍 Al editar la dirección a mano, invalidamos las coordenadas previas de Google.
-document.getElementById('coDir').addEventListener('input',()=>{PLACE_COORDS=null;});
+// 🔎 Cédula: se valida sola al salir del campo o con Enter.
+document.getElementById('coCedula').addEventListener('blur',verificarCedula);
+document.getElementById('coCedula').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();e.target.blur();}});
+// 📍 Dirección: al editar a mano invalidamos coords previas; al salir, se valida sola.
+document.getElementById('coDir').addEventListener('input',()=>{PLACE_COORDS=null;COB_LAST='';});
+document.getElementById('coDir').addEventListener('blur',()=>{setTimeout(validarCobertura,300);});
 
 // 🗺️ Google Places Autocomplete + auto-validación al elegir una sugerencia.
 let CARTA_AUTOCOMPLETE=null;
