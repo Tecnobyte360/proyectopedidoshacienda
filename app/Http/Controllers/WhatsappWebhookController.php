@@ -1943,6 +1943,7 @@ TXT;
         // ("quiero pedir", "qué manejan", "info", etc.), sin depender de palabras
         // clave. La Hacienda y otros sin catálogo quedan intactos (no se inyecta).
         $tieneCatalogoNativo = false;
+        $cartaWebUrl = null;   // 🥩 URL de carta web /carta/{slug} si el tenant la usa
         try {
             $tidCat = app(\App\Services\TenantManager::class)->id();
             $tieneCat = \App\Models\MetaWhatsappConfig::where('tenant_id', $tidCat)
@@ -1999,6 +2000,30 @@ TXT;
                     . "3) CADA mensaje tuyo DEBE terminar con UNA pregunta clara que lleve al siguiente paso. "
                     . "Nunca cierres un mensaje sin una pregunta.\n"
                     . "4) No te salgas NUNCA del contexto del pedido."];
+            }
+
+            // 🥩 CARTA WEB (IA): tenants SIN catálogo nativo pero con carta web
+            // (/carta/{slug}). Exponemos `mostrar_catalogo` para que la IA mande un
+            // BOTÓN que abre el catálogo dentro de WhatsApp y el cliente arme su pedido.
+            if (!$tieneCatalogoNativo) {
+                $cartaWebUrl = $this->cartaWebUrl();
+                if ($cartaWebUrl) {
+                    $yaCat = collect($toolsFiltradas)->contains(
+                        fn ($t) => ($t['function']['name'] ?? '') === 'mostrar_catalogo'
+                    );
+                    if (!$yaCat) {
+                        $catDef = collect($this->getToolsDefinicion())->first(
+                            fn ($t) => ($t['function']['name'] ?? '') === 'mostrar_catalogo'
+                        );
+                        if ($catDef) $toolsFiltradas[] = $catDef;
+                    }
+                    $messages[] = ['role' => 'system', 'content' =>
+                        "🥩 CATÁLOGO WEB: cuando el cliente pida ver el catálogo/menú, pregunte qué productos o "
+                        . "precios hay, o muestre intención de hacer un pedido SIN decir aún un producto específico, "
+                        . "DEBES llamar la tool `mostrar_catalogo` (le enviará un botón para abrir el catálogo dentro "
+                        . "de WhatsApp y armar su pedido). Si el cliente YA dijo exactamente qué quiere (ej. 'quiero 2 "
+                        . "de X'), NO la llames — sigue el flujo normal de pedido."];
+                }
             }
         } catch (\Throwable $e) { /* no bloquear el flujo */ }
 
@@ -2230,6 +2255,30 @@ TXT;
         // Lo enviamos y salimos (sin texto extra). Funciona con CUALQUIER redacción
         // del cliente. Fallback: si Meta aún no propagó, respondemos en texto.
         if ($toolCalls && ($toolCalls[0]['function']['name'] ?? '') === 'mostrar_catalogo') {
+            // 🥩 CARTA WEB: si el tenant usa carta web, enviamos un BOTÓN que abre
+            // la página del catálogo dentro de WhatsApp (no el catálogo nativo).
+            if (!empty($cartaWebUrl)) {
+                try {
+                    $svcCarta = app(\App\Services\Meta\MetaWhatsappCloudService::class);
+                    $tidCarta = app(\App\Services\TenantManager::class)->id();
+                    $pidCarta = ($connectionId && str_starts_with((string) $connectionId, 'meta:'))
+                        ? substr((string) $connectionId, 5) : null;
+                    $okCarta = $svcCarta->enviarBotonUrl(
+                        $from,
+                        "🛒 Mira nuestro catálogo completo y arma tu pedido aquí 👇",
+                        "Ver catálogo",
+                        $cartaWebUrl,
+                        $tidCarta,
+                        $pidCarta
+                    );
+                    if ($okCarta) return '';
+                } catch (\Throwable $e) {
+                    Log::warning('🥩 carta web botón falló: ' . $e->getMessage());
+                }
+                // Fallback: mandar el enlace en texto si el botón no salió.
+                return "🛒 Mira nuestro catálogo y arma tu pedido aquí:\n" . $cartaWebUrl;
+            }
+
             $enviadoCat = false;
             try {
                 $enviadoCat = $this->enviarCatalogoWhatsapp($conversacion, $from, $connectionId);
@@ -5300,6 +5349,23 @@ TXT;
             }
         }
         return false;
+    }
+
+    /**
+     * 🥩 URL de la carta web (/carta/{slug}) si el tenant actual la usa.
+     * Whitelist temporal por slug mientras no exista una columna de config.
+     */
+    private function cartaWebUrl(): ?string
+    {
+        try {
+            $tenant = app(\App\Services\TenantManager::class)->current();
+            if (!$tenant || empty($tenant->slug)) return null;
+            $habilitados = ['la-hacienda'];
+            if (!in_array($tenant->slug, $habilitados, true)) return null;
+            return 'https://kivox.co/carta/' . $tenant->slug;
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 
     private function obtenerSedeIdDesdeConexion(?string $connectionId): ?int

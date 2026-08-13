@@ -120,6 +120,60 @@ class MetaWhatsappCloudService
     }
 
     /**
+     * 🔗 Envía un mensaje interactivo con UN botón tipo URL (cta_url).
+     * Al tocarlo, WhatsApp abre la URL en su navegador interno (sin salir del chat).
+     * Requiere ventana de 24h abierta (es un mensaje de sesión, no plantilla).
+     */
+    public function enviarBotonUrl(
+        string $telefono,
+        string $cuerpo,
+        string $textoBoton,
+        string $url,
+        ?int   $tenantId = null,
+        ?string $phoneNumberId = null,
+        bool   $persistir = true
+    ): bool {
+        $config = $this->resolverConfig($tenantId, $phoneNumberId);
+        if (!$config) return false;
+
+        $payload = [
+            'messaging_product' => 'whatsapp',
+            'to'                => $this->normalizar($telefono),
+            'type'              => 'interactive',
+            'interactive'       => [
+                'type'   => 'cta_url',
+                'body'   => ['text' => mb_substr($cuerpo, 0, 1024)],
+                'action' => [
+                    'name'       => 'cta_url',
+                    'parameters' => [
+                        'display_text' => mb_substr($textoBoton, 0, 20),
+                        'url'          => $url,
+                    ],
+                ],
+            ],
+        ];
+
+        $ok = $this->ejecutar($config, $payload, 'cta_url');
+
+        if ($persistir && $ok && $this->ultimoWamid) {
+            $this->persistirOutbound(
+                config: $config,
+                telefono: $telefono,
+                contenido: $cuerpo . "\n" . $url,
+                wamid: $this->ultimoWamid,
+                meta: [
+                    'enviado_por_humano' => false,
+                    'provider'           => 'meta',
+                    'tipo'               => 'cta_url',
+                    'url'                => $url,
+                ],
+            );
+        }
+
+        return $ok;
+    }
+
+    /**
      * 🛒 Envía un mensaje de LISTA DE PRODUCTOS (Multi-Product Message).
      * El cliente ve los productos del catálogo dentro de WhatsApp y puede
      * armar un carrito sin salir del chat. Requiere:
