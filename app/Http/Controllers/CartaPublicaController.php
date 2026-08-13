@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Tenant;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -101,5 +102,93 @@ class CartaPublicaController extends Controller
             'colorPrim'   => $cPrim,
             'colorSec'    => $cSec,
         ]);
+    }
+
+    /**
+     * 🔎 Verifica una cédula en el ERP (HGI/SGI) del tenant desde el checkout web.
+     * Si existe, devuelve nombre/dirección/teléfono para pre-llenar.
+     * Ruta pública con throttle — ver routes/web.php.
+     */
+    public function verificarCliente(Request $request, string $slug)
+    {
+        $tenant = $this->resolverTenant($slug);
+        $cedula = preg_replace('/\D+/', '', (string) $request->input('cedula', ''));
+        if (strlen($cedula) < 5) {
+            return response()->json(['ok' => false, 'msg' => 'Cédula inválida.'], 422);
+        }
+
+        app(\App\Services\TenantManager::class)->set($tenant);
+
+        try {
+            $integ = \App\Models\Integracion::where('tenant_id', $tenant->id)
+                ->where('activo', true)
+                ->where('exporta_pedidos', true)
+                ->get()
+                ->first(fn ($i) => $i->config['cliente_lookup']['activo'] ?? false);
+
+            if (!$integ) {
+                return response()->json(['ok' => true, 'existe' => false]);
+            }
+
+            $row = app(\App\Services\ClienteErpService::class)->buscar($integ, $cedula);
+            if ($row) {
+                return response()->json([
+                    'ok'        => true,
+                    'existe'    => true,
+                    'nombre'    => trim((string) ($row['StrNombre'] ?? '')) ?: null,
+                    'telefono'  => trim((string) ($row['StrCelular'] ?? '')) ?: null,
+                    'direccion' => trim((string) ($row['StrDireccion'] ?? '')) ?: null,
+                ]);
+            }
+            return response()->json(['ok' => true, 'existe' => false]);
+        } catch (\Throwable $e) {
+            return response()->json(['ok' => false, 'msg' => 'No se pudo consultar el ERP en este momento.'], 200);
+        }
+    }
+
+    /**
+     * 🗺️ Valida cobertura de una dirección (geocodifica con Google + polígonos de
+     * sede) y devuelve si hay cobertura + costo de envío. Reusa la lógica del bot.
+     */
+    public function validarCobertura(Request $request, string $slug)
+    {
+        $tenant = $this->resolverTenant($slug);
+        $direccion = trim((string) $request->input('direccion', ''));
+        $ciudad    = trim((string) $request->input('ciudad', '')) ?: 'Bello';
+        if ($direccion === '') {
+            return response()->json(['ok' => false, 'msg' => 'Escribe la dirección.'], 422);
+        }
+
+        app(\App\Services\TenantManager::class)->set($tenant);
+
+        try {
+            $sedeId = \App\Models\Sede::where('tenant_id', $tenant->id)
+                ->where('activa', true)->value('id');
+
+            $ctrl = app(\App\Http\Controllers\WhatsappWebhookController::class);
+            $m = new \ReflectionMethod($ctrl, 'validarCoberturaDireccion');
+            $m->setAccessible(true);
+            $res = $m->invoke($ctrl, $direccion, '', $ciudad, $sedeId, null);
+
+            return response()->json([
+                'ok'              => true,
+                'cubierta'        => (bool) ($res['cubierta'] ?? false),
+                'costo_envio'     => $res['costo_envio'] ?? null,
+                'tiempo_estimado' => $res['tiempo_estimado'] ?? null,
+                'pedido_minimo'   => $res['pedido_minimo'] ?? null,
+                'sede'            => $res['sede_sugerida'] ?? null,
+                'mensaje'         => $res['mensaje_para_cliente'] ?? ($res['mensaje_sugerido'] ?? null),
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json(['ok' => false, 'msg' => 'No se pudo validar la cobertura.'], 200);
+        }
+    }
+
+    private function resolverTenant(string $slug): Tenant
+    {
+        $tenant = Tenant::withoutGlobalScopes()
+            ->where('slug', $slug)->where('activo', true)->first();
+        abort_unless($tenant, 404, 'Catálogo no disponible.');
+        return $tenant;
     }
 }

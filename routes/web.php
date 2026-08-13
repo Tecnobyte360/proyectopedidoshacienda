@@ -476,6 +476,12 @@ Route::get('/carta/{slug}', [\App\Http\Controllers\CartaPublicaController::class
     ->where('slug', '[a-z0-9\-]+')
     ->name('carta.publica');
 
+// 🔎 Checkout web: verificar cédula en ERP + validar cobertura (throttle anti-abuso).
+Route::post('/carta/{slug}/cliente', [\App\Http\Controllers\CartaPublicaController::class, 'verificarCliente'])
+    ->where('slug', '[a-z0-9\-]+')->middleware('throttle:15,1')->name('carta.cliente');
+Route::post('/carta/{slug}/cobertura', [\App\Http\Controllers\CartaPublicaController::class, 'validarCobertura'])
+    ->where('slug', '[a-z0-9\-]+')->middleware('throttle:20,1')->name('carta.cobertura');
+
 // Feed de catálogo para Meta (Commerce Manager / WhatsApp) — público, sin auth.
 Route::get('/catalogo-meta/{tenant}.csv', [\App\Http\Controllers\MetaCatalogFeedController::class, 'csv'])
     ->where('tenant', '[0-9]+')

@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="csrf-token" content="{{ csrf_token() }}">
 <title>Catálogo · {{ $tenant->nombre }}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -92,6 +93,35 @@
   .cartbar .total{font-variant-numeric:tabular-nums;font-size:15px}
   .cartbar i{font-size:16px}
   .wa-note{position:fixed;bottom:0;left:0;right:0;max-width:560px;margin:0 auto;background:#fff4e5;color:#8a5a1e;font-size:12px;text-align:center;padding:9px;display:none;font-weight:600}
+
+  /* ── modal checkout ── */
+  .modal{position:fixed;inset:0;z-index:50;display:none}
+  .modal.open{display:block}
+  .modal .backdrop{position:absolute;inset:0;background:rgba(0,0,0,.55)}
+  .sheet{position:absolute;left:0;right:0;bottom:0;max-width:560px;margin:0 auto;background:var(--bg);border-radius:20px 20px 0 0;max-height:94vh;overflow-y:auto;animation:slideup .26s cubic-bezier(.2,.7,.2,1)}
+  @keyframes slideup{from{transform:translateY(100%)}to{transform:translateY(0)}}
+  .sheet-head{position:sticky;top:0;z-index:2;background:linear-gradient(135deg,#2b2b2b,#0b0b0b);color:#fff;padding:15px 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid var(--brand)}
+  .sheet-head h3{margin:0;font-size:16px;font-weight:700}
+  .sheet-head .x{background:rgba(255,255,255,.15);border:0;color:#fff;width:30px;height:30px;border-radius:8px;font-size:15px;cursor:pointer}
+  .sheet-body{padding:16px 18px calc(20px + env(safe-area-inset-bottom))}
+  .co-sum{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 14px;margin-bottom:6px}
+  .co-sum .li{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;padding:2px 0;color:var(--ink-soft)}
+  .co-sum .li b{color:var(--ink);font-weight:600}
+  .co-sum .tot{display:flex;justify-content:space-between;font-weight:800;font-size:15px;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line-2);color:var(--ink)}
+  .co-label{font-size:12.5px;font-weight:700;color:var(--ink);margin:14px 0 6px}
+  .co-input{width:100%;border:1.5px solid var(--line-2);border-radius:11px;padding:12px 14px;font-size:15px;font-family:var(--font);outline:0;color:var(--ink);background:var(--card)}
+  .co-input:focus{border-color:var(--brand)}
+  .co-btn{width:100%;border:0;border-radius:12px;padding:13px;font-weight:700;font-size:14.5px;font-family:var(--font);cursor:pointer;background:var(--brand);color:#fff;margin-top:12px;display:flex;align-items:center;justify-content:center;gap:8px}
+  .co-btn.dark{background:#111}
+  .co-btn.wa{background:linear-gradient(135deg,#1f9d4d,#137a38)}
+  .co-btn:disabled{opacity:.5;cursor:default}
+  .co-hint{font-size:12.5px;padding:10px 12px;border-radius:10px;margin-top:10px;line-height:1.4}
+  .co-hint.ok{background:#e9f9ef;color:#12703a}
+  .co-hint.warn{background:#fff4e5;color:#8a5a1e}
+  .co-hint.err{background:#fdecec;color:#b23b3b}
+  .hiddenx{display:none}
+  .spin{width:14px;height:14px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite;display:inline-block}
+  @keyframes sp{to{transform:rotate(360deg)}}
 </style>
 </head>
 <body>
@@ -125,6 +155,48 @@
   </div>
   <div class="wa-note" id="waNote">Este catálogo aún no tiene número de WhatsApp configurado.</div>
 
+  {{-- ── Modal checkout ── --}}
+  <div class="modal" id="checkout">
+    <div class="backdrop" onclick="cerrarCheckout()"></div>
+    <div class="sheet">
+      <div class="sheet-head">
+        <h3>Confirma tu pedido</h3>
+        <button class="x" onclick="cerrarCheckout()">✕</button>
+      </div>
+      <div class="sheet-body">
+        <div class="co-sum" id="coSum"></div>
+
+        {{-- Paso 1: cédula --}}
+        <div id="coCedulaWrap">
+          <div class="co-label">Tu número de cédula o NIT</div>
+          <input class="co-input" id="coCedula" inputmode="numeric" autocomplete="off" placeholder="Ej. 1036457890">
+          <button class="co-btn" id="coCedulaBtn" onclick="verificarCedula()">Continuar</button>
+          <div class="co-hint err" id="coCedulaHint" style="display:none"></div>
+        </div>
+
+        {{-- Paso 2: datos + dirección --}}
+        <div id="coDatos" class="hiddenx">
+          <div class="co-hint ok" id="coSaludo" style="display:none"></div>
+          <div class="co-label">Nombre completo</div>
+          <input class="co-input" id="coNombre" placeholder="Nombre y apellido">
+          <div class="co-label">Celular de contacto</div>
+          <input class="co-input" id="coCel" inputmode="numeric" placeholder="30xxxxxxxx">
+          <div class="co-label">Dirección de entrega</div>
+          <input class="co-input" id="coDir" placeholder="Cra 50 # 47-80, barrio, municipio">
+          <button class="co-btn dark" id="coCobBtn" onclick="validarCobertura()">📍 Validar cobertura</button>
+          <div class="co-hint" id="coCobHint" style="display:none"></div>
+          <button class="co-btn wa" id="coEnviar" onclick="enviarFinal()"><i class="fa-brands fa-whatsapp"></i> Enviar pedido</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+const SLUG=@json($tenant->slug);
+const CSRF=document.querySelector('meta[name=csrf-token]').content;
+let CLIENTE={existe:null,nombre:'',telefono:'',direccion:''};
+let COBERTURA=null;
+</script>
 <script>
 const TENANT=@json($tenant->nombre), WA=@json($waNumero), CATS=@json($categorias), PRODS=@json($productos);
 const FA={RES:'fa-cow',CERDO:'fa-bacon',POLLO:'fa-drumstick-bite',PESCADO:'fa-fish',EMBUTIDOS:'fa-hotdog',ABARROTES:'fa-basket-shopping'};
@@ -189,12 +261,76 @@ function updateCart(){
   document.getElementById('cartTotal').textContent=fmt(total);
   document.getElementById('cartbar').classList.toggle('show',count>0);
 }
-function enviarPedido(){
-  const ids=Object.keys(cart);if(!ids.length)return;
+function pedidoLineas(){
+  const ids=Object.keys(cart);let total=0;
+  const lineas=ids.map(id=>{const p=prodById[id],q=cart[id];total+=q*p.pr;return {t:`• ${q} ${p.u} — ${p.n}`,sub:q*p.pr,n:p.n,q,u:p.u};});
+  return {lineas,total};
+}
+// El botón del carrito ahora abre el checkout (no manda directo a WhatsApp).
+function enviarPedido(){ if(!Object.keys(cart).length)return; abrirCheckout(); }
+function abrirCheckout(){
+  const {lineas,total}=pedidoLineas();
+  document.getElementById('coSum').innerHTML=lineas.map(l=>`<div class="li"><b>${l.q} ${l.u}</b> ${l.n}<span style="margin-left:auto;white-space:nowrap">${fmt(l.sub)}</span></div>`).join('')+`<div class="tot"><span>Total productos</span><span>${fmt(total)}</span></div>`;
+  document.getElementById('checkout').classList.add('open');document.body.style.overflow='hidden';
+}
+function cerrarCheckout(){document.getElementById('checkout').classList.remove('open');document.body.style.overflow='';}
+async function apiCarta(path,body){
+  const r=await fetch(`/carta/${SLUG}/${path}`,{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':CSRF,'Accept':'application/json'},body:JSON.stringify(body)});
+  return r.json();
+}
+async function verificarCedula(){
+  const ced=(document.getElementById('coCedula').value||'').replace(/\D+/g,'');
+  const hint=document.getElementById('coCedulaHint');hint.style.display='none';
+  if(ced.length<5){hint.textContent='Escribe una cédula válida.';hint.style.display='block';return;}
+  const btn=document.getElementById('coCedulaBtn');btn.disabled=true;btn.innerHTML='<span class="spin"></span> Consultando…';
+  let res;try{res=await apiCarta('cliente',{cedula:ced});}catch(e){res={ok:false};}
+  btn.disabled=false;btn.textContent='Actualizar';
+  if(!res.ok){hint.textContent=res.msg||'No se pudo consultar. Intenta de nuevo.';hint.style.display='block';return;}
+  CLIENTE.cedula=ced;CLIENTE.existe=!!res.existe;
+  document.getElementById('coDatos').classList.remove('hiddenx');
+  const saludo=document.getElementById('coSaludo');
+  if(res.existe){
+    saludo.innerHTML=`¡Hola <b>${(res.nombre||'').split(' ')[0]||''}</b>! 👋 Ya estás registrado en HGI. Confirma tus datos:`;saludo.style.display='block';
+    document.getElementById('coNombre').value=res.nombre||'';
+    document.getElementById('coCel').value=res.telefono||'';
+    document.getElementById('coDir').value=res.direccion||'';
+  }else{
+    saludo.style.display='none';
+  }
+  document.getElementById('coDatos').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+async function validarCobertura(){
+  const dir=(document.getElementById('coDir').value||'').trim();
+  const hint=document.getElementById('coCobHint');hint.style.display='none';
+  if(dir.length<5){hint.className='co-hint err';hint.textContent='Escribe la dirección completa.';hint.style.display='block';return;}
+  const btn=document.getElementById('coCobBtn');btn.disabled=true;btn.innerHTML='<span class="spin"></span> Validando…';
+  let res;try{res=await apiCarta('cobertura',{direccion:dir});}catch(e){res={ok:false};}
+  btn.disabled=false;btn.innerHTML='📍 Validar cobertura';
+  if(!res.ok){hint.className='co-hint err';hint.textContent=res.msg||'No se pudo validar.';hint.style.display='block';return;}
+  if(res.cubierta){
+    COBERTURA={cubierta:true,costo:res.costo_envio,tiempo:res.tiempo_estimado};
+    let t='✅ ¡Tenemos cobertura!';
+    if(res.costo_envio!=null)t+=` Envío: <b>${fmt(res.costo_envio)}</b>`;
+    if(res.tiempo_estimado)t+=` · ~${res.tiempo_estimado} min`;
+    hint.className='co-hint ok';hint.innerHTML=t;hint.style.display='block';
+  }else{
+    COBERTURA={cubierta:false};
+    hint.className='co-hint warn';hint.innerHTML=res.mensaje||'😕 Esa dirección está fuera de cobertura. Puedes recoger en sede.';hint.style.display='block';
+  }
+}
+function enviarFinal(){
+  const nombre=(document.getElementById('coNombre').value||'').trim();
+  const cel=(document.getElementById('coCel').value||'').trim();
+  const dir=(document.getElementById('coDir').value||'').trim();
   if(!WA){document.getElementById('waNote').style.display='block';return;}
-  let total=0;const lineas=ids.map(id=>{const p=prodById[id],q=cart[id];total+=q*p.pr;return `• ${q} ${p.u} — ${p.n}`;});
-  const texto=`Hola ${TENANT} 🥩, quiero hacer un pedido:\n\n${lineas.join('\n')}\n\n*Total aprox: ${fmt(total)}*`;
-  window.location.href=`https://wa.me/${WA}?text=${encodeURIComponent(texto)}`;
+  const {lineas,total}=pedidoLineas();
+  let txt=`Hola ${TENANT} 🥩, quiero hacer un pedido:\n\n${lineas.map(l=>l.t).join('\n')}\n\n*Total productos: ${fmt(total)}*\n\n👤 *Mis datos:*`;
+  if(CLIENTE.cedula)txt+=`\nCédula: ${CLIENTE.cedula}`;
+  if(nombre)txt+=`\nNombre: ${nombre}`;
+  if(cel)txt+=`\nCelular: ${cel}`;
+  if(dir)txt+=`\nDirección: ${dir}`;
+  if(COBERTURA&&COBERTURA.cubierta&&COBERTURA.costo!=null)txt+=`\nEnvío: ${fmt(COBERTURA.costo)}`;
+  window.location.href=`https://wa.me/${WA}?text=${encodeURIComponent(txt)}`;
 }
 document.getElementById('q').addEventListener('input',render);
 buildChips();render();
