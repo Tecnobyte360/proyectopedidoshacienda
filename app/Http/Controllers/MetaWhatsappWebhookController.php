@@ -472,11 +472,37 @@ class MetaWhatsappWebhookController extends Controller
         $estado = $status['status'] ?? null;
         if (!$waId || !$estado) return;
 
+        // ❌ FAILED: marcar el mensaje como FALLIDO + guardar el motivo en claro.
+        //    (No lo bloquea la regla "solo subir el ack": lo forzamos a -1.)
+        if ($estado === 'failed') {
+            $err     = $status['errors'][0] ?? [];
+            $code    = (int) ($err['code'] ?? 0);
+            $detalle = $err['error_data']['details'] ?? ($err['title'] ?? 'No se pudo enviar el mensaje.');
+            $amigable = match ($code) {
+                131047 => 'Fuera de la ventana de 24h: el cliente no responde hace más de 24h. Debes enviarle una *plantilla* (no texto libre).',
+                131026 => 'El número no puede recibir mensajes de WhatsApp.',
+                131051 => 'Tipo de mensaje no soportado por WhatsApp.',
+                131049, 131050 => 'WhatsApp limitó el envío de marketing a este número por ahora.',
+                default => $detalle,
+            };
+            try {
+                foreach (\App\Models\MensajeWhatsapp::withoutGlobalScopes()
+                    ->where('mensaje_externo_id', $waId)->get() as $m) {
+                    $meta = is_array($m->meta) ? $m->meta : [];
+                    $meta['error_envio']  = $amigable;
+                    $meta['error_codigo'] = $code;
+                    $m->update(['ack' => -1, 'meta' => $meta]);
+                }
+                Log::info('❌ Mensaje marcado como FALLIDO', ['wa_id' => $waId, 'code' => $code, 'motivo' => $amigable]);
+            } catch (\Throwable $e) {
+                Log::warning('No se pudo marcar mensaje fallido: ' . $e->getMessage());
+            }
+        }
+
         $mapAck = [
             'sent'      => 1,
             'delivered' => 2,
             'read'      => 3,
-            'failed'    => -1,
         ];
         $ack = $mapAck[$estado] ?? null;
         if ($ack !== null) {

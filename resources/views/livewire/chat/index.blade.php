@@ -1077,7 +1077,9 @@
                                     {{-- Solo mostramos ticks/reloj si podemos rastrear el estado (mensaje del operador).
                                          Los mensajes del bot se envían vía API y asumimos entregados correctamente. --}}
                                     @if($esHumano)
-                                        @if($ack >= 3)
+                                        @if($ack < 0)
+                                            <i class="fa-solid fa-circle-exclamation text-rose-500" title="No enviado"></i>
+                                        @elseif($ack >= 3)
                                             <i class="fa-solid fa-check-double text-blue-500" title="Leído"></i>
                                         @elseif($ack === 2)
                                             <i class="fa-solid fa-check-double text-slate-400" title="Entregado"></i>
@@ -1091,6 +1093,12 @@
                                         <i class="fa-solid fa-check text-slate-400" title="Enviado"></i>
                                     @endif
                                 </p>
+                                @if($esHumano && $ack < 0)
+                                    <div class="mt-1 rounded-lg bg-rose-50 border border-rose-200 px-2.5 py-1.5 text-[11px] text-rose-700 flex items-start gap-1.5">
+                                        <i class="fa-solid fa-triangle-exclamation mt-0.5 shrink-0"></i>
+                                        <span><b>No se envió.</b> {{ $m->meta['error_envio'] ?? 'WhatsApp rechazó el mensaje.' }}</span>
+                                    </div>
+                                @endif
                             </div>
                         </div>
                     @endif

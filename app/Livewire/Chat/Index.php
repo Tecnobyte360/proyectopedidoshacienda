@@ -2217,8 +2217,8 @@ class Index extends Component
             $conv = app(ConversacionService::class)->obtenerOCrearActiva($telefono, $cliente->id, null, null);
 
             try {
-                $ok = app(\App\Services\Meta\MetaWhatsappCloudService::class)
-                    ->enviarTexto($telefono, $texto, $tenant->id);
+                $svcNuevo = app(\App\Services\Meta\MetaWhatsappCloudService::class);
+                $ok = $svcNuevo->enviarTexto($telefono, $texto, $tenant->id);
 
                 if (!$ok) {
                     $this->dispatch('notify', [
@@ -2235,7 +2235,15 @@ class Index extends Component
                         $texto,
                         ['meta' => ['enviado_por_humano' => true, 'usuario_id' => auth()->id(), 'provider' => 'meta']]
                     );
-                    $mensaje->update(['ack' => MensajeWhatsapp::ACK_SENT]);
+                    // 📌 Persistir el wamid — imprescindible para que el webhook de
+                    // estados (entregado/leído/FALLIDO por ventana 24h) pueda emparejar
+                    // el mensaje y actualizar su ack. Sin esto, un envío rechazado por
+                    // Meta queda mostrando ✓ eternamente.
+                    $updNuevo = ['ack' => MensajeWhatsapp::ACK_SENT];
+                    if ($svcNuevo->ultimoWamid) {
+                        $updNuevo['mensaje_externo_id'] = $svcNuevo->ultimoWamid;
+                    }
+                    $mensaje->update($updNuevo);
                 } catch (\Throwable $e) {
                     Log::warning('No se persistió mensaje manual Meta (nuevo chat): ' . $e->getMessage());
                 }
