@@ -15,9 +15,11 @@ use Illuminate\Http\Response;
 class ApiDocsController extends Controller
 {
     /** Especificación OpenAPI 3.0 de la API pública de KIVOX. */
-    public function openapi(): JsonResponse
+    public function openapi(\Illuminate\Http\Request $request): JsonResponse
     {
-        $base = rtrim(config('app.url'), '/');
+        // 🌐 El "server" es el host DESDE DONDE se abre la doc (el subdominio del
+        //    tenant, ej. https://doblamos-sas.kivox.co), no un dominio fijo.
+        $base = rtrim($request->getSchemeAndHttpHost(), '/');
 
         $spec = [
             'openapi' => '3.0.3',
@@ -30,7 +32,7 @@ class ApiDocsController extends Controller
                     . "2. Pulsa **Authorize** 🔒 arriba y pega el token (sin la palabra Bearer).\n"
                     . "3. Todas las peticiones van con `Authorization: Bearer <token>` y operan sobre TU empresa.",
             ],
-            'servers' => [['url' => $base, 'description' => 'Producción']],
+            'servers' => [['url' => $base, 'description' => 'Tu empresa (' . $request->getHost() . ')']],
             'components' => [
                 'securitySchemes' => [
                     'BearerAuth' => [
@@ -217,7 +219,8 @@ class ApiDocsController extends Controller
     /** Página Swagger UI. */
     public function ui(): Response
     {
-        $specUrl = rtrim(config('app.url'), '/') . '/api/openapi.json';
+        // Cargar el spec del MISMO host (subdominio del tenant), no uno fijo.
+        $specUrl = '/api/openapi.json';
 
         $html = <<<HTML
 <!doctype html>
