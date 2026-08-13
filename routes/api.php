@@ -182,28 +182,41 @@ Route::get('openapi.json', [\App\Http\Controllers\Api\V1\ApiDocsController::clas
 
 Route::prefix('v1')->group(function () {
 
-    // 🟢 WhatsApp por TENANT (api_key del tenant): enviar plantillas a clientes.
-    //    Header:  X-API-KEY: <api_key_del_tenant>
-    Route::middleware('tenant.apikey')->prefix('whatsapp')->group(function () {
-        Route::get ('plantillas', [\App\Http\Controllers\Api\V1\WhatsappApiController::class, 'plantillas']);
-        Route::post('plantilla',  [\App\Http\Controllers\Api\V1\WhatsappApiController::class, 'enviarPlantilla']);
+    // 🔑 API por TENANT (api_key del tenant). Un solo key para TODO.
+    //    Header:  X-API-KEY: <api_key_del_tenant>   → todo sale/consulta de ESE tenant.
+    Route::middleware('tenant.apikey')->group(function () {
+
+        // ── WhatsApp ──
+        Route::get ('whatsapp/plantillas', [\App\Http\Controllers\Api\V1\WhatsappApiController::class, 'plantillas']);
+        Route::post('whatsapp/plantilla',  [\App\Http\Controllers\Api\V1\WhatsappApiController::class, 'enviarPlantilla']);
+
+        // ── Categorías ──
+        Route::get   ('categorias',        [CategoriaApiController::class, 'index']);
+        Route::get   ('categorias/{id}',   [CategoriaApiController::class, 'show']);
+        Route::post  ('categorias',        [CategoriaApiController::class, 'store']);
+        Route::match (['put','patch'], 'categorias/{id}', [CategoriaApiController::class, 'update']);
+        Route::delete('categorias/{id}',   [CategoriaApiController::class, 'destroy']);
+
+        // ── Productos ──
+        Route::get   ('productos',         [ProductoApiController::class, 'index']);
+        Route::get   ('productos/{id}',    [ProductoApiController::class, 'show']);
+        Route::post  ('productos',         [ProductoApiController::class, 'store']);
+        Route::match (['put','patch'], 'productos/{id}',  [ProductoApiController::class, 'update']);
+        Route::delete('productos/{id}',    [ProductoApiController::class, 'destroy']);
+
+        // ── Promociones ──
+        Route::get   ('promociones',       [PromocionApiController::class, 'index']);
+        Route::get   ('promociones/{id}',  [PromocionApiController::class, 'show']);
+        Route::post  ('promociones',       [PromocionApiController::class, 'store']);
+        Route::match (['put','patch'], 'promociones/{id}',[PromocionApiController::class, 'update']);
+        Route::delete('promociones/{id}',  [PromocionApiController::class, 'destroy']);
+
+        // ── Zonas de cobertura ──
+        Route::get ('zonas',              [ZonaApiController::class, 'index']);
+        Route::post('zonas/resolver',     [ZonaApiController::class, 'resolver']);
     });
 
-    // Lectura pública
-    Route::get('categorias',          [CategoriaApiController::class, 'index']);
-    Route::get('categorias/{id}',     [CategoriaApiController::class, 'show']);
-
-    Route::get('productos',           [ProductoApiController::class, 'index']);
-    Route::get('productos/{id}',      [ProductoApiController::class, 'show']);
-
-    Route::get('promociones',         [PromocionApiController::class, 'index']);
-    Route::get('promociones/{id}',    [PromocionApiController::class, 'show']);
-
-    // Zonas de cobertura — lectura pública + endpoint de resolución
-    Route::get ('zonas',              [ZonaApiController::class, 'index']);
-    Route::post('zonas/resolver',     [ZonaApiController::class, 'resolver']);
-
-    // 📞 IVR — endpoints que consume Asterisk (vía AGI scripts en el VPS de telefonía)
+    // 📞 IVR — endpoints que consume Asterisk (key global de plataforma)
     Route::middleware('api.key')->prefix('ivr')->group(function () {
         Route::post('llamadas/registrar',      [\App\Http\Controllers\Api\V1\IvrApiController::class, 'registrar']);
         Route::post('llamadas/evento',         [\App\Http\Controllers\Api\V1\IvrApiController::class, 'evento']);
@@ -216,21 +229,6 @@ Route::prefix('v1')->group(function () {
     });
     // Audio público (no requiere API key, sirve los WAV generados al Asterisk)
     Route::get('ivr/audio/{filename}', [\App\Http\Controllers\Api\V1\IvrApiController::class, 'servirAudio']);
-
-    // Escritura protegida
-    Route::middleware('api.key')->group(function () {
-        Route::post  ('categorias',        [CategoriaApiController::class, 'store']);
-        Route::match (['put','patch'], 'categorias/{id}', [CategoriaApiController::class, 'update']);
-        Route::delete('categorias/{id}',   [CategoriaApiController::class, 'destroy']);
-
-        Route::post  ('productos',         [ProductoApiController::class, 'store']);
-        Route::match (['put','patch'], 'productos/{id}',  [ProductoApiController::class, 'update']);
-        Route::delete('productos/{id}',    [ProductoApiController::class, 'destroy']);
-
-        Route::post  ('promociones',       [PromocionApiController::class, 'store']);
-        Route::match (['put','patch'], 'promociones/{id}',[PromocionApiController::class, 'update']);
-        Route::delete('promociones/{id}',  [PromocionApiController::class, 'destroy']);
-    });
 });
 
 Route::patch('/whatsapp-webhook/orders/{id}/status', function (Request $request, $id) {

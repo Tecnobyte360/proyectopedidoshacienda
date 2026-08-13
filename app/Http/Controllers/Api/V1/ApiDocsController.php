@@ -99,6 +99,81 @@ class ApiDocsController extends Controller
                         ],
                     ],
                 ],
+
+                // ══════════════ PRODUCTOS ══════════════
+                '/api/v1/productos' => [
+                    'get' => [
+                        'summary' => 'Listar productos', 'tags' => ['Productos'],
+                        'parameters' => [
+                            ['name'=>'q','in'=>'query','schema'=>['type'=>'string'],'description'=>'Búsqueda por nombre'],
+                            ['name'=>'categoria_id','in'=>'query','schema'=>['type'=>'integer']],
+                            ['name'=>'solo_activos','in'=>'query','schema'=>['type'=>'boolean']],
+                            ['name'=>'solo_destacados','in'=>'query','schema'=>['type'=>'boolean']],
+                            ['name'=>'per_page','in'=>'query','schema'=>['type'=>'integer','default'=>30]],
+                        ],
+                        'responses' => ['200'=>['description'=>'Lista paginada de productos'], '401'=>['description'=>'API key inválida']],
+                    ],
+                    'post' => [
+                        'summary' => 'Crear producto', 'tags' => ['Productos'],
+                        'requestBody' => ['required'=>true,'content'=>['application/json'=>['schema'=>[
+                            'type'=>'object','required'=>['nombre','unidad','precio_base'],
+                            'properties'=>[
+                                'nombre'=>['type'=>'string','example'=>'Café Guayacán 250g'],
+                                'unidad'=>['type'=>'string','example'=>'unidad'],
+                                'precio_base'=>['type'=>'number','example'=>40000],
+                                'codigo'=>['type'=>'string','example'=>'GA250G'],
+                                'categoria_id'=>['type'=>'integer','example'=>null],
+                                'descripcion'=>['type'=>'string'],
+                                'imagen_url'=>['type'=>'string'],
+                                'activo'=>['type'=>'boolean','example'=>true],
+                                'destacado'=>['type'=>'boolean','example'=>false],
+                            ],
+                        ]]]],
+                        'responses' => ['201'=>['description'=>'Producto creado'], '401'=>['description'=>'API key inválida'], '422'=>['description'=>'Datos inválidos']],
+                    ],
+                ],
+                '/api/v1/productos/{id}' => [
+                    'get'    => ['summary'=>'Ver producto','tags'=>['Productos'],'parameters'=>[['name'=>'id','in'=>'path','required'=>true,'schema'=>['type'=>'integer']]],'responses'=>['200'=>['description'=>'Producto'],'404'=>['description'=>'No encontrado']]],
+                    'put'    => ['summary'=>'Editar producto','tags'=>['Productos'],'parameters'=>[['name'=>'id','in'=>'path','required'=>true,'schema'=>['type'=>'integer']]],'requestBody'=>['content'=>['application/json'=>['schema'=>['type'=>'object','properties'=>['nombre'=>['type'=>'string'],'precio_base'=>['type'=>'number'],'activo'=>['type'=>'boolean']]]]]],'responses'=>['200'=>['description'=>'Actualizado']]],
+                    'delete' => ['summary'=>'Eliminar producto','tags'=>['Productos'],'parameters'=>[['name'=>'id','in'=>'path','required'=>true,'schema'=>['type'=>'integer']]],'responses'=>['200'=>['description'=>'Eliminado']]],
+                ],
+
+                // ══════════════ CATEGORÍAS ══════════════
+                '/api/v1/categorias' => [
+                    'get'  => ['summary'=>'Listar categorías','tags'=>['Categorías'],'responses'=>['200'=>['description'=>'Lista']]],
+                    'post' => ['summary'=>'Crear categoría','tags'=>['Categorías'],'requestBody'=>['required'=>true,'content'=>['application/json'=>['schema'=>['type'=>'object','required'=>['nombre'],'properties'=>['nombre'=>['type'=>'string','example'=>'Cafés especiales'],'orden'=>['type'=>'integer'],'activa'=>['type'=>'boolean']]]]]],'responses'=>['201'=>['description'=>'Creada']]],
+                ],
+                '/api/v1/categorias/{id}' => [
+                    'get'    => ['summary'=>'Ver categoría','tags'=>['Categorías'],'parameters'=>[['name'=>'id','in'=>'path','required'=>true,'schema'=>['type'=>'integer']]],'responses'=>['200'=>['description'=>'Categoría']]],
+                    'put'    => ['summary'=>'Editar categoría','tags'=>['Categorías'],'parameters'=>[['name'=>'id','in'=>'path','required'=>true,'schema'=>['type'=>'integer']]],'responses'=>['200'=>['description'=>'Actualizada']]],
+                    'delete' => ['summary'=>'Eliminar categoría','tags'=>['Categorías'],'parameters'=>[['name'=>'id','in'=>'path','required'=>true,'schema'=>['type'=>'integer']]],'responses'=>['200'=>['description'=>'Eliminada']]],
+                ],
+
+                // ══════════════ PROMOCIONES ══════════════
+                '/api/v1/promociones' => [
+                    'get'  => ['summary'=>'Listar promociones','tags'=>['Promociones'],'responses'=>['200'=>['description'=>'Lista']]],
+                    'post' => ['summary'=>'Crear promoción','tags'=>['Promociones'],'requestBody'=>['required'=>true,'content'=>['application/json'=>['schema'=>['type'=>'object','properties'=>['nombre'=>['type'=>'string'],'descripcion'=>['type'=>'string'],'activa'=>['type'=>'boolean']]]]]],'responses'=>['201'=>['description'=>'Creada']]],
+                ],
+                '/api/v1/promociones/{id}' => [
+                    'get'    => ['summary'=>'Ver promoción','tags'=>['Promociones'],'parameters'=>[['name'=>'id','in'=>'path','required'=>true,'schema'=>['type'=>'integer']]],'responses'=>['200'=>['description'=>'Promoción']]],
+                    'put'    => ['summary'=>'Editar promoción','tags'=>['Promociones'],'parameters'=>[['name'=>'id','in'=>'path','required'=>true,'schema'=>['type'=>'integer']]],'responses'=>['200'=>['description'=>'Actualizada']]],
+                    'delete' => ['summary'=>'Eliminar promoción','tags'=>['Promociones'],'parameters'=>[['name'=>'id','in'=>'path','required'=>true,'schema'=>['type'=>'integer']]],'responses'=>['200'=>['description'=>'Eliminada']]],
+                ],
+
+                // ══════════════ ZONAS DE COBERTURA ══════════════
+                '/api/v1/zonas' => [
+                    'get' => ['summary'=>'Listar zonas de cobertura','tags'=>['Zonas'],'responses'=>['200'=>['description'=>'Lista de zonas']]],
+                ],
+                '/api/v1/zonas/resolver' => [
+                    'post' => [
+                        'summary'=>'Resolver cobertura de una dirección','tags'=>['Zonas'],
+                        'requestBody'=>['required'=>true,'content'=>['application/json'=>['schema'=>[
+                            'type'=>'object','required'=>['direccion'],
+                            'properties'=>['direccion'=>['type'=>'string','example'=>'Calle 10 #20-30'],'barrio'=>['type'=>'string'],'ciudad'=>['type'=>'string','example'=>'Bello']],
+                        ]]]],
+                        'responses'=>['200'=>['description'=>'Resultado de cobertura (cubierta, costo_envio, zona...)']],
+                    ],
+                ],
             ],
         ];
 
