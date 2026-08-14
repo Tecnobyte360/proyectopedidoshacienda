@@ -245,8 +245,8 @@ const EMO={RES:'🐄',CERDO:'🐷',POLLO:'🐔',PESCADO:'🐟',EMBUTIDOS:'🌭',
 function emo(name){const u=(name||'').toUpperCase();for(const k in EMO){if(u.includes(k))return EMO[k];}return '🍽️';}
 const fmt=n=>'$'+Math.round(n).toLocaleString('es-CO');
 const norm=s=>(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''); // sin tildes
-const cart={}, prodById={}; PRODS.forEach(p=>{prodById[p.id]=p; p._s=norm(p.n+' '+(p.kw||''));});
 const catName={}; CATS.forEach(c=>catName[c.id]=c.n);
+const cart={}, prodById={}; PRODS.forEach(p=>{prodById[p.id]=p; p._s=norm(p.n+' '+(catName[p.cid]||'')+' '+(p.kw||''));});
 
 const chipsEl=document.getElementById('chips');
 const DEST=PRODS.some(p=>p.d);
