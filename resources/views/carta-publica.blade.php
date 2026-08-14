@@ -49,8 +49,10 @@
   .search input::placeholder{color:#9aa2ac;font-weight:400}
 
   /* chips */
-  .chips{display:flex;flex-wrap:wrap;gap:7px;padding:8px 14px 12px;background:var(--bg);position:sticky;top:60px;z-index:5;justify-content:center}
-  .chip{border:1px solid var(--line-2);background:var(--card);color:var(--ink-soft);font-weight:600;font-size:12.5px;padding:8px 13px;border-radius:999px;cursor:pointer;white-space:nowrap;transition:.15s;display:flex;align-items:center;gap:6px;font-family:var(--font)}
+  .chips{display:flex;gap:7px;overflow-x:auto;padding:8px 14px 12px;background:var(--bg);position:sticky;top:60px;z-index:5;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .chips::-webkit-scrollbar{display:none}
+  .chip{flex:0 0 auto;border:1px solid var(--line-2);background:var(--card);color:var(--ink-soft);font-weight:600;font-size:12.5px;padding:7px 12px 7px 10px;border-radius:999px;cursor:pointer;white-space:nowrap;transition:.15s;display:flex;align-items:center;gap:5px;font-family:var(--font)}
+  .chip .ce{font-size:15px;line-height:1}
   .chip i{font-size:12px}
   .chip[aria-selected="true"]{background:var(--brand);border-color:var(--brand);color:#fff;box-shadow:0 3px 10px color-mix(in srgb,var(--brand) 35%,transparent)}
 
@@ -58,7 +60,7 @@
   main{padding:2px 16px 8px}
   .cat{margin-top:18px}
   .cat-head{display:flex;align-items:center;gap:11px;margin-bottom:12px}
-  .cat-head .ic{width:32px;height:32px;border-radius:9px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--tint);color:var(--brand-2);font-size:15px}
+  .cat-head .ic{width:34px;height:34px;border-radius:9px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--tint);font-size:19px;line-height:1}
   .cat-head h2{font-size:16px;font-weight:700;margin:0;letter-spacing:-.01em}
   .cat-head .count{margin-left:auto;font-size:11px;color:var(--ink-soft);background:var(--card);border:1px solid var(--line);padding:3px 9px;border-radius:999px;font-weight:600}
 
@@ -66,6 +68,7 @@
   .item{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:11px 13px;display:flex;align-items:center;gap:12px;box-shadow:var(--shadow);transition:border-color .15s}
   .item.incart{border-color:var(--brand);box-shadow:0 0 0 1px var(--brand),var(--shadow)}
   .item .thumb{position:relative;width:74px;height:74px;border-radius:13px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--tint);color:var(--brand-2);font-size:28px;overflow:hidden}
+  .item .thumb .ico-emo{font-size:36px;line-height:1}
   .item .thumb .ph{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#fff}
   .item .body{flex:1;min-width:0}
   .item .name{font-weight:600;font-size:14px;line-height:1.25;letter-spacing:-.005em;color:var(--ink)}
@@ -238,8 +241,8 @@ let SEDE_SEL=null;
 </script>
 <script>
 const TENANT=@json($tenant->nombre), WA=@json($waNumero), CATS=@json($categorias), PRODS=@json($productos);
-const FA={RES:'fa-cow',CERDO:'fa-bacon',POLLO:'fa-drumstick-bite',PESCADO:'fa-fish',EMBUTIDOS:'fa-hotdog',ABARROTES:'fa-basket-shopping'};
-function faFor(name){const u=(name||'').toUpperCase();for(const k in FA){if(u.includes(k))return FA[k];}return 'fa-utensils';}
+const EMO={RES:'🐄',CERDO:'🐷',POLLO:'🐔',PESCADO:'🐟',EMBUTIDOS:'🌭',ABARROTES:'🛒'};
+function emo(name){const u=(name||'').toUpperCase();for(const k in EMO){if(u.includes(k))return EMO[k];}return '🍽️';}
 const fmt=n=>'$'+Math.round(n).toLocaleString('es-CO');
 const cart={}, prodById={}; PRODS.forEach(p=>prodById[p.id]=p);
 const catName={}; CATS.forEach(c=>catName[c.id]=c.n);
@@ -249,13 +252,13 @@ const DEST=PRODS.some(p=>p.d);
 const _cerdo=CATS.find(c=>(c.n||'').toUpperCase().includes('CERDO'));
 let active=_cerdo?_cerdo.id:(DEST?'DEST':(CATS[0]?.id ?? null));
 function buildChips(){
-  const all=[]; if(DEST)all.push({id:'DEST',n:'Destacados',fa:'fa-star'});
-  CATS.forEach(c=>all.push({id:c.id,n:c.n,fa:faFor(c.n)}));
+  const all=[]; if(DEST)all.push({id:'DEST',n:'Destacados',e:'⭐'});
+  CATS.forEach(c=>all.push({id:c.id,n:c.n,e:emo(c.n)}));
   chipsEl.innerHTML='';
   all.forEach(c=>{
     const b=document.createElement('button');
     b.className='chip';b.setAttribute('aria-selected',c.id===active);
-    b.innerHTML=`<i class="fa-solid ${c.fa}"></i><span>${c.n}</span>`;
+    b.innerHTML=`<span class="ce">${c.e}</span><span>${c.n}</span>`;
     b.onclick=()=>{active=c.id;document.getElementById('q').value='';render();[...chipsEl.children].forEach((el,i)=>el.setAttribute('aria-selected',all[i].id===active));};
     chipsEl.appendChild(b);
   });
@@ -263,7 +266,7 @@ function buildChips(){
 const listEl=document.getElementById('list'), emptyEl=document.getElementById('empty');
 function itemHTML(p){
   const inc=cart[p.id]>0;
-  const thumb=`<i class="fa-solid ${faFor(catName[p.cid])}"></i>`+(p.img?`<img class="ph" loading="lazy" decoding="async" src="${p.img}" alt="" onerror="this.remove()">`:'');
+  const thumb=`<span class="ico-emo">${emo(catName[p.cid])}</span>`+(p.img?`<img class="ph" loading="lazy" decoding="async" src="${p.img}" alt="" onerror="this.remove()">`:'');
   const ctrl=inc
     ?`<div class="stepper"><button onclick="dec(${p.id})">−</button><span class="qty" id="q${p.id}">${cart[p.id]}</span><button onclick="inc(${p.id})">+</button></div>`
     :`<button class="plus" onclick="inc(${p.id})"><i class="fa-solid fa-plus"></i></button>`;
@@ -274,21 +277,21 @@ function itemHTML(p){
       <div class="meta"><span class="price">${fmt(p.pr)}</span><span class="unit">/ ${p.u}</span>${p.d?'<span class="tag">Destacado</span>':''}</div>
     </div>${ctrl}</div>`;
 }
-function section(icon,titulo,items){
-  return `<section class="cat"><div class="cat-head"><div class="ic"><i class="fa-solid ${icon}"></i></div><h2>${titulo}</h2><span class="count">${items.length}</span></div><div class="grid">${items.map(itemHTML).join('')}</div></section>`;
+function section(ic,titulo,items){
+  return `<section class="cat"><div class="cat-head"><div class="ic">${ic}</div><h2>${titulo}</h2><span class="count">${items.length}</span></div><div class="grid">${items.map(itemHTML).join('')}</div></section>`;
 }
 function render(){
   const q=(document.getElementById('q').value||'').trim().toLowerCase();
   if(q){
     const res=PRODS.filter(p=>p.n.toLowerCase().includes(q));
     emptyEl.style.display=res.length?'none':'block';
-    listEl.innerHTML=res.length?section('fa-magnifying-glass','Resultados',res):'';
+    listEl.innerHTML=res.length?section('🔎','Resultados',res):'';
     return;
   }
   emptyEl.style.display='none';
-  if(active==='DEST'){listEl.innerHTML=section('fa-star','Destacados',PRODS.filter(p=>p.d));return;}
+  if(active==='DEST'){listEl.innerHTML=section('⭐','Destacados',PRODS.filter(p=>p.d));return;}
   const cat=CATS.find(c=>c.id===active)||CATS[0];
-  listEl.innerHTML=section(faFor(cat.n),cat.n,PRODS.filter(p=>p.cid===cat.id));
+  listEl.innerHTML=section(emo(cat.n),cat.n,PRODS.filter(p=>p.cid===cat.id));
 }
 function inc(id){cart[id]=(cart[id]||0)+1;refresh(id);}
 function dec(id){cart[id]=(cart[id]||0)-1;if(cart[id]<=0)delete cart[id];refresh(id);}
