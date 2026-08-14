@@ -33,7 +33,7 @@ class CartaPublicaController extends Controller
         'la-hacienda' => ['#F47920', '#C25E12'], // naranja + negro (como el logo)
     ];
 
-    public function show(string $slug)
+    public function show(Request $request, string $slug)
     {
         $tenant = Tenant::withoutGlobalScopes()
             ->where('slug', $slug)
@@ -41,6 +41,13 @@ class CartaPublicaController extends Controller
             ->first();
 
         abort_unless($tenant, 404, 'Catálogo no disponible.');
+
+        // La API key de Google Maps solo autoriza *.kivox.co (no el apex "kivox.co").
+        // Si abren la carta en el apex, redirigimos al subdominio del tenant para
+        // que el autocompletado de direcciones funcione.
+        if ($request->getHost() === 'kivox.co') {
+            return redirect()->away('https://' . $slug . '.kivox.co/carta/' . $slug);
+        }
 
         // Categorías del tenant (solo las que tienen productos activos)
         $categorias = DB::table('productos_categorias as c')
@@ -203,6 +210,128 @@ class CartaPublicaController extends Controller
             ]);
         } catch (\Throwable $e) {
             return response()->json(['ok' => false, 'msg' => 'No se pudo validar la cobertura.'], 200);
+        }
+    }
+
+    /**
+     * 🛒 Crea el pedido en KIVOX desde el checkout de la carta y notifica al
+     * cliente por WhatsApp (plantilla pedido_confirmado). Reusa exactamente la
+     * misma lógica del pedido manual del panel (guardarPedidoDesdeToolCall).
+     * Re-precia los productos del lado servidor (no confía en el navegador).
+     */
+    public function crearPedido(Request $request, string $slug)
+    {
+        $tenant = $this->resolverTenant($slug);
+        app(\App\Services\TenantManager::class)->set($tenant);
+
+        $cedula    = preg_replace('/\D+/', '', (string) $request->input('cedula', ''));
+        $nombre    = trim((string) $request->input('nombre', ''));
+        $cel       = preg_replace('/\D+/', '', (string) $request->input('celular', ''));
+        $direccion = trim((string) $request->input('direccion', ''));
+        $lat       = $request->input('lat');
+        $lng       = $request->input('lng');
+        $costoEnvio = (float) $request->input('costo_envio', 0);
+        $items     = $request->input('items', []);
+
+        if (strlen($cedula) < 5)   return response()->json(['ok' => false, 'msg' => 'Falta tu cédula.'], 422);
+        if ($nombre === '')        return response()->json(['ok' => false, 'msg' => 'Falta el nombre.'], 422);
+        if (strlen($cel) < 7)      return response()->json(['ok' => false, 'msg' => 'Falta el celular.'], 422);
+        if ($direccion === '')     return response()->json(['ok' => false, 'msg' => 'Falta la dirección.'], 422);
+        if (empty($items) || !is_array($items)) return response()->json(['ok' => false, 'msg' => 'El carrito está vacío.'], 422);
+
+        // Teléfono internacional (Colombia): 10 dígitos que empiezan por 3 → +57.
+        $tel = $cel;
+        if (strlen($tel) === 10 && $tel[0] === '3') $tel = '57' . $tel;
+
+        // 🔒 Re-precio en el servidor (no confiar en el precio del navegador).
+        $products = [];
+        foreach ($items as $it) {
+            $pid = (int) ($it['id'] ?? 0);
+            $qty = (float) ($it['qty'] ?? 0);
+            if ($pid <= 0 || $qty <= 0) continue;
+            $p = DB::table('productos')->where('tenant_id', $tenant->id)
+                ->where('id', $pid)->where('activo', true)->first();
+            if (!$p) continue;
+            $products[] = [
+                'name'            => $p->nombre,
+                'quantity'        => $qty,
+                'unit'            => $p->unidad ?: 'und',
+                'precio_unitario' => (float) $p->precio_base,
+                'observacion'     => '',
+            ];
+        }
+        if (empty($products)) return response()->json(['ok' => false, 'msg' => 'Los productos no son válidos.'], 422);
+
+        $sedeId = \App\Models\Sede::where('tenant_id', $tenant->id)->where('activa', true)->value('id');
+
+        $orderData = [
+            'products'           => $products,
+            'customer_name'      => $nombre,
+            'cedula'             => $cedula,
+            'phone'              => $tel,
+            'payment_method'     => 'efectivo',
+            'notes'              => '[PEDIDO DESDE CARTA WEB]',
+            'manual'             => true,
+            'metodo_entrega'     => 'domicilio',
+            'address'            => $direccion,
+            'location'           => '',
+            'shipping_cost'      => $costoEnvio,
+            'costo_envio'        => $costoEnvio,
+            'costo_envio_manual' => true,
+        ];
+        if ($sedeId) $orderData['sede_id'] = (int) $sedeId;
+        if (is_numeric($lat) && is_numeric($lng)) {
+            $orderData['location_lat'] = (float) $lat;
+            $orderData['location_lng'] = (float) $lng;
+        }
+
+        try {
+            $conv = \App\Models\ConversacionWhatsapp::firstOrCreate(
+                ['telefono_normalizado' => $tel],
+                ['tenant_id' => $tenant->id, 'estado' => 'activa', 'canal' => 'carta_web']
+            );
+            $convService = app(\App\Services\ConversacionService::class);
+            $controller  = app(\App\Http\Controllers\WhatsappWebhookController::class);
+
+            $resultado = $controller->guardarPedidoDesdeToolCall(
+                $orderData, $tel, $nombre, [],
+                'carta_' . substr(md5($tel . uniqid('', true)), 0, 8),
+                $conv->connection_id ? (string) $conv->connection_id : null,
+                $conv, $convService
+            );
+
+            $pedido = \App\Models\Pedido::where('telefono', $tel)
+                ->where('created_at', '>=', now()->subSeconds(30))
+                ->orderByDesc('id')->first();
+
+            if (!$pedido) {
+                $motivo = trim(strip_tags((string) $resultado)) ?: 'No se pudo crear el pedido.';
+                return response()->json(['ok' => false, 'msg' => mb_substr($motivo, 0, 200)], 200);
+            }
+
+            try { app(\App\Services\EstadoPedidoService::class)->marcarConfirmado($conv, $pedido->id); }
+            catch (\Throwable $e) { /* no bloquear */ }
+
+            // 📲 Notificar al cliente por WhatsApp (plantilla pedido_confirmado).
+            $notificado = false;
+            try {
+                $primerNombre = explode(' ', trim($nombre))[0] ?: 'Cliente';
+                $notificado = (bool) app(\App\Services\Meta\MetaWhatsappCloudService::class)
+                    ->enviarPlantilla($tel, 'pedido_confirmado', [$primerNombre, (string) $pedido->id],
+                        $tenant->id, 'es', null, null, true);
+            } catch (\Throwable $e) {
+                \Log::warning('Carta: notificación al cliente falló: ' . $e->getMessage());
+            }
+
+            return response()->json([
+                'ok'         => true,
+                'pedido_id'  => $pedido->id,
+                'total'      => (float) $pedido->total,
+                'notificado' => $notificado,
+            ]);
+        } catch (\Throwable $e) {
+            \Log::error('Carta crearPedido falló: ' . $e->getMessage());
+            return response()->json(['ok' => false, 'msg' => 'No se pudo crear el pedido. Intenta de nuevo.'], 200);
         }
     }
 

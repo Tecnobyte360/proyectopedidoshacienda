@@ -337,19 +337,32 @@ async function validarCobertura(){
     hint.className='co-hint warn';hint.innerHTML=res.mensaje||'😕 Esa dirección está fuera de cobertura. Puedes recoger en sede.';hint.style.display='block';
   }
 }
-function enviarFinal(){
+async function enviarFinal(){
   const nombre=(document.getElementById('coNombre').value||'').trim();
   const cel=(document.getElementById('coCel').value||'').trim();
   const dir=(document.getElementById('coDir').value||'').trim();
-  if(!WA){document.getElementById('waNote').style.display='block';return;}
-  const {lineas,total}=pedidoLineas();
-  let txt=`Hola ${TENANT} 🥩, quiero hacer un pedido:\n\n${lineas.map(l=>l.t).join('\n')}\n\n*Total productos: ${fmt(total)}*\n\n👤 *Mis datos:*`;
-  if(CLIENTE.cedula)txt+=`\nCédula: ${CLIENTE.cedula}`;
-  if(nombre)txt+=`\nNombre: ${nombre}`;
-  if(cel)txt+=`\nCelular: ${cel}`;
-  if(dir)txt+=`\nDirección: ${dir}`;
-  if(COBERTURA&&COBERTURA.cubierta&&COBERTURA.costo!=null)txt+=`\nEnvío: ${fmt(COBERTURA.costo)}`;
-  window.location.href=`https://wa.me/${WA}?text=${encodeURIComponent(txt)}`;
+  const hint=document.getElementById('coCobHint');
+  const err=m=>{hint.className='co-hint err';hint.innerHTML=m;hint.style.display='block';};
+  if(!CLIENTE.cedula){err('Escribe tu cédula arriba para continuar.');return;}
+  if(!nombre){err('Falta tu nombre.');return;}
+  if(cel.replace(/\D+/g,'').length<7){err('Falta tu celular.');return;}
+  if(dir.length<5){err('Falta tu dirección.');return;}
+  const items=Object.keys(cart).map(id=>({id:Number(id),qty:cart[id]}));
+  if(!items.length){err('Tu carrito está vacío.');return;}
+  const btn=document.getElementById('coEnviar');btn.disabled=true;btn.innerHTML='<span class="spin"></span> Enviando pedido…';
+  const body={cedula:CLIENTE.cedula,nombre,celular:cel,direccion:dir,items,
+    costo_envio:(COBERTURA&&COBERTURA.cubierta&&COBERTURA.costo!=null)?COBERTURA.costo:0};
+  if(PLACE_COORDS){body.lat=PLACE_COORDS.lat;body.lng=PLACE_COORDS.lng;}
+  let res;try{res=await apiCarta('pedido',body);}catch(e){res={ok:false,msg:'Error de conexión.'};}
+  if(!res.ok){btn.disabled=false;btn.innerHTML='<i class="fa-brands fa-whatsapp"></i> Enviar pedido';err(res.msg||'No se pudo crear el pedido.');return;}
+  document.querySelector('#checkout .sheet-body').innerHTML=`
+    <div style="text-align:center;padding:28px 8px">
+      <div style="font-size:46px;line-height:1">✅</div>
+      <h3 style="margin:12px 0 4px;font-size:19px;font-weight:800">¡Pedido creado!</h3>
+      <p style="color:var(--ink-soft);font-size:14px;margin:0 0 4px">Tu pedido <b>#${res.pedido_id}</b> quedó registrado.</p>
+      <p style="color:var(--ink-soft);font-size:13px;margin:0 0 20px">${res.notificado?'Te enviamos la confirmación por WhatsApp 📲':'Pronto te contactamos por WhatsApp.'}</p>
+      <button class="co-btn wa" onclick="location.reload()"><i class="fa-solid fa-check"></i> Entendido</button>
+    </div>`;
 }
 // 🔎 Cédula: se valida sola al salir del campo o con Enter.
 document.getElementById('coCedula').addEventListener('blur',verificarCedula);

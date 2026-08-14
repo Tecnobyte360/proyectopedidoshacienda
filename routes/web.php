@@ -481,6 +481,8 @@ Route::post('/carta/{slug}/cliente', [\App\Http\Controllers\CartaPublicaControll
     ->where('slug', '[a-z0-9\-]+')->middleware('throttle:15,1')->name('carta.cliente');
 Route::post('/carta/{slug}/cobertura', [\App\Http\Controllers\CartaPublicaController::class, 'validarCobertura'])
     ->where('slug', '[a-z0-9\-]+')->middleware('throttle:20,1')->name('carta.cobertura');
+Route::post('/carta/{slug}/pedido', [\App\Http\Controllers\CartaPublicaController::class, 'crearPedido'])
+    ->where('slug', '[a-z0-9\-]+')->middleware('throttle:10,1')->name('carta.pedido');
 
 // Feed de catálogo para Meta (Commerce Manager / WhatsApp) — público, sin auth.
 Route::get('/catalogo-meta/{tenant}.csv', [\App\Http\Controllers\MetaCatalogFeedController::class, 'csv'])
