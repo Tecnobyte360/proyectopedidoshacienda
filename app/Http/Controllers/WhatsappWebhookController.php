@@ -2294,6 +2294,17 @@ TXT;
                     $tidCarta = app(\App\Services\TenantManager::class)->id();
                     $pidCarta = ($connectionId && str_starts_with((string) $connectionId, 'meta:'))
                         ? substr((string) $connectionId, 5) : null;
+                    // 👋 Si la IA además escribió un saludo/texto corto (ej. respuesta a
+                    //    "hola"), lo mandamos como PRIMER mensaje, y luego el botón.
+                    $saludoPrevio = trim((string) $textContent);
+                    if ($saludoPrevio !== '' && mb_strlen($saludoPrevio) <= 280) {
+                        try {
+                            $svcCarta->enviarTexto($from, $saludoPrevio, $tidCarta, $pidCarta);
+                            app(\App\Services\ConversacionService::class)->agregarMensaje(
+                                $conversacion, MensajeWhatsapp::ROL_ASSISTANT, $saludoPrevio, ['meta' => ['provider' => 'meta']]
+                            );
+                        } catch (\Throwable $eS) { /* no bloquear */ }
+                    }
                     $okCarta = $svcCarta->enviarBotonUrl(
                         $from,
                         "🛒 Arma tu pedido aquí 👇\n\nEs muy fácil:\n1️⃣ Elige tus productos y toca ➕\n2️⃣ Toca *Enviar pedido*\n3️⃣ Pon tus datos y ¡listo! 🎉",
