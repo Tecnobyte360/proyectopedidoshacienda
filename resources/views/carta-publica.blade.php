@@ -51,7 +51,7 @@
   /* chips */
   .chips{display:flex;gap:7px;overflow-x:auto;padding:8px 14px 12px;background:var(--bg);position:sticky;top:60px;z-index:5;scrollbar-width:none;-webkit-overflow-scrolling:touch}
   .chips::-webkit-scrollbar{display:none}
-  .chip{flex:0 0 auto;border:1px solid var(--line-2);background:var(--card);color:var(--ink-soft);font-weight:600;font-size:12.5px;padding:7px 12px 7px 10px;border-radius:999px;cursor:pointer;white-space:nowrap;transition:.15s;display:flex;align-items:center;gap:5px;font-family:var(--font)}
+  .chip{flex:0 0 30%;justify-content:center;border:1px solid var(--line-2);background:var(--card);color:var(--ink-soft);font-weight:600;font-size:13px;padding:9px 10px;border-radius:999px;cursor:pointer;white-space:nowrap;transition:.15s;display:flex;align-items:center;gap:6px;font-family:var(--font)}
   .chip .ce{font-size:15px;line-height:1}
   .chip i{font-size:12px}
   .chip[aria-selected="true"]{background:var(--brand);border-color:var(--brand);color:#fff;box-shadow:0 3px 10px color-mix(in srgb,var(--brand) 35%,transparent)}
@@ -460,7 +460,11 @@ function elegirSug(placeId){
 document.getElementById('coDir').addEventListener('input',()=>{PLACE_COORDS=null;COB_LAST='';clearTimeout(sugTimer);sugTimer=setTimeout(buscarSug,250);});
 document.getElementById('coDir').addEventListener('blur',()=>{setTimeout(ocultarSug,180);setTimeout(validarCobertura,320);});
 document.getElementById('q').addEventListener('input',render);
-buildChips();render();
+function scrollChipActivo(){
+  const el=chipsEl.querySelector('.chip[aria-selected="true"]');
+  if(el){ chipsEl.scrollLeft = el.offsetLeft - chipsEl.offsetLeft - 12; } // solo mueve la fila de chips, no la página
+}
+buildChips();render();scrollChipActivo();
 </script>
 @if(!empty($mapsKey))
 <script async defer src="https://maps.googleapis.com/maps/api/js?key={{ $mapsKey }}&libraries=places&callback=initCartaMaps&language=es&region=CO"></script>
