@@ -2196,12 +2196,18 @@ TXT;
                     $razonForzado = 'catalogo_nativo_forzar_seleccion';
                 }
             } elseif (!empty($cartaWebUrl)) {
-                // 🥩 Carta web: NO forzamos. Dejamos que la IA decida según el prompt:
-                //    si es un ALIMENTO que vendemos → llama `mostrar_catalogo`; si es algo
-                //    que NO vendemos (ropa, etc.) → aclara en texto SIN mandar el catálogo.
-                //    (Solo tiene disponible `mostrar_catalogo` como acción de producto.)
-                $toolChoiceInicial = 'auto';
-                $razonForzado = 'carta_web_auto';
+                // 🥩 Carta web:
+                //  - Intención CLARA de pedido (domicilio, pedido, menú, catálogo) →
+                //    FORZAR mostrar_catalogo (manda el botón bonito, no un link en texto).
+                //  - Mención ambigua (un producto suelto, "venden X") → 'auto': la IA
+                //    decide (alimento → catálogo; no-alimento como ropa → aclara).
+                if ($this->esIntencionPedidoClara($message)) {
+                    $toolChoiceInicial = ['type' => 'function', 'function' => ['name' => 'mostrar_catalogo']];
+                    $razonForzado = 'carta_web_forzar_pedido';
+                } else {
+                    $toolChoiceInicial = 'auto';
+                    $razonForzado = 'carta_web_auto';
+                }
             } else {
                 $messages[] = [
                     'role' => 'system',
@@ -5383,7 +5389,14 @@ TXT;
     private function cartaWebUrl(): ?string
     {
         try {
-            $tenant = app(\App\Services\TenantManager::class)->current();
+            $tm = app(\App\Services\TenantManager::class);
+            $tenant = $tm->current();
+            // 🛡️ Fallback: en el flujo del bot current() puede venir null aunque
+            //    id() sí esté seteado — cargamos el tenant por id. Sin esto, todo el
+            //    bloque de carta web se saltaba y el bot usaba el flujo viejo.
+            if (!$tenant && $tm->id()) {
+                $tenant = \App\Models\Tenant::find($tm->id());
+            }
             if (!$tenant || empty($tenant->slug)) return null;
             $habilitados = ['la-hacienda'];
             if (!in_array($tenant->slug, $habilitados, true)) return null;
@@ -5401,6 +5414,21 @@ TXT;
      * general? Ej. lo que vuelve del catálogo web: "• 2 kg — Solomito…".
      * Si lo es, NO forzamos el botón del catálogo: se procesa el pedido.
      */
+    /**
+     * 🥩 ¿El mensaje muestra intención CLARA de pedir (para forzar el catálogo)?
+     * Ej: "quiero un domicilio", "hacer un pedido", "el menú", "el catálogo".
+     * NO incluye menciones de un producto suelto ("venden X") — eso lo decide la IA.
+     */
+    private function esIntencionPedidoClara(string $m): bool
+    {
+        $n = mb_strtolower(\Illuminate\Support\Str::ascii(trim($m)));
+        foreach (['domicilio', 'pedido', 'quiero pedir', 'hacer un pedido', 'ordenar',
+                  'menu', 'catalogo', 'la carta', 'delivery'] as $p) {
+            if (str_contains($n, $p)) return true;
+        }
+        return false;
+    }
+
     private function mensajeEsPedidoConcreto(string $m): bool
     {
         // Viñetas del catálogo: "• 2 kg — ..."
