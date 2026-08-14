@@ -348,12 +348,15 @@ class CartaPublicaController extends Controller
             try { app(\App\Services\EstadoPedidoService::class)->marcarConfirmado($conv, $pedido->id); }
             catch (\Throwable $e) { /* no bloquear */ }
 
+            // Número visible del pedido (numero_pedido), NO el id interno.
+            $numPedido = $pedido->numero_pedido ?: $pedido->id;
+
             // 📲 Notificar al cliente por WhatsApp (plantilla pedido_confirmado).
             $notificado = false;
             try {
                 $primerNombre = explode(' ', trim($nombre))[0] ?: 'Cliente';
                 $notificado = (bool) app(\App\Services\Meta\MetaWhatsappCloudService::class)
-                    ->enviarPlantilla($tel, 'pedido_confirmado', [$primerNombre, (string) $pedido->id],
+                    ->enviarPlantilla($tel, 'pedido_confirmado', [$primerNombre, (string) $numPedido],
                         $tenant->id, 'es', null, null, true);
             } catch (\Throwable $e) {
                 \Log::warning('Carta: notificación al cliente falló: ' . $e->getMessage());
@@ -361,7 +364,7 @@ class CartaPublicaController extends Controller
 
             return response()->json([
                 'ok'         => true,
-                'pedido_id'  => $pedido->id,
+                'pedido_id'  => $numPedido,
                 'total'      => (float) $pedido->total,
                 'notificado' => $notificado,
             ]);
