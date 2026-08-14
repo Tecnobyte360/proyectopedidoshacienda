@@ -32,6 +32,13 @@ class RouterDeterminista
      */
     public function decidir(ConversacionWhatsapp $conv, string $mensaje, string $primerNombre = '', ?int $connectionId = null): array
     {
+        // 🥩 Tenants con CARTA WEB no usan el flujo determinista de pedido
+        //    (validar cobertura / cerrar pedido por chat). TODO el pedido va por
+        //    el catálogo web, así que dejamos que el LLM maneje (solo redirige).
+        if ($this->usaCartaWeb($conv)) {
+            return ['accion' => 'llm'];
+        }
+
         $estado = app(EstadoPedidoService::class)->obtener($conv);
 
         // Captador determinista: extrae datos del mensaje al estado
@@ -149,6 +156,18 @@ class RouterDeterminista
      *   - Pregunta por cobertura
      *   - Responde a una pregunta del bot sobre dirección/cobertura
      */
+    /** 🥩 ¿El tenant de la conversación recibe pedidos por carta web? */
+    private function usaCartaWeb(ConversacionWhatsapp $conv): bool
+    {
+        try {
+            $tenant = app(\App\Services\TenantManager::class)->current()
+                ?: \App\Models\Tenant::find($conv->tenant_id);
+            return $tenant && in_array($tenant->slug, ['la-hacienda'], true);
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
     private function mensajeJustificaValidarCobertura(string $mensaje): bool
     {
         $m = mb_strtolower(Str::ascii(trim($mensaje)));
