@@ -66,7 +66,7 @@
   .grid{display:flex;flex-direction:column;gap:9px}
   .item{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:11px 13px;display:flex;align-items:center;gap:12px;box-shadow:var(--shadow);transition:border-color .15s}
   .item.incart{border-color:var(--brand);box-shadow:0 0 0 1px var(--brand),var(--shadow)}
-  .item .thumb{position:relative;width:46px;height:46px;border-radius:11px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--tint);color:var(--brand-2);font-size:17px;overflow:hidden}
+  .item .thumb{position:relative;width:74px;height:74px;border-radius:13px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--tint);color:var(--brand-2);font-size:28px;overflow:hidden}
   .item .thumb .ph{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#fff}
   .item .body{flex:1;min-width:0}
   .item .name{font-weight:600;font-size:14px;line-height:1.25;letter-spacing:-.005em;color:var(--ink)}
@@ -247,7 +247,8 @@ const catName={}; CATS.forEach(c=>catName[c.id]=c.n);
 
 const chipsEl=document.getElementById('chips');
 const DEST=PRODS.some(p=>p.d);
-let active=DEST?'DEST':(CATS[0]?.id ?? null);
+const _cerdo=CATS.find(c=>(c.n||'').toUpperCase().includes('CERDO'));
+let active=_cerdo?_cerdo.id:(DEST?'DEST':(CATS[0]?.id ?? null));
 function buildChips(){
   const all=[]; if(DEST)all.push({id:'DEST',n:'Destacados',fa:'fa-star'});
   CATS.forEach(c=>all.push({id:c.id,n:c.n,fa:faFor(c.n)}));
