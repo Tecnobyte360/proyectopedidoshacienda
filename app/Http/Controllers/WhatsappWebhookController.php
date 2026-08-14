@@ -2017,12 +2017,25 @@ TXT;
                         );
                         if ($catDef) $toolsFiltradas[] = $catDef;
                     }
+                    // 🚫 Este negocio recibe TODOS los pedidos por la carta web. Quitamos
+                    //    las tools de tomar pedido por chat para que la IA no lo intente.
+                    $sinChat = ['validar_cobertura', 'agregar_producto_al_pedido', 'confirmar_pedido',
+                        'registrar_datos_cliente', 'consultar_zonas_cobertura', 'crear_adicion_pedido'];
+                    $toolsFiltradas = array_values(array_filter(
+                        $toolsFiltradas,
+                        fn ($t) => !in_array($t['function']['name'] ?? '', $sinChat, true)
+                    ));
+
                     $messages[] = ['role' => 'system', 'content' =>
-                        "🥩 CATÁLOGO WEB: cuando el cliente pida ver el catálogo/menú, pregunte qué productos o "
-                        . "precios hay, o muestre intención de hacer un pedido SIN decir aún un producto específico, "
-                        . "DEBES llamar la tool `mostrar_catalogo` (le enviará un botón para abrir el catálogo dentro "
-                        . "de WhatsApp y armar su pedido). Si el cliente YA dijo exactamente qué quiere (ej. 'quiero 2 "
-                        . "de X'), NO la llames — sigue el flujo normal de pedido."];
+                        "🥩 PEDIDOS SOLO POR LA CARTA WEB (OBLIGATORIO, máxima prioridad):\n"
+                        . "Este negocio recibe TODOS los pedidos por su catálogo web. NUNCA tomes el pedido por el chat.\n"
+                        . "• SIEMPRE que el cliente quiera pedir algo, mencione un producto, diga que quiere un *domicilio*, "
+                        . "pregunte precios/qué hay, o muestre CUALQUIER intención de comprar → DEBES llamar la tool "
+                        . "`mostrar_catalogo` (le manda un botón para abrir el catálogo) y dile de forma corta y amable que "
+                        . "haga su pedido ahí, que es *muy fácil y rápido*.\n"
+                        . "• PROHIBIDO: pedir dirección, cédula o datos por el chat; validar cobertura por el chat; "
+                        . "reutilizar direcciones anteriores; listar productos o precios en texto; tomar el pedido tú.\n"
+                        . "• Solo usa texto para saludar, resolver una duda simple o dar horarios; para PEDIR, SIEMPRE el catálogo."];
                 }
             }
         } catch (\Throwable $e) { /* no bloquear el flujo */ }
@@ -2178,12 +2191,9 @@ TXT;
                     $toolChoiceInicial = ['type' => 'function', 'function' => ['name' => 'mostrar_catalogo']];
                     $razonForzado = 'catalogo_nativo_forzar_seleccion';
                 }
-            } elseif (!empty($cartaWebUrl) && empty($estadoActualBd?->productos) && !$this->mensajeEsPedidoConcreto($message)) {
-                // 🥩 Carta web: SOLO si es una consulta GENERAL ("qué tienen", "menú")
-                //    con el carrito vacío → FORZAR el botón del catálogo web.
-                //    Si el cliente ya mandó un pedido concreto (con cantidades, ej. lo que
-                //    vuelve del catálogo), NO forzamos: dejamos que se procese el pedido
-                //    y siga el flujo normal (cédula → HGI → datos → cobertura).
+            } elseif (!empty($cartaWebUrl)) {
+                // 🥩 Carta web: CUALQUIER intención de producto/pedido → SIEMPRE el botón
+                //    del catálogo. Este negocio no toma pedidos por chat.
                 $toolChoiceInicial = ['type' => 'function', 'function' => ['name' => 'mostrar_catalogo']];
                 $razonForzado = 'carta_web_forzar_boton';
             } else {
@@ -2193,6 +2203,7 @@ TXT;
                 ];
             }
         } elseif (
+            empty($cartaWebUrl) &&
             $datosFinalesEnTexto &&
             !empty($estadoActualBd?->direccion) &&
             $estadoActualBd?->metodo_entrega === \App\Models\ConversacionPedidoEstado::METODO_DOMICILIO &&
@@ -2209,7 +2220,7 @@ TXT;
                 'role' => 'system',
                 'content' => "🚨 El cliente dio una dirección de despacho ({$estadoActualBd->direccion}). INVOCA `validar_cobertura` con esa dirección AHORA. NO llames otras tools. NO respondas texto.",
             ];
-        } elseif ($datosFinalesEnTexto) {
+        } elseif (empty($cartaWebUrl) && $datosFinalesEnTexto) {
             // Cliente dio datos clave (recoger, dirección, pago) pero estado aún no completo
             // Forzamos required para que llame validar_cobertura/buscar_productos/etc según faltante
             $toolChoiceInicial = 'required';

@@ -49,9 +49,8 @@
   .search input::placeholder{color:#9aa2ac;font-weight:400}
 
   /* chips */
-  .chips{display:flex;gap:8px;overflow-x:auto;padding:6px 16px 12px;background:var(--bg);position:sticky;top:60px;z-index:5;scrollbar-width:none}
-  .chips::-webkit-scrollbar{display:none}
-  .chip{flex:0 0 auto;border:1px solid var(--line-2);background:var(--card);color:var(--ink-soft);font-weight:600;font-size:13px;padding:8px 15px;border-radius:999px;cursor:pointer;white-space:nowrap;transition:.15s;display:flex;align-items:center;gap:7px;font-family:var(--font)}
+  .chips{display:flex;flex-wrap:wrap;gap:7px;padding:8px 14px 12px;background:var(--bg);position:sticky;top:60px;z-index:5;justify-content:center}
+  .chip{border:1px solid var(--line-2);background:var(--card);color:var(--ink-soft);font-weight:600;font-size:12.5px;padding:8px 13px;border-radius:999px;cursor:pointer;white-space:nowrap;transition:.15s;display:flex;align-items:center;gap:6px;font-family:var(--font)}
   .chip i{font-size:12px}
   .chip[aria-selected="true"]{background:var(--brand);border-color:var(--brand);color:#fff;box-shadow:0 3px 10px color-mix(in srgb,var(--brand) 35%,transparent)}
 
