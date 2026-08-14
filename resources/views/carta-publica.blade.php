@@ -135,6 +135,16 @@
   .co-sug .pw{padding:7px 14px;font-size:10px;color:var(--ink-soft);text-align:right;background:#fafafa}
   /* ocultar el desplegable nativo de Google por si acaso aparece */
   .pac-container{display:none !important}
+  /* ── guía 1-2-3 + toast + resaltado del carrito ── */
+  .guia{margin:10px 16px 0;background:linear-gradient(135deg,var(--tint),#fff);border:1px solid var(--line-2);border-radius:14px;padding:12px 40px 12px 14px;position:relative;box-shadow:var(--shadow)}
+  .guia h4{margin:0 0 6px;font-size:13.5px;font-weight:800;color:var(--brand-2);display:flex;align-items:center;gap:6px}
+  .guia .pasos{font-size:12.5px;color:var(--ink);line-height:1.75}
+  .guia .x{position:absolute;top:8px;right:10px;background:transparent;border:0;color:var(--ink-soft);font-size:17px;cursor:pointer;line-height:1}
+  .toast{position:fixed;left:50%;bottom:92px;transform:translateX(-50%) translateY(16px);background:#111;color:#fff;padding:9px 17px;border-radius:999px;font-size:13px;font-weight:700;opacity:0;transition:.25s;z-index:40;pointer-events:none;max-width:90%;white-space:nowrap}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .cartbar.pulse button{animation:cbpulse 1.1s ease 2}
+  @keyframes cbpulse{0%,100%{transform:scale(1)}50%{transform:scale(1.045)}}
+
   /* ── toggle domicilio/recoger + selector de sede ── */
   .co-toggle{display:flex;gap:8px;margin-top:6px}
   .co-toggle .tg{flex:1;border:1.5px solid var(--line-2);background:var(--card);color:var(--ink-soft);font-weight:700;font-size:13.5px;padding:11px;border-radius:11px;cursor:pointer;font-family:var(--font)}
@@ -165,6 +175,16 @@
     </label>
   </div>
 
+  <div class="guia" id="guia">
+    <button class="x" onclick="cerrarGuia()" aria-label="Cerrar">✕</button>
+    <h4>🛒 Pedir es muy fácil</h4>
+    <div class="pasos">
+      1️⃣ Elige tus productos y toca <b>➕</b><br>
+      2️⃣ Toca <b>Enviar pedido</b> abajo<br>
+      3️⃣ Pon tus datos y ¡listo! 🎉
+    </div>
+  </div>
+
   <nav class="chips" id="chips"></nav>
   <main id="list"></main>
   <div class="empty" id="empty"><i class="fa-solid fa-magnifying-glass"></i>Sin resultados</div>
@@ -177,6 +197,7 @@
     </button>
   </div>
   <div class="wa-note" id="waNote">Este catálogo aún no tiene número de WhatsApp configurado.</div>
+  <div class="toast" id="toast"></div>
 
   {{-- ── Modal checkout ── --}}
   <div class="modal" id="checkout">
@@ -295,7 +316,11 @@ function render(){
   const cat=CATS.find(c=>c.id===active)||CATS[0];
   listEl.innerHTML=section(emo(cat.n),cat.n,PRODS.filter(p=>p.cid===cat.id));
 }
-function inc(id){cart[id]=(cart[id]||0)+1;refresh(id);}
+// 🎯 Guía + empujoncitos
+function cerrarGuia(){const g=document.getElementById('guia');if(g)g.style.display='none';try{localStorage.setItem('guia_hda','1');}catch(e){}}
+let toastT=null;
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),1500);}
+function inc(id){cart[id]=(cart[id]||0)+1;refresh(id);toast('¡Agregado ✓!');cerrarGuia();}
 function dec(id){cart[id]=(cart[id]||0)-1;if(cart[id]<=0)delete cart[id];refresh(id);}
 function refresh(id){const el=document.getElementById('it'+id);if(el)el.outerHTML=itemHTML(prodById[id]);updateCart();}
 function updateCart(){
@@ -304,7 +329,10 @@ function updateCart(){
   const total=ids.reduce((s,id)=>s+cart[id]*prodById[id].pr,0);
   document.getElementById('cartCount').textContent=count;
   document.getElementById('cartTotal').textContent=fmt(total);
-  document.getElementById('cartbar').classList.toggle('show',count>0);
+  const bar=document.getElementById('cartbar');
+  const estaba=bar.classList.contains('show');
+  bar.classList.toggle('show',count>0);
+  if(count>0&&!estaba){bar.classList.add('pulse');setTimeout(()=>bar.classList.remove('pulse'),2400);} // resalta al aparecer
 }
 function pedidoLineas(){
   const ids=Object.keys(cart);let total=0;
@@ -466,6 +494,7 @@ function scrollChipActivo(){
   const el=chipsEl.querySelector('.chip[aria-selected="true"]');
   if(el){ chipsEl.scrollLeft = el.offsetLeft - chipsEl.offsetLeft - 12; } // solo mueve la fila de chips, no la página
 }
+try{if(localStorage.getItem('guia_hda')){const g=document.getElementById('guia');if(g)g.style.display='none';}}catch(e){}
 buildChips();render();scrollChipActivo();
 </script>
 @if(!empty($mapsKey))

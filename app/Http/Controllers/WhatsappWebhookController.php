@@ -2290,7 +2290,7 @@ TXT;
                         ? substr((string) $connectionId, 5) : null;
                     $okCarta = $svcCarta->enviarBotonUrl(
                         $from,
-                        "🛒 Mira nuestro catálogo completo y arma tu pedido aquí 👇",
+                        "🛒 Arma tu pedido aquí 👇\n\nEs muy fácil:\n1️⃣ Elige tus productos y toca ➕\n2️⃣ Toca *Enviar pedido*\n3️⃣ Pon tus datos y ¡listo! 🎉",
                         "Ver catálogo",
                         $cartaWebUrl,
                         $tidCarta,
