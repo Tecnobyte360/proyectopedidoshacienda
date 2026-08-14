@@ -2018,9 +2018,13 @@ TXT;
                         if ($catDef) $toolsFiltradas[] = $catDef;
                     }
                     // 🚫 Este negocio recibe TODOS los pedidos por la carta web. Quitamos
-                    //    las tools de tomar pedido por chat para que la IA no lo intente.
+                    //    las tools de tomar pedido Y de listar productos por chat, para que
+                    //    la IA no tome pedidos ni enumere productos/precios en texto. Su
+                    //    única acción de producto es `mostrar_catalogo`.
                     $sinChat = ['validar_cobertura', 'agregar_producto_al_pedido', 'confirmar_pedido',
-                        'registrar_datos_cliente', 'consultar_zonas_cobertura', 'crear_adicion_pedido'];
+                        'registrar_datos_cliente', 'consultar_zonas_cobertura', 'crear_adicion_pedido',
+                        'buscar_productos', 'listar_categorias', 'productos_de_categoria',
+                        'productos_destacados', 'info_producto', 'enviar_imagen_producto', 'consultar_promociones'];
                     $toolsFiltradas = array_values(array_filter(
                         $toolsFiltradas,
                         fn ($t) => !in_array($t['function']['name'] ?? '', $sinChat, true)
@@ -2192,10 +2196,12 @@ TXT;
                     $razonForzado = 'catalogo_nativo_forzar_seleccion';
                 }
             } elseif (!empty($cartaWebUrl)) {
-                // 🥩 Carta web: CUALQUIER intención de producto/pedido → SIEMPRE el botón
-                //    del catálogo. Este negocio no toma pedidos por chat.
-                $toolChoiceInicial = ['type' => 'function', 'function' => ['name' => 'mostrar_catalogo']];
-                $razonForzado = 'carta_web_forzar_boton';
+                // 🥩 Carta web: NO forzamos. Dejamos que la IA decida según el prompt:
+                //    si es un ALIMENTO que vendemos → llama `mostrar_catalogo`; si es algo
+                //    que NO vendemos (ropa, etc.) → aclara en texto SIN mandar el catálogo.
+                //    (Solo tiene disponible `mostrar_catalogo` como acción de producto.)
+                $toolChoiceInicial = 'auto';
+                $razonForzado = 'carta_web_auto';
             } else {
                 $messages[] = [
                     'role' => 'system',
