@@ -64,7 +64,7 @@ class CartaPublicaController extends Controller
             ->where('tenant_id', $tenant->id)
             ->where('activo', true)
             ->where('precio_base', '>', 0)
-            ->select('id', 'categoria_id', 'nombre', 'descripcion_corta', 'unidad', 'precio_base', 'destacado', 'imagen_url')
+            ->select('id', 'categoria_id', 'nombre', 'descripcion_corta', 'unidad', 'precio_base', 'destacado', 'imagen_url', 'palabras_clave')
             ->orderByDesc('destacado')
             ->orderBy('nombre')
             ->get();
@@ -76,16 +76,23 @@ class CartaPublicaController extends Controller
             'cnt' => (int) $c->n,
         ])->values();
 
-        $prods = $productos->map(fn ($p) => [
-            'id'  => (int) $p->id,
-            'cid' => (int) $p->categoria_id,
-            'n'   => $p->nombre,
-            'ds'  => $p->descripcion_corta ? mb_substr($p->descripcion_corta, 0, 60) : null,
-            'u'   => $p->unidad ?: 'und',
-            'pr'  => (float) $p->precio_base,
-            'd'   => (bool) $p->destacado,
-            'img' => $p->imagen_url ?: null,
-        ])->values();
+        $prods = $productos->map(function ($p) {
+            // 🔎 palabras_clave (sinónimos populares) → string para buscar en el front
+            $kw = '';
+            $arr = json_decode((string) $p->palabras_clave, true);
+            if (is_array($arr)) $kw = mb_strtolower(implode(' ', $arr));
+            return [
+                'id'  => (int) $p->id,
+                'cid' => (int) $p->categoria_id,
+                'n'   => $p->nombre,
+                'ds'  => $p->descripcion_corta ? mb_substr($p->descripcion_corta, 0, 60) : null,
+                'u'   => $p->unidad ?: 'und',
+                'pr'  => (float) $p->precio_base,
+                'd'   => (bool) $p->destacado,
+                'img' => $p->imagen_url ?: null,
+                'kw'  => $kw,
+            ];
+        })->values();
 
         $waNumero = self::WA_NUMEROS[$slug] ?? null;
 
