@@ -296,8 +296,11 @@ class CartaPublicaController extends Controller
             $orderData['location']       = $sede->nombre ?? '';
             $orderData['sede_id']        = $sedeSel;
         } else {
-            // 🛵 Domicilio: dirección + cobertura + costo de envío.
-            $sedeId = \App\Models\Sede::where('tenant_id', $tenant->id)->where('activa', true)->value('id');
+            // 🛵 Domicilio: SIEMPRE se despacha desde Hacienda Selva (su consecutivo
+            //    HGI). Fallback a la primera sede activa si no existe "Selva".
+            $sedeId = \App\Models\Sede::where('tenant_id', $tenant->id)->where('activa', true)
+                        ->where('nombre', 'like', '%SELVA%')->value('id')
+                    ?: \App\Models\Sede::where('tenant_id', $tenant->id)->where('activa', true)->value('id');
             $orderData['metodo_entrega']     = 'domicilio';
             $orderData['address']            = $direccion;
             $orderData['location']           = '';

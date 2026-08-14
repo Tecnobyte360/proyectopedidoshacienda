@@ -256,7 +256,7 @@ function buildChips(){
     const b=document.createElement('button');
     b.className='chip';b.setAttribute('aria-selected',c.id===active);
     b.innerHTML=`<i class="fa-solid ${c.fa}"></i><span>${c.n}</span>`;
-    b.onclick=()=>{active=c.id;document.getElementById('q').value='';render();[...chipsEl.children].forEach((el,i)=>el.setAttribute('aria-selected',all[i].id===active));window.scrollTo({top:document.querySelector('main').offsetTop-6,behavior:'smooth'});};
+    b.onclick=()=>{active=c.id;document.getElementById('q').value='';render();[...chipsEl.children].forEach((el,i)=>el.setAttribute('aria-selected',all[i].id===active));};
     chipsEl.appendChild(b);
   });
 }
