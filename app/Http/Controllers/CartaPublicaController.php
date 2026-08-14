@@ -100,6 +100,14 @@ class CartaPublicaController extends Controller
         [$cPrim, $cSec] = self::COLORS[$slug]
             ?? [$tenant->color_primario ?: '#c1471f', $tenant->color_secundario ?: '#a3391a'];
 
+        // Sedes activas (para "recoger en sede")
+        $sedes = \App\Models\Sede::where('tenant_id', $tenant->id)
+            ->where('activa', true)
+            ->orderBy('nombre')
+            ->get(['id', 'nombre', 'direccion'])
+            ->map(fn ($s) => ['id' => (int) $s->id, 'n' => $s->nombre, 'd' => $s->direccion])
+            ->values();
+
         return view('carta-publica', [
             'tenant'      => $tenant,
             'categorias'  => $cats,
@@ -109,6 +117,7 @@ class CartaPublicaController extends Controller
             'colorPrim'   => $cPrim,
             'colorSec'    => $cSec,
             'mapsKey'     => $tenant->google_maps_activo ? ($tenant->google_maps_api_key ?: null) : null,
+            'sedes'       => $sedes,
         ]);
     }
 
@@ -232,12 +241,18 @@ class CartaPublicaController extends Controller
         $lng       = $request->input('lng');
         $costoEnvio = (float) $request->input('costo_envio', 0);
         $items     = $request->input('items', []);
+        $metodo    = $request->input('metodo_entrega', 'domicilio') === 'recoger' ? 'recoger' : 'domicilio';
+        $sedeSel   = (int) $request->input('sede_id', 0);
 
         if (strlen($cedula) < 5)   return response()->json(['ok' => false, 'msg' => 'Falta tu cédula.'], 422);
         if ($nombre === '')        return response()->json(['ok' => false, 'msg' => 'Falta el nombre.'], 422);
         if (strlen($cel) < 7)      return response()->json(['ok' => false, 'msg' => 'Falta el celular.'], 422);
-        if ($direccion === '')     return response()->json(['ok' => false, 'msg' => 'Falta la dirección.'], 422);
         if (empty($items) || !is_array($items)) return response()->json(['ok' => false, 'msg' => 'El carrito está vacío.'], 422);
+        if ($metodo === 'domicilio' && $direccion === '') return response()->json(['ok' => false, 'msg' => 'Falta la dirección.'], 422);
+        if ($metodo === 'recoger') {
+            $sedeOk = \App\Models\Sede::where('tenant_id', $tenant->id)->where('activa', true)->where('id', $sedeSel)->exists();
+            if (!$sedeOk) return response()->json(['ok' => false, 'msg' => 'Elige la sede donde vas a recoger.'], 422);
+        }
 
         // Teléfono internacional (Colombia): 10 dígitos que empiezan por 3 → +57.
         $tel = $cel;
@@ -262,27 +277,38 @@ class CartaPublicaController extends Controller
         }
         if (empty($products)) return response()->json(['ok' => false, 'msg' => 'Los productos no son válidos.'], 422);
 
-        $sedeId = \App\Models\Sede::where('tenant_id', $tenant->id)->where('activa', true)->value('id');
-
         $orderData = [
-            'products'           => $products,
-            'customer_name'      => $nombre,
-            'cedula'             => $cedula,
-            'phone'              => $tel,
-            'payment_method'     => 'efectivo',
-            'notes'              => '[PEDIDO DESDE CARTA WEB]',
-            'manual'             => true,
-            'metodo_entrega'     => 'domicilio',
-            'address'            => $direccion,
-            'location'           => '',
-            'shipping_cost'      => $costoEnvio,
-            'costo_envio'        => $costoEnvio,
-            'costo_envio_manual' => true,
+            'products'       => $products,
+            'customer_name'  => $nombre,
+            'cedula'         => $cedula,
+            'phone'          => $tel,
+            'payment_method' => 'efectivo',
+            'notes'          => '[PEDIDO DESDE CARTA WEB]',
+            'manual'         => true,
         ];
-        if ($sedeId) $orderData['sede_id'] = (int) $sedeId;
-        if (is_numeric($lat) && is_numeric($lng)) {
-            $orderData['location_lat'] = (float) $lat;
-            $orderData['location_lng'] = (float) $lng;
+
+        if ($metodo === 'recoger') {
+            // 🏪 Recoger en sede: sin dirección, sin costo de envío.
+            $sede = \App\Models\Sede::where('tenant_id', $tenant->id)->find($sedeSel);
+            $orderData['metodo_entrega'] = 'recoger';
+            $orderData['pickup']         = true;
+            $orderData['address']        = '';
+            $orderData['location']       = $sede->nombre ?? '';
+            $orderData['sede_id']        = $sedeSel;
+        } else {
+            // 🛵 Domicilio: dirección + cobertura + costo de envío.
+            $sedeId = \App\Models\Sede::where('tenant_id', $tenant->id)->where('activa', true)->value('id');
+            $orderData['metodo_entrega']     = 'domicilio';
+            $orderData['address']            = $direccion;
+            $orderData['location']           = '';
+            $orderData['shipping_cost']      = $costoEnvio;
+            $orderData['costo_envio']        = $costoEnvio;
+            $orderData['costo_envio_manual'] = true;
+            if ($sedeId) $orderData['sede_id'] = (int) $sedeId;
+            if (is_numeric($lat) && is_numeric($lng)) {
+                $orderData['location_lat'] = (float) $lat;
+                $orderData['location_lng'] = (float) $lng;
+            }
         }
 
         try {

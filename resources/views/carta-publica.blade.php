@@ -133,6 +133,16 @@
   .co-sug .pw{padding:7px 14px;font-size:10px;color:var(--ink-soft);text-align:right;background:#fafafa}
   /* ocultar el desplegable nativo de Google por si acaso aparece */
   .pac-container{display:none !important}
+  /* ── toggle domicilio/recoger + selector de sede ── */
+  .co-toggle{display:flex;gap:8px;margin-top:6px}
+  .co-toggle .tg{flex:1;border:1.5px solid var(--line-2);background:var(--card);color:var(--ink-soft);font-weight:700;font-size:13.5px;padding:11px;border-radius:11px;cursor:pointer;font-family:var(--font)}
+  .co-toggle .tg.on{background:var(--brand);border-color:var(--brand);color:#fff;box-shadow:0 3px 10px color-mix(in srgb,var(--brand) 30%,transparent)}
+  .co-sede{border:1.5px solid var(--line-2);background:var(--card);border-radius:11px;padding:11px 13px;margin-top:8px;cursor:pointer;display:flex;gap:11px;align-items:flex-start}
+  .co-sede.on{border-color:var(--brand);box-shadow:0 0 0 1px var(--brand)}
+  .co-sede .rd{width:18px;height:18px;border-radius:50%;border:2px solid var(--line-2);flex-shrink:0;margin-top:1px}
+  .co-sede.on .rd{border-color:var(--brand);background:radial-gradient(circle,var(--brand) 42%,#fff 46%)}
+  .co-sede .nm{font-weight:700;font-size:13.5px;color:var(--ink)}
+  .co-sede .dr{font-size:12px;color:var(--ink-soft);margin-top:2px}
 </style>
 </head>
 <body>
@@ -191,9 +201,24 @@
           <input class="co-input" id="coNombre" placeholder="Nombre y apellido">
           <div class="co-label">Celular de contacto</div>
           <input class="co-input" id="coCel" inputmode="numeric" placeholder="30xxxxxxxx">
-          <div class="co-label">Dirección de entrega</div>
-          <input class="co-input" id="coDir" placeholder="Escribe y elige tu dirección" autocomplete="off">
-          <div class="co-sug hiddenx" id="coSug"></div>
+
+          <div class="co-label">¿Cómo lo quieres?</div>
+          <div class="co-toggle">
+            <button type="button" class="tg on" id="tgDom" onclick="setMetodo('domicilio')">🛵 A domicilio</button>
+            <button type="button" class="tg" id="tgRec" onclick="setMetodo('recoger')">🏪 Recoger en sede</button>
+          </div>
+
+          <div id="coDomWrap">
+            <div class="co-label">Dirección de entrega</div>
+            <input class="co-input" id="coDir" placeholder="Escribe y elige tu dirección" autocomplete="off">
+            <div class="co-sug hiddenx" id="coSug"></div>
+          </div>
+
+          <div id="coRecWrap" class="hiddenx">
+            <div class="co-label">Sede donde vas a recoger</div>
+            <div id="coSedes"></div>
+          </div>
+
           <div class="co-hint" id="coCobHint" style="display:none"></div>
           <button class="co-btn wa" id="coEnviar" onclick="enviarFinal()"><i class="fa-brands fa-whatsapp"></i> Enviar pedido</button>
         </div>
@@ -205,9 +230,12 @@
 const SLUG=@json($tenant->slug);
 const CSRF=document.querySelector('meta[name=csrf-token]').content;
 const MAPS_KEY=@json($mapsKey ?? null);
+const SEDES=@json($sedes ?? []);
 let CLIENTE={existe:null,nombre:'',telefono:'',direccion:''};
 let COBERTURA=null;
 let PLACE_COORDS=null; // lat/lng cuando el cliente elige una sugerencia de Google
+let METODO='domicilio';
+let SEDE_SEL=null;
 </script>
 <script>
 const TENANT=@json($tenant->nombre), WA=@json($waNumero), CATS=@json($categorias), PRODS=@json($productos);
@@ -337,22 +365,49 @@ async function validarCobertura(){
     hint.className='co-hint warn';hint.innerHTML=res.mensaje||'😕 Esa dirección está fuera de cobertura. Puedes recoger en sede.';hint.style.display='block';
   }
 }
+function setMetodo(m){
+  METODO=m;
+  document.getElementById('tgDom').classList.toggle('on',m==='domicilio');
+  document.getElementById('tgRec').classList.toggle('on',m==='recoger');
+  document.getElementById('coDomWrap').classList.toggle('hiddenx',m!=='domicilio');
+  document.getElementById('coRecWrap').classList.toggle('hiddenx',m!=='recoger');
+  document.getElementById('coCobHint').style.display='none';
+  if(m==='recoger'){ renderSedes(); } // recoger no necesita cobertura
+}
+function renderSedes(){
+  const box=document.getElementById('coSedes');
+  if(box.dataset.done)return;
+  box.innerHTML=(SEDES&&SEDES.length)
+    ? SEDES.map(s=>`<div class="co-sede" data-id="${s.id}" onclick="elegirSede(${s.id})"><div class="rd"></div><div><div class="nm">${s.n}</div>${s.d?`<div class="dr">${s.d}</div>`:''}</div></div>`).join('')
+    : '<div class="co-hint warn" style="display:block">No hay sedes disponibles para recoger.</div>';
+  box.dataset.done='1';
+}
+function elegirSede(id){
+  SEDE_SEL=id;
+  document.querySelectorAll('#coSedes .co-sede').forEach(el=>el.classList.toggle('on',Number(el.dataset.id)===id));
+}
 async function enviarFinal(){
   const nombre=(document.getElementById('coNombre').value||'').trim();
   const cel=(document.getElementById('coCel').value||'').trim();
-  const dir=(document.getElementById('coDir').value||'').trim();
   const hint=document.getElementById('coCobHint');
   const err=m=>{hint.className='co-hint err';hint.innerHTML=m;hint.style.display='block';};
   if(!CLIENTE.cedula){err('Escribe tu cédula arriba para continuar.');return;}
   if(!nombre){err('Falta tu nombre.');return;}
   if(cel.replace(/\D+/g,'').length<7){err('Falta tu celular.');return;}
-  if(dir.length<5){err('Falta tu dirección.');return;}
   const items=Object.keys(cart).map(id=>({id:Number(id),qty:cart[id]}));
   if(!items.length){err('Tu carrito está vacío.');return;}
+  const body={cedula:CLIENTE.cedula,nombre,celular:cel,items,metodo_entrega:METODO};
+  if(METODO==='domicilio'){
+    const dir=(document.getElementById('coDir').value||'').trim();
+    if(dir.length<5){err('Falta tu dirección.');return;}
+    body.direccion=dir;
+    body.costo_envio=(COBERTURA&&COBERTURA.cubierta&&COBERTURA.costo!=null)?COBERTURA.costo:0;
+    if(PLACE_COORDS){body.lat=PLACE_COORDS.lat;body.lng=PLACE_COORDS.lng;}
+  }else{
+    if(!SEDE_SEL){err('Elige la sede donde vas a recoger.');return;}
+    body.sede_id=SEDE_SEL;
+  }
   const btn=document.getElementById('coEnviar');btn.disabled=true;btn.innerHTML='<span class="spin"></span> Enviando pedido…';
-  const body={cedula:CLIENTE.cedula,nombre,celular:cel,direccion:dir,items,
-    costo_envio:(COBERTURA&&COBERTURA.cubierta&&COBERTURA.costo!=null)?COBERTURA.costo:0};
-  if(PLACE_COORDS){body.lat=PLACE_COORDS.lat;body.lng=PLACE_COORDS.lng;}
   let res;try{res=await apiCarta('pedido',body);}catch(e){res={ok:false,msg:'Error de conexión.'};}
   if(!res.ok){btn.disabled=false;btn.innerHTML='<i class="fa-brands fa-whatsapp"></i> Enviar pedido';err(res.msg||'No se pudo crear el pedido.');return;}
   document.querySelector('#checkout .sheet-body').innerHTML=`
